@@ -60,6 +60,12 @@ def init_db(db_name: str = DB_NAME, caminho_excel: str = CAMINHO_EXCEL):
                 quantidade INTEGER, finalidade TEXT, data_baixa TEXT
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS preferencias_usuario (
+                usuario TEXT PRIMARY KEY,
+                atalhos_excluidos TEXT DEFAULT '[]'
+            )
+        """)
 
         colunas_extras_veiculos = [
             ("foto_carro", "TEXT DEFAULT ''"),
@@ -236,3 +242,42 @@ def salvar_dados_seguro(dataframe: pd.DataFrame, db_name: str = DB_NAME, caminho
     except Exception as e:
         st.error(f"⚠️ Erro ao salvar dados: {e}")
         return False
+
+
+def carregar_atalhos_excluidos_usuario(db_name: str, usuario: str) -> list:
+    import json
+    usr_key = limpar_texto(usuario, "NETTO").upper()
+    try:
+        with get_db_connection(db_name) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS preferencias_usuario (usuario TEXT PRIMARY KEY, atalhos_excluidos TEXT DEFAULT '[]')"
+            )
+            cur.execute("SELECT atalhos_excluidos FROM preferencias_usuario WHERE usuario = ?", (usr_key,))
+            row = cur.fetchone()
+            if row and row[0]:
+                dados = json.loads(row[0])
+                if isinstance(dados, list):
+                    return dados
+    except Exception:
+        pass
+    return []
+
+
+def salvar_atalhos_excluidos_usuario(db_name: str, usuario: str, excluidos: list) -> None:
+    import json
+    usr_key = limpar_texto(usuario, "NETTO").upper()
+    try:
+        with get_db_connection(db_name) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS preferencias_usuario (usuario TEXT PRIMARY KEY, atalhos_excluidos TEXT DEFAULT '[]')"
+            )
+            cur.execute(
+                "INSERT INTO preferencias_usuario (usuario, atalhos_excluidos) VALUES (?, ?) "
+                "ON CONFLICT(usuario) DO UPDATE SET atalhos_excluidos = excluded.atalhos_excluidos",
+                (usr_key, json.dumps(excluidos, ensure_ascii=False)),
+            )
+            conn.commit()
+    except Exception:
+        pass

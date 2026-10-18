@@ -86,10 +86,18 @@ if not st.session_state.autenticado:
     st.stop()
 
 # Barra Lateral e Navegação Modular
+if st.sidebar.button(
+    "◀️ Esconder Aba Lateral Esquerda",
+    key="btn_sidebar_esconder_interno",
+    use_container_width=True,
+):
+    st.session_state.aba_lateral_oculta = True
+    st.rerun()
+
 st.sidebar.markdown(f"### 👤 Utilizador: {st.session_state.utilizador}")
 st.sidebar.markdown(f"**Perfil:** `{st.session_state.perfil}`")
 
-if st.sidebar.button("🔄 Trocar de Técnico / Sair", type="secondary"):
+if st.sidebar.button("🔄 Trocar de Técnico / Sair", type="secondary", use_container_width=True):
     st.session_state.autenticado = False
     st.rerun()
 
@@ -175,8 +183,14 @@ with col_logo:
     elif os.path.exists("emed1.jpg"):
         st.image("emed1.jpg", use_container_width=True)
 
-# Grade de Ícones Estilo Área de Trabalho do Windows (Navegação 1-Toque para Celular e PC)
-renderizar_area_trabalho_icones(opcoes_menu, st.session_state.menu_acao_ativa, st.session_state.perfil)
+# Grade de Ícones Estilo Área de Trabalho do Windows (Navegação 1-Toque e Edição por Utilizador)
+renderizar_area_trabalho_icones(
+    opcoes_menu,
+    st.session_state.menu_acao_ativa,
+    st.session_state.perfil,
+    usuario_atual=st.session_state.utilizador,
+    db_name=DB_NAME,
+)
 
 acao = st.session_state.menu_acao_ativa
 

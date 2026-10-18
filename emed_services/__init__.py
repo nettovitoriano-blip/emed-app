@@ -13,6 +13,8 @@ from emed_services.repositories import (
     carregar_baixas_consumiveis,
     montar_equipa_tecnica,
     salvar_dados_seguro,
+    carregar_atalhos_excluidos_usuario,
+    salvar_atalhos_excluidos_usuario,
 )
 from emed_services.domain_utils import (
     calcular_distancia,
@@ -37,6 +39,8 @@ __all__ = [
     "carregar_baixas_consumiveis",
     "montar_equipa_tecnica",
     "salvar_dados_seguro",
+    "carregar_atalhos_excluidos_usuario",
+    "salvar_atalhos_excluidos_usuario",
     "calcular_distancia",
     "formatar_tempo",
     "obter_icone_equipamento",

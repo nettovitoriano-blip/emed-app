@@ -28,158 +28,163 @@ def _selecionar_atalho_desktop(opcao_escolhida: str):
     st.session_state.nav_sync_id = st.session_state.get("nav_sync_id", 0) + 1
 
 
-def _injetar_barra_vertical_sidebar():
-    """Injeta uma barra vertical retrátil idêntica à barra horizontal do expander,
-    colada na borda da aba lateral esquerda para fechar e abrir a aba com 1 toque no celular ou PC.
+def _alternar_aba_lateral():
+    """Alterna o estado visível/oculto da aba lateral esquerda."""
+    st.session_state.aba_lateral_oculta = not st.session_state.get("aba_lateral_oculta", False)
+
+
+def renderizar_area_trabalho_icones(
+    opcoes_menu: list,
+    acao_atual: str,
+    perfil_atual: str,
+    usuario_atual: str = "NETTO",
+    db_name: str = "",
+):
+    """Renderiza:
+    1. O botão em barra para Esconder/Mostrar a Aba Lateral Esquerda (igual à barra horizontal).
+    2. A Área de Trabalho Rápida com edição personalizada por utilizador (permitindo excluir/ocultar
+       qualquer botão superior para deixar a tela mais clean, sem nunca remover os itens da aba lateral).
     """
-    html_barra_vertical = """
-    <script>
-    (function() {
-        try {
-            const parentDoc = window.parent.document;
-            if (!parentDoc || !parentDoc.body) return;
+    from emed_services import (
+        DB_NAME as DEFAULT_DB_NAME,
+        carregar_atalhos_excluidos_usuario,
+        salvar_atalhos_excluidos_usuario,
+    )
 
-            let bar = parentDoc.getElementById('emed-vertical-sidebar-bar');
-            if (!bar) {
-                bar = parentDoc.createElement('div');
-                bar.id = 'emed-vertical-sidebar-bar';
-                bar.title = 'Clique em qualquer ponto desta barra vertical para Fechar ou Abrir a Aba Lateral';
-                parentDoc.body.appendChild(bar);
+    caminho_db = db_name or DEFAULT_DB_NAME
+    usr_key = limpar_texto(usuario_atual, "NETTO").upper()
+
+    if "aba_lateral_oculta" not in st.session_state:
+        st.session_state.aba_lateral_oculta = False
+
+    if st.session_state.aba_lateral_oculta:
+        st.markdown(
+            """
+            <style>
+            section[data-testid="stSidebar"] {
+                display: none !important;
+                width: 0px !important;
+                min-width: 0px !important;
+                max-width: 0px !important;
             }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
 
-            bar.style.cssText = [
-                'position: fixed',
-                'top: 16vh',
-                'height: 68vh',
-                'width: 28px',
-                'background-color: #1c2541',
-                'border: 1.5px solid #3a506b',
-                'border-right: 2px solid #64dfdf',
-                'border-left: none',
-                'border-radius: 0 10px 10px 0',
-                'z-index: 999998',
-                'cursor: pointer',
-                'display: flex',
-                'flex-direction: column',
-                'align-items: center',
-                'justify-content: space-between',
-                'padding: 14px 0',
-                'box-shadow: 4px 0 14px rgba(0, 0, 0, 0.6)',
-                'transition: left 0.18s ease, background-color 0.18s ease, width 0.15s ease',
-                'user-select: none',
-                '-webkit-user-select: none'
-            ].join(';');
+    # Barra Superior de Controle da Aba Lateral Esquerda (estilo barra retrátil igual à horizontal)
+    rotulo_barra_lateral = (
+        "▶️ MOSTRAR ABA LATERAL ESQUERDA (ABRIR MENU COMPLETO)"
+        if st.session_state.aba_lateral_oculta
+        else "◀️ ESCONDER ABA LATERAL ESQUERDA (DEIXAR ÁREA DE TRABALHO MAIS CLEAN)"
+    )
+    st.button(
+        rotulo_barra_lateral,
+        key="btn_barra_toggle_sidebar_main",
+        type="primary" if st.session_state.aba_lateral_oculta else "secondary",
+        use_container_width=True,
+        on_click=_alternar_aba_lateral,
+    )
 
-            function isSidebarOpen() {
-                const sb = parentDoc.querySelector('section[data-testid="stSidebar"]');
-                if (!sb) return false;
-                const expanded = sb.getAttribute('aria-expanded');
-                const rect = sb.getBoundingClientRect();
-                return expanded === 'true' && rect.right > 60;
-            }
-
-            function atualizarEstadoVisual() {
-                const sb = parentDoc.querySelector('section[data-testid="stSidebar"]');
-                const aberta = isSidebarOpen();
-                if (aberta && sb) {
-                    const rect = sb.getBoundingClientRect();
-                    bar.style.left = Math.max(0, Math.floor(rect.right - 2)) + 'px';
-                    bar.innerHTML = `
-                        <span style="color:#64dfdf; font-size:13px; font-weight:bold;">❮</span>
-                        <span style="writing-mode:vertical-rl; transform:rotate(180deg); color:#64dfdf; font-family:sans-serif; font-size:11px; font-weight:700; letter-spacing:1.2px; white-space:nowrap;">
-                            🖥️ ABA LATERAL — TOQUE P/ FECHAR
-                        </span>
-                        <span style="color:#64dfdf; font-size:13px; font-weight:bold;">❮</span>
-                    `;
-                } else {
-                    bar.style.left = '0px';
-                    bar.innerHTML = `
-                        <span style="color:#64dfdf; font-size:13px; font-weight:bold;">❯</span>
-                        <span style="writing-mode:vertical-rl; transform:rotate(180deg); color:#64dfdf; font-family:sans-serif; font-size:11px; font-weight:700; letter-spacing:1.2px; white-space:nowrap;">
-                            🖥️ ABA LATERAL — TOQUE P/ ABRIR
-                        </span>
-                        <span style="color:#64dfdf; font-size:13px; font-weight:bold;">❯</span>
-                    `;
-                }
-            }
-
-            bar.onmouseenter = function() {
-                bar.style.backgroundColor = '#25335a';
-                bar.style.width = '32px';
-            };
-            bar.onmouseleave = function() {
-                bar.style.backgroundColor = '#1c2541';
-                bar.style.width = '28px';
-            };
-
-            bar.onclick = function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                const aberta = isSidebarOpen();
-                if (aberta) {
-                    const btnClose = parentDoc.querySelector('[data-testid="stSidebarCollapseButton"] button')
-                        || parentDoc.querySelector('button[data-testid="stSidebarCollapseButton"]')
-                        || parentDoc.querySelector('[data-testid="stSidebarHeader"] button')
-                        || parentDoc.querySelector('section[data-testid="stSidebar"] button');
-                    if (btnClose) btnClose.click();
-                } else {
-                    const btnOpen = parentDoc.querySelector('button[data-testid="stExpandSidebarButton"]')
-                        || parentDoc.querySelector('[data-testid="stExpandSidebarButton"] button')
-                        || parentDoc.querySelector('[data-testid="stExpandSidebarButton"]')
-                        || parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"] button')
-                        || parentDoc.querySelector('[data-testid="collapsedControl"] button');
-                    if (btnOpen) btnOpen.click();
-                }
-                setTimeout(atualizarEstadoVisual, 60);
-                setTimeout(atualizarEstadoVisual, 220);
-                setTimeout(atualizarEstadoVisual, 450);
-            };
-
-            atualizarEstadoVisual();
-            if (window.parent._emedSidebarInterval) {
-                clearInterval(window.parent._emedSidebarInterval);
-            }
-            window.parent._emedSidebarInterval = setInterval(atualizarEstadoVisual, 250);
-        } catch (err) {
-            console.log('Aviso barra vertical:', err);
-        }
-    })();
-    </script>
-    """
-    components.html(html_barra_vertical, height=0)
-
-
-def renderizar_area_trabalho_icones(opcoes_menu: list, acao_atual: str, perfil_atual: str):
-    """Renderiza uma grade de ícones estilo Área de Trabalho do Windows / App Launcher
-    para facilitar a navegação rápida com 1 toque no celular e no computador, além da barra vertical da sidebar.
-    """
-    _injetar_barra_vertical_sidebar()
+    excluidos_usuario = carregar_atalhos_excluidos_usuario(caminho_db, usr_key)
+    opcoes_visiveis = [op for op in opcoes_menu if op not in excluidos_usuario]
 
     with st.expander(
         "🖥️ ÁREA DE TRABALHO RÁPIDA (ÍCONES DE ATALHO — TOQUE PARA ABRIR / RECOLHER)",
         expanded=True,
     ):
-        st.caption(
-            "💡 **Navegação Rápida (Celular & PC):** Toque diretamente num ícone abaixo para mudar de módulo (ou use a barra vertical na borda esquerda para fechar/abrir o menu lateral):"
-        )
-        colunas_por_linha = 4 if perfil_atual == "Gestor" else 3
-        cols = st.columns(colunas_por_linha)
-        for idx, opcao in enumerate(opcoes_menu):
-            icone, rotulo_curto = ATALHOS_DESKTOP_META.get(opcao, ("📌", opcao))
-            ativo = opcao == acao_atual
-            prefixo_ativo = "🟢 " if ativo else ""
-            with cols[idx % colunas_por_linha]:
-                clicou = st.button(
-                    f"{prefixo_ativo}{icone} {rotulo_curto}",
-                    key=f"desk_tile_{idx}",
-                    type="primary" if ativo else "secondary",
-                    use_container_width=True,
-                    on_click=_selecionar_atalho_desktop,
-                    args=(opcao,),
-                )
-                if clicou and st.session_state.get("menu_acao_ativa") != opcao:
-                    _selecionar_atalho_desktop(opcao)
-                    st.rerun()
+        col_info, col_edit = st.columns([3.2, 1.3])
+        with col_info:
+            st.caption(
+                f"💡 **Atalhos de `{usr_key}`:** Toque num botão para abrir o módulo. "
+                "*(Os botões da aba lateral esquerda são fixos e nunca são removidos)*"
+            )
+        with col_edit:
+            modo_edicao = st.toggle(
+                f"🛠️ Editar / Excluir Botões ({usr_key})",
+                value=st.session_state.get("modo_edicao_atalhos", False),
+                key="toggle_modo_edicao_atalhos",
+            )
+            st.session_state.modo_edicao_atalhos = modo_edicao
+
+        if modo_edicao:
+            st.info(
+                f"✏️ **Modo de Personalização ({usr_key}):** Clique em **❌** ao lado de qualquer botão abaixo para "
+                "excluí-lo da sua página principal e deixar a área de trabalho mais clean. "
+                "Na aba lateral esquerda todos os menus continuarão sempre disponíveis."
+            )
+
+        if not opcoes_visiveis:
+            st.caption(
+                "✨ Todos os botões superiores foram ocultados para deixar a sua Área de Trabalho clean! "
+                "Use a Aba Lateral Esquerda ou ative **🛠️ Editar / Excluir Botões** acima para restaurar atalhos."
+            )
+        else:
+            colunas_por_linha = 3 if modo_edicao else (4 if perfil_atual == "Gestor" else 3)
+            cols = st.columns(colunas_por_linha)
+            for idx, opcao in enumerate(opcoes_visiveis):
+                icone, rotulo_curto = ATALHOS_DESKTOP_META.get(opcao, ("📌", opcao))
+                ativo = opcao == acao_atual
+                prefixo_ativo = "🟢 " if ativo else ""
+                idx_global = opcoes_menu.index(opcao)
+                with cols[idx % colunas_por_linha]:
+                    if modo_edicao:
+                        c_btn, c_del = st.columns([4.2, 1.0])
+                        with c_btn:
+                            clicou = st.button(
+                                f"{prefixo_ativo}{icone} {rotulo_curto}",
+                                key=f"desk_tile_{idx_global}",
+                                type="primary" if ativo else "secondary",
+                                use_container_width=True,
+                                on_click=_selecionar_atalho_desktop,
+                                args=(opcao,),
+                            )
+                            if clicou and st.session_state.get("menu_acao_ativa") != opcao:
+                                _selecionar_atalho_desktop(opcao)
+                                st.rerun()
+                        with c_del:
+                            if st.button(
+                                "❌",
+                                key=f"del_tile_{idx_global}",
+                                help=f"Excluir '{rotulo_curto}' da página principal de {usr_key}",
+                                use_container_width=True,
+                            ):
+                                nova_lista = list(set(excluidos_usuario + [opcao]))
+                                salvar_atalhos_excluidos_usuario(caminho_db, usr_key, nova_lista)
+                                st.rerun()
+                    else:
+                        clicou = st.button(
+                            f"{prefixo_ativo}{icone} {rotulo_curto}",
+                            key=f"desk_tile_{idx_global}",
+                            type="primary" if ativo else "secondary",
+                            use_container_width=True,
+                            on_click=_selecionar_atalho_desktop,
+                            args=(opcao,),
+                        )
+                        if clicou and st.session_state.get("menu_acao_ativa") != opcao:
+                            _selecionar_atalho_desktop(opcao)
+                            st.rerun()
+
+        if modo_edicao and excluidos_usuario:
+            st.markdown("---")
+            st.caption(f"📦 **Botões ocultados da Área de Trabalho de `{usr_key}` (clique para restaurar):**")
+            cols_rest = st.columns(4)
+            excluidos_validos = [op for op in excluidos_usuario if op in opcoes_menu]
+            for r_idx, op_exc in enumerate(excluidos_validos):
+                icone_e, rot_e = ATALHOS_DESKTOP_META.get(op_exc, ("📌", op_exc))
+                with cols_rest[r_idx % 4]:
+                    if st.button(
+                        f"➕ Restaurar: {icone_e} {rot_e}",
+                        key=f"rest_tile_{r_idx}",
+                        use_container_width=True,
+                    ):
+                        nova_lista = [x for x in excluidos_usuario if x != op_exc]
+                        salvar_atalhos_excluidos_usuario(caminho_db, usr_key, nova_lista)
+                        st.rerun()
+
+            if st.button("🔄 Restaurar Todos os Botões Padrão da Área de Trabalho", key="btn_restaurar_todos_atalhos"):
+                salvar_atalhos_excluidos_usuario(caminho_db, usr_key, [])
+                st.rerun()
 
 
 def estilizar_grafico(fig):
