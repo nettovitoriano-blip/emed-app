@@ -1,0 +1,45 @@
+from emed_services.context import AppContext
+from emed_services.repositories import (
+    BASE_DIR,
+    DB_NAME,
+    CAMINHO_EXCEL,
+    init_db,
+    carregar_dados,
+    carregar_tecnicos,
+    carregar_veiculos,
+    carregar_estoque,
+    carregar_clientes_internos,
+    carregar_solicitacoes,
+    carregar_baixas_consumiveis,
+    montar_equipa_tecnica,
+    salvar_dados_seguro,
+)
+from emed_services.domain_utils import (
+    calcular_distancia,
+    formatar_tempo,
+    obter_icone_equipamento,
+    classificar_pendencia,
+    calcular_duracao_os,
+)
+
+__all__ = [
+    "AppContext",
+    "BASE_DIR",
+    "DB_NAME",
+    "CAMINHO_EXCEL",
+    "init_db",
+    "carregar_dados",
+    "carregar_tecnicos",
+    "carregar_veiculos",
+    "carregar_estoque",
+    "carregar_clientes_internos",
+    "carregar_solicitacoes",
+    "carregar_baixas_consumiveis",
+    "montar_equipa_tecnica",
+    "salvar_dados_seguro",
+    "calcular_distancia",
+    "formatar_tempo",
+    "obter_icone_equipamento",
+    "classificar_pendencia",
+    "calcular_duracao_os",
+]

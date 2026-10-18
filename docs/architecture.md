@@ -258,3 +258,116 @@ O núcleo transacional e de regras de domínio está desacoplado no módulo `eme
 3. **Ciclo Circular de Manutenção Preventiva (`sugerir_proxima_etapa_preventiva` & `agendar_proxima_etapa_circular`):**
    - Inspeciona o histórico do equipamento para sugerir automaticamente a próxima etapa (`ETAPA 1 ➔ ETAPA 2 ➔ ETAPA 3 ➔ ETAPA 1`) na abertura de chamado e permite agendar automaticamente (+30 dias) a próxima etapa ao concluir uma preventiva, sem duplicar agendamentos ativos.
 
+---
+
+## 7. Diagnóstico do Monólito de Orquestração (`app_emed.py`) e Blueprint de Modularização (SoC / SRP)
+
+### 7.1 Diagnóstico Arquitetural: Por que `app_emed.py` (~3.396 linhas) ainda opera como um Monólito de Interface?
+Embora a extração do [`emed_core.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_core.py) (460 linhas) tenha desacoplado as transações SQLite e as regras de negócio críticas, o arquivo [`app_emed.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/app_emed.py) permanece com **3.396 linhas** atuando como um *God Script* (Monólito Procedural de Interface e Orquestração).
+
+A anatomia atual do [`app_emed.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/app_emed.py) mistura **5 camadas de responsabilidade distintas** no mesmo escopo léxico:
+
+| Camada / Responsabilidade | Linhas em `app_emed.py` | Volume Aprox. | Acoplamento e Sintomas de Manutenibilidade |
+| :--- | :--- | :--- | :--- |
+| **1. Tema & Injeção CSS BaseWeb** | `L40–L300` | ~260 linhas | Bloco estático de CSS misturado ao bootstrap da aplicação. |
+| **2. Bootstrap DB, Seed & Cache Data Access** | `L309–L532` | ~225 linhas | `init_db()`, 7 funções `@st.cache_data` (`carregar_dados`, `carregar_estoque`, etc.) e wrapper `salvar_dados_seguro`. |
+| **3. Utilitários, Componentes Visuais & PWA Offline** | `L534–L978` | ~445 linhas | Funções matemáticas/geográficas (`calcular_distancia`), componentes Canvas (`renderizar_quadro_assinatura_cliente`), tema Plotly (`estilizar_grafico`) e 225 linhas de template HTML/JS inline (`gerar_html_coletor_offline`). |
+| **4. Portal QR Externo, Autenticação & Router** | `L980–L1205` | ~225 linhas | Interceptação de `?equipamento_qr=`, login RBAC em `st.session_state`, barra lateral e carregamento de variáveis globais (`df`, `EQUIPA_TECNICA`, `FROTA`). |
+| **5. Views Monolíticas (`if/elif acao == ...`)** | `L1206–L3396` | ~2.190 linhas | **13 módulos de negócio** encadeados em uma única árvore condicional `if/elif`, compartilhando variáveis mutáveis em escopo global. |
+
+#### Principais Riscos Técnicos do Formato Atual:
+1. **Poluição de Escopo Global e Efeitos Colaterais:** As 13 telas dentro da cadeia `if/elif acao == ...` leem e sobrescrevem variáveis globais carregadas no topo do script (`df`, `EQUIPA_TECNICA`, `FROTA`, `usuario_atual`, `perfil_atual`) e usam nomes genéricos (`c1, c2, c3`, `row`, `idx`), aumentando o risco de colisão de variáveis.
+2. **Hipertrofia de Módulos Críticos:** Apenas o bloco `elif acao == "🎫 Abertura de Chamados & OS":` (`L1955–L2670`) concentra **716 linhas contínuas** com 3 sub-abas complexas (Novo Chamado + Despacho + Execução de OS + Gerador de PDF/HTML + Coletor Offline), dificultando testes isolados e manutenção evolutiva.
+3. **Templates Estáticos Embutidos em Código Python:** Mais de **500 linhas** do arquivo são strings literais de CSS (`L40–L300`) e HTML/JS (`gerar_html_coletor_offline` em `L753–L978` e geradores de Laudo Técnico), prejudicando lint, syntax highlighting e leitura do código Python.
+
+---
+
+### 7.2 Arquitetura Alvo: Modularização por Divisão de Responsabilidades (SoC & SRP)
+
+Para transformar o sistema em uma arquitetura limpa, testável e de fácil manutenção — **sem alterar nenhuma regra de negócio ou funcionalidade existente (Regra de Ouro)** — a estrutura deve evoluir de um script monolítico para pacotes coesos divididos por **Camadas Horizontais (`core`, `services`, `ui`)** e **Fatias Verticais de Domínio (`views`)**:
+
+```mermaid
+flowchart TD
+    Entry["app_emed.py (~140 linhas)<br/>Entrypoint, Auth, QR Interceptor & View Router"]
+    
+    subgraph UI["Camada de Apresentação & Recursos (emed_ui/)"]
+        Styles["styles.py<br/>Tema Escuro & CSS BaseWeb"]
+        Components["components.py<br/>Assinatura Canvas, Rubrica, Plotly Theme"]
+        Templates["offline_pwa.py & print_templates.py<br/>HTML/JS do Coletor Offline & Laudos"]
+    end
+
+    subgraph Views["Camada de Domínios / Telas (emed_views/)"]
+        V1["mural_despacho.py (Mural & Pendências Técnico)"]
+        V2["bi_analytics.py (Gráficos & BI)"]
+        V3["comercial_orcamentos.py (Follow-up Comercial)"]
+        V4["clientes_parque.py (Parque, Preventivas & QR)"]
+        V5["chamados_os.py (Abertura, Despacho & Execução OS)"]
+        V6["logistica_estoque.py (Solicitações, Estoque & Rotas)"]
+        V7["administracao.py (RBAC, Equipe, Frota & Auditoria)"]
+    end
+
+    subgraph Services["Camada de Serviços & Estado (emed_services/)"]
+        Repo["repositories.py<br/>init_db(), @st.cache_data loaders & salvar_dados_seguro()"]
+        Utils["domain_utils.py<br/>Haversine, SLA, Duração OS, Classificação"]
+    end
+
+    subgraph Core["Núcleo Transacional & Regras Puras"]
+        EmedCore["emed_core.py (460 linhas)<br/>SQLite WAL, PK Imutável, Idempotência & Ciclos Circulares"]
+    end
+
+    Entry --> UI
+    Entry --> Views
+    Views --> UI
+    Views --> Services
+    Services --> Core
+    Views --> Core
+```
+
+---
+
+### 7.3 Mapa Detalhado de Desacoplamento Implementado
+
+| Módulo Implementado | Responsabilidade Única (SRP) | Linhas Reais |
+| :--- | :--- | :--- |
+| **[`app_emed.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/app_emed.py)** | Entrypoint (`st.set_page_config`), autenticação RBAC, barra lateral, *hook* plugável para `emed_fiscal.py` e roteamento O(1) via `VIEW_ROUTER[acao](ctx)`. | 145 linhas |
+| **[`emed_core.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_core.py)** | Persistência transacional SQLite WAL, PK imutável, sincronização offline idempotente e ciclos circulares de negócio. | 460 linhas |
+| **[`emed_services/context.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_services/context.py)** | Contrato tipado `AppContext` (`@dataclass`) para injeção explícita de dependências sem variáveis globais. | 20 linhas |
+| **[`emed_services/repositories.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_services/repositories.py)** | Inicialização/migração de tabelas e *seed* (`init_db`), leituras cacheadas (`@st.cache_data`) e persistência (`salvar_dados_seguro`). | 228 linhas |
+| **[`emed_services/domain_utils.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_services/domain_utils.py)** | Funções puras de cálculo geográfico (`calcular_distancia`), formatação de SLA/tempo (`formatar_tempo`, `calcular_duracao_os`), ícones e classificação de pendências. | 70 linhas |
+| **[`emed_ui/styles.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_ui/styles.py)** | Injeção isolada do CSS de alta especificidade (`inject_custom_css()`). | 262 linhas |
+| **[`emed_ui/components.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_ui/components.py)** | Componentes reutilizáveis de UI: `estilizar_grafico`, `renderizar_rubrica_tecnico` e `renderizar_quadro_assinatura_cliente`. | 156 linhas |
+| **[`emed_ui/offline_pwa.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_ui/offline_pwa.py)** | Geração desacoplada do aplicativo HTML5/JS de coleta offline (`gerar_html_coletor_offline`). | 230 linhas |
+| **[`emed_views/portal_qr.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_views/portal_qr.py)** | Interceptador e portal externo de atendimento via etiqueta QR Code (`verificar_e_renderizar_portal_qr`). | 136 linhas |
+| **[`emed_views/mural_despacho.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_views/mural_despacho.py)** | Views `📊 Mural & Despacho WhatsApp` (`render_mural_despacho`) e `📋 Minhas Pendências (Técnico)` (`render_minhas_pendencias`). | 226 linhas |
+| **[`emed_views/bi_analytics.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_views/bi_analytics.py)** | View `📈 Gráficos & BI` (`render_graficos_bi`). | 139 linhas |
+| **[`emed_views/comercial_orcamentos.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_views/comercial_orcamentos.py)** | View `⏳ Follow-up de Orçamentos` (`render_followup_orcamentos`). | 80 linhas |
+| **[`emed_views/clientes_parque.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_views/clientes_parque.py)** | View `👥 Clientes & Equipamentos` (`render_clientes_equipamentos`). | 322 linhas |
+| **[`emed_views/chamados_os.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_views/chamados_os.py)** | View `🎫 Abertura de Chamados & OS` dividida em 4 sub-renderizadores: `_render_modo_offline`, `_render_criar_nova_os`, `_render_historico_concluidas` e `_render_execucao_os_ativas`. | 745 linhas |
+| **[`emed_views/logistica_estoque.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_views/logistica_estoque.py)** | Views `🚨 Gestão de Pendências`, `📦 Solicitação de Peças & Ferramentas`, `🗺️ Mapa & Planeamento de Rotas` e `📦 Gestão de Estoque & Peças`. | 435 linhas |
+| **[`emed_views/administracao.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_views/administracao.py)** | Views `⚙️ Gestão & Administração`, `🚗 Atualizar Quilometragem (Opcional)` e `📝 Editor Direto da Planilha`. | 314 linhas |
+| **[`emed_fiscal.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_fiscal.py)** | Módulo Fiscal desacoplado (`FiscalProvider`, `MockProvider`, `FiscalManager` e view `🧾 Faturamento & Notas Fiscais` com emissão idempotente e estorno circular). | 428 linhas |
+
+---
+
+### 7.4 Contrato de Injeção de Contexto (`AppContext`), Roteamento O(1) e Integração Fiscal (`emed_fiscal.py`)
+
+Cada *View* recebe uma instância tipada de [`AppContext`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_services/context.py#L6-L20):
+
+```python
+@dataclass
+class AppContext:
+    base_dir: str
+    db_name: str
+    caminho_excel: str
+    hoje: pd.Timestamp
+    usuario_atual: str
+    perfil_atual: str
+    df: pd.DataFrame
+    df_tecnicos: pd.DataFrame
+    df_veiculos: pd.DataFrame
+    df_estoque: pd.DataFrame
+    df_internos: pd.DataFrame
+    equipa_tecnica: Dict[str, Dict[str, Any]]
+```
+
+No [`app_emed.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/app_emed.py#L115-L124), o roteador conecta automaticamente o módulo [`emed_fiscal.py`](file:///C:/Users/vitor/OneDrive/Desktop/Sistema%20Emed/emed_fiscal.py), exibindo a aba `🧾 Faturamento & Notas Fiscais` na barra lateral e injetando `(db_name, usuario_atual, perfil_atual)`.
