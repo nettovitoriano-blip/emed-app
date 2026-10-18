@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>EMED - Sistema de Gestão de Preventivas e Corretivas</title>
+    <style>
+        :root { --primary: #0f172a; --accent: #0284c7; --success: #10b981; --warning: #f59e0b; --danger: #ef4444; --bg: #f8fafc; --card-bg: #ffffff; --text: #334155; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding: 20px; }
+        header { display: flex; justify-content: space-between; align-items: center; background: var(--primary); color: white; padding: 15px 30px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .logo-area { display: flex; align-items: center; gap: 20px; }
+        .logo-area img { height: 65px; background: #ffffff; padding: 6px 12px; border-radius: 8px; box-shadow: 0 3px 6px rgba(0,0,0,0.25); object-fit: contain; }
+        header h1 { font-size: 22px; font-weight: 600; }
+        header .badge { background: var(--accent); padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: 600; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .stat-card { background: var(--card-bg); padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-left: 5px solid var(--accent); display: flex; flex-direction: column; }
+        .stat-card.success { border-left-color: var(--success); }
+        .stat-card.warning { border-left-color: var(--warning); }
+        .stat-card.danger { border-left-color: var(--danger); }
+        .stat-card h3 { font-size: 12px; color: #64748b; margin-bottom: 8px; text-transform: uppercase; }
+        .stat-card .value { font-size: 24px; font-weight: 700; color: var(--primary); }
+        .main-container { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; }
+        @media(max-width: 1024px) { .main-container { grid-template-columns: 1fr; } }
+        .card { background: var(--card-bg); border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        .card h2 { font-size: 18px; color: var(--primary); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+        th, td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f8fafc; color: #475569; font-weight: 600; }
+        tr:hover { background: #f1f5f9; }
+        .tag { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; display: inline-block; }
+        .tag.preventiva { background: #dbeafe; color: #1e40af; }
+        .tag.corretiva { background: #fee2e2; color: #991b1b; }
+        .tag.urgente { background: #fef3c7; color: #92400e; }
+        .alerta-item { background: #fff7ed; border: 1px solid #ffedd5; border-left: 4px solid var(--warning); border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 13px; color: #9a3412; }
+        .pendencia-item { background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid var(--warning); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+        .despacho-card { background: #f0fdf4; border: 1px solid #bbf7d0; border-left: 4px solid var(--success); border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+        .btn-zap { display: inline-block; background: #25d366; color: white; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; }
+        .cluster-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+        .cluster-box h4 { color: var(--accent); margin-bottom: 8px; font-size: 15px; }
+        .cluster-box ul { padding-left: 20px; font-size: 13px; color: #475569; }
+        .checklist-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; margin-top: 12px; }
+        .checklist-box h5 { color: #166534; margin-bottom: 5px; font-size: 13px; }
+        .checklist-box ul { padding-left: 18px; font-size: 12px; color: #15803d; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo-area">
+            <img src="emed1.jpg" alt="Logo EMED" onerror="this.style.display='none'">
+            <h1>EMED Eletromedicina — Mural de Operações</h1>
+        </div>
+        <div class="badge">Despacho Inteligente de Campo</div>
+    </header>
+
+    <div class="stats-grid">
+        <div class="stat-card"><h3>Total Equipamentos</h3><div class="value">14</div></div>
+        <div class="stat-card warning"><h3>⚠️ Alertas (15d)</h3><div class="value">7</div></div>
+        <div class="stat-card success"><h3>✅ Confirmados</h3><div class="value">1</div></div>
+        <div class="stat-card" style="border-left-color: #f59e0b;"><h3>Com Pendências</h3><div class="value">4</div></div>
+    </div>
+
+    <div class="main-container">
+        <div>
+            <div class="card" style="border-top: 4px solid var(--success);">
+                <h2>💬 Despacho de Cronogramas via WhatsApp para Técnicos</h2>
+                
+        <div class="despacho-card">
+            <h4>👷 Técnico: Netto <span>(1 Atendimentos Confirmados)</span></h4>
+            <ul><li><b>18/10/2026</b> — Hospital Sao Carlos (Fortaleza) [Compacto plus 300]<br>
+                <small>📍 Avenida Pontes Vieira, 2531 - Dionisio Torres, Fotaleza<br>👤 Resp: Sra. Damares (5585996197923.0) | 
+                <a href="https://www.google.com/maps/search/?api=1&query=Hospital%20Sao%20Carlos%20Avenida%20Pontes%20Vieira%2C%202531%20-%20Dionisio%20Torres%2C%20Fotaleza" target="_blank">🗺️ Maps</a> | 
+                <a href="https://waze.com/ul?q=Hospital%20Sao%20Carlos%20Avenida%20Pontes%20Vieira%2C%202531%20-%20Dionisio%20Torres%2C%20Fotaleza&navigate=yes" target="_blank">🚗 Waze</a></small>
+            </li><br>
+            </ul>
+            <div style="margin-top: 12px;">
+                <a href="https://wa.me/558599991502730?text=Ol%C3%A1%20Netto%2C%20aqui%20est%C3%A1%20o%20seu%20cronograma%20oficial%20de%20atendimentos%20EMED%20confirmados%3A%0A%0A%F0%9F%8F%A5%20Cliente%3A%20Hospital%20Sao%20Carlos%20%28Fortaleza-CE%29%0A%F0%9F%93%8D%20Endere%C3%A7o%3A%20Avenida%20Pontes%20Vieira%2C%202531%20-%20Dionisio%20Torres%2C%20Fotaleza%0A%F0%9F%91%A4%20Respons%C3%A1vel%3A%20Sra.%20Damares%20%285585996197923.0%29%0A%E2%9A%99%EF%B8%8F%20Equipamento%3A%20Compacto%20plus%20300%0A%F0%9F%93%85%20Data%20Agendada%3A%2018/10/2026%0A%F0%9F%97%BA%EF%B8%8F%20Google%20Maps%3A%20https%3A//www.google.com/maps/search/%3Fapi%3D1%26query%3DHospital%2520Sao%2520Carlos%2520Avenida%2520Pontes%2520Vieira%252C%25202531%2520-%2520Dionisio%2520Torres%252C%2520Fotaleza%0A%F0%9F%9A%97%20Waze%3A%20https%3A//waze.com/ul%3Fq%3DHospital%2520Sao%2520Carlos%2520Avenida%2520Pontes%2520Vieira%252C%25202531%2520-%2520Dionisio%2520Torres%252C%2520Fotaleza%26navigate%3Dyes%0A%E2%9A%A0%EF%B8%8F%20Pend%C3%AAncias%3A%20%C3%A9%20necessraio%20substituir%20o%20botao%20da%20pera%0A-----------------------------------%0A" target="_blank" class="btn-zap">💬 Enviar Cronograma via WhatsApp</a>
+            </div>
+        </div>
+            </div>
+            <div class="card" style="border-top: 4px solid var(--warning);">
+                <h2>⏰ Central de Alertas (Ligar para Agendamento - 15 dias)</h2>
+                
+            <div class="alerta-item">
+                <strong>📞 LIGAR PARA AGENDAMENTO: Hospital Sao Carlos (Fortaleza - CE)</strong>
+                <p>Equipamento: Compacto plus 300 | Data Limite: <strong>18/10/2026</strong> (Faltam 6 dias)</p>
+                <div style="font-size: 11px; margin-top: 4px; color: #9a3412;">Técnico Responsável: Netto | Confirmado: <b>sim</b></div>
+            </div>
+            <div class="alerta-item">
+                <strong>📞 LIGAR PARA AGENDAMENTO: CLEMIR ARAIS (Juazeiro - CE)</strong>
+                <p>Equipamento: RX XR6000 (salesiano). | Data Limite: <strong>14/10/2026</strong> (Faltam 2 dias)</p>
+                <div style="font-size: 11px; margin-top: 4px; color: #9a3412;">Técnico Responsável: Antonio Matos | Confirmado: <b>nao</b></div>
+            </div>
+            <div class="alerta-item">
+                <strong>📞 LIGAR PARA AGENDAMENTO: CLEMIR ARAIS (Juazeiro - CE)</strong>
+                <p>Equipamento: MM (salesiano). | Data Limite: <strong>20/10/2026</strong> (Faltam 8 dias)</p>
+                <div style="font-size: 11px; margin-top: 4px; color: #9a3412;">Técnico Responsável: Marquinhos | Confirmado: <b>nao</b></div>
+            </div>
+            <div class="alerta-item">
+                <strong>📞 LIGAR PARA AGENDAMENTO: CLINICA IMEDIATA (ARARIPINA - PE)</strong>
+                <p>Equipamento: RX VMI COMPACTO 500 | Data Limite: <strong>16/10/2026</strong> (Faltam 4 dias)</p>
+                <div style="font-size: 11px; margin-top: 4px; color: #9a3412;">Técnico Responsável: Gabriel | Confirmado: <b>nao</b></div>
+            </div>
+            <div class="alerta-item">
+                <strong>📞 LIGAR PARA AGENDAMENTO: CLINICA IMEDIATA (ARARIPINA - PE)</strong>
+                <p>Equipamento: DO | Data Limite: <strong>16/10/2026</strong> (Faltam 4 dias)</p>
+                <div style="font-size: 11px; margin-top: 4px; color: #9a3412;">Técnico Responsável: Leonardo | Confirmado: <b>nao</b></div>
+            </div>
+            <div class="alerta-item">
+                <strong>📞 LIGAR PARA AGENDAMENTO: CLINICA IMEDIATA (ARARIPINA - PE)</strong>
+                <p>Equipamento: MM SIEMENS | Data Limite: <strong>16/10/2026</strong> (Faltam 4 dias)</p>
+                <div style="font-size: 11px; margin-top: 4px; color: #9a3412;">Técnico Responsável: Yasmim | Confirmado: <b>nao</b></div>
+            </div>
+            <div class="alerta-item">
+                <strong>📞 LIGAR PARA AGENDAMENTO: UDI PETROLINA (PETROLINA - PE)</strong>
+                <p>Equipamento: TC BRIGTHSPEED | Data Limite: <strong>19/10/2026</strong> (Faltam 7 dias)</p>
+                <div style="font-size: 11px; margin-top: 4px; color: #9a3412;">Técnico Responsável: Netto | Confirmado: <b>nao</b></div>
+            </div>
+            </div>
+            <div class="card" style="border-top: 4px solid var(--warning);">
+                <h2>⚠️ Peças e Substituições Pendentes</h2>
+                
+            <div class="pendencia-item">
+                <div class="pendencia-header">
+                    <strong>Hospital Sao Carlos</strong> (Fortaleza - CE)
+                    <span class="tag urgente">Compacto plus 300</span>
+                </div>
+                <p><strong>Peças / Substituições:</strong> é necessraio substituir o botao da pera</p>
+                <div class="pendencia-footer">Técnico: Netto</div>
+            </div>
+            <div class="pendencia-item">
+                <div class="pendencia-header">
+                    <strong>Hospital Uniclinic</strong> (Fortaleza - CE)
+                    <span class="tag urgente">RX FIXO ALTUS</span>
+                </div>
+                <p><strong>Peças / Substituições:</strong> levar peso para balancear a estativa porta tubo.</p>
+                <div class="pendencia-footer">Técnico: Arquimedes</div>
+            </div>
+            <div class="pendencia-item">
+                <div class="pendencia-header">
+                    <strong>Hospital Uniclinic</strong> (Fortaleza - CE)
+                    <span class="tag urgente">RX FIXO PHILIPS</span>
+                </div>
+                <p><strong>Peças / Substituições:</strong> substituir teclado de membrana</p>
+                <div class="pendencia-footer">Técnico: Tony</div>
+            </div>
+            <div class="pendencia-item">
+                <div class="pendencia-header">
+                    <strong>UDI PETROLINA</strong> (PETROLINA - PE)
+                    <span class="tag urgente">TC BRIGTHSPEED</span>
+                </div>
+                <p><strong>Peças / Substituições:</strong> Solicitar nobreak</p>
+                <div class="pendencia-footer">Técnico: Netto</div>
+            </div>
+            </div>
+            <div class="card">
+                <h2>📋 Carteira de Equipamentos & Histórico Técnico</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Cliente / Obs</th>
+                            <th>Cidade/UF</th>
+                            <th>Equipamento</th>
+                            <th>Última Prev. / Técnico</th>
+                            <th>Data Agendamento</th>
+                            <th>Resp. / Contato</th>
+                            <th>Conf.</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        
+        <tr>
+            <td><strong>Hospital Sao Carlos</strong><br><small style="color:#64748b">End: Avenida Pontes Vieira, 2531 - Dionisio Torres, Fotaleza</small></td>
+            <td>Fortaleza - CE</td>
+            <td>Compacto plus 300</td>
+            <td>13/09/2026<br><small style="color:#475569">Por: Netto</small></td>
+            <td><strong>18/10/2026</strong> <span class="tag urgente">⚠️ Ligar (15d)</span></td>
+            <td>Netto<br><small>Resp: Sra. Damares (5585996197923.0)</small></td>
+            <td><span class="tag preventiva">Conf: sim</span></td>
+            <td><span class="tag urgente">nan</span></td>
+        </tr>
+        <tr>
+            <td><strong>Hospital Uniclinic</strong><br><small style="color:#64748b">End: Fortaleza - CE</small></td>
+            <td>Fortaleza - CE</td>
+            <td>RX FIXO ALTUS</td>
+            <td>14/09/2026<br><small style="color:#475569">Por: Arquimedes</small></td>
+            <td><strong>23/11/2026</strong> </td>
+            <td>Arquimedes<br><small>Resp: Não informado ()</small></td>
+            <td><span class="tag urgente">Conf: nao</span></td>
+            <td><span class="tag preventiva">nan</span></td>
+        </tr>
+        <tr>
+            <td><strong>Hospital Uniclinic</strong><br><small style="color:#64748b">End: Fortaleza - CE</small></td>
+            <td>Fortaleza - CE</td>
+            <td>RX FIXO PHILIPS</td>
+            <td>15/09/2026<br><small style="color:#475569">Por: Tony</small></td>
+            <td><strong>20/11/2026</strong> </td>
+            <td>Tony<br><small>Resp: Não informado ()</small></td>
+            <td><span class="tag urgente">Conf: nao</span></td>
+            <td><span class="tag preventiva">nan</span></td>
+        </tr>
+        <tr>
+            <td><strong>Hospital Uniclinic</strong><br><small style="color:#64748b">End: Fortaleza - CE</small></td>
+            <td>Fortaleza - CE</td>
+            <td>RX FIXO ALTUS</td>
+            <td>16/09/2026<br><small style="color:#475569">Por: Antonio Matos</small></td>
+            <td><strong>30/11/2026</strong> </td>
+            <td>Antonio Matos<br><small>Resp: Não informado ()</small></td>
+            <td><span class="tag urgente">Conf: nao</span></td>
+            <td><span class="tag preventiva">nan</span></td>
+        </tr>
+        <tr>
+            <td><strong>Hospital Uniclinic</strong><br><small style="color:#64748b">End: Fortaleza - CE</small></td>
+            <td>Fortaleza - CE</td>
+            <td>RX TRANSP VMI</td>
+            <td>17/09/2026<br><small style="color:#475569">Por: Marquinhos</small></td>
+            <td><strong>05/12/2026</strong> </td>
+            <td>Marquinhos<br><small>Resp: Não informado ()</small></td>
+            <td><span class="tag urgente">Conf: nao</span></td>
+            <td><span class="tag preventiva">nan</span></td>
+        </tr>
+        <tr>
+            <td><strong>CLEMIR ARAIS</strong><br><small style="color:#64748b">End: Juazeiro - CE</small></td>
+            <td>Juazeiro - CE</td>
+            <td>DO (patio).</td>
+            <td>18/09/2026<br><small style="color:#475569">Por: Gabriel</small></td>
+            <td><strong>05/12/2026</strong> </td>
+            <td>Gabriel<br><small>Resp: Não informado ()</small></td>
+            <td><span class="tag urgente">Conf: nao</span></td>
+            <td><span class="tag preventiva">nan</span></td>
+        </tr>
+        <tr>
+            <td><strong>CLEMIR ARAIS</strong><br><small style="color:#64748b">End: Juazeiro - CE</small></td>
+            <td>Juazeiro - CE</td>
+            <td>MM (patio).</td>
+            <td>19/09/2026<br><small style="color:#475569">Por: Paulo</small></td>
+            <td><strong>01/01/1970</strong> </td>
+            <td>Paulo<br><small>Resp: Não informado ()</small></td>
+            <td><span class="tag urgente">Conf: nao</span></td>
+            <td><span class="tag preventiva">nan</span></td>
+        </tr>
+        <tr>
+            <td><strong>CLEMIR ARAIS</strong><br><small style="color:#64748b">End: Juazeiro - CE</small></td>
+            <td>Juazeiro - CE</td>
+            <td>DO (salesiano).</td>
+            <td>20/09/2026<br><small style="color:#475569">Por: Yasmim</small></td>
+            <td><strong>01/12/2026</strong> </td>
+            <td>Yasmim<br><small>Resp: Não informado ()</small></td>
+            <td><span class="tag urgente">Conf: nao</span></td>
+            <td><span class="tag preventiva">nan</span></td>
+        </tr>
+        <tr>
+            <td><strong>CLEMIR ARAIS</strong><br><small style="color:#64748b">End: Juazeiro - CE</small></td>
+            <td>Juazeiro - CE</td>
+            <td>RX XR6000 (salesiano).</td>
+            <td>21/09/2026<br><small style="color:#475569">Por: Antonio Matos</small></td>
+            <td><strong>14/10/2026</strong> <span class="tag urgente">⚠️ Ligar (15d)</span></td>
+            <td>Antonio Matos<br><small>Resp: Não informado ()</small></td>
+            <td><span class="tag urgente">Conf: nao</span></td>
+            <td><span class="tag urgente">nan</span></td>
+        </tr>
+        <tr>
+            <td><strong>CLEMIR ARAIS</strong><br><small style="color:#64748b">End: Juazeiro - CE</small></td>
+            <td>Juazeiro - CE</td>
+            <td>MM (salesiano).</td>
+            <td>22/09/2026<br><small style="color:#475569">Por: Marquinhos</small></td>
+            <td><strong>20/10/2026</strong> <span class="tag urgente">⚠️ Ligar (15d)</span></td>
+            <td>Marquinhos<br><small>Resp: Não informado ()</small></td>
+            <td><span class="tag urgente">Conf: nao</span></td>
+            <td><span class="tag urgente">nan</span></td>
+        </tr>
+        <tr>
+            <td><strong>CLINICA IMEDIATA</strong><br><small style="color:#64748b">End: ARARIPINA - PE</small></td>
+            <td>ARARIPINA - PE</td>
+            <td>RX VMI COMPACTO 500</td>
+            <td>23/09/2026<br><small style="color:#475569">Por: Gabriel</small></td>
+            <td><strong>16/10/2026</strong> <span class="tag urgente">⚠️ Ligar (15d)</span></td>
+            <td>Gabriel<br><small>Resp: Não informado ()</small></td>
+            <td><span class="tag urgente">Conf: nao</span></td>
+            <td><span class="tag urgente">nan</span></td>
+        </tr>
+        <tr>
+            <td><strong>CLINICA IMEDIATA</strong><br><small style="color:#64748b">End: ARARIPINA - PE</small></td>
+            <td>ARARIPINA - PE</td>
+            <td>DO</td>
+            <td>24/09/2026<br><small style="color:#475569">Por: Leonardo</small></td>
+            <td><strong>16/10/2026</strong> <span class="tag urgente">⚠️ Ligar (15d)</span></td>
+            <td>Leonardo<br><small>Resp: Não informado ()</small></td>
+            <td><span class="tag urgente">Conf: nao</span></td>
+            <td><span class="tag urgente">nan</span></td>
+        </tr>
+        <tr>
+            <td><strong>CLINICA IMEDIATA</strong><br><small style="color:#64748b">End: ARARIPINA - PE</small></td>
+            <td>ARARIPINA - PE</td>
+            <td>MM SIEMENS</td>
+            <td>25/09/2026<br><small style="color:#475569">Por: Yasmim</small></td>
+            <td><strong>16/10/2026</strong> <span class="tag urgente">⚠️ Ligar (15d)</span></td>
+            <td>Yasmim<br><small>Resp: Não informado ()</small></td>
+            <td><span class="tag urgente">Conf: nao</span></td>
+            <td><span class="tag urgente">nan</span></td>
+        </tr>
+        <tr>
+            <td><strong>UDI PETROLINA</strong><br><small style="color:#64748b">End: PETROLINA - PE</small></td>
+            <td>PETROLINA - PE</td>
+            <td>TC BRIGTHSPEED</td>
+            <td>26/09/2026<br><small style="color:#475569">Por: NETTO</small></td>
+            <td><strong>19/10/2026</strong> <span class="tag urgente">⚠️ Ligar (15d)</span></td>
+            <td>Netto<br><small>Resp: Não informado ()</small></td>
+            <td><span class="tag urgente">Conf: nao</span></td>
+            <td><span class="tag urgente">nan</span></td>
+        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div>
+            <div class="card">
+                <h2>🗺️ Clusters e Logística de Viagem</h2>
+                <div class="cluster-box">
+                    <h4>📍 Fortaleza - CE</h4>
+                    <ul><li>Hospitais e Clínicas da Capital</li></ul>
+                    <div class="checklist-box">
+                        <h5>🛠️ Kit Técnico Base:</h5>
+                        <ul><li>Multímetro True RMS e Osciloscópio</li><li>Fusíveis de gerador e filtros de ar</li></ul>
+                    </div>
+                </div>
+                <div class="cluster-box">
+                    <h4>📍 Juazeiro do Norte - CE</h4>
+                    <ul><li>Atendimento regional sul</li></ul>
+                    <div class="checklist-box">
+                        <h5>🛠️ Kit Técnico Base:</h5>
+                        <ul><li>Nível digital e placa de teste</li></ul>
+                    </div>
+                </div>
+                <div class="cluster-box">
+                    <h4>📍 Araripina - PE</h4>
+                    <ul><li>Atendimento regional oeste (Corretivas)</li></ul>
+                    <div class="checklist-box">
+                        <h5>🛠️ Kit Corretivo:</h5>
+                        <ul><li>Osciloscópio portátil para alta tensão</li></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

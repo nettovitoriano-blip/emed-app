@@ -1,0 +1,1564 @@
+Analisei o teu código linha por linha, Netto. Ele está muito bem estruturado e com ótimas funcionalidades (Check-in/Check-out, POP/IT, Assinaturas, Waze/Maps e Gestão de Frota), mas encontrei 4 armadilhas críticas que estavam a impedir os gráficos de aparecerem ou a causar bugs silenciosos:
+
+🔍 O que encontrei na verificação:
+Aba de Gráficos "Invisível" (Código Morto): No menu lateral, a opção chama-se "📊 Mural & Despacho WhatsApp", mas logo abaixo tinhas um elif acao == "📊 Mural & Despacho Inteligente via WhatsApp":. Como esse segundo nome não existia no menu lateral, o Python nunca entrava nessa parte onde estavam os teus gráficos! Além disso, a primeira parte do Mural terminava na variável whatsapp_link sem mostrar o botão nem a caixa de texto na tela.
+
+Perda de Dados ao Reiniciar (Sincronização do Excel): Na função init_db_e_migrar(), o código lia o base_clientes.xlsx e fazia if_exists='replace' no SQLite toda vez que o script rodava. Se o Excel alguma vez corrompesse (BadZipFile) ou falhasse ao salvar, ou se editasses algo só no banco, podias perder atualizações. Ajustei para que o SQLite seja soberano e só importe do Excel se o banco estiver vazio, protegendo contra ficheiros corrompidos.
+
+Caracteres Invisíveis (NBSP): O código que colaste tinha dezenas de espaços invisíveis (\xa0), que no VS Code causam aqueles sublinhados vermelhos misteriosos de indentação. Limpei todos eles.
+
+Upgrade nos Gráficos: Unifiquei os dois blocos do Mural num só! Agora, logo ao abrir a primeira aba, tens os 4 cartões de métricas no topo, seguidos de uma secção completa de Gráficos Operacionais (Por Tipo de Serviço, Volume por Técnico, Status das OS e Cidades atendidas) e, logo abaixo, o Despacho Consolidado com botão direto para o WhatsApp (com links de Google Maps e Waze incluídos) e o Resumo para o Grupo Geral.
+
+🚀 Código Completo, Limpo e com Gráficos Implementados (app_emed.py)
+Copia todo o código abaixo, substitui no teu app_emed.py e guarda com Ctrl + S:
+
+Python
+import streamlit as st
+import pandas as pd
+import datetime
+import os
+import urllib.parse
+import math
+import sqlite3
+
+# Configuração da Página do Sistema EMED com Tema Escuro Nativo
+st.set_page_config(
+    page_title="EMED - Gestão de Equipamentos e Frota",
+    page_icon="🏥",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# ----------------------------------------------------
+# ESTILIZAÇÃO CSS CUSTOMIZADA (TEMA ESCURO & FLUIDEZ)
+# ----------------------------------------------------
+st.markdown("""
+    <style>
+    .stApp {
+        background-color: #0b132b;
+        color: #ffffff;
+    }
+    
+    [data-testid="stSidebar"] {
+        background-color: #1c2541;
+        border-right: 1px solid #3a506b;
+    }
+    [data-testid="stSidebar"] .stRadio label {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        font-size: 15px !important;
+    }
+    [data-testid="stSidebar"] p, [data-testid="stSidebar"] span {
+        color: #cbd5e1 !important;
+    }
+
+    .stButton button {
+        background-color: #1c2541 !important;
+        color: #ffffff !important;
+        border: 1px solid #3a506b !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+    }
+    .stButton button:hover {
+        background-color: #3a506b !important;
+        border-color: #64dfdf !important;
+        color: #64dfdf !important;
+    }
+
+    .client-card {
+        background-color: #1c2541;
+        border: 1px solid #3a506b;
+        border-radius: 12px;
+        padding: 18px;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    .client-card h3 {
+        color: #64dfdf;
+        margin-top: 0;
+        font-size: 18px;
+        font-family: 'Courier New', Courier, monospace;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+    }
+    .client-card p {
+        color: #cbd5e1;
+        margin: 4px 0;
+        font-size: 14px;
+    }
+
+    .stTextInput input, .stSelectbox select, .stDateInput input, .stTextArea textarea {
+        background-color: #1c2541 !important;
+        color: white !important;
+        border: 1px solid #3a506b !important;
+        border-radius: 8px !important;
+        text-transform: uppercase !important;
+    }
+    
+    h1, h2, h3, h4, h5, h6 {
+        color: #ffffff !important;
+    }
+    
+    p, span, label {
+        color: #e2e8f0;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# ----------------------------------------------------
+# CONFIGURAÇÃO DA BASE DE DADOS SQLITE & RESTAURAÇÃO DE LINHAS
+# ----------------------------------------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_NAME = os.path.join(BASE_DIR, "emed.db")
+CAMINHO_EXCEL = os.path.join(BASE_DIR, "base_clientes.xlsx")
+
+def init_db_e_migrar():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS clientes_equipamentos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cliente TEXT,
+            cidade TEXT,
+            estado TEXT,
+            equipamento TEXT,
+            tipo_servico TEXT,
+            tecnico_responsavel TEXT,
+            telefone_tecnico TEXT,
+            confirmado TEXT,
+            data_agendamento TEXT,
+            endereco TEXT,
+            responsavel_hospital TEXT,
+            contato_responsavel TEXT,
+            pendencias TEXT,
+            status TEXT
+        )
+    """)
+
+    colunas_novas = [
+        ("checkin_hora", "TEXT"),
+        ("checkout_hora", "TEXT"),
+        ("tempo_atendimento", "TEXT"),
+        ("checklist_pop", "TEXT"),
+        ("assinatura_cliente", "TEXT"),
+        ("assinatura_tecnico", "TEXT"),
+        ("pre_atendimento", "TEXT"),
+        ("foto_evidencia", "TEXT")
+    ]
+    cursor.execute("PRAGMA table_info(clientes_equipamentos)")
+    colunas_existentes = [col[1] for col in cursor.fetchall()]
+    for col_nome, col_tipo in colunas_novas:
+        if col_nome not in colunas_existentes:
+            cursor.execute(f"ALTER TABLE clientes_equipamentos ADD COLUMN {col_nome} {col_tipo}")
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tecnicos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT UNIQUE,
+            telefone TEXT,
+            partida TEXT,
+            sede TEXT,
+            senha TEXT,
+            perfil TEXT,
+            assinatura_padrao TEXT
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS veiculos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            modelo TEXT,
+            placa TEXT UNIQUE,
+            km_atual INTEGER,
+            km_ultima_revisao INTEGER,
+            km_proxima_revisao INTEGER,
+            status_manutencao TEXT
+        )
+    """)
+    conn.commit()
+    
+    # Sincroniza do Excel APENAS se a tabela SQLite estiver vazia (evita perder dados ou travar com BadZipFile)
+    cursor.execute("SELECT COUNT(*) FROM clientes_equipamentos")
+    qtd_registros_db = cursor.fetchone()[0]
+
+    if qtd_registros_db == 0 and os.path.exists(CAMINHO_EXCEL):
+        try:
+            df_excel_completo = pd.read_excel(CAMINHO_EXCEL, engine='openpyxl')
+            if not df_excel_completo.empty:
+                df_excel_completo.to_sql('clientes_equipamentos', conn, if_exists='replace', index=False)
+                qtd_registros_db = len(df_excel_completo)
+        except Exception as e:
+            print(f"Aviso ao ler Excel inicial (ignorado com segurança): {e}")
+
+    # Se ainda estiver vazia, insere um registo inicial padrão para não travar o sistema
+    if qtd_registros_db == 0:
+        cursor.execute("""
+            INSERT INTO clientes_equipamentos (
+                cliente, cidade, estado, equipamento, tipo_servico,
+                tecnico_responsavel, telefone_tecnico, confirmado,
+                data_agendamento, endereco, responsavel_hospital,
+                contato_responsavel, pendencias, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            "HOSPITAL SÃO CARLOS", "FORTALEZA", "CE", "TOMÓGRAFO - GE BRIVO CT385",
+            "PREVENTIVA", "NETTO", "5585988888888", "SIM",
+            datetime.date.today().strftime('%Y-%m-%d'),
+            "AV. PONTES VIEIRA, 2531 - FORTALEZA - CE", "DRA. DAMARES",
+            "85996197923", "MANUTENÇÃO PREVENTIVA PROGRAMADA", "ATIVO"
+        ))
+        conn.commit()
+
+    cursor.execute("SELECT COUNT(*) FROM tecnicos")
+    if cursor.fetchone()[0] == 0:
+        equipa_inicial = [
+            ("NETTO", "5585988888888", "MARAPONGA, FORTALEZA - CE", "EUSEBIO", "1234", "Gestor", "VALFREDO V. O. NETTO - CFT"),
+            ("ARQUIMEDES", "5585977777777", "FORTALEZA - CE", "EUSEBIO", "1234", "Técnico", "ARQUIMEDES - Técnico"),
+            ("GABRIEL", "5585966666666", "FORTALEZA - CE", "EUSEBIO", "1234", "Técnico", "GABRIEL - Técnico"),
+            ("SÉRGIO", "5585955555555", "FORTALEZA - CE", "EUSEBIO", "1234", "Técnico", "SÉRGIO - Técnico"),
+            ("FELIPE", "5585944444444", "FORTALEZA - CE", "EUSEBIO", "1234", "Técnico", "FELIPE - Técnico"),
+            ("TONY", "5585933333333", "FORTALEZA - CE", "EUSEBIO", "1234", "Técnico", "TONY - Técnico"),
+            ("JAIR", "5585922222222", "FORTALEZA - CE", "EUSEBIO", "1234", "Técnico", "JAIR - Técnico"),
+            ("ANTONIO", "5585911111111", "FORTALEZA - CE", "EUSEBIO", "1234", "Técnico", "ANTONIO - Técnico")
+        ]
+        cursor.executemany("INSERT OR IGNORE INTO tecnicos (nome, telefone, partida, sede, senha, perfil, assinatura_padrao) VALUES (?, ?, ?, ?, ?, ?, ?)", equipa_inicial)
+        conn.commit()
+
+    cursor.execute("SELECT COUNT(*) FROM veiculos")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("""
+            INSERT INTO veiculos (modelo, placa, km_atual, km_ultima_revisao, km_proxima_revisao, status_manutencao)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, ("Renault Captur 1.6 SCe", "EMD-2026", 45000, 40000, 50000, "EM DIA"))
+        conn.commit()
+
+    conn.close()
+
+init_db_e_migrar()
+
+@st.cache_data
+def carregar_dados():
+    conn = sqlite3.connect(DB_NAME)
+    df_lido = pd.read_sql_query("SELECT * FROM clientes_equipamentos", conn)
+    conn.close()
+    return df_lido
+
+@st.cache_data
+def carregar_tecnicos():
+    conn = sqlite3.connect(DB_NAME)
+    df_tec = pd.read_sql_query("SELECT * FROM tecnicos", conn)
+    conn.close()
+    return df_tec
+
+@st.cache_data
+def carregar_veiculos():
+    conn = sqlite3.connect(DB_NAME)
+    df_veic = pd.read_sql_query("SELECT * FROM veiculos", conn)
+    conn.close()
+    return df_veic
+
+df = carregar_dados()
+df_tecnicos = carregar_tecnicos()
+df_veiculos = carregar_veiculos()
+
+EQUIPA_TECNICA = {}
+for _, row in df_tecnicos.iterrows():
+    EQUIPA_TECNICA[str(row['nome']).strip().upper()] = {
+        "tel": str(row['telefone']),
+        "partida": str(row['partida']),
+        "sede": str(row['sede']),
+        "perfil": str(row.get('perfil', 'Técnico')),
+        "assinatura": str(row.get('assinatura_padrao', row['nome']))
+    }
+
+if not EQUIPA_TECNICA:
+    EQUIPA_TECNICA["NETTO"] = {
+        "tel": "5585988888888",
+        "partida": "FORTALEZA - CE",
+        "sede": "EUSEBIO",
+        "perfil": "Gestor",
+        "assinatura": "VALFREDO V. O. NETTO - CFT"
+    }
+
+# ----------------------------------------------------
+# SISTEMA DE AUTENTICAÇÃO (LOGIN, TROCA DE SENHA & LOGOUT)
+# ----------------------------------------------------
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+    st.session_state.utilizador = ""
+    st.session_state.perfil = ""
+    st.session_state.forcar_troca_senha = False
+
+if not st.session_state.autenticado:
+    col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
+    with col_l2:
+        st.markdown("<h2 style='text-align: center; color: #64dfdf;'>🔐 EMED - Autenticação de Acesso</h2>", unsafe_allow_html=True)
+        
+        with st.form("form_login"):
+            nome_utilizador_input = st.text_input("Nome de Utilizador / Técnico", placeholder="Digite o seu nome (ex: NETTO)").strip()
+            senha_input = st.text_input("Palavra-passe / PIN", type="password", value="1234")
+            
+            btn_entrar = st.form_submit_button("Entrar no Sistema", type="primary")
+            
+            if btn_entrar:
+                conn = sqlite3.connect(DB_NAME)
+                cursor = conn.cursor()
+                cursor.execute("SELECT nome, senha, perfil FROM tecnicos WHERE UPPER(nome) = UPPER(?)", (nome_utilizador_input,))
+                res = cursor.fetchone()
+                conn.close()
+                
+                if res and str(res[1]).strip() == senha_input.strip():
+                    st.session_state.utilizador = res[0]
+                    st.session_state.perfil = res[2]
+                    
+                    if senha_input.strip() == "1234":
+                        st.session_state.forcar_troca_senha = True
+                        st.rerun()
+                    else:
+                        st.session_state.autenticado = True
+                        st.session_state.forcar_troca_senha = False
+                        st.success(f"Bem-vindo, {res[0]} ({res[2]})!")
+                        st.rerun()
+                else:
+                    st.error("❌ Utilizador não encontrado ou palavra-passe incorreta! (Use PIN 1234)")
+
+        if st.session_state.get("forcar_troca_senha", False):
+            st.markdown("---")
+            st.warning("⚠️ **Primeiro Acesso Detectado:** Por motivos de segurança, por favor defina uma nova senha pessoal antes de continuar.")
+            with st.form("form_nova_senha"):
+                nova_senha_1 = st.text_input("Nova Palavra-passe / PIN", type="password")
+                nova_senha_2 = st.text_input("Confirme a Nova Palavra-passe / PIN", type="password")
+                btn_salvar_nova_senha = st.form_submit_button("💾 Guardar Nova Senha & Entrar", type="primary")
+                
+                if btn_salvar_nova_senha:
+                    if not nova_senha_1 or len(nova_senha_1.strip()) < 3:
+                        st.error("⚠️ A senha deve conter pelo menos 3 caracteres.")
+                    elif nova_senha_1 != nova_senha_2:
+                        st.error("⚠️ As senhas não coincidem!")
+                    else:
+                        conn = sqlite3.connect(DB_NAME)
+                        cursor = conn.cursor()
+                        cursor.execute("UPDATE tecnicos SET senha = ? WHERE nome = ?", (nova_senha_1.strip(), st.session_state.utilizador))
+                        conn.commit()
+                        conn.close()
+                        st.cache_data.clear()
+                        
+                        st.session_state.autenticado = True
+                        st.session_state.forcar_troca_senha = False
+                        st.success("✅ Senha atualizada com sucesso! A entrar no sistema...")
+                        st.rerun()
+    st.stop()
+
+# ----------------------------------------------------
+# BARRA LATERAL & CONTROLO DE PERFIS & LOGOUT RÁPIDO
+# ----------------------------------------------------
+st.sidebar.markdown(f"### 👤 Utilizador: {st.session_state.utilizador}")
+st.sidebar.markdown(f"**Perfil:** `{st.session_state.perfil}`")
+
+if st.sidebar.button("🔄 Trocar de Técnico / Sair", type="secondary"):
+    st.session_state.autenticado = False
+    st.session_state.utilizador = ""
+    st.session_state.perfil = ""
+    st.session_state.forcar_troca_senha = False
+    st.rerun()
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### PAINEL DE OPERAÇÕES")
+
+if st.session_state.perfil == "Gestor":
+    opcoes_menu = [
+        "📊 Mural & Despacho WhatsApp", 
+        "👥 Clientes & Equipamentos", 
+        "🎫 Abertura de Chamados & OS",
+        "🗺️ Mapa & Planeamento de Rotas",
+        "➕ Cadastro de Clientes", 
+        "⚙️ Gestão & Administração",
+        "🚗 Atualizar Quilometragem (Opcional)",
+        "📝 Editor Direto da Planilha"
+    ]
+else:
+    opcoes_menu = [
+        "📊 Mural & Despacho WhatsApp", 
+        "🎫 Abertura de Chamados & OS",
+        "🗺️ Mapa & Planeamento de Rotas",
+        "🚗 Atualizar Quilometragem (Opcional)"
+    ]
+
+acao = st.sidebar.radio("Menu:", opcoes_menu)
+
+if st.session_state.perfil == "Gestor":
+    st.sidebar.markdown("---")
+    if os.path.exists(CAMINHO_EXCEL):
+        try:
+            with open(CAMINHO_EXCEL, "rb") as file:
+                st.sidebar.download_button(
+                    label="📥 Descarregar Backup Excel",
+                    data=file,
+                    file_name="base_clientes_backup.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+        except Exception:
+            pass
+
+hoje = pd.Timestamp.today().normalize()
+
+colunas_necessarias = [
+    'cliente', 'cidade', 'estado', 'equipamento', 'tipo_servico',
+    'tecnico_responsavel', 'telefone_tecnico', 'confirmado', 'data_agendamento',
+    'endereco', 'responsavel_hospital', 'contato_responsavel', 'pendencias',
+    'status', 'checkin_hora', 'checkout_hora', 'tempo_atendimento',
+    'checklist_pop', 'assinatura_cliente', 'assinatura_tecnico',
+    'pre_atendimento', 'foto_evidencia'
+]
+for col in colunas_necessarias:
+    if col not in df.columns:
+        df[col] = ''
+
+df['cliente'] = df['cliente'].fillna('').astype(str).str.upper()
+
+def salvar_dados_seguro(dataframe):
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        df_save = dataframe.copy()
+        if 'id' in df_save.columns:
+            df_save = df_save.drop(columns=['id'])
+        df_save.to_sql('clientes_equipamentos', conn, if_exists='replace', index=False)
+        conn.close()
+        
+        try:
+            df_save.to_excel(CAMINHO_EXCEL, index=False, engine='openpyxl')
+            df_save.to_excel(os.path.join(BASE_DIR, "base_clientes_backup.xlsx"), index=False, engine='openpyxl')
+        except Exception:
+            pass
+        return True
+    except Exception as e:
+        st.error(f"⚠️ Erro ao salvar dados: {e}")
+        return False
+
+def calcular_distancia(lat1, lon1, lat2, lon2):
+    R = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return round(R * c, 1)
+
+def formatar_tempo(km):
+    horas_totais = km / 70.0
+    horas = int(horas_totais)
+    minutos = int(round((horas_totais - horas) * 60))
+    if horas == 0:
+        return f"{minutos} min"
+    elif minutos == 0:
+        return f"{horas}h"
+    else:
+        return f"{horas}h {minutos}min"
+
+def obter_icone_equipamento(eq_str):
+    eq_upper = str(eq_str).upper()
+    if 'MAMÓGRAFO' in eq_upper or eq_upper.startswith('MM'):
+        return '🎗️'
+    elif 'TOMÓGRAFO' in eq_upper or eq_upper.startswith('TC'):
+        return '🌀'
+    elif 'RAIO-X' in eq_upper or eq_upper.startswith('RX'):
+        return '⚡'
+    elif 'DENSITOMETRIA' in eq_upper or eq_upper.startswith('DO'):
+        return '🦴'
+    elif 'RESSONÂNCIA' in eq_upper or eq_upper.startswith('RM'):
+        return '🧲'
+    elif 'ULTRASSOM' in eq_upper or eq_upper.startswith('US'):
+        return '📡'
+    else:
+        return '⚙️'
+
+# Cabeçalho Principal com Logo Centralizada
+col1, col_logo, col3 = st.columns([1.5, 3, 1.5])
+with col_logo:
+    caminho_logo = os.path.join(BASE_DIR, "emed1.jpg")
+    if os.path.exists(caminho_logo):
+        st.image(caminho_logo, use_container_width=True)
+    elif os.path.exists("emed1.jpg"):
+        st.image("emed1.jpg", use_container_width=True)
+
+st.markdown("<hr style='border: 0; border-top: 1px solid #3a506b; margin-top: 10px; margin-bottom: 25px;'>", unsafe_allow_html=True)
+
+# ----------------------------------------------------
+# ABA 1: MURAL GERENCIAL, GRÁFICOS & DESPACHO WHATSAPP
+# ----------------------------------------------------
+if acao == "📊 Mural & Despacho WhatsApp":
+    total_eq = len(df)
+    count_alertas = 0
+    count_confirmados = 0
+    count_concluidos = len(df[df['status'].astype(str).str.upper() == 'CONCLUÍDO'])
+    tecnicos_agenda = {}
+
+    for _, row in df.iterrows():
+        cliente = str(row.get('cliente', '')).upper()
+        cidade = str(row.get('cidade', '')).upper()
+        estado = str(row.get('estado', '')).upper()
+        equipamento = str(row.get('equipamento', '')).upper()
+        
+        endereco = str(row.get('endereco', '')).upper() if pd.notna(row.get('endereco')) and str(row.get('endereco')).lower() != 'nan' else f"{cidade} - {estado}"
+        resp_cliente = str(row.get('responsavel_hospital', '')).upper() if pd.notna(row.get('responsavel_hospital')) and str(row.get('responsavel_hospital')).lower() != 'nan' else "NÃO INFORMADO"
+        
+        raw_tel = str(row.get('contato_responsavel', ''))
+        if raw_tel.endswith('.0'):
+            raw_tel = raw_tel[:-2]
+        tel_cliente = raw_tel if raw_tel.lower() != 'nan' else ""
+
+        raw_agend = row.get('data_agendamento', None)
+        if pd.notna(raw_agend) and str(raw_agend).lower() not in ['nan', 'nat', 'none', '']:
+            data_agend = pd.to_datetime(raw_agend, errors='coerce')
+            if pd.isna(data_agend):
+                data_agend = hoje
+        else:
+            data_agend = hoje
+        
+        tecnico_resp = str(row.get('tecnico_responsavel', 'A DEFINIR')).strip().upper()
+        if tecnico_resp.lower() == 'nan' or not tecnico_resp:
+            tecnico_resp = 'A DEFINIR'
+
+        confirmado = str(row.get('confirmado', 'NÃO')).upper()
+        pendencias = str(row.get('pendencias', '')).upper()
+        tipo_srv = str(row.get('tipo_servico', 'PREVENTIVA')).upper() if pd.notna(row.get('tipo_servico')) else 'PREVENTIVA'
+
+        query_mapa = urllib.parse.quote(f"{cliente} {endereco}")
+        link_maps = f"https://www.google.com/maps/search/?api=1&query={query_mapa}"
+        link_waze = f"https://waze.com/ul?q={query_mapa}&navigate=yes"
+
+        dias_restantes = (data_agend.normalize() - hoje).days
+        if 0 <= dias_restantes <= 15:
+            count_alertas += 1
+
+        if confirmado.strip() in ["SIM", "YES", "S"]:
+            count_confirmados += 1
+            if tecnico_resp != 'A DEFINIR':
+                if tecnico_resp not in tecnicos_agenda:
+                    tecnicos_agenda[tecnico_resp] = []
+                tecnicos_agenda[tecnico_resp].append({
+                    'cliente': cliente, 'cidade': cidade, 'estado': estado, 
+                    'equipamento': equipamento, 'data': data_agend, 'pendencias': pendencias,
+                    'endereco': endereco, 'resp': resp_cliente, 'tel': tel_cliente,
+                    'maps': link_maps, 'waze': link_waze, 'tipo_servico': tipo_srv
+                })
+
+    # 1. CARTÕES DE INDICADORES (KPIs)
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("🏥 Total de Equipamentos / OS", total_eq)
+    k2.metric("⏰ Alertas Próximos (15d)", count_alertas)
+    k3.metric("✅ Atendimentos Confirmados", count_confirmados)
+    k4.metric("🏁 OS Concluídas", count_concluidos)
+
+    # 2. PAINEL DE GRÁFICOS ANALÍTICOS
+    st.markdown("---")
+    st.markdown("### 📈 Indicadores Operacionais & Gráficos em Tempo Real")
+
+    df_graf = df.copy()
+    df_graf['tipo_servico_clean'] = df_graf['tipo_servico'].fillna('NÃO DEFINIDO').astype(str).str.upper().str.strip()
+    df_graf['tecnico_clean'] = df_graf['tecnico_responsavel'].fillna('A DEFINIR').astype(str).str.upper().str.strip()
+    df_graf['cidade_clean'] = df_graf['cidade'].fillna('OUTRAS').astype(str).str.upper().str.strip()
+    df_graf['status_clean'] = df_graf['status'].fillna('ATIVO').astype(str).str.upper().str.strip()
+
+    col_g1, col_g2 = st.columns(2)
+    with col_g1:
+        st.markdown("##### 🛠️ Distribuição por Tipo de Serviço")
+        contagem_servico = df_graf['tipo_servico_clean'].value_counts()
+        if not contagem_servico.empty:
+            st.bar_chart(contagem_servico, color="#64dfdf")
+        else:
+            st.info("Sem dados para o gráfico de serviços.")
+
+    with col_g2:
+        st.markdown("##### 👨‍🔧 Volume de Equipamentos / OS por Técnico")
+        contagem_tecnico = df_graf[df_graf['tecnico_clean'] != '']['tecnico_clean'].value_counts()
+        if not contagem_tecnico.empty:
+            st.bar_chart(contagem_tecnico, color="#4cc9f0")
+        else:
+            st.info("Sem dados para o gráfico de técnicos.")
+
+    col_g3, col_g4 = st.columns(2)
+    with col_g3:
+        st.markdown("##### 📍 Top Cidades em Volume de Atendimento")
+        contagem_cidade = df_graf[df_graf['cidade_clean'] != '']['cidade_clean'].value_counts().head(8)
+        if not contagem_cidade.empty:
+            st.bar_chart(contagem_cidade, color="#f72585")
+        else:
+            st.info("Sem dados de cidades.")
+
+    with col_g4:
+        st.markdown("##### 📊 Status das Ordens de Serviço (Ativo vs Concluído)")
+        contagem_status = df_graf['status_clean'].value_counts()
+        if not contagem_status.empty:
+            st.bar_chart(contagem_status, color="#10b981")
+        else:
+            st.info("Sem dados de status.")
+
+    # 3. DESPACHO CONSOLIDADO PARA O WHATSAPP DOS TÉCNICOS
+    st.markdown("---")
+    st.markdown("### 💬 Despacho Consolidado para o WhatsApp dos Técnicos")
+
+    if not tecnicos_agenda:
+        st.warning("⚠️ Nenhum atendimento marcado como CONFIRMADO ('SIM') com técnico atribuído no momento.")
+    else:
+        itens_a_exibir = (
+            tecnicos_agenda.items()
+            if st.session_state.perfil == "Gestor"
+            else [(st.session_state.utilizador.upper(), tecnicos_agenda.get(st.session_state.utilizador.upper(), []))]
+        )
+        
+        mensagem_grupo_geral = "📢 *RESUMO CONSOLIDADO DE CHAMADOS CONFIRMADOS - EMED*\n\n"
+
+        for tec, itens in itens_a_exibir:
+            if not itens and st.session_state.perfil != "Gestor":
+                st.info(f"Olá {tec}, não existem atendimentos confirmados atribuídos a si no momento.")
+                continue
+            if not itens:
+                continue
+
+            texto_msg = f"Olá *{tec}*, aqui está o seu cronograma oficial consolidado de atendimentos EMED:\n\n"
+            mensagem_grupo_geral += f"👨‍🔧 *{tec}* ({len(itens)} OS):\n"
+
+            for idx, i in enumerate(itens, 1):
+                d_str = i['data'].strftime('%d/%m/%Y') if pd.notna(i['data']) else "-"
+                texto_msg += f"*{idx}. Hospital: {i['cliente']} ({i['cidade']}-{i['estado']})*\n"
+                texto_msg += f"🛠️ Tipo de Serviço: {i['tipo_servico']}\n"
+                texto_msg += f"📍 Endereço: {i['endereco']}\n"
+                texto_msg += f"👤 Responsável: {i['resp']} ({i['tel']})\n"
+                texto_msg += f"⚙️ Equipamento: {i['equipamento']}\n"
+                texto_msg += f"📅 Data: {d_str}\n"
+                texto_msg += f"🗺️ Maps: {i['maps']}\n"
+                texto_msg += f"🚗 Waze: {i['waze']}\n-----------------------------------\n"
+
+                mensagem_grupo_geral += f"• {d_str} - {i['cliente']} ({i['cidade']}) | {i['equipamento']} [{i['tipo_servico']}]\n"
+            
+            mensagem_grupo_geral += "\n"
+
+            encoded_msg = urllib.parse.quote(texto_msg)
+            tel_raw = EQUIPA_TECNICA.get(tec, {}).get("tel", "")
+            if tel_raw.endswith('.0'):
+                tel_raw = tel_raw[:-2]
+            tel_limpo = ''.join(filter(str.isdigit, tel_raw))
+            whatsapp_link = f"https://wa.me/{tel_limpo}?text={encoded_msg}" if tel_limpo else "#"
+
+            with st.expander(f"👷 Técnico: {tec} ({len(itens)} atendimento(s) confirmado(s))", expanded=True):
+                st.text_area(f"Mensagem formatada para {tec}:", value=texto_msg, height=180, key=f"txt_wpp_{tec}")
+                if tel_limpo:
+                    st.markdown(f"""
+                        <a href="{whatsapp_link}" target="_blank" style="background: #25d366; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 15px; display: inline-block; margin-top: 5px;">
+                            📲 Enviar Escala Completa via WhatsApp para {tec}
+                        </a>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.warning("⚠️ Telefone deste técnico não está registado na aba Gestão & Administração.")
+
+        if st.session_state.perfil == "Gestor":
+            st.markdown("---")
+            st.markdown("#### 📋 Resumo Geral para Copiar e Colar no Grupo da Empresa")
+            mensagem_grupo_geral += "🔗 *Sistema EMED - Gestão de Equipamentos e Frota*"
+            st.text_area("Mensagem Global para o Grupo EMED:", value=mensagem_grupo_geral, height=200, key="msg_grupo_geral")
+
+# ----------------------------------------------------
+# ABA 2: CLIENTES & EQUIPAMENTOS (Apenas Gestor)
+# ----------------------------------------------------
+elif acao == "👥 Clientes & Equipamentos":
+    st.markdown("### 📋 Cadastro de Clientes & Parque Tecnológico")
+
+    with st.expander("➕ Adicionar Novo Equipamento ao Parque Tecnológico"):
+        clientes_disponiveis_add = sorted([c for c in df['cliente'].unique() if str(c).strip() != ''])
+        with st.form("form_add_equipamento_superior"):
+            cliente_escolhido_add = st.selectbox("Selecione o Hospital / Cliente *", clientes_disponiveis_add)
+            
+            eq_tipo_escolha = st.selectbox(
+                "1. Equipamento *", 
+                ["TOMÓGRAFO", "RAIO-X", "DENSITOMETRIA ÓSSEA", "MAMÓGRAFO", "OUTROS"]
+            )
+            
+            eq_tipo_aparelho = eq_tipo_escolha
+            if eq_tipo_escolha == "OUTROS":
+                eq_tipo_aparelho = st.text_input("Especifique o Equipamento *")
+            
+            eq_modelo = st.text_input("2. Fabricante / Modelo *")
+            
+            col_det1, col_det2 = st.columns(2)
+            with col_det1:
+                eq_ns = st.text_input("3. N/S (Número de Série)")
+                eq_fabricacao = st.text_input("4. Fabricação (Ano)")
+            with col_det2:
+                eq_local = st.text_input("6. Local de Instalação (Ex: Sala 1, UTI)")
+                eq_status_ativo = st.selectbox("Status Operacional", ["EM FUNCIONAMENTO", "PARADO", "EM MANUTENÇÃO", "FAZER VISTORIA", "DESATIVADO"])
+            
+            eq_obs = st.text_area("5. Observação / Notas Técnicas")
+            
+            btn_gravar_eq_superior = st.form_submit_button("💾 Salvar Equipamento no Parque", type="primary")
+            if btn_gravar_eq_superior:
+                if not eq_modelo or (eq_tipo_escolha == "OUTROS" and not eq_tipo_aparelho.strip()):
+                    st.error("⚠️ Preencha o fabricante/modelo e o tipo do equipamento!")
+                else:
+                    nome_equip_final = (eq_tipo_aparelho if eq_tipo_escolha != "OUTROS" else eq_tipo_aparelho.strip()).upper()
+                    desc_equipamento = f"{nome_equip_final} - {eq_modelo.strip().upper()}"
+                    
+                    detalhes_extras = []
+                    if eq_ns.strip(): detalhes_extras.append(f"N/S: {eq_ns.strip().upper()}")
+                    if eq_fabricacao.strip(): detalhes_extras.append(f"Fab: {eq_fabricacao.strip().upper()}")
+                    if eq_local.strip(): detalhes_extras.append(f"Local: {eq_local.strip().upper()}")
+                    if eq_status_ativo: detalhes_extras.append(f"Status: {eq_status_ativo}")
+                    
+                    if detalhes_extras:
+                        desc_equipamento += f" [{' | '.join(detalhes_extras)}]"
+
+                    obs_final = eq_obs.strip().upper() if eq_obs.strip() else "SEM PENDENCIAS APARENTES"
+                    info_cli_ref = df[df['cliente'] == cliente_escolhido_add].iloc[0]
+                    
+                    nova_linha_ativo = {
+                        'cliente': cliente_escolhido_add,
+                        'cidade': str(info_cli_ref.get('cidade', '')).upper(),
+                        'estado': str(info_cli_ref.get('estado', '')).upper(),
+                        'equipamento': desc_equipamento,
+                        'endereco': str(info_cli_ref.get('endereco', '')).upper(),
+                        'tipo_servico': 'PREVENTIVA',
+                        'data_agendamento': None,
+                        'tecnico_responsavel': 'A DEFINIR',
+                        'telefone_tecnico': '',
+                        'responsavel_hospital': str(info_cli_ref.get('responsavel_hospital', '')).upper(),
+                        'contato_responsavel': str(info_cli_ref.get('contato_responsavel', '')),
+                        'confirmado': 'NÃO',
+                        'pendencias': obs_final,
+                        'status': 'ATIVO'
+                    }
+                    df = pd.concat([df, pd.DataFrame([nova_linha_ativo])], ignore_index=True)
+                    
+                    if salvar_dados_seguro(df):
+                        st.cache_data.clear()
+                        st.success(f"✅ Equipamento '{desc_equipamento}' adicionado com sucesso a {cliente_escolhido_add}!")
+                        st.rerun()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    clientes_agrupados = sorted(list(df.groupby('cliente')), key=lambda x: x[0])
+    colunas_cards = st.columns(2)
+    card_idx = 0
+    
+    for cliente_nome, grupo in clientes_agrupados:
+        if not str(cliente_nome).strip():
+            continue
+        col_atual = colunas_cards[card_idx % 2]
+        primeira_linha = grupo.iloc[0]
+        cidade = str(primeira_linha.get('cidade', '')).upper()
+        estado = str(primeira_linha.get('estado', '')).upper()
+        resp = str(primeira_linha.get('responsavel_hospital', 'Não informado')).upper()
+        tel_resp = str(primeira_linha.get('contato_responsavel', ''))
+        endereco = str(primeira_linha.get('endereco', f"{cidade} - {estado}")).upper()
+        
+        equipamentos_validos = grupo[~grupo['equipamento'].astype(str).str.contains("Nenhum|Aguardando", case=False, na=False)]
+        qtd_equipamentos = len(equipamentos_validos)
+        
+        with col_atual:
+            st.markdown(f"""
+                <div class="client-card">
+                    <h3>🏥 {cliente_nome}</h3>
+                    <p>📍 <strong>Local:</strong> {cidade} - {estado}</p>
+                    <p>🏠 <strong>Endereço:</strong> {endereco}</p>
+                    <p>👤 <strong>Contacto:</strong> {resp} ({tel_resp})</p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            with st.expander(f"⚙️ Ver Equipamentos ({qtd_equipamentos} registados)"):
+                if equipamentos_validos.empty:
+                    st.info("Nenhum equipamento registado.")
+                else:
+                    for i_eq, r_eq in equipamentos_validos.iterrows():
+                        eq_desc = str(r_eq.get('equipamento', '')).upper()
+                        icone = obter_icone_equipamento(eq_desc)
+                        
+                        col_eq_txt, col_eq_ed, col_eq_del = st.columns([6, 1.5, 1.5])
+                        with col_eq_txt:
+                            st.markdown(f"{icone} {eq_desc}")
+                        with col_eq_ed:
+                            if st.button("✏️", key=f"btn_edit_{i_eq}"):
+                                st.session_state[f"editando_{i_eq}"] = True
+                        with col_eq_del:
+                            if st.button("🗑️", key=f"btn_del_{i_eq}"):
+                                df = df.drop(i_eq)
+                                if salvar_dados_seguro(df):
+                                    st.cache_data.clear()
+                                    st.success("Equipamento excluído com sucesso!")
+                                    st.rerun()
+
+                        if st.session_state.get(f"editando_{i_eq}", False):
+                            with st.form(f"form_edit_{i_eq}"):
+                                novo_texto_eq = st.text_input("Editar Equipamento / Detalhes", value=eq_desc)
+                                col_sb1, col_sb2 = st.columns(2)
+                                with col_sb1:
+                                    btn_salvar_ed = st.form_submit_button("💾 Salvar Alteração")
+                                with col_sb2:
+                                    btn_cancelar_ed = st.form_submit_button("❌ Cancelar")
+                                
+                                if btn_salvar_ed:
+                                    df.at[i_eq, 'equipamento'] = novo_texto_eq.strip().upper()
+                                    if salvar_dados_seguro(df):
+                                        st.session_state[f"editando_{i_eq}"] = False
+                                        st.cache_data.clear()
+                                        st.success("Equipamento atualizado!")
+                                        st.rerun()
+                                if btn_cancelar_ed:
+                                    st.session_state[f"editando_{i_eq}"] = False
+                                    st.rerun()
+        card_idx += 1
+
+# ----------------------------------------------------
+# ABA 3: ABERTURA DE CHAMADOS & OS
+# ----------------------------------------------------
+elif acao == "🎫 Abertura de Chamados & OS":
+    st.markdown("### 🎫 Gestão de Ordens de Serviço (OS) & Execução em Campo")
+    st.markdown("Preenchimento estruturado com pré-atendimento para diagnóstico, upload de evidências e restrição de acesso por técnico.")
+
+    sub_os = st.radio("Escolha a vista:", ["📋 Listar / Executar Ordens Abertas", "📁 Histórico de OS Concluídas", "➕ Criar Nova OS"], horizontal=True)
+    st.markdown("---")
+
+    if sub_os == "➕ Criar Nova OS":
+        clientes_disponiveis = sorted([c for c in df['cliente'].unique() if str(c).strip() != ''])
+        with st.form("form_abertura_chamado_estruturada"):
+            col_ch1, col_ch2 = st.columns(2)
+            with col_ch1:
+                chamado_cliente = st.selectbox("1. Selecionar Hospital / Cliente *", clientes_disponiveis)
+                eqs_do_cliente = df[df['cliente'] == chamado_cliente]['equipamento'].tolist()
+                eqs_validos_cliente = [e for e in eqs_do_cliente if not str(e).lower().startswith(('nenhum', 'aguardando'))]
+                opcoes_equipamento = eqs_validos_cliente + ["➕ Outro / Equipamento Avulso"]
+                escolha_equipamento = st.selectbox("2. Equipamento Alvo *", opcoes_equipamento)
+                
+                equipamento_final = escolha_equipamento
+                if escolha_equipamento == "➕ Outro / Equipamento Avulso":
+                    equipamento_final = st.text_input("Especifique o Equipamento Avulso *")
+
+            with col_ch2:
+                chamado_tipo = st.selectbox("3. Tipo de Serviço", ["PREVENTIVA (Com Checklist POP/IT)", "CORRETIVA (Falha / Parada)", "INSTALAÇÃO", "CALIBRAÇÃO"])
+                chamado_prioridade = st.selectbox("4. Nível de Urgência", ["NORMAL", "URGENTE / HOSPITAL PARADO", "CRÍTICO (Emergência)"])
+                
+                lista_tecs_ch = list(EQUIPA_TECNICA.keys())
+                tec_default = st.session_state.utilizador.upper() if st.session_state.perfil != "Gestor" else lista_tecs_ch[0]
+                chamado_tec = st.selectbox("5. Técnico Responsável (Apenas este técnico poderá executar)", lista_tecs_ch, index=lista_tecs_ch.index(tec_default) if tec_default in lista_tecs_ch else 0)
+
+            st.markdown("#### 🔬 Pré-Atendimento & Diagnóstico Prévio")
+            col_pre1, col_pre2 = st.columns(2)
+            with col_pre1:
+                pre_codigo_erro = st.text_input("Código de Erro no Display (Ex: ERR-402, E-10)")
+                pre_sintoma = st.selectbox("Sintoma / Comportamento", ["FALHA DE LIGAÇÃO / FONTE", "ERRO DE SOFTWARE / TRAVAMENTO", "DEFEITO DE HARDWARE / PLACA", "RUÍDO ANÓMALO / MECÂNICO", "OUTROS"])
+            with col_pre2:
+                pre_testes_cliente = st.text_input("Testes já realizados pelo cliente no local")
+            
+            chamado_relato = st.text_area("6. Relato Inicial / Descrição Detalhada da Falha *", placeholder="Descreva o problema...")
+            
+            foto_arquivo = st.file_uploader("📸 Anexar Foto / Evidência (Opcional - Erro no Display, Placa, etc.)", type=["png", "jpg", "jpeg"])
+            
+            chamado_data = st.date_input("7. Data Prevista", value=datetime.date.today())
+
+            btn_abrir_chamado = st.form_submit_button("🚀 Emitir Nova Ordem de Serviço", type="primary")
+
+            if btn_abrir_chamado:
+                if not equipamento_final or not chamado_relato:
+                    st.error("⚠️ Preencha o equipamento e o relato!")
+                else:
+                    info_cli_base = df[df['cliente'] == chamado_cliente].iloc[0]
+                    tel_tec_val = EQUIPA_TECNICA.get(chamado_tec, {}).get("tel", "")
+                    
+                    caminho_foto_salva = ""
+                    if foto_arquivo is not None:
+                        pasta_uploads = os.path.join(BASE_DIR, "uploads_os")
+                        os.makedirs(pasta_uploads, exist_ok=True)
+                        caminho_foto_salva = os.path.join(pasta_uploads, foto_arquivo.name)
+                        with open(caminho_foto_salva, "wb") as f:
+                            f.write(foto_arquivo.getbuffer())
+
+                    pre_atendimento_str = f"[CÓDIGO ERRO: {pre_codigo_erro.strip().upper() if pre_codigo_erro else 'N/D'}] [SINTOMA: {pre_sintoma}] [TESTES PRÉVIOS: {pre_testes_cliente.strip().upper() if pre_testes_cliente else 'NENHUM'}]"
+
+                    nova_os = {
+                        'cliente': chamado_cliente,
+                        'cidade': str(info_cli_base.get('cidade', '')).upper(),
+                        'estado': str(info_cli_base.get('estado', '')).upper(),
+                        'equipamento': equipamento_final.strip().upper(),
+                        'endereco': str(info_cli_base.get('endereco', '')).upper(),
+                        'tipo_servico': chamado_tipo.upper(),
+                        'data_agendamento': pd.to_datetime(chamado_data).strftime('%Y-%m-%d'),
+                        'tecnico_responsavel': chamado_tec.upper(),
+                        'telefone_tecnico': tel_tec_val,
+                        'responsavel_hospital': str(info_cli_base.get('responsavel_hospital', '')).upper(),
+                        'contato_responsavel': str(info_cli_base.get('contato_responsavel', '')),
+                        'confirmado': 'SIM',
+                        'pendencias': f"[{chamado_prioridade.upper()}] {chamado_relato.strip().upper()}",
+                        'status': 'ATIVO',
+                        'checkin_hora': '',
+                        'checkout_hora': '',
+                        'tempo_atendimento': '',
+                        'checklist_pop': '',
+                        'assinatura_cliente': '',
+                        'assinatura_tecnico': '',
+                        'pre_atendimento': pre_atendimento_str,
+                        'foto_evidencia': caminho_foto_salva
+                    }
+                    df = pd.concat([df, pd.DataFrame([nova_os])], ignore_index=True)
+                    if salvar_dados_seguro(df):
+                        st.cache_data.clear()
+                        st.success("✅ Ordem de Serviço emitida com sucesso e atribuída ao técnico!")
+                        st.rerun()
+
+    elif sub_os == "📁 Histórico de OS Concluídas":
+        st.markdown("#### 📁 Ordens de Serviço Fechadas / Concluídas")
+        df_os_concluidas = df[df['status'].astype(str).str.upper() == 'CONCLUÍDO']
+        
+        if df_os_concluidas.empty:
+            st.info("ℹ️ Ainda não existem ordens de serviço concluídas.")
+        else:
+            for idx_c, row_c in df_os_concluidas.iterrows():
+                with st.expander(f"✅ OS #{idx_c} | {row_c['cliente']} ({row_c['cidade']}) — Equipamento: {row_c['equipamento']} [Técnico: {row_c['tecnico_responsavel']}]"):
+                    st.markdown(f"**Tipo de Serviço:** `{row_c['tipo_servico']}` | **Data:** {row_c['data_agendamento']}")
+                    st.markdown(f"**Pré-Atendimento / Diagnóstico:** {row_c.get('pre_atendimento', '-')}")
+                    st.markdown(f"**Relato/Laudo Técnico:** {row_c['pendencias']}")
+                    st.markdown(f"**Check-in:** {row_c.get('checkin_hora', '-')} | **Check-out:** {row_c.get('checkout_hora', '-')} | **Duração:** {row_c.get('tempo_atendimento', '-')}")
+                    st.markdown(f"**Checklist POP/IT:** {row_c.get('checklist_pop', '-')}")
+                    st.markdown(f"**Assinaturas:** Técnico: `{row_c.get('assinatura_tecnico', '-')}` | Cliente: `{row_c.get('assinatura_cliente', '-')}`")
+                    
+                    if pd.notna(row_c.get('foto_evidencia')) and str(row_c.get('foto_evidencia')) != '':
+                        if os.path.exists(str(row_c.get('foto_evidencia'))):
+                            st.image(str(row_c.get('foto_evidencia')), caption="Foto / Evidência Anexada", width=300)
+
+                    msg_os = f"*LAUDO TÉCNICO OS #{idx_c} - EMED*\n\n"
+                    msg_os += f"🏥 *Hospital:* {row_c['cliente']} ({row_c['cidade']}-{row_c['estado']})\n"
+                    msg_os += f"🛠️ *Serviço:* {row_c['tipo_servico']}\n"
+                    msg_os += f"⚙️ *Equipamento:* {row_c['equipamento']}\n"
+                    msg_os += f"🔬 *Pré-Atendimento:* {row_c.get('pre_atendimento', '-')}\n"
+                    msg_os += f"📝 *Laudo Técnico:* {row_c['pendencias']}\n"
+                    msg_os += f"⏱️ *Atendimento:* {row_c.get('checkin_hora', '-')} até {row_c.get('checkout_hora', '-')}\n"
+                    msg_os += f"✍️ *Assinado por:* {row_c.get('assinatura_cliente', 'Responsável')}\n"
+                    msg_os += f"👷 *Técnico:* {row_c.get('assinatura_tecnico', row_c['tecnico_responsavel'])}\n\n_EMED Eletromedicina - Relatório Certificado_"
+                    
+                    encoded_os = urllib.parse.quote(msg_os)
+                    raw_t_cli = str(row_c.get('contato_responsavel', ''))
+                    if raw_t_cli.endswith('.0'): raw_t_cli = raw_t_cli[:-2]
+                    t_cli_limpo = ''.join(filter(str.isdigit, raw_t_cli))
+                    
+                    if t_cli_limpo:
+                        link_wpp_os = f"https://wa.me/{t_cli_limpo}?text={encoded_os}"
+                        st.markdown(f"""
+                            <a href="{link_wpp_os}" target="_blank" style="background: #25d366; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block; margin-top: 10px;">
+                                💬 Enviar Relatório da OS via WhatsApp
+                            </a>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.info("ℹ️ Telefone do contacto do hospital não preenchido para envio direto via WhatsApp.")
+
+    else:
+        st.markdown("#### Execução de Campo & Fecho de OS (Com Controlo de Acesso por Técnico)")
+        
+        if st.session_state.perfil == "Gestor":
+            df_os_ativas = df[df['status'].astype(str).str.upper() == 'ATIVO']
+        else:
+            df_os_ativas = df[(df['status'].astype(str).str.upper() == 'ATIVO') & (df['tecnico_responsavel'].astype(str).str.upper() == st.session_state.utilizador.upper())]
+
+        if df_os_ativas.empty:
+            st.info(f"ℹ️ Não existem ordens de serviço ativas atribuídas a si ({st.session_state.utilizador}) no momento.")
+        else:
+            for idx_os, row_os in df_os_ativas.iterrows():
+                tec_resp_os = str(row_os.get('tecnico_responsavel', '')).upper()
+                utilizador_atual = st.session_state.utilizador.upper()
+                is_gestor = st.session_state.perfil == "Gestor"
+                
+                with st.expander(f"🛠️ OS #{idx_os} | {row_os['cliente']} ({row_os['cidade']}) — Equipamento: {row_os['equipamento']} [Técnico: {tec_resp_os}]"):
+                    st.markdown(f"**Tipo de Serviço:** `{row_os['tipo_servico']}` | **Data:** {row_os['data_agendamento']}")
+                    st.markdown(f"**Endereço:** {row_os['endereco']}")
+                    st.markdown(f"**🔬 Pré-Atendimento / Diagnóstico:** {row_os.get('pre_atendimento', '-')}")
+                    st.markdown(f"**Relato/Instrução:** {row_os['pendencias']}")
+                    
+                    if pd.notna(row_os.get('foto_evidencia')) and str(row_os.get('foto_evidencia')) != '':
+                        if os.path.exists(str(row_os.get('foto_evidencia'))):
+                            st.image(str(row_os.get('foto_evidencia')), caption="Foto Anexada na Abertura", width=250)
+
+                    if not is_gestor and tec_resp_os != utilizador_atual:
+                        st.warning(f"🔒 **Acesso Restrito:** Esta OS está atribuída ao técnico **{tec_resp_os}**. Apenas ele ou o Gestor podem executar e fechar esta ordem de serviço.")
+                    else:
+                        st.markdown("---")
+                        st.markdown("#### 📍 Controlo de Presença & Tempos (GPS / Check-in)")
+                        
+                        col_gps1, col_gps2, col_gps3 = st.columns(3)
+                        with col_gps1:
+                            if st.button("📍 Fazer Check-in (Chegada)", key=f"cin_{idx_os}"):
+                                hora_atual_str = datetime.datetime.now().strftime('%d/%m/%Y %H:%M')
+                                df.at[idx_os, 'checkin_hora'] = hora_atual_str
+                                salvar_dados_seguro(df)
+                                st.cache_data.clear()
+                                st.success(f"Check-in registado às {hora_atual_str}!")
+                                st.rerun()
+                            if pd.notna(row_os.get('checkin_hora')) and str(row_os.get('checkin_hora')) != '':
+                                st.caption(f"✅ Check-in: {row_os['checkin_hora']}")
+
+                        with col_gps2:
+                            if st.button("🏁 Fazer Check-out (Saída)", key=f"cout_{idx_os}"):
+                                hora_saida_str = datetime.datetime.now().strftime('%d/%m/%Y %H:%M')
+                                df.at[idx_os, 'checkout_hora'] = hora_saida_str
+                                try:
+                                    t_in = pd.to_datetime(row_os['checkin_hora'], format='%d/%m/%Y %H:%M')
+                                    t_out = pd.to_datetime(hora_saida_str, format='%d/%m/%Y %H:%M')
+                                    diff_mins = int((t_out - t_in).total_seconds() / 60)
+                                    df.at[idx_os, 'tempo_atendimento'] = f"{diff_mins} minutos"
+                                except Exception:
+                                    df.at[idx_os, 'tempo_atendimento'] = "Concluído"
+
+                                salvar_dados_seguro(df)
+                                st.cache_data.clear()
+                                st.success("Check-out registado! Duração calculada.")
+                                st.rerun()
+                            if pd.notna(row_os.get('checkout_hora')) and str(row_os.get('checkout_hora')) != '':
+                                st.caption(f"🏁 Check-out: {row_os['checkout_hora']} ({row_os.get('tempo_atendimento', '')})")
+
+                        st.markdown("---")
+                        st.markdown("#### 📋 Checklist Técnico (POP / IT - Procedimento Operacional Padrão)")
+                        
+                        chk1 = st.checkbox("1. Inspeção visual e limpeza de segurança do equipamento", key=f"c1_{idx_os}")
+                        chk2 = st.checkbox("2. Verificação de cabos, aterramento e tensões de alimentação", key=f"c2_{idx_os}")
+                        chk3 = st.checkbox("3. Testes funcionais e calibração de rotina conforme IT", key=f"c3_{idx_os}")
+                        chk4 = st.checkbox("4. Validação de leituras e emissão de laudo técnico", key=f"c4_{idx_os}")
+                        
+                        obs_tecnico_final = st.text_input("Relatório Técnico / Peças Aplicadas / Conclusão", key=f"obs_f_{idx_os}")
+
+                        st.markdown("---")
+                        st.markdown("#### ✍️ Recolha de Assinaturas Digitais")
+                        
+                        col_as1, col_as2 = st.columns(2)
+                        with col_as1:
+                            st.markdown(f"**Técnico Responsável:** `{row_os['tecnico_responsavel']}`")
+                            assinatura_tec_input = st.text_input("Confirmação Nome/CFT do Técnico", value=EQUIPA_TECNICA.get(str(row_os['tecnico_responsavel']).upper(), {}).get("assinatura", row_os['tecnico_responsavel']), key=f"as_tec_{idx_os}")
+                        with col_as2:
+                            assinatura_cliente_input = st.text_input("Nome e Cargo do Responsável no Hospital (Assinatura digital)", placeholder="Ex: Dr. Carlos - Chefe de Radiologia", key=f"as_cli_{idx_os}")
+
+                        if st.button("💾 Finalizar, Assinar e Fechar OS", key=f"btn_finalizar_os_{idx_os}", type="primary"):
+                            if not assinatura_cliente_input.strip():
+                                st.error("⚠️ O nome do responsável do hospital é obrigatório para assinar a OS!")
+                            else:
+                                df.at[idx_os, 'pendencias'] = f"[CONCLUÍDO] {obs_tecnico_final.strip().upper()}"
+                                df.at[idx_os, 'status'] = 'CONCLUÍDO'
+                                df.at[idx_os, 'checklist_pop'] = f"POP/IT Validado | Obs: {obs_tecnico_final.strip().upper()}"
+                                df.at[idx_os, 'assinatura_cliente'] = assinatura_cliente_input.strip().upper()
+                                df.at[idx_os, 'assinatura_tecnico'] = assinatura_tec_input.strip().upper()
+                                
+                                if salvar_dados_seguro(df):
+                                    st.cache_data.clear()
+                                    st.success("✅ Ordem de Serviço concluída, assinada e arquivada com sucesso!")
+                                    st.balloons()
+                                    st.rerun()
+
+# ----------------------------------------------------
+# ABA 4: MAPA & PLANEAMENTO DE ROTAS
+# ----------------------------------------------------
+elif acao == "🗺️ Mapa & Planeamento de Rotas":
+    st.markdown("### 🗺️ Mapa Operacional & Planeamento de Rotas")
+
+    COORDINADAS_CIDADES = {
+        "fortaleza": (-3.7172, -38.5433),
+        "juazeiro": (-7.2009, -39.3148),
+        "araripina": (-7.4811, -40.4994),
+        "petrolina": (-9.3875, -40.5028),
+        "taua": (-6.0044, -40.2934),
+        "sobral": (-3.6895, -40.3486),
+        "crato": (-7.2347, -39.4069),
+        "eusebio": (-3.8856, -38.4614),
+        "brasilia": (-15.7975, -47.8919)
+    }
+
+    cores_hex = ["#64dfdf", "#f72585", "#7209b7", "#4cc9f0", "#ff9f1c", "#2ec4b6", "#e71d36", "#ffb703"]
+
+    pontos_mapa = []
+    clientes_ordenados = sorted([c for c in df['cliente'].unique() if str(c).strip() != ''])
+    dict_clientes_coords = {}
+
+    for idx_c, cliente_nome in enumerate(clientes_ordenados):
+        grupo = df[df['cliente'] == cliente_nome]
+        primeira = grupo.iloc[0]
+        cidade_str = str(primeira.get('cidade', '')).strip().lower()
+        
+        raw_end = primeira.get('endereco', '')
+        if pd.isna(raw_end) or str(raw_end).strip().lower() in ['', 'nan', 'none']:
+            endereco_hosp = f"{primeira.get('cidade', '')} - {primeira.get('estado', '')}"
+        else:
+            endereco_hosp = str(raw_end)
+        
+        lat, lon = -3.7172, -38.5433
+        for cid_key, coords in COORDINADAS_CIDADES.items():
+            if cid_key in cidade_str:
+                lat, lon = coords
+                break
+        
+        cor_atribuida = cores_hex[idx_c % len(cores_hex)]
+        pontos_mapa.append({
+            'lat': lat, 'lon': lon, 'cliente': cliente_nome,
+            'cidade': str(primeira.get('cidade', '')).upper(), 'estado': str(primeira.get('estado', '')).upper(), 'color': cor_atribuida
+        })
+
+        dict_clientes_coords[cliente_nome] = {
+            'lat': lat, 'lon': lon, 'endereco': f"{cliente_nome}, {endereco_hosp}".upper(), 'cidade': str(primeira.get('cidade', '')).upper()
+        }
+
+    col_R1, col_R2 = st.columns(2)
+    with col_R1:
+        lista_tecs_rota = list(EQUIPA_TECNICA.keys())
+        tecnico_rota_default = st.session_state.utilizador.upper() if st.session_state.perfil != "Gestor" else lista_tecs_rota[0]
+        tecnico_rota = st.selectbox("👷 Técnico Responsável pela Rota:", lista_tecs_rota, index=lista_tecs_rota.index(tecnico_rota_default) if tecnico_rota_default in lista_tecs_rota else 0)
+        
+        tipo_saida = st.radio("📍 Ponto de Partida:", ["Residência do Técnico", "Sede da EMED"], horizontal=True)
+        if tipo_saida == "Residência do Técnico":
+            ponto_partida_padrao = EQUIPA_TECNICA.get(tecnico_rota, {}).get("partida", "FORTALEZA - CE")
+        else:
+            sede_tec = EQUIPA_TECNICA.get(tecnico_rota, {}).get("sede", "EUSEBIO")
+            ponto_partida_padrao = f"EMED - {sede_tec}"
+            
+        ponto_partida = st.text_input("Endereço de Origem:", value=ponto_partida_padrao)
+        retorno_base = st.checkbox("🔄 Incluir retorno no final da rota", value=True)
+        
+        if retorno_base:
+            tipo_retorno = st.radio("📍 Destino do Retorno:", ["Residência do Técnico", "Sede da EMED"], horizontal=True)
+            if tipo_retorno == "Residência do Técnico":
+                ponto_retorno = EQUIPA_TECNICA.get(tecnico_rota, {}).get("partida", "FORTALEZA - CE")
+            else:
+                sede_tec = EQUIPA_TECNICA.get(tecnico_rota, {}).get("sede", "EUSEBIO")
+                ponto_retorno = f"EMED - {sede_tec}"
+        else:
+            ponto_retorno = ponto_partida
+
+    with col_R2:
+        st.markdown("#### 🛑 Seleção de Paradas (Hospitais / Clientes)")
+        clientes_selecionados_rota = st.multiselect("Selecione os clientes na ordem desejada:", options=clientes_ordenados, key="multiselect_paradas_principal")
+
+    if clientes_selecionados_rota:
+        pontos_filtrados = [p for p in pontos_mapa if p['cliente'] in clientes_selecionados_rota]
+        df_mapa_exibicao = pd.DataFrame(pontos_filtrados)
+        zoom_val = 7
+    else:
+        df_mapa_exibicao = pd.DataFrame(pontos_mapa)
+        zoom_val = 6
+
+    if not df_mapa_exibicao.empty:
+        st.map(df_mapa_exibicao, latitude="lat", longitude="lon", size=400, color="color", zoom=zoom_val)
+
+    if clientes_selecionados_rota:
+        st.markdown("---")
+        st.markdown("#### 📋 Pré-visualização do Itinerário Sequencial, Quilometragem & Tempo Estimado")
+        lat_origem, lon_origem = -3.7172, -38.5433
+        lat_retorno, lon_retorno = lat_origem, lon_origem
+        lat_ant, lon_ant = lat_origem, lon_origem
+
+        sequencia_viagem = [f"🏠 **Origem (Início):** {ponto_partida}"]
+        distancia_total = 0.0
+        
+        for idx, cli_parada in enumerate(clientes_selecionados_rota, 1):
+            info_c = dict_clientes_coords[cli_parada]
+            dist_parada = calcular_distancia(lat_ant, lon_ant, info_c['lat'], info_c['lon'])
+            tempo_parada = formatar_tempo(dist_parada)
+            distancia_total += dist_parada
+            sequencia_viagem.append(f"🛑 **Parada {idx}:** {info_c['endereco']} — *(Trecho: ~{dist_parada} km | ⏱️ ~{tempo_parada})*")
+            lat_ant, lon_ant = info_c['lat'], info_c['lon']
+        
+        if retorno_base:
+            dist_volta = calcular_distancia(lat_ant, lon_ant, lat_retorno, lon_retorno)
+            tempo_volta = formatar_tempo(dist_volta)
+            distancia_total += dist_volta
+            sequencia_viagem.append(f"🏠 **Retorno ({tipo_retorno}):** {ponto_retorno} — *(Trecho de volta: ~{dist_volta} km | ⏱️ ~{tempo_volta})*")
+
+        for passo in sequencia_viagem:
+            st.markdown(f"<div style='background: #1c2541; padding: 10px 15px; border-radius: 6px; margin-bottom: 6px; border-left: 4px solid #64dfdf;'>{passo}</div>", unsafe_allow_html=True)
+
+        tempo_total_est = formatar_tempo(distancia_total)
+        st.info(f"🚗 **Distância Total Estimada da Rota:** Aproximadamente **{distancia_total:.1f} km** | ⏱️ **Tempo Total Estimado de Condução:** Aproximadamente **{tempo_total_est}**")
+
+        origem_encoded = urllib.parse.quote(ponto_partida)
+        if retorno_base:
+            destino_final = ponto_retorno
+            waypoints = [dict_clientes_coords[c]['endereco'] for c in clientes_selecionados_rota]
+        else:
+            destino_final = dict_clientes_coords[clientes_selecionados_rota[-1]]['endereco']
+            waypoints = [dict_clientes_coords[c]['endereco'] for c in clientes_selecionados_rota[:-1]]
+        
+        destino_encoded = urllib.parse.quote(destino_final)
+        if waypoints:
+            waypoints_str = "|".join([urllib.parse.quote(w) for w in waypoints])
+            url_maps_rota = f"https://www.google.com/maps/dir/?api=1&origin={origem_encoded}&destination={destino_encoded}&waypoints={waypoints_str}&travelmode=driving"
+        else:
+            url_maps_rota = f"https://www.google.com/maps/dir/?api=1&origin={origem_encoded}&destination={destino_encoded}&travelmode=driving"
+
+        st.markdown(f"""
+            <a href="{url_maps_rota}" target="_blank" style="background: #10b981; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block; margin-top: 10px;">
+                🧭 Abrir Rota Completa no Google Maps (Com Paradas e Retorno)
+            </a>
+        """, unsafe_allow_html=True)
+
+# ----------------------------------------------------
+# ABA 5: CADASTRO DE CLIENTES (Apenas Gestor)
+# ----------------------------------------------------
+elif acao == "➕ Cadastro de Clientes":
+    st.markdown("### ➕ Registo de Novo Hospital / Cliente Base")
+
+    with st.form("form_novo_cliente_puro"):
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            novo_cliente = st.text_input("Nome do Hospital / Cliente *")
+            novo_cidade = st.text_input("Cidade *")
+            novo_estado = st.text_input("Estado (UF) *", value="CE")
+        with col_c2:
+            novo_endereco = st.text_input("Endereço Completo (para GPS) *")
+            novo_resp_hosp = st.text_input("Responsável no Hospital")
+            novo_tel_hosp = st.text_input("Contacto do Hospital")
+
+        btn_salvar_novo = st.form_submit_button("💾 Salvar Novo Cliente na Base", type="primary")
+
+        if btn_salvar_novo:
+            if not novo_cliente or not novo_cidade or not novo_endereco:
+                st.error("⚠️ Preencha os campos obrigatórios: Nome do Hospital, Cidade e Endereço!")
+            else:
+                cliente_upper = novo_cliente.strip().upper()
+                cidade_upper = novo_cidade.strip().upper()
+                estado_upper = novo_estado.strip().upper()
+                endereco_upper = novo_endereco.strip().upper()
+                resp_upper = novo_resp_hosp.strip().upper() if novo_resp_hosp else ""
+                
+                if cliente_upper in df['cliente'].values:
+                    st.warning(f"⚠️ O cliente '{cliente_upper}' já se encontra registado na base de dados!")
+                else:
+                    nova_linha = {
+                        'cliente': cliente_upper,
+                        'cidade': cidade_upper,
+                        'estado': estado_upper,
+                        'equipamento': 'NENHUM (AGUARDANDO EQUIPAMENTO)',
+                        'endereco': endereco_upper,
+                        'tipo_servico': 'PREVENTIVA',
+                        'data_agendamento': None,
+                        'tecnico_responsavel': 'A DEFINIR',
+                        'telefone_tecnico': '',
+                        'responsavel_hospital': resp_upper,
+                        'contato_responsavel': novo_tel_hosp.strip(),
+                        'confirmado': 'NÃO',
+                        'pendencias': 'SEM PENDENCIAS APARENTES',
+                        'status': 'ATIVO'
+                    }
+                    df = pd.concat([df, pd.DataFrame([nova_linha])], ignore_index=True)
+                    if salvar_dados_seguro(df):
+                        st.cache_data.clear()
+                        st.success(f"✅ Cliente '{cliente_upper}' registado com sucesso!")
+                        st.rerun()
+
+    st.markdown("---")
+    st.markdown("### 📋 Lista de Clientes Registados")
+    clientes_unicos_df = df[['cliente', 'cidade', 'estado', 'endereco', 'responsavel_hospital', 'contato_responsavel']].drop_duplicates(subset=['cliente'])
+    st.dataframe(clientes_unicos_df, use_container_width=True, hide_index=True)
+
+# ----------------------------------------------------
+# ABA 6: GESTÃO & ADMINISTRAÇÃO (Apenas Gestor)
+# ----------------------------------------------------
+elif acao == "⚙️ Gestão & Administração":
+    st.markdown("### ⚙️ Painel de Gestão & Administração")
+    
+    sub_gestao = st.radio("Selecione o módulo de gestão:", ["👷 Gestão de Técnicos", "🚗 Gestão de Veículos & Frota"], horizontal=True)
+    st.markdown("---")
+
+    if sub_gestao == "👷 Gestão de Técnicos":
+        st.markdown("#### Registo e Atualização da Equipa Técnica")
+        with st.form("form_novo_tecnico"):
+            col_t1, col_t2 = st.columns(2)
+            with col_t1:
+                novo_tec_nome = st.text_input("Nome do Técnico *")
+                novo_tec_tel = st.text_input("Telemóvel / WhatsApp (Ex: 5585988888888)")
+                novo_tec_senha = st.text_input("Palavra-passe / PIN de Acesso *", value="1234")
+            with col_t2:
+                novo_tec_partida = st.text_input("Endereço de Partida / Residência (Ex: Maraponga, Fortaleza - CE)")
+                novo_tec_sede = st.selectbox("Sede Principal", ["EUSEBIO", "BRASILIA"])
+                novo_tec_perfil = st.selectbox("Nível de Acesso", ["Técnico", "Gestor"])
+
+            btn_salvar_tec = st.form_submit_button("💾 Salvar Novo Técnico", type="primary")
+
+            if btn_salvar_tec:
+                if not novo_tec_nome.strip():
+                    st.error("⚠️ O nome do técnico é obrigatório!")
+                else:
+                    try:
+                        conn = sqlite3.connect(DB_NAME)
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            INSERT INTO tecnicos (nome, telefone, partida, sede, senha, perfil)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        """, (
+                            novo_tec_nome.strip().upper(), 
+                            novo_tec_tel.strip(), 
+                            novo_tec_partida.strip().upper(), 
+                            novo_tec_sede, 
+                            novo_tec_senha.strip(), 
+                            novo_tec_perfil
+                        ))
+                        conn.commit()
+                        conn.close()
+                        st.cache_data.clear()
+                        st.success(f"✅ Técnico '{novo_tec_nome.strip().upper()}' cadastrado com sucesso!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"⚠️ Erro ao cadastrar técnico: {e}")
+
+        st.markdown("---")
+        st.markdown("#### 📋 Gestão Unificada de Técnicos (Editar / Excluir)")
+        
+        df_tecs_atualizado = carregar_tecnicos()
+        if not df_tecs_atualizado.empty:
+            def _txt_tec(val, default=""):
+                if val is None or pd.isna(val):
+                    return default
+                texto = str(val)
+                if texto.strip().lower() in ("nan", "none"):
+                    return default
+                return texto
+
+            nomes_tecnicos = df_tecs_atualizado['nome'].astype(str).tolist()
+            tecnico_selecionado_edicao = st.selectbox(
+                "Selecione o técnico para gerir/editar:",
+                nomes_tecnicos,
+                key="select_tec_edit"
+            )
+            
+            row_tec_selecionado = df_tecs_atualizado[df_tecs_atualizado['nome'].astype(str) == tecnico_selecionado_edicao].iloc[0]
+            t_id = int(row_tec_selecionado['id'])
+            
+            with st.form("form_edicao_tecnico_definitivo"):
+                st.markdown(f"#### Editando: {row_tec_selecionado['nome']}")
+                edt_nome = st.text_input("Nome", value=_txt_tec(row_tec_selecionado['nome']), key=f"edt_nome_{t_id}")
+                edt_tel = st.text_input("Telemóvel", value=_txt_tec(row_tec_selecionado['telefone']), key=f"edt_tel_{t_id}")
+                edt_partida = st.text_input("Endereço de Partida", value=_txt_tec(row_tec_selecionado['partida']), key=f"edt_partida_{t_id}")
+                
+                sede_atual = _txt_tec(row_tec_selecionado['sede']).strip().upper()
+                idx_sede = 1 if "BRASILIA" in sede_atual else 0
+                edt_sede = st.selectbox("Sede Principal", ["EUSEBIO", "BRASILIA"], index=idx_sede, key=f"edt_sede_{t_id}")
+                
+                edt_senha = st.text_input("Palavra-passe / PIN", value=_txt_tec(row_tec_selecionado['senha']), key=f"edt_senha_{t_id}")
+                perfil_atual = _txt_tec(row_tec_selecionado.get('perfil', 'Técnico'), "Técnico")
+                edt_perfil = st.selectbox(
+                    "Perfil de Acesso",
+                    ["Técnico", "Gestor"],
+                    index=1 if perfil_atual.lower() == "gestor" else 0,
+                    key=f"edt_perfil_{t_id}"
+                )
+                
+                col_b1, col_b2 = st.columns(2)
+                with col_b1:
+                    btn_salvar_alt_t = st.form_submit_button("💾 Salvar Alterações", type="primary")
+                with col_b2:
+                    btn_excluir_t = st.form_submit_button("🗑️ Excluir este Técnico")
+                    
+                if btn_salvar_alt_t:
+                    try:
+                        conn = sqlite3.connect(DB_NAME)
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            UPDATE tecnicos
+                            SET nome = ?, telefone = ?, partida = ?, sede = ?, senha = ?, perfil = ?
+                            WHERE id = ?
+                        """, (
+                            edt_nome.strip().upper(),
+                            edt_tel.strip(),
+                            edt_partida.strip().upper(),
+                            edt_sede,
+                            edt_senha.strip(),
+                            edt_perfil,
+                            t_id
+                        ))
+                        conn.commit()
+                        conn.close()
+                        st.cache_data.clear()
+                        st.success("✅ Técnico atualizado com sucesso!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"⚠️ Erro ao atualizar técnico: {e}")
+
+                if btn_excluir_t:
+                    if _txt_tec(row_tec_selecionado['nome']).upper() == "NETTO":
+                        st.error("❌ Não é permitido excluir o gestor principal NETTO!")
+                    else:
+                        try:
+                            conn = sqlite3.connect(DB_NAME)
+                            cursor = conn.cursor()
+                            cursor.execute("DELETE FROM tecnicos WHERE id = ?", (t_id,))
+                            conn.commit()
+                            conn.close()
+                            st.cache_data.clear()
+                            st.success("Técnico excluído com sucesso!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"⚠️ Erro ao excluir técnico: {e}")
+            
+            st.markdown("---")
+            st.caption("A tabela abaixo é só consulta. Para gravar, use o formulário acima e o botão **Salvar Alterações**.")
+            st.dataframe(carregar_tecnicos(), use_container_width=True, hide_index=True)
+
+    elif sub_gestao == "🚗 Gestão de Veículos & Frota":
+        st.markdown("#### Controlo de Quilometragem & Alertas de Manutenção")
+        
+        with st.expander("➕ Adicionar Novo Veículo à Frota"):
+            with st.form("form_novo_veiculo"):
+                col_v1, col_v2 = st.columns(2)
+                with col_v1:
+                    v_modelo = st.text_input("Modelo do Veículo (Ex: Renault Captur) *")
+                    v_placa = st.text_input("Placa / Identificação *")
+                    v_km_atual = st.number_input("Quilometragem Atual (KM)", min_value=0, value=10000)
+                with col_v2:
+                    v_km_ultima = st.number_input("KM da Última Revisão", min_value=0, value=0)
+                    v_km_proxima = st.number_input("KM para a Próxima Revisão", min_value=0, value=10000)
+
+                btn_salvar_v = st.form_submit_button("💾 Registar Veículo", type="primary")
+                if btn_salvar_v:
+                    if not v_modelo.strip() or not v_placa.strip():
+                        st.error("⚠️ Preencha o modelo e a placa do veículo!")
+                    else:
+                        try:
+                            conn = sqlite3.connect(DB_NAME)
+                            cursor = conn.cursor()
+                            cursor.execute("""
+                                INSERT INTO veiculos (modelo, placa, km_atual, km_ultima_revisao, km_proxima_revisao, status_manutencao)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            """, (v_modelo.strip().upper(), v_placa.strip().upper(), v_km_atual, v_km_ultima, v_km_proxima, "EM DIA"))
+                            conn.commit()
+                            conn.close()
+                            st.cache_data.clear()
+                            st.success(f"✅ Veículo '{v_modelo.strip().upper()}' registado com sucesso!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"⚠️ Erro ao registar veículo: {e}")
+
+        st.markdown("---")
+        st.markdown("#### 🚨 Alertas, Monitoramento & Edição da Frota")
+        
+        df_veic_atualizado = carregar_veiculos()
+        if not df_veic_atualizado.empty:
+            for _, v_row in df_veic_atualizado.iterrows():
+                v_id = int(v_row['id'])
+                km_atual = int(v_row['km_atual'])
+                km_prox = int(v_row['km_proxima_revisao'])
+                km_restantes = km_prox - km_atual
+                
+                if km_restantes <= 0:
+                    status_cor = "#ef4444"
+                    status_txt = "🚨 REVISÃO URGENTE NECESSÁRIA!"
+                elif km_restantes <= 1500:
+                    status_cor = "#f59e0b"
+                    status_txt = "⚠️ Próximo da Revisão Preventiva"
+                else:
+                    status_cor = "#10b981"
+                    status_txt = "✅ Manutenção em Dia"
+
+                modelo_veic = v_row['modelo']
+                placa_veic = v_row['placa']
+                
+                st.markdown(
+                    f'<div style="background: #1c2541; border-left: 5px solid {status_cor}; padding: 15px; border-radius: 8px; margin-bottom: 12px;">'
+                    f'<h4 style="margin: 0 0 5px 0; color: #64dfdf;">🚗 {modelo_veic} (Placa: <code>{placa_veic}</code>)</h4>'
+                    f'<p style="margin: 3px 0;"><strong>KM Atual:</strong> {km_atual:,} km | <strong>Próxima Revisão em:</strong> {km_prox:,} km</p>'
+                    f'<p style="margin: 3px 0;"><strong>Faltam:</strong> {km_restantes:,} km para a revisão | <span style="color: {status_cor}; font-weight: bold;">{status_txt}</span></p>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+                
+                col_veic_btn1, col_veic_btn2 = st.columns(2)
+                with col_veic_btn1:
+                    if st.button(f"✏️ Editar Veículo {v_row['placa']}", key=f"edit_v_{v_id}"):
+                        st.session_state[f"editando_veiculo_{v_id}"] = True
+                with col_veic_btn2:
+                    if st.button(f"🗑️ Excluir Veículo {v_row['placa']}", key=f"del_v_{v_id}"):
+                        conn = sqlite3.connect(DB_NAME)
+                        cursor = conn.cursor()
+                        cursor.execute("DELETE FROM veiculos WHERE id = ?", (v_id,))
+                        conn.commit()
+                        conn.close()
+                        st.cache_data.clear()
+                        st.success("Veículo excluído com sucesso!")
+                        st.rerun()
+
+                if st.session_state.get(f"editando_veiculo_{v_id}", False):
+                    with st.form(f"form_edicao_veiculo_{v_id}"):
+                        novo_modelo = st.text_input("Modelo", value=v_row['modelo'])
+                        nova_placa = st.text_input("Placa", value=v_row['placa'])
+                        novo_km = st.number_input("KM Atual", min_value=0, value=int(v_row['km_atual']))
+                        nova_prox_rev = st.number_input("KM Próxima Revisão", min_value=0, value=int(v_row['km_proxima_revisao']))
+                        
+                        col_fb1, col_fb2 = st.columns(2)
+                        with col_fb1:
+                            btn_salvar_alt_v = st.form_submit_button("💾 Salvar Alterações", type="primary")
+                        with col_fb2:
+                            btn_cancelar_alt_v = st.form_submit_button("❌ Cancelar")
+                            
+                        if btn_salvar_alt_v:
+                            conn = sqlite3.connect(DB_NAME)
+                            cursor = conn.cursor()
+                            cursor.execute("""
+                                UPDATE veiculos SET modelo = ?, placa = ?, km_atual = ?, km_proxima_revisao = ?
+                                WHERE id = ?
+                            """, (novo_modelo.strip().upper(), nova_placa.strip().upper(), novo_km, nova_prox_rev, v_id))
+                            conn.commit()
+                            conn.close()
+                            st.session_state[f"editando_veiculo_{v_id}"] = False
+                            st.cache_data.clear()
+                            st.success("Veículo atualizado com sucesso!")
+                            st.rerun()
+                        if btn_cancelar_alt_v:
+                            st.session_state[f"editando_veiculo_{v_id}"] = False
+                            st.rerun()
+            
+            st.markdown("---")
+            st.dataframe(df_veic_atualizado, use_container_width=True, hide_index=True)
+
+# ----------------------------------------------------
+# ABA: ATUALIZAR QUILOMETRAGEM (OPCIONAL)
+# ----------------------------------------------------
+elif acao == "🚗 Atualizar Quilometragem (Opcional)":
+    st.markdown("### 🚗 Registo Opcional de Quilometragem da Frota")
+    st.markdown("Este preenchimento é totalmente **opcional**. Utilize apenas quando desejar atualizar a quilometragem do veículo em viagens longas.")
+
+    if df_veiculos.empty:
+        st.warning("⚠️ Nenhum veículo registado.")
+    else:
+        with st.form("form_update_km_tecnico"):
+            veiculo_escolhido = st.selectbox("Selecione o Veículo / Placa", df_veiculos['modelo'] + " (" + df_veiculos['placa'] + ")")
+            km_informado = st.number_input("Quilometragem Atual no Painel (KM)", min_value=0, value=0)
+            
+            btn_submeter_km = st.form_submit_button("📤 Atualizar (Opcional)", type="primary")
+            if btn_submeter_km:
+                if km_informado > 0:
+                    placa_extraida = veiculo_escolhido.split("(")[-1].replace(")", "").strip()
+                    conn = sqlite3.connect(DB_NAME)
+                    cursor = conn.cursor()
+                    cursor.execute("UPDATE veiculos SET km_atual = ? WHERE placa = ?", (km_informado, placa_extraida))
+                    conn.commit()
+                    conn.close()
+                    st.cache_data.clear()
+                    st.success(f"✅ Quilometragem atualizada para {km_informado:,} km!")
+                    st.rerun()
+                else:
+                    st.info("ℹ️ Nenhum valor alterado (preenchimento opcional ignorado com sucesso).")
+
+# ----------------------------------------------------
+# ABA 7: EDITOR DIRETO DA PLANILHA (Apenas Gestor)
+# ----------------------------------------------------
+elif acao == "📝 Editor Direto da Planilha":
+    st.markdown("### 📝 Edição de Dados em Tempo Real")
+    st.markdown("Altere os dados diretamente na tabela abaixo e clique em gravar para atualizar instantaneamente.")
+
+    df_exibicao = df.copy()
+    for col in df_exibicao.columns:
+        if 'data' in col.lower() or 'preventiva' in col.lower():
+            df_exibicao[col] = pd.to_datetime(df_exibicao[col], errors='coerce').dt.strftime('%d/%m/%Y')
+
+    df_editado = st.data_editor(df_exibicao, num_rows="dynamic", use_container_width=True)
+
+    if st.button("💾 Guardar Alterações na Base", type="primary"):
+        for col in df_editado.columns:
+            if 'data' in col.lower() or 'preventiva' in col.lower():
+                df_editado[col] = pd.to_datetime(df_editado[col], format='%d/%m/%Y', errors='coerce').dt.strftime('%Y-%m-%d')
+            elif df_editado[col].dtype == object:
+                df_editado[col] = df_editado[col].fillna('').astype(str).str.upper()
+        
+        df_editado['cliente'] = df_editado['cliente'].fillna('').astype(str).str.upper()
+        
+        if salvar_dados_seguro(df_editado):
+            st.cache_data.clear()
+            st.success("✅ Alterações gravadas com sucesso na base de dados SQLite e sincronizadas!")
+            st.rerun()
+        else:
+            st.error("❌ Erro ao gravar as alterações.")
