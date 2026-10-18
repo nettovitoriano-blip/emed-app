@@ -130,6 +130,9 @@ except ImportError:
 if "menu_acao_ativa" not in st.session_state or st.session_state.menu_acao_ativa not in opcoes_menu:
     st.session_state.menu_acao_ativa = opcoes_menu[0]
 
+if "radio_menu_sidebar" not in st.session_state or st.session_state.radio_menu_sidebar not in opcoes_menu:
+    st.session_state.radio_menu_sidebar = st.session_state.menu_acao_ativa
+
 
 def _ao_mudar_sidebar():
     st.session_state.menu_acao_ativa = st.session_state.radio_menu_sidebar
@@ -138,7 +141,6 @@ def _ao_mudar_sidebar():
 acao = st.sidebar.radio(
     "Menu:",
     opcoes_menu,
-    index=opcoes_menu.index(st.session_state.menu_acao_ativa),
     key="radio_menu_sidebar",
     on_change=_ao_mudar_sidebar,
 )

@@ -22,6 +22,12 @@ ATALHOS_DESKTOP_META = {
 }
 
 
+def _selecionar_atalho_desktop(opcao_escolhida: str):
+    """Callback executado antes da re-renderização para sincronizar a grade de ícones e a sidebar."""
+    st.session_state.menu_acao_ativa = opcao_escolhida
+    st.session_state.radio_menu_sidebar = opcao_escolhida
+
+
 def renderizar_area_trabalho_icones(opcoes_menu: list, acao_atual: str, perfil_atual: str):
     """Renderiza uma grade de ícones estilo Área de Trabalho do Windows / App Launcher
     para facilitar a navegação rápida com 1 toque no celular e no computador.
@@ -43,14 +49,14 @@ def renderizar_area_trabalho_icones(opcoes_menu: list, acao_atual: str, perfil_a
             ativo = opcao == acao_atual
             prefixo_ativo = "🟢 " if ativo else ""
             with cols[idx % colunas_por_linha]:
-                if st.button(
-                    f"{prefixo_ativo}{icone}\n{rotulo_curto}",
+                st.button(
+                    f"{prefixo_ativo}{icone} {rotulo_curto}",
                     key=f"desk_tile_{idx}",
                     type="primary" if ativo else "secondary",
                     use_container_width=True,
-                ):
-                    st.session_state.menu_acao_ativa = opcao
-                    st.rerun()
+                    on_click=_selecionar_atalho_desktop,
+                    args=(opcao,),
+                )
 
 
 def estilizar_grafico(fig):

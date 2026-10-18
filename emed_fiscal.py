@@ -453,26 +453,31 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
                         aliquota_iss=aliq_iss_in,
                         codigo_servico_iss=cod_iss.strip(),
                     )
-                    st.success(
-                        f"✅ Nota Fiscal **{nota.get('status_fiscal')}**! "
-                        f"Número: **{nota.get('numero_nf')}** | Chave: `{nota.get('chave_acesso')}` | "
-                        f"Protocolo: `{nota.get('protocolo_autorizacao')}`"
-                    )
-                    xml_p = str(nota.get("xml_path") or "")
-                    html_path = xml_p.replace("xml", "html")
-                    if os.path.exists(html_path):
-                        with open(html_path, "r", encoding="utf-8") as f:
-                            st.markdown(f.read(), unsafe_allow_html=True)
-                    if os.path.exists(xml_p):
-                        with open(xml_p, "rb") as fx:
-                            st.download_button(
-                                label="📥 Baixar XML da Nota Fiscal",
-                                data=fx,
-                                file_name=f"NF_{nota.get('numero_nf')}_OS_{os_id}.xml",
-                                mime="application/xml",
-                            )
+                    st.session_state.ultima_nota_emitida = nota
                 except Exception as exc:
                     st.error(f"⚠️ Erro ao emitir nota: {exc}")
+
+            nota_exibir = st.session_state.get("ultima_nota_emitida")
+            if nota_exibir:
+                st.success(
+                    f"✅ Nota Fiscal **{nota_exibir.get('status_fiscal')}**! "
+                    f"Número: **{nota_exibir.get('numero_nf')}** | Chave: `{nota_exibir.get('chave_acesso')}` | "
+                    f"Protocolo: `{nota_exibir.get('protocolo_autorizacao')}`"
+                )
+                xml_p = str(nota_exibir.get("xml_path") or "")
+                html_path = xml_p.replace("xml", "html")
+                if os.path.exists(html_path):
+                    with open(html_path, "r", encoding="utf-8") as f:
+                        st.markdown(f.read(), unsafe_allow_html=True)
+                if os.path.exists(xml_p):
+                    with open(xml_p, "rb") as fx:
+                        st.download_button(
+                            label="📥 Baixar XML da Nota Fiscal",
+                            data=fx,
+                            file_name=f"NF_{nota_exibir.get('numero_nf')}_OS_{nota_exibir.get('os_id')}.xml",
+                            mime="application/xml",
+                            key=f"dl_xml_{nota_exibir.get('numero_nf')}",
+                        )
 
     with aba_f2:
         st.markdown("#### 📋 Notas Fiscais Emitidas no Banco (`notas_fiscais`)")
@@ -486,23 +491,44 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
         st.markdown("#### 🔍 Consulta de Status e Cancelamento / Estorno Circular")
         opcoes_chaves = (
             [f"{r['chave_acesso']} | NF {r['numero_nf']} - {r['cliente']} [{r['status_fiscal']}]" for _, r in df_notas.iterrows()]
-            if not df_notas.empty else []
+            if not df_notas.empty else ["Nenhuma nota emitida"]
         )
-        chave_sel = st.selectbox("Selecionar Nota Emitida (ou digite abaixo):", [""] + opcoes_chaves)
-        chave_default = chave_sel.split("|")[0].strip() if chave_sel else ""
-        chave = st.text_input("Chave de Acesso da Nota Fiscal", value=chave_default)
+
+        def _sincronizar_chave_selecionada():
+            sel = st.session_state.get("sel_nota_fiscal_lista", "")
+            if sel and "|" in sel:
+                st.session_state.input_chave_fiscal = sel.split("|")[0].strip()
+
+        chave_sel = st.selectbox(
+            "Selecionar Nota Emitida (ou digite abaixo):",
+            opcoes_chaves,
+            key="sel_nota_fiscal_lista",
+            on_change=_sincronizar_chave_selecionada,
+        )
+        chave_padrao_inicial = chave_sel.split("|")[0].strip() if "|" in str(chave_sel) else ""
+        if "input_chave_fiscal" not in st.session_state or not st.session_state.input_chave_fiscal:
+            st.session_state.input_chave_fiscal = chave_padrao_inicial
+
+        chave = st.text_input("Chave de Acesso da Nota Fiscal", key="input_chave_fiscal")
+        chave_efetiva = (chave or chave_padrao_inicial).strip()
 
         c_b1, c_b2 = st.columns(2)
         with c_b1:
-            if st.button("🔍 Consultar Status na SEFAZ/Prefeitura") and chave:
-                st.json(manager.consultar_status(chave))
+            if st.button("🔍 Consultar Status na SEFAZ/Prefeitura", use_container_width=True):
+                if not chave_efetiva:
+                    st.warning("⚠️ Selecione uma nota fiscal na lista ou informe a Chave de Acesso.")
+                else:
+                    st.json(manager.consultar_status(chave_efetiva))
         with c_b2:
-            if st.button("🚫 Cancelar / Estornar Nota Fiscal") and chave:
-                try:
-                    if manager.cancelar_nota(chave):
-                        st.success("✅ Nota fiscal cancelada com sucesso! A OS correspondente está liberada para nova emissão.")
-                        st.rerun()
-                    else:
-                        st.warning("⚠️ Cancelamento não concluído.")
-                except Exception as e:
-                    st.error(str(e))
+            if st.button("🚫 Cancelar / Estornar Nota Fiscal", use_container_width=True):
+                if not chave_efetiva:
+                    st.warning("⚠️ Selecione uma nota fiscal na lista ou informe a Chave de Acesso para cancelar.")
+                else:
+                    try:
+                        if manager.cancelar_nota(chave_efetiva):
+                            st.success("✅ Nota fiscal cancelada com sucesso! A OS correspondente está liberada para nova emissão.")
+                            st.rerun()
+                        else:
+                            st.warning("⚠️ Cancelamento não concluído.")
+                    except Exception as e:
+                        st.error(str(e))
