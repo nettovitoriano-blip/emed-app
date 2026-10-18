@@ -18,7 +18,13 @@ from emed_services import (
     montar_equipa_tecnica,
     salvar_dados_seguro,
 )
-from emed_ui import inject_custom_css, renderizar_area_trabalho_icones
+import importlib
+import emed_ui.styles as _ui_styles
+import emed_ui.components as _ui_comp
+importlib.reload(_ui_styles)
+importlib.reload(_ui_comp)
+from emed_ui.styles import inject_custom_css
+from emed_ui.components import renderizar_area_trabalho_icones
 from emed_views import verificar_e_renderizar_portal_qr, VIEW_ROUTER
 
 # Configuração da Página do Sistema EMED com Tema Escuro Nativo

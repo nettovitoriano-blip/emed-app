@@ -33,6 +33,11 @@ def _alternar_aba_lateral():
     st.session_state.aba_lateral_oculta = not st.session_state.get("aba_lateral_oculta", False)
 
 
+def _alternar_area_trabalho_horizontal():
+    """Alterna o recolhimento/abertura da Área de Trabalho Rápida horizontal."""
+    st.session_state.area_trabalho_aberta = not st.session_state.get("area_trabalho_aberta", True)
+
+
 def renderizar_area_trabalho_icones(
     opcoes_menu: list,
     acao_atual: str,
@@ -40,10 +45,10 @@ def renderizar_area_trabalho_icones(
     usuario_atual: str = "NETTO",
     db_name: str = "",
 ):
-    """Renderiza:
-    1. O botão em barra para Esconder/Mostrar a Aba Lateral Esquerda (igual à barra horizontal).
-    2. A Área de Trabalho Rápida com edição personalizada por utilizador (permitindo excluir/ocultar
-       qualquer botão superior para deixar a tela mais clean, sem nunca remover os itens da aba lateral).
+    """Renderiza na mesma linha:
+    - À esquerda: O botão para Esconder/Abrir a Aba Lateral Esquerda.
+    - À direita (vizinho na mesma linha): A barra horizontal da Área de Trabalho Rápida (abrir/recolher).
+    - Abaixo (quando aberta): Os botões de atalho com edição/exclusão personalizada por utilizador.
     """
     from emed_services import (
         DB_NAME as DEFAULT_DB_NAME,
@@ -56,6 +61,9 @@ def renderizar_area_trabalho_icones(
 
     if "aba_lateral_oculta" not in st.session_state:
         st.session_state.aba_lateral_oculta = False
+
+    if "area_trabalho_aberta" not in st.session_state:
+        st.session_state.area_trabalho_aberta = True
 
     if st.session_state.aba_lateral_oculta:
         st.markdown(
@@ -72,65 +80,98 @@ def renderizar_area_trabalho_icones(
             unsafe_allow_html=True,
         )
 
-    # Barra Superior de Controle da Aba Lateral Esquerda (estilo barra retrátil igual à horizontal)
-    rotulo_barra_lateral = (
-        "▶️ MOSTRAR ABA LATERAL ESQUERDA (ABRIR MENU COMPLETO)"
-        if st.session_state.aba_lateral_oculta
-        else "◀️ ESCONDER ABA LATERAL ESQUERDA (DEIXAR ÁREA DE TRABALHO MAIS CLEAN)"
-    )
-    st.button(
-        rotulo_barra_lateral,
-        key="btn_barra_toggle_sidebar_main",
-        type="primary" if st.session_state.aba_lateral_oculta else "secondary",
-        use_container_width=True,
-        on_click=_alternar_aba_lateral,
-    )
-
     excluidos_usuario = carregar_atalhos_excluidos_usuario(caminho_db, usr_key)
     opcoes_visiveis = [op for op in opcoes_menu if op not in excluidos_usuario]
 
-    with st.expander(
-        "🖥️ ÁREA DE TRABALHO RÁPIDA (ÍCONES DE ATALHO — TOQUE PARA ABRIR / RECOLHER)",
-        expanded=True,
-    ):
-        col_info, col_edit = st.columns([3.2, 1.3])
-        with col_info:
-            st.caption(
-                f"💡 **Atalhos de `{usr_key}`:** Toque num botão para abrir o módulo. "
-                "*(Os botões da aba lateral esquerda são fixos e nunca são removidos)*"
-            )
-        with col_edit:
-            modo_edicao = st.toggle(
-                f"🛠️ Editar / Excluir Botões ({usr_key})",
-                value=st.session_state.get("modo_edicao_atalhos", False),
-                key="toggle_modo_edicao_atalhos",
-            )
-            st.session_state.modo_edicao_atalhos = modo_edicao
+    # Linha Única Alinhada: Botão da Aba Lateral à Esquerda + Barra Horizontal da Área de Trabalho ao Lado
+    col_btn_aba_esq, col_barra_horizontal = st.columns([1.35, 4.65])
+    with col_btn_aba_esq:
+        rotulo_barra_lateral = (
+            "▶️ Abrir Aba Lateral"
+            if st.session_state.aba_lateral_oculta
+            else "◀️ Esconder Aba Lateral"
+        )
+        st.button(
+            rotulo_barra_lateral,
+            key="btn_barra_toggle_sidebar_main",
+            type="primary" if st.session_state.aba_lateral_oculta else "secondary",
+            use_container_width=True,
+            on_click=_alternar_aba_lateral,
+        )
 
-        if modo_edicao:
-            st.info(
-                f"✏️ **Modo de Personalização ({usr_key}):** Clique em **❌** ao lado de qualquer botão abaixo para "
-                "excluí-lo da sua página principal e deixar a área de trabalho mais clean. "
-                "Na aba lateral esquerda todos os menus continuarão sempre disponíveis."
-            )
+    with col_barra_horizontal:
+        seta_horiz = "🔽" if st.session_state.area_trabalho_aberta else "▶️"
+        acao_horiz = "RECOLHER" if st.session_state.area_trabalho_aberta else "ABRIR"
+        st.button(
+            f"{seta_horiz} 🖥️ ÁREA DE TRABALHO RÁPIDA ({len(opcoes_visiveis)} ATALHOS ATIVOS — TOQUE PARA {acao_horiz})",
+            key="btn_barra_toggle_desktop_horiz",
+            type="secondary",
+            use_container_width=True,
+            on_click=_alternar_area_trabalho_horizontal,
+        )
 
-        if not opcoes_visiveis:
-            st.caption(
-                "✨ Todos os botões superiores foram ocultados para deixar a sua Área de Trabalho clean! "
-                "Use a Aba Lateral Esquerda ou ative **🛠️ Editar / Excluir Botões** acima para restaurar atalhos."
-            )
-        else:
-            colunas_por_linha = 3 if modo_edicao else (4 if perfil_atual == "Gestor" else 3)
-            cols = st.columns(colunas_por_linha)
-            for idx, opcao in enumerate(opcoes_visiveis):
-                icone, rotulo_curto = ATALHOS_DESKTOP_META.get(opcao, ("📌", opcao))
-                ativo = opcao == acao_atual
-                prefixo_ativo = "🟢 " if ativo else ""
-                idx_global = opcoes_menu.index(opcao)
-                with cols[idx % colunas_por_linha]:
-                    if modo_edicao:
-                        c_btn, c_del = st.columns([4.2, 1.0])
-                        with c_btn:
+    if st.session_state.area_trabalho_aberta:
+        with st.container():
+            col_info, col_edit = st.columns([3.2, 1.3])
+            with col_info:
+                st.caption(
+                    f"💡 **Atalhos de `{usr_key}`:** Toque num botão para abrir o módulo. "
+                    "*(Os botões da aba lateral esquerda são fixos e nunca são removidos)*"
+                )
+            with col_edit:
+                modo_edicao = st.toggle(
+                    f"🛠️ Editar / Excluir Botões ({usr_key})",
+                    value=st.session_state.get("modo_edicao_atalhos", False),
+                    key="toggle_modo_edicao_atalhos",
+                )
+                st.session_state.modo_edicao_atalhos = modo_edicao
+
+            if modo_edicao:
+                st.info(
+                    f"✏️ **Modo de Personalização ({usr_key}):** Clique em **❌** ao lado dos botões que não usa com frequência "
+                    "para deixar apenas os seus **botões mais usados** na barra superior! "
+                    "Todos os menus continuam sempre disponíveis na aba lateral esquerda."
+                )
+
+            if not opcoes_visiveis:
+                st.caption(
+                    "✨ Todos os botões superiores foram ocultados para deixar a sua Área de Trabalho clean! "
+                    "Use a Aba Lateral Esquerda ou ative **🛠️ Editar / Excluir Botões** acima para restaurar atalhos."
+                )
+            else:
+                colunas_por_linha = 3 if modo_edicao else (4 if perfil_atual == "Gestor" else 3)
+                cols = st.columns(colunas_por_linha)
+                for idx, opcao in enumerate(opcoes_visiveis):
+                    icone, rotulo_curto = ATALHOS_DESKTOP_META.get(opcao, ("📌", opcao))
+                    ativo = opcao == acao_atual
+                    prefixo_ativo = "🟢 " if ativo else ""
+                    idx_global = opcoes_menu.index(opcao)
+                    with cols[idx % colunas_por_linha]:
+                        if modo_edicao:
+                            c_btn, c_del = st.columns([4.2, 1.0])
+                            with c_btn:
+                                clicou = st.button(
+                                    f"{prefixo_ativo}{icone} {rotulo_curto}",
+                                    key=f"desk_tile_{idx_global}",
+                                    type="primary" if ativo else "secondary",
+                                    use_container_width=True,
+                                    on_click=_selecionar_atalho_desktop,
+                                    args=(opcao,),
+                                )
+                                if clicou and st.session_state.get("menu_acao_ativa") != opcao:
+                                    _selecionar_atalho_desktop(opcao)
+                                    st.rerun()
+                            with c_del:
+                                if st.button(
+                                    "❌",
+                                    key=f"del_tile_{idx_global}",
+                                    help=f"Excluir '{rotulo_curto}' da página principal de {usr_key}",
+                                    use_container_width=True,
+                                ):
+                                    nova_lista = list(set(excluidos_usuario + [opcao]))
+                                    salvar_atalhos_excluidos_usuario(caminho_db, usr_key, nova_lista)
+                                    st.rerun()
+                        else:
                             clicou = st.button(
                                 f"{prefixo_ativo}{icone} {rotulo_curto}",
                                 key=f"desk_tile_{idx_global}",
@@ -142,49 +183,50 @@ def renderizar_area_trabalho_icones(
                             if clicou and st.session_state.get("menu_acao_ativa") != opcao:
                                 _selecionar_atalho_desktop(opcao)
                                 st.rerun()
-                        with c_del:
-                            if st.button(
-                                "❌",
-                                key=f"del_tile_{idx_global}",
-                                help=f"Excluir '{rotulo_curto}' da página principal de {usr_key}",
-                                use_container_width=True,
-                            ):
-                                nova_lista = list(set(excluidos_usuario + [opcao]))
-                                salvar_atalhos_excluidos_usuario(caminho_db, usr_key, nova_lista)
-                                st.rerun()
-                    else:
-                        clicou = st.button(
-                            f"{prefixo_ativo}{icone} {rotulo_curto}",
-                            key=f"desk_tile_{idx_global}",
-                            type="primary" if ativo else "secondary",
-                            use_container_width=True,
-                            on_click=_selecionar_atalho_desktop,
-                            args=(opcao,),
-                        )
-                        if clicou and st.session_state.get("menu_acao_ativa") != opcao:
-                            _selecionar_atalho_desktop(opcao)
-                            st.rerun()
 
-        if modo_edicao and excluidos_usuario:
-            st.markdown("---")
-            st.caption(f"📦 **Botões ocultados da Área de Trabalho de `{usr_key}` (clique para restaurar):**")
-            cols_rest = st.columns(4)
-            excluidos_validos = [op for op in excluidos_usuario if op in opcoes_menu]
-            for r_idx, op_exc in enumerate(excluidos_validos):
-                icone_e, rot_e = ATALHOS_DESKTOP_META.get(op_exc, ("📌", op_exc))
-                with cols_rest[r_idx % 4]:
+            if modo_edicao:
+                st.markdown("---")
+                c_preset1, c_preset2 = st.columns(2)
+                with c_preset1:
                     if st.button(
-                        f"➕ Restaurar: {icone_e} {rot_e}",
-                        key=f"rest_tile_{r_idx}",
+                        "⭐ Deixar Apenas os 5 Mais Usados (Mural, Pendências, OS, Clientes, NF)",
+                        key="btn_preset_mais_usados",
                         use_container_width=True,
                     ):
-                        nova_lista = [x for x in excluidos_usuario if x != op_exc]
-                        salvar_atalhos_excluidos_usuario(caminho_db, usr_key, nova_lista)
+                        favoritos = {
+                            "📊 Mural & Despacho WhatsApp",
+                            "📋 Minhas Pendências (Técnico)",
+                            "🎫 Abertura de Chamados & OS",
+                            "👥 Clientes & Equipamentos",
+                            "🧾 Faturamento & Notas Fiscais",
+                        }
+                        excluidos_auto = [op for op in opcoes_menu if op not in favoritos]
+                        salvar_atalhos_excluidos_usuario(caminho_db, usr_key, excluidos_auto)
+                        st.rerun()
+                with c_preset2:
+                    if st.button(
+                        "🔄 Restaurar Todos os Botões Padrão da Área de Trabalho",
+                        key="btn_restaurar_todos_atalhos",
+                        use_container_width=True,
+                    ):
+                        salvar_atalhos_excluidos_usuario(caminho_db, usr_key, [])
                         st.rerun()
 
-            if st.button("🔄 Restaurar Todos os Botões Padrão da Área de Trabalho", key="btn_restaurar_todos_atalhos"):
-                salvar_atalhos_excluidos_usuario(caminho_db, usr_key, [])
-                st.rerun()
+                if excluidos_usuario:
+                    st.caption(f"📦 **Botões ocultados da Área de Trabalho de `{usr_key}` (clique para restaurar individualmente):**")
+                    cols_rest = st.columns(4)
+                    excluidos_validos = [op for op in excluidos_usuario if op in opcoes_menu]
+                    for r_idx, op_exc in enumerate(excluidos_validos):
+                        icone_e, rot_e = ATALHOS_DESKTOP_META.get(op_exc, ("📌", op_exc))
+                        with cols_rest[r_idx % 4]:
+                            if st.button(
+                                f"➕ Restaurar: {icone_e} {rot_e}",
+                                key=f"rest_tile_{r_idx}",
+                                use_container_width=True,
+                            ):
+                                nova_lista = [x for x in excluidos_usuario if x != op_exc]
+                                salvar_atalhos_excluidos_usuario(caminho_db, usr_key, nova_lista)
+                                st.rerun()
 
 
 def estilizar_grafico(fig):

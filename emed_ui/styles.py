@@ -31,33 +31,29 @@ def inject_custom_css():
             color: #cbd5e1 !important;
         }
 
-        /* PUXADOR VERTICAL E BOTÕES DE RECOLHER/ABRIR ABA LATERAL (STREAMLIT 1.59+) */
+        /* BOTÕES DE RECOLHER/ABRIR ABA LATERAL (SEM BORDA DUPLA) */
         [data-testid="stSidebarCollapseButton"],
-        [data-testid="stSidebarCollapseButton"] button {
+        [data-testid="collapsedControl"],
+        [data-testid="stSidebarCollapsedControl"] {
             opacity: 1 !important;
             visibility: visible !important;
-            display: flex !important;
-            background-color: #1c2541 !important;
-            border: 1.5px solid #64dfdf !important;
-            border-radius: 8px !important;
-            color: #64dfdf !important;
+            border: none !important;
+            background: transparent !important;
+            box-shadow: none !important;
         }
-        [data-testid="stSidebarCollapseButton"] svg {
-            fill: #64dfdf !important;
-            color: #64dfdf !important;
-        }
+        [data-testid="stSidebarCollapseButton"] button,
         [data-testid="stExpandSidebarButton"],
-        [data-testid="collapsedControl"],
-        [data-testid="stSidebarCollapsedControl"],
         [data-testid="collapsedControl"] button,
         [data-testid="stSidebarCollapsedControl"] button {
-            background-color: #1c2541 !important;
-            color: #64dfdf !important;
-            border: 1.5px solid #64dfdf !important;
-            border-radius: 8px !important;
             opacity: 1 !important;
             visibility: visible !important;
+            background-color: #1c2541 !important;
+            border: 1px solid #64dfdf !important;
+            border-radius: 8px !important;
+            color: #64dfdf !important;
+            box-shadow: none !important;
         }
+        [data-testid="stSidebarCollapseButton"] svg,
         [data-testid="stExpandSidebarButton"] svg,
         [data-testid="collapsedControl"] svg,
         [data-testid="stSidebarCollapsedControl"] svg {
@@ -233,14 +229,23 @@ def inject_custom_css():
             color: #64dfdf !important;
         }
 
-        /* Expanders escuros */
-        [data-testid="stExpander"],
-        [data-testid="stExpander"] details,
-        [data-testid="stExpanderDetails"] {
+        /* Expanders escuros (borda única nítida sem linha dupla) */
+        [data-testid="stExpander"] {
+            background-color: transparent !important;
+            border: none !important;
+            margin-bottom: 10px !important;
+        }
+        [data-testid="stExpander"] details {
             background-color: #1c2541 !important;
             border: 1px solid #3a506b !important;
             border-radius: 10px !important;
-            margin-bottom: 10px !important;
+            color: #ffffff !important;
+        }
+        [data-testid="stExpanderDetails"] {
+            background-color: #1c2541 !important;
+            border: none !important;
+            border-top: 1px solid #2b3a55 !important;
+            border-radius: 0 0 10px 10px !important;
             color: #ffffff !important;
         }
         [data-testid="stExpander"] details summary {
