@@ -127,24 +127,31 @@ try:
 except ImportError:
     pass
 
+if "nav_sync_id" not in st.session_state:
+    st.session_state.nav_sync_id = 0
+
 if "menu_acao_ativa" not in st.session_state or st.session_state.menu_acao_ativa not in opcoes_menu:
     st.session_state.menu_acao_ativa = opcoes_menu[0]
 
-if "radio_menu_sidebar" not in st.session_state or st.session_state.radio_menu_sidebar not in opcoes_menu:
-    st.session_state.radio_menu_sidebar = st.session_state.menu_acao_ativa
+chave_radio_atual = f"radio_menu_sidebar_{st.session_state.nav_sync_id}"
+idx_menu_atual = opcoes_menu.index(st.session_state.menu_acao_ativa)
 
 
 def _ao_mudar_sidebar():
-    st.session_state.menu_acao_ativa = st.session_state.radio_menu_sidebar
+    novo_valor = st.session_state.get(chave_radio_atual)
+    if novo_valor in opcoes_menu:
+        st.session_state.menu_acao_ativa = novo_valor
 
 
-acao = st.sidebar.radio(
+acao_sidebar = st.sidebar.radio(
     "Menu:",
     opcoes_menu,
-    key="radio_menu_sidebar",
+    index=idx_menu_atual,
+    key=chave_radio_atual,
     on_change=_ao_mudar_sidebar,
 )
-st.session_state.menu_acao_ativa = acao
+if acao_sidebar != st.session_state.menu_acao_ativa:
+    st.session_state.menu_acao_ativa = acao_sidebar
 
 st.sidebar.markdown("---")
 if os.path.exists(CAMINHO_EXCEL):
@@ -169,11 +176,18 @@ with col_logo:
         st.image("emed1.jpg", use_container_width=True)
 
 # Grade de Ícones Estilo Área de Trabalho do Windows (Navegação 1-Toque para Celular e PC)
-renderizar_area_trabalho_icones(opcoes_menu, acao, st.session_state.perfil)
+renderizar_area_trabalho_icones(opcoes_menu, st.session_state.menu_acao_ativa, st.session_state.perfil)
+
+acao = st.session_state.menu_acao_ativa
 
 st.markdown(
-    "<hr style='border: 0; border-top: 1px solid #3a506b; margin-top: 10px; margin-bottom: 20px;'>",
-    unsafe_allow_html=True
+    f"""
+    <div style="background: linear-gradient(90deg, #1c2541 0%, #0b132b 100%); border-left: 4px solid #64dfdf; border-top: 1px solid #3a506b; border-right: 1px solid #3a506b; border-bottom: 1px solid #3a506b; border-radius: 8px; padding: 8px 14px; margin-top: 6px; margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between;">
+        <span style="color: #64dfdf !important; font-weight: 700; font-size: 14px;">📍 MÓDULO EM EXIBIÇÃO: <span style="color: #ffffff !important;">{acao}</span></span>
+        <span style="color: #94a3b8 !important; font-size: 12px;">👤 {st.session_state.utilizador} ({st.session_state.perfil})</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
 # Roteador O(1) de Views Desacopladas

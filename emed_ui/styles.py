@@ -31,43 +31,38 @@ def inject_custom_css():
             color: #cbd5e1 !important;
         }
 
-        /* PUXADOR VERTICAL RETANGULAR FINO NA LATERAL ESQUERDA (PARA CELULAR E DESKTOP) */
+        /* PUXADOR VERTICAL E BOTÕES DE RECOLHER/ABRIR ABA LATERAL (STREAMLIT 1.59+) */
+        [data-testid="stSidebarCollapseButton"],
+        [data-testid="stSidebarCollapseButton"] button {
+            opacity: 1 !important;
+            visibility: visible !important;
+            display: flex !important;
+            background-color: #1c2541 !important;
+            border: 1.5px solid #64dfdf !important;
+            border-radius: 8px !important;
+            color: #64dfdf !important;
+        }
+        [data-testid="stSidebarCollapseButton"] svg {
+            fill: #64dfdf !important;
+            color: #64dfdf !important;
+        }
+        [data-testid="stExpandSidebarButton"],
         [data-testid="collapsedControl"],
         [data-testid="stSidebarCollapsedControl"],
         [data-testid="collapsedControl"] button,
         [data-testid="stSidebarCollapsedControl"] button {
-            position: fixed !important;
-            left: 0px !important;
-            top: 38vh !important;
-            width: 30px !important;
-            height: 115px !important;
             background-color: #1c2541 !important;
             color: #64dfdf !important;
-            border: 2px solid #64dfdf !important;
-            border-left: none !important;
-            border-radius: 0 12px 12px 0 !important;
-            z-index: 999999 !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            box-shadow: 3px 4px 14px rgba(0, 0, 0, 0.65) !important;
-            padding: 0 !important;
-            cursor: pointer !important;
+            border: 1.5px solid #64dfdf !important;
+            border-radius: 8px !important;
+            opacity: 1 !important;
+            visibility: visible !important;
         }
+        [data-testid="stExpandSidebarButton"] svg,
         [data-testid="collapsedControl"] svg,
         [data-testid="stSidebarCollapsedControl"] svg {
             fill: #64dfdf !important;
             color: #64dfdf !important;
-            width: 24px !important;
-            height: 24px !important;
-            transform: scale(1.35);
-        }
-        [data-testid="collapsedControl"]:hover,
-        [data-testid="stSidebarCollapsedControl"]:hover,
-        [data-testid="collapsedControl"] button:hover,
-        [data-testid="stSidebarCollapsedControl"] button:hover {
-            background-color: #3a506b !important;
-            width: 36px !important;
         }
 
         /* Caixas de Seleção (Selectbox / Multiselect / Dropdowns / Popovers) */
@@ -209,15 +204,23 @@ def inject_custom_css():
         [data-testid="stFormSubmitButton"] > button,
         [data-testid="stDownloadButton"] > button,
         button[kind="secondary"],
-        button[kind="primary"],
-        button[kind="secondaryFormSubmit"],
-        button[kind="primaryFormSubmit"] {
+        button[kind="secondaryFormSubmit"] {
             background-color: #1c2541 !important;
             color: #ffffff !important;
             border: 1px solid #64dfdf !important;
             border-radius: 8px !important;
             font-weight: 600 !important;
             padding: 0.5rem 1rem !important;
+        }
+        button[kind="primary"],
+        button[kind="primaryFormSubmit"] {
+            background: linear-gradient(135deg, #0f766e 0%, #1c2541 100%) !important;
+            color: #64dfdf !important;
+            border: 2px solid #10b981 !important;
+            border-radius: 8px !important;
+            font-weight: 700 !important;
+            padding: 0.5rem 1rem !important;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.35) !important;
         }
         .stButton button:hover,
         div.stButton > button:hover,

@@ -25,22 +25,142 @@ ATALHOS_DESKTOP_META = {
 def _selecionar_atalho_desktop(opcao_escolhida: str):
     """Callback executado antes da re-renderização para sincronizar a grade de ícones e a sidebar."""
     st.session_state.menu_acao_ativa = opcao_escolhida
-    st.session_state.radio_menu_sidebar = opcao_escolhida
+    st.session_state.nav_sync_id = st.session_state.get("nav_sync_id", 0) + 1
+
+
+def _injetar_barra_vertical_sidebar():
+    """Injeta uma barra vertical retrátil idêntica à barra horizontal do expander,
+    colada na borda da aba lateral esquerda para fechar e abrir a aba com 1 toque no celular ou PC.
+    """
+    html_barra_vertical = """
+    <script>
+    (function() {
+        try {
+            const parentDoc = window.parent.document;
+            if (!parentDoc || !parentDoc.body) return;
+
+            let bar = parentDoc.getElementById('emed-vertical-sidebar-bar');
+            if (!bar) {
+                bar = parentDoc.createElement('div');
+                bar.id = 'emed-vertical-sidebar-bar';
+                bar.title = 'Clique em qualquer ponto desta barra vertical para Fechar ou Abrir a Aba Lateral';
+                parentDoc.body.appendChild(bar);
+            }
+
+            bar.style.cssText = [
+                'position: fixed',
+                'top: 16vh',
+                'height: 68vh',
+                'width: 28px',
+                'background-color: #1c2541',
+                'border: 1.5px solid #3a506b',
+                'border-right: 2px solid #64dfdf',
+                'border-left: none',
+                'border-radius: 0 10px 10px 0',
+                'z-index: 999998',
+                'cursor: pointer',
+                'display: flex',
+                'flex-direction: column',
+                'align-items: center',
+                'justify-content: space-between',
+                'padding: 14px 0',
+                'box-shadow: 4px 0 14px rgba(0, 0, 0, 0.6)',
+                'transition: left 0.18s ease, background-color 0.18s ease, width 0.15s ease',
+                'user-select: none',
+                '-webkit-user-select: none'
+            ].join(';');
+
+            function isSidebarOpen() {
+                const sb = parentDoc.querySelector('section[data-testid="stSidebar"]');
+                if (!sb) return false;
+                const expanded = sb.getAttribute('aria-expanded');
+                const rect = sb.getBoundingClientRect();
+                return expanded === 'true' && rect.right > 60;
+            }
+
+            function atualizarEstadoVisual() {
+                const sb = parentDoc.querySelector('section[data-testid="stSidebar"]');
+                const aberta = isSidebarOpen();
+                if (aberta && sb) {
+                    const rect = sb.getBoundingClientRect();
+                    bar.style.left = Math.max(0, Math.floor(rect.right - 2)) + 'px';
+                    bar.innerHTML = `
+                        <span style="color:#64dfdf; font-size:13px; font-weight:bold;">❮</span>
+                        <span style="writing-mode:vertical-rl; transform:rotate(180deg); color:#64dfdf; font-family:sans-serif; font-size:11px; font-weight:700; letter-spacing:1.2px; white-space:nowrap;">
+                            🖥️ ABA LATERAL — TOQUE P/ FECHAR
+                        </span>
+                        <span style="color:#64dfdf; font-size:13px; font-weight:bold;">❮</span>
+                    `;
+                } else {
+                    bar.style.left = '0px';
+                    bar.innerHTML = `
+                        <span style="color:#64dfdf; font-size:13px; font-weight:bold;">❯</span>
+                        <span style="writing-mode:vertical-rl; transform:rotate(180deg); color:#64dfdf; font-family:sans-serif; font-size:11px; font-weight:700; letter-spacing:1.2px; white-space:nowrap;">
+                            🖥️ ABA LATERAL — TOQUE P/ ABRIR
+                        </span>
+                        <span style="color:#64dfdf; font-size:13px; font-weight:bold;">❯</span>
+                    `;
+                }
+            }
+
+            bar.onmouseenter = function() {
+                bar.style.backgroundColor = '#25335a';
+                bar.style.width = '32px';
+            };
+            bar.onmouseleave = function() {
+                bar.style.backgroundColor = '#1c2541';
+                bar.style.width = '28px';
+            };
+
+            bar.onclick = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const aberta = isSidebarOpen();
+                if (aberta) {
+                    const btnClose = parentDoc.querySelector('[data-testid="stSidebarCollapseButton"] button')
+                        || parentDoc.querySelector('button[data-testid="stSidebarCollapseButton"]')
+                        || parentDoc.querySelector('[data-testid="stSidebarHeader"] button')
+                        || parentDoc.querySelector('section[data-testid="stSidebar"] button');
+                    if (btnClose) btnClose.click();
+                } else {
+                    const btnOpen = parentDoc.querySelector('button[data-testid="stExpandSidebarButton"]')
+                        || parentDoc.querySelector('[data-testid="stExpandSidebarButton"] button')
+                        || parentDoc.querySelector('[data-testid="stExpandSidebarButton"]')
+                        || parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"] button')
+                        || parentDoc.querySelector('[data-testid="collapsedControl"] button');
+                    if (btnOpen) btnOpen.click();
+                }
+                setTimeout(atualizarEstadoVisual, 60);
+                setTimeout(atualizarEstadoVisual, 220);
+                setTimeout(atualizarEstadoVisual, 450);
+            };
+
+            atualizarEstadoVisual();
+            if (window.parent._emedSidebarInterval) {
+                clearInterval(window.parent._emedSidebarInterval);
+            }
+            window.parent._emedSidebarInterval = setInterval(atualizarEstadoVisual, 250);
+        } catch (err) {
+            console.log('Aviso barra vertical:', err);
+        }
+    })();
+    </script>
+    """
+    components.html(html_barra_vertical, height=0)
 
 
 def renderizar_area_trabalho_icones(opcoes_menu: list, acao_atual: str, perfil_atual: str):
     """Renderiza uma grade de ícones estilo Área de Trabalho do Windows / App Launcher
-    para facilitar a navegação rápida com 1 toque no celular e no computador.
+    para facilitar a navegação rápida com 1 toque no celular e no computador, além da barra vertical da sidebar.
     """
-    if "mostrar_grade_desktop" not in st.session_state:
-        st.session_state.mostrar_grade_desktop = True
+    _injetar_barra_vertical_sidebar()
 
     with st.expander(
-        f"🖥️ ÁREA DE TRABALHO RÁPIDA (ÍCONES DE ATALHO) — Tela Atual: {acao_atual}",
-        expanded=st.session_state.mostrar_grade_desktop,
+        "🖥️ ÁREA DE TRABALHO RÁPIDA (ÍCONES DE ATALHO — TOQUE PARA ABRIR / RECOLHER)",
+        expanded=True,
     ):
         st.caption(
-            "💡 **Navegação Rápida (Celular & PC):** Toque diretamente num ícone abaixo para mudar de módulo sem precisar abrir a aba lateral:"
+            "💡 **Navegação Rápida (Celular & PC):** Toque diretamente num ícone abaixo para mudar de módulo (ou use a barra vertical na borda esquerda para fechar/abrir o menu lateral):"
         )
         colunas_por_linha = 4 if perfil_atual == "Gestor" else 3
         cols = st.columns(colunas_por_linha)
@@ -49,7 +169,7 @@ def renderizar_area_trabalho_icones(opcoes_menu: list, acao_atual: str, perfil_a
             ativo = opcao == acao_atual
             prefixo_ativo = "🟢 " if ativo else ""
             with cols[idx % colunas_por_linha]:
-                st.button(
+                clicou = st.button(
                     f"{prefixo_ativo}{icone} {rotulo_curto}",
                     key=f"desk_tile_{idx}",
                     type="primary" if ativo else "secondary",
@@ -57,6 +177,9 @@ def renderizar_area_trabalho_icones(opcoes_menu: list, acao_atual: str, perfil_a
                     on_click=_selecionar_atalho_desktop,
                     args=(opcao,),
                 )
+                if clicou and st.session_state.get("menu_acao_ativa") != opcao:
+                    _selecionar_atalho_desktop(opcao)
+                    st.rerun()
 
 
 def estilizar_grafico(fig):
