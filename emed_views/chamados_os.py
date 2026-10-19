@@ -66,32 +66,336 @@ def _render_modo_offline(ctx: AppContext):
                     st.rerun()
 
 
-def _gerar_html_os_formatada(id_os_c: str, row_c: pd.Series, equipa_tecnica: dict) -> str:
-    """Gera o documento HTML/A4 oficial da Ordem de Serviço Fechada (pronto para impressão/PDF e anexo de e-mail)."""
+def _obter_logo_emed_b64(base_dir: str = "") -> str:
+    """Carrega a logo oficial da EMED (emed1.jpg) em Base64 para o cabeçalho da OS."""
+    import base64
+    caminhos = [
+        os.path.join(base_dir, "emed1.jpg") if base_dir else "",
+        "emed1.jpg",
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "emed1.jpg"),
+    ]
+    for cam in caminhos:
+        if cam and os.path.exists(cam):
+            try:
+                with open(cam, "rb") as f:
+                    b64 = base64.b64encode(f.read()).decode("utf-8")
+                return f"data:image/jpeg;base64,{b64}"
+            except Exception:
+                pass
+    return ""
+
+
+def _extrair_dados_equipamento(eq_raw: str) -> dict:
+    """Separa modelo, N/S, ano de fabrico, local/setor e status a partir da string de equipamento."""
+    import re
+    texto = limpar_texto(eq_raw, "EQUIPAMENTO NÃO ESPECIFICADO")
+    dados = {
+        "modelo": texto,
+        "ns": "CONFORME CADASTRO",
+        "fab": "-",
+        "local": "SETOR CLÍNICO",
+        "status_eq": "OPERACIONAL",
+    }
+    if "[" in texto and "]" in texto:
+        partes = texto.split("[", 1)
+        dados["modelo"] = partes[0].strip(" -|") or texto
+        meta = partes[1].rsplit("]", 1)[0]
+        for item in meta.split("|"):
+            it = item.strip()
+            up = it.upper()
+            if up.startswith("N/S:") or up.startswith("NS:"):
+                dados["ns"] = it.split(":", 1)[1].strip() or "N/D"
+            elif up.startswith("FAB:"):
+                dados["fab"] = it.split(":", 1)[1].strip() or "-"
+            elif up.startswith("LOCAL:") or up.startswith("SETOR:"):
+                dados["local"] = it.split(":", 1)[1].strip() or "SETOR CLÍNICO"
+            elif up.startswith("STATUS:"):
+                dados["status_eq"] = it.split(":", 1)[1].strip() or "OPERACIONAL"
+    return dados
+
+
+def _limpar_laudo_servico(srv_raw: str, pend_raw: str = "") -> str:
+    """Limpa prefixos internos ([CONCLUÍDO], faturamento etc.) para exibir o laudo técnico limpo na OS."""
+    import re
+    base = limpar_texto(srv_raw) or limpar_texto(pend_raw) or "MANUTENÇÃO TÉCNICA E TESTES OPERACIONAIS REALIZADOS CONFORME PROCEDIMENTO."
+    base = re.sub(r"^\[CONCLU[ÍI]DO[^\]]*\]\s*", "", base, flags=re.IGNORECASE)
+    base = re.sub(r"^POP/IT VALIDADO\s*\|\s*OBS:\s*", "", base, flags=re.IGNORECASE)
+    if "| [FATURAMENTO" in base.upper():
+        base = re.split(r"\|\s*\[FATURAMENTO", base, flags=re.IGNORECASE)[0].strip()
+    return base.strip(" |") or "SERVIÇO TÉCNICO EXECUTADO E VALIDADO."
+
+
+def _gerar_midia_os_oficial(id_os_c: str, row_c: pd.Series, equipa_tecnica: dict, base_dir: str = "") -> tuple[bytes, bytes]:
+    """Gera a Folha Oficial da Ordem de Serviço EMED em Imagem PNG (para WhatsApp) e PDF A4 (para impressão/e-mail) com Logo da EMED no canto superior esquerdo."""
+    import base64
+    import io
+    import textwrap
+    from PIL import Image, ImageDraw, ImageFont
+
+    W, H = 1240, 1754  # Proporção A4 Alta Definição (150 DPI)
+    img = Image.new("RGB", (W, H), "#FFFFFF")
+    draw = ImageDraw.Draw(img)
+
+    def _font(nome_arq: str, tam: int):
+        cam = os.path.join("C:\\Windows\\Fonts", nome_arq)
+        if os.path.exists(cam):
+            try:
+                return ImageFont.truetype(cam, tam)
+            except Exception:
+                pass
+        return ImageFont.load_default()
+
+    f_title = _font("segoeuib.ttf", 26)
+    f_sub = _font("segoeui.ttf", 16)
+    f_os_num = _font("segoeuib.ttf", 34)
+    f_sec = _font("segoeuib.ttf", 18)
+    f_lbl = _font("segoeuib.ttf", 16)
+    f_val = _font("segoeui.ttf", 16)
+    f_val_b = _font("segoeuib.ttf", 16)
+    f_laudo = _font("segoeui.ttf", 17)
+    f_sig_script = _font("segoepr.ttf", 28)
+    f_small = _font("segoeui.ttf", 13)
+
+    # Moldura Externa Dupla Corporativa
+    draw.rectangle([28, 28, W - 28, H - 28], outline="#0B132B", width=3)
+    draw.rectangle([34, 34, W - 34, H - 34], outline="#CBD5E1", width=1)
+
+    # CABEÇALHO SUPERIOR (Logo EMED à esquerda + Dados Institucionais ao centro + Quadro Nº OS à direita)
+    draw.rectangle([35, 35, W - 35, 205], fill="#F8FAFC", outline="#0B132B", width=2)
+
+    # 1) Logo da EMED no canto superior esquerdo
+    caminhos_logo = [
+        os.path.join(base_dir, "emed1.jpg") if base_dir else "",
+        "emed1.jpg",
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "emed1.jpg"),
+    ]
+    logo_colada = False
+    for cam_l in caminhos_logo:
+        if cam_l and os.path.exists(cam_l):
+            try:
+                im_logo = Image.open(cam_l).convert("RGB")
+                im_logo.thumbnail((310, 135), Image.Resampling.LANCZOS)
+                lx = 52
+                ly = 48 + (140 - im_logo.height) // 2
+                draw.rectangle([lx - 4, ly - 4, lx + im_logo.width + 4, ly + im_logo.height + 4], fill="#FFFFFF", outline="#CBD5E1", width=1)
+                img.paste(im_logo, (lx, ly))
+                logo_colada = True
+                break
+            except Exception:
+                pass
+    if not logo_colada:
+        draw.rectangle([52, 60, 340, 175], fill="#0B132B", radius=8)
+        draw.text((75, 98), "@MED ELETROMEDICINA", fill="#64DFDF", font=f_title)
+
+    # 2) Texto Institucional no Centro do Cabeçalho
+    cx_txt = 385
+    draw.text((cx_txt, 52), "EMED ELETROMEDICINA LTDA.", fill="#0B132B", font=f_title)
+    draw.text((cx_txt, 86), "Engenharia Clínica • Manutenção Preventiva, Corretiva & Calibração", fill="#1E293B", font=f_lbl)
+    draw.text((cx_txt, 112), "Conformidade Técnica ABNT NBR IEC 60601 / RDC ANVISA", fill="#475569", font=f_sub)
+    draw.text((cx_txt, 136), "Portal Oficial: www.emed.med.br  |  Assistência Técnica Especializada", fill="#0284C7", font=f_lbl)
+    draw.text((cx_txt, 164), "DOCUMENTO OFICIAL DE ORDEM DE SERVIÇO E LAUDO DE INTERVENÇÃO", fill="#0F766E", font=f_small)
+
+    # 3) Quadro Oficial Nº da OS no Canto Superior Direito
+    draw.rounded_rectangle([915, 48, W - 50, 192], radius=10, fill="#0B132B", outline="#0F766E", width=2)
+    draw.text((935, 56), "ORDEM DE SERVIÇO", fill="#94A3B8", font=f_lbl)
+    draw.text((935, 80), f"Nº #{str(id_os_c).zfill(4)}", fill="#64DFDF", font=f_os_num)
+    draw.rounded_rectangle([935, 130, 1165, 158], radius=6, fill="#10B981")
+    draw.text((955, 134), "STATUS: CONCLUÍDA", fill="#0B132B", font=f_lbl)
+    dt_agend = limpar_texto(row_c.get("data_agendamento"), datetime.date.today().strftime("%Y-%m-%d"))
+    draw.text((935, 164), f"Emissão / Data: {dt_agend}", fill="#E2E8F0", font=f_small)
+
+    # Extração e limpeza dos dados da OS
+    cliente = limpar_texto(row_c.get("cliente"), "NÃO INFORMADO")
+    cnpj = limpar_texto(row_c.get("cnpj"), "CONFORME CADASTRO")
+    endereco = limpar_texto(row_c.get("endereco"), "ENDEREÇO NÃO INFORMADO")
+    cidade = limpar_texto(row_c.get("cidade"), "FORTALEZA")
+    estado = limpar_texto(row_c.get("estado"), "CE")
+    email_cli = limpar_texto(row_c.get("email"), "NÃO INFORMADO")
+    resp_hosp = limpar_texto(row_c.get("responsavel_hospital"), limpar_texto(row_c.get("assinatura_cliente"), "RESPONSÁVEL LOCAL"))
+    eq_info = _extrair_dados_equipamento(row_c.get("equipamento", ""))
+    tipo_srv = limpar_texto(row_c.get("tipo_servico"), "MANUTENÇÃO PREVENTIVA")
+    etapa_prev = limpar_texto(row_c.get("etapa_preventiva"), "GERAL / COMPLETA")
+    tec_princ_raw = limpar_texto(row_c.get("tecnico_responsavel"), "EQUIPE EMED")
+    tec_princ = "EQUIPE TÉCNICA EMED" if tec_princ_raw.upper() in ("A DEFINIR", "N/D", "") else tec_princ_raw
+    tec_aux = limpar_texto(row_c.get("tecnico_auxiliar"), "NENHUM (INDIVIDUAL)")
+    cin = limpar_texto(row_c.get("checkin_hora"), "-")
+    cout = limpar_texto(row_c.get("checkout_hora"), "-")
+    dur = limpar_texto(row_c.get("tempo_atendimento"), "-")
+    def_rel = _limpar_laudo_servico(limpar_texto(row_c.get("defeito_relatado"), "MANUTENÇÃO / VERIFICAÇÃO TÉCNICA PERIÓDICA"))
+    prob_enc = limpar_texto(row_c.get("problemas_encontrados"), "INSPEÇÃO TÉCNICA E VERIFICAÇÃO DE COMPONENTES")
+    causa_r = limpar_texto(row_c.get("causa_raiz"), "MANUTENÇÃO PROGRAMADA / USO NORMAL")
+    srv_exec = _limpar_laudo_servico(row_c.get("servico_executado", ""), row_c.get("pendencias", ""))
+    chk_pop_raw = limpar_texto(row_c.get("checklist_pop"), "POP/IT VALIDADO CONFORME NORMA TÉCNICA")
+    chk_pop = chk_pop_raw.split("| OBS:")[0].strip() if "| OBS:" in chk_pop_raw.upper() else chk_pop_raw
+    param_m = limpar_texto(row_c.get("parametros_medidos"), "DENTRO DOS LIMITES NORMATIVOS (NBR IEC 60601)")
+    obs_ger = limpar_texto(row_c.get("observacoes_gerais"), "SEM OBSERVAÇÕES ADICIONAIS.")
+    cond_fin = limpar_texto(row_c.get("condicao_final"), "LIBERADO PARA USO NORMAL")
+    ass_tec = limpar_texto(row_c.get("assinatura_tecnico"), f"{tec_princ} - CFT")
+    ass_cli = limpar_texto(row_c.get("assinatura_cliente"), resp_hosp)
+    img_sig_cli = limpar_texto(row_c.get("assinatura_cliente_img"), "")
+
+    def _draw_section_header(y_top: int, titulo: str) -> int:
+        draw.rectangle([48, y_top, W - 48, y_top + 34], fill="#1C2541", outline="#0B132B", width=1)
+        draw.rectangle([48, y_top, 56, y_top + 34], fill="#64DFDF")
+        draw.text((68, y_top + 6), titulo, fill="#FFFFFF", font=f_sec)
+        return y_top + 34
+
+    def _draw_table_row_2col(y_top: int, h_row: int, lbl1: str, val1: str, lbl2: str, val2: str) -> int:
+        x0, x1, x2, x3, x4 = 48, 235, 620, 815, W - 48
+        draw.rectangle([x0, y_top, x1, y_top + h_row], fill="#F1F5F9", outline="#CBD5E1", width=1)
+        draw.rectangle([x1, y_top, x2, y_top + h_row], fill="#FFFFFF", outline="#CBD5E1", width=1)
+        draw.rectangle([x2, y_top, x3, y_top + h_row], fill="#F1F5F9", outline="#CBD5E1", width=1)
+        draw.rectangle([x3, y_top, x4, y_top + h_row], fill="#FFFFFF", outline="#CBD5E1", width=1)
+        draw.text((x0 + 10, y_top + 10), lbl1, fill="#334155", font=f_lbl)
+        draw.text((x1 + 10, y_top + 10), str(val1)[:42], fill="#0F172A", font=f_val_b)
+        draw.text((x2 + 10, y_top + 10), lbl2, fill="#334155", font=f_lbl)
+        draw.text((x3 + 10, y_top + 10), str(val2)[:40], fill="#0F172A", font=f_val_b)
+        return y_top + h_row
+
+    # SEÇÃO 1: DADOS DO CLIENTE / UNIDADE DE SAÚDE
+    y = _draw_section_header(220, "1. IDENTIFICAÇÃO DO CLIENTE / UNIDADE DE SAÚDE")
+    y = _draw_table_row_2col(y, 42, "Cliente / Hospital:", cliente, "CNPJ / Registo:", cnpj)
+    y = _draw_table_row_2col(y, 42, "Endereço Local:", endereco, "Cidade / UF:", f"{cidade} / {estado}")
+    y = _draw_table_row_2col(y, 42, "Responsável Local:", resp_hosp, "E-mail / Contato:", email_cli)
+
+    # SEÇÃO 2: IDENTIFICAÇÃO DO EQUIPAMENTO & EQUIPE TÉCNICA
+    y = _draw_section_header(y + 16, "2. IDENTIFICAÇÃO DO EQUIPAMENTO MÉDICO & EQUIPE TÉCNICA")
+    y = _draw_table_row_2col(y, 42, "Equipamento:", eq_info["modelo"], "Nº de Série (N/S):", f"{eq_info['ns']} (Fab: {eq_info['fab']})")
+    y = _draw_table_row_2col(y, 42, "Setor / Local:", eq_info["local"], "Tipo de Serviço:", tipo_srv)
+    y = _draw_table_row_2col(y, 42, "Técnico Principal:", tec_princ, "Técnico Auxiliar:", tec_aux if tec_aux else "NENHUM (INDIVIDUAL)")
+    y = _draw_table_row_2col(y, 42, "Divisão / Etapa:", etapa_prev, "Horário Atend.:", f"In: {cin} | Out: {cout} ({dur})")
+
+    # SEÇÃO 3: SOLICITAÇÃO / DIAGNÓSTICO TÉCNICO
+    y = _draw_section_header(y + 16, "3. SOLICITAÇÃO INICIAL, DEFEITO RELATADO & DIAGNÓSTICO")
+    draw.rectangle([48, y, W - 48, y + 115], fill="#FFFFFF", outline="#CBD5E1", width=1)
+    draw.text((62, y + 10), "Defeito Relatado / Escopo da Visita:", fill="#334155", font=f_lbl)
+    linhas_def = textwrap.wrap(def_rel, width=105)[:2]
+    for idx_l, ln in enumerate(linhas_def):
+        draw.text((62, y + 34 + idx_l * 22), ln, fill="#0F172A", font=f_val)
+    draw.line([60, y + 78, W - 60, y + 78], fill="#E2E8F0", width=1)
+    draw.text((62, y + 84), f"Diagnóstico / Causa Raiz: {prob_enc[:65]}  |  Causa: {causa_r[:45]}", fill="#1E293B", font=f_val)
+    y += 115
+
+    # SEÇÃO 4: SERVIÇOS EXECUTADOS & CHECKLIST POP/IT (GRANDE DESTAQUE)
+    y = _draw_section_header(y + 16, "4. SERVIÇOS EXECUTADOS, PROCEDIMENTOS & MEDIÇÕES TÉCNICAS")
+    draw.rectangle([48, y, W - 48, y + 275], fill="#F8FAFC", outline="#0F766E", width=2)
+    draw.text((64, y + 12), "DESCRIÇÃO DETALHADA DOS SERVIÇOS EXECUTADOS (LAUDO TÉCNICO):", fill="#0F766E", font=f_lbl)
+    linhas_srv = textwrap.wrap(srv_exec, width=102)[:6]
+    for idx_s, ln_s in enumerate(linhas_srv):
+        draw.text((64, y + 40 + idx_s * 25), ln_s, fill="#0F172A", font=f_laudo)
+
+    draw.line([62, y + 195, W - 62, y + 195], fill="#CBD5E1", width=1)
+    draw.text((64, y + 204), "Formulário / Checklist POP-IT:", fill="#334155", font=f_lbl)
+    draw.text((310, y + 204), chk_pop[:78], fill="#0F172A", font=f_val_b)
+    draw.text((64, y + 236), "Parâmetros / Medições:", fill="#334155", font=f_lbl)
+    draw.text((310, y + 236), param_m[:78], fill="#0F172A", font=f_val)
+    y += 275
+
+    # SEÇÃO 5: OBSERVAÇÕES, PENDÊNCIAS & CONDIÇÃO FINAL DE LIBERAÇÃO
+    y = _draw_section_header(y + 16, "5. OBSERVAÇÕES TÉCNICAS, PENDÊNCIAS & PARECER FINAL")
+    draw.rectangle([48, y, W - 48, y + 145], fill="#FFFFFF", outline="#CBD5E1", width=1)
+    draw.text((64, y + 12), "Observações Gerais / Recomendações:", fill="#334155", font=f_lbl)
+    linhas_obs = textwrap.wrap(obs_ger, width=102)[:2]
+    for idx_o, ln_o in enumerate(linhas_obs):
+        draw.text((64, y + 36 + idx_o * 22), ln_o, fill="#0F172A", font=f_val)
+
+    cor_status_bg = "#DCFCE7" if "LIBERADO PARA USO NORMAL" in cond_fin.upper() else "#FEF3C7"
+    cor_status_bd = "#10B981" if "LIBERADO PARA USO NORMAL" in cond_fin.upper() else "#F59E0B"
+    cor_status_tx = "#065F46" if "LIBERADO PARA USO NORMAL" in cond_fin.upper() else "#92400E"
+    draw.rounded_rectangle([64, y + 88, W - 64, y + 132], radius=8, fill=cor_status_bg, outline=cor_status_bd, width=2)
+    draw.text((84, y + 99), f"PARECER / CONDIÇÃO FINAL DO EQUIPAMENTO:  {cond_fin.upper()}", fill=cor_status_tx, font=f_sec)
+    y += 145
+
+    # SEÇÃO 6: ASSINATURAS E TERMO DE RECEBIMENTO
+    y = _draw_section_header(y + 16, "6. TERMO DE CONFORMIDADE E ASSINATURAS (TÉCNICO & CLIENTE)")
+    box_h = 225
+    mid_x = W // 2
+    # Caixa Técnico (Esquerda)
+    draw.rounded_rectangle([48, y + 12, mid_x - 12, y + 12 + box_h], radius=8, fill="#F8FAFC", outline="#94A3B8", width=2)
+    draw.text((68, y + 22), "RESPONSÁVEL TÉCNICO EMED ELETROMEDICINA", fill="#334155", font=f_lbl)
+    draw.text((140, y + 72), tec_princ.title(), fill="#0F766E", font=f_sig_script)
+    draw.line([80, y + 135, mid_x - 44, y + 135], fill="#475569", width=2)
+    draw.text((80, y + 144), f"Técnico Principal: {ass_tec}", fill="#0F172A", font=f_val_b)
+    draw.text((80, y + 168), f"Técnico(s) Auxiliar(es): {tec_aux if tec_aux else 'Nenhum'}", fill="#475569", font=f_val)
+    draw.text((80, y + 194), "Assinatura Eletrónica Autenticada - Sistema EMED", fill="#0F766E", font=f_small)
+
+    # Caixa Cliente (Direita)
+    draw.rounded_rectangle([mid_x + 12, y + 12, W - 48, y + 12 + box_h], radius=8, fill="#F8FAFC", outline="#94A3B8", width=2)
+    draw.text((mid_x + 32, y + 22), "RECEBIMENTO PELO CLIENTE / UNIDADE DE SAÚDE", fill="#334155", font=f_lbl)
+
+    sig_colada = False
+    if img_sig_cli.startswith("data:image"):
+        try:
+            b64_part = img_sig_cli.split(",", 1)[1]
+            im_s = Image.open(io.BytesIO(base64.b64decode(b64_part))).convert("RGBA")
+            im_s.thumbnail((340, 75), Image.Resampling.LANCZOS)
+            sx = mid_x + 110
+            sy = y + 52
+            img.paste(im_s, (sx, sy), im_s)
+            sig_colada = True
+        except Exception:
+            pass
+    if not sig_colada:
+        draw.text((mid_x + 120, y + 72), ass_cli.title()[:26], fill="#1E3A8A", font=f_sig_script)
+
+    draw.line([mid_x + 44, y + 135, W - 80, y + 135], fill="#475569", width=2)
+    draw.text((mid_x + 44, y + 144), f"Recebido / Assinado por: {ass_cli}", fill="#0F172A", font=f_val_b)
+    draw.text((mid_x + 44, y + 168), f"Unidade: {cliente[:38]}", fill="#475569", font=f_val)
+    draw.text((mid_x + 44, y + 194), "Declaro que os serviços descritos foram executados e conferidos.", fill="#475569", font=f_small)
+
+    # Rodapé Oficial da Folha A4
+    draw.rectangle([35, H - 68, W - 35, H - 35], fill="#0B132B")
+    draw.text(
+        (55, H - 59),
+        f"EMED ELETROMEDICINA LTDA. | www.emed.med.br | OS #{str(id_os_c).zfill(4)} | Emitido em {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}",
+        fill="#CBD5E1",
+        font=f_small,
+    )
+
+    buf_png = io.BytesIO()
+    img.save(buf_png, format="PNG", optimize=True)
+    png_bytes = buf_png.getvalue()
+
+    buf_pdf = io.BytesIO()
+    img.save(buf_pdf, format="PDF", resolution=150.0)
+    pdf_bytes = buf_pdf.getvalue()
+
+    return png_bytes, pdf_bytes
+
+
+def _gerar_html_os_formatada(id_os_c: str, row_c: pd.Series, equipa_tecnica: dict, base_dir: str = "") -> str:
+    """Gera o documento HTML/A4 oficial da Ordem de Serviço Fechada com Logo da EMED no canto superior esquerdo."""
+    logo_b64 = _obter_logo_emed_b64(base_dir)
+    tag_logo = (
+        f'<img src="{logo_b64}" style="max-height:72px; width:auto; border-radius:6px; border:1px solid #cbd5e1; padding:3px; background:#fff;" alt="Logo EMED"/>'
+        if logo_b64
+        else '<div style="font-size:22px; font-weight:900; color:#0b132b;">@MED ELETROMEDICINA</div>'
+    )
     cliente = limpar_texto(row_c.get("cliente"), "N/D")
-    cnpj = limpar_texto(row_c.get("cnpj"), "N/D")
+    cnpj = limpar_texto(row_c.get("cnpj"), "CONFORME CADASTRO")
     endereco = limpar_texto(row_c.get("endereco"), "N/D")
     cidade = limpar_texto(row_c.get("cidade"), "FORTALEZA")
     estado = limpar_texto(row_c.get("estado"), "CE")
     email_cli = limpar_texto(row_c.get("email"), "N/D")
-    resp_hosp = limpar_texto(row_c.get("responsavel_hospital"), "N/D")
-    equipamento = limpar_texto(row_c.get("equipamento"), "N/D")
+    resp_hosp = limpar_texto(row_c.get("responsavel_hospital"), limpar_texto(row_c.get("assinatura_cliente"), "N/D"))
+    eq_info = _extrair_dados_equipamento(row_c.get("equipamento", ""))
     tipo_srv = limpar_texto(row_c.get("tipo_servico"), "MANUTENÇÃO")
     etapa_prev = limpar_texto(row_c.get("etapa_preventiva"), "GERAL")
-    tec_princ = limpar_texto(row_c.get("tecnico_responsavel"), "N/D")
+    tec_princ_raw = limpar_texto(row_c.get("tecnico_responsavel"), "EQUIPE EMED")
+    tec_princ = "EQUIPE TÉCNICA EMED" if tec_princ_raw.upper() in ("A DEFINIR", "N/D", "") else tec_princ_raw
     tec_aux = limpar_texto(row_c.get("tecnico_auxiliar"), "NENHUM (INDIVIDUAL)")
     dt_agend = limpar_texto(row_c.get("data_agendamento"), "-")
     cin = limpar_texto(row_c.get("checkin_hora"), "-")
     cout = limpar_texto(row_c.get("checkout_hora"), "-")
     dur = limpar_texto(row_c.get("tempo_atendimento"), "-")
-    def_rel = limpar_texto(row_c.get("defeito_relatado"), "-")
+    def_rel = _limpar_laudo_servico(limpar_texto(row_c.get("defeito_relatado"), "-"))
     prob_enc = limpar_texto(row_c.get("problemas_encontrados"), "-")
     causa_r = limpar_texto(row_c.get("causa_raiz"), "-")
-    srv_exec = limpar_texto(row_c.get("servico_executado"), limpar_texto(row_c.get("pendencias"), "-"))
-    chk_pop = limpar_texto(row_c.get("checklist_pop"), "N/A")
-    param_m = limpar_texto(row_c.get("parametros_medidos"), "-")
+    srv_exec = _limpar_laudo_servico(row_c.get("servico_executado", ""), row_c.get("pendencias", ""))
+    chk_pop_raw = limpar_texto(row_c.get("checklist_pop"), "VALIDADO CONFORME POP/IT")
+    chk_pop = chk_pop_raw.split("| OBS:")[0].strip() if "| OBS:" in chk_pop_raw.upper() else chk_pop_raw
+    param_m = limpar_texto(row_c.get("parametros_medidos"), "DENTRO DOS PADRÕES NORMATIVOS")
     obs_ger = limpar_texto(row_c.get("observacoes_gerais"), "SEM OBSERVAÇÕES ADICIONAIS")
-    pend_txt = limpar_texto(row_c.get("pendencias"), "SEM PENDÊNCIAS")
     cond_fin = limpar_texto(row_c.get("condicao_final"), "LIBERADO PARA USO NORMAL")
     cond_pag = limpar_texto(row_c.get("condicao_pagamento"), "-")
     ass_tec = limpar_texto(row_c.get("assinatura_tecnico"), f"{tec_princ} - CFT")
@@ -99,9 +403,9 @@ def _gerar_html_os_formatada(id_os_c: str, row_c: pd.Series, equipa_tecnica: dic
     img_sig = limpar_texto(row_c.get("assinatura_cliente_img"), "")
 
     bloco_img_cli = (
-        f'<img src="{img_sig}" style="max-height:70px; max-width:220px;" alt="Assinatura Cliente"/>'
+        f'<img src="{img_sig}" style="max-height:68px; max-width:220px;" alt="Assinatura Cliente"/>'
         if img_sig.startswith("data:image")
-        else '<div style="height:50px; line-height:50px; color:#64748b;">(Assinatura Digital Registada)</div>'
+        else f'<div style="font-family:\'Brush Script MT\',cursive; font-size:22px; color:#1e3a8a; height:36px;">{ass_cli.title()}</div>'
     )
 
     return f"""<!DOCTYPE html>
@@ -110,91 +414,123 @@ def _gerar_html_os_formatada(id_os_c: str, row_c: pd.Series, equipa_tecnica: dic
 <meta charset="utf-8"/>
 <title>Ordem de Serviço #{id_os_c} - EMED Eletromedicina</title>
 <style>
-  body {{ font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 24px; background: #ffffff; }}
-  .os-box {{ border: 2px solid #0b132b; border-radius: 8px; padding: 20px; max-width: 860px; margin: auto; }}
-  .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0b132b; padding-bottom: 12px; margin-bottom: 14px; }}
-  .title {{ font-size: 20px; font-weight: bold; color: #0b132b; }}
-  .badge {{ background: #10b981; color: #fff; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 13px; }}
-  .sec-title {{ background: #1c2541; color: #64dfdf; padding: 6px 10px; font-weight: bold; font-size: 13px; border-radius: 4px; margin-top: 12px; margin-bottom: 8px; text-transform: uppercase; }}
+  body {{ font-family: 'Segoe UI', Arial, Helvetica, sans-serif; color: #0f172a; margin: 20px; background: #ffffff; }}
+  .os-box {{ border: 2.5px solid #0b132b; border-radius: 10px; padding: 22px; max-width: 880px; margin: auto; }}
+  .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2.5px solid #0b132b; padding-bottom: 14px; margin-bottom: 14px; gap: 16px; }}
+  .header-left {{ display: flex; align-items: center; gap: 16px; }}
+  .title {{ font-size: 19px; font-weight: 800; color: #0b132b; letter-spacing: 0.3px; }}
+  .os-num-box {{ background: #0b132b; color: #fff; padding: 10px 16px; border-radius: 8px; text-align: right; min-width: 190px; }}
+  .badge {{ background: #10b981; color: #0b132b; padding: 3px 10px; border-radius: 5px; font-weight: 800; font-size: 12px; display: inline-block; margin-top: 4px; }}
+  .sec-title {{ background: #1c2541; color: #ffffff; border-left: 5px solid #64dfdf; padding: 6px 12px; font-weight: 700; font-size: 13px; border-radius: 4px; margin-top: 14px; margin-bottom: 8px; text-transform: uppercase; }}
   table {{ width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 6px; }}
-  td, th {{ border: 1px solid #cbd5e1; padding: 7px 9px; text-align: left; vertical-align: top; }}
-  .label {{ font-weight: bold; color: #334155; width: 22%; background: #f8fafc; }}
-  .sigs {{ display: flex; gap: 20px; margin-top: 18px; }}
-  .sig-card {{ flex: 1; border: 1px solid #94a3b8; border-radius: 6px; padding: 12px; text-align: center; font-size: 12px; }}
+  td, th {{ border: 1px solid #cbd5e1; padding: 7px 10px; text-align: left; vertical-align: top; }}
+  .label {{ font-weight: 700; color: #334155; width: 21%; background: #f1f5f9; }}
+  .laudo-box {{ background: #f8fafc; border: 1.5px solid #0f766e; border-radius: 6px; padding: 12px 14px; font-size: 13.5px; line-height: 1.5; margin-bottom: 8px; }}
+  .sigs {{ display: flex; gap: 20px; margin-top: 16px; }}
+  .sig-card {{ flex: 1; border: 1.5px solid #94a3b8; border-radius: 8px; padding: 14px; text-align: center; font-size: 12px; background: #f8fafc; }}
   @media print {{ .no-print {{ display: none; }} body {{ margin: 0; }} }}
 </style>
 </head>
 <body>
 <div class="os-box">
   <div class="header">
-    <div>
-      <div class="title">🏥 EMED ELETROMEDICINA LTDA.</div>
-      <div style="font-size:12px; color:#475569;">Engenharia Clínica, Manutenção Preventiva, Corretiva e Calibração</div>
+    <div class="header-left">
+      {tag_logo}
+      <div>
+        <div class="title">EMED ELETROMEDICINA LTDA.</div>
+        <div style="font-size:12.5px; color:#334155; font-weight:600;">Engenharia Clínica • Manutenção Preventiva, Corretiva e Calibração</div>
+        <div style="font-size:11.5px; color:#0284c7;">Conformidade ABNT NBR IEC 60601 / RDC ANVISA • www.emed.med.br</div>
+      </div>
     </div>
-    <div style="text-align:right;">
-      <div class="title">ORDEM DE SERVIÇO Nº #{id_os_c}</div>
-      <span class="badge">STATUS: CONCLUÍDA</span>
+    <div class="os-num-box">
+      <div style="font-size:11px; color:#94a3b8; font-weight:700;">ORDEM DE SERVIÇO</div>
+      <div style="font-size:24px; font-weight:900; color:#64dfdf;">Nº #{str(id_os_c).zfill(4)}</div>
+      <span class="badge">CONCLUÍDA</span>
+      <div style="font-size:11px; color:#cbd5e1; margin-top:4px;">Data: {dt_agend}</div>
     </div>
   </div>
 
-  <div class="sec-title">1. Dados do Cliente, Endereço & Tipo de Serviço</div>
+  <div class="sec-title">1. Identificação do Cliente / Unidade de Saúde</div>
   <table>
     <tr>
-      <td class="label">Nome do Cliente:</td><td><b>{cliente}</b> (CNPJ: {cnpj})</td>
+      <td class="label">Cliente / Hospital:</td><td><b>{cliente}</b></td>
+      <td class="label">CNPJ / Registo:</td><td>{cnpj}</td>
+    </tr>
+    <tr>
+      <td class="label">Endereço Local:</td><td>{endereco}</td>
+      <td class="label">Cidade / UF:</td><td>{cidade} / {estado}</td>
+    </tr>
+    <tr>
+      <td class="label">Responsável Local:</td><td>{resp_hosp}</td>
+      <td class="label">E-mail / Contato:</td><td>{email_cli}</td>
+    </tr>
+  </table>
+
+  <div class="sec-title">2. Identificação do Equipamento & Equipe Técnica</div>
+  <table>
+    <tr>
+      <td class="label">Equipamento / Modelo:</td><td><b>{eq_info['modelo']}</b></td>
+      <td class="label">Nº de Série (N/S):</td><td><b>{eq_info['ns']}</b> (Fab: {eq_info['fab']})</td>
+    </tr>
+    <tr>
+      <td class="label">Setor / Localização:</td><td>{eq_info['local']}</td>
       <td class="label">Tipo de Serviço:</td><td><b>{tipo_srv}</b></td>
-    </tr>
-    <tr>
-      <td class="label">Endereço do Cliente:</td><td>{endereco} — {cidade}/{estado}</td>
-      <td class="label">Equipamento:</td><td><b>{equipamento}</b></td>
-    </tr>
-    <tr>
-      <td class="label">Responsável / E-mail:</td><td>{resp_hosp} ({email_cli})</td>
-      <td class="label">Data / Horários:</td><td>Data: {dt_agend} | In: {cin} | Out: {cout} ({dur})</td>
     </tr>
     <tr>
       <td class="label">Técnico Principal:</td><td><b>{tec_princ}</b></td>
       <td class="label">Técnico(s) Auxiliar(es):</td><td><b>{tec_aux}</b></td>
     </tr>
+    <tr>
+      <td class="label">Etapa / Divisão:</td><td>{etapa_prev}</td>
+      <td class="label">Horários Atend.:</td><td>In: {cin} | Out: {cout} ({dur})</td>
+    </tr>
   </table>
 
-  <div class="sec-title">2. Serviços Executados, Diagnóstico & Formulários (POP/IT)</div>
+  <div class="sec-title">3. Solicitação Inicial & Diagnóstico Técnico</div>
   <table>
     <tr><td class="label">Defeito Relatado:</td><td colspan="3">{def_rel}</td></tr>
-    <tr><td class="label">Problemas / Causa:</td><td colspan="3">{prob_enc} (Causa Raiz: {causa_r})</td></tr>
-    <tr><td class="label">Serviços Executados:</td><td colspan="3"><b>{srv_exec}</b></td></tr>
-    <tr><td class="label">Formulário Checklist POP:</td><td colspan="3">{chk_pop} (Etapa: {etapa_prev})</td></tr>
-    <tr><td class="label">Parâmetros Medidos:</td><td colspan="3">{param_m}</td></tr>
+    <tr><td class="label">Diagnóstico / Causa:</td><td colspan="3">{prob_enc} &nbsp;|&nbsp; <b>Causa Raiz:</b> {causa_r}</td></tr>
   </table>
 
-  <div class="sec-title">3. Observações, Pendências & Condição Final</div>
+  <div class="sec-title">4. Serviços Executados, Checklist POP/IT & Medições</div>
+  <div class="laudo-box">
+    <div style="font-size:11.5px; font-weight:800; color:#0f766e; margin-bottom:4px;">LAUDO TÉCNICO DOS SERVIÇOS EXECUTADOS:</div>
+    <b>{srv_exec}</b>
+  </div>
+  <table>
+    <tr><td class="label">Formulário POP/IT:</td><td><b>{chk_pop}</b></td><td class="label">Medições / Parâm.:</td><td>{param_m}</td></tr>
+  </table>
+
+  <div class="sec-title">5. Observações, Pendências & Parecer Final de Liberação</div>
   <table>
     <tr><td class="label">Observações Gerais:</td><td colspan="3">{obs_ger}</td></tr>
-    <tr><td class="label">Pendências / Histórico:</td><td colspan="3">{pend_txt}</td></tr>
     <tr>
-      <td class="label">Condição na Saída:</td><td><b>{cond_fin}</b></td>
+      <td class="label">Parecer / Saída:</td><td><b style="color:#065f46;">{cond_fin}</b></td>
       <td class="label">Faturamento:</td><td>{cond_pag}</td>
     </tr>
   </table>
 
-  <div class="sec-title">4. Assinaturas e Validação Técnica</div>
+  <div class="sec-title">6. Termo de Conformidade e Assinaturas</div>
   <div class="sigs">
     <div class="sig-card">
-      <div style="font-family:'Brush Script MT',cursive; font-size:22px; color:#0f766e;">{tec_princ.title()}</div>
-      <hr style="border:0; border-top:1px solid #94a3b8; margin:6px 0;"/>
+      <div style="font-family:'Brush Script MT',cursive; font-size:24px; color:#0f766e; height:36px;">{tec_princ.title()}</div>
+      <hr style="border:0; border-top:1.5px solid #64748b; margin:6px 0;"/>
       <b>{ass_tec}</b><br/>
       Técnico Auxiliar: {tec_aux}<br/>
-      <span style="color:#64748b;">Equipa Técnica EMED Eletromedicina</span>
+      <span style="color:#64748b;">Responsável Técnico EMED Eletromedicina</span>
     </div>
     <div class="sig-card">
       {bloco_img_cli}
-      <hr style="border:0; border-top:1px solid #94a3b8; margin:6px 0;"/>
+      <hr style="border:0; border-top:1.5px solid #64748b; margin:6px 0;"/>
       <b>{ass_cli}</b><br/>
+      Unidade: {cliente}<br/>
       <span style="color:#64748b;">Assinatura do Cliente / Responsável Local</span>
     </div>
   </div>
 </div>
 </body>
 </html>"""
+
 
 
 def _render_criar_nova_os(ctx: AppContext):
@@ -395,94 +731,165 @@ def _render_historico_concluidas(ctx: AppContext):
     import urllib.parse
     df = ctx.df
     equipa_tecnica = ctx.equipa_tecnica
+    logo_b64_emed = _obter_logo_emed_b64(ctx.base_dir)
 
-    st.markdown("#### 📁 Ordens de Serviço Fechadas (Formatadas, E-mail, Fotos/Vídeo, Formulários & Reabertura)")
+    st.markdown("#### 📁 Ordens de Serviço Fechadas (Documento Oficial EMED, WhatsApp, E-mail, PDF/Imagem & Reabertura)")
     df_os_concluidas = df[df['status'].astype(str).str.upper() == 'CONCLUÍDO']
     if df_os_concluidas.empty:
         st.info("ℹ️ Ainda não existem ordens de serviço concluídas.")
     else:
         for idx_c, row_c in df_os_concluidas.iterrows():
             id_os_c = obter_id_os(idx_c, row_c)
-            tec_hist_c = limpar_texto(row_c.get('tecnico_responsavel'), 'N/D')
+            tec_raw_c = limpar_texto(row_c.get('tecnico_responsavel'), 'EQUIPE EMED')
+            tec_hist_c = "EQUIPE TÉCNICA EMED" if tec_raw_c.upper() in ("A DEFINIR", "N/D", "") else tec_raw_c
             tec_aux_c = limpar_texto(row_c.get('tecnico_auxiliar'), '')
             txt_aux_header = f" + Aux: {tec_aux_c}" if tec_aux_c else ""
             tipo_srv_c = limpar_texto(row_c.get('tipo_servico'), 'MANUTENÇÃO')
+            eq_dados_c = _extrair_dados_equipamento(row_c.get('equipamento', ''))
+
             titulo_exp_c = (
-                f"✅ OS #{id_os_c} | {row_c['cliente']} — {row_c['equipamento']} "
+                f"✅ OS #{str(id_os_c).zfill(4)} | {row_c['cliente']} — {eq_dados_c['modelo']} "
                 f"[{tipo_srv_c}] [Técnico: {tec_hist_c}{txt_aux_header}]"
             )
             with st.expander(titulo_exp_c, expanded=(idx_c == df_os_concluidas.index[0])):
                 cli_nome_c = limpar_texto(row_c.get('cliente'), '-')
-                cli_end_c = limpar_texto(row_c.get('endereco'), 'ENDEREÇO NÃO INFORMADO')
+                cli_end_c = limpar_texto(row_c.get('endereco'), 'ENDEREÇO CONFORME CADASTRO')
                 cli_cid_c = limpar_texto(row_c.get('cidade'), 'FORTALEZA')
                 cli_uf_c = limpar_texto(row_c.get('estado'), 'CE')
-                cli_cnpj_c = limpar_texto(row_c.get('cnpj'), 'N/D')
+                cli_cnpj_c = limpar_texto(row_c.get('cnpj'), 'CONFORME CADASTRO')
                 cli_email_c = limpar_texto(row_c.get('email'), '')
-                cli_resp_c = limpar_texto(row_c.get('responsavel_hospital'), '-')
+                cli_resp_c = limpar_texto(row_c.get('responsavel_hospital'), limpar_texto(row_c.get('assinatura_cliente'), '-'))
                 laudo_hist = limpar_texto(row_c.get('pendencias'), '-')
-                etapa_hist = limpar_texto(row_c.get('etapa_preventiva'), 'GERAL')
+                etapa_hist = limpar_texto(row_c.get('etapa_preventiva'), 'GERAL / COMPLETA')
                 ass_cli_hist = limpar_texto(row_c.get('assinatura_cliente'), cli_resp_c)
-                def_rel_h = limpar_texto(row_c.get('defeito_relatado'), '-')
-                prob_enc_h = limpar_texto(row_c.get('problemas_encontrados'), '-')
-                srv_exec_h = limpar_texto(row_c.get('servico_executado'), laudo_hist)
+                ass_tec_hist = limpar_texto(row_c.get('assinatura_tecnico'), f"{tec_hist_c} - CFT")
+                def_rel_h = _limpar_laudo_servico(limpar_texto(row_c.get('defeito_relatado'), 'MANUTENÇÃO / VERIFICAÇÃO TÉCNICA PROGRAMADA'))
+                prob_enc_h = limpar_texto(row_c.get('problemas_encontrados'), 'INSPEÇÃO FUNCIONAL E VERIFICAÇÃO DE COMPONENTES')
+                causa_r_h = limpar_texto(row_c.get('causa_raiz'), 'MANUTENÇÃO PREVENTIVA / USO NORMAL')
+                srv_exec_h = _limpar_laudo_servico(row_c.get('servico_executado', ''), laudo_hist)
                 obs_ger_h = limpar_texto(row_c.get('observacoes_gerais'), 'SEM OBSERVAÇÕES ADICIONAIS')
-                param_h = limpar_texto(row_c.get('parametros_medidos'), '-')
+                param_h = limpar_texto(row_c.get('parametros_medidos'), 'DENTRO DOS PADRÕES NORMATIVOS (NBR IEC 60601)')
                 cond_f_h = limpar_texto(row_c.get('condicao_final'), 'LIBERADO PARA USO NORMAL')
-                chk_pop_h = limpar_texto(row_c.get('checklist_pop'), '')
+                chk_pop_raw = limpar_texto(row_c.get('checklist_pop'), 'POP/IT VALIDADO CONFORME PROCEDIMENTO')
+                chk_pop_h = chk_pop_raw.split("| OBS:")[0].strip() if "| OBS:" in chk_pop_raw.upper() else chk_pop_raw
                 dt_ag_h = limpar_texto(row_c.get('data_agendamento'), '-')
                 cin_h = limpar_texto(row_c.get('checkin_hora'), '-')
                 cout_h = limpar_texto(row_c.get('checkout_hora'), '-')
                 dur_h = limpar_texto(row_c.get('tempo_atendimento'), '-')
+                fat_h = limpar_texto(row_c.get('condicao_pagamento'), 'CONFORME CONTRATO / ORÇAMENTO')
+                img_sig_cli = limpar_texto(row_c.get('assinatura_cliente_img'), '')
 
-                # CARTÃO VISUAL DA OS FECHADA FORMATADA
-                st.markdown(
-                    f"""
-                    <div style="background:#141c35; border:1.5px solid #64dfdf; border-radius:12px; padding:18px; margin-bottom:14px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #3a506b; padding-bottom:10px; margin-bottom:12px;">
-                            <div>
-                                <span style="font-size:18px; font-weight:800; color:#64dfdf !important;">🏥 ORDEM DE SERVIÇO FECHADA Nº #{id_os_c}</span><br/>
-                                <span style="font-size:12px; color:#94a3b8 !important;">📅 Data: {dt_ag_h} | 📍 Check-in: {cin_h} | 🏁 Check-out: {cout_h} ({dur_h})</span>
-                            </div>
-                            <div style="text-align:right;">
-                                <span style="background:#0f766e; color:#64dfdf !important; border:1px solid #10b981; padding:4px 10px; border-radius:8px; font-weight:700; font-size:12px;">
-                                    🔧 TIPO DE SERVIÇO: {tipo_srv_c}
-                                </span>
-                            </div>
-                        </div>
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; font-size:13px;">
-                            <div style="background:#1c2541; padding:10px 12px; border-radius:8px; border:1px solid #3a506b;">
-                                <b style="color:#64dfdf !important;">🏥 NOME E ENDEREÇO DO CLIENTE:</b><br/>
-                                <b>Cliente:</b> {cli_nome_c} (CNPJ: {cli_cnpj_c})<br/>
-                                <b>Endereço:</b> {cli_end_c} — {cli_cid_c}/{cli_uf_c}<br/>
-                                <b>Responsável Local:</b> {cli_resp_c} | <b>E-mail:</b> {cli_email_c or 'Não informado'}
-                            </div>
-                            <div style="background:#1c2541; padding:10px 12px; border-radius:8px; border:1px solid #3a506b;">
-                                <b style="color:#64dfdf !important;">👷 EQUIPA TÉCNICA & EQUIPAMENTO:</b><br/>
-                                <b>Equipamento:</b> {row_c['equipamento']}<br/>
-                                <b>Técnico Principal:</b> {tec_hist_c}<br/>
-                                <b>Técnico(s) Auxiliar(es):</b> {tec_aux_c if tec_aux_c else 'NENHUM (ATENDIMENTO INDIVIDUAL)'}
-                            </div>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
+                tag_logo_header = (
+                    f'<img src="{logo_b64_emed}" style="height:68px; width:auto; border-radius:8px; background:#ffffff; padding:4px 8px; border:2px solid #64dfdf; box-shadow:0 2px 8px rgba(0,0,0,0.35);" alt="EMED Eletromedicina"/>'
+                    if logo_b64_emed
+                    else '<div style="background:#ffffff; color:#0b132b !important; font-weight:900; font-size:20px; padding:12px 18px; border-radius:8px;">@MED ELETROMEDICINA</div>'
                 )
 
-                ch1, ch2 = st.columns(2)
-                with ch1:
-                    st.markdown("##### 🛠️ Serviços Executados & Diagnóstico")
-                    st.markdown(f"**📢 Defeito Relatado:** {def_rel_h}")
-                    st.markdown(f"**🔍 Problemas Encontrados:** {prob_enc_h}")
-                    st.markdown(f"**🛠️ Serviços Executados:** {srv_exec_h}")
-                    st.markdown(f"**⚡ Parâmetros / Medições:** `{param_h}`")
-                with ch2:
-                    st.markdown("##### 📝 Observações, Pendências & Formulários")
-                    st.markdown(f"**📝 Observações:** {obs_ger_h}")
-                    st.markdown(f"**🚨 Pendência / Histórico:** {laudo_hist}")
-                    st.markdown(f"**🏁 Condição Final:** `{cond_f_h}`")
-                    st.markdown(f"**📋 Formulário Checklist POP/IT ({etapa_hist}):** `{chk_pop_h if chk_pop_h else 'Padrão Concluído'}`")
-                    if limpar_texto(row_c.get('condicao_pagamento')):
-                        st.markdown(f"💰 **Faturamento:** `{row_c.get('condicao_pagamento')}`")
+                bloco_sig_cli_html = (
+                    f'<img src="{img_sig_cli}" style="max-height:60px; max-width:220px; margin:4px auto; display:block;" alt="Assinatura Cliente"/>'
+                    if img_sig_cli.startswith("data:image")
+                    else f'<div style="font-family:\'Brush Script MT\',\'Segoe Script\',cursive; font-size:26px; color:#64dfdf !important; margin:6px 0;">{ass_cli_hist.title()}</div>'
+                )
+
+                cor_parecer_bg = "rgba(16, 185, 129, 0.18)" if "LIBERADO PARA USO NORMAL" in cond_f_h.upper() else "rgba(245, 158, 11, 0.22)"
+                cor_parecer_bd = "#10b981" if "LIBERADO PARA USO NORMAL" in cond_f_h.upper() else "#f59e0b"
+                icone_parecer = "🟢" if "LIBERADO PARA USO NORMAL" in cond_f_h.upper() else "🟡"
+
+                # FOLHA DE ORDEM DE SERVIÇO OFICIAL EMED NA TELA (CABEÇALHO COM LOGO À ESQUERDA + TABELAS NUMERADAS + ASSINATURAS)
+                html_folha_os_tela = (
+                    f'<div style="background:#0f172a; border:2px solid #64dfdf; border-radius:12px; padding:20px; margin-bottom:16px; box-shadow:0 6px 20px rgba(0,0,0,0.45);">'
+                    f'<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; background:linear-gradient(90deg, #1c2541 0%, #141c35 100%); border:1px solid #3a506b; border-bottom:3px solid #64dfdf; border-radius:10px; padding:14px 18px; margin-bottom:16px;">'
+                    f'<div style="display:flex; align-items:center; gap:16px;">'
+                    f'{tag_logo_header}'
+                    f'<div>'
+                    f'<div style="font-size:19px; font-weight:900; color:#ffffff !important; letter-spacing:0.5px;">EMED ELETROMEDICINA LTDA.</div>'
+                    f'<div style="font-size:12.5px; color:#64dfdf !important; font-weight:600;">Engenharia Clínica • Manutenção Preventiva, Corretiva, Instalação & Calibração</div>'
+                    f'<div style="font-size:11.5px; color:#cbd5e1 !important;">Conformidade Técnica ABNT NBR IEC 60601 / RDC ANVISA • <b>www.emed.med.br</b></div>'
+                    f'</div>'
+                    f'</div>'
+                    f'<div style="background:#0b132b; border:1.5px solid #64dfdf; border-radius:10px; padding:10px 16px; text-align:right; min-width:220px;">'
+                    f'<div style="font-size:11px; color:#94a3b8 !important; font-weight:700; text-transform:uppercase;">Ordem de Serviço Oficial</div>'
+                    f'<div style="font-size:24px; font-weight:900; color:#64dfdf !important; line-height:1.1;">Nº #{str(id_os_c).zfill(4)}</div>'
+                    f'<div style="margin-top:5px; display:flex; gap:6px; justify-content:flex-end; flex-wrap:wrap;">'
+                    f'<span style="background:#10b981; color:#0b132b !important; font-weight:800; font-size:11px; padding:2px 8px; border-radius:5px;">✅ CONCLUÍDA</span>'
+                    f'<span style="background:#1c2541; color:#64dfdf !important; border:1px solid #64dfdf; font-weight:700; font-size:11px; padding:2px 8px; border-radius:5px;">{tipo_srv_c}</span>'
+                    f'</div>'
+                    f'<div style="font-size:11px; color:#cbd5e1 !important; margin-top:5px;">📅 {dt_ag_h} | ⏱️ In: {cin_h} • Out: {cout_h} ({dur_h})</div>'
+                    f'</div>'
+                    f'</div>'
+                    # SEÇÃO 1: CLIENTE
+                    f'<div style="background:#1c2541; border-left:4px solid #64dfdf; padding:6px 12px; font-weight:800; font-size:12.5px; color:#64dfdf !important; text-transform:uppercase; border-radius:4px; margin-bottom:8px;">'
+                    f'1. Identificação do Cliente / Unidade Hospitalar'
+                    f'</div>'
+                    f'<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:14px; font-size:13px;">'
+                    f'<div style="background:#141c35; border:1px solid #3a506b; border-radius:6px; padding:8px 12px;"><span style="color:#94a3b8 !important; font-size:11px; display:block;">CLIENTE / UNIDADE DE SAÚDE</span><b style="color:#ffffff !important; font-size:14px;">{cli_nome_c}</b></div>'
+                    f'<div style="background:#141c35; border:1px solid #3a506b; border-radius:6px; padding:8px 12px;"><span style="color:#94a3b8 !important; font-size:11px; display:block;">CNPJ / REGISTO</span><b style="color:#ffffff !important;">{cli_cnpj_c}</b></div>'
+                    f'<div style="background:#141c35; border:1px solid #3a506b; border-radius:6px; padding:8px 12px;"><span style="color:#94a3b8 !important; font-size:11px; display:block;">CIDADE / UF</span><b style="color:#ffffff !important;">{cli_cid_c} / {cli_uf_c}</b></div>'
+                    f'<div style="background:#141c35; border:1px solid #3a506b; border-radius:6px; padding:8px 12px; grid-column: span 2;"><span style="color:#94a3b8 !important; font-size:11px; display:block;">ENDEREÇO DO ATENDIMENTO</span><b style="color:#ffffff !important;">{cli_end_c}</b></div>'
+                    f'<div style="background:#141c35; border:1px solid #3a506b; border-radius:6px; padding:8px 12px;"><span style="color:#94a3b8 !important; font-size:11px; display:block;">RESPONSÁVEL LOCAL / E-MAIL</span><b style="color:#ffffff !important;">{cli_resp_c}</b> <span style="font-size:11.5px; color:#cbd5e1 !important;">({cli_email_c or "Sem e-mail"})</span></div>'
+                    f'</div>'
+                    # SEÇÃO 2: EQUIPAMENTO & EQUIPE TÉCNICA
+                    f'<div style="background:#1c2541; border-left:4px solid #64dfdf; padding:6px 12px; font-weight:800; font-size:12.5px; color:#64dfdf !important; text-transform:uppercase; border-radius:4px; margin-bottom:8px;">'
+                    f'2. Identificação do Equipamento Médico-Hospitalar & Equipe Técnica'
+                    f'</div>'
+                    f'<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:14px; font-size:13px;">'
+                    f'<div style="background:#141c35; border:1px solid #3a506b; border-radius:6px; padding:8px 12px;"><span style="color:#94a3b8 !important; font-size:11px; display:block;">EQUIPAMENTO / MODELO</span><b style="color:#64dfdf !important; font-size:14px;">{eq_dados_c["modelo"]}</b></div>'
+                    f'<div style="background:#141c35; border:1px solid #3a506b; border-radius:6px; padding:8px 12px;"><span style="color:#94a3b8 !important; font-size:11px; display:block;">Nº DE SÉRIE (N/S) & ANO FAB.</span><b style="color:#ffffff !important;">{eq_dados_c["ns"]}</b> <span style="color:#cbd5e1 !important;">(Fab: {eq_dados_c["fab"]})</span></div>'
+                    f'<div style="background:#141c35; border:1px solid #3a506b; border-radius:6px; padding:8px 12px;"><span style="color:#94a3b8 !important; font-size:11px; display:block;">SETOR / LOCALIZAÇÃO</span><b style="color:#ffffff !important;">{eq_dados_c["local"]}</b></div>'
+                    f'<div style="background:#141c35; border:1px solid #3a506b; border-radius:6px; padding:8px 12px;"><span style="color:#94a3b8 !important; font-size:11px; display:block;">TÉCNICO RESPONSÁVEL PRINCIPAL</span><b style="color:#10b981 !important;">👷 {tec_hist_c}</b></div>'
+                    f'<div style="background:#141c35; border:1px solid #3a506b; border-radius:6px; padding:8px 12px;"><span style="color:#94a3b8 !important; font-size:11px; display:block;">TÉCNICO(S) AUXILIAR(ES)</span><b style="color:#ffffff !important;">🤝 {tec_aux_c if tec_aux_c else "NENHUM (ATENDIMENTO INDIVIDUAL)"}</b></div>'
+                    f'<div style="background:#141c35; border:1px solid #3a506b; border-radius:6px; padding:8px 12px;"><span style="color:#94a3b8 !important; font-size:11px; display:block;">DIVISÃO / ETAPA EXECUTADA</span><b style="color:#ffffff !important;">{etapa_hist}</b></div>'
+                    f'</div>'
+                    # SEÇÃO 3: SERVIÇOS EXECUTADOS, DIAGNÓSTICO & FORMULÁRIOS POP/IT
+                    f'<div style="background:#1c2541; border-left:4px solid #64dfdf; padding:6px 12px; font-weight:800; font-size:12.5px; color:#64dfdf !important; text-transform:uppercase; border-radius:4px; margin-bottom:8px;">'
+                    f'3. Solicitação, Diagnóstico & Serviços Executados (Laudo Técnico)'
+                    f'</div>'
+                    f'<div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px; font-size:13px;">'
+                    f'<div style="background:#141c35; border:1px solid #3a506b; border-radius:6px; padding:8px 12px;"><span style="color:#94a3b8 !important; font-size:11px; display:block;">DEFEITO RELATADO / ESCOPO INICIAL</span><span style="color:#ffffff !important;">{def_rel_h}</span></div>'
+                    f'<div style="background:#141c35; border:1px solid #3a506b; border-radius:6px; padding:8px 12px;"><span style="color:#94a3b8 !important; font-size:11px; display:block;">PROBLEMAS ENCONTRADOS / CAUSA RAIZ</span><span style="color:#ffffff !important;">{prob_enc_h} (Causa: {causa_r_h})</span></div>'
+                    f'</div>'
+                    f'<div style="background:#14293a; border:1.5px solid #10b981; border-radius:8px; padding:12px 16px; margin-bottom:8px;">'
+                    f'<span style="color:#64dfdf !important; font-size:11.5px; font-weight:800; display:block; margin-bottom:4px;">🛠️ DESCRIÇÃO DETALHADA DOS SERVIÇOS EXECUTADOS:</span>'
+                    f'<div style="font-size:14.5px; font-weight:700; color:#ffffff !important; line-height:1.45;">{srv_exec_h}</div>'
+                    f'</div>'
+                    f'<div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:14px; font-size:13px;">'
+                    f'<div style="background:#141c35; border:1px solid #3a506b; border-radius:6px; padding:8px 12px;"><span style="color:#94a3b8 !important; font-size:11px; display:block;">📋 FORMULÁRIO / CHECKLIST POP-IT</span><b style="color:#64dfdf !important;">{chk_pop_h}</b></div>'
+                    f'<div style="background:#141c35; border:1px solid #3a506b; border-radius:6px; padding:8px 12px;"><span style="color:#94a3b8 !important; font-size:11px; display:block;">⚡ PARÂMETROS TÉCNICOS MEDIDOS</span><b style="color:#ffffff !important;">{param_h}</b></div>'
+                    f'</div>'
+                    # SEÇÃO 4: OBSERVAÇÕES, PENDÊNCIAS & PARECER FINAL
+                    f'<div style="background:#1c2541; border-left:4px solid #64dfdf; padding:6px 12px; font-weight:800; font-size:12.5px; color:#64dfdf !important; text-transform:uppercase; border-radius:4px; margin-bottom:8px;">'
+                    f'4. Observações Técnicas, Pendências & Parecer Final de Liberação'
+                    f'</div>'
+                    f'<div style="display:grid; grid-template-columns: 1.3fr 1fr; gap:8px; margin-bottom:14px; font-size:13px;">'
+                    f'<div style="background:#141c35; border:1px solid #3a506b; border-radius:6px; padding:10px 12px;"><span style="color:#94a3b8 !important; font-size:11px; display:block;">📝 OBSERVAÇÕES GERAIS & RECOMENDAÇÕES</span><span style="color:#ffffff !important;">{obs_ger_h}</span><br/><span style="color:#94a3b8 !important; font-size:11px;">💰 Condição Comercial: {fat_h}</span></div>'
+                    f'<div style="background:{cor_parecer_bg}; border:1.5px solid {cor_parecer_bd}; border-radius:8px; padding:10px 14px; display:flex; flex-direction:column; justify-content:center;">'
+                    f'<span style="color:#cbd5e1 !important; font-size:11px; font-weight:700;">PARECER DE SAÍDA / STATUS DO EQUIPAMENTO:</span>'
+                    f'<div style="font-size:15px; font-weight:900; color:#ffffff !important; margin-top:3px;">{icone_parecer} {cond_f_h}</div>'
+                    f'</div>'
+                    f'</div>'
+                    # SEÇÃO 5: TERMO DE RECEBIMENTO E ASSINATURAS
+                    f'<div style="background:#1c2541; border-left:4px solid #64dfdf; padding:6px 12px; font-weight:800; font-size:12.5px; color:#64dfdf !important; text-transform:uppercase; border-radius:4px; margin-bottom:8px;">'
+                    f'5. Termo de Conformidade e Assinaturas (Técnico & Cliente)'
+                    f'</div>'
+                    f'<div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">'
+                    f'<div style="background:#141c35; border:1px solid #64dfdf; border-radius:8px; padding:12px; text-align:center;">'
+                    f'<span style="background:#10b981; color:#0b132b !important; font-weight:800; font-size:10.5px; padding:2px 8px; border-radius:10px;">✅ RUBRICA TÉCNICA AUTENTICADA EMED</span>'
+                    f'<div style="font-family:\'Brush Script MT\',\'Segoe Script\',cursive; font-size:26px; color:#64dfdf !important; margin:6px 0;">{tec_hist_c.title()}</div>'
+                    f'<hr style="border:0; border-top:1px dashed #3a506b; width:82%; margin:4px auto;"/>'
+                    f'<div style="font-size:13px; font-weight:700; color:#ffffff !important;">{ass_tec_hist}</div>'
+                    f'<div style="font-size:11.5px; color:#cbd5e1 !important;">Técnico(s) Auxiliar(es): {tec_aux_c if tec_aux_c else "Nenhum"}</div>'
+                    f'</div>'
+                    f'<div style="background:#141c35; border:1px solid #64dfdf; border-radius:8px; padding:12px; text-align:center;">'
+                    f'<span style="background:#0284c7; color:#ffffff !important; font-weight:800; font-size:10.5px; padding:2px 8px; border-radius:10px;">🏥 RECEBIMENTO PELO CLIENTE / HOSPITAL</span>'
+                    f'{bloco_sig_cli_html}'
+                    f'<hr style="border:0; border-top:1px dashed #3a506b; width:82%; margin:4px auto;"/>'
+                    f'<div style="font-size:13px; font-weight:700; color:#ffffff !important;">{ass_cli_hist}</div>'
+                    f'<div style="font-size:11.5px; color:#cbd5e1 !important;">Responsável Local — {cli_nome_c}</div>'
+                    f'</div>'
+                    f'</div>'
+                    f'</div>'
+                )
+                st.markdown(html_folha_os_tela, unsafe_allow_html=True)
 
                 # Anexos de Formulários e Orçamentos
                 form_anexo_c = limpar_texto(row_c.get('formulario_anexo'), '')
@@ -513,7 +920,6 @@ def _render_historico_concluidas(ctx: AppContext):
                 f_dep_c = limpar_texto(row_c.get('foto_depois'), '')
                 vid_c = limpar_texto(row_c.get('video_evidencia'), '')
                 if (f_ant_c and os.path.exists(f_ant_c)) or (f_dep_c and os.path.exists(f_dep_c)) or (vid_c and os.path.exists(vid_c)):
-                    st.markdown("---")
                     st.markdown("##### 📸 Anexo de Fotos & 🎥 Vídeo da Intervenção")
                     cf1, cf2, cf3 = st.columns(3)
                     with cf1:
@@ -527,31 +933,17 @@ def _render_historico_concluidas(ctx: AppContext):
                             st.video(vid_c)
                             st.caption(f"🎥 Vídeo: {os.path.basename(vid_c)}")
 
-                st.markdown("---")
-                st.markdown("##### ✍️ Assinatura Técnica (Principal + Auxiliar) & Assinatura do Cliente")
-                ca_h1, ca_h2 = st.columns(2)
-                with ca_h1:
-                    renderizar_rubrica_tecnico(tec_hist_c, equipa_tecnica)
-                    if tec_aux_c:
-                        st.caption(f"🤝 **Técnico(s) Auxiliar(es) Participante(s):** `{tec_aux_c}`")
-                with ca_h2:
-                    st.markdown(f"**Responsável no Cliente:** `{ass_cli_hist}`")
-                    img_sig_cli = limpar_texto(row_c.get('assinatura_cliente_img'), '')
-                    if img_sig_cli.startswith("data:image"):
-                        st.markdown(f"""
-                            <div style="background:#0b132b; border:1px solid #64dfdf; border-radius:8px; padding:8px; text-align:center;">
-                                <img src="{img_sig_cli}" style="max-width:260px; height:auto;" alt="Assinatura Cliente"/>
-                                <p style="margin:2px 0 0 0; font-size:11px; color:#10b981 !important;">✅ Assinatura Coletada na Tela do Celular</p>
-                            </div>
-                        """, unsafe_allow_html=True)
-                    elif img_sig_cli and os.path.exists(img_sig_cli):
-                        st.image(img_sig_cli, caption="Rubrica do Cliente", width=240)
-                    else:
-                        st.caption("ℹ️ Assinatura validada nominalmente pelo responsável local.")
+                # GERAÇÃO DA FOLHA OFICIAL A4 EM IMAGEM PNG E PDF (COM LOGO EMED NO CANTO SUPERIOR ESQUERDO)
+                png_os_bytes, pdf_os_bytes = _gerar_midia_os_oficial(str(id_os_c), row_c, equipa_tecnica, ctx.base_dir)
+                html_ficha_os = _gerar_html_os_formatada(str(id_os_c), row_c, equipa_tecnica, ctx.base_dir)
+                nome_base_arq = f"OS_{str(id_os_c).zfill(4)}_{limpar_texto(cli_nome_c, 'EMED').replace(' ', '_')}"
 
-                # OPÇÃO DE ENVIO POR E-MAIL, WHATSAPP & FICHA OFICIAL A4
-                st.markdown("---")
-                st.markdown("##### 📧 Envio da OS por E-mail, 💬 WhatsApp & 🖨️ Impressão da Ficha Oficial")
+                with st.expander("📄 Folha de Ordem de Serviço A4 Timbrada (Pronta para Copiar/Colar no WhatsApp ou Imprimir)", expanded=True):
+                    st.caption("💡 **Dica rápida para WhatsApp:** Clique com o botão direito na Folha de OS abaixo, escolha **'Copiar imagem'** e cole (**Ctrl+V**) direto na conversa do WhatsApp do cliente! Ou baixe o **PDF Oficial** / **Imagem PNG** nos botões abaixo.")
+                    st.image(png_os_bytes, caption=f"Ordem de Serviço Oficial Nº #{str(id_os_c).zfill(4)} — EMED Eletromedicina Ltda.", use_container_width=True)
+
+                # OPÇÃO DE ENVIO POR E-MAIL, WHATSAPP & DOWNLOAD DA FOLHA OFICIAL (PDF / IMAGEM / HTML)
+                st.markdown("##### 📧 Envio da OS por E-mail, 💬 WhatsApp & 🖨️ Emissão da Folha Oficial (PDF / Imagem)")
                 cli_whats_c = limpar_texto(row_c.get('whatsapp'), limpar_texto(row_c.get('contato_responsavel'), ''))
                 c_inp1, c_inp2 = st.columns(2)
                 with c_inp1:
@@ -569,20 +961,31 @@ def _render_historico_concluidas(ctx: AppContext):
                         key=f"wa_dest_c_{idx_c}",
                     )
 
-                assunto_email = f"Ordem de Servico #{id_os_c} Concluida - EMED Eletromedicina ({cli_nome_c})"
+                assunto_email = f"Ordem de Servico #{str(id_os_c).zfill(4)} Concluida - EMED Eletromedicina ({cli_nome_c})"
                 corpo_email = (
                     f"Prezado(a) {cli_resp_c} ({cli_nome_c}),\n\n"
-                    f"Segue o resumo da Ordem de Serviço #{id_os_c} concluída pela EMED Eletromedicina:\n\n"
-                    f"• Cliente: {cli_nome_c}\n"
-                    f"• Endereço: {cli_end_c} - {cli_cid_c}/{cli_uf_c}\n"
-                    f"• Equipamento: {row_c['equipamento']}\n"
-                    f"• Tipo de Serviço: {tipo_srv_c} ({etapa_hist})\n"
-                    f"• Técnico Principal: {tec_hist_c} | Técnico Auxiliar: {tec_aux_c or 'Nenhum'}\n"
-                    f"• Serviços Executados: {srv_exec_h}\n"
-                    f"• Formulário / Checklist POP: {chk_pop_h or 'Realizado'}\n"
-                    f"• Observações: {obs_ger_h}\n"
-                    f"• Pendências / Status Final: {cond_f_h}\n"
-                    f"• Assinatura Responsável Local: {ass_cli_hist}\n\n"
+                    f"Segue a Ordem de Serviço Nº #{str(id_os_c).zfill(4)} concluída pela EMED Eletromedicina Ltda.:\n\n"
+                    f"==================================================\n"
+                    f"EMED ELETROMEDICINA LTDA. | www.emed.med.br\n"
+                    f"ORDEM DE SERVIÇO OFICIAL Nº #{str(id_os_c).zfill(4)}\n"
+                    f"==================================================\n"
+                    f"1. DADOS DO CLIENTE:\n"
+                    f"   - Cliente: {cli_nome_c} (CNPJ: {cli_cnpj_c})\n"
+                    f"   - Endereço: {cli_end_c} - {cli_cid_c}/{cli_uf_c}\n"
+                    f"   - Responsável Local: {cli_resp_c}\n\n"
+                    f"2. EQUIPAMENTO E EQUIPE TÉCNICA:\n"
+                    f"   - Equipamento: {eq_dados_c['modelo']} | N/S: {eq_dados_c['ns']} | Setor: {eq_dados_c['local']}\n"
+                    f"   - Tipo de Serviço: {tipo_srv_c} ({etapa_hist})\n"
+                    f"   - Técnico Principal: {tec_hist_c} | Técnico Auxiliar: {tec_aux_c or 'Nenhum'}\n\n"
+                    f"3. SERVIÇOS EXECUTADOS (LAUDO TÉCNICO):\n"
+                    f"   {srv_exec_h}\n"
+                    f"   - Checklist POP/IT: {chk_pop_h}\n"
+                    f"   - Medições: {param_h}\n\n"
+                    f"4. OBSERVAÇÕES E PARECER FINAL:\n"
+                    f"   - Observações: {obs_ger_h}\n"
+                    f"   - Condição Final: {cond_f_h}\n"
+                    f"   - Recebido/Assinado por: {ass_cli_hist}\n"
+                    f"==================================================\n\n"
                     f"Atenciosamente,\nEMED Eletromedicina Ltda."
                 )
                 link_mailto = (
@@ -591,62 +994,88 @@ def _render_historico_concluidas(ctx: AppContext):
                     f"body={urllib.parse.quote(corpo_email)}"
                 )
 
+                # Texto do WhatsApp 100% blindado contra caracteres corrompidos (sem emojis de 4 bytes que viram losango no Windows)
                 texto_whatsapp_os = (
-                    f"*🏥 EMED ELETROMEDICINA — ORDEM DE SERVIÇO #{id_os_c}*\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"🏢 *Cliente:* {cli_nome_c}\n"
-                    f"📍 *Endereço:* {cli_end_c} ({cli_cid_c}/{cli_uf_c})\n"
-                    f"🔬 *Equipamento:* {row_c['equipamento']}\n"
-                    f"🔧 *Tipo de Serviço:* {tipo_srv_c} ({etapa_hist})\n"
-                    f"👷 *Técnico Principal:* {tec_hist_c}\n"
-                    f"🤝 *Técnico Auxiliar:* {tec_aux_c or 'Nenhum'}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"🛠️ *Serviços Executados:* {srv_exec_h}\n"
-                    f"📋 *Formulário Checklist POP:* {chk_pop_h or 'Concluído'}\n"
-                    f"📝 *Observações:* {obs_ger_h}\n"
-                    f"🚨 *Pendência / Condição Final:* {cond_f_h}\n"
-                    f"✍️ *Recebido/Assinado por:* {ass_cli_hist}\n"
-                    f"✅ *Status:* OS CONCLUÍDA"
+                    f"*@MED ELETROMEDICINA LTDA.*\n"
+                    f"*ORDEM DE SERVICO OFICIAL No #{str(id_os_c).zfill(4)}*\n"
+                    f"----------------------------------------\n"
+                    f"*1. DADOS DO CLIENTE*\n"
+                    f"• *Cliente:* {cli_nome_c}\n"
+                    f"• *Endereco:* {cli_end_c} ({cli_cid_c}/{cli_uf_c})\n"
+                    f"----------------------------------------\n"
+                    f"*2. EQUIPAMENTO E EQUIPE TECNICA*\n"
+                    f"• *Equipamento:* {eq_dados_c['modelo']}\n"
+                    f"• *N/S:* {eq_dados_c['ns']} | *Local:* {eq_dados_c['local']}\n"
+                    f"• *Tipo de Servico:* {tipo_srv_c}\n"
+                    f"• *Tecnico Principal:* {tec_hist_c}\n"
+                    f"• *Tecnico Auxiliar:* {tec_aux_c or 'Nenhum'}\n"
+                    f"----------------------------------------\n"
+                    f"*3. SERVICOS EXECUTADOS (LAUDO)*\n"
+                    f"{srv_exec_h}\n\n"
+                    f"• *Checklist POP/IT:* {chk_pop_h}\n"
+                    f"• *Observacoes:* {obs_ger_h}\n"
+                    f"----------------------------------------\n"
+                    f"*4. PARECER FINAL E ASSINATURA*\n"
+                    f"• *Condicao Final:* {cond_f_h}\n"
+                    f"• *Recebido/Assinado por:* {ass_cli_hist}\n"
+                    f"• *Status:* OS CONCLUIDA - www.emed.med.br"
                 )
                 num_wa_limpo = "".join(ch for ch in whats_dest_in if ch.isdigit())
                 if num_wa_limpo and not num_wa_limpo.startswith("55") and len(num_wa_limpo) in (10, 11):
                     num_wa_limpo = "55" + num_wa_limpo
                 base_wa = f"https://wa.me/{num_wa_limpo}" if num_wa_limpo else "https://wa.me/"
-                link_whatsapp_os = f"{base_wa}?text={urllib.parse.quote(texto_whatsapp_os)}"
+                link_whatsapp_os = f"{base_wa}?text={urllib.parse.quote(texto_whatsapp_os, safe='')}"
 
-                html_ficha_os = _gerar_html_os_formatada(str(id_os_c), row_c, equipa_tecnica)
-
-                c_bt1, c_bt2, c_bt3 = st.columns(3)
+                c_bt1, c_bt2, c_bt3, c_bt4 = st.columns(4)
                 with c_bt1:
-                    if st.button("📧 Enviar OS por E-mail", key=f"btn_send_em_{idx_c}", type="primary", use_container_width=True):
-                        if not email_dest_in.strip():
-                            st.warning("⚠️ Informe o endereço de e-mail do cliente no campo acima!")
-                        else:
-                            df.at[idx_c, 'email'] = email_dest_in.strip()
-                            salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel)
-                            st.success(f"✅ E-mail preparado para **{email_dest_in.strip()}**!")
-                            st.markdown(
-                                f'<a href="{link_mailto}" target="_blank" style="display:block; text-align:center; background:#10b981; color:#0b132b; font-weight:bold; padding:8px 12px; border-radius:6px; text-decoration:none; margin-top:4px;">📨 Abrir no Cliente de E-mail</a>',
-                                unsafe_allow_html=True,
-                            )
-                with c_bt2:
                     if st.button("💬 Enviar OS por WhatsApp", key=f"btn_send_wa_{idx_c}", type="primary", use_container_width=True):
                         if whats_dest_in.strip():
                             df.at[idx_c, 'whatsapp'] = whats_dest_in.strip()
                             salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel)
                         st.markdown(
-                            f'<a href="{link_whatsapp_os}" target="_blank" style="display:block; text-align:center; background:#25D366; color:#0b132b; font-weight:bold; padding:8px 12px; border-radius:6px; text-decoration:none; margin-top:4px;">📲 Abrir Conversa no WhatsApp com a OS</a>',
+                            f'<a href="{link_whatsapp_os}" target="_blank" style="display:block; text-align:center; background:#25D366; color:#0b132b !important; font-weight:800; padding:8px 10px; border-radius:6px; text-decoration:none; margin-top:4px;">📲 Abrir WhatsApp c/ OS</a>',
                             unsafe_allow_html=True,
                         )
+                        st.caption("💡 Anexe também o **PDF** ou **Imagem da OS** ao lado na conversa!")
+                with c_bt2:
+                    st.download_button(
+                        label="📄 Baixar PDF Oficial da OS",
+                        data=pdf_os_bytes,
+                        file_name=f"{nome_base_arq}.pdf",
+                        mime="application/pdf",
+                        key=f"dl_pdf_os_{idx_c}",
+                        type="primary",
+                        use_container_width=True,
+                    )
                 with c_bt3:
                     st.download_button(
-                        label="🖨️ Baixar Ficha da OS (A4/PDF)",
+                        label="🖼️ Baixar Imagem da OS (WhatsApp)",
+                        data=png_os_bytes,
+                        file_name=f"{nome_base_arq}.png",
+                        mime="image/png",
+                        key=f"dl_png_os_{idx_c}",
+                        use_container_width=True,
+                    )
+                with c_bt4:
+                    if st.button("📧 Enviar OS por E-mail", key=f"btn_send_em_{idx_c}", use_container_width=True):
+                        if not email_dest_in.strip():
+                            st.warning("⚠️ Informe o e-mail do cliente acima!")
+                        else:
+                            df.at[idx_c, 'email'] = email_dest_in.strip()
+                            salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel)
+                            st.markdown(
+                                f'<a href="{link_mailto}" target="_blank" style="display:block; text-align:center; background:#10b981; color:#0b132b !important; font-weight:800; padding:8px 10px; border-radius:6px; text-decoration:none; margin-top:4px;">📨 Abrir E-mail</a>',
+                                unsafe_allow_html=True,
+                            )
+                    st.download_button(
+                        label="🖨️ Versão Web Imprimível (.html)",
                         data=html_ficha_os.encode("utf-8"),
-                        file_name=f"OS_{id_os_c}_{limpar_texto(cli_nome_c, 'EMED').replace(' ', '_')}.html",
+                        file_name=f"{nome_base_arq}.html",
                         mime="text/html",
                         key=f"dl_html_os_{idx_c}",
                         use_container_width=True,
                     )
+
 
                 st.markdown("---")
                 st.markdown("##### 🔄 Reabrir OS / Transferir Pendência para Outro Técnico")
@@ -679,6 +1108,7 @@ def _render_execucao_os_ativas(ctx: AppContext):
     df = ctx.df
     df_estoque = ctx.df_estoque
     equipa_tecnica = ctx.equipa_tecnica
+    logo_b64_ativa = _obter_logo_emed_b64(ctx.base_dir)
 
     st.markdown("#### 🛠️ Execução Modular de Ordem de Serviço em Campo (6 Módulos)")
     df_os_ativas = df[df['status'].astype(str).str.upper() == 'ATIVO']
@@ -691,6 +1121,7 @@ def _render_execucao_os_ativas(ctx: AppContext):
             tec_resp_os = limpar_texto(row_os.get('tecnico_responsavel'), 'A DEFINIR').upper()
             cli_os_atual = limpar_texto(row_os.get('cliente'), '')
             eq_os_atual = limpar_texto(row_os.get('equipamento'), '')
+            eq_dados_at = _extrair_dados_equipamento(eq_os_atual)
             inst_os_atual = limpar_texto(row_os.get('instrumento_necessario'), '')
             etapa_os_atual = limpar_texto(row_os.get('etapa_preventiva'), '')
             srv_os_atual = limpar_texto(row_os.get('tipo_servico'), 'PREVENTIVA')
@@ -710,16 +1141,29 @@ def _render_execucao_os_ativas(ctx: AppContext):
             email_os_atual = limpar_texto(row_os.get('email'), '')
             txt_aux_ativo = f" + Aux: {tec_aux_os_atual}" if tec_aux_os_atual else ""
 
-            titulo_os_ativa = f"🛠️ OS #{id_os_ativa} | {cli_os_atual} — Equipamento: {eq_os_atual} [{srv_os_atual}] [Técnico: {tec_resp_os}{txt_aux_ativo}]"
+            tag_logo_at = (
+                f'<img src="{logo_b64_ativa}" style="height:56px; width:auto; border-radius:6px; background:#ffffff; padding:3px 6px; border:1.5px solid #64dfdf;" alt="EMED"/>'
+                if logo_b64_ativa
+                else '<span style="font-weight:900; color:#64dfdf !important;">@MED</span>'
+            )
+
+            titulo_os_ativa = f"🛠️ OS #{str(id_os_ativa).zfill(4)} | {cli_os_atual} — {eq_dados_at['modelo']} [{srv_os_atual}] [Técnico: {tec_resp_os}{txt_aux_ativo}]"
             with st.expander(titulo_os_ativa):
                 st.markdown(
-                    f"""
-                    <div style="background:#141c35; border-left:4px solid #64dfdf; border-radius:8px; padding:10px 14px; margin-bottom:10px; font-size:13px;">
-                        <b>🏥 Cliente:</b> {cli_os_atual} &nbsp;|&nbsp; <b>📍 Endereço:</b> {end_os_atual} ({cid_os_atual}/{uf_os_atual}) &nbsp;|&nbsp;
-                        <b>🔧 Tipo de Serviço:</b> <span style="color:#64dfdf !important; font-weight:bold;">{srv_os_atual}</span> &nbsp;|&nbsp;
-                        <b>📅 Data:</b> {dt_os_atual}
-                    </div>
-                    """,
+                    f'<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; background:linear-gradient(90deg, #1c2541 0%, #141c35 100%); border:1px solid #3a506b; border-left:5px solid #64dfdf; border-radius:10px; padding:12px 16px; margin-bottom:12px;">'
+                    f'<div style="display:flex; align-items:center; gap:14px;">'
+                    f'{tag_logo_at}'
+                    f'<div>'
+                    f'<div style="font-size:16px; font-weight:900; color:#ffffff !important;">EMED ELETROMEDICINA — ORDEM DE SERVIÇO EM EXECUÇÃO</div>'
+                    f'<div style="font-size:12.5px; color:#cbd5e1 !important;"><b>🏥 Cliente:</b> {cli_os_atual} &nbsp;|&nbsp; <b>📍 Endereço:</b> {end_os_atual} ({cid_os_atual}/{uf_os_atual})</div>'
+                    f'<div style="font-size:12px; color:#64dfdf !important;"><b>🔬 Equipamento:</b> {eq_dados_at["modelo"]} (N/S: {eq_dados_at["ns"]} | Local: {eq_dados_at["local"]})</div>'
+                    f'</div>'
+                    f'</div>'
+                    f'<div style="background:#0b132b; border:1px solid #64dfdf; border-radius:8px; padding:6px 14px; text-align:right;">'
+                    f'<div style="font-size:18px; font-weight:900; color:#64dfdf !important;">OS Nº #{str(id_os_ativa).zfill(4)}</div>'
+                    f'<div style="font-size:11px; color:#fbbf24 !important; font-weight:700;">🔧 {srv_os_atual} • 📅 {dt_os_atual}</div>'
+                    f'</div>'
+                    f'</div>',
                     unsafe_allow_html=True,
                 )
                 c_top1, c_top2, c_top3 = st.columns([2.4, 1.3, 1.3])
