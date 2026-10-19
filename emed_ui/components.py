@@ -95,9 +95,8 @@ def renderizar_area_trabalho_icones(
     opcoes_visiveis = [op for op in opcoes_menu if op not in excluidos_usuario]
     modo_edicao = st.session_state.modo_edicao_atalhos
 
-    # Três botões somente com ícones, próximos à esquerda e sem background (type="tertiary")
-    c_aba, c_desk, c_cfg, _ = st.columns([0.42, 0.58, 0.42, 8.58], gap="small")
-    with c_aba:
+    # Três botões somente com ícones, alinhados totalmente à esquerda e sem background (type="tertiary")
+    with st.container(horizontal=True, horizontal_alignment="left", vertical_alignment="center", gap="small"):
         icone_aba = "▶️" if st.session_state.aba_lateral_oculta else "◀️"
         st.button(
             icone_aba,
@@ -106,7 +105,6 @@ def renderizar_area_trabalho_icones(
             help="Abrir / Esconder Aba Lateral Esquerda",
             on_click=_alternar_aba_lateral,
         )
-    with c_desk:
         seta_horiz = "🔽" if st.session_state.area_trabalho_aberta else "▶️"
         st.button(
             f"{seta_horiz} 🖥️",
@@ -115,7 +113,6 @@ def renderizar_area_trabalho_icones(
             help="Abrir / Recolher Área de Trabalho Rápida",
             on_click=_alternar_area_trabalho_horizontal,
         )
-    with c_cfg:
         icone_cfg = "🟢🛠️" if modo_edicao else "🛠️"
         st.button(
             icone_cfg,

@@ -228,7 +228,7 @@ def inject_custom_css():
             border-color: #64dfdf !important;
             color: #64dfdf !important;
         }
-        /* Botões de Ícone Sem Background (Ultra Clean) */
+        /* Botões de Ícone Sem Background (Ultra Clean e Alinhados à Esquerda) */
         button[kind="tertiary"],
         .stButton button[kind="tertiary"],
         div.stButton > button[kind="tertiary"] {
@@ -236,19 +236,25 @@ def inject_custom_css():
             background-color: transparent !important;
             border: none !important;
             box-shadow: none !important;
-            padding: 2px 6px !important;
-            min-height: 34px !important;
+            padding: 0px 4px 0px 0px !important;
+            margin: 0px !important;
+            min-height: 30px !important;
+            min-width: 0px !important;
+            width: auto !important;
+            justify-content: flex-start !important;
         }
         button[kind="tertiary"] p,
         .stButton button[kind="tertiary"] p {
             font-size: 20px !important;
             line-height: 1.1 !important;
+            margin: 0px !important;
+            text-align: left !important;
         }
         button[kind="tertiary"]:hover,
         .stButton button[kind="tertiary"]:hover,
         div.stButton > button[kind="tertiary"]:hover {
             background: rgba(100, 223, 223, 0.14) !important;
-            border-radius: 8px !important;
+            border-radius: 6px !important;
             border: none !important;
             transform: scale(1.08);
         }
