@@ -504,107 +504,91 @@ def _render_historico_concluidas(ctx: AppContext):
                     else f'<div style="height:45px; line-height:45px; font-weight:bold; color:#cbd5e1;">(Assinatura Coletada: {ass_cli_hist})</div>'
                 )
 
-                st.markdown(
-                    f"""
-                    <div style="background:#101935; border:1.8px solid #64dfdf; border-radius:12px; padding:20px; margin-bottom:16px; box-shadow:0 4px 16px rgba(0,0,0,0.35);">
-                        <!-- CABEÇALHO COM LOGO SUPERIOR ESQUERDO E IDENTIFICAÇÃO DA OS -->
-                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #3a506b; padding-bottom:14px; margin-bottom:14px; flex-wrap:wrap; gap:12px;">
-                            <div style="display:flex; align-items:center; gap:14px;">
-                                {bloco_logo_tela}
-                                <div>
-                                    <div style="font-size:18px; font-weight:800; color:#ffffff; letter-spacing:0.5px;">EMED ELETROMEDICINA LTDA.</div>
-                                    <div style="font-size:12px; color:#64dfdf; font-weight:600;">Eletromedicina, Manutenção em Equipamentos de Diagnóstico por Imagem</div>
-                                    <div style="font-size:11px; color:#94a3b8;">CNPJ: 03.611.974/0001-08 • Fone: (85) 3254-2929 • Site: <a href="https://emed.med.br/" target="_blank" style="color:#64dfdf; text-decoration:none;">emed.med.br</a> • Fortaleza - CE</div>
-                                </div>
-                            </div>
-                            <div style="text-align:right;">
-                                <div style="font-size:19px; font-weight:900; color:#64dfdf; letter-spacing:0.5px;">ORDEM DE SERVIÇO Nº #{id_os_c}</div>
-                                <div style="font-size:12px; color:#cbd5e1; margin-top:2px;">📅 Data: <b>{dt_ag_h}</b> &nbsp;|&nbsp; ⏱️ <b>{cin_h} às {cout_h}</b> ({dur_h})</div>
-                                <div style="margin-top:6px; display:flex; gap:6px; justify-content:flex-end;">
-                                    <span style="background:#10b981; color:#0b132b; padding:3px 10px; border-radius:6px; font-weight:800; font-size:11px; text-transform:uppercase;">STATUS: CONCLUÍDA</span>
-                                    <span style="background:#0f766e; color:#64dfdf; border:1px solid #64dfdf; padding:3px 10px; border-radius:6px; font-weight:700; font-size:11px; text-transform:uppercase;">TIPO: {tipo_srv_c}</span>
-                                </div>
-                            </div>
-                        </div>
+                card_os_fechada_html = f"""<div style="background:#101935; border:1.8px solid #64dfdf; border-radius:12px; padding:20px; margin-bottom:16px; box-shadow:0 4px 16px rgba(0,0,0,0.35);">
+<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #3a506b; padding-bottom:14px; margin-bottom:14px; flex-wrap:wrap; gap:12px;">
+<div style="display:flex; align-items:center; gap:14px;">
+{bloco_logo_tela}
+<div>
+<div style="font-size:18px; font-weight:900; color:#ffffff; letter-spacing:0.5px;">EMED ELETROMEDICINA LTDA.</div>
+<div style="font-size:12px; color:#64dfdf; font-weight:600;">Eletromedicina, Manutenção em Equipamentos de Diagnóstico por Imagem</div>
+<div style="font-size:11px; color:#94a3b8;">CNPJ: 03.611.974/0001-08 • Fone: (85) 3254-2929 • Site: <a href="https://emed.med.br/" target="_blank" style="color:#64dfdf; text-decoration:none;">emed.med.br</a> • Fortaleza - CE</div>
+</div>
+</div>
+<div style="text-align:right;">
+<div style="font-size:22px; font-weight:900; color:#64dfdf; letter-spacing:0.5px; text-shadow:0 2px 4px rgba(0,0,0,0.4);"><b>ORDEM DE SERVIÇO Nº #{id_os_c}</b></div>
+<div style="font-size:12px; color:#cbd5e1; margin-top:2px;">📅 Data: <b>{dt_ag_h}</b> &nbsp;|&nbsp; ⏱️ <b>{cin_h} às {cout_h}</b> ({dur_h})</div>
+<div style="margin-top:6px; display:flex; gap:6px; justify-content:flex-end;">
+<span style="background:#10b981; color:#0b132b; padding:4px 10px; border-radius:6px; font-weight:900; font-size:11px; text-transform:uppercase;">STATUS: CONCLUÍDA</span>
+<span style="background:#0f766e; color:#64dfdf; border:1px solid #64dfdf; padding:4px 10px; border-radius:6px; font-weight:800; font-size:11px; text-transform:uppercase;">TIPO: {tipo_srv_c}</span>
+</div>
+</div>
+</div>
+<div style="display:grid; grid-template-columns: 1.15fr 1fr; gap:12px; margin-bottom:12px; font-size:13px;">
+<div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b; border-left:4px solid #64dfdf;">
+<div style="font-size:11px; font-weight:bold; color:#64dfdf; text-transform:uppercase; margin-bottom:6px; letter-spacing:0.5px;">🏥 DADOS DO CLIENTE & LOCALIZAÇÃO</div>
+<div style="font-size:14px; font-weight:bold; color:#ffffff;">{cli_nome_c} <span style="font-size:11px; color:#94a3b8; font-weight:normal;">(CNPJ: {cli_cnpj_c})</span></div>
+<div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>📍 Endereço:</b> {cli_end_c} — {cli_cid_c}/{cli_uf_c}</div>
+<div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>👤 Responsável:</b> {cli_resp_c} &nbsp;|&nbsp; <b>📧 E-mail:</b> {cli_email_c or 'Não informado'}</div>
+{f'<div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>💬 WhatsApp:</b> {cli_whats_c}</div>' if cli_whats_c else ''}
+</div>
+<div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b; border-left:4px solid #38bdf8;">
+<div style="font-size:11px; font-weight:bold; color:#38bdf8; text-transform:uppercase; margin-bottom:6px; letter-spacing:0.5px;">🔬 ATIVO MÉDICO & EQUIPE TÉCNICA</div>
+<div style="font-size:13.5px; font-weight:bold; color:#ffffff;"><b>Equipamento:</b> {row_c['equipamento']}</div>
+<div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>👷 Técnico Principal:</b> {tec_hist_c} (CFT/CREA)</div>
+<div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>🤝 Técnico Auxiliar:</b> {tec_aux_c if tec_aux_c else 'Atendimento Individual'}</div>
+<div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>📋 Etapa Preventiva:</b> {etapa_hist}</div>
+</div>
+</div>
+<div style="background:#1c2541; padding:14px 16px; border-radius:8px; border:1px solid #3a506b; border-left:4px solid #10b981; margin-bottom:12px;">
+<div style="font-size:12px; font-weight:bold; color:#10b981; text-transform:uppercase; margin-bottom:8px; letter-spacing:0.5px;">🛠️ SERVIÇOS EXECUTADOS & PROCEDIMENTOS TÉCNICOS</div>
+<div style="background:#0b132b; border:1px solid #3a506b; border-radius:6px; padding:12px 14px; margin-bottom:10px;">
+<div style="font-size:13.5px; color:#f8fafc; line-height:1.5; font-weight:500;">{srv_exec_h}</div>
+</div>
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:12px;">
+<div style="background:#0b132b; padding:8px 10px; border-radius:6px; border:1px solid #233554;">
+<b style="color:#f59e0b;">📢 Defeito Relatado:</b> {def_rel_h}<br/>
+<b style="color:#ef4444;">🔍 Causa Raiz / Problema:</b> {prob_enc_h}
+</div>
+<div style="background:#0b132b; padding:8px 10px; border-radius:6px; border:1px solid #233554;">
+<b style="color:#38bdf8;">📋 Checklist POP / Protocolo:</b> {chk_pop_h or 'Padrão Concluído'}<br/>
+<b style="color:#a78bfa;">⚡ Parâmetros / Testes:</b> {param_h}
+</div>
+</div>
+</div>
+<div style="display:grid; grid-template-columns: 1.15fr 1fr; gap:12px; margin-bottom:12px; font-size:13px;">
+<div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b;">
+<div style="font-size:11px; font-weight:bold; color:#cbd5e1; text-transform:uppercase; margin-bottom:4px;">📝 Observações Gerais & Recomendações</div>
+<div style="font-size:12.5px; color:#f8fafc;">{obs_ger_h}</div>
+<div style="font-size:11.5px; color:#94a3b8; margin-top:6px;"><b>Pendências / Histórico:</b> {laudo_hist}</div>
+</div>
+<div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b; display:flex; flex-direction:column; justify-content:center;">
+<div style="font-size:11px; font-weight:bold; color:#cbd5e1; text-transform:uppercase; margin-bottom:4px;">🏁 Condição de Liberação do Equipamento</div>
+<div style="margin-top:2px;">
+<span style="background:#064e3b; color:#34d399; border:1px solid #059669; padding:5px 12px; border-radius:6px; font-size:13px; font-weight:800; display:inline-block;">✅ {cond_f_h}</span>
+</div>
+<div style="font-size:11.5px; color:#94a3b8; margin-top:6px;">Faturamento / Contrato: <b>{row_c.get('condicao_pagamento') or 'Contrato Padrão'}</b></div>
+</div>
+</div>
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+<div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b; text-align:center;">
+<div style="font-size:11px; font-weight:bold; color:#64dfdf; text-transform:uppercase; margin-bottom:6px;">✍️ Responsável Técnico EMED</div>
+<div style="font-family:'Brush Script MT',cursive; font-size:24px; color:#34d399; height:40px; line-height:40px;">{tec_hist_c.title()}</div>
+<hr style="border:0; border-top:1px solid #475569; margin:6px 20px;"/>
+<div style="font-size:12px; font-weight:bold; color:#ffffff;">{tec_hist_c}</div>
+<div style="font-size:11px; color:#94a3b8;">Registro Técnico CFT / CREA</div>
+{f'<div style="font-size:11px; color:#38bdf8; margin-top:2px;">Auxiliar: {tec_aux_c}</div>' if tec_aux_c else ''}
+</div>
+<div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b; text-align:center;">
+<div style="font-size:11px; font-weight:bold; color:#64dfdf; text-transform:uppercase; margin-bottom:6px;">✍️ Aceite do Cliente / Hospital</div>
+{bloco_img_cli_card}
+<hr style="border:0; border-top:1px solid #475569; margin:6px 20px;"/>
+<div style="font-size:12px; font-weight:bold; color:#ffffff;">{ass_cli_hist}</div>
+<div style="font-size:11px; color:#94a3b8;">Responsável no Estabelecimento</div>
+</div>
+</div>
+</div>"""
 
-                        <!-- 1. DADOS DO CLIENTE & ATIVO MÉDICO / EQUIPE -->
-                        <div style="display:grid; grid-template-columns: 1.15fr 1fr; gap:12px; margin-bottom:12px; font-size:13px;">
-                            <div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b; border-left:4px solid #64dfdf;">
-                                <div style="font-size:11px; font-weight:bold; color:#64dfdf; text-transform:uppercase; margin-bottom:6px; letter-spacing:0.5px;">🏥 DADOS DO CLIENTE & LOCALIZAÇÃO</div>
-                                <div style="font-size:14px; font-weight:bold; color:#ffffff;">{cli_nome_c} <span style="font-size:11px; color:#94a3b8; font-weight:normal;">(CNPJ: {cli_cnpj_c})</span></div>
-                                <div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>📍 Endereço:</b> {cli_end_c} — {cli_cid_c}/{cli_uf_c}</div>
-                                <div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>👤 Responsável:</b> {cli_resp_c} &nbsp;|&nbsp; <b>📧 E-mail:</b> {cli_email_c or 'Não informado'}</div>
-                                {f'<div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>💬 WhatsApp:</b> {cli_whats_c}</div>' if cli_whats_c else ''}
-                            </div>
-                            <div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b; border-left:4px solid #38bdf8;">
-                                <div style="font-size:11px; font-weight:bold; color:#38bdf8; text-transform:uppercase; margin-bottom:6px; letter-spacing:0.5px;">🔬 ATIVO MÉDICO & EQUIPE TÉCNICA</div>
-                                <div style="font-size:13.5px; font-weight:bold; color:#ffffff;"><b>Equipamento:</b> {row_c['equipamento']}</div>
-                                <div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>👷 Técnico Principal:</b> {tec_hist_c} (CFT/CREA)</div>
-                                <div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>🤝 Técnico Auxiliar:</b> {tec_aux_c if tec_aux_c else 'Atendimento Individual'}</div>
-                                <div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>📋 Etapa Preventiva:</b> {etapa_hist}</div>
-                            </div>
-                        </div>
-
-                        <!-- 2. SERVIÇOS EXECUTADOS & DIAGNÓSTICO TÉCNICO (DESTAQUE NOBRE) -->
-                        <div style="background:#1c2541; padding:14px 16px; border-radius:8px; border:1px solid #3a506b; border-left:4px solid #10b981; margin-bottom:12px;">
-                            <div style="font-size:12px; font-weight:bold; color:#10b981; text-transform:uppercase; margin-bottom:8px; letter-spacing:0.5px;">
-                                🛠️ SERVIÇOS EXECUTADOS & PROCEDIMENTOS TÉCNICOS
-                            </div>
-                            <div style="background:#0b132b; border:1px solid #3a506b; border-radius:6px; padding:12px 14px; margin-bottom:10px;">
-                                <div style="font-size:13.5px; color:#f8fafc; line-height:1.5; font-weight:500;">{srv_exec_h}</div>
-                            </div>
-                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:12px;">
-                                <div style="background:#0b132b; padding:8px 10px; border-radius:6px; border:1px solid #233554;">
-                                    <b style="color:#f59e0b;">📢 Defeito Relatado:</b> {def_rel_h}<br/>
-                                    <b style="color:#ef4444;">🔍 Causa Raiz / Problema:</b> {prob_enc_h}
-                                </div>
-                                <div style="background:#0b132b; padding:8px 10px; border-radius:6px; border:1px solid #233554;">
-                                    <b style="color:#38bdf8;">📋 Checklist POP / Protocolo:</b> {chk_pop_h or 'Padrão Concluído'}<br/>
-                                    <b style="color:#a78bfa;">⚡ Parâmetros / Testes:</b> {param_h}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 3. OBSERVAÇÕES, PENDÊNCIAS & CONDIÇÃO FINAL -->
-                        <div style="display:grid; grid-template-columns: 1.15fr 1fr; gap:12px; margin-bottom:12px; font-size:13px;">
-                            <div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b;">
-                                <div style="font-size:11px; font-weight:bold; color:#cbd5e1; text-transform:uppercase; margin-bottom:4px;">📝 Observações Gerais & Recomendações</div>
-                                <div style="font-size:12.5px; color:#f8fafc;">{obs_ger_h}</div>
-                                <div style="font-size:11.5px; color:#94a3b8; margin-top:6px;"><b>Pendências / Histórico:</b> {laudo_hist}</div>
-                            </div>
-                            <div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b; display:flex; flex-direction:column; justify-content:center;">
-                                <div style="font-size:11px; font-weight:bold; color:#cbd5e1; text-transform:uppercase; margin-bottom:4px;">🏁 Condição de Liberação do Equipamento</div>
-                                <div style="margin-top:2px;">
-                                    <span style="background:#064e3b; color:#34d399; border:1px solid #059669; padding:5px 12px; border-radius:6px; font-size:13px; font-weight:800; display:inline-block;">
-                                        ✅ {cond_f_h}
-                                    </span>
-                                </div>
-                                <div style="font-size:11.5px; color:#94a3b8; margin-top:6px;">Faturamento / Contrato: <b>{row_c.get('condicao_pagamento') or 'Contrato Padrão'}</b></div>
-                            </div>
-                        </div>
-
-                        <!-- 4. TERMO DE ACEITE & ASSINATURAS DIGITAIS -->
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-                            <div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b; text-align:center;">
-                                <div style="font-size:11px; font-weight:bold; color:#64dfdf; text-transform:uppercase; margin-bottom:6px;">✍️ Responsável Técnico EMED</div>
-                                <div style="font-family:'Brush Script MT',cursive; font-size:24px; color:#34d399; height:40px; line-height:40px;">{tec_hist_c.title()}</div>
-                                <hr style="border:0; border-top:1px solid #475569; margin:6px 20px;"/>
-                                <div style="font-size:12px; font-weight:bold; color:#ffffff;">{tec_hist_c}</div>
-                                <div style="font-size:11px; color:#94a3b8;">Registro Técnico CFT / CREA</div>
-                                {f'<div style="font-size:11px; color:#38bdf8; margin-top:2px;">Auxiliar: {tec_aux_c}</div>' if tec_aux_c else ''}
-                            </div>
-                            <div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b; text-align:center;">
-                                <div style="font-size:11px; font-weight:bold; color:#64dfdf; text-transform:uppercase; margin-bottom:6px;">✍️ Aceite do Cliente / Hospital</div>
-                                {bloco_img_cli_card}
-                                <hr style="border:0; border-top:1px solid #475569; margin:6px 20px;"/>
-                                <div style="font-size:12px; font-weight:bold; color:#ffffff;">{ass_cli_hist}</div>
-                                <div style="font-size:11px; color:#94a3b8;">Responsável no Estabelecimento</div>
-                            </div>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                st.markdown(card_os_fechada_html, unsafe_allow_html=True)
 
                 # Anexos de Formulários e Orçamentos
                 form_anexo_c = limpar_texto(row_c.get('formulario_anexo'), '')
@@ -830,30 +814,26 @@ def _render_execucao_os_ativas(ctx: AppContext):
                     if logo_atv_b64
                     else '<span style="font-size:18px; font-weight:bold; color:#64dfdf;">🏥 EMED</span>'
                 )
-                st.markdown(
-                    f"""
-                    <div style="background:#101935; border:1.5px solid #64dfdf; border-radius:10px; padding:14px; margin-bottom:12px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; border-bottom:1px solid #3a506b; padding-bottom:10px; margin-bottom:10px;">
-                            <div style="display:flex; align-items:center; gap:12px;">
-                                {bloco_logo_atv}
-                                <div>
-                                    <div style="font-size:16px; font-weight:800; color:#ffffff;">EMED ELETROMEDICINA LTDA.</div>
-                                    <div style="font-size:11px; color:#64dfdf; font-weight:600;">Eletromedicina, Manutenção em Equipamentos de Diagnóstico por Imagem</div>
-                                    <div style="font-size:10.5px; color:#94a3b8;">CNPJ: 03.611.974/0001-08 • Fone: (85) 3254-2929 • emed.med.br</div>
-                                </div>
-                            </div>
-                            <div style="text-align:right;">
-                                <div style="font-size:16px; font-weight:800; color:#64dfdf;">OS ATIVA Nº #{id_os_ativa}</div>
-                                <div style="font-size:11px; color:#cbd5e1;">📅 Data: <b>{dt_os_atual}</b> &nbsp;|&nbsp; 🔧 <b>{srv_os_atual}</b></div>
-                            </div>
-                        </div>
-                        <div style="background:#1c2541; padding:8px 12px; border-radius:6px; font-size:12.5px; border-left:3px solid #64dfdf;">
-                            <b>🏥 Cliente:</b> {cli_os_atual} &nbsp;|&nbsp; <b>📍 Endereço:</b> {end_os_atual} ({cid_os_atual}/{uf_os_atual}) &nbsp;|&nbsp; <b>🔬 Equipamento:</b> {eq_os_atual}
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                card_os_ativa_html = f"""<div style="background:#101935; border:1.5px solid #64dfdf; border-radius:10px; padding:14px; margin-bottom:12px;">
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; border-bottom:1px solid #3a506b; padding-bottom:10px; margin-bottom:10px;">
+<div style="display:flex; align-items:center; gap:12px;">
+{bloco_logo_atv}
+<div>
+<div style="font-size:16px; font-weight:900; color:#ffffff;">EMED ELETROMEDICINA LTDA.</div>
+<div style="font-size:11px; color:#64dfdf; font-weight:600;">Eletromedicina, Manutenção em Equipamentos de Diagnóstico por Imagem</div>
+<div style="font-size:10.5px; color:#94a3b8;">CNPJ: 03.611.974/0001-08 • Fone: (85) 3254-2929 • emed.med.br</div>
+</div>
+</div>
+<div style="text-align:right;">
+<div style="font-size:18px; font-weight:900; color:#64dfdf;"><b>OS ATIVA Nº #{id_os_ativa}</b></div>
+<div style="font-size:11px; color:#cbd5e1;">📅 Data: <b>{dt_os_atual}</b> &nbsp;|&nbsp; 🔧 <b>{srv_os_atual}</b></div>
+</div>
+</div>
+<div style="background:#1c2541; padding:8px 12px; border-radius:6px; font-size:12.5px; border-left:3px solid #64dfdf;">
+<b>🏥 Cliente:</b> {cli_os_atual} &nbsp;|&nbsp; <b>📍 Endereço:</b> {end_os_atual} ({cid_os_atual}/{uf_os_atual}) &nbsp;|&nbsp; <b>🔬 Equipamento:</b> {eq_os_atual}
+</div>
+</div>"""
+                st.markdown(card_os_ativa_html, unsafe_allow_html=True)
 
                 c_top1, c_top2, c_top3 = st.columns([2.4, 1.3, 1.3])
                 with c_top1:
