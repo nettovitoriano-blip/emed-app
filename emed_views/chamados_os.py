@@ -549,17 +549,26 @@ def _render_historico_concluidas(ctx: AppContext):
                     else:
                         st.caption("ℹ️ Assinatura validada nominalmente pelo responsável local.")
 
-                # OPÇÃO DE ENVIO POR E-MAIL & FICHA OFICIAL A4
+                # OPÇÃO DE ENVIO POR E-MAIL, WHATSAPP & FICHA OFICIAL A4
                 st.markdown("---")
-                st.markdown("##### 📧 Envio da OS por E-mail ao Cliente & Impressão da Ficha Oficial")
-                c_em1, c_em2, c_em3 = st.columns([2.2, 1.4, 1.4])
-                with c_em1:
+                st.markdown("##### 📧 Envio da OS por E-mail, 💬 WhatsApp & 🖨️ Impressão da Ficha Oficial")
+                cli_whats_c = limpar_texto(row_c.get('whatsapp'), limpar_texto(row_c.get('contato_responsavel'), ''))
+                c_inp1, c_inp2 = st.columns(2)
+                with c_inp1:
                     email_dest_in = st.text_input(
-                        "E-mail do Cliente / Destinatário",
+                        "📧 E-mail do Cliente / Destinatário",
                         value=cli_email_c,
                         placeholder="engenharia@hospital.com.br",
                         key=f"em_dest_c_{idx_c}",
                     )
+                with c_inp2:
+                    whats_dest_in = st.text_input(
+                        "💬 WhatsApp do Cliente / Responsável (com DDD)",
+                        value=cli_whats_c,
+                        placeholder="5585999999999",
+                        key=f"wa_dest_c_{idx_c}",
+                    )
+
                 assunto_email = f"Ordem de Servico #{id_os_c} Concluida - EMED Eletromedicina ({cli_nome_c})"
                 corpo_email = (
                     f"Prezado(a) {cli_resp_c} ({cli_nome_c}),\n\n"
@@ -581,21 +590,55 @@ def _render_historico_concluidas(ctx: AppContext):
                     f"subject={urllib.parse.quote(assunto_email)}&"
                     f"body={urllib.parse.quote(corpo_email)}"
                 )
+
+                texto_whatsapp_os = (
+                    f"*🏥 EMED ELETROMEDICINA — ORDEM DE SERVIÇO #{id_os_c}*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🏢 *Cliente:* {cli_nome_c}\n"
+                    f"📍 *Endereço:* {cli_end_c} ({cli_cid_c}/{cli_uf_c})\n"
+                    f"🔬 *Equipamento:* {row_c['equipamento']}\n"
+                    f"🔧 *Tipo de Serviço:* {tipo_srv_c} ({etapa_hist})\n"
+                    f"👷 *Técnico Principal:* {tec_hist_c}\n"
+                    f"🤝 *Técnico Auxiliar:* {tec_aux_c or 'Nenhum'}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🛠️ *Serviços Executados:* {srv_exec_h}\n"
+                    f"📋 *Formulário Checklist POP:* {chk_pop_h or 'Concluído'}\n"
+                    f"📝 *Observações:* {obs_ger_h}\n"
+                    f"🚨 *Pendência / Condição Final:* {cond_f_h}\n"
+                    f"✍️ *Recebido/Assinado por:* {ass_cli_hist}\n"
+                    f"✅ *Status:* OS CONCLUÍDA"
+                )
+                num_wa_limpo = "".join(ch for ch in whats_dest_in if ch.isdigit())
+                if num_wa_limpo and not num_wa_limpo.startswith("55") and len(num_wa_limpo) in (10, 11):
+                    num_wa_limpo = "55" + num_wa_limpo
+                base_wa = f"https://wa.me/{num_wa_limpo}" if num_wa_limpo else "https://wa.me/"
+                link_whatsapp_os = f"{base_wa}?text={urllib.parse.quote(texto_whatsapp_os)}"
+
                 html_ficha_os = _gerar_html_os_formatada(str(id_os_c), row_c, equipa_tecnica)
 
-                with c_em2:
-                    if st.button("📧 Enviar OS por E-mail Agora", key=f"btn_send_em_{idx_c}", type="primary", use_container_width=True):
+                c_bt1, c_bt2, c_bt3 = st.columns(3)
+                with c_bt1:
+                    if st.button("📧 Enviar OS por E-mail", key=f"btn_send_em_{idx_c}", type="primary", use_container_width=True):
                         if not email_dest_in.strip():
-                            st.warning("⚠️ Informe o endereço de e-mail do cliente no campo ao lado!")
+                            st.warning("⚠️ Informe o endereço de e-mail do cliente no campo acima!")
                         else:
                             df.at[idx_c, 'email'] = email_dest_in.strip()
                             salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel)
-                            st.success(f"✅ E-mail da OS #{id_os_c} preparado/registado para **{email_dest_in.strip()}**!")
+                            st.success(f"✅ E-mail preparado para **{email_dest_in.strip()}**!")
                             st.markdown(
-                                f'<a href="{link_mailto}" target="_blank" style="display:inline-block; background:#10b981; color:#0b132b; font-weight:bold; padding:8px 14px; border-radius:6px; text-decoration:none; margin-top:4px;">📨 Clique aqui para abrir no seu Cliente de E-mail já preenchido</a>',
+                                f'<a href="{link_mailto}" target="_blank" style="display:block; text-align:center; background:#10b981; color:#0b132b; font-weight:bold; padding:8px 12px; border-radius:6px; text-decoration:none; margin-top:4px;">📨 Abrir no Cliente de E-mail</a>',
                                 unsafe_allow_html=True,
                             )
-                with c_em3:
+                with c_bt2:
+                    if st.button("💬 Enviar OS por WhatsApp", key=f"btn_send_wa_{idx_c}", type="primary", use_container_width=True):
+                        if whats_dest_in.strip():
+                            df.at[idx_c, 'whatsapp'] = whats_dest_in.strip()
+                            salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel)
+                        st.markdown(
+                            f'<a href="{link_whatsapp_os}" target="_blank" style="display:block; text-align:center; background:#25D366; color:#0b132b; font-weight:bold; padding:8px 12px; border-radius:6px; text-decoration:none; margin-top:4px;">📲 Abrir Conversa no WhatsApp com a OS</a>',
+                            unsafe_allow_html=True,
+                        )
+                with c_bt3:
                     st.download_button(
                         label="🖨️ Baixar Ficha da OS (A4/PDF)",
                         data=html_ficha_os.encode("utf-8"),
