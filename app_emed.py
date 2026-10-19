@@ -93,9 +93,10 @@ if not st.session_state.autenticado:
 
 # Barra Lateral e Navegação Modular
 if st.sidebar.button(
-    "◀️ Esconder Aba Lateral Esquerda",
+    "◀️",
     key="btn_sidebar_esconder_interno",
-    use_container_width=True,
+    type="tertiary",
+    help="Esconder Aba Lateral Esquerda",
 ):
     st.session_state.aba_lateral_oculta = True
     st.rerun()

@@ -38,6 +38,14 @@ def _alternar_area_trabalho_horizontal():
     st.session_state.area_trabalho_aberta = not st.session_state.get("area_trabalho_aberta", True)
 
 
+def _alternar_modo_edicao_atalhos():
+    """Alterna o modo de edição/exclusão de botões superiores e garante a área aberta."""
+    novo_estado = not st.session_state.get("modo_edicao_atalhos", False)
+    st.session_state.modo_edicao_atalhos = novo_estado
+    if novo_estado:
+        st.session_state.area_trabalho_aberta = True
+
+
 def renderizar_area_trabalho_icones(
     opcoes_menu: list,
     acao_atual: str,
@@ -45,10 +53,10 @@ def renderizar_area_trabalho_icones(
     usuario_atual: str = "NETTO",
     db_name: str = "",
 ):
-    """Renderiza na mesma linha:
-    - À esquerda: O botão para Esconder/Abrir a Aba Lateral Esquerda.
-    - À direita (vizinho na mesma linha): A barra horizontal da Área de Trabalho Rápida (abrir/recolher).
-    - Abaixo (quando aberta): Os botões de atalho com edição/exclusão personalizada por utilizador.
+    """Renderiza os 3 botões de controlo minimalistas (apenas ícones, próximos à esquerda e sem background):
+    1. ▶️ / ◀️ (Abrir/Esconder Aba Lateral Esquerda)
+    2. 🔽 🖥️ / ▶️ 🖥️ (Abrir/Recolher Área de Trabalho Rápida)
+    3. 🛠️ (Configurar/Excluir Botões da Página Principal por Utilizador)
     """
     from emed_services import (
         DB_NAME as DEFAULT_DB_NAME,
@@ -64,6 +72,9 @@ def renderizar_area_trabalho_icones(
 
     if "area_trabalho_aberta" not in st.session_state:
         st.session_state.area_trabalho_aberta = True
+
+    if "modo_edicao_atalhos" not in st.session_state:
+        st.session_state.modo_edicao_atalhos = False
 
     if st.session_state.aba_lateral_oculta:
         st.markdown(
@@ -82,61 +93,49 @@ def renderizar_area_trabalho_icones(
 
     excluidos_usuario = carregar_atalhos_excluidos_usuario(caminho_db, usr_key)
     opcoes_visiveis = [op for op in opcoes_menu if op not in excluidos_usuario]
+    modo_edicao = st.session_state.modo_edicao_atalhos
 
-    # Linha Única Alinhada: Botão da Aba Lateral à Esquerda + Barra Horizontal da Área de Trabalho ao Lado
-    col_btn_aba_esq, col_barra_horizontal = st.columns([1.35, 4.65])
-    with col_btn_aba_esq:
-        rotulo_barra_lateral = (
-            "▶️ Abrir Aba Lateral"
-            if st.session_state.aba_lateral_oculta
-            else "◀️ Esconder Aba Lateral"
-        )
+    # Três botões somente com ícones, próximos à esquerda e sem background (type="tertiary")
+    c_aba, c_desk, c_cfg, _ = st.columns([0.42, 0.58, 0.42, 8.58], gap="small")
+    with c_aba:
+        icone_aba = "▶️" if st.session_state.aba_lateral_oculta else "◀️"
         st.button(
-            rotulo_barra_lateral,
+            icone_aba,
             key="btn_barra_toggle_sidebar_main",
-            type="primary" if st.session_state.aba_lateral_oculta else "secondary",
-            use_container_width=True,
+            type="tertiary",
+            help="Abrir / Esconder Aba Lateral Esquerda",
             on_click=_alternar_aba_lateral,
         )
-
-    with col_barra_horizontal:
+    with c_desk:
         seta_horiz = "🔽" if st.session_state.area_trabalho_aberta else "▶️"
-        acao_horiz = "RECOLHER" if st.session_state.area_trabalho_aberta else "ABRIR"
         st.button(
-            f"{seta_horiz} 🖥️ ÁREA DE TRABALHO RÁPIDA ({len(opcoes_visiveis)} ATALHOS ATIVOS — TOQUE PARA {acao_horiz})",
+            f"{seta_horiz} 🖥️",
             key="btn_barra_toggle_desktop_horiz",
-            type="secondary",
-            use_container_width=True,
+            type="tertiary",
+            help="Abrir / Recolher Área de Trabalho Rápida",
             on_click=_alternar_area_trabalho_horizontal,
+        )
+    with c_cfg:
+        icone_cfg = "🟢🛠️" if modo_edicao else "🛠️"
+        st.button(
+            icone_cfg,
+            key="btn_barra_toggle_edicao",
+            type="tertiary",
+            help=f"Editar / Excluir Botões da Área de Trabalho ({usr_key})",
+            on_click=_alternar_modo_edicao_atalhos,
         )
 
     if st.session_state.area_trabalho_aberta:
         with st.container():
-            col_info, col_edit = st.columns([3.2, 1.3])
-            with col_info:
-                st.caption(
-                    f"💡 **Atalhos de `{usr_key}`:** Toque num botão para abrir o módulo. "
-                    "*(Os botões da aba lateral esquerda são fixos e nunca são removidos)*"
-                )
-            with col_edit:
-                modo_edicao = st.toggle(
-                    f"🛠️ Editar / Excluir Botões ({usr_key})",
-                    value=st.session_state.get("modo_edicao_atalhos", False),
-                    key="toggle_modo_edicao_atalhos",
-                )
-                st.session_state.modo_edicao_atalhos = modo_edicao
-
             if modo_edicao:
-                st.info(
-                    f"✏️ **Modo de Personalização ({usr_key}):** Clique em **❌** ao lado dos botões que não usa com frequência "
-                    "para deixar apenas os seus **botões mais usados** na barra superior! "
-                    "Todos os menus continuam sempre disponíveis na aba lateral esquerda."
+                st.caption(
+                    f"✏️ **Edição de Atalhos (`{usr_key}`):** Toque em **❌** para ocultar qualquer botão superior "
+                    "*(os botões da aba lateral esquerda são fixos e nunca são removidos)*."
                 )
 
             if not opcoes_visiveis:
                 st.caption(
-                    "✨ Todos os botões superiores foram ocultados para deixar a sua Área de Trabalho clean! "
-                    "Use a Aba Lateral Esquerda ou ative **🛠️ Editar / Excluir Botões** acima para restaurar atalhos."
+                    "✨ Área de Trabalho clean! Clique no ícone **🛠️** acima para restaurar atalhos ou use a Aba Lateral Esquerda."
                 )
             else:
                 colunas_por_linha = 3 if modo_edicao else (4 if perfil_atual == "Gestor" else 3)
@@ -165,8 +164,8 @@ def renderizar_area_trabalho_icones(
                                 if st.button(
                                     "❌",
                                     key=f"del_tile_{idx_global}",
+                                    type="tertiary",
                                     help=f"Excluir '{rotulo_curto}' da página principal de {usr_key}",
-                                    use_container_width=True,
                                 ):
                                     nova_lista = list(set(excluidos_usuario + [opcao]))
                                     salvar_atalhos_excluidos_usuario(caminho_db, usr_key, nova_lista)

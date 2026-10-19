@@ -195,8 +195,8 @@ def inject_custom_css():
         }
 
         /* Botões Gerais, Form Submit e Download */
-        .stButton button,
-        div.stButton > button,
+        .stButton button:not([kind="tertiary"]),
+        div.stButton > button:not([kind="tertiary"]),
         [data-testid="stFormSubmitButton"] > button,
         [data-testid="stDownloadButton"] > button,
         button[kind="secondary"],
@@ -218,8 +218,8 @@ def inject_custom_css():
             padding: 0.5rem 1rem !important;
             box-shadow: 0 0 10px rgba(16, 185, 129, 0.35) !important;
         }
-        .stButton button:hover,
-        div.stButton > button:hover,
+        .stButton button:not([kind="tertiary"]):hover,
+        div.stButton > button:not([kind="tertiary"]):hover,
         [data-testid="stFormSubmitButton"] > button:hover,
         [data-testid="stDownloadButton"] > button:hover,
         button[kind="secondary"]:hover,
@@ -227,6 +227,30 @@ def inject_custom_css():
             background-color: #3a506b !important;
             border-color: #64dfdf !important;
             color: #64dfdf !important;
+        }
+        /* Botões de Ícone Sem Background (Ultra Clean) */
+        button[kind="tertiary"],
+        .stButton button[kind="tertiary"],
+        div.stButton > button[kind="tertiary"] {
+            background: transparent !important;
+            background-color: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 2px 6px !important;
+            min-height: 34px !important;
+        }
+        button[kind="tertiary"] p,
+        .stButton button[kind="tertiary"] p {
+            font-size: 20px !important;
+            line-height: 1.1 !important;
+        }
+        button[kind="tertiary"]:hover,
+        .stButton button[kind="tertiary"]:hover,
+        div.stButton > button[kind="tertiary"]:hover {
+            background: rgba(100, 223, 223, 0.14) !important;
+            border-radius: 8px !important;
+            border: none !important;
+            transform: scale(1.08);
         }
 
         /* Expanders escuros (borda única nítida sem linha dupla) */
