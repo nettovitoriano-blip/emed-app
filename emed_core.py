@@ -52,7 +52,10 @@ SCHEMA_COLUNAS_OS = [
     ("foto_depois", "TEXT DEFAULT ''"),
     ("assinatura_cliente_img", "TEXT DEFAULT ''"),
     ("sync_hash", "TEXT DEFAULT ''"),
-    ("peca_baixada_ref", "TEXT DEFAULT ''")
+    ("peca_baixada_ref", "TEXT DEFAULT ''"),
+    ("tecnico_auxiliar", "TEXT DEFAULT ''"),
+    ("video_evidencia", "TEXT DEFAULT ''"),
+    ("formulario_anexo", "TEXT DEFAULT ''"),
 ]
 
 NOMES_COLUNAS_OS = [c[0] for c in SCHEMA_COLUNAS_OS]

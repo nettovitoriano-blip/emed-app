@@ -1,6 +1,9 @@
 import os
+import importlib
 import pandas as pd
 import streamlit as st
+import emed_core as _emed_core
+importlib.reload(_emed_core)
 from emed_core import normalizar_dataframe_os
 from emed_services import (
     AppContext,
@@ -18,11 +21,14 @@ from emed_services import (
     montar_equipa_tecnica,
     salvar_dados_seguro,
 )
-import importlib
 import emed_ui.styles as _ui_styles
 import emed_ui.components as _ui_comp
+import emed_views.chamados_os as _vw_os
+import emed_views as _vw_all
 importlib.reload(_ui_styles)
 importlib.reload(_ui_comp)
+importlib.reload(_vw_os)
+importlib.reload(_vw_all)
 from emed_ui.styles import inject_custom_css
 from emed_ui.components import renderizar_area_trabalho_icones
 from emed_views import verificar_e_renderizar_portal_qr, VIEW_ROUTER
