@@ -107,11 +107,22 @@ def _gerar_html_os_formatada(id_os_c: str, row_c: pd.Series, equipa_tecnica: dic
     def_rel = limpar_texto(row_c.get("defeito_relatado"), "-")
     prob_enc = limpar_texto(row_c.get("problemas_encontrados"), "-")
     causa_r = limpar_texto(row_c.get("causa_raiz"), "-")
-    srv_exec = limpar_texto(row_c.get("servico_executado"), limpar_texto(row_c.get("pendencias"), "-"))
+    raw_srv = limpar_texto(row_c.get("servico_executado"), "")
+    if not raw_srv or raw_srv.upper() in ["[CONCLUÍDO]", "CONCLUIDO", "CONCLUÍDO"]:
+        srv_exec = "Manutenção preventiva / corretiva executada e validada operacionalmente conforme protocolos da EMED."
+    else:
+        srv_exec = raw_srv
+
     chk_pop = limpar_texto(row_c.get("checklist_pop"), "N/A")
     param_m = limpar_texto(row_c.get("parametros_medidos"), "-")
     obs_ger = limpar_texto(row_c.get("observacoes_gerais"), "SEM OBSERVAÇÕES ADICIONAIS")
-    pend_txt = limpar_texto(row_c.get("pendencias"), "SEM PENDÊNCIAS")
+
+    raw_pend = limpar_texto(row_c.get("pendencias"), "")
+    if not raw_pend or raw_pend.upper() in ["[CONCLUÍDO]", "CONCLUIDO", "CONCLUÍDO", "NENHUMA", "SEM PENDÊNCIAS", "-"]:
+        pend_txt = "Nenhuma pendência técnica. Equipamento liberado para uso normal."
+    else:
+        pend_txt = raw_pend
+
     cond_fin = limpar_texto(row_c.get("condicao_final"), "LIBERADO PARA USO NORMAL")
     cond_pag = limpar_texto(row_c.get("condicao_pagamento"), "-")
     ass_tec = limpar_texto(row_c.get("assinatura_tecnico"), f"{tec_princ} - CFT")
@@ -131,6 +142,8 @@ def _gerar_html_os_formatada(id_os_c: str, row_c: pd.Series, equipa_tecnica: dic
         else f'<div style="height:50px; line-height:50px; font-weight:bold; color:#0b132b;">{ass_cli}</div>'
     )
 
+    horario_atend_txt = f"{cin} às {cout} ({dur})" if cin != "-" and cin else "Horário comercial"
+
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -141,8 +154,6 @@ def _gerar_html_os_formatada(id_os_c: str, row_c: pd.Series, equipa_tecnica: dic
   .os-box {{ border: 2px solid #0b132b; border-radius: 8px; padding: 22px; max-width: 880px; margin: auto; }}
   .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0b132b; padding-bottom: 14px; margin-bottom: 14px; }}
   .title {{ font-size: 19px; font-weight: 800; color: #0b132b; }}
-  .badge {{ background: #10b981; color: #fff; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 12px; }}
-  .badge-tipo {{ background: #0f766e; color: #fff; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 12px; margin-left: 4px; }}
   .sec-title {{ background: #1c2541; color: #64dfdf; padding: 6px 10px; font-weight: bold; font-size: 12px; border-radius: 4px; margin-top: 12px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }}
   table {{ width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 4px; }}
   td, th {{ border: 1px solid #cbd5e1; padding: 6px 9px; text-align: left; vertical-align: top; }}
@@ -167,46 +178,46 @@ def _gerar_html_os_formatada(id_os_c: str, row_c: pd.Series, equipa_tecnica: dic
       </div>
     </div>
     <div style="text-align:right;">
-      <div class="title" style="color:#0b132b;">ORDEM DE SERVIÇO Nº #{id_os_c}</div>
-      <div style="font-size:12px; color:#475569; margin-top:2px;">Data: <b>{dt_agend}</b> | Horários: <b>{cin} às {cout}</b> ({dur})</div>
-      <div style="margin-top:6px;">
-        <span class="badge">STATUS: CONCLUÍDA</span>
-        <span class="badge-tipo">TIPO: {tipo_srv}</span>
-      </div>
+      <div style="font-size:22px; font-weight:900; color:#0b132b; letter-spacing:0.5px;">ORDEM DE SERVIÇO Nº #{id_os_c}</div>
+      <div style="font-size:13px; color:#334155; margin-top:4px;"><b>Data:</b> {dt_agend}</div>
     </div>
   </div>
 
   <div class="sec-title">1. Dados do Cliente & Localização do Atendimento</div>
   <table>
     <tr>
-      <td class="label">Nome do Cliente:</td><td><b>{cliente}</b> (CNPJ: {cnpj})</td>
-      <td class="label">Tipo de Serviço:</td><td><b>{tipo_srv}</b> ({etapa_prev})</td>
+      <td class="label">Nome do Cliente:</td><td><b>{cliente}</b></td>
+      <td class="label">CNPJ:</td><td><b>{cnpj}</b></td>
     </tr>
     <tr>
       <td class="label">Endereço Completo:</td><td colspan="3">{endereco} — {cidade}/{estado}</td>
     </tr>
     <tr>
       <td class="label">Responsável Local:</td><td>{resp_hosp}</td>
-      <td class="label">Contatos (E-mail/Whats):</td><td>{email_cli} &nbsp;|&nbsp; {whats_cli}</td>
+      <td class="label">Contatos (E-mail / Whats):</td><td>{email_cli} &nbsp;|&nbsp; {whats_cli}</td>
     </tr>
   </table>
 
-  <div class="sec-title">2. Dados do Equipamento & Equipe Técnica</div>
+  <div class="sec-title">2. Dados do Equipamento, Tipo de Serviço & Equipe Técnica</div>
   <table>
     <tr>
       <td class="label">Equipamento / Ativo:</td><td><b>{equipamento}</b></td>
-      <td class="label">Técnico Principal:</td><td><b>{tec_princ}</b> (CFT/CREA)</td>
+      <td class="label">Tipo de Serviço:</td><td><b>{tipo_srv}</b> ({etapa_prev})</td>
     </tr>
     <tr>
-      <td class="label">Data & Horários:</td><td>Atendimento: {dt_agend} ({cin} - {cout})</td>
+      <td class="label">Técnico Principal:</td><td><b>{tec_princ}</b> (CFT/CREA)</td>
       <td class="label">Técnico Auxiliar:</td><td><b>{tec_aux}</b></td>
+    </tr>
+    <tr>
+      <td class="label">Horário de Atendimento:</td><td>{horario_atend_txt}</td>
+      <td class="label">Condição na Saída:</td><td><b style="color:#059669;">✅ {cond_fin}</b></td>
     </tr>
   </table>
 
   <div class="sec-title">3. Serviços Executados & Diagnóstico Técnico (Intervenção Realizada)</div>
   <table>
-    <tr><td class="label">Defeito Relatado / Causa:</td><td>{def_rel} (Causa Raiz: {causa_r})</td></tr>
-    <tr><td class="label">Problemas Encontrados:</td><td>{prob_enc}</td></tr>
+    <tr><td class="label">Defeito Relatado / Causa:</td><td colspan="3">{def_rel} (Causa Raiz: {causa_r})</td></tr>
+    <tr><td class="label">Problemas Encontrados:</td><td colspan="3">{prob_enc}</td></tr>
   </table>
   <div style="margin-top:6px; font-size:12px; font-weight:bold; color:#0f766e;">🛠️ DESCRIÇÃO DETALHADA DOS SERVIÇOS EXECUTADOS:</div>
   <div class="destaque-exec">{srv_exec}</div>
@@ -217,13 +228,12 @@ def _gerar_html_os_formatada(id_os_c: str, row_c: pd.Series, equipa_tecnica: dic
     </tr>
   </table>
 
-  <div class="sec-title">4. Observações Técnicas, Pendências & Condição Final de Liberação</div>
+  <div class="sec-title">4. Observações Técnicas, Pendências & Condição Final</div>
   <table>
     <tr><td class="label">Observações Gerais:</td><td colspan="3">{obs_ger}</td></tr>
     <tr><td class="label">Pendências / Recomendações:</td><td colspan="3">{pend_txt}</td></tr>
     <tr>
-      <td class="label">Condição de Saída / Liberação:</td><td><b style="color:#059669; font-size:13px;">✅ {cond_fin}</b></td>
-      <td class="label">Condição de Pagamento:</td><td>{cond_pag}</td>
+      <td class="label">Condição de Pagamento:</td><td colspan="3">{cond_pag}</td>
     </tr>
   </table>
 
@@ -246,7 +256,6 @@ def _gerar_html_os_formatada(id_os_c: str, row_c: pd.Series, equipa_tecnica: dic
 </div>
 </body>
 </html>"""
-
 
 
 def _render_criar_nova_os(ctx: AppContext):
@@ -301,6 +310,23 @@ def _render_criar_nova_os(ctx: AppContext):
                 "3. Tipo de Serviço",
                 ["PREVENTIVA (Com Checklist POP/IT)", "CORRETIVA (Falha / Parada)", "INSTALAÇÃO", "CALIBRAÇÃO", "SERVIÇO INTERNO EMED"]
             )
+            if chamado_tipo == "INSTALAÇÃO":
+                caminho_pre = os.path.join(ctx.base_dir, "Manuais", "RAIO-X", "Formulario_Pre_Instalacao_Lotus_HF500M_Emed.pdf")
+                if os.path.exists(caminho_pre):
+                    try:
+                        with open(caminho_pre, "rb") as f_pre:
+                            dados_pre_pdf = f_pre.read()
+                        st.download_button(
+                            "📄 Baixar Formulário de Pré-Instalação (PDF)",
+                            data=dados_pre_pdf,
+                            file_name="Formulario_Pre_Instalacao_Lotus_HF500M_Emed.pdf",
+                            mime="application/pdf",
+                            key="btn_dl_pre_instalacao_abertura",
+                            use_container_width=True,
+                            help="Envie este formulário ao cliente para preenchimento prévio das condições da sala."
+                        )
+                    except Exception:
+                        pass
             chamado_prioridade = st.selectbox("4. Nível de Urgência", ["NORMAL", "URGENTE / HOSPITAL PARADO", "CRÍTICO (Emergência)"])
 
             lista_tecs_ch = sorted(list(equipa_tecnica.keys()))
@@ -476,15 +502,28 @@ def _render_historico_concluidas(ctx: AppContext):
                 ass_cli_hist = limpar_texto(row_c.get('assinatura_cliente'), cli_resp_c)
                 def_rel_h = limpar_texto(row_c.get('defeito_relatado'), '-')
                 prob_enc_h = limpar_texto(row_c.get('problemas_encontrados'), '-')
-                srv_exec_h = limpar_texto(row_c.get('servico_executado'), laudo_hist)
+                raw_srv_h = limpar_texto(row_c.get('servico_executado'), '')
+                if not raw_srv_h or raw_srv_h.upper() in ['[CONCLUÍDO]', 'CONCLUIDO', 'CONCLUÍDO']:
+                    srv_exec_h = "Manutenção preventiva / corretiva executada e validada operacionalmente conforme protocolos da EMED."
+                else:
+                    srv_exec_h = raw_srv_h
+
                 obs_ger_h = limpar_texto(row_c.get('observacoes_gerais'), 'SEM OBSERVAÇÕES ADICIONAIS')
                 param_h = limpar_texto(row_c.get('parametros_medidos'), '-')
+
+                raw_pend_h = limpar_texto(row_c.get('pendencias'), '')
+                if not raw_pend_h or raw_pend_h.upper() in ['[CONCLUÍDO]', 'CONCLUIDO', 'CONCLUÍDO', 'NENHUMA', 'SEM PENDÊNCIAS', '-']:
+                    pend_h_txt = "Nenhuma pendência técnica. Equipamento liberado para uso normal."
+                else:
+                    pend_h_txt = raw_pend_h
+
                 cond_f_h = limpar_texto(row_c.get('condicao_final'), 'LIBERADO PARA USO NORMAL')
                 chk_pop_h = limpar_texto(row_c.get('checklist_pop'), '')
                 dt_ag_h = limpar_texto(row_c.get('data_agendamento'), '-')
                 cin_h = limpar_texto(row_c.get('checkin_hora'), '-')
                 cout_h = limpar_texto(row_c.get('checkout_hora'), '-')
                 dur_h = limpar_texto(row_c.get('tempo_atendimento'), '-')
+                horario_h_txt = f"{cin_h} às {cout_h} ({dur_h})" if cin_h != "-" and cin_h else "Horário comercial"
 
                 # FICHA TÉCNICA OFICIAL DA ORDEM DE SERVIÇO (LAYOUT COM LOGO E CARA DE OS)
                 logo_tela_b64 = _obter_logo_base64()
@@ -516,11 +555,7 @@ def _render_historico_concluidas(ctx: AppContext):
 </div>
 <div style="text-align:right;">
 <div style="font-size:22px; font-weight:900; color:#64dfdf; letter-spacing:0.5px; text-shadow:0 2px 4px rgba(0,0,0,0.4);"><b>ORDEM DE SERVIÇO Nº #{id_os_c}</b></div>
-<div style="font-size:12px; color:#cbd5e1; margin-top:2px;">📅 Data: <b>{dt_ag_h}</b> &nbsp;|&nbsp; ⏱️ <b>{cin_h} às {cout_h}</b> ({dur_h})</div>
-<div style="margin-top:6px; display:flex; gap:6px; justify-content:flex-end;">
-<span style="background:#10b981; color:#0b132b; padding:4px 10px; border-radius:6px; font-weight:900; font-size:11px; text-transform:uppercase;">STATUS: CONCLUÍDA</span>
-<span style="background:#0f766e; color:#64dfdf; border:1px solid #64dfdf; padding:4px 10px; border-radius:6px; font-weight:800; font-size:11px; text-transform:uppercase;">TIPO: {tipo_srv_c}</span>
-</div>
+<div style="font-size:13px; color:#cbd5e1; margin-top:4px;">📅 <b>Data:</b> {dt_ag_h}</div>
 </div>
 </div>
 <div style="display:grid; grid-template-columns: 1.15fr 1fr; gap:12px; margin-bottom:12px; font-size:13px;">
@@ -534,9 +569,10 @@ def _render_historico_concluidas(ctx: AppContext):
 <div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b; border-left:4px solid #38bdf8;">
 <div style="font-size:11px; font-weight:bold; color:#38bdf8; text-transform:uppercase; margin-bottom:6px; letter-spacing:0.5px;">🔬 ATIVO MÉDICO & EQUIPE TÉCNICA</div>
 <div style="font-size:13.5px; font-weight:bold; color:#ffffff;"><b>Equipamento:</b> {row_c['equipamento']}</div>
+<div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>🔧 Tipo de Serviço:</b> {tipo_srv_c} ({etapa_hist})</div>
 <div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>👷 Técnico Principal:</b> {tec_hist_c} (CFT/CREA)</div>
 <div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>🤝 Técnico Auxiliar:</b> {tec_aux_c if tec_aux_c else 'Atendimento Individual'}</div>
-<div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>📋 Etapa Preventiva:</b> {etapa_hist}</div>
+<div style="font-size:12px; color:#cbd5e1; margin-top:3px;"><b>⏱️ Horário de Atendimento:</b> {horario_h_txt}</div>
 </div>
 </div>
 <div style="background:#1c2541; padding:14px 16px; border-radius:8px; border:1px solid #3a506b; border-left:4px solid #10b981; margin-bottom:12px;">
@@ -559,7 +595,7 @@ def _render_historico_concluidas(ctx: AppContext):
 <div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b;">
 <div style="font-size:11px; font-weight:bold; color:#cbd5e1; text-transform:uppercase; margin-bottom:4px;">📝 Observações Gerais & Recomendações</div>
 <div style="font-size:12.5px; color:#f8fafc;">{obs_ger_h}</div>
-<div style="font-size:11.5px; color:#94a3b8; margin-top:6px;"><b>Pendências / Histórico:</b> {laudo_hist}</div>
+<div style="font-size:11.5px; color:#94a3b8; margin-top:6px;"><b>Pendências:</b> {pend_h_txt}</div>
 </div>
 <div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b; display:flex; flex-direction:column; justify-content:center;">
 <div style="font-size:11px; font-weight:bold; color:#cbd5e1; text-transform:uppercase; margin-bottom:4px;">🏁 Condição de Liberação do Equipamento</div>
