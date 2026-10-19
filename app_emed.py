@@ -24,10 +24,12 @@ from emed_services import (
 import emed_ui.styles as _ui_styles
 import emed_ui.components as _ui_comp
 import emed_views.chamados_os as _vw_os
+import emed_views.manuais_tecnicos as _vw_manuais
 import emed_views as _vw_all
 importlib.reload(_ui_styles)
 importlib.reload(_ui_comp)
 importlib.reload(_vw_os)
+importlib.reload(_vw_manuais)
 importlib.reload(_vw_all)
 from emed_ui.styles import inject_custom_css
 from emed_ui.components import renderizar_area_trabalho_icones
@@ -120,6 +122,7 @@ st.sidebar.markdown("### PAINEL DE OPERAÇÕES")
 opcoes_menu = [
     "📊 Mural & Despacho WhatsApp",
     "📋 Minhas Pendências (Técnico)",
+    "📚 Manuais & Procedimentos",
     "📈 Gráficos & BI",
     "⏳ Follow-up de Orçamentos",
     "👥 Clientes & Equipamentos",
@@ -186,6 +189,14 @@ if os.path.exists(CAMINHO_EXCEL):
             )
     except Exception:
         pass
+
+with st.sidebar.expander("📱 Conectar Celular (QR Code)"):
+    st.markdown("**Acesso 4G / 5G:**")
+    caminho_qr = os.path.join(BASE_DIR, "qrcode_mobile_4g.png")
+    if os.path.exists(caminho_qr):
+        st.image(caminho_qr, caption="Aponte a câmera do celular")
+    st.markdown("[🌐 Abrir link](https://fashion-spending-earned-medium.trycloudflare.com)")
+    st.caption("Disponível via Cloudflare Tunnel")
 
 # Cabeçalho Principal com Logo Ampliada e Centralizada
 col1, col_logo, col3 = st.columns([0.5, 5.0, 0.5])
