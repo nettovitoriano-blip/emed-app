@@ -162,8 +162,8 @@ def _gerar_html_os_formatada(id_os_c: str, row_c: pd.Series, equipa_tecnica: dic
       </div>
       <div>
         <div class="title">EMED ELETROMEDICINA LTDA.</div>
-        <div style="font-size:12px; color:#334155; font-weight:600;">Engenharia Clínica, Manutenção & Calibração de Equipamentos Médicos</div>
-        <div style="font-size:11px; color:#64748b;">CNPJ: 14.123.456/0001-00 • Plantão Técnico: (85) 99999-9999 • Fortaleza - CE</div>
+        <div style="font-size:12px; color:#334155; font-weight:600;">Eletromedicina, Manutenção em Equipamentos de Diagnóstico por Imagem</div>
+        <div style="font-size:11px; color:#64748b;">CNPJ: 03.611.974/0001-08 • Fone: (85) 3254-2929 • Site: https://emed.med.br/ • Fortaleza - CE</div>
       </div>
     </div>
     <div style="text-align:right;">
@@ -513,8 +513,8 @@ def _render_historico_concluidas(ctx: AppContext):
                                 {bloco_logo_tela}
                                 <div>
                                     <div style="font-size:18px; font-weight:800; color:#ffffff; letter-spacing:0.5px;">EMED ELETROMEDICINA LTDA.</div>
-                                    <div style="font-size:12px; color:#64dfdf; font-weight:600;">Engenharia Clínica, Manutenção & Calibração de Equipamentos Médicos</div>
-                                    <div style="font-size:11px; color:#94a3b8;">CNPJ: 14.123.456/0001-00 • Plantão Técnico: (85) 99999-9999 • Fortaleza - CE</div>
+                                    <div style="font-size:12px; color:#64dfdf; font-weight:600;">Eletromedicina, Manutenção em Equipamentos de Diagnóstico por Imagem</div>
+                                    <div style="font-size:11px; color:#94a3b8;">CNPJ: 03.611.974/0001-08 • Fone: (85) 3254-2929 • Site: <a href="https://emed.med.br/" target="_blank" style="color:#64dfdf; text-decoration:none;">emed.med.br</a> • Fortaleza - CE</div>
                                 </div>
                             </div>
                             <div style="text-align:right;">
@@ -684,7 +684,11 @@ def _render_historico_concluidas(ctx: AppContext):
                     f"• Observações: {obs_ger_h}\n"
                     f"• Pendências / Status Final: {cond_f_h}\n"
                     f"• Assinatura Responsável Local: {ass_cli_hist}\n\n"
-                    f"Atenciosamente,\nEMED Eletromedicina Ltda."
+                    f"Atenciosamente,\n"
+                    f"EMED ELETROMEDICINA LTDA.\n"
+                    f"Eletromedicina, Manutenção em Equipamentos de Diagnóstico por Imagem\n"
+                    f"CNPJ: 03.611.974/0001-08 • Fone: (85) 3254-2929\n"
+                    f"Site: https://emed.med.br/"
                 )
                 link_mailto = (
                     f"mailto:{urllib.parse.quote(email_dest_in.strip())}?"
@@ -694,6 +698,8 @@ def _render_historico_concluidas(ctx: AppContext):
 
                 texto_whatsapp_os = (
                     f"🏥 *EMED ELETROMEDICINA LTDA.*\n"
+                    f"_Eletromedicina, Manutenção em Equipamentos de Diagnóstico por Imagem_\n"
+                    f"🌐 https://emed.med.br/ | 📞 (85) 3254-2929\n\n"
                     f"📋 *ORDEM DE SERVIÇO Nº #{id_os_c}*\n\n"
                     f"🏢 *Cliente:* {cli_nome_c}\n"
                     f"📍 *Endereço:* {cli_end_c} ({cli_cid_c}/{cli_uf_c})\n"
@@ -709,7 +715,7 @@ def _render_historico_concluidas(ctx: AppContext):
                     f"🏁 *Condição Final:* {cond_f_h}\n"
                     f"✍️ *Recebido/Assinado por:* {ass_cli_hist}\n\n"
                     f"✅ *STATUS:* OS CONCLUÍDA\n"
-                    f"🌐 *Engenharia Clínica EMED*"
+                    f"🌐 *CNPJ: 03.611.974/0001-08 — EMED Eletromedicina*"
                 )
                 num_wa_limpo = "".join(ch for ch in whats_dest_in if ch.isdigit())
                 if num_wa_limpo and not num_wa_limpo.startswith("55") and len(num_wa_limpo) in (10, 11):
@@ -832,7 +838,8 @@ def _render_execucao_os_ativas(ctx: AppContext):
                                 {bloco_logo_atv}
                                 <div>
                                     <div style="font-size:16px; font-weight:800; color:#ffffff;">EMED ELETROMEDICINA LTDA.</div>
-                                    <div style="font-size:11px; color:#64dfdf; font-weight:600;">ENGENHARIA CLÍNICA — ORDEM DE SERVIÇO EM ATENDIMENTO</div>
+                                    <div style="font-size:11px; color:#64dfdf; font-weight:600;">Eletromedicina, Manutenção em Equipamentos de Diagnóstico por Imagem</div>
+                                    <div style="font-size:10.5px; color:#94a3b8;">CNPJ: 03.611.974/0001-08 • Fone: (85) 3254-2929 • emed.med.br</div>
                                 </div>
                             </div>
                             <div style="text-align:right;">
