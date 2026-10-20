@@ -192,12 +192,24 @@ if os.path.exists(CAMINHO_EXCEL):
         pass
 
 with st.sidebar.expander("📱 Conectar Celular (QR Code)"):
-    st.markdown("**Acesso 4G / 5G:**")
-    caminho_qr = os.path.join(BASE_DIR, "qrcode_mobile_4g.png")
-    if os.path.exists(caminho_qr):
-        st.image(caminho_qr, caption="Aponte a câmera do celular")
-    st.markdown("[🌐 Abrir link](https://fashion-spending-earned-medium.trycloudflare.com)")
-    st.caption("Disponível via Cloudflare Tunnel")
+    st.markdown("**Acesso Nuvem 24/7:**")
+    url_oficial = "https://emed-app.streamlit.app"
+    try:
+        import qrcode
+        import io
+        qr_mem = qrcode.QRCode(box_size=6, border=2)
+        qr_mem.add_data(url_oficial)
+        qr_mem.make(fit=True)
+        img_mem = qr_mem.make_image(fill_color="#0a2540", back_color="white")
+        buf = io.BytesIO()
+        img_mem.save(buf, format="PNG")
+        st.image(buf.getvalue(), caption="Aponte a câmera para abrir no celular", use_container_width=True)
+    except Exception:
+        caminho_qr = os.path.join(BASE_DIR, "qrcode_permanente_nuvem.png")
+        if os.path.exists(caminho_qr):
+            st.image(caminho_qr, caption="Aponte a câmera do celular")
+    st.markdown(f"[🌐 Abrir no Celular]({url_oficial})")
+    st.caption("Acesso direto na nuvem sem necessidade de computador ligado.")
 
 # Cabeçalho Principal com Logo Ampliada e Centralizada
 col1, col_logo, col3 = st.columns([0.5, 5.0, 0.5])
