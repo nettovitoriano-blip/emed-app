@@ -126,14 +126,27 @@ KITS_INSTRUMENTOS_POR_SITUACAO = {
             "Certificado de Calibração dos Padrões Vigente",
         ],
     },
+    "FREIOS / MECÂNICA": {
+        "nome": "KIT 6: MECÂNICA & FREIOS ELETROMAGNÉTICOS (RAIO-X / ESTATIVA)",
+        "itens": [
+            "Multímetro True RMS (Teste de Alimentação 24V DC / Continuidade)",
+            "Kit de Bobinas Solenoides Sobressalentes (Freio Horizontal e Vertical)",
+            "Microswitches / Chaves Fim de Curso de Acionamento da Manopla",
+            "Jogo de Chaves Allen (Métricas e Polegadas) para Ajuste de Pastilhas",
+            "Spray Limpa Contatos e Desengripante Mecânico Não-Resinoso",
+            "Fiação Flexível / Conectores de Trava para Chicote Espiralado",
+        ],
+    },
 }
 
 
-def obter_kit_por_servico(tipo_servico: str) -> dict:
-    """Retorna o Kit de Instrumentos mais indicado com base no tipo de serviço agendado."""
-    tipo = (tipo_servico or "").upper()
+def obter_kit_por_servico(tipo_servico: str, defeito: str = "") -> dict:
+    """Retorna o Kit de Instrumentos mais indicado com base no tipo de serviço e no relato técnico."""
+    texto_busca = ((tipo_servico or "") + " " + (defeito or "")).upper()
+    if any(k in texto_busca for k in ["FREIO", "ESTATIVA", "PORTA TUBO", "PORTA-TUBO", "TRILHO", "MECANIC"]):
+        return KITS_INSTRUMENTOS_POR_SITUACAO["FREIOS / MECÂNICA"]
     for chave, dados in KITS_INSTRUMENTOS_POR_SITUACAO.items():
-        if chave in tipo:
+        if chave in texto_busca:
             return dados
     return {
         "nome": "KIT GERAL DE ATENDIMENTO",
