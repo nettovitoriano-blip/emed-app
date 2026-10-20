@@ -15,6 +15,8 @@ from emed_services.repositories import (
     salvar_dados_seguro,
     carregar_atalhos_excluidos_usuario,
     salvar_atalhos_excluidos_usuario,
+    atualizar_calibracao_instrumento,
+    atualizar_calibracao_equipamento_cliente,
 )
 from emed_services.domain_utils import (
     calcular_distancia,
@@ -41,6 +43,8 @@ __all__ = [
     "salvar_dados_seguro",
     "carregar_atalhos_excluidos_usuario",
     "salvar_atalhos_excluidos_usuario",
+    "atualizar_calibracao_instrumento",
+    "atualizar_calibracao_equipamento_cliente",
     "calcular_distancia",
     "formatar_tempo",
     "obter_icone_equipamento",

@@ -11,6 +11,7 @@ from emed_core import (
     atualizar_status_solicitacao_peca,
     SUGESTOES_SEPARACAO_POR_ATIVIDADE,
     KITS_INSTRUMENTOS_POR_SITUACAO,
+    calcular_status_calibracao,
 )
 from emed_services import (
     AppContext,
@@ -470,6 +471,29 @@ def render_gestao_estoque(ctx: AppContext):
         ma_num = pd.to_numeric(df_est_mostra['margem_avulso'], errors='coerce').fillna(60.0)
         df_est_mostra['Preço Venda Contrato (R$)'] = (custo_num * (1 + mc_num / 100.0)).round(2)
         df_est_mostra['Preço Venda Avulso (R$)'] = (custo_num * (1 + ma_num / 100.0)).round(2)
+
+        if 'data_validade_calibracao' in df_est_mostra.columns:
+            def _obter_badge_cal(row):
+                req_cal = str(row.get('requer_calibracao', '0')) in ['1', 'True', 'true']
+                dt_val = row.get('data_validade_calibracao')
+                req_cred = str(row.get('requer_creditos', '0')) in ['1', 'True', 'true']
+                saldo = row.get('saldo_creditos')
+
+                partes = []
+                if req_cal or (pd.notna(dt_val) and str(dt_val).strip()):
+                    if pd.notna(dt_val) and str(dt_val).strip():
+                        res = calcular_status_calibracao(str(dt_val))
+                        partes.append(f"{res['badge']} (Venc: {dt_val})")
+                    else:
+                        partes.append("⚠️ Sem data")
+
+                if req_cred:
+                    partes.append(f"💳 {saldo or 0} créditos")
+
+                return " | ".join(partes) if partes else "—"
+
+            df_est_mostra['Calibração & Créditos'] = df_est_mostra.apply(_obter_badge_cal, axis=1)
+
         st.dataframe(df_est_mostra, use_container_width=True, hide_index=True)
 
     st.markdown("---")
@@ -498,14 +522,16 @@ def render_gestao_estoque(ctx: AppContext):
                 cod_p = st.text_input(
                     "Código do Item *",
                     value=limpar_texto(row_p_ed['codigo']) if row_p_ed is not None else "",
-                    placeholder="EX: PEC-005 ou CON-003"
+                    placeholder="EX: PEC-005 ou FER-018"
                 )
                 nome_p = st.text_input(
                     "Nome / Descrição *",
                     value=limpar_texto(row_p_ed['nome_peca']) if row_p_ed is not None else "",
-                    placeholder="EX: ESTABILIZADOR DE FILAMENTO ou ABRAÇADEIRA"
+                    placeholder="EX: ESTABILIZADOR DE FILAMENTO ou MULTÍMETRO DIGITAL"
                 )
-                idx_cat_p = 0 if row_p_ed is None or "COMERCIAL" in str(row_p_ed.get('tipo_item', '')) else 1
+                idx_cat_p = 0 if row_p_ed is None or "COMERCIAL" in str(row_p_ed.get('tipo_item', '')) else (
+                    2 if "INSTRUMENTO" in str(row_p_ed.get('tipo_item', '')).upper() or "FERRAMENTA" in str(row_p_ed.get('tipo_item', '')).upper() else 1
+                )
                 tipo_item_p = st.selectbox(
                     "Categoria do Item *",
                     ["PEÇA COMERCIAL (OS)", "CONSUMÍVEL INTERNO (USO DIÁRIO / SEM NF SAÍDA)", "INSTRUMENTO / FERRAMENTA"],
@@ -528,6 +554,37 @@ def render_gestao_estoque(ctx: AppContext):
                 m_cont_p = st.number_input("Margem Contrato (%)", min_value=0.0, value=val_mc, step=5.0)
                 m_avul_p = st.number_input("Margem Avulso (%)", min_value=0.0, value=val_ma, step=5.0)
 
+            st.markdown("##### 🔬 Parâmetros de Calibração & Créditos Anuais (Opcional para Instrumentos)")
+            ci1, ci2, ci3 = st.columns(3)
+            with ci1:
+                val_req_cal = False
+                if row_p_ed is not None:
+                    val_req_cal = str(row_p_ed.get('requer_calibracao', '0')) in ['1', 'True', 'true'] or "INSTRUMENTO" in str(row_p_ed.get('tipo_item', '')).upper()
+                chk_req_cal = st.checkbox("Requer Calibração Anual", value=val_req_cal)
+                dt_ult_cal = st.text_input(
+                    "Data Última Calibração (YYYY-MM-DD)",
+                    value=str(row_p_ed.get('data_ultima_calibracao', '') or '') if row_p_ed is not None else ""
+                )
+            with ci2:
+                dt_val_cal = st.text_input(
+                    "Data Validade Calibração (YYYY-MM-DD)",
+                    value=str(row_p_ed.get('data_validade_calibracao', '') or '') if row_p_ed is not None else ""
+                )
+                cert_cal = st.text_input(
+                    "Certificado de Calibração",
+                    value=str(row_p_ed.get('certificado_calibracao', '') or '') if row_p_ed is not None else ""
+                )
+            with ci3:
+                val_req_cred = False
+                if row_p_ed is not None:
+                    val_req_cred = str(row_p_ed.get('requer_creditos', '0')) in ['1', 'True', 'true']
+                chk_req_cred = st.checkbox("Requer Recarga Anual de Créditos", value=val_req_cred)
+                saldo_cred = st.number_input(
+                    "Saldo de Créditos / Disparos",
+                    min_value=0,
+                    value=int(row_p_ed.get('saldo_creditos', 0) or 0) if row_p_ed is not None else 0
+                )
+
             c_bp1, c_bp2 = st.columns(2)
             with c_bp1:
                 btn_salvar_peca = st.form_submit_button("💾 Registar / Atualizar Item no Estoque", type="primary")
@@ -541,12 +598,33 @@ def render_gestao_estoque(ctx: AppContext):
                     try:
                         with get_db_connection(ctx.db_name) as conn_ip:
                             conn_ip.execute("""
-                                INSERT OR REPLACE INTO estoque_pecas
-                                (codigo, nome_peca, quantidade, preco_custo, margem_contrato, margem_avulso, tipo_item)
-                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                                INSERT INTO estoque_pecas
+                                (codigo, nome_peca, quantidade, preco_custo, margem_contrato, margem_avulso, tipo_item,
+                                 requer_calibracao, data_ultima_calibracao, data_validade_calibracao, certificado_calibracao,
+                                 requer_creditos, saldo_creditos)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                ON CONFLICT(codigo) DO UPDATE SET
+                                    nome_peca = excluded.nome_peca,
+                                    quantidade = excluded.quantidade,
+                                    preco_custo = excluded.preco_custo,
+                                    margem_contrato = excluded.margem_contrato,
+                                    margem_avulso = excluded.margem_avulso,
+                                    tipo_item = excluded.tipo_item,
+                                    requer_calibracao = excluded.requer_calibracao,
+                                    data_ultima_calibracao = excluded.data_ultima_calibracao,
+                                    data_validade_calibracao = excluded.data_validade_calibracao,
+                                    certificado_calibracao = excluded.certificado_calibracao,
+                                    requer_creditos = excluded.requer_creditos,
+                                    saldo_creditos = excluded.saldo_creditos
                             """, (
                                 cod_p.strip().upper(), nome_p.strip().upper(),
-                                int(qtd_p), float(custo_p), float(m_cont_p), float(m_avul_p), tipo_item_p
+                                int(qtd_p), float(custo_p), float(m_cont_p), float(m_avul_p), tipo_item_p,
+                                1 if chk_req_cal else 0,
+                                dt_ult_cal.strip() or None,
+                                dt_val_cal.strip() or None,
+                                cert_cal.strip() or None,
+                                1 if chk_req_cred else 0,
+                                int(saldo_cred)
                             ))
                         st.cache_data.clear()
                         st.success(f"✅ Item '{nome_p.strip().upper()}' guardado e tabela atualizada com sucesso!")

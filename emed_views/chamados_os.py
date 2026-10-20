@@ -16,6 +16,7 @@ from emed_core import (
     KITS_INSTRUMENTOS_POR_SITUACAO,
     obter_kit_por_servico,
     acionar_separacao_automatica_almoxarifado,
+    registrar_aplicacao_definitiva_e_fluxo_cobranca,
 )
 from emed_services import (
     AppContext,
@@ -840,6 +841,68 @@ def _render_historico_concluidas(ctx: AppContext):
                     )
 
                 st.markdown("---")
+                st.markdown("##### 🧾 Fluxo de Cobrança, Peças Aplicadas & Faturamento (NFS-e / NF-e)")
+                peca_concluida_ref = limpar_texto(row_c.get('peca_baixada_ref'), 'NENHUMA PEÇA EXTRA')
+                val_total_c = limpar_float(row_c.get('valor_os'), 0.0)
+
+                # Busca registro fiscal de cobrança se existente
+                row_nf_dados = None
+                try:
+                    import sqlite3
+                    with sqlite3.connect(ctx.db_name) as conn_nf_chk:
+                        cur_nf_c = conn_nf_chk.cursor()
+                        cur_nf_c.execute("""
+                            SELECT valor_servicos, valor_pecas, valor_liquido, status_fiscal, numero_nf, chave_acesso, tipo_nota
+                            FROM notas_fiscais WHERE os_id = ?
+                        """, (int(id_os_c),))
+                        row_nf_dados = cur_nf_c.fetchone()
+                except Exception:
+                    pass
+
+                c_cob1, c_cob2 = st.columns([2, 1.2])
+                with c_cob1:
+                    if row_nf_dados:
+                        v_srv_c, v_pec_c, v_liq_c, st_fisc_c, num_nf_c, chv_nf_c, tp_nf_c = row_nf_dados
+                        st_cor = "#10b981" if "EMITID" in str(st_fisc_c).upper() else "#f59e0b"
+                        st.markdown(f"""
+                            <div style="background:#1e293b; border-left: 4px solid {st_cor}; padding: 10px 14px; border-radius: 6px;">
+                                <div style="font-size:12px; font-weight:700; color:{st_cor};">SITUAÇÃO DO FATURAMENTO: {st_fisc_c}</div>
+                                <div style="font-size:13px; color:#f8fafc; margin-top:4px;">
+                                    ⚙️ <b>Peça Definitiva:</b> <code>{peca_concluida_ref}</code> (Baixada no Estoque)<br/>
+                                    💵 <b>Peças:</b> R$ {float(v_pec_c or 0):,.2f} | 🛠️ <b>Mão de Obra:</b> R$ {float(v_srv_c or 0):,.2f} | 💰 <b>Total:</b> R$ {float(v_liq_c or 0):,.2f}
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                            <div style="background:#1e293b; border-left: 4px solid #64dfdf; padding: 10px 14px; border-radius: 6px;">
+                                <div style="font-size:12px; font-weight:700; color:#64dfdf;">FATURAMENTO REGISTRADO</div>
+                                <div style="font-size:13px; color:#f8fafc; margin-top:4px;">
+                                    ⚙️ <b>Peça:</b> <code>{peca_concluida_ref}</code><br/>
+                                    💰 <b>Valor Total:</b> R$ {val_total_c:,.2f}
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+
+                with c_cob2:
+                    msg_cobranca_wpp = (
+                        f"🧾 *DEMONSTRATIVO DE FATURAMENTO / COBRANÇA - EMED*\n\n"
+                        f"🏥 *Cliente:* {cli_nome_c}\n"
+                        f"📋 *OS Concluída:* #{id_os_c} ({row_c['equipamento']})\n"
+                        f"⚙️ *Peça Aplicada em Definitivo:* {peca_concluida_ref}\n"
+                        f"💰 *Valor Total do Atendimento:* R$ {val_total_c:,.2f}\n"
+                        f"💳 *Condição:* {limpar_texto(row_c.get('condicao_pagamento'), 'FATURAMENTO')}\n\n"
+                        f"Para emissão de NFS-e ou boletos, estamos à disposição!\n"
+                        f"EMED Eletromedicina • CNPJ: 03.611.974/0001-08"
+                    )
+                    link_wpp_cob = f"https://wa.me/?text={urllib.parse.quote(msg_cobranca_wpp)}"
+                    st.markdown(f"""
+                        <a href="{link_wpp_cob}" target="_blank" style="background:#0284c7; color:white; padding:9px 16px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:13px; display:inline-block; margin-top:4px;">
+                            📲 Disparar Cobrança p/ Financeiro (WhatsApp)
+                        </a>
+                    """, unsafe_allow_html=True)
+
+                st.markdown("---")
                 st.markdown("##### 🔄 Reabrir OS / Transferir Pendência para Outro Técnico")
                 with st.form(f"form_reabrir_os_{idx_c}"):
                     lista_t_reab = sorted(list(equipa_tecnica.keys()))
@@ -1383,10 +1446,27 @@ def _render_execucao_os_ativas(ctx: AppContext):
                             df.at[idx_os, 'peca_baixada_ref'] = nova_ref_peca
 
                             resumo_diag = f" | [DIAGNÓSTICO: {problemas_encontrados_in.strip().upper()}]" if problemas_encontrados_in.strip() else ""
+                            msg_cobranca_resumo = ""
                             if fechar_definitivo:
                                 df.at[idx_os, 'pendencias'] = f"[CONCLUÍDO - {etapa_executada_fecho}] {relatorio_com_peca}{resumo_diag} | [{resumo_pag}]"
                                 df.at[idx_os, 'status'] = 'CONCLUÍDO'
                                 df.at[idx_os, 'instrumento_necessario'] = ''
+
+                                # 1. Baixa definitiva no estoque + atualização de status + sequência imediata ao fluxo de cobrança
+                                ok_cob, msg_cob = registrar_aplicacao_definitiva_e_fluxo_cobranca(
+                                    ctx.db_name,
+                                    id_os_ativa,
+                                    row_os.get('cliente', ''),
+                                    row_os.get('equipamento', ''),
+                                    novo_tec_exec,
+                                    peca_selecionada,
+                                    int(qtd_aplicada),
+                                    valor_final_faturar,
+                                    condicao_pagamento=opcao_faturamento,
+                                    tipo_contrato=row_os.get('tipo_contrato', 'CONTRATO')
+                                )
+                                msg_cobranca_resumo = msg_cob
+
                                 if agendar_prox_ciclo:
                                     df, _ = agendar_proxima_etapa_circular(
                                         df,
@@ -1401,7 +1481,9 @@ def _render_execucao_os_ativas(ctx: AppContext):
 
                             if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
                                 st.cache_data.clear()
-                                st.success("✅ Salvo com sucesso! Ordem de Serviço gravada e estoque atualizado!")
+                                st.success("✅ Salvo com sucesso! Ordem de Serviço concluída!")
+                                if msg_cobranca_resumo:
+                                    st.info(msg_cobranca_resumo)
                                 st.rerun()
 
 

@@ -56,6 +56,10 @@ SCHEMA_COLUNAS_OS = [
     ("tecnico_auxiliar", "TEXT DEFAULT ''"),
     ("video_evidencia", "TEXT DEFAULT ''"),
     ("formulario_anexo", "TEXT DEFAULT ''"),
+    ("data_ultima_calibracao", "TEXT DEFAULT ''"),
+    ("data_validade_calibracao", "TEXT DEFAULT ''"),
+    ("certificado_calibracao", "TEXT DEFAULT ''"),
+    ("requer_calibracao_anual", "TEXT DEFAULT 'SIM'"),
 ]
 
 NOMES_COLUNAS_OS = [c[0] for c in SCHEMA_COLUNAS_OS]
@@ -458,6 +462,162 @@ def aplicar_peca_os_idempotente(db_path, nome_peca, qtd_aplicada, ref_anterior="
     return True, f"[PEÇA APLICADA: {nova_ref}]", nova_ref
 
 
+def registrar_aplicacao_definitiva_e_fluxo_cobranca(
+    db_path,
+    os_id,
+    cliente,
+    equipamento,
+    tecnico,
+    nome_peca,
+    qtd_aplicada,
+    valor_total_os,
+    condicao_pagamento="FATURAMENTO BOLETO BANCÁRIO",
+    tipo_contrato="CONTRATO"
+):
+    """
+    Ao finalizar a OS com peça definitiva:
+    1. Atualiza o status da peça em solicitacoes_pecas para 'APLICADO EM DEFINITIVO NO CLIENTE / BAIXADO'
+    2. Garante a baixa permanente no estoque_pecas
+    3. Dá sequência automática ao fluxo de cobrança e faturamento (inserindo/atualizando em notas_fiscais)
+    """
+    if not nome_peca or nome_peca == "NENHUMA PEÇA":
+        # Mesmo sem peça, se houver valor faturável na OS, registra no fluxo de cobrança
+        if float(valor_total_os or 0) > 0:
+            with get_db_connection(db_path) as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT cnpj FROM clientes_equipamentos WHERE id = ?", (int(os_id),))
+                r_cnpj = cur.fetchone()
+                cnpj_val = r_cnpj[0] if r_cnpj and r_cnpj[0] else ""
+
+                cur.execute("SELECT id FROM notas_fiscais WHERE os_id = ?", (int(os_id),))
+                ja_nf = cur.fetchone()
+                agora_iso = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                if not ja_nf:
+                    cur.execute("""
+                        INSERT INTO notas_fiscais (
+                            os_id, cliente, cnpj_tomador, tipo_nota, valor_servicos, valor_pecas,
+                            valor_liquido, status_fiscal, natureza_operacao, data_emissao, criado_em, atualizado_em
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        int(os_id), cliente, cnpj_val, "NFSE", float(valor_total_os), 0.0,
+                        float(valor_total_os), "AGUARDANDO FATURAMENTO / COBRANÇA",
+                        f"SERVIÇO TÉCNICO [{condicao_pagamento}]", agora_iso, agora_iso, agora_iso
+                    ))
+            return True, "✅ Serviço concluído e encaminhado para o fluxo de cobrança!"
+        return True, ""
+
+    qtd = int(qtd_aplicada) if qtd_aplicada else 1
+    nome_peca_limpo = str(nome_peca).strip().upper()
+    ref_peca = f"{qtd}x {nome_peca_limpo}"
+
+    with get_db_connection(db_path) as conn:
+        cur = conn.cursor()
+
+        # 1. Obter dados de preço da peça em estoque_pecas
+        cur.execute("""
+            SELECT codigo, preco_custo, margem_contrato, margem_avulso, quantidade 
+            FROM estoque_pecas 
+            WHERE UPPER(nome_peca) = ? OR UPPER(codigo) = ?
+        """, (nome_peca_limpo, nome_peca_limpo))
+        row_peca = cur.fetchone()
+
+        cod_peca = row_peca[0] if row_peca else "PEC-000"
+        preco_custo = float(row_peca[1]) if row_peca and row_peca[1] is not None else 0.0
+        m_contrato = float(row_peca[2]) if row_peca and row_peca[2] is not None else 25.0
+        m_avulso = float(row_peca[3]) if row_peca and row_peca[3] is not None else 50.0
+
+        margem_aplicada = m_contrato if "CONTRATO" in str(tipo_contrato).upper() else m_avulso
+        valor_un_venda = round(preco_custo * (1 + margem_aplicada / 100.0), 2)
+        if valor_un_venda == 0 and float(valor_total_os or 0) > 0:
+            valor_total_pecas = round(float(valor_total_os) * 0.7, 2)
+        else:
+            valor_total_pecas = round(valor_un_venda * qtd, 2)
+
+        v_total_os = float(valor_total_os or 0)
+        if v_total_os >= valor_total_pecas:
+            valor_servicos = round(v_total_os - valor_total_pecas, 2)
+            valor_liquido = v_total_os
+        else:
+            valor_servicos = 0.0
+            valor_liquido = valor_total_pecas
+
+        # 2. Atualizar status na tabela solicitacoes_pecas para 'APLICADO EM DEFINITIVO NO CLIENTE / BAIXADO'
+        cur.execute("""
+            SELECT id FROM solicitacoes_pecas
+            WHERE (UPPER(destino_cliente) LIKE ? OR UPPER(destino_cliente) LIKE ?)
+            AND UPPER(status_pedido) NOT LIKE '%APLICADO%'
+            ORDER BY id DESC LIMIT 1
+        """, (f"%OS #{os_id}%", f"%{str(cliente).strip().upper()}%"))
+        
+        row_sol = cur.fetchone()
+        agora_str = datetime.datetime.now().strftime('%d/%m/%Y %H:%M')
+        if row_sol:
+            id_sol = row_sol[0]
+            cur.execute("""
+                UPDATE solicitacoes_pecas 
+                SET status_pedido = 'APLICADO EM DEFINITIVO NO CLIENTE / BAIXADO',
+                    itens_solicitados = ?
+                WHERE id = ?
+            """, (f"{ref_peca} ({cod_peca})", id_sol))
+        else:
+            cur.execute("""
+                INSERT INTO solicitacoes_pecas 
+                (tecnico, destino_cliente, itens_solicitados, instrumentos_solicitados, status_pedido, data_pedido)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                str(tecnico).upper(),
+                f"{cliente} ({equipamento}) [OS #{os_id}]".upper(),
+                f"{ref_peca} ({cod_peca})",
+                "BAIXA DEFINITIVA AO FINALIZAR OS",
+                "APLICADO EM DEFINITIVO NO CLIENTE / BAIXADO",
+                agora_str
+            ))
+
+        # 3. Encaminhamento para o Fluxo de Cobrança / Faturamento (tabela notas_fiscais)
+        cur.execute("SELECT cnpj FROM clientes_equipamentos WHERE id = ?", (int(os_id),))
+        r_cnpj = cur.fetchone()
+        cnpj_val = r_cnpj[0] if r_cnpj and r_cnpj[0] else ""
+
+        cur.execute("SELECT id FROM notas_fiscais WHERE os_id = ?", (int(os_id),))
+        ja_nf = cur.fetchone()
+        agora_iso = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        tipo_nota_final = "NF-e (PRODUTO/PEÇA) + NFS-e (SERVIÇO)" if valor_servicos > 0 else "NF-e (PEÇA DE REPOSIÇÃO)"
+        natureza_op = f"VENDA/APLICAÇÃO DE {cod_peca} + MÃO DE OBRA [{condicao_pagamento}]"
+
+        if ja_nf:
+            cur.execute("""
+                UPDATE notas_fiscais SET
+                    valor_servicos = ?,
+                    valor_pecas = ?,
+                    valor_liquido = ?,
+                    status_fiscal = 'AGUARDANDO FATURAMENTO / COBRANÇA',
+                    tipo_nota = ?,
+                    natureza_operacao = ?,
+                    atualizado_em = ?
+                WHERE os_id = ?
+            """, (valor_servicos, valor_total_pecas, valor_liquido, tipo_nota_final, natureza_op, agora_iso, int(os_id)))
+        else:
+            cur.execute("""
+                INSERT INTO notas_fiscais (
+                    os_id, cliente, cnpj_tomador, tipo_nota, valor_servicos, valor_pecas,
+                    valor_liquido, status_fiscal, natureza_operacao, data_emissao, criado_em, atualizado_em
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                int(os_id), cliente, cnpj_val, tipo_nota_final,
+                valor_servicos, valor_total_pecas, valor_liquido,
+                "AGUARDANDO FATURAMENTO / COBRANÇA", natureza_op,
+                agora_iso, agora_iso, agora_iso
+            ))
+
+    resumo_cobranca = (
+        f"✅ Peça '{ref_peca}' baixada em definitivo no Almoxarifado! "
+        f"Encaminhada para o Fluxo de Cobrança: R$ {valor_liquido:,.2f} "
+        f"(Peças: R$ {valor_total_pecas:,.2f} | Serviços: R$ {valor_servicos:,.2f})."
+    )
+    return True, resumo_cobranca
+
+
 def atualizar_status_solicitacao_peca(db_path, id_pedido, novo_status):
     with get_db_connection(db_path) as conn:
         cur = conn.cursor()
@@ -677,3 +837,160 @@ def calcular_dias_aguardando_orcamento(data_str, hoje_ts=None):
     if pd.isna(dt):
         return 0
     return max(0, int((hoje_ts - dt.normalize()).days))
+
+
+def calcular_status_calibracao(data_validade_str: str) -> dict:
+    """Calcula o status de conformidade anual de calibração ou renovação de créditos."""
+    if not data_validade_str or not str(data_validade_str).strip():
+        return {
+            "status": "NÃO INFORMADO",
+            "dias_restantes": 9999,
+            "badge_cor": "#64748b",
+            "badge_bg": "rgba(100, 116, 139, 0.15)",
+            "badge_txt": "⚪ SEM DATA CADASTRADA",
+            "alerta_urgente": False,
+            "nivel_alerta": 0
+        }
+
+    dt_alvo = None
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
+        try:
+            dt_alvo = datetime.datetime.strptime(str(data_validade_str).strip(), fmt).date()
+            break
+        except ValueError:
+            continue
+
+    if not dt_alvo:
+        return {
+            "status": "INVÁLIDO",
+            "dias_restantes": 9999,
+            "badge_cor": "#64748b",
+            "badge_bg": "rgba(100, 116, 139, 0.15)",
+            "badge_txt": "⚪ DATA INVÁLIDA",
+            "alerta_urgente": False,
+            "nivel_alerta": 0
+        }
+
+    hoje = datetime.date.today()
+    dias = (dt_alvo - hoje).days
+
+    if dias < 0:
+        return {
+            "status": "VENCIDO",
+            "dias_restantes": dias,
+            "badge_cor": "#ef4444",
+            "badge_bg": "rgba(239, 68, 68, 0.18)",
+            "badge_txt": f"🔴 VENCIDO HÁ {abs(dias)} D",
+            "alerta_urgente": True,
+            "nivel_alerta": 3
+        }
+    elif dias <= 30:
+        return {
+            "status": "A VENCER",
+            "dias_restantes": dias,
+            "badge_cor": "#f59e0b",
+            "badge_bg": "rgba(245, 158, 11, 0.18)",
+            "badge_txt": f"🟡 VENCE EM {dias} D",
+            "alerta_urgente": True,
+            "nivel_alerta": 2
+        }
+    elif dias <= 60:
+        return {
+            "status": "ATENÇÃO",
+            "dias_restantes": dias,
+            "badge_cor": "#38bdf8",
+            "badge_bg": "rgba(56, 189, 248, 0.15)",
+            "badge_txt": f"🔵 VENCE EM {dias} D",
+            "alerta_urgente": False,
+            "nivel_alerta": 1
+        }
+    else:
+        return {
+            "status": "EM DIA",
+            "dias_restantes": dias,
+            "badge_cor": "#10b981",
+            "badge_bg": "rgba(16, 185, 129, 0.15)",
+            "badge_txt": f"🟢 EM DIA ({dias} D)",
+            "alerta_urgente": False,
+            "nivel_alerta": 0
+        }
+
+
+def obter_resumo_alarmes_calibracao(db_path: str) -> dict:
+    """Retorna contagem consolidada de instrumentos e equipamentos com calibração ou créditos anuais a vencer ou vencidos."""
+    resumo = {
+        "instrumentos_vencidos": 0,
+        "instrumentos_a_vencer": 0,
+        "instrumentos_em_dia": 0,
+        "equipamentos_vencidos": 0,
+        "equipamentos_a_vencer": 0,
+        "equipamentos_em_dia": 0,
+        "total_alarmes_urgentes": 0,
+        "itens_urgentes": []
+    }
+
+    try:
+        with get_db_connection(db_path) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT codigo, nome_peca, data_validade_calibracao, certificado_calibracao,
+                       requer_calibracao, requer_creditos, saldo_creditos
+                FROM estoque_pecas
+                WHERE requer_calibracao = 1 OR requer_creditos = 1
+            """)
+            rows_inst = cur.fetchall()
+            for r in rows_inst:
+                st_info = calcular_status_calibracao(r[2])
+                if st_info["status"] == "VENCIDO":
+                    resumo["instrumentos_vencidos"] += 1
+                elif st_info["status"] == "A VENCER":
+                    resumo["instrumentos_a_vencer"] += 1
+                elif st_info["status"] == "EM DIA":
+                    resumo["instrumentos_em_dia"] += 1
+
+                if st_info["alerta_urgente"]:
+                    resumo["total_alarmes_urgentes"] += 1
+                    tipo_desc = "CRÉDITOS ANUAIS" if r[5] == 1 and r[4] == 0 else ("CALIBRAÇÃO & CRÉDITOS" if r[5] == 1 else "CALIBRAÇÃO ANUAL")
+                    resumo["itens_urgentes"].append({
+                        "origem": "INSTRUMENTO EMED",
+                        "codigo": r[0],
+                        "nome": r[1],
+                        "tipo": tipo_desc,
+                        "validade": r[2],
+                        "status": st_info["status"],
+                        "badge_txt": st_info["badge_txt"],
+                        "dias": st_info["dias_restantes"]
+                    })
+
+            cur.execute("""
+                SELECT cliente, equipamento, data_validade_calibracao, certificado_calibracao, cidade
+                FROM clientes_equipamentos
+                WHERE data_validade_calibracao IS NOT NULL AND data_validade_calibracao != ''
+            """)
+            rows_eq = cur.fetchall()
+            for req in rows_eq:
+                st_eq = calcular_status_calibracao(req[2])
+                if st_eq["status"] == "VENCIDO":
+                    resumo["equipamentos_vencidos"] += 1
+                elif st_eq["status"] == "A VENCER":
+                    resumo["equipamentos_a_vencer"] += 1
+                elif st_eq["status"] == "EM DIA":
+                    resumo["equipamentos_em_dia"] += 1
+
+                if st_eq["alerta_urgente"]:
+                    resumo["total_alarmes_urgentes"] += 1
+                    resumo["itens_urgentes"].append({
+                        "origem": "EQUIPAMENTO CLIENTE",
+                        "codigo": req[0],
+                        "nome": f"{req[0]} — {req[1]} ({req[4]})",
+                        "tipo": "CALIBRAÇÃO / QA ANUAL (RDC 611)",
+                        "validade": req[2],
+                        "status": st_eq["status"],
+                        "badge_txt": st_eq["badge_txt"],
+                        "dias": st_eq["dias_restantes"]
+                    })
+    except Exception:
+        pass
+
+    return resumo
+

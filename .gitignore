@@ -5,3 +5,12 @@ __pycache__/
 *.db-shm
 .DS_Store
 *.mp4
+
+scratch/
+screenshots_fluxo_kit/
+temp_video_fluxo_kit/
+qrcode_*.png
+qrcode_*.html
+test_*.py
+build_fluxo_kit_ferramentas_video.py
+capture_fluxo_kit_screenshots.py

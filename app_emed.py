@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 import emed_core as _emed_core
 importlib.reload(_emed_core)
-from emed_core import normalizar_dataframe_os
+from emed_core import normalizar_dataframe_os, obter_resumo_alarmes_calibracao
 from emed_services import (
     AppContext,
     BASE_DIR,
@@ -117,10 +117,24 @@ if st.sidebar.button("🔄 Trocar de Técnico / Sair", type="secondary", use_con
     st.rerun()
 
 st.sidebar.markdown("---")
+
+resumo_alarmes = obter_resumo_alarmes_calibracao(DB_NAME)
+if resumo_alarmes["total_alarmes_urgentes"] > 0:
+    st.sidebar.markdown(f"""
+        <div style="background: rgba(239, 68, 68, 0.18); border: 1px solid #ef4444; border-radius: 8px; padding: 10px; margin-bottom: 12px; text-align: center;">
+            <span style="color: #ef4444; font-weight: 800; font-size: 13px;">🚨 {resumo_alarmes['total_alarmes_urgentes']} ALARMES DE VENCIMENTO</span>
+            <div style="color: #cbd5e1; font-size: 11px; margin-top: 3px;">Calibrações ou créditos anuais vencidos ou vencendo este mês.</div>
+        </div>
+    """, unsafe_allow_html=True)
+    if st.sidebar.button("⏰ Abrir Painel de Alarmes", key="btn_sidebar_jump_alarmes", use_container_width=True):
+        st.session_state.menu_acao_ativa = "⏰ Alarmes de Calibração & Créditos"
+        st.rerun()
+
 st.sidebar.markdown("### PAINEL DE OPERAÇÕES")
 
 opcoes_menu = [
     "🤖 EmedOnline (Triagem & Rota)",
+    "⏰ Alarmes de Calibração & Créditos",
     "📊 Mural & Despacho WhatsApp",
     "📋 Minhas Pendências (Técnico)",
     "📚 Manuais & Procedimentos",

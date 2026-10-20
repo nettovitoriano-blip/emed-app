@@ -155,19 +155,32 @@ class FiscalManager:
         return hashlib.sha256(f"{os_id}|{tipo_nota}|{data_emissao}".encode('utf-8')).hexdigest()
 
     def _fetch_os_data(self, os_id: int) -> Dict[str, Any]:
-        query = """SELECT cliente, cnpj, valor_os FROM clientes_equipamentos WHERE id = ?"""
         with _get_db_connection(self.db_name) as conn:
+            # 1. Verifica se já existem valores detalhados de peças e serviços na fila de cobrança
+            cur_nf = conn.execute(
+                "SELECT valor_servicos, valor_pecas, valor_liquido, tipo_nota FROM notas_fiscais WHERE os_id = ?",
+                (os_id,)
+            )
+            row_nf = cur_nf.fetchone()
+
+            # 2. Busca dados da OS
+            query = """SELECT cliente, cnpj, valor_os, peca_baixada_ref FROM clientes_equipamentos WHERE id = ?"""
             cur = conn.execute(query, (os_id,))
             row = cur.fetchone()
             if not row:
                 raise ValueError(f"OS id={os_id} não encontrada.")
-            cliente, cnpj, valor_os = row
+            cliente, cnpj, valor_os, peca_ref = row
+
         v_total = float(valor_os or 0)
+        v_serv = float(row_nf[0]) if row_nf and row_nf[0] is not None else v_total
+        v_pecas = float(row_nf[1]) if row_nf and row_nf[1] is not None else 0.0
+
         return {
             "cliente": cliente,
             "cnpj": cnpj,
-            "valor_servicos": v_total,
-            "valor_pecas": 0.0,
+            "valor_servicos": v_serv,
+            "valor_pecas": v_pecas,
+            "peca_ref": peca_ref or ""
         }
 
     def create_pre_nota(self, os_id: int, tipo_nota: str = "NFSE") -> Dict[str, Any]:
@@ -258,30 +271,105 @@ class FiscalManager:
 def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) -> None:
     if st is None:
         raise RuntimeError("Streamlit não está instalado – UI indisponível.")
-    st.title(":page_facing_up: Módulo Fiscal – Emissão Simulada")
+    st.markdown("### 🧾 Módulo Fiscal & Sequência do Fluxo de Cobrança (NFS-e / NF-e)")
+    st.caption("Acompanhamento das Ordens de Serviço concluídas, peças aplicadas em definitivo e faturamento fiscal SEFAZ.")
     manager = FiscalManager(db_name)
 
+    # 1. Painel Geral de Cobrança e Faturamento
+    with _get_db_connection(db_name) as conn:
+        cur_tot = conn.execute("""
+            SELECT 
+                COUNT(*) as total_nf,
+                SUM(CASE WHEN UPPER(status_fiscal) LIKE '%EMITID%' THEN 1 ELSE 0 END) as emitidas,
+                SUM(CASE WHEN UPPER(status_fiscal) NOT LIKE '%EMITID%' THEN 1 ELSE 0 END) as pendentes,
+                SUM(COALESCE(valor_liquido, 0)) as total_faturar,
+                SUM(COALESCE(valor_pecas, 0)) as total_pecas
+            FROM notas_fiscais
+        """).fetchone()
+
+    total_nf, emitidas, pendentes, total_faturar, total_pecas = cur_tot if cur_tot else (0, 0, 0, 0, 0)
+    
+    m_col1, m_col2, m_col3 = st.columns(3)
+    with m_col1:
+        st.metric("Total em Fila de Cobrança", f"{pendentes or 0} OSs", help="Ordens com peças aplicadas ou serviços aguardando emissão fiscal.")
+    with m_col2:
+        st.metric("Notas Fiscais Emitidas", f"{emitidas or 0} NFs")
+    with m_col3:
+        st.metric("Total de Peças Aplicadas", f"R$ {float(total_pecas or 0):,.2f}")
+
+    st.markdown("---")
+    st.markdown("#### 📋 Fila de Faturamento & Cobrança (OSs com Peças Aplicadas em Definitivo)")
+
     # Lista OS concluídas
-    sql_os = """SELECT id, cliente, equipamento FROM clientes_equipamentos WHERE UPPER(status) LIKE '%CONCLU%' ORDER BY id DESC"""
+    sql_os = """
+        SELECT c.id, c.cliente, c.equipamento, c.valor_os, c.peca_baixada_ref, n.status_fiscal, n.valor_pecas, n.valor_servicos
+        FROM clientes_equipamentos c
+        LEFT JOIN notas_fiscais n ON c.id = n.os_id
+        WHERE UPPER(c.status) LIKE '%CONCLU%' 
+        ORDER BY c.id DESC
+    """
     with _get_db_connection(db_name) as conn:
         rows = conn.execute(sql_os).fetchall()
+
     if not rows:
-        st.info("Nenhuma OS concluída encontrada para emissão de nota.")
+        st.info("Nenhuma OS concluída encontrada para faturamento.")
         return
-    options = {f"OS #{r[0]} – {r[1]} ({r[2]})": r[0] for r in rows}
-    selected_label = st.selectbox("Selecione a OS", list(options.keys()))
+
+    # Exibição da Fila
+    lista_os_tabela = []
+    for r in rows:
+        os_id_i, cli_i, eq_i, val_os_i, peca_i, st_fisc_i, val_pec_i, val_srv_i = r
+        st_exib = st_fisc_i if st_fisc_i else "AGUARDANDO FATURAMENTO"
+        lista_os_tabela.append({
+            "OS #": os_id_i,
+            "Cliente / Hospital": cli_i,
+            "Equipamento": eq_i,
+            "Peça Definitiva": peca_i if peca_i else "NENHUMA",
+            "Valor Peças": f"R$ {float(val_pec_i or 0):,.2f}",
+            "Valor Serviços": f"R$ {float(val_srv_i or (val_os_i or 0)):,.2f}",
+            "Total OS": f"R$ {float(val_os_i or 0):,.2f}",
+            "Situação Cobrança": st_exib
+        })
+    st.dataframe(pd.DataFrame(lista_os_tabela), use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+    st.markdown("#### 🚀 Emissão de Nota Fiscal & Cobrança (Simulação SEFAZ)")
+    
+    options = {f"OS #{r[0]} – {r[1]} ({r[2]}) [Peça: {r[4] or 'Nenhuma'}]": r[0] for r in rows}
+    selected_label = st.selectbox("Selecione a Ordem de Serviço para Faturamento:", list(options.keys()))
     os_id = options[selected_label]
 
-    if st.button("Emitir Nota Fiscal (Simulação)"):
-        try:
-            nota = manager.create_pre_nota(os_id)
-            st.success(f"Nota emitida! Número: {nota.get('numero_nf')} – Chave: {nota.get('chave_acesso')}")
-            html_path = nota.get('xml_path').replace('xml', 'html').replace('.xml', '.html')
-            if os.path.exists(html_path):
-                with open(html_path, 'r', encoding='utf-8') as f:
-                    st.markdown(f.read(), unsafe_allow_html=True)
-        except Exception as exc:
-            st.error(f"Erro ao emitir nota: {exc}")
+    c_btn_nf1, c_btn_nf2 = st.columns(2)
+    with c_btn_nf1:
+        if st.button("🚀 Emitir Nota Fiscal (Simulação SEFAZ)", type="primary", use_container_width=True):
+            try:
+                nota = manager.create_pre_nota(os_id)
+                st.success(f"✅ Nota emitida com sucesso! Número: {nota.get('numero_nf')} – Chave: {nota.get('chave_acesso')}")
+                html_path = nota.get('xml_path', '').replace('xml', 'html').replace('.xml', '.html')
+                if os.path.exists(html_path):
+                    with open(html_path, 'r', encoding='utf-8') as f:
+                        st.markdown(f.read(), unsafe_allow_html=True)
+            except Exception as exc:
+                st.error(f"Erro ao emitir nota: {exc}")
+
+    with c_btn_nf2:
+        # Busca dados da OS selecionada para disparo de cobrança
+        row_sel = [r for r in rows if r[0] == os_id][0]
+        msg_cobranca_dir = (
+            f"🧾 *EMED ELETROMEDICINA • DEMONSTRATIVO FISCAL / COBRANÇA*\n\n"
+            f"🏥 *Cliente:* {row_sel[1]}\n"
+            f"📋 *OS:* #{os_id} ({row_sel[2]})\n"
+            f"⚙️ *Peça Aplicada:* {row_sel[4] or 'Nenhuma'}\n"
+            f"💰 *Valor Total:* R$ {float(row_sel[3] or 0):,.2f}\n"
+            f"📌 *Status:* PRONTO PARA FATURAMENTO / BOLETO / PIX\n\n"
+            f"CNPJ: 03.611.974/0001-08 • EMED Eletromedicina"
+        )
+        link_wpp_fisc = f"https://wa.me/?text={urllib.parse.quote(msg_cobranca_dir)}"
+        st.markdown(f"""
+            <a href="{link_wpp_fisc}" target="_blank" style="background:#0284c7; color:white; padding:9px 18px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:14px; display:inline-block; text-align:center; width:100%;">
+                📲 Enviar Demonstrativo de Cobrança p/ Financeiro (WhatsApp)
+            </a>
+        """, unsafe_allow_html=True)
 
     st.subheader(":mag_right: Consulta / Cancelamento")
     chave = st.text_input("Chave de acesso da nota")

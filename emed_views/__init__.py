@@ -17,9 +17,11 @@ from emed_views.administracao import (
 )
 from emed_views.manuais_tecnicos import render_manuais_tecnicos
 from emed_views.emedonline import render_emedonline
+from emed_views.alarmes_calibracao import render_alarmes_calibracao
 
 VIEW_ROUTER = {
     "🤖 EmedOnline (Triagem & Rota)": render_emedonline,
+    "⏰ Alarmes de Calibração & Créditos": render_alarmes_calibracao,
     "📊 Mural & Despacho WhatsApp": render_mural_despacho,
     "📋 Minhas Pendências (Técnico)": render_minhas_pendencias,
     "📚 Manuais & Procedimentos": render_manuais_tecnicos,
@@ -39,6 +41,7 @@ VIEW_ROUTER = {
 __all__ = [
     "verificar_e_renderizar_portal_qr",
     "render_emedonline",
+    "render_alarmes_calibracao",
     "render_mural_despacho",
     "render_minhas_pendencias",
     "render_manuais_tecnicos",

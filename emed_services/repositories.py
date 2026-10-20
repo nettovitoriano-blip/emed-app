@@ -81,11 +81,29 @@ def init_db(db_name: str = DB_NAME, caminho_excel: str = CAMINHO_EXCEL):
         colunas_extras_estoque = [
             ("margem_contrato", "REAL DEFAULT 30.0"),
             ("margem_avulso", "REAL DEFAULT 60.0"),
-            ("tipo_item", "TEXT DEFAULT 'PEÇA COMERCIAL (OS)'")
+            ("tipo_item", "TEXT DEFAULT 'PEÇA COMERCIAL (OS)'"),
+            ("data_ultima_calibracao", "TEXT DEFAULT ''"),
+            ("data_validade_calibracao", "TEXT DEFAULT ''"),
+            ("requer_calibracao", "INTEGER DEFAULT 0"),
+            ("requer_creditos", "INTEGER DEFAULT 0"),
+            ("saldo_creditos", "TEXT DEFAULT ''"),
+            ("certificado_calibracao", "TEXT DEFAULT ''")
         ]
         for col_n, col_t in colunas_extras_estoque:
             try:
                 cur.execute(f"ALTER TABLE estoque_pecas ADD COLUMN {col_n} {col_t}")
+            except Exception:
+                pass
+
+        colunas_extras_os = [
+            ("data_ultima_calibracao", "TEXT DEFAULT ''"),
+            ("data_validade_calibracao", "TEXT DEFAULT ''"),
+            ("certificado_calibracao", "TEXT DEFAULT ''"),
+            ("requer_calibracao_anual", "TEXT DEFAULT 'SIM'")
+        ]
+        for col_n, col_t in colunas_extras_os:
+            try:
+                cur.execute(f"ALTER TABLE clientes_equipamentos ADD COLUMN {col_n} {col_t}")
             except Exception:
                 pass
 
@@ -312,3 +330,36 @@ def salvar_atalhos_excluidos_usuario(db_name: str, usuario: str, excluidos: list
             conn.commit()
     except Exception:
         pass
+
+
+def atualizar_calibracao_instrumento(db_path: str, codigo: str, data_ultima: str, data_validade: str, certificado: str, saldo_creditos: str = "") -> tuple:
+    try:
+        with get_db_connection(db_path) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE estoque_pecas 
+                SET data_ultima_calibracao = ?,
+                    data_validade_calibracao = ?,
+                    certificado_calibracao = ?,
+                    saldo_creditos = ?
+                WHERE codigo = ?
+            """, (data_ultima.strip(), data_validade.strip(), certificado.strip().upper(), saldo_creditos.strip(), codigo.strip()))
+        return True, "✅ Calibração / Créditos do instrumento atualizados com sucesso!"
+    except Exception as ex:
+        return False, f"Erro ao atualizar calibração: {ex}"
+
+
+def atualizar_calibracao_equipamento_cliente(db_path: str, os_id: int, data_ultima: str, data_validade: str, certificado: str) -> tuple:
+    try:
+        with get_db_connection(db_path) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE clientes_equipamentos
+                SET data_ultima_calibracao = ?,
+                    data_validade_calibracao = ?,
+                    certificado_calibracao = ?
+                WHERE id = ?
+            """, (data_ultima.strip(), data_validade.strip(), certificado.strip().upper(), int(os_id)))
+        return True, "✅ Laudo e calibração anual do equipamento registrados com sucesso!"
+    except Exception as ex:
+        return False, f"Erro ao atualizar calibração do equipamento: {ex}"
