@@ -67,117 +67,121 @@ CICLO_ETAPAS_PREVENTIVA = [
     "PREVENTIVA COMPLETA (CHECKLIST INTEGRAL POP/IT)"
 ]
 
-KITS_INSTRUMENTOS_POR_SITUACAO = {
-    "INSTALAÇÃO": {
-        "nome": "KIT 1: INSTALAÇÃO PESADA (RAIO-X / TOMÓGRAFO / ARCO)",
+SUGESTOES_SEPARACAO_POR_ATIVIDADE = {
+    "AFERIÇÃO RADIOMÉTRICA & FOTOCÉLULA (AEC)": {
+        "nome": "SUGESTÃO: AFERIÇÃO RADIOMÉTRICA & FOTOCÉLULA / AEC (MULTÍMETRO 1000V)",
         "itens": [
-            "Nível a Laser com Tripé",
-            "Furadeira de Impacto / Martelete + Brocas SDS de Vídea",
-            "Jogo de Chumbadores Parabolt e Arruelas",
-            "Trena Laser Métrica",
-            "Torquímetro com Soquetes Calibrados",
-            "Osciloscópio Digital com Pontas Atenuadas",
-            "Kit Calibração Radiométrica / Dosímetro",
-            "Multímetro Digital True RMS",
-            "EPIs de Segurança (Óculos, Luvas e Protetor Auricular)",
+            "FER-001: Multímetro Especial até 1000V (Aferição Fotocélula / AEC & Mamógrafo)",
+            "FER-004: Medidor Radiométrico Multi-Parâmetro (kVp, Dose, Tempo, CSR)",
+            "FER-005: Fantoma de Resolução Espacial e Baixo Contraste (QA RX / Mamografia)",
+            "FER-009: Trena Laser Métrica Digital",
         ],
     },
-    "TROCA DE TUBO": {
-        "nome": "KIT 2: TROCA DE TUBO DE TOMÓGRAFO (GE / MULTIMARCAS)",
+    "MANUTENÇÃO DE ELETROFREIOS & MECÂNICA": {
+        "nome": "SUGESTÃO: MANUTENÇÃO DE ELETROFREIOS & MECÂNICA (ESTATIVA / MESA)",
         "itens": [
-            "Ferramenta Gerador JEDI e Giga de Comunicação",
-            "Torquímetro Calibrado para Anel de Fixação",
-            "Talha de Içamento / Macaco Hidráulico do Gantry",
-            "Kit Óleo Dielétrico e Bomba de Vácuo",
-            "Kit Limpeza Óptica de Colimador e Detectores",
-            "Multímetro e Giga de Teste de Filamento",
-            "Graxa Especial de Alta Rotação SlipRing",
+            "PEC-005: Bobina Solenoide / Eletrofreio (Universal 12V / 24V / 100V)",
+            "PEC-006: Botão de Acionamento / Microswitch de Freio",
+            "PEC-007: Fonte de Alimentação Chaveada Industrial",
+            "PEC-008: Cabo de Alimentação / Chicote Flexível de Freio",
+            "CON-003: Kit Limpeza Padrão (Limpa-Contatos Elétricos, Desengripante, Veja, Panos e Aspirador)",
         ],
     },
-    "PREVENTIVA": {
-        "nome": "KIT 3: MANUTENÇÃO PREVENTIVA PADRÃO & POP",
+    "CALIBRAÇÃO DE DENSITOMETRIA": {
+        "nome": "SUGESTÃO: CALIBRAÇÃO & MANUTENÇÃO EM DENSITOMETRIA ÓSSEA",
         "itens": [
-            "Kit de Calibração e Fantomas Padrão (Cabeça / Corpo)",
-            "Multímetro Digital Calibrado",
-            "Graxa Especial para Rolamentos e SlipRing",
-            "Soprador / Aspirador Antiestático ESD",
-            "Jogo de Chaves Allen (Métricas e Polegadas) e Torx",
-            "Álcool Isopropílico 99% e Panos de Microfibra ESD",
-            "Checklist Oficial POP/IT Impresso/Digital",
+            "FER-006: Fantoma Oficial de Calibração de Densidade Óssea",
+            "PEC-003: Cabos de Alta Tensão (HV) Sobressalentes",
+            "CON-003: Kit Limpeza Padrão (Limpa-Contatos Elétricos, Desengripante, Veja, Panos e Aspirador)",
         ],
     },
-    "CORRETIVA": {
-        "nome": "KIT 4: CORRETIVA EMERGENCIAL & DIAGNÓSTICO",
+    "SISTEMAS DIGITAIS (DR / CR)": {
+        "nome": "SUGESTÃO: SISTEMAS DIGITAIS (DR / CR & WORKSTATION)",
         "itens": [
-            "Osciloscópio Portátil com Pontas HV",
-            "Kit Sortido de Fusíveis de Ação Rápida e Retardada",
-            "Estação de Solda Portátil",
-            "Alicate Amperímetro DC/AC True RMS",
-            "Maleta de Chaves Isoladas 1000V",
-            "Spray Limpa Contatos e Desengripante",
+            "PEC-010: Interface Box / Fonte de Alimentação do Detector DR",
+            "PEC-009: Baterias Sobressalentes e Carregador para Flat Panel Wi-Fi",
+            "PEC-011: Cabos de Comunicação Tether Cable e Rede Cat6 Blindados",
+            "FER-005: Fantoma de Resolução Espacial e Baixo Contraste",
+            "CON-004: Álcool Isopropílico 99% ESD e Panos de Microfibra",
         ],
     },
-    "CALIBRAÇÃO / QA": {
-        "nome": "KIT 5: CALIBRAÇÃO, QA & FOTOCÉLULA (AEC)",
+    "INSTALAÇÃO PESADA": {
+        "nome": "SUGESTÃO: INSTALAÇÃO & MONTAGEM MECÂNICA PESADA",
         "itens": [
-            "Multímetro Especial até 1000V (Aferição de Tensão na Fotocélula / AEC)",
-            "Medidor de Radiação Multi-Parâmetro (kVp, Dose, Tempo, CSR)",
-            "Fantoma de Resolução Espacial e Baixo Contraste",
-            "Trena Métrica e Posicionador Radiográfico",
-            "Certificado de Calibração dos Padrões Vigente",
+            "FER-008: Nível a Laser Autonivelante com Tripé",
+            "FER-016: Furadeira de Impacto / Martelete SDS + Brocas de Vídea",
+            "FER-009: Trena Laser Métrica Digital",
+            "FER-010: Torquímetro Calibrado com Jogo de Soquetes",
+            "FER-003: Osciloscópio Digital Portátil com Pontas HV",
+            "FER-002: Multímetro Digital True RMS Calibrado",
         ],
     },
-    "FREIOS / MECÂNICA": {
-        "nome": "KIT 6: MECÂNICA & ELETROFREIOS (RAIO-X / ESTATIVA)",
+    "TROCA DE TUBO & VÁCUO": {
+        "nome": "SUGESTÃO: TROCA DE TUBO DE RAIOS-X / TC & ALTA TENSÃO",
         "itens": [
-            "Bobinas Solenoides / Eletrofreio Sobressalentes",
-            "Botões de Acionamento / Microswitches de Reposição",
-            "Cabo de Alimentação / Chicote Flexível",
-            "Kit Limpeza Padrão (Limpa-Contatos Elétricos, Desengripante, Veja, Panos e Aspirador)",
+            "FER-015: Giga de Comunicação JEDI & Cabos de Serviço (Tomografia)",
+            "FER-010: Torquímetro Calibrado para Anel de Fixação",
+            "FER-012: Talha de Içamento Mecânica / Macaco Hidráulico de Gantry",
+            "CON-005: Graxa Especial de Alta Rotação SlipRing",
+            "PEC-003: Cabos de Alta Tensão (HV)",
+            "CON-003: Kit Limpeza Padrão (Limpa-Contatos, Desengripante, Panos)",
         ],
     },
-    "DENSITOMETRIA": {
-        "nome": "KIT 7: DENSITOMETRIA ÓSSEA (BRAÇO C / SHUTTER / CABOS HV)",
+    "PREVENTIVA PADRÃO": {
+        "nome": "SUGESTÃO: MANUTENÇÃO PREVENTIVA PADRÃO & POP",
         "itens": [
-            "Kit Mecânico para Braço C e Shutter/Colimador",
-            "Cabos de Alta Tensão (HV) Sobressalentes",
-            "Fantoma Oficial de Calibração de Densidade Óssea",
-            "Kit Limpeza Padrão (Limpa-Contatos Elétricos, Desengripante, Veja, Panos e Aspirador)",
+            "FER-005: Fantomas de Calibração Padrão (Cabeça / Corpo / QA)",
+            "FER-002: Multímetro Digital Calibrado True RMS",
+            "FER-011: Alicate Amperímetro DC/AC True RMS",
+            "CON-005: Graxa Especial para Rolamentos e SlipRing",
+            "CON-004: Álcool Isopropílico 99% e Panos de Microfibra ESD",
+            "CON-003: Kit Limpeza Padrão (Limpa-Contatos, Desengripante, Veja, Panos e Aspirador)",
         ],
     },
-    "SISTEMA DIGITAL": {
-        "nome": "KIT 8: SISTEMAS DIGITAIS (DR / CR & WORKSTATION)",
+    "DIAGNÓSTICO & BANCADA DE LABORATÓRIO": {
+        "nome": "SUGESTÃO: DIAGNÓSTICO & BANCADA DE LABORATÓRIO INTERNO EMED",
         "itens": [
-            "Interface Box / Fonte de Alimentação do Detector DR",
-            "Baterias Sobressalentes e Carregador para Flat Panel Wi-Fi",
-            "Cabos de Comunicação / Tether Cable e Rede Cat6 Blindados",
-            "Fantoma de Resolução e Contraste para Imagem Digital",
-            "Kit Limpeza Óptica e Telas de Fósforo (Pano ESD e Álcool Isopropílico)",
+            "FER-001: Multímetro Especial até 1000V (Aferição Fotocélula / AEC & Mamógrafo)",
+            "FER-003: Osciloscópio Digital Portátil com Pontas HV / Atenuadas",
+            "FER-013: Estação de Solda Portátil ESD com Controle Térmico",
+            "FER-011: Alicate Amperímetro DC/AC True RMS",
+            "FER-014: Soprador / Aspirador Antiestático ESD",
+            "PEC-012: Kit Sortido de Fusíveis de Ação Rápida e Retardada",
         ],
     },
 }
 
+# Alias de compatibilidade retroativa
+KITS_INSTRUMENTOS_POR_SITUACAO = SUGESTOES_SEPARACAO_POR_ATIVIDADE
+
 
 def obter_kit_por_servico(tipo_servico: str, defeito: str = "") -> dict:
-    """Retorna o Kit de Instrumentos mais indicado com base no tipo de serviço e no relato técnico."""
+    """Retorna a sugestão de separação de ferramentas e materiais mais indicada com base no tipo de serviço e no relato técnico."""
     texto_busca = ((tipo_servico or "") + " " + (defeito or "")).upper()
-    if any(k in texto_busca for k in ["FOTOCEL", "FOTO-CEL", "AEC", "1000V"]):
-        return KITS_INSTRUMENTOS_POR_SITUACAO["CALIBRAÇÃO / QA"]
+    if any(k in texto_busca for k in ["FOTOCEL", "FOTO-CEL", "AEC", "1000V", "MAMOGR", "MAMO"]):
+        return SUGESTOES_SEPARACAO_POR_ATIVIDADE["AFERIÇÃO RADIOMÉTRICA & FOTOCÉLULA (AEC)"]
     if any(k in texto_busca for k in ["FREIO", "ESTATIVA", "PORTA TUBO", "PORTA-TUBO", "TRILHO", "MECANIC"]):
-        return KITS_INSTRUMENTOS_POR_SITUACAO["FREIOS / MECÂNICA"]
+        return SUGESTOES_SEPARACAO_POR_ATIVIDADE["MANUTENÇÃO DE ELETROFREIOS & MECÂNICA"]
     if any(k in texto_busca for k in ["DENSITO", "LUNAR", "PRODIGY", "SHUTTER"]):
-        return KITS_INSTRUMENTOS_POR_SITUACAO["DENSITOMETRIA"]
+        return SUGESTOES_SEPARACAO_POR_ATIVIDADE["CALIBRAÇÃO DE DENSITOMETRIA"]
     if any(k in texto_busca for k in ["DR", "CR", "FLAT PANEL", "DETECTOR", "DIGITALIZADOR", "CHASSI", "CASSETE", "WORKSTATION", "DICOM"]):
-        return KITS_INSTRUMENTOS_POR_SITUACAO["SISTEMA DIGITAL"]
-    for chave, dados in KITS_INSTRUMENTOS_POR_SITUACAO.items():
+        return SUGESTOES_SEPARACAO_POR_ATIVIDADE["SISTEMAS DIGITAIS (DR / CR)"]
+    if any(k in texto_busca for k in ["INSTALA", "MONTAG"]):
+        return SUGESTOES_SEPARACAO_POR_ATIVIDADE["INSTALAÇÃO PESADA"]
+    if any(k in texto_busca for k in ["TUBO", "GANTRY", "JEDI"]):
+        return SUGESTOES_SEPARACAO_POR_ATIVIDADE["TROCA DE TUBO & VÁCUO"]
+    if any(k in texto_busca for k in ["LABORAT", "BANCADA", "PLACA"]):
+        return SUGESTOES_SEPARACAO_POR_ATIVIDADE["DIAGNÓSTICO & BANCADA DE LABORATÓRIO"]
+    if any(k in texto_busca for k in ["PREVENT"]):
+        return SUGESTOES_SEPARACAO_POR_ATIVIDADE["PREVENTIVA PADRÃO"]
+    for chave, dados in SUGESTOES_SEPARACAO_POR_ATIVIDADE.items():
         if chave in texto_busca:
             return dados
     return {
-        "nome": "KIT GERAL DE ATENDIMENTO",
+        "nome": "SUGESTÃO GERAL DE ATENDIMENTO",
         "itens": [
-            "Maleta de Ferramentas Manuais Básica",
-            "Kit Limpeza Padrão (Limpa-Contatos, Desengripante, Veja, Panos e Aspirador)",
-            "EPI Padrão",
+            "FER-002: Multímetro Digital True RMS Calibrado",
+            "CON-003: Kit Limpeza Padrão (Limpa-Contatos, Desengripante, Veja, Panos e Aspirador)",
         ]
     }
 
@@ -470,7 +474,8 @@ def atualizar_status_solicitacao_peca(db_path, id_pedido, novo_status):
         if status_atual == novo_status_up:
             return True, f"O pedido #{id_pedido} já está com o status '{novo_status_up}'."
 
-        if "ESTORNADO" in novo_status_up and "ESTORNADO" not in status_atual:
+        # Se devolver ao estoque (cancelado/estornado ou devolvido pelo técnico)
+        if ("ESTORNADO" in novo_status_up or "DEVOLVIDO" in novo_status_up) and ("ESTORNADO" not in status_atual and "DEVOLVIDO" not in status_atual):
             partes = [p.strip() for p in itens_str.split(",") if "x " in p and "(" in p]
             for p in partes:
                 try:

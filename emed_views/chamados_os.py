@@ -372,9 +372,9 @@ def _render_criar_nova_os(ctx: AppContext):
             )
             kit_sugerido = obter_kit_por_servico(chamado_tipo)
             instrumento_abertura = st.text_input(
-                f"5.2 Instrumentos & Ferramentas a Separar pelo Almoxarifado ({kit_sugerido['nome']})",
+                f"5.2 Sugestão de Instrumentos & Peças para o Atendimento ({kit_sugerido['nome']})",
                 value=", ".join(kit_sugerido["itens"]),
-                help="O Almoxarifado é notificado automaticamente com este Kit de ferramentas ao salvar a OS."
+                help="O Almoxarifado recebe a lista de ferramentas calibradas e peças sobressalentes sugeridas para separação."
             )
 
         st.markdown("#### 🔬 Pré-Atendimento, Defeito Relatado, Formulários & Anexos (Foto / Vídeo)")

@@ -25,6 +25,7 @@ DICIONARIO_NOMES_AMIGAVEIS = {
     "IT_10_Alinhamento_Isocentro_Mecanico_e_HOT_ISO_GE.md": "🎯 IT-10: Alinhamento do Isocentro Mecânico (ISO) & Feixe Ativo (HOT ISO)",
     "IT_11_Calibracao_Colimador_Aberturas_e_Detailed_Cal_GE.md": "🔬 IT-11: Calibração das Aberturas do Colimador & Detailed Calibration",
     "IT_12_Seguranca_Rotacao_Gantry_e_Varreduras_HHS_GE.md": "🛡️ IT-12: Segurança de Rotação, Varreduras Térmicas HHS & Estabilidade",
+    "IT_13_Substituicao_Placa_KV_Control_Board_GE_BrightSpeed.md": "⚡ IT-13: Substituição da Placa Controladora de Alta Tensão (KV Control Board GE)",
     
     # Brivo CT385 - Calibrações e Procedimentos
     "01_Procedimento_Troca_de_Tubo_Gantry.pdf": "01. Procedimento Oficial de Troca do Tubo de Raio-X no Gantry",
@@ -57,12 +58,14 @@ DICIONARIO_NOMES_AMIGAVEIS = {
     "02_Manual_de_Instalacao_MobileDaRt_MX8_Shimadzu.pdf": "📑 Manual de Instalação e Montagem MobileDaRt MX8 (Shimadzu 560p)",
     "IT_RXM_SHIM_001_Manutencao_Descarga_Capacitores_MobileDaRt_MX8.md": "⚡ IT-01: Manutenção, Diagnóstico de Falhas & Descarga de Capacitores (Shimadzu MX8)",
     "IT_RXM_SHIM_002_Calibracao_Manopla_Balanca_Sensor_Braco_MX8.md": "🎯 IT-02: Calibração da Manopla com Balança (FSR) & Sensor do Braço no Catcher (Andar Frente/Trás)",
+    "IT_RXM_SHIM_003_Instalacao_Montagem_Comissionamento_MobileDaRt_MX8.md": "🚀 IT-03: Roteiro Completo de Instalação, Montagem Mecânica & Comissionamento (Shimadzu MX8)",
 
     # Lotus Família HF
     "01_Manual_Usuario_Familia_HF_Parte_1.pdf": "📖 Manual do Usuário e Operação - Família HF Raio-X Fixo (Lotus)",
 
     # Neusoft NeuVision 550M
-    "01_Manual_Instalacao_Software_NeuVision_550M_Plus.pdf": "💻 Manual de Instalação do Software DR NeuVision 550M Plus (Neusoft)"
+    "01_Manual_Instalacao_Software_NeuVision_550M_Plus.pdf": "💻 Manual de Instalação do Software DR NeuVision 550M Plus (Fábrica Neusoft)",
+    "IT_RXD_NEU_001_Instalacao_Software_Configuracao_DR_NeuVision550M.md": "💻 IT-01: Instalação de Software, Configuração Sedecal & Wi-Fi Canon (NeuVision 550M/Plus)"
 }
 
 DICIONARIO_SUBGRUPOS = {
@@ -71,8 +74,9 @@ DICIONARIO_SUBGRUPOS = {
     "03_SOFTWARE_E_UTILITARIOS_LINUX": "💻 SOFTWARE E UTILITÁRIOS LINUX",
     "02_PORTAL_INTERATIVO_SERVICE_METHODS": "🌐 PORTAL INTERATIVO SERVICE METHODS",
     "02_MANUAIS_DE_SERVICO_E_INSTALACAO": "📚 MANUAIS DE SERVIÇO & INSTALAÇÃO",
+    "02_MANUAIS_OFICIAIS_PDF": "📚 MANUAIS DE FÁBRICA OFICIAIS (PDF)",
     "01_MANUAIS_DE_OPERACAO": "📖 MANUAIS DE OPERAÇÃO",
-    "01_MANUAIS_DE_SOFTWARE_DR": "💻 SOFTWARE DR & INSTALAÇÃO",
+    "01_MANUAIS_DE_SOFTWARE_DR": "📚 MANUAIS DE FÁBRICA OFICIAIS (PDF)",
     "HF500M": "📄 MANUAIS E VISTORIA PRÉ-INSTALAÇÃO",
     "LOTUS": "📄 MANUAIS E VISTORIA PRÉ-INSTALAÇÃO"
 }
@@ -186,15 +190,7 @@ def _abrir_no_sistema_operacional(caminho: str) -> bool:
 
 
 def _renderizar_leitor_pdf(caminho_pdf: str, doc_key: str):
-    """Exibe o leitor de PDF inline com renderização nativa via PyMuPDF e paginação de alta fidelidade."""
-    # Botão de abertura externa desacoplado do try de renderização de páginas
-    col_win, col_prev, col_info, col_next = st.columns([1.6, 1.2, 1.5, 1.2])
-
-    with col_win:
-        if st.button("🖥️ Abrir no App do Windows", key=f"btn_win_{doc_key}", use_container_width=True):
-            _abrir_no_sistema_operacional(caminho_pdf)
-            st.toast("Manual aberto no leitor do Windows!", icon="📄")
-
+    """Exibe o leitor de PDF inline com busca interna de texto, navegação rápida e renderização de alta fidelidade."""
     try:
         import pymupdf
         doc_pdf = pymupdf.open(caminho_pdf)
@@ -204,15 +200,24 @@ def _renderizar_leitor_pdf(caminho_pdf: str, doc_key: str):
         if sess_key_pag not in st.session_state:
             st.session_state[sess_key_pag] = 0
 
+        # Barra Superior de Controles e Paginação
+        col_win, col_prev, col_info, col_next, col_jump = st.columns([1.5, 0.9, 1.3, 0.9, 1.4])
+
+        with col_win:
+            if st.button("🖥️ Abrir no App do Windows", key=f"btn_win_{doc_key}", use_container_width=True):
+                _abrir_no_sistema_operacional(caminho_pdf)
+                st.toast("Manual aberto no leitor do Windows!", icon="📄")
+
+        pag_atual = st.session_state[sess_key_pag] + 1
+
         with col_prev:
             if st.button("⬅️ Anterior", key=f"prev_{doc_key}", use_container_width=True, disabled=(st.session_state[sess_key_pag] <= 0)):
                 st.session_state[sess_key_pag] -= 1
                 st.rerun()
 
         with col_info:
-            pag_atual = st.session_state[sess_key_pag] + 1
             st.markdown(
-                f"<div style='text-align: center; padding-top: 8px; font-weight: 600; color: #00b4d8; font-size: 0.95rem;'>"
+                f"<div style='text-align: center; padding-top: 8px; font-weight: 700; color: #00b4d8; font-size: 0.95rem;'>"
                 f"Página {pag_atual} de {total_paginas}"
                 f"</div>",
                 unsafe_allow_html=True
@@ -223,7 +228,65 @@ def _renderizar_leitor_pdf(caminho_pdf: str, doc_key: str):
                 st.session_state[sess_key_pag] += 1
                 st.rerun()
 
-        # Renderização da página em alta nitidez (DPI 150)
+        with col_jump:
+            num_alvo = st.number_input(
+                "Ir para pág:",
+                min_value=1,
+                max_value=total_paginas,
+                value=pag_atual,
+                key=f"jump_{doc_key}",
+                label_visibility="collapsed"
+            )
+            if num_alvo != pag_atual:
+                st.session_state[sess_key_pag] = num_alvo - 1
+                st.rerun()
+
+        # BUSCADOR INTERNO NO DOCUMENTO PDF
+        st.markdown(
+            """
+            <div style="background: rgba(0, 180, 216, 0.08); border-left: 3px solid #00b4d8; padding: 6px 12px; margin: 8px 0; border-radius: 4px;">
+                <span style="font-weight: 600; color: #caf0f8; font-size: 0.88rem;">🔎 Localizador no Manual: Busque códigos de erro, chaves, calibrações ou palavras-chave</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        termo_busca_pdf = st.text_input(
+            "Buscar palavra ou código dentro deste PDF:",
+            placeholder="Ex: SW7, cxdiadmin, reset, error, calibração, torque, 192.168...",
+            key=f"search_pdf_{doc_key}",
+            label_visibility="collapsed"
+        )
+
+        if termo_busca_pdf and termo_busca_pdf.strip():
+            termo = termo_busca_pdf.strip().lower()
+            paginas_encontradas = []
+            for i in range(total_paginas):
+                page_obj = doc_pdf[i]
+                txt = page_obj.get_text("text").lower()
+                if termo in txt:
+                    # Encontra trecho do snippet
+                    pos = txt.find(termo)
+                    inicio_snip = max(0, pos - 25)
+                    fim_snip = min(len(txt), pos + len(termo) + 40)
+                    snippet = txt[inicio_snip:fim_snip].replace("\n", " ").strip()
+                    paginas_encontradas.append((i + 1, snippet))
+
+            if paginas_encontradas:
+                st.success(f"🎯 O termo **'{termo_busca_pdf}'** foi localizado em **{len(paginas_encontradas)} página(s)**! Clique para ir direto:")
+                cols_botoes = st.columns(min(len(paginas_encontradas), 8))
+                for idx_btn, (p_num, snip) in enumerate(paginas_encontradas[:8]):
+                    with cols_botoes[idx_btn % len(cols_botoes)]:
+                        destaque = "primary" if p_num == pag_atual else "secondary"
+                        if st.button(f"Pág {p_num}", key=f"btn_p_{p_num}_{doc_key}", type=destaque, use_container_width=True, help=f"Trecho: ...{snip}..."):
+                            st.session_state[sess_key_pag] = p_num - 1
+                            st.rerun()
+                if len(paginas_encontradas) > 8:
+                    st.caption(f"Mais páginas com resultados: {', '.join([f'Pág {p[0]}' for p in paginas_encontradas[8:20]])}")
+            else:
+                st.info(f"Nenhuma ocorrência do termo '{termo_busca_pdf}' neste documento.")
+
+        # Renderização da página selecionada em alta nitidez (DPI 150)
         idx_pag = min(max(0, st.session_state[sess_key_pag]), total_paginas - 1)
         pagina = doc_pdf.load_page(idx_pag)
         pix = pagina.get_pixmap(dpi=150)
@@ -243,11 +306,38 @@ def _renderizar_leitor_pdf(caminho_pdf: str, doc_key: str):
         st.info("💡 Você pode visualizar este manual em alta resolução clicando em **'Abrir no App do Windows'** acima ou em **'Baixar Arquivo'**.")
 
 
-def _renderizar_leitor_markdown(caminho_md: str):
-    """Lê e renderiza um documento Markdown de Instrução de Trabalho formatado."""
+def _renderizar_leitor_markdown(caminho_md: str, doc_key: str = "it"):
+    """Lê e renderiza um documento Markdown de Instrução de Trabalho formatado com busca rápida."""
     try:
         with open(caminho_md, "r", encoding="utf-8") as f:
             conteudo = f.read()
+
+        col_it_info, col_it_busca = st.columns([1.5, 2.5])
+        with col_it_info:
+            st.markdown(
+                """
+                <div style="background: rgba(0, 180, 216, 0.1); border-left: 3px solid #00b4d8; padding: 6px 12px; border-radius: 4px; font-weight: 600; color: #caf0f8; font-size: 0.88rem;">
+                    📋 Instrução de Trabalho em Português
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        with col_it_busca:
+            busca_it = st.text_input(
+                "Buscar termo nesta IT:",
+                placeholder="Ex: torque, SW7, cxdiadmin, IP, 192.168, erro...",
+                key=f"search_md_{doc_key}",
+                label_visibility="collapsed"
+            )
+
+        if busca_it and busca_it.strip():
+            termo = busca_it.strip()
+            ocorrencias = conteudo.lower().count(termo.lower())
+            if ocorrencias > 0:
+                st.success(f"🎯 O termo **'{termo}'** foi encontrado **{ocorrencias} vez(es)** na instrução abaixo:")
+            else:
+                st.info(f"O termo '{termo}' não foi encontrado nesta instrução.")
+
         st.markdown(
             f"""
             <div style="background: #111a36; border: 1px solid #3a506b; padding: 25px; border-radius: 8px; margin-top: 10px;">
@@ -285,7 +375,7 @@ def render_manuais_tecnicos(ctx: AppContext):
     # Modelos / Sub-linhas (Nível 2)
     modelos_disponiveis = sorted(list(set(d["modelo"] for d in docs_cat if d["modelo"] != "GERAL")))
     
-    col_mod, col_busca = st.columns([1, 2])
+    col_mod, col_busca, col_deep = st.columns([1, 1.8, 1.2])
     with col_mod:
         if modelos_disponiveis:
             mod_selecionado = st.selectbox("🔬 Modelo do Equipamento", ["TODOS OS MODELOS"] + modelos_disponiveis)
@@ -293,21 +383,58 @@ def render_manuais_tecnicos(ctx: AppContext):
             mod_selecionado = "TODOS OS MODELOS"
 
     with col_busca:
-        termo_busca = st.text_input("🔍 Busca rápida de manual, calibração ou palavra-chave...", placeholder="Ex: Tubo, Balanceamento, Slip Ring, JEDI, POR, Lotus...")
+        termo_busca = st.text_input("🔍 Buscador Geral da Biblioteca Técnica...", placeholder="Ex: SW7, cxdiadmin, Tubo, Balanceamento, Slip Ring, MX8, 550M...")
+
+    with col_deep:
+        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+        busca_profunda = st.checkbox("🔎 Conteúdo Completo", value=False, help="Pesquisa profunda também dentro do texto dos PDFs e das Instruções de Trabalho")
 
     # Filtra pelos seletores e busca
     docs_filtrados = []
+    ocorrencias_busca = {}
+    termo_limpo = termo_busca.strip().lower() if termo_busca else ""
+
     for d in docs_cat:
         if mod_selecionado != "TODOS OS MODELOS" and d["modelo"] != mod_selecionado:
             continue
-        if termo_busca:
-            busca_termo = termo_busca.lower()
-            if (busca_termo not in d["titulo_amigavel"].lower() and 
-                busca_termo not in d["nome_arquivo"].lower() and 
-                busca_termo not in d["subgrupo"].lower() and 
-                busca_termo not in d["categoria"].lower()):
-                continue
-        docs_filtrados.append(d)
+        
+        match_direto = False
+        if not termo_limpo:
+            match_direto = True
+        else:
+            # 1. Busca por Metadados (Nome, Título, Categoria, Subgrupo)
+            if (termo_limpo in d["titulo_amigavel"].lower() or 
+                termo_limpo in d["nome_arquivo"].lower() or 
+                termo_limpo in d["subgrupo"].lower() or 
+                termo_limpo in d["categoria"].lower()):
+                match_direto = True
+
+            # 2. Busca Profunda no Conteúdo (Texto do PDF e Markdown)
+            if not match_direto and busca_profunda:
+                try:
+                    if d["tipo"] == "MARKDOWN":
+                        with open(d["caminho"], "r", encoding="utf-8", errors="ignore") as f_txt:
+                            conteudo_txt = f_txt.read().lower()
+                            cnt = conteudo_txt.count(termo_limpo)
+                            if cnt > 0:
+                                match_direto = True
+                                ocorrencias_busca[d["caminho"]] = cnt
+                    elif d["tipo"] == "PDF":
+                        import pymupdf
+                        doc_temp = pymupdf.open(d["caminho"])
+                        cnt = 0
+                        for p in doc_temp:
+                            if termo_limpo in p.get_text("text").lower():
+                                cnt += 1
+                        doc_temp.close()
+                        if cnt > 0:
+                            match_direto = True
+                            ocorrencias_busca[d["caminho"]] = cnt
+                except Exception:
+                    pass
+
+        if match_direto:
+            docs_filtrados.append(d)
 
     # Caminho do frameset do Portal Service Methods
     caminho_portal_bs = os.path.join(pasta_manuais, "TOMOGRAFO", "GE", "BRIGHTSPEED_LITE", "02_PORTAL_INTERATIVO_SERVICE_METHODS", "frameset.htm")
@@ -336,12 +463,12 @@ def render_manuais_tecnicos(ctx: AppContext):
                     _render_card_portal_service_methods(caminho_portal_bs)
                 else:
                     docs_do_grupo = [d for d in docs_filtrados if d["subgrupo"] == sg]
-                    _render_lista_cards(docs_do_grupo)
+                    _render_lista_cards(docs_do_grupo, ocorrencias_busca)
     elif len(lista_abas) == 1:
         if lista_abas[0] == "🌐 PORTAL INTERATIVO SERVICE METHODS":
             _render_card_portal_service_methods(caminho_portal_bs)
         else:
-            _render_lista_cards(docs_filtrados)
+            _render_lista_cards(docs_filtrados, ocorrencias_busca)
     else:
         st.info("Nenhum manual encontrado para os filtros selecionados.")
 
@@ -450,11 +577,14 @@ def _render_card_portal_service_methods(caminho_frameset: str):
         st.components.v1.iframe(url_portal, height=850, scrolling=True)
 
 
-def _render_lista_cards(docs: list):
-    """Renderiza a lista de documentos em cards informativos, elegantes e padronizados."""
+def _render_lista_cards(docs: list, ocorrencias_busca: dict = None):
+    """Renderiza a lista de documentos em cards informativos, elegantes e padronizados com suporte a busca de conteúdo."""
     if not docs:
         st.info("Nenhum documento encontrado nesta seção.")
         return
+
+    if ocorrencias_busca is None:
+        ocorrencias_busca = {}
 
     for idx, doc in enumerate(docs):
         with st.container():
@@ -466,10 +596,16 @@ def _render_lista_cards(docs: list):
             with col_det:
                 st.markdown(f"#### **{doc['titulo_amigavel']}**")
                 tipo_badge = "📖 INSTRUÇÃO DE TRABALHO eMED (IT)" if doc["tipo"] == "MARKDOWN" else "📑 MANUAL OFICIAL PDF"
+                badge_busca = ""
+                if doc["caminho"] in ocorrencias_busca:
+                    badge_busca = f" &nbsp;|&nbsp; <span style='background: #e76f51; color: white; padding: 2px 7px; border-radius: 4px; font-size: 0.82rem; font-weight: 700;'>🎯 {ocorrencias_busca[doc['caminho']]} ocorrência(s) no conteúdo</span>"
+
                 st.markdown(
                     f"`{tipo_badge}` &nbsp;|&nbsp; "
                     f"💾 `{doc['tamanho_mb']:.2f} MB` &nbsp;|&nbsp; "
                     f"🕒 Atualizado em: `{doc['data_mod']}`"
+                    f"{badge_busca}",
+                    unsafe_allow_html=True
                 )
 
                 # Destaque de parâmetros rápidos para ITs críticas
@@ -498,6 +634,36 @@ def _render_lista_cards(docs: list):
                         * **Tensão nas Pistas:** **$750\\text{V DC}$** (Inversor) e **$120\\text{V AC}$** (LOTO obrigatório).
                         * **Desgaste das Escovas:** Substituir conjunto se grafite útil for **$< 5,0\\text{ mm}$**.
                         * **Limpeza:** Apenas aspirador com filtro **HEPA** e álcool isopropílico $99,8\\%$. (Ar comprimido proibido!).
+                        """)
+                elif "kv_control" in doc["nome_arquivo"].lower() or "it_13" in doc["nome_arquivo"].lower():
+                    with st.expander("⚡ Parâmetros Críticos da KV Control Board (GE BrightSpeed)"):
+                        st.markdown(r"""
+                        * **Fixação Física:** 12 parafusos na tampa frontal da Power Unit + 7 porcas sextavadas da placa + 2 cabos flat ribbon.
+                        * **Backup Prévio Obrigatório:** JEDI Generator Tool -> *Save Runtime Parameters* (antes de desligar o sistema).
+                        * **Desenergização LOTO:** Desligar PDU + 3 chaves do Service Switch Panel (Axial Drive, HVDC, 120VAC).
+                        * **Firmware:** Executar *Flash Download* após religar para gravar firmware na NVRAM da nova placa.
+                        * **Restauração de Parâmetros:** *Restore Runtime Parameters* (ou *Initialize Database* se sem backup).
+                        * **Calibrações Mandatórias:** Rotation Safety Check, Meter Verification, Filament Calibration, HHS Scans e QA Fantom H2O ($0 \pm 4\text{ HU}$).
+                        """)
+                elif "neuvision" in doc["nome_arquivo"].lower() or "neu_001" in doc["nome_arquivo"].lower():
+                    with st.expander("⚡ Parâmetros Críticos e Senhas (Neusoft NeuVision 550M Plus)"):
+                        st.markdown(r"""
+                        * **Logon Windows (SO):** `cxdiadmin` / Senha: `nmsadmin`
+                        * **Canon Service Tool:** `cxdiadmin` / Senha: `Canononac`
+                        * **Chave de Serviço Gerador Sedecal:** **SW7** (ON: modo de serviço/alarme sonoro contínuo; OFF: operação clínica normal).
+                        * **Postos de Trabalho (WS):** WS1 = Bucky 1, Tube 1, RAD | WS2 = direct, Tube 1, RAD.
+                        * **Rede AP Wi-Fi Canon:** IP Local `192.168.100.10` | Alvo `192.168.100.200` | RX IF `192.168.100.96` | ESSID `NMSAP` | Wi-Fi 5 GHz `149ch - 5745MHz`.
+                        * **Link Infravermelho Detector:** Distância $\le 30\text{ cm}$, ângulo $< 10^\circ$ (LEDs Azul e Verde acesos).
+                        """)
+                elif "mobiledart" in doc["nome_arquivo"].lower() or "shim_" in doc["nome_arquivo"].lower():
+                    with st.expander("⚡ Parâmetros Críticos de Instalação e Manutenção (Shimadzu MobileDaRt MX8)"):
+                        st.markdown(r"""
+                        * **Ajuste de Tensão (Obrigatório!):** P1 = `A0` e P2 = `A220` para tomadas $220\text{V} \pm 10\%$ (Padrão de fábrica é 100V!).
+                        * **Travas de Transporte:** Remover suportes metálicos do braço, parafusos de parada do colimador e 2 cintas plásticas PP (Guardar suportes com o cliente!).
+                        * **Aquecimento do Tubo (Warm-Up):** Modo `tUbeUP` no visor (13 passos de $60\text{ kV}$ até $133\text{ kV}$ com colimador fechado).
+                        * **Descarga de Capacitores (32kW):** Medir nos bornes do banco até que $V_{DC} < 5\text{V}$ (conector CN1 no DISCHARGE da placa MUX CAPACITOR).
+                        * **Calibração da Manopla (FSR) & Braço:** Sensor óptico PH1 no catcher da base e balança de tração calibrada para tração proporcional.
+                        * **Carga Inicial:** Mínimo de 12 horas contínuas antes do primeiro uso clínico.
                         """)
 
             with col_acoes:
@@ -529,7 +695,7 @@ def _render_lista_cards(docs: list):
             # Área de exibição inline
             if st.session_state.get(chave_view, False):
                 if doc["tipo"] == "MARKDOWN":
-                    _renderizar_leitor_markdown(doc["caminho"])
+                    _renderizar_leitor_markdown(doc["caminho"], f"{doc['rel_path']}_{idx}")
                 else:
                     _renderizar_leitor_pdf(doc["caminho"], f"{doc['rel_path']}_{idx}")
 

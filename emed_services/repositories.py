@@ -125,21 +125,51 @@ def init_db(db_name: str = DB_NAME, caminho_excel: str = CAMINHO_EXCEL):
                 "Revisão de 50.000 KM (Freios e Suspensão)"
             ))
 
-        cur.execute("SELECT COUNT(*) FROM estoque_pecas")
-        if cur.fetchone()[0] == 0:
-            dados_iniciais_pecas = [
-                ("PEC-001", "TUBO DE RAIOS-X", 2, 15000.00, 25.0, 50.0, "PEÇA COMERCIAL (OS)"),
-                ("PEC-002", "PLACA DE FONTE DE ALTA TENSÃO", 4, 3500.00, 30.0, 60.0, "PEÇA COMERCIAL (OS)"),
-                ("PEC-003", "CABO DE ALTA TENSÃO", 5, 1200.00, 30.0, 60.0, "PEÇA COMERCIAL (OS)"),
-                ("PEC-004", "SENSOR DE TEMPERATURA", 8, 450.00, 35.0, 70.0, "PEÇA COMERCIAL (OS)"),
-                ("CON-001", "ABRAÇADEIRA DE NYLON (PACOTE 100 UN)", 15, 25.00, 0.0, 0.0, "CONSUMÍVEL INTERNO"),
-                ("CON-002", "FITA ISOLANTE ALTA FUSÃO", 10, 35.00, 0.0, 0.0, "CONSUMÍVEL INTERNO")
-            ]
-            cur.executemany("""
-                INSERT OR IGNORE INTO estoque_pecas
-                (codigo, nome_peca, quantidade, preco_custo, margem_contrato, margem_avulso, tipo_item)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, dados_iniciais_pecas)
+        catalogo_iniciais_itens = [
+            # INSTRUMENTOS E FERRAMENTARIA ESPECIALIZADA
+            ("FER-001", "MULTÍMETRO ESPECIAL ATÉ 1000V (AFERIÇÃO FOTOCÉLULA / AEC & MAMÓGRAFO)", 3, 2800.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+            ("FER-002", "MULTÍMETRO DIGITAL TRUE RMS CALIBRADO", 6, 950.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+            ("FER-003", "OSCILOSCÓPIO DIGITAL PORTÁTIL COM PONTAS HV / ATENUADAS", 2, 6500.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+            ("FER-004", "MEDIDOR RADIOMÉTRICO MULTI-PARÂMETRO (kVp, DOSE, TEMPO, CSR)", 2, 18500.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+            ("FER-005", "FANTOMA DE RESOLUÇÃO ESPACIAL E BAIXO CONTRASTE (QA RX / MAMOGRAFIA)", 2, 4200.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+            ("FER-006", "FANTOMA OFICIAL DE CALIBRAÇÃO DE DENSIDADE ÓSSEA (DENSITOMETRIA)", 1, 7800.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+            ("FER-007", "FANTOMA DE CABEÇA E CORPO CTDI (TOMOGRAFIA)", 1, 12000.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+            ("FER-008", "NÍVEL A LASER AUTONIVELANTE COM TRIPÉ", 3, 850.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+            ("FER-009", "TRENA LASER MÉTRICA DIGITAL", 4, 320.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+            ("FER-010", "TORQUÍMETRO CALIBRADO COM JOGO DE SOQUETES", 3, 1400.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+            ("FER-011", "ALICATE AMPERÍMETRO DC/AC TRUE RMS", 4, 680.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+            ("FER-012", "TALHA DE IÇAMENTO MECÂNICA / MACACO HIDRÁULICO DE GANTRY", 2, 2200.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+            ("FER-013", "ESTAÇÃO DE SOLDA PORTÁTIL ESD COM CONTROLE TÉRMICO", 3, 750.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+            ("FER-014", "SOPRADOR / ASPIRADOR ANTIESTÁTICO ESD", 3, 550.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+            ("FER-015", "GIGA DE COMUNICAÇÃO JEDI & CABOS DE SERVIÇO (TOMOGRAFIA)", 2, 4500.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+            ("FER-016", "FURADEIRA DE IMPACTO / MARTELETE SDS + BROCAS DE VÍDEA", 2, 1100.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+
+            # PEÇAS DE REPOSIÇÃO (COMERCIAIS / OS)
+            ("PEC-001", "TUBO DE RAIOS-X", 2, 15000.00, 25.0, 50.0, "PEÇA COMERCIAL (OS)"),
+            ("PEC-002", "PLACA DE FONTE DE ALTA TENSÃO", 4, 3500.00, 30.0, 60.0, "PEÇA COMERCIAL (OS)"),
+            ("PEC-003", "CABO DE ALTA TENSÃO", 5, 1200.00, 30.0, 60.0, "PEÇA COMERCIAL (OS)"),
+            ("PEC-004", "SENSOR DE TEMPERATURA", 8, 450.00, 35.0, 70.0, "PEÇA COMERCIAL (OS)"),
+            ("PEC-005", "BOBINA SOLENOIDE / ELETROFREIO (ESTATIVA PORTA-TUBO / MESA)", 6, 480.00, 30.0, 60.0, "PEÇA COMERCIAL (OS)"),
+            ("PEC-006", "BOTÃO DE ACIONAMENTO / MICROSWITCH DE FREIO", 12, 85.00, 35.0, 70.0, "PEÇA COMERCIAL (OS)"),
+            ("PEC-007", "FONTE DE ALIMENTAÇÃO CHAVEADA INDUSTRIAL (12V / 24V / 100V)", 5, 380.00, 30.0, 60.0, "PEÇA COMERCIAL (OS)"),
+            ("PEC-008", "CABO DE ALIMENTAÇÃO / CHICOTE FLEXÍVEL DE FREIO", 10, 110.00, 35.0, 70.0, "PEÇA COMERCIAL (OS)"),
+            ("PEC-009", "BATERIA SOBRESSALENTE PARA FLAT PANEL DR WI-FI", 4, 890.00, 25.0, 50.0, "PEÇA COMERCIAL (OS)"),
+            ("PEC-010", "INTERFACE BOX / FONTE DE ALIMENTAÇÃO DO DETECTOR DR", 2, 3200.00, 25.0, 50.0, "PEÇA COMERCIAL (OS)"),
+            ("PEC-011", "CABO DE COMUNICAÇÃO TETHER CABLE & REDE CAT6 BLINDADO", 6, 260.00, 30.0, 60.0, "PEÇA COMERCIAL (OS)"),
+            ("PEC-012", "KIT SORTIDO DE FUSÍVEIS DE AÇÃO RÁPIDA E RETARDADA", 20, 45.00, 30.0, 60.0, "PEÇA COMERCIAL (OS)"),
+
+            # CONSUMÍVEIS & LIMPEZA TÉCNICA
+            ("CON-001", "ABRAÇADEIRA DE NYLON (PACOTE 100 UN)", 15, 25.00, 0.0, 0.0, "CONSUMÍVEL INTERNO"),
+            ("CON-002", "FITA ISOLANTE ALTA FUSÃO", 10, 35.00, 0.0, 0.0, "CONSUMÍVEL INTERNO"),
+            ("CON-003", "KIT LIMPEZA PADRÃO (LIMPA-CONTATOS, DESENGRIPANTE, VEJA, PANOS E ASPIRADOR)", 8, 180.00, 0.0, 0.0, "CONSUMÍVEL INTERNO"),
+            ("CON-004", "ÁLCOOL ISOPROPÍLICO 99% ESD (FRASCO 1L)", 10, 40.00, 0.0, 0.0, "CONSUMÍVEL INTERNO"),
+            ("CON-005", "GRAXA ESPECIAL DE ALTA ROTAÇÃO SLIPRING / ROLAMENTOS", 6, 160.00, 0.0, 0.0, "CONSUMÍVEL INTERNO")
+        ]
+        cur.executemany("""
+            INSERT OR IGNORE INTO estoque_pecas
+            (codigo, nome_peca, quantidade, preco_custo, margem_contrato, margem_avulso, tipo_item)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, catalogo_iniciais_itens)
 
         cur.execute("SELECT COUNT(*) FROM clientes_internos")
         if cur.fetchone()[0] == 0:

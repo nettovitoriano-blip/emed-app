@@ -9,6 +9,7 @@ from emed_core import (
     get_db_connection,
     obter_id_os,
     atualizar_status_solicitacao_peca,
+    SUGESTOES_SEPARACAO_POR_ATIVIDADE,
     KITS_INSTRUMENTOS_POR_SITUACAO,
 )
 from emed_services import (
@@ -96,15 +97,40 @@ def render_solicitacao_pecas(ctx: AppContext):
     df = ctx.df
     equipa_tecnica = ctx.equipa_tecnica
 
+    st.markdown("### 🧰 Quadro Geral de Ferramentas, Kits & Instrumentos Disponíveis")
+    st.caption("Visão em tempo real de instrumentos e ferramentas no Almoxarifado EMED para consulta rápida de toda a equipe.")
+
+    df_est_quadro = carregar_estoque(ctx.db_name)
+    if not df_est_quadro.empty:
+        df_ferramentas = df_est_quadro[df_est_quadro['tipo_item'].fillna('').str.contains('INSTRUMENTO|FERRAMENTA', case=False)]
+        if not df_ferramentas.empty:
+            cols_q = st.columns(4)
+            for idx_f, (_, r_ferr) in enumerate(df_ferramentas.iterrows()):
+                nome_f = r_ferr['nome_peca']
+                cod_f = r_ferr['codigo']
+                qtd_f = limpar_int(r_ferr.get('quantidade'), 0)
+                disp_cor = "#10b981" if qtd_f > 0 else "#ef4444"
+                disp_txt = f"🟢 {qtd_f} DISPONÍVEL" if qtd_f > 0 else "🔴 EM USO / ESGOTADO"
+                with cols_q[idx_f % 4]:
+                    st.markdown(f"""
+                        <div style="background: #1e293b; border-radius: 8px; padding: 12px; margin-bottom: 12px; border: 1px solid #334155; border-top: 3px solid {disp_cor}; min-height: 110px;">
+                            <div style="font-size: 11px; color: #94a3b8; font-weight: bold;">{cod_f}</div>
+                            <div style="font-size: 12px; font-weight: 700; color: #f8fafc; margin: 4px 0 6px 0; line-height: 1.3;">{nome_f[:50]}...</div>
+                            <div style="font-size: 11.5px; font-weight: 800; color: {disp_cor};">{disp_txt}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+    
+    st.markdown("---")
     st.markdown("### 📦 Formulário de Solicitação de Peças, Consumíveis e Instrumentos")
     st.info(
-        "Marque os itens necessários para o atendimento. O sistema valida e reserva as quantidades "
-        "online na base de dados em tempo real para impedir conflitos entre técnicos."
+        "Marque os itens necessários para o atendimento em campo ou para a bancada interna. "
+        "O sistema valida e reserva as quantidades online em tempo real na base de dados do Almoxarifado."
     )
 
     df_est_atual = carregar_estoque(ctx.db_name)
     lista_t_sol = sorted(list(equipa_tecnica.keys()))
     clientes_sol = sorted([c for c in df['cliente'].unique() if str(c).strip() != '' and "NENHUM" not in str(c).upper()])
+    destinos_disponiveis = ["LABORATÓRIO / BANCADA INTERNA EMED", "USO GERAL / VIATURA / FERRAMENTARIA"] + clientes_sol
 
     with st.form("form_solicitacao_almoxarifado"):
         c_sol1, c_sol2 = st.columns(2)
@@ -113,54 +139,115 @@ def render_solicitacao_pecas(ctx: AppContext):
             idx_sol_u = lista_t_sol.index(usr_sol_up) if usr_sol_up in lista_t_sol else 0
             tec_solicitante = st.selectbox("Técnico Solicitante", lista_t_sol, index=idx_sol_u)
         with c_sol2:
-            cli_destino_sol = st.selectbox("Hospital / Cliente ou Setor de Destino", ["USO GERAL / VIATURA"] + clientes_sol)
+            cli_destino_sol = st.selectbox(
+                "Hospital / Cliente ou Setor de Destino",
+                destinos_disponiveis,
+                help="Selecione o cliente de destino ou direcione para a bancada do Laboratório Interno da EMED."
+            )
 
-        st.markdown("#### ☑️ Ticagem de Materiais e Peças Disponíveis em Estoque")
+        st.markdown("#### ☑️ Ticagem de Materiais, Instrumentos e Peças em Estoque")
         itens_ticados = []
         if df_est_atual.empty:
             st.warning("Nenhum item registado no estoque.")
         else:
-            for _, r_item in df_est_atual.iterrows():
-                cod_i = r_item['codigo']
-                nome_i = r_item['nome_peca']
-                qtd_disp_i = limpar_int(r_item.get('quantidade'), 0)
-                tipo_i = limpar_texto(r_item.get('tipo_item'), 'PEÇA COMERCIAL (OS)')
+            # 1. INSTRUMENTOS E FERRAMENTARIA
+            df_inst = df_est_atual[df_est_atual['tipo_item'].fillna('').str.contains('INSTRUMENTO|FERRAMENTA', case=False)]
+            if not df_inst.empty:
+                st.markdown("##### 🔬 Instrumentos de Medição & Ferramentas Calibradas")
+                for _, r_item in df_inst.iterrows():
+                    cod_i = r_item['codigo']
+                    nome_i = r_item['nome_peca']
+                    qtd_disp_i = limpar_int(r_item.get('quantidade'), 0)
+                    c_it1, c_it2 = st.columns([3.8, 1])
+                    with c_it1:
+                        marcado = st.checkbox(
+                            f"🔬 [{cod_i}] {nome_i} | Saldo Almoxarifado: {qtd_disp_i} un.",
+                            disabled=(qtd_disp_i <= 0),
+                            key=f"chk_item_{cod_i}"
+                        )
+                    with c_it2:
+                        qtd_ped = st.number_input(
+                            "Qtd",
+                            min_value=1,
+                            max_value=max(1, qtd_disp_i),
+                            value=1,
+                            disabled=(qtd_disp_i <= 0),
+                            key=f"num_item_{cod_i}"
+                        )
+                    if marcado and qtd_disp_i > 0:
+                        itens_ticados.append({"codigo": cod_i, "nome": nome_i, "qtd": int(qtd_ped)})
 
-                c_it1, c_it2 = st.columns([3.5, 1])
-                with c_it1:
-                    marcado = st.checkbox(
-                        f"[{cod_i}] {nome_i} — ({tipo_i}) | Saldo Online: {qtd_disp_i} un.",
-                        disabled=(qtd_disp_i <= 0),
-                        key=f"chk_item_{cod_i}"
-                    )
-                with c_it2:
-                    qtd_ped = st.number_input(
-                        "Qtd",
-                        min_value=1,
-                        max_value=max(1, qtd_disp_i),
-                        value=1,
-                        disabled=(qtd_disp_i <= 0),
-                        key=f"num_item_{cod_i}"
-                    )
-                if marcado and qtd_disp_i > 0:
-                    itens_ticados.append({"codigo": cod_i, "nome": nome_i, "qtd": int(qtd_ped)})
+            # 2. PEÇAS DE REPOSIÇÃO
+            df_pec = df_est_atual[df_est_atual['tipo_item'].fillna('').str.contains('COMERCIAL|PEÇA', case=False)]
+            if not df_pec.empty:
+                st.markdown("##### ⚙️ Peças de Reposição & Componentes Sobressalentes")
+                for _, r_item in df_pec.iterrows():
+                    cod_i = r_item['codigo']
+                    nome_i = r_item['nome_peca']
+                    qtd_disp_i = limpar_int(r_item.get('quantidade'), 0)
+                    c_it1, c_it2 = st.columns([3.8, 1])
+                    with c_it1:
+                        marcado = st.checkbox(
+                            f"⚙️ [{cod_i}] {nome_i} | Saldo Almoxarifado: {qtd_disp_i} un.",
+                            disabled=(qtd_disp_i <= 0),
+                            key=f"chk_item_{cod_i}"
+                        )
+                    with c_it2:
+                        qtd_ped = st.number_input(
+                            "Qtd",
+                            min_value=1,
+                            max_value=max(1, qtd_disp_i),
+                            value=1,
+                            disabled=(qtd_disp_i <= 0),
+                            key=f"num_item_{cod_i}"
+                        )
+                    if marcado and qtd_disp_i > 0:
+                        itens_ticados.append({"codigo": cod_i, "nome": nome_i, "qtd": int(qtd_ped)})
 
-        st.markdown("#### 🧰 Kits de Ferramentas & Instrumentos Padronizados")
-        kit_rapido = st.selectbox(
-            "Selecione um Kit de Atividade (Auto-Preenchimento):",
-            ["-- Nenhum / Personalizado --"] + list(KITS_INSTRUMENTOS_POR_SITUACAO.keys()),
-            help="Carrega instantaneamente a lista de equipamentos necessários (ex: osciloscópio, kit calibração, furadeira, nível laser)."
+            # 3. CONSUMÍVEIS E LIMPEZA
+            df_con = df_est_atual[df_est_atual['tipo_item'].fillna('').str.contains('CONSUM|LIMPEZA', case=False)]
+            if not df_con.empty:
+                st.markdown("##### 🧪 Consumíveis & Limpeza Técnica")
+                for _, r_item in df_con.iterrows():
+                    cod_i = r_item['codigo']
+                    nome_i = r_item['nome_peca']
+                    qtd_disp_i = limpar_int(r_item.get('quantidade'), 0)
+                    c_it1, c_it2 = st.columns([3.8, 1])
+                    with c_it1:
+                        marcado = st.checkbox(
+                            f"🧪 [{cod_i}] {nome_i} | Saldo Almoxarifado: {qtd_disp_i} un.",
+                            disabled=(qtd_disp_i <= 0),
+                            key=f"chk_item_{cod_i}"
+                        )
+                    with c_it2:
+                        qtd_ped = st.number_input(
+                            "Qtd",
+                            min_value=1,
+                            max_value=max(1, qtd_disp_i),
+                            value=1,
+                            disabled=(qtd_disp_i <= 0),
+                            key=f"num_item_{cod_i}"
+                        )
+                    if marcado and qtd_disp_i > 0:
+                        itens_ticados.append({"codigo": cod_i, "nome": nome_i, "qtd": int(qtd_ped)})
+
+        st.markdown("#### 📋 Sugestão de Separação por Atividade (Checklist Rápido do Almoxarifado)")
+        lista_opcoes_sug = ["-- Seleção Livre Direta no Estoque --"] + list(SUGESTOES_SEPARACAO_POR_ATIVIDADE.keys())
+        sug_rapida = st.selectbox(
+            "Selecione uma Sugestão de Carga por Atividade (Opcional):",
+            lista_opcoes_sug,
+            help="Carrega instantaneamente a lista de instrumentos e materiais sugeridos para o tipo de intervenção técnica."
         )
-        texto_kit_padrao = ""
-        if kit_rapido != "-- Nenhum / Personalizado --":
-            kit_dados = KITS_INSTRUMENTOS_POR_SITUACAO[kit_rapido]
-            texto_kit_padrao = f"[{kit_dados['nome']}]\n" + "\n".join(f"• {it}" for it in kit_dados["itens"])
-            st.caption(f"✨ **Ferramentas do {kit_dados['nome']}:** " + ", ".join(kit_dados["itens"]))
+        texto_sug_padrao = ""
+        if sug_rapida != "-- Seleção Livre Direta no Estoque --":
+            sug_dados = SUGESTOES_SEPARACAO_POR_ATIVIDADE[sug_rapida]
+            texto_sug_padrao = f"[{sug_dados['nome']}]\n" + "\n".join(f"• {it}" for it in sug_dados["itens"])
+            st.caption(f"✨ **Recomendados para {sug_dados['nome']}:** " + ", ".join(sug_dados["itens"]))
 
         instrumentos_extras_sol = st.text_area(
-            "📐 Instrumentos de Medição / Ferramentas a Separar pelo Almoxarifado:",
-            value=texto_kit_padrao,
-            placeholder="EX: NÍVEL LASER, FURADEIRA, OSCILOSCÓPIO, KIT CALIBRAÇÃO...",
+            "📐 Instrumentos & Ferramentas a Separar pelo Almoxarifado:",
+            value=texto_sug_padrao,
+            placeholder="EX: MULTÍMETRO 1000V, OSCILOSCÓPIO, FANTOMA DE RESOÇÃO, TALHA, NÍVEL LASER...",
             height=110
         )
 
@@ -308,14 +395,40 @@ def render_mapa_rotas(ctx: AppContext):
 
 
 def render_gestao_estoque(ctx: AppContext):
-    st.markdown("### 📦 Controlo do Almoxarifado, Peças Comerciais & Consumíveis Internos EMED")
+    st.markdown("### 📦 Controlo do Almoxarifado, Ferramentas & Peças Comerciais EMED")
 
-    st.markdown("#### 📋 Listagem Geral de Peças e Consumíveis em Almoxarifado")
     df_est_view = carregar_estoque(ctx.db_name)
     if df_est_view.empty:
         st.info("Nenhuma peça registada no estoque.")
     else:
-        df_est_mostra = df_est_view.copy()
+        # Métricas de Categorias do Almoxarifado
+        qtd_total = len(df_est_view)
+        qtd_inst = len(df_est_view[df_est_view['tipo_item'].fillna('').str.contains('INSTRUMENTO|FERRAMENTA', case=False)])
+        qtd_pec = len(df_est_view[df_est_view['tipo_item'].fillna('').str.contains('COMERCIAL|PEÇA', case=False)])
+        qtd_con = len(df_est_view[df_est_view['tipo_item'].fillna('').str.contains('CONSUM|LIMPEZA', case=False)])
+
+        m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+        m_col1.metric("📦 Total de Itens", f"{qtd_total} itens")
+        m_col2.metric("🔬 Instrumentos & Ferramentas", f"{qtd_inst} un.")
+        m_col3.metric("⚙️ Peças de Reposição (OS)", f"{qtd_pec} un.")
+        m_col4.metric("🧪 Consumíveis & Limpeza", f"{qtd_con} un.")
+
+        st.markdown("#### 📋 Catálogo Geral do Almoxarifado")
+        filtro_aba_est = st.radio(
+            "Filtrar Visualização do Almoxarifado:",
+            ["TODOS OS ITENS", "🔬 INSTRUMENTOS & FERRAMENTARIA", "⚙️ PEÇAS DE REPOSIÇÃO (OS)", "🧪 CONSUMÍVEIS & LIMPEZA"],
+            horizontal=True
+        )
+
+        df_filtrado_view = df_est_view.copy()
+        if "INSTRUMENTOS" in filtro_aba_est:
+            df_filtrado_view = df_filtrado_view[df_filtrado_view['tipo_item'].fillna('').str.contains('INSTRUMENTO|FERRAMENTA', case=False)]
+        elif "PEÇAS" in filtro_aba_est:
+            df_filtrado_view = df_filtrado_view[df_filtrado_view['tipo_item'].fillna('').str.contains('COMERCIAL|PEÇA', case=False)]
+        elif "CONSUMÍVEIS" in filtro_aba_est:
+            df_filtrado_view = df_filtrado_view[df_filtrado_view['tipo_item'].fillna('').str.contains('CONSUM|LIMPEZA', case=False)]
+
+        df_est_mostra = df_filtrado_view.copy()
         custo_num = pd.to_numeric(df_est_mostra['preco_custo'], errors='coerce').fillna(0.0)
         mc_num = pd.to_numeric(df_est_mostra['margem_contrato'], errors='coerce').fillna(30.0)
         ma_num = pd.to_numeric(df_est_mostra['margem_avulso'], errors='coerce').fillna(60.0)
