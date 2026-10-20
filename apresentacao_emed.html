@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apresentação Oficial • Plataforma Integrada EMED Eletromedicina</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #060d1a;
+            color: #f1f5f9;
+            overflow-x: hidden;
+            user-select: none;
+        }
+        .slide {
+            display: none;
+            opacity: 0;
+            transform: scale(0.97) translateY(10px);
+            transition: all 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .slide.active {
+            display: flex;
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glow-accent {
+            box-shadow: 0 0 40px -10px rgba(100, 223, 223, 0.3);
+        }
+        .glow-emerald {
+            box-shadow: 0 0 35px -10px rgba(16, 185, 129, 0.3);
+        }
+        /* Custom progress bar animation */
+        #progress-fill {
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-teal-500 selection:text-white">
+
+    <!-- Top Bar: Progress & Mode Controls -->
+    <header class="w-full fixed top-0 left-0 z-50 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/80 px-4 md:px-8 py-3">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <span class="bg-gradient-to-r from-teal-400 to-cyan-500 text-slate-950 font-black px-2.5 py-1 rounded-md text-xs tracking-wider">
+                    EMED 4.0
+                </span>
+                <span class="text-xs md:text-sm font-semibold text-slate-300 hidden sm:inline">
+                    Plataforma Integrada de Engenharia Clínica
+                </span>
+            </div>
+
+            <!-- Slide indicator & Player Controls -->
+            <div class="flex items-center space-x-2 md:space-x-4">
+                <button id="btn-autoplay" onclick="toggleAutoplay()" class="px-3 py-1.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 text-xs font-semibold flex items-center space-x-1.5 transition">
+                    <i id="autoplay-icon" class="fa-solid fa-play"></i>
+                    <span id="autoplay-text">Modo Vídeo (Auto)</span>
+                </button>
+
+                <div class="h-4 w-[1px] bg-slate-700"></div>
+
+                <button onclick="prevSlide()" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition text-xs" title="Slide Anterior (Seta Esquerda)">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <span id="slide-number" class="text-xs font-bold text-teal-400 font-mono px-1">01 / 10</span>
+                <button onclick="nextSlide()" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition text-xs" title="Próximo Slide (Seta Direita / Espaço)">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+        <!-- Top progress bar -->
+        <div class="w-full bg-slate-800 h-1 absolute bottom-0 left-0">
+            <div id="progress-fill" class="bg-gradient-to-r from-teal-400 to-cyan-400 h-full w-[10%]"></div>
+        </div>
+    </header>
+
+    <!-- Main Slides Container -->
+    <main class="flex-1 max-w-6xl w-full mx-auto px-4 md:px-8 pt-24 pb-16 flex items-center justify-center">
+
+        <!-- ========================================== -->
+        <!-- SLIDE 1: CAPA IMPACTANTE -->
+        <!-- ========================================== -->
+        <div class="slide active flex-col items-center text-center max-w-4xl space-y-6">
+            <div class="inline-flex items-center space-x-2 bg-teal-500/10 border border-teal-400/30 px-4 py-1.5 rounded-full text-teal-300 text-xs font-semibold uppercase tracking-wider mb-2">
+                <i class="fa-solid fa-bolt text-teal-400"></i>
+                <span>Transformação Digital em Diagnóstico por Imagem</span>
+            </div>
+            <h1 class="text-3xl md:text-5xl lg:text-6xl font-black tracking-tight text-white leading-tight">
+                A Nova Plataforma Oficial da <br/>
+                <span class="bg-gradient-to-r from-teal-400 via-cyan-300 to-blue-400 bg-clip-text text-transparent">
+                    EMED Eletromedicina
+                </span>
+            </h1>
+            <p class="text-slate-300 text-sm md:text-lg max-w-2xl font-light leading-relaxed">
+                Mais agilidade para os técnicos em campo, transparência total para os hospitais e faturamento integrado sem retrabalho.
+            </p>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4 w-full pt-4">
+                <div class="glass-card p-4 rounded-xl border border-slate-700/60 text-center">
+                    <i class="fa-solid fa-brain text-2xl text-teal-400 mb-2"></i>
+                    <div class="font-bold text-white text-sm">EmedOnline</div>
+                    <div class="text-[11px] text-slate-400">Triagem com IA</div>
+                </div>
+                <div class="glass-card p-4 rounded-xl border border-slate-700/60 text-center">
+                    <i class="fa-solid fa-file-invoice text-2xl text-cyan-400 mb-2"></i>
+                    <div class="font-bold text-white text-sm">OS Hospitalar</div>
+                    <div class="text-[11px] text-slate-400">Design Executivo A4</div>
+                </div>
+                <div class="glass-card p-4 rounded-xl border border-slate-700/60 text-center">
+                    <i class="fa-solid fa-cloud text-2xl text-blue-400 mb-2"></i>
+                    <div class="font-bold text-white text-sm">Nuvem 24/7</div>
+                    <div class="text-[11px] text-slate-400">Acesso Celular & Web</div>
+                </div>
+                <div class="glass-card p-4 rounded-xl border border-slate-700/60 text-center">
+                    <i class="fa-solid fa-users-gear text-2xl text-emerald-400 mb-2"></i>
+                    <div class="font-bold text-white text-sm">A Várias Mãos</div>
+                    <div class="text-[11px] text-slate-400">Feito pela Equipe</div>
+                </div>
+            </div>
+            <div class="pt-2">
+                <button onclick="nextSlide()" class="px-6 py-3 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-slate-950 font-bold text-sm shadow-lg shadow-teal-500/20 transition flex items-center space-x-2">
+                    <span>Iniciar Apresentação</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- SLIDE 2: O CENÁRIO & O DESAFIO REAL -->
+        <!-- ========================================== -->
+        <div class="slide flex-col max-w-5xl space-y-6">
+            <div class="text-teal-400 text-xs font-bold uppercase tracking-wider flex items-center space-x-2">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>O Desafio Hospitalar</span>
+            </div>
+            <h2 class="text-2xl md:text-4xl font-extrabold text-white">
+                Por que a manutenção tradicional perde tempo e dinheiro?
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2">
+                <div class="glass-card p-6 rounded-2xl border-l-4 border-rose-500 space-y-3">
+                    <div class="text-rose-400 font-bold text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-hospital-user text-xl"></i>
+                        <span>Máquina Parada em Hospital</span>
+                    </div>
+                    <p class="text-slate-300 text-xs md:text-sm leading-relaxed">
+                        Tomógrafo ou Raio-X fora de operação paralisa exames de urgência e UTI. O cliente precisa de abertura imediata, sem atendimentos robóticos ou filas demoradas.
+                    </p>
+                </div>
+
+                <div class="glass-card p-6 rounded-2xl border-l-4 border-amber-500 space-y-3">
+                    <div class="text-amber-400 font-bold text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-boxes-packing text-xl"></i>
+                        <span>Peças Esquecidas de Cobrança</span>
+                    </div>
+                    <p class="text-slate-300 text-xs md:text-sm leading-relaxed">
+                        Técnico usa componente valioso em campo, mas por falta de integração rápida com a OS, a peça não é baixada do estoque e o faturamento deixa de cobrar.
+                    </p>
+                </div>
+
+                <div class="glass-card p-6 rounded-2xl border-l-4 border-blue-500 space-y-3">
+                    <div class="text-blue-400 font-bold text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-signal text-xl"></i>
+                        <span>Bunkers e Salas Blindadas</span>
+                    </div>
+                    <p class="text-slate-300 text-xs md:text-sm leading-relaxed">
+                        Salas de tomografia e radiologia são revestidas de chumbo. Se o aplicativo depender 100% de internet o tempo todo, o técnico fica travado sem poder preencher.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- SLIDE 3: A SOLUÇÃO INTEGRADA EMED -->
+        <!-- ========================================== -->
+        <div class="slide flex-col max-w-5xl space-y-6">
+            <div class="text-teal-400 text-xs font-bold uppercase tracking-wider flex items-center space-x-2">
+                <i class="fa-solid fa-cubes"></i>
+                <span>Arquitetura Híbrida & Moderna</span>
+            </div>
+            <h2 class="text-2xl md:text-4xl font-extrabold text-white">
+                Nuvem 24/7 + Coletor Offline Blindado
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                <div class="glass-card p-6 rounded-2xl border border-teal-500/30 space-y-4 glow-accent">
+                    <div class="flex items-center justify-between">
+                        <span class="text-teal-400 font-bold text-lg flex items-center space-x-2">
+                            <i class="fa-solid fa-cloud"></i>
+                            <span>Nuvem Streamlit & GitHub</span>
+                        </span>
+                        <span class="bg-teal-500/20 text-teal-300 text-[11px] font-bold px-2.5 py-1 rounded-md">Ativo 24/7</span>
+                    </div>
+                    <ul class="text-xs md:text-sm text-slate-300 space-y-2.5">
+                        <li class="flex items-start space-x-2">
+                            <i class="fa-solid fa-check text-teal-400 mt-1"></i>
+                            <span>Acesso instantâneo de qualquer celular em 3G, 4G, 5G ou Wi-Fi.</span>
+                        </li>
+                        <li class="flex items-start space-x-2">
+                            <i class="fa-solid fa-check text-teal-400 mt-1"></i>
+                            <span>Não depende do computador da oficina estar ligado na tomada.</span>
+                        </li>
+                        <li class="flex items-start space-x-2">
+                            <i class="fa-solid fa-check text-teal-400 mt-1"></i>
+                            <span>Gestor e diretoria acompanham chamados em tempo real de onde estiverem.</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="glass-card p-6 rounded-2xl border border-cyan-500/30 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-cyan-400 font-bold text-lg flex items-center space-x-2">
+                            <i class="fa-solid fa-shield-halved"></i>
+                            <span>Operação Offline nos Bunkers</span>
+                        </span>
+                        <span class="bg-cyan-500/20 text-cyan-300 text-[11px] font-bold px-2.5 py-1 rounded-md">Zero Sinal</span>
+                    </div>
+                    <ul class="text-xs md:text-sm text-slate-300 space-y-2.5">
+                        <li class="flex items-start space-x-2">
+                            <i class="fa-solid fa-check text-cyan-400 mt-1"></i>
+                            <span>Coletor universal roda direto no aparelho sem necessidade de internet.</span>
+                        </li>
+                        <li class="flex items-start space-x-2">
+                            <i class="fa-solid fa-check text-cyan-400 mt-1"></i>
+                            <span>Coleta assinatura do cliente e dados técnicos mesmo sem torre de celular.</span>
+                        </li>
+                        <li class="flex items-start space-x-2">
+                            <i class="fa-solid fa-check text-cyan-400 mt-1"></i>
+                            <span>Sincronização com 1 clique assim que o técnico sai da sala de chumbo.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- SLIDE 4: EMEDONLINE (IA DE PRÉ-ATENDIMENTO) -->
+        <!-- ========================================== -->
+        <div class="slide flex-col max-w-5xl space-y-6">
+            <div class="text-teal-400 text-xs font-bold uppercase tracking-wider flex items-center space-x-2">
+                <i class="fa-solid fa-robot"></i>
+                <span>Novo Módulo Revolucionário</span>
+            </div>
+            <h2 class="text-2xl md:text-4xl font-extrabold text-white">
+                EmedOnline: Triagem Rápida Sem Robô Amarrado
+            </h2>
+            <p class="text-slate-300 text-sm max-w-3xl">
+                O cliente não precisa responder questionários cansativos. O atendimento é humanizado, objetivo e pré-preenche a OS em segundos:
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-1">
+                <div class="glass-card p-5 rounded-xl border border-slate-700/80 space-y-2">
+                    <span class="text-xs font-black text-teal-400 bg-teal-400/10 px-2 py-0.5 rounded">PASSO 1</span>
+                    <h3 class="font-bold text-white text-sm">Busca por CNPJ</h3>
+                    <p class="text-xs text-slate-400">Digita o CNPJ ou nome e o sistema já puxa a instituição, endereço e cidade cadastrados.</p>
+                </div>
+
+                <div class="glass-card p-5 rounded-xl border border-slate-700/80 space-y-2">
+                    <span class="text-xs font-black text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded">PASSO 2</span>
+                    <h3 class="font-bold text-white text-sm">Escolha do Aparelho</h3>
+                    <p class="text-xs text-slate-400">1 toque no equipamento (Tomógrafo, Raio-X, Ultrassom) e indica se está totalmente parado.</p>
+                </div>
+
+                <div class="glass-card p-5 rounded-xl border border-slate-700/80 space-y-2">
+                    <span class="text-xs font-black text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded">PASSO 3</span>
+                    <h3 class="font-bold text-white text-sm">Relato & Foto do Erro</h3>
+                    <p class="text-xs text-slate-400">Descreve com as próprias palavras e tira foto do painel pela câmera do próprio celular.</p>
+                </div>
+
+                <div class="glass-card p-5 rounded-xl border border-emerald-500/50 bg-emerald-950/20 space-y-2">
+                    <span class="text-xs font-black text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded">PASSO 4</span>
+                    <h3 class="font-bold text-white text-sm">OS Pré-Preenchida</h3>
+                    <p class="text-xs text-slate-300 font-medium">A OS já nasce pronta no sistema com o defeito, foto e prioridade médica (P1/P2)!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- SLIDE 5: O TÉCNICO EM CAMPO -->
+        <!-- ========================================== -->
+        <div class="slide flex-col max-w-5xl space-y-6">
+            <div class="text-teal-400 text-xs font-bold uppercase tracking-wider flex items-center space-x-2">
+                <i class="fa-solid fa-wrench"></i>
+                <span>Agilidade Para a Equipe Técnica</span>
+            </div>
+            <h2 class="text-2xl md:text-4xl font-extrabold text-white">
+                O Técnico em Campo Não Redigita Nada!
+            </h2>
+            <div class="glass-card p-6 rounded-2xl border border-slate-700 space-y-4">
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Quando o chamado é aberto pela EmedOnline, o técnico só precisa preencher 4 itens:
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-slate-900/90 p-4 rounded-xl border-l-4 border-teal-400">
+                        <div class="text-teal-400 font-bold text-sm mb-1">🛠️ 1. Serviço Executado</div>
+                        <div class="text-xs text-slate-400">O que foi feito tecnicamente para resolver a falha.</div>
+                    </div>
+                    <div class="bg-slate-900/90 p-4 rounded-xl border-l-4 border-amber-400">
+                        <div class="text-amber-400 font-bold text-sm mb-1">📦 2. Peças Utilizadas</div>
+                        <div class="text-xs text-slate-400">Seleciona o item do estoque: já gera a baixa e a cobrança!</div>
+                    </div>
+                    <div class="bg-slate-900/90 p-4 rounded-xl border-l-4 border-blue-400">
+                        <div class="text-blue-400 font-bold text-sm mb-1">🚨 3. Pendências</div>
+                        <div class="text-xs text-slate-400">Equipamento 100% liberado ou se precisa de peça adicional.</div>
+                    </div>
+                    <div class="bg-slate-900/90 p-4 rounded-xl border-l-4 border-emerald-400">
+                        <div class="text-emerald-400 font-bold text-sm mb-1">✍️ 4. Assinatura Touch</div>
+                        <div class="text-xs text-slate-400">O responsável do hospital assina direto na tela do celular.</div>
+                    </div>
+                </div>
+            </div>
+            <p class="text-slate-400 text-xs md:text-sm text-center">
+                Resultado: Menos tempo preenchendo papel e mais tempo focado na excelência do serviço técnico!
+            </p>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- SLIDE 6: A NOVA FOLHA DE OS HOSPITALAR -->
+        <!-- ========================================== -->
+        <div class="slide flex-col max-w-5xl space-y-6">
+            <div class="text-teal-400 text-xs font-bold uppercase tracking-wider flex items-center space-x-2">
+                <i class="fa-solid fa-file-pdf"></i>
+                <span>Apresentação Institucional Nobre</span>
+            </div>
+            <h2 class="text-2xl md:text-4xl font-extrabold text-white">
+                Folha Oficial de Ordem de Serviço Hospitalar
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div class="glass-card p-5 rounded-xl border border-slate-700/80 space-y-2">
+                    <i class="fa-solid fa-award text-2xl text-teal-400"></i>
+                    <h3 class="font-bold text-white text-sm">Cabeçalho Padrão Ouro</h3>
+                    <p class="text-xs text-slate-300">Logo oficial da EMED no canto esquerdo, dados cadastrais (CNPJ, site, fone) e Número da OS em negrito à direita.</p>
+                </div>
+                <div class="glass-card p-5 rounded-xl border border-slate-700/80 space-y-2">
+                    <i class="fa-solid fa-broom text-2xl text-cyan-400"></i>
+                    <h3 class="font-bold text-white text-sm">Zero Duplicidades</h3>
+                    <p class="text-xs text-slate-300">Tabelas técnicas organizadas sem tags duplicadas. Texto elegante pronto para auditoria hospitalar.</p>
+                </div>
+                <div class="glass-card p-5 rounded-xl border border-slate-700/80 space-y-2">
+                    <i class="fa-brands fa-whatsapp text-2xl text-emerald-400"></i>
+                    <h3 class="font-bold text-white text-sm">Envio WhatsApp & E-mail</h3>
+                    <p class="text-xs text-slate-300">Com 1 clique, o laudo fechado é formatado e enviado para o WhatsApp do cliente e da diretoria.</p>
+                </div>
+            </div>
+            <div class="text-center pt-1">
+                <span class="inline-block bg-slate-900 text-slate-300 border border-slate-700 px-4 py-2 rounded-lg text-xs font-mono">
+                    Formato A4 Oficial • Impressão Limpa • PDF & Imagem de Alta Resolução
+                </span>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- SLIDE 7: LOGÍSTICA & ROTAS INTELIGENTES -->
+        <!-- ========================================== -->
+        <div class="slide flex-col max-w-5xl space-y-6">
+            <div class="text-teal-400 text-xs font-bold uppercase tracking-wider flex items-center space-x-2">
+                <i class="fa-solid fa-route"></i>
+                <span>Otimização Operacional</span>
+            </div>
+            <h2 class="text-2xl md:text-4xl font-extrabold text-white">
+                Logística em Tempo Real & Rotas no Waze / Maps
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="glass-card p-6 rounded-2xl border border-slate-700 space-y-3">
+                    <div class="text-teal-400 font-bold text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-map-location-dot text-xl"></i>
+                        <span>Despacho da Equipe Mais Próxima</span>
+                    </div>
+                    <p class="text-slate-300 text-xs md:text-sm leading-relaxed">
+                        Quando surge uma emergência (Tomógrafo Parado P1), o sistema consulta a localização dos técnicos e sugere o remanejamento imediato da equipe mais próxima, poupando tempo crítico de socorro médico.
+                    </p>
+                </div>
+
+                <div class="glass-card p-6 rounded-2xl border border-slate-700 space-y-3">
+                    <div class="text-cyan-400 font-bold text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-car text-xl"></i>
+                        <span>Navegação com 1 Toque</span>
+                    </div>
+                    <p class="text-slate-300 text-xs md:text-sm leading-relaxed">
+                        Tanto na central quanto no celular do técnico, cada chamado aberto já possui atalhos prontos para abrir o trajeto diretamente no <b>Waze</b> e no <b>Google Maps</b>, reduzindo custo de combustível e deslocamento.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- SLIDE 8: BIBLIOTECA TÉCNICA VIVA (ITs & POPs) -->
+        <!-- ========================================== -->
+        <div class="slide flex-col max-w-5xl space-y-6">
+            <div class="text-teal-400 text-xs font-bold uppercase tracking-wider flex items-center space-x-2">
+                <i class="fa-solid fa-book-medical"></i>
+                <span>Engenharia & Conhecimento Integrado</span>
+            </div>
+            <h2 class="text-2xl md:text-4xl font-extrabold text-white">
+                Manuais, POPs e ITs na Palma da Mão
+            </h2>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="glass-card p-5 rounded-xl border border-slate-700 space-y-2">
+                    <div class="text-teal-400 font-bold text-sm">Tomógrafo GE Brivo CT385</div>
+                    <p class="text-xs text-slate-300">Instruções de troca de tubo, calibração de filamento, alinhamento óptico e gerador JEDI.</p>
+                </div>
+                <div class="glass-card p-5 rounded-xl border border-slate-700 space-y-2">
+                    <div class="text-cyan-400 font-bold text-sm">Raio-X Lotus HF500M</div>
+                    <p class="text-xs text-slate-300">Checklists de pré-instalação, vistoria, procedimentos de colimação e segurança radiológica.</p>
+                </div>
+                <div class="glass-card p-5 rounded-xl border border-slate-700 space-y-2">
+                    <div class="text-blue-400 font-bold text-sm">Vídeos de Treinamento</div>
+                    <p class="text-xs text-slate-300">Vídeos didáticos das ITs integrados diretamente no painel do técnico para consulta em campo.</p>
+                </div>
+            </div>
+            <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-400 text-center">
+                A IA da EmedOnline consulta essa base técnica para orientar clientes sobre resets básicos antes mesmo do técnico sair da oficina!
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- SLIDE 9: MÓDULO FISCAL & FATURAMENTO -->
+        <!-- ========================================== -->
+        <div class="slide flex-col max-w-5xl space-y-6">
+            <div class="text-teal-400 text-xs font-bold uppercase tracking-wider flex items-center space-x-2">
+                <i class="fa-solid fa-receipt"></i>
+                <span>Gestão Financeira Sem Retrabalho</span>
+            </div>
+            <h2 class="text-2xl md:text-4xl font-extrabold text-white">
+                Da Ordem de Serviço à Nota Fiscal
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="glass-card p-6 rounded-2xl border border-slate-700 space-y-3">
+                    <div class="text-teal-400 font-bold text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-file-invoice-dollar text-xl"></i>
+                        <span>Faturamento Automático de Peças & Serviços</span>
+                    </div>
+                    <p class="text-slate-300 text-xs md:text-sm leading-relaxed">
+                        Cada peça lançada pelo técnico na OS tem seu código, custo e margem calculados automaticamente. A diretoria visualiza na hora o valor final da OS para faturamento.
+                    </p>
+                </div>
+
+                <div class="glass-card p-6 rounded-2xl border border-slate-700 space-y-3">
+                    <div class="text-emerald-400 font-bold text-base flex items-center space-x-2">
+                        <i class="fa-solid fa-stamp text-xl"></i>
+                        <span>Módulo Fiscal Desacoplado</span>
+                    </div>
+                    <p class="text-slate-300 text-xs md:text-sm leading-relaxed">
+                        Estrutura pronta para emissão de NFSe (serviços) e NFe (peças), com retenções federais (IR, PIS, COFINS, CSLL) e suporte a certificado digital A1.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- SLIDE 10: CONSTRUÍDO A VÁRIAS MÃOS -->
+        <!-- ========================================== -->
+        <div class="slide flex-col max-w-4xl space-y-6 text-center">
+            <div class="inline-flex items-center space-x-2 bg-emerald-500/10 border border-emerald-400/30 px-4 py-1.5 rounded-full text-emerald-300 text-xs font-semibold uppercase tracking-wider">
+                <i class="fa-solid fa-handshake-angle text-emerald-400"></i>
+                <span>Construído a Várias Mãos</span>
+            </div>
+            <h2 class="text-3xl md:text-5xl font-black text-white">
+                O Sistema Pertence a Toda a Equipe EMED!
+            </h2>
+            <p class="text-slate-300 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+                Técnicos, gestores, administrativo e diretoria: todas as opiniões são bem-vindas. Queremos ouvir suas sugestões para tornar a nossa ferramenta cada dia melhor!
+            </p>
+
+            <!-- Interactive Suggestion Card -->
+            <div class="glass-card p-6 md:p-8 rounded-2xl border border-slate-700 max-w-xl mx-auto w-full text-left space-y-4 glow-emerald">
+                <h3 class="font-bold text-white text-base flex items-center space-x-2">
+                    <i class="fa-regular fa-comment-dots text-emerald-400"></i>
+                    <span>Tem uma ideia ou sugestão de melhoria?</span>
+                </h3>
+                <textarea id="campo-sugestao" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs md:text-sm text-slate-200 focus:outline-none focus:border-teal-400" placeholder="Ex: Adicionar opção de checklist rápido para mesa cirúrgica..."></textarea>
+                <div class="flex items-center justify-between pt-1">
+                    <span class="text-[11px] text-slate-400">Juntos fazemos a melhor engenharia do Ceará!</span>
+                    <button onclick="enviarSugestaoWhats()" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center space-x-1.5 transition">
+                        <i class="fa-brands fa-whatsapp"></i>
+                        <span>Enviar Sugestão</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="pt-4 flex flex-wrap items-center justify-center gap-3">
+                <button onclick="irParaSlide(0)" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition">
+                    <i class="fa-solid fa-rotate-left mr-1"></i> Rever Apresentação
+                </button>
+                <a href="https://emed.med.br/" target="_blank" class="px-5 py-2.5 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 text-xs font-semibold transition">
+                    🌐 Visitar Site EMED
+                </a>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Bottom Controls & Hints Footer -->
+    <footer class="w-full bg-slate-950/80 backdrop-blur-md border-t border-slate-800/80 py-3 px-4 text-center">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-2">
+            <div>
+                © 2026 <b>EMED Eletromedicina Ltda.</b> • CNPJ: 03.611.974/0001-08
+            </div>
+            <div class="flex items-center space-x-3 text-[11px]">
+                <span>Navegação:</span>
+                <span class="bg-slate-800 px-2 py-0.5 rounded text-slate-300 border border-slate-700">Espaço / ➡️ Próximo</span>
+                <span class="bg-slate-800 px-2 py-0.5 rounded text-slate-300 border border-slate-700">⬅️ Anterior</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript Player Logic -->
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        let currentSlide = 0;
+        let autoplayTimer = null;
+        let isAutoplaying = false;
+        const AUTOPLAY_DELAY = 9000; // 9 segundos por slide em modo vídeo
+
+        function updateSlideUI() {
+            slides.forEach((s, idx) => {
+                if (idx === currentSlide) {
+                    s.classList.add('active');
+                } else {
+                    s.classList.remove('active');
+                }
+            });
+
+            // Update Counter
+            const numEl = document.getElementById('slide-number');
+            const total = slides.length;
+            numEl.innerText = `${String(currentSlide + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`;
+
+            // Update Progress Bar
+            const progress = ((currentSlide + 1) / total) * 100;
+            document.getElementById('progress-fill').style.width = `${progress}%`;
+        }
+
+        function nextSlide() {
+            if (currentSlide < slides.length - 1) {
+                currentSlide++;
+            } else {
+                currentSlide = 0; // Loop no final
+            }
+            updateSlideUI();
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                currentSlide--;
+            } else {
+                currentSlide = slides.length - 1;
+            }
+            updateSlideUI();
+        }
+
+        function irParaSlide(index) {
+            currentSlide = index;
+            updateSlideUI();
+        }
+
+        function toggleAutoplay() {
+            const btn = document.getElementById('btn-autoplay');
+            const icon = document.getElementById('autoplay-icon');
+            const txt = document.getElementById('autoplay-text');
+
+            if (!isAutoplaying) {
+                isAutoplaying = true;
+                btn.classList.add('bg-teal-500', 'text-slate-950');
+                btn.classList.remove('bg-teal-500/10', 'text-teal-300');
+                icon.className = 'fa-solid fa-pause';
+                txt.innerText = 'Pausar Vídeo';
+
+                autoplayTimer = setInterval(() => {
+                    nextSlide();
+                }, AUTOPLAY_DELAY);
+            } else {
+                isAutoplaying = false;
+                btn.classList.remove('bg-teal-500', 'text-slate-950');
+                btn.classList.add('bg-teal-500/10', 'text-teal-300');
+                icon.className = 'fa-solid fa-play';
+                txt.innerText = 'Modo Vídeo (Auto)';
+
+                if (autoplayTimer) {
+                    clearInterval(autoplayTimer);
+                    autoplayTimer = null;
+                }
+            }
+        }
+
+        function enviarSugestaoWhats() {
+            const sugestao = document.getElementById('campo-sugestao').value.trim();
+            if (!sugestao) {
+                alert("Por favor, digite sua sugestão ou ideia antes de enviar!");
+                return;
+            }
+            const msg = `💡 *SUGESTÃO PARA A PLATAFORMA EMED 4.0*\n\n${sugestao}\n\n_Enviado através dos slides de apresentação da EMED_`;
+            const url = `https://wa.me/558532542929?text=${encodeURIComponent(msg)}`;
+            window.open(url, '_blank');
+        }
+
+        // Teclado Controls
+        window.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+            if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+                e.preventDefault();
+                nextSlide();
+            } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                e.preventDefault();
+                prevSlide();
+            }
+        });
+
+        // Initialize UI
+        updateSlideUI();
+    </script>
+</body>
+</html>
