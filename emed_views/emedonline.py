@@ -261,6 +261,54 @@ def render_emedonline(ctx: AppContext):
                 if dica_it:
                     st.info(dica_it)
 
+            st.markdown("---")
+            st.markdown("#### ⚡ 3.1 Triagem Rápida de Campo (Checklist em 5 Segundos)")
+            st.caption("Marque as condições básicas observadas. Isso direciona o diagnóstico técnico imediato antes do deslocamento:")
+
+            c_chk1, c_chk2 = st.columns(2)
+            with c_chk1:
+                chk_rede_eletrica = st.radio(
+                    "⚡ 1. Houve oscilação na rede elétrica ou falta de energia no prédio?",
+                    [
+                        "🟢 Não foi observada oscilação (Fornecimento normal)",
+                        "🟡 Sim, houve oscilações / queda, mas a rede já estabilizou",
+                        "🔴 Sim, faltou energia no prédio / instabilidade no gerador",
+                    ],
+                    index=0,
+                    help="Indica se houve distúrbios na alimentação elétrica que possam afetar fontes e placas."
+                )
+                chk_disjuntor_nobreak = st.radio(
+                    "🔌 2. O disjuntor geral, chave do gantry ou nobreak desarmou?",
+                    [
+                        "🟢 Normal (Nenhum desarme ou alarme sonoro)",
+                        "⚠️ Sim, disjuntor desarmou ou nobreak em alarme",
+                        "❓ Não observado / Sem acesso ao quadro",
+                    ],
+                    index=0,
+                )
+
+            with c_chk2:
+                chk_reboot = st.radio(
+                    "🔄 3. Foi realizada tentativa de reinicialização (desligar e ligar a console)?",
+                    [
+                        "🔄 Sim, reiniciamos e o erro persistiu",
+                        "⚠️ Não reiniciamos por precaução",
+                        "❌ Sistema travado / Não desliga",
+                    ],
+                    index=0,
+                )
+                chk_ruido_temp = st.radio(
+                    "🌡️ 4. Notou ruído mecânico anormal, aquecimento ou cheiro atípico?",
+                    [
+                        "🟢 Nenhum ruído ou aquecimento (Erro apenas no display)",
+                        "⚠️ Alerta de temperatura / chiller no display",
+                        "🚨 Ruído mecânico anormal ou odor característico",
+                    ],
+                    index=0,
+                )
+
+            st.markdown("---")
+            st.markdown("#### 📸 3.2 Foto do Painel & Dados do Solicitante")
             col_foto1, col_foto2 = st.columns(2)
             with col_foto1:
                 arquivo_foto = st.file_uploader(
@@ -318,6 +366,13 @@ def render_emedonline(ctx: AppContext):
                             tec_sugerido = t_nome
                             break
 
+                    checklist_resumo = (
+                        f"[REDE ELÉTRICA: {chk_rede_eletrica}] "
+                        f"[DISJUNTOR/NOBREAK: {chk_disjuntor_nobreak}] "
+                        f"[REINICIALIZAÇÃO: {chk_reboot}] "
+                        f"[SINAIS: {chk_ruido_temp}]"
+                    )
+
                     novo_chamado = {
                         "cliente": cliente_selecionado.strip().upper(),
                         "cidade": cid_cli.upper(),
@@ -337,10 +392,10 @@ def render_emedonline(ctx: AppContext):
                         "checkin_hora": "",
                         "checkout_hora": "",
                         "tempo_atendimento": "",
-                        "checklist_pop": "POP-TRIAGEM-EMEDONLINE",
+                        "checklist_pop": f"ENERGIA: {chk_rede_eletrica[:20]} | DISJ: {chk_disjuntor_nobreak[:20]} | REBOOT: {chk_reboot[:20]}",
                         "assinatura_cliente": "",
                         "assinatura_tecnico": f"{tec_sugerido} - CFT",
-                        "pre_atendimento": f"[EMEDONLINE] {defeito_digitado.strip()} | Solicitante: {nome_solicitante}",
+                        "pre_atendimento": f"[EMEDONLINE] {defeito_digitado.strip()} | {checklist_resumo} | Solicitante: {nome_solicitante}",
                         "foto_evidencia": caminho_foto_final,
                         "video_evidencia": "",
                         "formulario_anexo": "",
@@ -383,7 +438,12 @@ def render_emedonline(ctx: AppContext):
                             f"Cliente: {cliente_selecionado}\n"
                             f"Equipamento: {equip_escolhido}\n"
                             f"Prioridade: {cond_ini}\n"
-                            f"Defeito: {defeito_digitado.strip()}\n"
+                            f"Defeito: {defeito_digitado.strip()}\n\n"
+                            f"*TRIAGEM RÁPIDA:*\n"
+                            f"• Rede Elétrica: {chk_rede_eletrica}\n"
+                            f"• Disjuntor/Nobreak: {chk_disjuntor_nobreak}\n"
+                            f"• Reinicialização: {chk_reboot}\n"
+                            f"• Sinais: {chk_ruido_temp}\n\n"
                             f"Solicitante: {nome_solicitante} ({contato_solicitante})\n"
                             f"Técnico Programado: {tec_sugerido}\n"
                             f"Local: {end_cli}"
@@ -441,6 +501,9 @@ def render_emedonline(ctx: AppContext):
                         st.markdown(f"**Cliente:** `{cli_a}` | **Cidade:** `{cid_a}`")
                         st.markdown(f"**Endereço:** {end_a}")
                         st.markdown(f"**Defeito Relatado:** {def_a}")
+                        pre_at_txt = limpar_texto(row_a.get("pre_atendimento"), "")
+                        if "REDE ELÉTRICA" in pre_at_txt or "ENERGIA:" in pre_at_txt:
+                            st.caption(f"⚡ **Diagnóstico Preliminar:** {pre_at_txt}")
                         st.markdown(f"**Técnico Atual Designado:** `{tec_a}`")
                         
                         # Link para Waze / Google Maps

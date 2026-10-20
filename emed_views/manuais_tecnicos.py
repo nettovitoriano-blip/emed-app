@@ -372,18 +372,55 @@ def render_manuais_tecnicos(ctx: AppContext):
                 st.rerun()
 
 
+_SERVER_THREAD = None
+_SERVER_PORT = 8585
+
+
+def _garantir_servidor_portal_ge(caminho_frameset: str):
+    """Garante a execução de um micro-servidor HTTP local para permitir a navegação por frames sem bloqueio de segurança."""
+    global _SERVER_THREAD
+    pasta_portal = os.path.dirname(os.path.abspath(caminho_frameset))
+    if _SERVER_THREAD is not None and _SERVER_THREAD.is_alive():
+        return
+    import http.server
+    import socketserver
+    import threading
+
+    class QuietHandler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=pasta_portal, **kwargs)
+
+        def log_message(self, format, *args):
+            pass
+
+    def run_server():
+        try:
+            # Allow address reuse to prevent bind errors on hot-reload
+            socketserver.TCPServer.allow_reuse_address = True
+            with socketserver.TCPServer(("127.0.0.1", _SERVER_PORT), QuietHandler) as httpd:
+                httpd.serve_forever()
+        except Exception:
+            pass
+
+    _SERVER_THREAD = threading.Thread(target=run_server, daemon=True)
+    _SERVER_THREAD.start()
+
+
 def _render_card_portal_service_methods(caminho_frameset: str):
-    """Renderiza o card oficial de acesso ao Service Methods da GE."""
+    """Renderiza o card oficial e o portal interativo embarcado GE Service Methods."""
+    _garantir_servidor_portal_ge(caminho_frameset)
+    url_portal = f"http://127.0.0.1:{_SERVER_PORT}/frameset.htm"
+
     st.markdown(
         """
-        <div style="background: linear-gradient(135deg, #0d1b2a, #1b263b); border: 2px solid #00b4d8; padding: 24px; border-radius: 12px; margin: 15px 0;">
+        <div style="background: linear-gradient(135deg, #0d1b2a, #1b263b); border: 2px solid #00b4d8; padding: 20px; border-radius: 12px; margin: 15px 0;">
             <div style="display: flex; align-items: center; gap: 15px;">
                 <span style="font-size: 2.8rem;">🌐</span>
                 <div>
-                    <h3 style="margin: 0; color: #caf0f8; font-weight: 700;">Portal de Manuais de Serviço GE BrightSpeed Lite & Select</h3>
-                    <p style="margin: 6px 0 0 0; color: #e0e1dd; font-size: 0.98rem; line-height: 1.5;">
-                        Documentação eletrônica de fábrica com mais de <b>4.300 tópicos técnicos</b>, esquemáticos elétricos completos, 
-                        árvore de navegação dinâmica, catálogo interativo de peças sobressalentes e sistema de busca indexada <i>dtSearch</i>.
+                    <h3 style="margin: 0; color: #caf0f8; font-weight: 700;">Portal de Manuais de Serviço GE BrightSpeed Lite & Select (100% Funcional)</h3>
+                    <p style="margin: 6px 0 0 0; color: #e0e1dd; font-size: 0.95rem; line-height: 1.5;">
+                        Documentação eletrônica completa de fábrica com mais de <b>4.300 tópicos</b>, esquemáticos elétricos dinâmicos, 
+                        árvore de navegação à esquerda, peças sobressalentes e sistema de busca indexada.
                     </p>
                 </div>
             </div>
@@ -391,11 +428,26 @@ def _render_card_portal_service_methods(caminho_frameset: str):
         """,
         unsafe_allow_html=True
     )
-    col_btn, _ = st.columns([1.5, 2.5])
-    with col_btn:
-        if st.button("🚀 Abrir Portal Interativo no Navegador (Chrome / Edge)", type="primary", use_container_width=True):
-            webbrowser.open(f"file:///{os.path.abspath(caminho_frameset)}")
-            st.toast("Portal GE Service Methods aberto no navegador padrão!", icon="🌐")
+
+    col_btn1, col_btn2 = st.columns([1.6, 2.4])
+    with col_btn1:
+        if st.button("🚀 Abrir em Nova Aba do Navegador (Tela Cheia)", type="primary", use_container_width=True):
+            _abrir_no_sistema_operacional(url_portal)
+            st.toast("Portal GE aberto no navegador!", icon="🌐")
+
+    with col_btn2:
+        st.markdown(
+            f"""
+            <a href="{url_portal}" target="_blank" style="display: inline-block; padding: 9px 18px; background: #0077b6; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 0.9rem;">
+                🔗 Clique Aqui para Acesso Direto (Link Web)
+            </a>
+            """,
+            unsafe_allow_html=True
+        )
+
+    # Visualização Integrada do Portal Interativo Diretamente no Sistema
+    with st.expander("🖥️ Visualizar Portal Interativo Embutido Aqui no Sistema", expanded=True):
+        st.components.v1.iframe(url_portal, height=850, scrolling=True)
 
 
 def _render_lista_cards(docs: list):
