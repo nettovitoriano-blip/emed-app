@@ -9,6 +9,7 @@ from emed_core import (
     get_db_connection,
     obter_id_os,
     atualizar_status_solicitacao_peca,
+    KITS_INSTRUMENTOS_POR_SITUACAO,
 )
 from emed_services import (
     AppContext,
@@ -144,9 +145,23 @@ def render_solicitacao_pecas(ctx: AppContext):
                 if marcado and qtd_disp_i > 0:
                     itens_ticados.append({"codigo": cod_i, "nome": nome_i, "qtd": int(qtd_ped)})
 
+        st.markdown("#### 🧰 Kits de Ferramentas & Instrumentos Padronizados")
+        kit_rapido = st.selectbox(
+            "Selecione um Kit de Atividade (Auto-Preenchimento):",
+            ["-- Nenhum / Personalizado --"] + list(KITS_INSTRUMENTOS_POR_SITUACAO.keys()),
+            help="Carrega instantaneamente a lista de equipamentos necessários (ex: osciloscópio, kit calibração, furadeira, nível laser)."
+        )
+        texto_kit_padrao = ""
+        if kit_rapido != "-- Nenhum / Personalizado --":
+            kit_dados = KITS_INSTRUMENTOS_POR_SITUACAO[kit_rapido]
+            texto_kit_padrao = f"[{kit_dados['nome']}]\n" + "\n".join(f"• {it}" for it in kit_dados["itens"])
+            st.caption(f"✨ **Ferramentas do {kit_dados['nome']}:** " + ", ".join(kit_dados["itens"]))
+
         instrumentos_extras_sol = st.text_area(
-            "📐 Instrumentos de Medição / Ferramentas Especiais Solicitadas",
-            placeholder="EX: ANALISADOR DE RAIOS-X, MULTÍMETRO FLUKE, MALA DE FERRAMENTAS 02..."
+            "📐 Instrumentos de Medição / Ferramentas a Separar pelo Almoxarifado:",
+            value=texto_kit_padrao,
+            placeholder="EX: NÍVEL LASER, FURADEIRA, OSCILOSCÓPIO, KIT CALIBRAÇÃO...",
+            height=110
         )
 
         if st.form_submit_button("🚀 Confirmar Reserva no Estoque & Enviar ao Almoxarifado", type="primary"):

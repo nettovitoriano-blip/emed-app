@@ -325,17 +325,16 @@ def render_emedonline(ctx: AppContext):
                         st.balloons()
                         st.success(f"🎉 **Chamado Aberto com Sucesso! Ordem de Serviço Nº #{num_os_gerada} emitida.**")
                         
-                        # Mensagem de WhatsApp para avisar a equipe
+                        # Mensagem objetiva para despacho e alinhamento da equipe
                         msg_whats = (
-                            f"🚨 *CHAMADO EMERGENCIAL EMEDONLINE*\n"
-                            f"*OS:* #{num_os_gerada}\n"
-                            f"*Cliente:* {cliente_selecionado}\n"
-                            f"*Equipamento:* {equip_escolhido}\n"
-                            f"*Status:* {cond_ini}\n"
-                            f"*Defeito:* {defeito_digitado.strip()}\n"
-                            f"*Solicitante:* {nome_solicitante} ({contato_solicitante})\n"
-                            f"*Técnico Sugerido:* {tec_sugerido}\n"
-                            f"*Endereço:* {end_cli}"
+                            f"🚨 *CHAMADO EMEDONLINE • OS #{num_os_gerada}*\n"
+                            f"Cliente: {cliente_selecionado}\n"
+                            f"Equipamento: {equip_escolhido}\n"
+                            f"Prioridade: {cond_ini}\n"
+                            f"Defeito: {defeito_digitado.strip()}\n"
+                            f"Solicitante: {nome_solicitante} ({contato_solicitante})\n"
+                            f"Técnico Programado: {tec_sugerido}\n"
+                            f"Local: {end_cli}"
                         )
                         link_wpp = f"https://wa.me/558532542929?text={urllib.parse.quote(msg_whats)}"
                         

@@ -67,6 +67,85 @@ CICLO_ETAPAS_PREVENTIVA = [
     "PREVENTIVA COMPLETA (CHECKLIST INTEGRAL POP/IT)"
 ]
 
+KITS_INSTRUMENTOS_POR_SITUACAO = {
+    "INSTALAÇÃO": {
+        "nome": "KIT 1: INSTALAÇÃO PESADA (RAIO-X / TOMÓGRAFO / ARCO)",
+        "itens": [
+            "Nível a Laser com Tripé",
+            "Furadeira de Impacto / Martelete + Brocas SDS de Vídea",
+            "Jogo de Chumbadores Parabolt e Arruelas",
+            "Trena Laser Métrica",
+            "Torquímetro com Soquetes Calibrados",
+            "Osciloscópio Digital com Pontas Atenuadas",
+            "Kit Calibração Radiométrica / Dosímetro",
+            "Multímetro Digital True RMS",
+            "EPIs de Segurança (Óculos, Luvas e Protetor Auricular)",
+        ],
+    },
+    "TROCA DE TUBO": {
+        "nome": "KIT 2: TROCA DE TUBO DE TOMÓGRAFO (GE / MULTIMARCAS)",
+        "itens": [
+            "Ferramenta Gerador JEDI e Giga de Comunicação",
+            "Torquímetro Calibrado para Anel de Fixação",
+            "Talha de Içamento / Macaco Hidráulico do Gantry",
+            "Kit Óleo Dielétrico e Bomba de Vácuo",
+            "Kit Limpeza Óptica de Colimador e Detectores",
+            "Multímetro e Giga de Teste de Filamento",
+            "Graxa Especial de Alta Rotação SlipRing",
+        ],
+    },
+    "PREVENTIVA": {
+        "nome": "KIT 3: MANUTENÇÃO PREVENTIVA PADRÃO & POP",
+        "itens": [
+            "Kit de Calibração e Fantomas Padrão (Cabeça / Corpo)",
+            "Multímetro Digital Calibrado",
+            "Graxa Especial para Rolamentos e SlipRing",
+            "Soprador / Aspirador Antiestático ESD",
+            "Jogo de Chaves Allen (Métricas e Polegadas) e Torx",
+            "Álcool Isopropílico 99% e Panos de Microfibra ESD",
+            "Checklist Oficial POP/IT Impresso/Digital",
+        ],
+    },
+    "CORRETIVA": {
+        "nome": "KIT 4: CORRETIVA EMERGENCIAL & DIAGNÓSTICO",
+        "itens": [
+            "Osciloscópio Portátil com Pontas HV",
+            "Kit Sortido de Fusíveis de Ação Rápida e Retardada",
+            "Estação de Solda Portátil",
+            "Alicate Amperímetro DC/AC True RMS",
+            "Maleta de Chaves Isoladas 1000V",
+            "Spray Limpa Contatos e Desengripante",
+        ],
+    },
+    "CALIBRAÇÃO / QA": {
+        "nome": "KIT 5: CALIBRAÇÃO & CONTROLE DE QUALIDADE (QA)",
+        "itens": [
+            "Medidor de Radiação Multi-Parâmetro (kVp, Dose, Tempo, CSR)",
+            "Fantoma de Resolução Espacial e Baixo Contraste",
+            "Trena Métrica e Posicionador Radiográfico",
+            "Certificado de Calibração dos Padrões Vigente",
+        ],
+    },
+}
+
+
+def obter_kit_por_servico(tipo_servico: str) -> dict:
+    """Retorna o Kit de Instrumentos mais indicado com base no tipo de serviço agendado."""
+    tipo = (tipo_servico or "").upper()
+    for chave, dados in KITS_INSTRUMENTOS_POR_SITUACAO.items():
+        if chave in tipo:
+            return dados
+    return {
+        "nome": "KIT GERAL DE ATENDIMENTO",
+        "itens": [
+            "Multímetro Digital True RMS",
+            "Maleta de Ferramentas Manuais Básica",
+            "Álcool Isopropílico e Pano ESD",
+            "EPI Padrão",
+        ]
+    }
+
+
 
 def limpar_texto(valor, padrao=""):
     if valor is None or pd.isna(valor):

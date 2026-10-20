@@ -13,6 +13,8 @@ from emed_core import (
     aplicar_peca_os_idempotente,
     sugerir_proxima_etapa_preventiva,
     agendar_proxima_etapa_circular,
+    KITS_INSTRUMENTOS_POR_SITUACAO,
+    obter_kit_por_servico,
 )
 from emed_services import (
     AppContext,
@@ -262,6 +264,35 @@ def _render_criar_nova_os(ctx: AppContext):
     df = ctx.df
     equipa_tecnica = ctx.equipa_tecnica
 
+    if "aviso_almox_pendente" in st.session_state:
+        av = st.session_state.pop("aviso_almox_pendente")
+        msg_almox = (
+            f"📦 *ORDEM DE SEPARAÇÃO • ALMOXARIFADO EMED*\n\n"
+            f"Técnico: {av['tecnico']}\n"
+            f"Cliente: {av['cliente']}\n"
+            f"Atividade: {av['tipo']}\n"
+            f"Data Prevista: {av['data']}\n\n"
+            f"*KIT REQUISITADO:*\n{av['kit']}\n\n"
+            f"*FERRAMENTAS / INSTRUMENTOS:*\n" + "\n".join(f"• {it}" for it in av['itens'])
+        )
+        link_almox = f"https://wa.me/558532542929?text={urllib.parse.quote(msg_almox)}"
+        st.markdown(
+            f"""
+            <div style="background: #0f2942; border: 1.5px solid #0284c7; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                <div style="font-weight: bold; color: #38bdf8; font-size: 14px; margin-bottom: 6px;">
+                    📦 OS Gerada! Notifique o Almoxarifado para Separar o Kit de Ferramentas:
+                </div>
+                <div style="color: #cbd5e1; font-size: 13px; margin-bottom: 10px;">
+                    <b>{av['kit']}</b> ({len(av['itens'])} itens: {', '.join(av['itens'][:4])}...)
+                </div>
+                <a href="{link_almox}" target="_blank" style="display: inline-block; background: #25d366; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px;">
+                    💬 Enviar Ordem de Separação no WhatsApp do Almoxarifado
+                </a>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
     clientes_externos = sorted([
         c for c in df['cliente'].unique()
         if str(c).strip() != '' and "NENHUM (AGUARDANDO" not in str(c).upper()
@@ -339,9 +370,11 @@ def _render_criar_nova_os(ctx: AppContext):
                 default=[],
                 help="Selecione um ou mais técnicos auxiliares caso a intervenção exija equipa dupla/múltipla."
             )
+            kit_sugerido = obter_kit_por_servico(chamado_tipo)
             instrumento_abertura = st.text_input(
-                "5.2 Instrumento / Ferramenta Especial Necessária",
-                placeholder="EX: MULTÍMETRO FLUKE, FANTOMA, CHAVE DINAMOMÉTRICA"
+                f"5.2 Instrumentos & Ferramentas a Separar pelo Almoxarifado ({kit_sugerido['nome']})",
+                value=", ".join(kit_sugerido["itens"]),
+                help="O Almoxarifado é notificado automaticamente com este Kit de ferramentas ao salvar a OS."
             )
 
         st.markdown("#### 🔬 Pré-Atendimento, Defeito Relatado, Formulários & Anexos (Foto / Vídeo)")
@@ -465,6 +498,14 @@ def _render_criar_nova_os(ctx: AppContext):
                 df = pd.concat([df, pd.DataFrame([nova_os])], ignore_index=True)
                 if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
                     st.cache_data.clear()
+                    st.session_state.aviso_almox_pendente = {
+                        "tecnico": chamado_tec,
+                        "cliente": chamado_cliente,
+                        "tipo": chamado_tipo,
+                        "kit": kit_sugerido["nome"],
+                        "itens": kit_sugerido["itens"],
+                        "data": pd.to_datetime(chamado_data).strftime('%d/%m/%Y'),
+                    }
                     st.success("✅ Salvo com sucesso! Ordem de Serviço emitida.")
                     st.rerun()
 

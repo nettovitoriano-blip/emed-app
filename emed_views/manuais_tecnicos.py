@@ -46,7 +46,18 @@ DICIONARIO_NOMES_AMIGAVEIS = {
     "01_Ferramenta_Gerador_JEDI.pdf": "01. Manual da Ferramenta de Calibração do Gerador JEDI",
     "02_Estatisticas_Uso_do_Tubo.pdf": "02. Estatísticas de Uso do Tubo de Raio-X (07MWxx.x)",
     "03_Comandos_Linux_GE.pdf": "03. Guia de Comandos do Terminal Linux GE Healthcare",
-    "04_Utilitarios_Diagnostico_Linux.pdf": "04. Utilitários de Diagnóstico e Recuperação Linux"
+    "04_Utilitarios_Diagnostico_Linux.pdf": "04. Utilitários de Diagnóstico e Recuperação Linux",
+
+    # Shimadzu MobileDaRt MX8
+    "01_Manual_de_Servico_MobileDaRt_MX8_Shimadzu.pdf": "📘 Manual de Serviço Completo MobileDaRt Evolution MX8 (Shimadzu 344p)",
+    "02_Manual_de_Instalacao_MobileDaRt_MX8_Shimadzu.pdf": "📑 Manual de Instalação e Montagem MobileDaRt MX8 (Shimadzu 560p)",
+    "IT_RXM_SHIM_001_Manutencao_Descarga_Capacitores_MobileDaRt_MX8.md": "⚡ IT-01: Manutenção, Diagnóstico de Falhas & Descarga de Capacitores (Shimadzu MX8)",
+
+    # Lotus Família HF
+    "01_Manual_Usuario_Familia_HF_Parte_1.pdf": "📖 Manual do Usuário e Operação - Família HF Raio-X Fixo (Lotus)",
+
+    # Neusoft NeuVision 550M
+    "01_Manual_Instalacao_Software_NeuVision_550M_Plus.pdf": "💻 Manual de Instalação do Software DR NeuVision 550M Plus (Neusoft)"
 }
 
 DICIONARIO_SUBGRUPOS = {
@@ -54,6 +65,9 @@ DICIONARIO_SUBGRUPOS = {
     "02_CALIBRACOES_E_PROCEDIMENTOS_OFICIAIS": "🔬 CALIBRAÇÕES E PROCEDIMENTOS OFICIAIS",
     "03_SOFTWARE_E_UTILITARIOS_LINUX": "💻 SOFTWARE E UTILITÁRIOS LINUX",
     "02_PORTAL_INTERATIVO_SERVICE_METHODS": "🌐 PORTAL INTERATIVO SERVICE METHODS",
+    "02_MANUAIS_DE_SERVICO_E_INSTALACAO": "📚 MANUAIS DE SERVIÇO & INSTALAÇÃO",
+    "01_MANUAIS_DE_OPERACAO": "📖 MANUAIS DE OPERAÇÃO",
+    "01_MANUAIS_DE_SOFTWARE_DR": "💻 SOFTWARE DR & INSTALAÇÃO",
     "HF500M": "📄 MANUAIS E VISTORIA PRÉ-INSTALAÇÃO",
     "LOTUS": "📄 MANUAIS E VISTORIA PRÉ-INSTALAÇÃO"
 }
@@ -106,12 +120,12 @@ def _escanear_arvore_manuais(pasta_base: str):
                 # Tratamento de subdiretórios com Categoria / Fabricante / Modelo / Submenu
                 # Ex: TOMOGRAFO / GE / BRIVO_CT385 / 01_INSTRUCOES_DE_TRABALHO / file.md (len = 5)
                 # Ex: RAIO-X / LOTUS / HF500M / file.pdf (len = 4)
-                if len(partes) >= 5 and partes[1].upper() in ("GE", "SIEMENS", "PHILIPS", "CANON", "TOSHIBA", "SHIMADZU", "LOTUS"):
+                if len(partes) >= 5 and partes[1].upper() in ("GE", "SIEMENS", "PHILIPS", "CANON", "TOSHIBA", "SHIMADZU", "LOTUS", "NEUSOFT"):
                     categoria = f"{partes[0].replace('_', ' ').upper()} ({partes[1].upper()})"
                     modelo = partes[2].replace("_", " ").upper()
                     raw_sub = partes[3]
                     subgrupo = _formatar_subgrupo_amigavel(raw_sub)
-                elif len(partes) == 4 and partes[1].upper() in ("GE", "SIEMENS", "PHILIPS", "CANON", "TOSHIBA", "SHIMADZU", "LOTUS"):
+                elif len(partes) == 4 and partes[1].upper() in ("GE", "SIEMENS", "PHILIPS", "CANON", "TOSHIBA", "SHIMADZU", "LOTUS", "NEUSOFT"):
                     categoria = f"{partes[0].replace('_', ' ').upper()} ({partes[1].upper()})"
                     modelo = partes[2].replace("_", " ").upper()
                     subgrupo = "📄 MANUAIS E VISTORIA PRÉ-INSTALAÇÃO"
