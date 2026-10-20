@@ -21,6 +21,10 @@ DICIONARIO_NOMES_AMIGAVEIS = {
     "IT_06_Alinhamentos_Opticos_Colimador_Detector_GE.md": "🎯 IT-06: Alinhamentos Ópticos do Colimador e Detector (BOW, CBF/SAG)",
     "IT_07_Guia_Ferramenta_Gerador_JEDI_GE.md": "⚡ IT-07: Guia Operacional da Ferramenta do Gerador JEDI (Traduzido)",
     "IT_08_Verificacao_Tanque_HV_e_QA_GE.md": "🔬 IT-08: Verificação do Tanque HV, Medidores & Teste Final de QA (Água 0 ± 4 HU)",
+    "IT_09_Alinhamento_Plano_de_Rotacao_POR_GE.md": "📐 IT-09: Alinhamento do Plano de Rotação (Plane of Rotation - POR)",
+    "IT_10_Alinhamento_Isocentro_Mecanico_e_HOT_ISO_GE.md": "🎯 IT-10: Alinhamento do Isocentro Mecânico (ISO) & Feixe Ativo (HOT ISO)",
+    "IT_11_Calibracao_Colimador_Aberturas_e_Detailed_Cal_GE.md": "🔬 IT-11: Calibração das Aberturas do Colimador & Detailed Calibration",
+    "IT_12_Seguranca_Rotacao_Gantry_e_Varreduras_HHS_GE.md": "🛡️ IT-12: Segurança de Rotação, Varreduras Térmicas HHS & Estabilidade",
     
     # Brivo CT385 - Calibrações e Procedimentos
     "01_Procedimento_Troca_de_Tubo_Gantry.pdf": "01. Procedimento Oficial de Troca do Tubo de Raio-X no Gantry",
@@ -52,6 +56,7 @@ DICIONARIO_NOMES_AMIGAVEIS = {
     "01_Manual_de_Servico_MobileDaRt_MX8_Shimadzu.pdf": "📘 Manual de Serviço Completo MobileDaRt Evolution MX8 (Shimadzu 344p)",
     "02_Manual_de_Instalacao_MobileDaRt_MX8_Shimadzu.pdf": "📑 Manual de Instalação e Montagem MobileDaRt MX8 (Shimadzu 560p)",
     "IT_RXM_SHIM_001_Manutencao_Descarga_Capacitores_MobileDaRt_MX8.md": "⚡ IT-01: Manutenção, Diagnóstico de Falhas & Descarga de Capacitores (Shimadzu MX8)",
+    "IT_RXM_SHIM_002_Calibracao_Manopla_Balanca_Sensor_Braco_MX8.md": "🎯 IT-02: Calibração da Manopla com Balança (FSR) & Sensor do Braço no Catcher (Andar Frente/Trás)",
 
     # Lotus Família HF
     "01_Manual_Usuario_Familia_HF_Parte_1.pdf": "📖 Manual do Usuário e Operação - Família HF Raio-X Fixo (Lotus)",
@@ -157,24 +162,47 @@ def _escanear_arvore_manuais(pasta_base: str):
     return catalogo
 
 
+def _abrir_no_sistema_operacional(caminho: str) -> bool:
+    """Abre qualquer arquivo no visualizador nativo padrão de forma multi-plataforma e à prova de falhas."""
+    try:
+        if hasattr(os, "startfile"):
+            os.startfile(caminho)
+            return True
+    except Exception:
+        pass
+    try:
+        import webbrowser
+        webbrowser.open(f"file:///{os.path.abspath(caminho)}")
+        return True
+    except Exception:
+        pass
+    try:
+        import subprocess
+        subprocess.Popen(f'start "" "{caminho}"', shell=True)
+        return True
+    except Exception:
+        pass
+    return False
+
+
 def _renderizar_leitor_pdf(caminho_pdf: str, doc_key: str):
     """Exibe o leitor de PDF inline com renderização nativa via PyMuPDF e paginação de alta fidelidade."""
+    # Botão de abertura externa desacoplado do try de renderização de páginas
+    col_win, col_prev, col_info, col_next = st.columns([1.6, 1.2, 1.5, 1.2])
+
+    with col_win:
+        if st.button("🖥️ Abrir no App do Windows", key=f"btn_win_{doc_key}", use_container_width=True):
+            _abrir_no_sistema_operacional(caminho_pdf)
+            st.toast("Manual aberto no leitor do Windows!", icon="📄")
+
     try:
         import pymupdf
         doc_pdf = pymupdf.open(caminho_pdf)
         total_paginas = len(doc_pdf)
 
-        col_win, col_prev, col_info, col_next = st.columns([1.6, 1.2, 1.5, 1.2])
-
         sess_key_pag = f"pag_{doc_key}"
         if sess_key_pag not in st.session_state:
             st.session_state[sess_key_pag] = 0
-
-        # Botão para abrir instantaneamente no aplicativo padrão do Windows
-        with col_win:
-            if st.button("🖥️ Abrir no App do Windows", key=f"btn_win_{doc_key}", use_container_width=True):
-                os.startfile(caminho_pdf)
-                st.toast("Manual aberto no visualizador de PDF do Windows!", icon="📄")
 
         with col_prev:
             if st.button("⬅️ Anterior", key=f"prev_{doc_key}", use_container_width=True, disabled=(st.session_state[sess_key_pag] <= 0)):
@@ -211,9 +239,8 @@ def _renderizar_leitor_pdf(caminho_pdf: str, doc_key: str):
         st.markdown("</div>", unsafe_allow_html=True)
         doc_pdf.close()
     except Exception as e:
-        st.error(f"Erro ao renderizar PDF na tela: {e}")
-        if st.button("🖥️ Abrir no Visualizador do Windows", key=f"fb_win_{doc_key}"):
-            os.startfile(caminho_pdf)
+        st.error(f"Erro ao renderizar pré-visualização na tela: {e}")
+        st.info("💡 Você pode visualizar este manual em alta resolução clicando em **'Abrir no App do Windows'** acima ou em **'Baixar Arquivo'**.")
 
 
 def _renderizar_leitor_markdown(caminho_md: str):

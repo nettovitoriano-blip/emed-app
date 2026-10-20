@@ -1,4 +1,6 @@
+import io
 import os
+import base64
 import urllib.parse
 import pandas as pd
 import streamlit as st
@@ -12,6 +14,21 @@ from emed_services import (
     salvar_dados_seguro,
     calcular_distancia,
 )
+
+
+def _gerar_qrcode_base64(url: str) -> str:
+    """Gera um QR Code em base64 diretamente em memória."""
+    try:
+        import qrcode
+        qr = qrcode.QRCode(version=1, box_size=8, border=2)
+        qr.add_data(url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="#0B3B60", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
+    except Exception:
+        return f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(url)}"
 
 
 def _buscar_cliente_por_cnpj_ou_nome(df: pd.DataFrame, termo_busca: str):
@@ -95,23 +112,50 @@ def render_emedonline(ctx: AppContext):
         unsafe_allow_html=True,
     )
 
-    aba_portal, aba_despacho, aba_instrucoes = st.tabs([
+    query_params = st.query_params
+    qr_eq_param = query_params.get("equipamento_qr", query_params.get("eq", ""))
+    qr_cli_param = query_params.get("cliente_qr", query_params.get("cli", ""))
+    qr_cnpj_param = query_params.get("cnpj", "")
+
+    aba_portal, aba_despacho, aba_etiquetas, aba_instrucoes = st.tabs([
         "🏥 1. Portal do Cliente (Abrir Chamado)",
         "🗺️ 2. Central de Despacho & Rotas",
-        "ℹ️ 3. Como Funciona (Guia Rápido)",
+        "🏷️ 3. Gerador de Etiquetas QR Code",
+        "ℹ️ 4. Como Funciona (Guia Rápido)",
     ])
 
     # =========================================================================
     # ABA 1: PORTAL DO CLIENTE (TRIAGEM ÁGIL E HUMANIZADA)
     # =========================================================================
     with aba_portal:
+        if qr_eq_param and (qr_cli_param or qr_cnpj_param):
+            st.markdown(
+                f"""
+                <div style="background: linear-gradient(90deg, #064e3b 0%, #022c22 100%); border: 1.5px solid #10b981; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px;">
+                    <div style="font-weight: 800; color: #6ee7b7; font-size: 14px;">
+                        🏷️ EQUIPAMENTO IDENTIFICADO POR QR CODE
+                    </div>
+                    <div style="color: #f1f5f9; font-size: 13px; margin-top: 4px;">
+                        <b>Cliente:</b> {qr_cli_param} {f'({qr_cnpj_param})' if qr_cnpj_param else ''}<br/>
+                        <b>Equipamento:</b> {qr_eq_param}
+                    </div>
+                    <div style="color: #a7f3d0; font-size: 12px; margin-top: 4px;">
+                        ⚡ Cadastro identificado automaticamente. Pule direto para o relato da falha e foto abaixo!
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
         st.markdown("### 📋 Solicitação de Atendimento Técnico")
         st.caption("Identifique a sua instituição e relate o problema. Os dados alimentarão diretamente a Ordem de Serviço.")
 
         col_id1, col_id2 = st.columns([2.5, 1.5])
         with col_id1:
+            valor_padrao_busca = qr_cnpj_param or qr_cli_param or ""
             termo_cli = st.text_input(
                 "1. Digite o CNPJ ou Nome da Clínica / Hospital *",
+                value=valor_padrao_busca,
                 placeholder="Ex: 03.611.974/0001-08 ou Hospital São Mateus",
                 help="Você pode digitar apenas os números do CNPJ ou o nome da instituição."
             )
@@ -176,9 +220,17 @@ def render_emedonline(ctx: AppContext):
 
             col_eq1, col_eq2 = st.columns([2.5, 1.5])
             with col_eq1:
+                opcoes_eq_totais = eqs_cadastrados + ["➕ Outro Equipamento"]
+                idx_eq_padrao = 0
+                if qr_eq_param:
+                    for i_cand, cand in enumerate(opcoes_eq_totais):
+                        if qr_eq_param.upper() in cand.upper():
+                            idx_eq_padrao = i_cand
+                            break
                 equip_escolhido = st.selectbox(
                     "Selecione o equipamento alvo *",
-                    eqs_cadastrados + ["➕ Outro Equipamento"],
+                    opcoes_eq_totais,
+                    index=idx_eq_padrao,
                 )
                 if equip_escolhido == "➕ Outro Equipamento":
                     equip_escolhido = st.text_input("Especifique o Fabricante, Modelo e Sala do Equipamento:")
@@ -415,7 +467,98 @@ def render_emedonline(ctx: AppContext):
                             st.caption("Sem foto anexada pelo solicitante.")
 
     # =========================================================================
-    # ABA 3: COMO FUNCIONA (GUIA TÉCNICO & PROCEDIMENTOS)
+    # ABA 3: GERADOR DE ETIQUETAS QR CODE POR EQUIPAMENTO
+    # =========================================================================
+    with aba_etiquetas:
+        st.markdown("### 🏷️ Gerador de Etiquetas QR Code por Equipamento")
+        st.caption("Gere a etiqueta técnica para colar no chassi do equipamento. Ao escanear, a EmedOnline já abre com CNPJ e Equipamento 100% preenchidos!")
+
+        col_et1, col_et2 = st.columns(2)
+        with col_et1:
+            clientes_cadastrados = sorted([c for c in df["cliente"].dropna().unique() if str(c).strip() and "NENHUM" not in str(c).upper()])
+            cli_etiqueta = st.selectbox("1. Selecione o Cliente / Hospital:", clientes_cadastrados, key="sel_cli_etiqueta")
+        
+        with col_et2:
+            df_cli_et = df[df["cliente"] == cli_etiqueta]
+            eqs_cli_et = [e for e in df_cli_et["equipamento"].dropna().unique() if str(e).strip() and "NENHUM" not in str(e).upper()]
+            if not eqs_cli_et:
+                eqs_cli_et = ["EQUIPAMENTO PADRÃO"]
+            eq_etiqueta = st.selectbox("2. Selecione o Equipamento Alvo:", eqs_cli_et, key="sel_eq_etiqueta")
+
+        cnpj_etiqueta = limpar_texto(df_cli_et.iloc[0].get("cnpj") if not df_cli_et.empty else "", "03.611.974/0001-08")
+        
+        # URL da nuvem permanente da EMED com auto-preenchimento
+        base_url_cloud = "https://emed-app.streamlit.app"
+        url_chamado_qr = f"{base_url_cloud}/?cliente_qr={urllib.parse.quote(cli_etiqueta)}&equipamento_qr={urllib.parse.quote(eq_etiqueta)}&cnpj={urllib.parse.quote(cnpj_etiqueta)}"
+        
+        # Link WhatsApp direto pré-formatado
+        msg_wpp_direto = (
+            f"🚨 *CHAMADO TÉCNICO • EMEDONLINE*\n"
+            f"Equipamento: {eq_etiqueta}\n"
+            f"Cliente: {cli_etiqueta}\n"
+            f"CNPJ: {cnpj_etiqueta}\n\n"
+            f"Defeito apresentado: "
+        )
+        url_wpp_direto = f"https://wa.me/558532542929?text={urllib.parse.quote(msg_wpp_direto)}"
+
+        qr_base64 = _gerar_qrcode_base64(url_chamado_qr)
+
+        st.markdown("---")
+        col_preview, col_inst = st.columns([1.8, 2.2])
+        with col_preview:
+            st.markdown("#### 🖨️ Pré-Visualização da Etiqueta Técnica:")
+            st.markdown(
+                f"""
+                <div style="background: #ffffff; color: #0b132b; border: 3px solid #0b132b; border-radius: 12px; padding: 18px; max-width: 380px; box-shadow: 0 4px 15px rgba(0,0,0,0.25); font-family: Arial, sans-serif;">
+                    <div style="border-bottom: 2px solid #0b132b; padding-bottom: 8px; margin-bottom: 10px;">
+                        <div style="font-size: 15px; font-weight: 900; color: #0b132b; letter-spacing: 0.5px;">🏥 EMED ELETROMEDICINA</div>
+                        <div style="font-size: 10px; color: #334155; font-weight: bold;">SUPORTE TÉCNICO & MANUTENÇÃO</div>
+                    </div>
+                    <div style="text-align: center; margin: 10px 0;">
+                        <img src="{qr_base64}" style="width: 175px; height: 175px; display: inline-block; border: 1px solid #cbd5e1; padding: 4px; border-radius: 6px;" alt="QR Code"/>
+                        <div style="font-size: 12px; font-weight: 800; color: #0284c7; margin-top: 6px;">APONTE A CÂMERA DO CELULAR</div>
+                        <div style="font-size: 10px; color: #64748b;">Abertura Direta em 10 Segundos</div>
+                    </div>
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; font-size: 11px; margin-top: 8px; line-height: 1.4;">
+                        <div><b>EQUIPAMENTO:</b> {eq_etiqueta}</div>
+                        <div><b>CLIENTE:</b> {cli_etiqueta}</div>
+                        <div><b>CNPJ:</b> {cnpj_etiqueta}</div>
+                        <div><b>CENTRAL 24H:</b> (85) 3254-2929</div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        with col_inst:
+            st.markdown("#### ⚡ Como funciona para o cliente em campo:")
+            st.markdown(
+                f"""
+                1. **Adesive a etiqueta** diretamente no chassi do Tomógrafo, Raio-X ou Ultrassom.
+                2. Quando o aparelho apresentar qualquer anomalia ou código de erro, o operador do hospital apenas aponta a câmera do celular para o adesivo.
+                3. **O sistema já abre no celular com Hospital, CNPJ e Equipamento 100% preenchidos!**
+                4. O cliente apenas descreve o defeito, tira a foto do display e clica em **Chamar Equipe**.
+                """
+            )
+            st.markdown(f"**🔗 Link Direto Integrado:**")
+            st.code(url_chamado_qr, language="text")
+            
+            st.markdown(
+                f"""
+                <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                    <a href="{url_chamado_qr}" target="_blank" style="display: inline-block; background: #0284c7; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px;">
+                        🧪 Testar Link do Equipamento
+                    </a>
+                    <a href="{url_wpp_direto}" target="_blank" style="display: inline-block; background: #25d366; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 13px;">
+                        💬 Abrir via WhatsApp Direto
+                    </a>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    # =========================================================================
+    # ABA 4: COMO FUNCIONA (GUIA TÉCNICO & PROCEDIMENTOS)
     # =========================================================================
     with aba_instrucoes:
         st.markdown("### 📘 Fluxo de Trabalho EmedOnline & Fechamento de OS")
