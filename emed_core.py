@@ -73,8 +73,8 @@ SUGESTOES_SEPARACAO_POR_ATIVIDADE = {
         "itens": [
             "FER-001: Multímetro Especial até 1000V (Aferição Fotocélula / AEC & Mamógrafo)",
             "FER-004: Medidor Radiométrico Multi-Parâmetro (kVp, Dose, Tempo, CSR)",
-            "FER-005: Kit de Mamografia (com Phantom de Mamografia)",
-            "FER-017: Kit de Alinhamento de Colimador (Beam Alignment Tools)",
+            "FER-005: Kit de Mamografia (Phantom, Acrílicos, Balança e Cassete)",
+            "FER-017: Kit de Alinhamento de Colimador (Beam Alignment Tools & Campo Luminoso)",
             "FER-009: Trena Laser Métrica Digital",
         ],
     },
@@ -102,7 +102,7 @@ SUGESTOES_SEPARACAO_POR_ATIVIDADE = {
             "PEC-010: Interface Box / Fonte de Alimentação do Detector DR",
             "PEC-009: Baterias Sobressalentes e Carregador para Flat Panel Wi-Fi",
             "PEC-011: Cabos de Comunicação Tether Cable e Rede Cat6 Blindados",
-            "FER-017: Kit de Alinhamento de Colimador (Beam Alignment Tools)",
+            "FER-017: Kit de Alinhamento de Colimador (Beam Alignment Tools & Campo Luminoso)",
             "CON-004: Álcool Isopropílico 99% ESD e Panos de Microfibra",
         ],
     },
@@ -509,6 +509,88 @@ def atualizar_status_solicitacao_peca(db_path, id_pedido, novo_status):
             (novo_status_up, int(id_pedido))
         )
     return True, f"✅ Status do pedido #{id_pedido} atualizado para '{novo_status_up}'!"
+
+
+def acionar_separacao_automatica_almoxarifado(
+    db_path,
+    tecnico,
+    cliente,
+    equipamento="",
+    tipo_servico="",
+    instrumentos_materiais="",
+    pecas="",
+    os_id=None
+):
+    """
+    Aciona o almoxarifado automaticamente quando um técnico é selecionado para um serviço
+    que necessite de peças ou ferramentas.
+    Cria a solicitação com status 'A SEPARAR / AGUARDANDO ALMOXARIFADO' e pré-reserva os itens.
+    """
+    if not tecnico or str(tecnico).strip().upper() in ["A DEFINIR", "N/D", "SEM TÉCNICO", "NONE", ""]:
+        return False, "Nenhum técnico atribuído ao serviço."
+
+    tec_up = str(tecnico).strip().upper()
+    cli_up = str(cliente).strip().upper()
+    eq_up = str(equipamento).strip().upper()
+    dest_str = f"{cli_up} — {eq_up}" if eq_up and eq_up not in cli_up else cli_up
+    
+    inst_str = str(instrumentos_materiais).strip().upper() if instrumentos_materiais else ""
+    pecas_str = str(pecas).strip().upper() if pecas else ""
+
+    # Se não foram explicitados instrumentos nem peças, obtém automaticamente pelo tipo de serviço e equipamento
+    if not inst_str and not pecas_str:
+        kit_auto = obter_kit_por_servico(tipo_servico, f"{eq_up} {tipo_servico}")
+        inst_str = f"[{kit_auto['nome']}] " + ", ".join(kit_auto.get("itens", []))
+
+    if not inst_str and not pecas_str:
+        return False, "Serviço não requer ferramentas ou peças especiais."
+
+    # Identificador de OS no texto
+    ref_os_txt = f" [OS #{os_id}]" if os_id else ""
+    dest_com_os = f"{dest_str}{ref_os_txt}"
+
+    with get_db_connection(db_path) as conn:
+        cur = conn.cursor()
+        
+        # Verificar se já existe solicitação pendente para este técnico e destino/OS
+        cur.execute("""
+            SELECT id, status_pedido FROM solicitacoes_pecas 
+            WHERE UPPER(tecnico) = ? AND (UPPER(destino_cliente) = ? OR UPPER(destino_cliente) LIKE ?)
+            AND UPPER(status_pedido) IN ('A SEPARAR / AGUARDANDO ALMOXARIFADO', 'RESERVADO / ENVIADO AO ESTOQUE', 'ENTREGUE AO TÉCNICO / EM CAMPO')
+            ORDER BY id DESC LIMIT 1
+        """, (tec_up, dest_com_os.upper(), f"%{cli_up}%"))
+        
+        existente = cur.fetchone()
+        if existente:
+            return True, f"O Almoxarifado já está com o Pedido #{existente[0]} ({existente[1]}) em separação para {tec_up}."
+
+        data_ped_agora = datetime.datetime.now().strftime('%d/%m/%Y %H:%M')
+        resumo_pecas = pecas_str if pecas_str else "NENHUMA PEÇA EXTRA"
+
+        # Reserva itens do estoque se houver códigos padrão PEC-xxx, FER-xxx, CON-xxx
+        import re
+        codigos_encontrados = re.findall(r'[A-Z]{3}-\d{3}', f"{resumo_pecas} {inst_str}")
+        for cod in set(codigos_encontrados):
+            cur.execute("SELECT quantidade FROM estoque_pecas WHERE codigo = ?", (cod,))
+            r_stk = cur.fetchone()
+            if r_stk and r_stk[0] > 0:
+                cur.execute("UPDATE estoque_pecas SET quantidade = max(0, quantidade - 1) WHERE codigo = ?", (cod,))
+
+        cur.execute("""
+            INSERT INTO solicitacoes_pecas
+            (tecnico, destino_cliente, itens_solicitados, instrumentos_solicitados, status_pedido, data_pedido)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            tec_up, dest_com_os, resumo_pecas, inst_str,
+            "A SEPARAR / AGUARDANDO ALMOXARIFADO", data_ped_agora
+        ))
+        novo_id = cur.lastrowid
+
+    msg_sucesso = (
+        f"✅ Almoxarifado acionado automaticamente! Pedido #{novo_id} "
+        f"gerado com status 'A SEPARAR' para o técnico {tec_up}."
+    )
+    return True, msg_sucesso
 
 
 def sugerir_proxima_etapa_preventiva(df, cliente, equipamento):

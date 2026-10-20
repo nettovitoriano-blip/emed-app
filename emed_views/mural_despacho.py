@@ -1,7 +1,8 @@
+import datetime
 import urllib.parse
 import pandas as pd
 import streamlit as st
-from emed_core import limpar_texto, obter_id_os
+from emed_core import limpar_texto, obter_id_os, acionar_separacao_automatica_almoxarifado
 from emed_services import AppContext, salvar_dados_seguro
 
 
@@ -142,6 +143,43 @@ def render_mural_despacho(ctx: AppContext):
                         mp_url = i_at['maps']
                         wz_url = i_at['waze']
                         st.markdown(f"🗺️ **[{cli_lbl} - Google Maps]({mp_url})** | 🚗 **[Waze]({wz_url})**")
+
+                # Acionamento Automático do Almoxarifado para os Materiais/Kits deste Técnico
+                itens_com_materiais = [it for it in itens if str(it.get('instrumento', '')).strip()]
+                if itens_com_materiais:
+                    st.markdown("---")
+                    st.markdown(f"##### 📦 Almoxarifado: Materiais & Kits a Separar para {tec}")
+                    for idx_m, it_m in enumerate(itens_com_materiais, 1):
+                        st.markdown(f"• **{it_m['cliente']}** ({it_m['equipamento']}): `{it_m['instrumento']}`")
+
+                    c_alm1, c_alm2 = st.columns(2)
+                    with c_alm1:
+                        if st.button(f"⚡ Acionar Almoxarifado para {tec} (Status: A SEPARAR)", key=f"btn_acionar_almox_{tec}"):
+                            qtd_acionados = 0
+                            for it_m in itens_com_materiais:
+                                ok_a, _ = acionar_separacao_automatica_almoxarifado(
+                                    ctx.db_name,
+                                    tec,
+                                    it_m['cliente'],
+                                    it_m['equipamento'],
+                                    it_m['tipo_servico'],
+                                    it_m['instrumento']
+                                )
+                                if ok_a:
+                                    qtd_acionados += 1
+                            st.success(f"✅ Almoxarifado acionado com sucesso para {tec}! Pedidos em fila 'A SEPARAR'.")
+                            st.rerun()
+
+                    with c_alm2:
+                        msg_almox_tec = f"📦 *ORDEM DE SEPARAÇÃO - ALMOXARIFADO EMED*\n\n👨‍🔧 *Técnico Escalado:* {tec}\n📅 *Data:* {datetime.date.today().strftime('%d/%m/%Y')}\n\n"
+                        for idx_m, it_m in enumerate(itens_com_materiais, 1):
+                            msg_almox_tec += f"*{idx_m}. {it_m['cliente']}* ({it_m['equipamento']})\n🛠️ *Materiais/Kit:* {it_m['instrumento']}\n\n"
+                        link_wpp_almox = f"https://wa.me/558593333333?text={urllib.parse.quote(msg_almox_tec)}"
+                        st.markdown(f"""
+                            <a href="{link_wpp_almox}" target="_blank" style="background: #0284c7; color: white; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block;">
+                                📲 Avisar Estoque/Almoxarifado (WhatsApp)
+                            </a>
+                        """, unsafe_allow_html=True)
 
         if ctx.perfil_atual == "Gestor":
             st.markdown("---")

@@ -9,6 +9,7 @@ from emed_core import (
     limpar_texto,
     obter_id_os,
     obter_kit_por_servico,
+    acionar_separacao_automatica_almoxarifado,
 )
 from emed_services import (
     AppContext,
@@ -708,9 +709,23 @@ def render_emedonline(ctx: AppContext):
                         st.cache_data.clear()
                         novo_idx = df_novo.index[-1]
                         num_os_gerada = obter_id_os(novo_idx, pd.Series(novo_chamado))
+
+                        # Acionamento Automático do Almoxarifado para separação
+                        itens_kit_str = ", ".join(kit_sugerido.get("itens", []))
+                        ok_sep, msg_sep = acionar_separacao_automatica_almoxarifado(
+                            ctx.db_name,
+                            tec_sugerido,
+                            cliente_selecionado,
+                            equip_escolhido,
+                            "CORRETIVA / TRIAGEM",
+                            f"[{kit_sugerido.get('nome')}] {itens_kit_str}",
+                            os_id=num_os_gerada
+                        )
                         
                         st.balloons()
                         st.success(f"🎉 **Chamado Aberto com Sucesso! Ordem de Serviço Nº #{num_os_gerada} emitida.**")
+                        if ok_sep:
+                            st.info(f"📦 {msg_sep}")
                         
                         # Mensagem objetiva para despacho e alinhamento da equipe
                         msg_whats = (

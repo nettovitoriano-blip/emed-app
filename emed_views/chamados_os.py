@@ -15,6 +15,7 @@ from emed_core import (
     agendar_proxima_etapa_circular,
     KITS_INSTRUMENTOS_POR_SITUACAO,
     obter_kit_por_servico,
+    acionar_separacao_automatica_almoxarifado,
 )
 from emed_services import (
     AppContext,
@@ -374,8 +375,9 @@ def _render_criar_nova_os(ctx: AppContext):
             instrumento_abertura = st.text_input(
                 f"5.2 Sugestão de Instrumentos & Peças para o Atendimento ({kit_sugerido['nome']})",
                 value=", ".join(kit_sugerido["itens"]),
-                help="O Almoxarifado recebe a lista de ferramentas calibradas e peças sobressalentes sugeridas para separação."
+                help="O Almoxarifado será acionado automaticamente pelo sistema com esta lista de materiais e ferramentas para separação imediata."
             )
+            st.caption(f"⚡ **Acionamento Automático:** Ao emitir a OS, o Almoxarifado entra imediatamente em status **'A SEPARAR'** para o técnico **{chamado_tec}**.")
 
         st.markdown("#### 🔬 Pré-Atendimento, Defeito Relatado, Formulários & Anexos (Foto / Vídeo)")
         col_pre1, col_pre2 = st.columns(2)
@@ -498,6 +500,20 @@ def _render_criar_nova_os(ctx: AppContext):
                 df = pd.concat([df, pd.DataFrame([nova_os])], ignore_index=True)
                 if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
                     st.cache_data.clear()
+                    novo_idx = df.index[-1]
+                    id_os_gerada = obter_id_os(novo_idx, pd.Series(nova_os))
+
+                    # Acionamento Automático do Almoxarifado para o Técnico Selecionado
+                    ok_sep, msg_sep = acionar_separacao_automatica_almoxarifado(
+                        ctx.db_name,
+                        chamado_tec,
+                        chamado_cliente,
+                        equipamento_final,
+                        chamado_tipo,
+                        instrumento_abertura,
+                        os_id=id_os_gerada
+                    )
+
                     st.session_state.aviso_almox_pendente = {
                         "tecnico": chamado_tec,
                         "cliente": chamado_cliente,
@@ -505,8 +521,12 @@ def _render_criar_nova_os(ctx: AppContext):
                         "kit": kit_sugerido["nome"],
                         "itens": kit_sugerido["itens"],
                         "data": pd.to_datetime(chamado_data).strftime('%d/%m/%Y'),
+                        "os_id": id_os_gerada,
+                        "msg_sep": msg_sep,
                     }
-                    st.success("✅ Salvo com sucesso! Ordem de Serviço emitida.")
+                    st.success(f"✅ Salvo com sucesso! Ordem de Serviço #{id_os_gerada} emitida.")
+                    if ok_sep:
+                        st.info(f"📦 {msg_sep}")
                     st.rerun()
 
 
@@ -842,7 +862,19 @@ def _render_historico_concluidas(ctx: AppContext):
                         df.at[idx_c, 'instrumento_necessario'] = inst_reab.strip().upper()
                         if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
                             st.cache_data.clear()
+                            # Acionamento Automático do Almoxarifado para o Novo Técnico
+                            ok_sep, msg_sep = acionar_separacao_automatica_almoxarifado(
+                                ctx.db_name,
+                                tec_reab,
+                                row_c.get('cliente', ''),
+                                row_c.get('equipamento', ''),
+                                row_c.get('tipo_servico', ''),
+                                inst_reab,
+                                os_id=id_os_c
+                            )
                             st.success(f"✅ Salvo com sucesso! OS #{id_os_c} reaberta para o técnico {tec_reab}!")
+                            if ok_sep:
+                                st.info(f"📦 {msg_sep}")
                             st.rerun()
 
 

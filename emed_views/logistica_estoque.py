@@ -97,8 +97,8 @@ def render_solicitacao_pecas(ctx: AppContext):
     df = ctx.df
     equipa_tecnica = ctx.equipa_tecnica
 
-    st.markdown("### 🧰 Quadro Geral de Ferramentas, Kits & Instrumentos Disponíveis")
-    st.caption("Visão em tempo real de instrumentos, kits e ferramentas no Almoxarifado EMED para consulta rápida de toda a equipe técnica antes de intervenções.")
+    st.markdown("### 🧰 Quadro de Ferramentas & Kits em Tempo Real")
+    st.info("💡 **Consulte antes de se deslocar à empresa:** saiba instantaneamente se o kit está disponível no Almoxarifado ou em posse de outro colega em campo, evitando viagens perdidas!")
 
     df_est_quadro = carregar_estoque(ctx.db_name)
     df_sol_ativas = carregar_solicitacoes(ctx.db_name)
@@ -151,7 +151,7 @@ def render_solicitacao_pecas(ctx: AppContext):
                 elif qtd_f > 0:
                     disp_cor = "#10b981"
                     disp_bg = "rgba(16, 185, 129, 0.12)"
-                    disp_txt = f"🟢 {qtd_f} DISPONÍVEL"
+                    disp_txt = f"🟢 NO ALMOXARIFADO ({qtd_f} un.)"
                 else:
                     disp_cor = "#ef4444"
                     disp_bg = "rgba(239, 68, 68, 0.12)"
@@ -169,11 +169,8 @@ def render_solicitacao_pecas(ctx: AppContext):
                     """, unsafe_allow_html=True)
     
     st.markdown("---")
-    st.markdown("### 📦 Cautela & Retirada de Ferramental, Kits e Peças")
-    st.info(
-        "Selecione o **Técnico que está com o material** e tique os itens retirados do Almoxarifado. "
-        "Não é necessário indicar o destino do hospital: o controle é focado diretamente na posse do técnico."
-    )
+    st.markdown("### ✋ Pegar / Retirar Ferramenta ou Peça (Registrar Posse)")
+    st.caption("Sem burocracia ou comprovantes: apenas selecione quem está pegando e tique os itens para que toda a equipe saiba onde a ferramenta está.")
 
     df_est_atual = carregar_estoque(ctx.db_name)
     lista_t_sol = sorted(list(equipa_tecnica.keys()))
@@ -295,7 +292,7 @@ def render_solicitacao_pecas(ctx: AppContext):
             height=110
         )
 
-        if st.form_submit_button("🚀 Confirmar Reserva no Estoque & Enviar ao Almoxarifado", type="primary"):
+        if st.form_submit_button("✅ Pegar Ferramenta / Registrar Saída", type="primary"):
             if not itens_ticados and not instrumentos_extras_sol.strip():
                 st.error("⚠️ Selecione pelo menos um material ou indique o instrumento necessário!")
             else:
@@ -338,67 +335,48 @@ def render_solicitacao_pecas(ctx: AppContext):
                     st.error(erro_conflito)
                 else:
                     st.cache_data.clear()
-                    inst_txt_msg = instrumentos_extras_sol.strip().upper() if instrumentos_extras_sol.strip() else 'NENHUM'
-                    msg_almox = (
-                        f"📦 *RETIRADA DE FERRAMENTAL / MATERIAL - EMED*\n\n"
-                        f"👨‍🔧 *Técnico Responsável:* {tec_solicitante}\n"
-                        f"📅 *Data/Hora:* {data_ped_agora}\n"
-                        f"📌 *Situação:* EM POSSE DO TÉCNICO / EM CAMPO\n\n"
-                        f"🛠️ *Materiais com o Técnico:*\n{resumo_itens_str}\n\n"
-                        f"📐 *Kits / Observações:*\n{inst_txt_msg}\n"
-                    )
-                    link_wpp_est = f"https://wa.me/558593333333?text={urllib.parse.quote(msg_almox)}"
-                    st.success(f"✅ Material registrado com sucesso na posse do técnico {tec_solicitante}!")
-                    st.markdown(f"""
-                        <a href="{link_wpp_est}" target="_blank" style="background:#25d366; color:white; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight:bold; display:inline-block; margin-top:8px;">
-                            📲 Enviar Comprovativo de Retirada para o Almoxarifado (WhatsApp)
-                        </a>
-                    """, unsafe_allow_html=True)
+                    st.success(f"✅ Registrado com sucesso! Agora toda a equipe já sabe que o material está com **{tec_solicitante}**.")
+                    st.rerun()
 
     st.markdown("---")
-    st.markdown("#### 📋 Histórico de Posse & Gestão Circular do Almoxarifado")
-    st.caption("Acompanhe com qual técnico cada kit e ferramenta se encontra e confirme a devolução ao estoque com 1 clique.")
+    st.markdown("#### 🔄 Ferramentas em Campo & Devolução Rápida ao Almoxarifado")
+    st.caption("Ao devolver a ferramenta ou sobra de peça à empresa, clique em 'Devolver' para restabelecer imediatamente a disponibilidade no quadro.")
     df_sol_hist = carregar_solicitacoes(ctx.db_name)
     if not df_sol_hist.empty:
-        df_sol_vis = df_sol_hist.copy()
-        cols_renomear = {
-            "id": "#",
-            "tecnico": "Técnico com a Posse",
-            "itens_solicitados": "Itens com o Técnico",
-            "instrumentos_solicitados": "Kits / Observações",
-            "status_pedido": "Situação da Carga",
-            "data_pedido": "Data Retirada"
-        }
-        cols_exibir = [c for c in cols_renomear.keys() if c in df_sol_vis.columns]
-        df_sol_vis_show = df_sol_vis[cols_exibir].rename(columns=cols_renomear)
-        st.dataframe(df_sol_vis_show, use_container_width=True, hide_index=True)
+        df_em_campo = df_sol_hist[~df_sol_hist['status_pedido'].fillna('').str.contains('DEVOLVIDO|CANCELADO|ESTORNADO', case=False)]
+        if not df_em_campo.empty:
+            st.markdown("##### 🔴 Materiais Atualmente com Técnicos (Clique para Devolver):")
+            for _, r_campo in df_em_campo.iterrows():
+                id_c = r_campo['id']
+                tec_c = r_campo['tecnico']
+                itens_c = r_campo['itens_solicitados']
+                data_c = r_campo.get('data_pedido', '')
+                col_info_c, col_btn_c = st.columns([3.8, 1.4])
+                with col_info_c:
+                    st.markdown(f"**👨‍🔧 {tec_c}** | `{data_c}` | 🛠️ {itens_c}")
+                with col_btn_c:
+                    if st.button("📥 Devolver ao Almoxarifado", key=f"btn_dev_rapido_{id_c}", type="primary"):
+                        ok_dev, msg_dev = atualizar_status_solicitacao_peca(ctx.db_name, id_c, "DEVOLVIDO AO ESTOQUE / BAIXA DE RETORNO")
+                        if ok_dev:
+                            st.cache_data.clear()
+                            st.success(f"✅ Material de {tec_c} devolvido com sucesso! O quadro foi liberado.")
+                            st.rerun()
+                        else:
+                            st.error(msg_dev)
+        else:
+            st.success("🟢 Todas as ferramentas e kits estão no Almoxarifado no momento! Nenhuma em campo.")
 
-        with st.expander("🔄 Devolver Material ao Almoxarifado / Alterar Situação da Posse", expanded=True):
-            with st.form("form_gestao_status_reserva"):
-                opcoes_ped = [
-                    f"#{r['id']} | Técnico: {r['tecnico']} | Itens: {r['itens_solicitados']} [{r['status_pedido']}]"
-                    for _, r in df_sol_hist.iterrows()
-                ]
-                ped_escolhido = st.selectbox("Selecione o Registro de Carga:", opcoes_ped)
-                novo_st_ped = st.selectbox(
-                    "Nova Situação da Carga:",
-                    [
-                        "DEVOLVIDO AO ESTOQUE / BAIXA DE RETORNO",
-                        "ENTREGUE AO TÉCNICO / EM CAMPO",
-                        "A SEPARAR / AGUARDANDO ALMOXARIFADO",
-                        "APLICADO EM DEFINITIVO NO CLIENTE / BAIXADO",
-                    ],
-                    help="Selecione 'DEVOLVIDO AO ESTOQUE' quando o técnico devolver a ferramenta ou sobra de peça para restabelecer imediatamente o saldo no almoxarifado."
-                )
-                if st.form_submit_button("💾 Atualizar Status da Posse / Confirmar Devolução", type="primary"):
-                    id_ped_alvo = int(ped_escolhido.split("|")[0].replace("#", "").strip())
-                    ok_st, msg_st = atualizar_status_solicitacao_peca(ctx.db_name, id_ped_alvo, novo_st_ped)
-                    if ok_st:
-                        st.cache_data.clear()
-                        st.success(msg_st)
-                        st.rerun()
-                    else:
-                        st.error(msg_st)
+        with st.expander("📋 Ver Histórico Geral de Movimentações"):
+            df_sol_vis = df_sol_hist.copy()
+            cols_renomear = {
+                "id": "#",
+                "tecnico": "Técnico",
+                "itens_solicitados": "Itens Retirados",
+                "status_pedido": "Situação",
+                "data_pedido": "Data Retirada"
+            }
+            cols_exibir = [c for c in cols_renomear.keys() if c in df_sol_vis.columns]
+            st.dataframe(df_sol_vis[cols_exibir].rename(columns=cols_renomear), use_container_width=True, hide_index=True)
 
 
 def render_mapa_rotas(ctx: AppContext):
