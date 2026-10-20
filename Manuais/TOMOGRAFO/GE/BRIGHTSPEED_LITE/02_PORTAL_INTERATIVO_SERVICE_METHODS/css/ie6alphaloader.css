@@ -1,0 +1,4 @@
+.blackTriangleie img { filter:progid:DXImageTransform.Microsoft.Alpha(opacity=0); }
+.blackTriangleie { filter:progid:DXImageTransform.Microsoft.AlphaImageLoader(src='../icons/black_triangle.png', sizingMethod='scale'); }
+.whiteTriangleie img { filter:progid:DXImageTransform.Microsoft.Alpha(opacity=0); }
+.whiteTriangleie { filter:progid:DXImageTransform.Microsoft.AlphaImageLoader(src='../icons/white_triangle.png', sizingMethod='scale'); }

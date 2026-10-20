@@ -1,0 +1,86 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>DASM Troubleshooting</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/14/07</P></td></tr></table><H1 ID="top">DASM Troubleshooting </H1><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669074448">1&nbsp;&nbsp;DASM Diagnostics<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">diagnostic(s): (OC) hinv, scsistat, showdasm, clrsp, rqs, rsp</FONT></SPAN></P><P CLASS="sect1"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">error log(s): (OC)</FONT></SPAN></P><P CLASS="sect1">The DASM runs a power up self-test as well as an idle test loop (heartbeat)
+when on. See the manual that comes with all DASMs for more info on LED error
+status and heartbeat indications. When the DASM is failing, its middle two
+LEDs flash an error code, after all LEDs are momentarily flashed ON.</P><P CLASS="sect1">There is an application utility called <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>showdasm</B></FONT></SPAN> that
+can be run from any shell to check basic communications with the DASM by retrieving
+its configuration. Note however that while there are active filming jobs, <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>showdasm</B></FONT></SPAN> will
+fail with an &#8220;open failure&#8221; because the DASM device is opened
+exclusively by the filming print filter/manager.</P><P CLASS="sect1">A SCSIbus0 reset popup ALERT message is a clear indication of a physical
+DASM problem/failure. This SCSIbus0 channel is dedicated to the DASM. The
+components in this chain include:</P><UL><LI CLASS="bulletlist"><P>DASM</P></LI><LI CLASS="bulletlist"><P>SCSI cable (SGI carrier to DASM)</P></LI><LI CLASS="bulletlist"><P>SCSI terminator module (on DASM)</P></LI><LI CLASS="bulletlist"><P>LED/switch/SCSI PWA inside SGI carrier</P></LI><LI CLASS="bulletlist"><P>SCSIbus0 ribbon cable inside SGI carrier</P></LI><LI CLASS="bulletlist"><P>Ribbon-to-IP22 PWA inside SGI carrier</P></LI><LI CLASS="bulletlist"><P>IP22 motherboard (contains SCSI controller/termination)</P></LI></UL><DIV CLASS="ILLUSTRATION" id="I5-180-63575"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">DASM LED, Reset Switch and SCSI Connector</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/63575-63577.gif" BORDER="0" usemap="#SL63578-63575"></P></DIV><P CLASS="sect1">Sometimes after a filming and/or SCSIbus problem/error, the DASM device
+can be confused and/or out of synchronization with the host SCSI driver and/or
+platform DASM manager. Usually a second or third attempt at running <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>showdasm</B></FONT></SPAN> will
+re-synchronize SCSI communications.</P><P CLASS="sect1">While the Analog DASM is in its idle test/loop or when an image has
+been sent to the DASM, the Video Output should have either a continuously
+changing pattern or the last image sent. This may be checked for the Analog
+DASM by connecting a short piece of coaxial cable from the DASM Analog Video
+Output connector to the Green Video input on one of the display monitors,
+after disconnecting the MG Video Input cables.</P><P CLASS="sect1">&nbsp;</P><P CLASS="sect1">WHERE FILMING ERRORS ARE LOCATED</P><P CLASS="sect1">To investigate a filming problem, look at the following logs:</P><P CLASS="sect1"><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>/usr/g/service/log/gessy*.log</B></FONT></SPAN></P><P CLASS="sect1"><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>/var/adm/SYSLOG*</B></FONT></SPAN></P><P CLASS="sect1"><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>/usr/g/ctuser/logfiles/prslog</B></FONT></SPAN></P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669074464">2&nbsp;&nbsp;DASM LEDs<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Make sure the DASM power is applied (green power LED) and that the DASM
+power-up self-test completes successfully (flashing green CPU LED indicates
+idle heartbeat).</P><P CLASS="sect1">On analog VDB DASM only, the &#8220;RDY&#8221; and &#8220;XFR&#8221;
+LEDs should toggle back and forth when filming is running. This toggling indicates
+that film sheet images are being output by the DASM (&#8220;RDY&#8221;) and
+then captured by the camera video/analog input port (&#8220;XFR&#8221;).</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669074464-dup.1">3&nbsp;&nbsp;Checking DASM SCSIbus Connection &amp; Basic DASM Operation<SPAN CLASS="SECT1EFF"> </SPAN></H2><OL><LI CLASS="numlist"><P>Use <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>hinv</B></FONT></SPAN> to check that the DASM was present
+at the last OC boot-up. The DASM looks like a disk drive to the Irix OS.</P><P>DASM LINE FROM <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>hinv</B></FONT></SPAN> OUTPUT:</P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">(other output)</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Disk drive: unit 1 on SCSI controller 1</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">(other output)</FONT></SPAN></P></LI><LI CLASS="numlist"><P>Use <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>scsistat</B></FONT></SPAN> to perform a &#8220;live&#8221;
+SCSIbus probe for the DASM device. Analog VDB and digital LCAM are shown separately,
+and the DASM firmware revisions should be as shown.</P><P>ANALOG VDB LINE FROM <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>scsistat</B></FONT></SPAN> OUTPUT:</P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">(other output)</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Device 1 1  Disk     CDA      DASM-VDB         FW Rev: 1.0e</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">(other output)</FONT></SPAN></P><P>DIGITAL LCAM LINE FROM <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>scsistat</B></FONT></SPAN> OUTPUT:</P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">(other output)</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Device 0 1  Disk      ANALOGIC DASM-LCAM-3M     FW Rev: 1.3</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">(other output)</FONT></SPAN></P></LI><LI CLASS="numlist"><P>Use <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>showdasm</B></FONT></SPAN> to perform an extended inquiry
+from the DASM device. You must be 'root' with <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">ctuser</FONT></SPAN> environment,
+as shown below, and the filming queue MUST be empty or fully paused or the <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>showdasm</B></FONT></SPAN> will
+fail.</P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@rhapby18}[1] </FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>showdasm</B></FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Could not initialize_scsi status = ffffffff</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@rhapby18}[2]</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>su</B></FONT></SPAN><SPAN CLASS="KEYBOARD">&lt;ENTER&gt;</SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Password:</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@rhapby18}[1]</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>showdasm</B></FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Vendor: CDA  Device: DASM-VDB</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Pif software rev: 1.0e  Krnl_rev: 2.1j</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">DRAM size: 1MB  SRAM size: 32KB I/O blocks: 2048  block size:
+512</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">SCSI ID: 1   CMDBLK addr: 200000 Baud: 1200  RS232 ctl reg:
+hex 8e</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Eprom checksum: hex 0038f90f       Internal checksum: hex 0038f770</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">RS232 Disabled DBUG Disabled           Power-on RAM tests Disabled</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@rhapby18}[2]</FONT></SPAN></P><P>Any SCSIbus or device related errors will be logged to the shell window
+you're using, the OC console shell window, and will also be saved in the OC <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/var/adm/SYSLOG*</FONT></SPAN> Irix
+system log. The DASM device is <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/dev/dasm1</FONT></SPAN>, which is linked
+to <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/dev/scsi/sc1d1l0</FONT></SPAN> (Octane).</P><P>If the above functions work, the DASM power, SCSIbus connections, and
+the host side DASM operation are all working properly. If not, you may have
+a problem with 'reconfig' (camera option, DASM type, etc.), SCSI cabling,
+or the DASM (it's usually NOT the DASM). Make sure you '<SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>su</B></FONT></SPAN>'
+from the '<SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">ctuser</FONT></SPAN>' shell and that the filming queue is empty
+or fully paused or the <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>scsistat</B></FONT></SPAN> will show<SPAN CLASS="SCRNFIX"><FONT FACE="COURIER"> EXCLUSIVELY
+OPEN</FONT></SPAN> for the DASM line, and the <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>showdasm</B></FONT></SPAN> will
+fail to open the DASM device, due to incorrect device permissions and environment
+variables.</P></LI></OL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669074468">4&nbsp;&nbsp;DASM Status File<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The LCAM Status file is used for ALARMS, ERRORS and other messages from
+the laser camera. Here are the error codes from <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">lc_msg_data.h</FONT></SPAN>:</P><PRE>/*.........................str..................,num,sev*/
+/* Status codes */
+  ""                                            ,0,0,
+  "1 Camera Is Ready"                           ,1,0,
+  "2 Acquiring an image"                        ,2,0,
+  "3 Opening the magazines"                     ,3,0,
+  "4 Removing a film from supply magazine"      ,4,0,
+  "5 Moving film to exposure area"              ,5,0,
+  "6 Exposing film (no other operations can be performed)",6,0,
+  "7 Closing the magazines"                     ,7,0,
+  "8 Moving film to film processor"             ,8,0,
+  "9 Unassigned status code"                    ,9,0,
+/* Recoverable Alarm codes */
+  "10 Supply Magazine Empty"            ,PRS_MEDIA_SUPPLY_EMPTY,ERR_FATAL,
+  "11 Receive Magazine Full"            ,PRS_MEDIA_RECEIVE_FULL,ERR_FATAL,
+  "12 Supply Magazine Full"             ,PRS_MEDIA_SUPPLY_MISSING,ERR_FATAL,
+  "13 Receive Magazine Missing"         ,PRS_MEDIA_RECEIVE_MISSING,ERR_FATAL,
+  "14 Supply Drawer Open"               ,PRS_MEDIA_SUPPLY_OPEN,ERR_FATAL,
+  "15 Receive Drawer Open"              ,PRS_MEDIA_RECEIVE_OPEN,ERR_FATAL,
+  "16 Top Cover Open"                   ,PRS_TOP_COVER_OPEN,ERR_FATAL,
+  "17 Film Processor Not Ready"         ,PRS_FILM_PROCESSOR_NOT_READY,ERR_FATAL,
+  "18 Docking Unit Not Ready"           ,PRS_DOCKING_UNIT_NOT_READY,ERR_FATAL,
+  "19 Unassigned alarm detected"        ,PRS_UNDEFINED_ALARM_CODE_19,ERR_FATAL,
+  "20 Film Transport Error..."          ,PRS_FIRST_FEED_ERROR,ERR_FATAL,
+  "92 Camera Interface On Line ?"       ,PRS_CAMERA_MMU_NO_RESPONSE,ERR_FATAL,
+  "99 MMU timer started (952)"          ,99,0,
+/* Status codes */
+  "200 Camera Interface On Line ?"              ,PRS_DASM_COMM_ERROR,ERR_FATAL,
+  "201 Can't allocate camera after 15 mn Trying...",PRS_PRINTER_BUSY_TIMEOUT,0,
+  "202 Your Film Was Queued Trying To Allocate Camera...",PRS_FILM_QUEUED,0,
+  "203 Film Low..."                             ,PRS_MEDIA_SUPPLY_LOW,0,
+  "204 Print Paused..."                         ,PRS_PRINT_PAUSED,0,
+  "207 Camera Is busy at This Time Print Paused...Restart",PRS_PRINTER_BUSY,0,
+  "208 Can't Process Print Request at This Time Print Paused...Restart"                                                               ,PRS_BAD_PARAM,ERR_FATAL,
+  "209 Time_out Print ...Restart"               ,PRS_PRINT_CYCLE_TIMEOUT,0,
+  "210 Failed acquire "                         ,PRS_FAILED_ACQUIRE,ERR_FATAL,
+  "212 Unsupported Format"                      ,212,0,
+  "301 OK"                                      ,PRS_STATUS_OK,0,
+  "Unknown Error returned"                      ,LAST_LC_MSG,0
+</PRE></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

@@ -1,0 +1,311 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>IG Node Command List</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;3.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;6/3/08</P></td></tr></table><H1 ID="top">IG Node Command List </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="45%"><col width="55%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised:</td><td valign="">16 May 2008</td></tr></tbody></table></div></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1765654-782773">1&nbsp;&nbsp;Overview<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">This module describes how to verify communication between the
+IG Node and the DARC Node..After verifying that communication exists
+between the IG Node and the DARC Node, RAC diagnostics for each IG
+Node may be performed. Memory size is important and may be checked;
+however, exact memory values expected are not discussed as this memory
+size value may change over time and with different types of IG Nodes
+offered. It is currently (July, 2006) around 2 GBytes for Main memory.
+Application software can be started to verify that Image Generation
+is running, which assists in determining if the IG Node(s) is up (as
+we determine up and ready for recon). Refer to the System Diagrams
+(block diagrams) to understand connections between Nodes. Refer to
+the Command List to determine which commands can be performed. Additional
+information has been supplied for specific command outputs.</P><P CLASS="sect1">All IG Nodes must be power cycled with the DARC Node running
+and booted up (rsh is successful on DARC). This is performed with
+Apps down. The IG Node should be successfully able to perform the
+rsh command. If this fails, reinitialize (power cycle) the specific
+IG Node. To determine issues with IG Nodes, refer to the Command List
+and at the DARC Node perform <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">cd /var/log</FONT></SPAN> and then <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">more messages</FONT></SPAN>. Before replacing any IG Node, copy the DARC
+Node var log (relevant date and time) and include this log with the
+defective part.</P><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e60"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">For All-In-One Console,
+There is no DARC node presence. CDIP card and scan data disks are
+mounted in Host computer. All the commands ran on DARC node will be
+ran on Host computer. <p>For AIO console, maximum one IG is supported. </p><p>For AIO console, we can telnet to IG from Host Computer with
+the same command.</p></TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1765655-782773">2&nbsp;&nbsp;Command List<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="INFTABLE"><div align="center"><table border="0"><colgroup><col width="34%"><col width="66%"></colgroup><tbody valign=""><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@darc} or [root@darc]</FONT></SPAN></td><td rowspan="2" valign="top">This command
+allows the user to determine what the DARC Node understands in relation
+to the Ethernet Address / port for a specific IG Node (IG Node1, 2
+and 3). When a IG Node is configured /acitive in the system, look
+for Running.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">ifconfig</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@darc]</FONT></SPAN></td><td rowspan="2" valign="">The ipmitool may be available.
+This command allows the user to determine what the DARC Node understands
+in relation to the power state for a specific IG Node (for ig# insert
+1, 2 or 3 as applicable). The telnet command or the service igpower#
+start command will allow the user to apply power to the IG Node from
+a Unix Shell. Refer to <SPAN CLASS="pubref"><I>Usage Examples</I></SPAN>, for help.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">ipmitool -I lan -H ig# -A NONE
+chassis power status</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@darc]</FONT></SPAN></td><td rowspan="2" valign="">This command allows the
+user to turn on power to a specific IG Node (for ig# insert 1, 2 or
+3 as applicable). The power cord must be inserted and AC Power must
+be good. The Ethernet cable must be routed between the DARC Node and
+IG Node correctly and must be in good (working) condition.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">service igpower# start</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@darc]</FONT></SPAN></td><td rowspan="2" valign="">This command allows the
+user to turn off power to a specific IG Node (for ig# insert 1, 2
+or 3 as applicable). The power cord must be inserted and AC Power
+must be good. The Ethernet cable must be routed between the DARC Node
+and IG Node correctly and must be in good (working) condition.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">service igpower# stop</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@darc]</FONT></SPAN></td><td valign="">Restarts or verifies the cliservice dpcproxy
+server is running on the DARC Node to allow for Serial Over LAN (SOL).</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">service cliservice start</FONT></SPAN></td><td valign="">Returning message will be either: &#8220;The
+dpcproxy is running&#8221; or &#8220;dpcproxy cliservice has been
+restarted&#8221;</td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@darc} or [root@darc]</FONT></SPAN></td><td rowspan="7" valign="">After rsh to darc this verifies
+dpcproxy server running / SOL jconnection for a specific IG Node</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">telnet localhost 623</FONT></SPAN></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Server: ig1 (or ig2 or ig3)</FONT></SPAN></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Username: </FONT></SPAN><SPAN CLASS="KEYBOARD">&lt;Enter&gt;</SPAN></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Password: </FONT></SPAN><SPAN CLASS="KEYBOARD">&lt;Enter&gt;</SPAN></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Login successful</FONT></SPAN></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">dpccli&gt; exit</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@darc} or [root@darc]</FONT></SPAN></td><td valign="">Performed from the DARC Node for ig1,
+ig2, or ig3</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">ping ig#</FONT></SPAN></td><td valign="">Select <SPAN CLASS="KEYBOARD">&lt;Ctrl+C&gt;</SPAN> to
+stop the ping process</td></tr><tr valign="top"><td valign="">&nbsp;</td><td valign="">OS and Apps software must be loaded on
+the DARC Node for ping to be successful.</td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@darc} or [root@darc]</FONT></SPAN></td><td valign="">Performed from the DARC Node for ig1,
+ig2, or ig3</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">rsh ig#</FONT></SPAN></td><td valign="">OS and Apps software must be loaded on
+the DARC Node for rsh to be successful.</td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@darc} or [root@darc]</FONT></SPAN></td><td rowspan="3" valign="">This IG Node status log
+can assist in determining issues (used in conjunction with the log
+on the DARC Node).</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">cd /var/log</FONT></SPAN></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">more messages</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@darc} or [root@darc]</FONT></SPAN></td><td valign="">After rsh to darc this verifies dpcproxy
+server running / SOL connection.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">telnet localhost 623</FONT></SPAN></td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Server: ig1 (or ig2 or ig3)</FONT></SPAN></td><td valign="">Show the help menu for commands / options.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Username: </FONT></SPAN>&lt;Enter&gt;</td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Password: </FONT></SPAN>&lt;Enter&gt;</td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Login successful</FONT></SPAN></td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">dpccli&gt; help</FONT></SPAN></td><td valign="">&nbsp;</td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@darc} or [root@darc]</FONT></SPAN></td><td valign="">After rsh to darc this verifies dpcproxy
+server running / SOL connection. The SOL CD may need to be loaded
+into the DARC if SOL issues exist.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">telnet localhost 623</FONT></SPAN></td><td valign="">Resets the IG Node.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Server: ig1 (or ig2 or ig3)</FONT></SPAN></td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Username: </FONT></SPAN>&lt;Enter&gt;</td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Password: </FONT></SPAN>&lt;Enter&gt;</td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Login successful</FONT></SPAN></td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">dpccli&gt; reset</FONT></SPAN></td><td valign="">This command depends on the software
+release. Try <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">reset -c</FONT></SPAN> for older versions of software
+(pre 06MW03.x).</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">dpccli&gt; console</FONT></SPAN></td><td valign="">&nbsp;</td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@darc} or [root@darc]</FONT></SPAN></td><td valign="">After rsh to darc this verifies dpcproxy
+server running / SOL connection.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">telnet localhost 623</FONT></SPAN></td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Server: ig1 (or ig2 or ig3)</FONT></SPAN></td><td valign="">Lists the IG Node information and current
+OS and kernel information.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Username: </FONT></SPAN>&lt;Enter&gt;</td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Password: </FONT></SPAN>&lt;Enter&gt;</td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Login successful</FONT></SPAN></td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">dpccli&gt; console</FONT></SPAN></td><td valign="">&nbsp;</td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@darc} or [root@darc]</FONT></SPAN></td><td valign="">After rsh to darc this verifies dpcproxy
+server running / SOL connection.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">telnet localhost 623</FONT></SPAN></td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Server: ig1 (or ig2 or ig3)</FONT></SPAN></td><td valign="">Lists if power is on or off and last
+or current voltage/temperature/fan information for the IG Node.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Username: </FONT></SPAN>&lt;Enter&gt;</td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Password: </FONT></SPAN>&lt;Enter&gt;</td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Login successful</FONT></SPAN></td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">dpccli&gt; sensors -v</FONT></SPAN></td><td valign="">This command depends on the software
+release. Try <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">sens -v</FONT></SPAN> for older versions of software
+(pre 06MW03.x).</td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@ig#} or [root@ig#]</FONT></SPAN></td><td rowspan="2" valign="">Lists devices and memory.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">lhinv</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@ig#} or [root@ig#]</FONT></SPAN></td><td rowspan="2" valign="">Lists memory size (2048).</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">lhinv | grep Main</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@ig#} or [root@ig#]</FONT></SPAN></td><td rowspan="2" valign="">Shows status and existence
+of a specific IG Node rac.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">cat /proc/driver/gemsrac</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@darc]</FONT></SPAN></td><td rowspan="4" valign="">Checking the existence of
+a RAC (recon accelerator card) in a specific IG Node. The output of
+this command will display &#8220;rac&#8221; (ignore any numbers in
+the output string), if the RAC is seen.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">rsh ig#</FONT></SPAN></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@ig#]</FONT></SPAN></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">lsmod | grep rac</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@hostname}</FONT></SPAN></td><td valign="">Performs rac (recon accelerator card)
+diagnostics on up to 3 IG Nodes from ctuser on the Host computer with
+Application Software Down (preferably when performed remotely).</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">racdiags</FONT></SPAN></td><td valign="">Alternate command is <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">racdiags
+1</FONT></SPAN> for a single IG Node Operator Console. It has been reported
+that racdiags may hang when running. Try the racbist command.</td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@ig#} or [root@ig#]</FONT></SPAN></td><td rowspan="2" valign="">Displays kernel name, hostname,
+kernel release and version, machine hardware name, hardware platform.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">uname -a</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@ig#} or [root@ig#]</FONT></SPAN></td><td rowspan="2" valign="">Does not adequately display
+IG Node total memory information but does display used memory.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">free -m</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@ig#} or [root@ig#]</FONT></SPAN></td><td rowspan="2" valign="">Displays detailed memory
+information.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">cat /proc/meminfo</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">df -h</FONT></SPAN></td><td valign="">Displays partition information.</td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@ig#} or [root@ig#]</FONT></SPAN></td><td rowspan="2" valign="">Lists all devices detected
+by the system's Node.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">cat /proc/devices</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@ig#]</FONT></SPAN></td><td rowspan="2" valign="">Shows the IG Node version
+of Motherboard.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">dmidecode | less</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@ig#]</FONT></SPAN></td><td rowspan="2" valign="">Shows IG Node BIOS version
+as loaded by the vendor.</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">dmidecode | grep -i version</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@ig#]</FONT></SPAN></td><td rowspan="2" valign=""><B>With APPS Up
+ONLY</B> - provides a clue that recon is up and running on
+the specific IG Node (do not perform this command on the DARC Node
+- the DARC Node information is not properly updated). Refer to <SPAN CLASS="pubref"><I>Usage Examples</I></SPAN>, for help..</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">ps -leaf | grep -v grep | grep
+image_generation</FONT></SPAN></td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@darc]</FONT></SPAN></td><td rowspan="4" valign="">For an Ethernet cabling
+connection issue or a bad DARC NIC issue, use the command 'ethtool
+-p eth#' (where # represents the Ethernet address) as root. If the
+Ethernet cable is good and correctly connected from the Host Computer
+to the DARC Node, and the DARC NIC port is good, then the port will
+blink or flash when activated. Ctrl-C will stop the test. To find
+the associated IG Node Ethernet address, perform the ifconfig command
+on the Host Computer</td></tr><tr valign="top"><td valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">ethtool -p eth#</FONT></SPAN></td></tr><tr valign="top"><td valign="">&nbsp;</td></tr><tr valign="top"><td valign="">(Ctrl-C to stop)</td></tr><tr valign="top"><td bgcolor="#C0C0C0" valign=""></td><td bgcolor="#C0C0C0" valign=""></td></tr><tr valign="top"><td valign=""><PRE>{ctuser@darc}
+ipmitool -I lan -H ig1 -P &#8220;&#8221; sel</PRE></td><td valign="">Basic comm. over SOL, and log status.</td></tr><tr valign="top"><td valign=""><PRE>{ctuser@darc}
+ipmitool -H ig1 -P '' chassis power status</PRE></td><td valign="">Check chassis power behavior at boot.</td></tr><tr valign="top"><td valign=""><PRE>{ctuser@darc}
+ipmitool -H ig1 -P '' fru</PRE></td><td valign="">Lists board components.</td></tr><tr valign="top"><td valign=""><PRE>{ctuser@darc}
+ipmitool -H ig1 -P '' sdr type temp</PRE></td><td valign="">Component temperature checks.</td></tr><tr valign="top"><td valign=""><PRE>{ctuser@darc}
+ipmitool -H ig1 -P '' sel list last 15</PRE></td><td valign="">Lists all board sensors. Many details. Look for OKs.</td></tr><tr valign="top"><td valign=""><PRE>{ctuser@darc}
+ipmitool -H ig1 -P '' sdr</PRE></td><td valign="">Simplified board sensors. Look for OKs.</td></tr><tr valign="top"><td valign=""><PRE>[root@ig#]
+dmidecode|grep -i vers</PRE></td><td valign="">Returns a Version string which contains <B>WV</B> for Westville, <B>JR</B> for Jarrell.</td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL877079-782773">3&nbsp;&nbsp;Usage Examples<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1765656-782773">3.1&nbsp;&nbsp;ipmitool<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@</FONT></SPAN><SPAN CLASS="SCRNVAR"><FONT FACE="COURIER"><I>hostname</I></FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">}</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>&nbsp; su&nbsp; -</B></FONT></SPAN></P><P CLASS="sect2"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Password:</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>&nbsp;&nbsp;#bigguy </B></FONT></SPAN></P><P CLASS="sect2"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@</FONT></SPAN><SPAN CLASS="SCRNVAR"><FONT FACE="COURIER"><I>hostname</I></FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">]#</FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">&nbsp;&nbsp;rsh &nbsp;darc </FONT></SPAN></P><P CLASS="sect2"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Last login: Mon Aug  6 19:35:00 from oc </FONT></SPAN></P><P CLASS="sect2"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">You have new mail. </FONT></SPAN></P><P CLASS="sect2"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@darc ~]#</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>&nbsp;&nbsp;ipmitool
+&nbsp;-I &nbsp;lan &nbsp;-H &nbsp;ig1 &nbsp;-A &nbsp;NONE &nbsp;chassis
+&nbsp;power &nbsp;status </B></FONT></SPAN></P><P CLASS="sect2"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Chassis Power is on  </FONT></SPAN></P><P CLASS="sect2"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@darc ~]#</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>&nbsp;&nbsp;ipmitool
+&nbsp;-I &nbsp;lan &nbsp;-H &nbsp;ig1 &nbsp;-A &nbsp;NONE &nbsp;chassis
+&nbsp;power &nbsp;status </B></FONT></SPAN></P><P CLASS="sect2"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Chassis Power is off </FONT></SPAN></P><P CLASS="sect2"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@darc ~]#</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>&nbsp;&nbsp;service
+&nbsp;igpower1 &nbsp;start </B></FONT></SPAN></P><P CLASS="sect2"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Starting ig1:                                     
+        [  OK  ]  </FONT></SPAN></P><P CLASS="sect2">To remove power to the chassis, perform the following command: </P><P CLASS="sect2"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@darc ~]#</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>&nbsp;&nbsp;service
+&nbsp;igpower1 &nbsp;stop </B></FONT></SPAN></P><P CLASS="sect2"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Stopping ig1:                                     
+        [  OK  ]</FONT></SPAN></P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1765657-782773">3.2&nbsp;&nbsp;image_generation (Apps Up)<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">ctuser@ig1:</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>&nbsp; ps &nbsp;-leaf
+&nbsp;| &nbsp;grep &nbsp;-v &nbsp;grep &nbsp;| &nbsp;grep &nbsp;image_generation</B></FONT></SPAN></P><PRE>
+4 S ctuser     767   766  0  81   0 -  1143 rt_sig 14:52 ?        00:00:00 csh -c 
+image_generation -bp 0 -host darc -node 1 -vrac 0
+
+0 S ctuser     785   767  0  75   0 - 48692 -      14:52 ?        00:00:00 
+image_generation -bp 0 -ho st darc -node 1 -vrac 0</PRE></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1590501-782773">4&nbsp;&nbsp;IG Node dpcproxy cliservice Verification<SPAN CLASS="SECT1EFF"> </SPAN></H2><PRE>{ctuser@hostname} su -
+Password: &lt;password&gt;
+[root@hostname]# telnet localhost 623
+Trying 127.0.0.1...
+Failed to connect to localhost.
+[root@hostname]# rsh darc
+Last login: Mon Aug  6 19:35:00 from oc
+You have new mail.
+[root@darc ~]# ps -aef |grep dpcproxy
+root      3836  3817  0 15:07 pts/10   00:00:00 grep dpcproxy
+</PRE><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e813"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">If the /usr/local/cli/dpcproxy information is not displayed
+then restart the cliservice. .<p>Alternate command: ps -aef | grep -v grep | grep dpcproxy </p><p>When this command is performed (ignore grep) then there will
+not be any output at all if the dpcproxy server is not running</p></TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><PRE>[root@darc ~]# /etc/rc.d/init.d/cliservice
+[root@darc ~]# service cliservice start
+The dpcproxy is running
+dpcproxy cliservice has been restarted
+[root@darc ~]# ps -aef |grep dpcproxy
+root      2891     1  0 14:51 ?        00:00:00 /usr/local/cli/dpcproxy
+root      3836  3817  0 15:07 pts/10   00:00:00 grep dpcproxy
+</PRE></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1590498-782773">5&nbsp;&nbsp;IG Node Ping and Remote Shell<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">This subsection will verify the IG Node can be communicated
+too or pinged via the DARC Node.  After verifying the ping communication
+line exists between the specific IG Node and the DARC Node a remote
+shell will be invoked to determine if the specific IG Node is up.
+ This can be performed as ctuser or as root (not insight).  </P><P CLASS="sect1">Open a Unix Shell and type the following:</P><PRE>{ctuser@hostname} su -
+Password: &lt;password&gt;
+[root@hostname]# rsh darc
+Last login: Mon Aug  6 19:35:00 from oc
+You have new mail.
+[root@darc ~]# ping ig1 (or ig2 or ig3 as applicable)
+PING ig1 (10.0.1.2) from (10.0.1.1): 56(84) bytes of data.
+64 bytes from ig1 (10.0.1.2) icmp_seq=1 ttl=64 time=0.157 ms
+64 bytes from ig1 (10.0.1.2) icmp_seq=2 ttl=64 time=0.209 ms
+64 bytes from ig1 (10.0.1.2) icmp_seq=3 ttl=64 time=0.175 ms
+64 bytes from ig1 (10.0.1.2) icmp_seq=4 ttl=64 time=0.134 ms
+</PRE><P CLASS="sect1">Select: Control-C to stop the ping</P><PRE>--- ig1 ping statistics ---
+4 packets transmitted, 4 received, 0% loss, time 3000ms
+rtt min/avg/max/mdev = 0.134/0.168/0.209/0.031 ms
+
+[root@darc ~]$ rsh ig1
+</PRE><P CLASS="sect1">(ignore the following messages)</P><PRE>connect to address 10.0.1.2: Connection refused 
+Trying krb4 rlogin...
+connect to address 10.0.1.2: Connection refused
+trying normal rlogin (/usr/bin/rlogin)
+Last login: Mon Aug  6 19:35:00 from darc
+[root@ig1 ~] exit
+logout
+rlogin: connection closed.
+[root@darc ~] exit
+logout
+rlogin: connection closed.
+[root@hostname]#
+</PRE></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1590494-782773">6&nbsp;&nbsp;DARC Node ifconfig Verification<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">This subsection will confirm the DARC Node address and the DARC
+Node Subnet address. Specific sites may require changing the DARC
+Subnet to a 169 base address due to a Hospital Backbone conflict with
+the 172.16.0.x base address. This 172 base address is the default.
+It is loaded onto the Host and DARC Node during the Load From Cold
+software installation process unless the DARC Subnet box is selected
+and the alternate address supplied is inserted.</P><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e848"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Remember to resave the System State Reconfig Info File
+whenever the DARC Subnet address is modified. <p>DEFAULT DARC Subnet address: inet addr: 172 16.0.2 Bcast: 172.16.0.255
+Mast: 255.255.255.0 </p><p>ALTERNATE DARC Subnet address: </p><p>inet addr: 169.254.0.2 Bcast: 169.254.0.255 Mast: 255.255.255.0</p></TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1765658-782773">7&nbsp;&nbsp;DARC Node&#61485;&#61485; ifconfig Running and Address Verification<SPAN CLASS="SECT1EFF"> </SPAN></H2><PRE>{ctuser@hostname} su -
+Password: &lt;password&gt;
+[root@hostname]# rsh darc
+Last login: Mon Aug  6 19:35:00 from oc
+You have new mail.
+[root@darc ~]# ifconfig
+</PRE><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e863"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">The eth2 inet addr and Bcast may be different for specific
+sites that have experienced a 172.16.0.x HOSPITAL Backbone conflict.
+ These specific sites will have a specific 169.254.0.2 address.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><PRE>eth0      Link encap:Ethernet  HWaddr 00:04:23:CA:7E:B8
+eth0      inet addr:10.0.2.1  Bcast:10.0.2.255  Mask:255.255.255.0
+IG2       inet6 addr: fe80::204:23ff:feca:7eb8/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:166057 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:146124 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000
+          RX bytes:32397595 (30.8 Mb)  TX bytes:91184965 (86.9 Mb)
+          Base address:0xc400 Memory:cfe80000-cfea0000
+ 
+eth1      Link encap:Ethernet  HWaddr 00:04:23:CA:7E:B9
+IG1       inet addr:10.0.1.1  Bcast:10.0.1.255  Mask:255.255.255.0
+          inet6 addr: fe80::204:23ff:feca:7eb9/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:164105 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:141147 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000
+          RX bytes:31762737 (30.2 Mb)  TX bytes:84167297 (80.2 Mb)
+          Base address:0xc480 Memory:cfea0000-cfec0000
+</PRE><PRE>eth2      Link encap:Ethernet  HWaddr 00:04:23:BB:DB:EC
+eth2      inet addr:172.16.0.2  Bcast:172.16.0.255  Mask:255.255.255.0
+DARC      inet6 addr: fe80::204:23ff:febb:dbec/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:89484 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:121201 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000
+          RX bytes:15385255 (14.6 Mb)  TX bytes:13943296 (13.2 Mb)
+          Base address:0xdc00 Memory:cffa0000-cffc0000
+ 
+eth3      Link encap:Ethernet  HWaddr 00:04:23:BB:DB:ED
+IG3       inet addr:10.0.3.1  Bcast:10.0.3.255  Mask:255.255.255.0
+          inet6 addr: fe80::204:23ff:febb:dbed/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:152621 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:118265 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000
+          RX bytes:28314323 (27.0 Mb)  TX bytes:55007399 (52.4 Mb)
+          Base address:0xdc80 Memory:cffe0000-d0000000
+ 
+lo        Link encap:Local Loopback
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:16436  Metric:1
+          RX packets:101274 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:101274 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0
+          RX bytes:5267464 (5.0 Mb)  TX bytes:5267464 (5.0 Mb)
+</PRE><P CLASS="sect1">Following is an example output
+of ifconfig ran on Host computer of All-in-one Console. For AIO console,
+IG node is connected to Host Computer.</P><PRE>{ctuser@hostname}ifconfig</PRE><PRE>eth0      Link encap:Ethernet  HWaddr 00:1B:21:02:18:E4  
+(IG Node) inet addr:10.0.1.1  Bcast:10.0.1.255  Mask:255.255.255.0
+          inet6 addr: fe80::21b:21ff:fe02:18e4/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:425 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:6 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:100 
+          RX bytes:27200 (26.5 KiB)  TX bytes:492 (492.0 b)
+          Base address:0x2400 Memory:f2180000-f21a0000 
+ 
+eth1      Link encap:Ethernet  HWaddr 00:1B:21:02:18:E5  
+          inet addr:192.9.220.1  Bcast:192.9.220.255  Mask:255.255.255.0
+          inet6 addr: fe80::21b:21ff:fe02:18e5/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:3788 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:3758 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:36 txqueuelen:10 
+          RX bytes:646931 (631.7 KiB)  TX bytes:492127 (480.5 KiB)
+          Base address:0x2440 Memory:f21a0000-f21c0000 
+</PRE><PRE>eth2      Link encap:Ethernet  HWaddr 00:0E:0C:AA:52:4E  
+          inet addr:3.36.231.122  Bcast:3.36.231.255  Mask:255.255.252.0
+          inet6 addr: fe80::20e:cff:feaa:524e/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:11874 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:2090 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:100 
+          RX bytes:3014106 (2.8 MiB)  TX bytes:234499 (229.0 KiB)
+          Base address:0x2480 Memory:f21c0000-f21e0000 
+ 
+eth3      Link encap:Ethernet  HWaddr 00:0E:0C:AA:52:4F  
+          UP BROADCAST MULTICAST  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:0 (0.0 b)  TX bytes:0 (0.0 b)
+          Base address:0x24c0 Memory:f21e0000-f2200000 
+ 
+eth4      Link encap:Ethernet  HWaddr 00:1A:4B:54:94:9D  
+          inet addr:10.44.22.20  Bcast:10.44.22.255  Mask:255.255.255.0
+          UP BROADCAST MULTICAST  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:0 (0.0 b)  TX bytes:0 (0.0 b)
+          Interrupt:177 
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:16436  Metric:1
+          RX packets:103607 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:103607 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:101229370 (96.5 MiB)  TX bytes:101229370 (96.5 MiB)
+</PRE></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1765659-782773">8&nbsp;&nbsp;dpccli Help Menu<SPAN CLASS="SECT1EFF"> </SPAN></H2><PRE>dpccli&gt; help
+    alarm -q { -g &lt;id&gt; [ -o &lt;id&gt; ] [-a &lt;id&gt; ] } | { -l &lt;severity&gt; } | -p
+    alarm -s -a &lt;id&gt; -l &lt;severity&gt;
+    alarm -c { -g &lt;id&gt; [ -o &lt;id&gt; ] [-a &lt;id&gt; ] } | { -l &lt;severity&gt; } | all
+    boot -s normal | service [-f] [-console]
+    clear
+    clearlog
+    commit
+    console
+    displaylog [-F csv|hex|dsv] [-O filename] [-n &lt;num&gt;]
+    exit
+    quit
+    get -T &lt;target&gt; &lt;options&gt;
+    help [-C &lt;command&gt;]
+    id
+    identify [-on [&lt;seconds&gt;]] [-off]
+
+    identify -s
+    interrupt -i nonmask [-console]
+    power { -on [-console] } | -off
+    power -state
+    reset [-console]
+    sensors [-v] [-F csv|dsv] [-f ok|nc|cr|nr|us] [-T volt|temp|power|fan]
+    service { console | exit | ftp { start | stop } }
+    set -T &lt;target&gt; &lt;options&gt;
+    shutdown [-f] [-r]
+    version
+</PRE></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

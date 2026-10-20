@@ -1,0 +1,186 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Gantry Thermal Theory</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;2.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;10/28/08</P></td></tr></table><H1 ID="top">Gantry Thermal Theory </H1><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL2000594-359001">1&nbsp;&nbsp;Overview<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="43%"><col width="57%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised on:</td><td valign="">October 13, 2008</td></tr></tbody></table></div></DIV><P CLASS="sect1">To manage the gantry internal temperature, four control loops
+are used.  These control loops include:</P><UL><LI CLASS="bulletlist"><P>Detector Air Plenum fans </P></LI><LI CLASS="bulletlist"><P>Detector Strip Heaters</P></LI><LI CLASS="bulletlist"><P>Top cover fans</P></LI><LI CLASS="bulletlist"><P>Inlet air heater</P></LI></UL><P CLASS="sect1">See <A HREF="359001.htm#SL359060-359001">Section&nbsp;4</A> for control loop summary details.</P><P CLASS="sect1">The TGPU and DAS DCB boards coordinate the operation of these
+control loops to optimize the temperature at the Detector modules
+and rails. </P><UL><LI CLASS="bulletlist"><P>The Gantry top cover fans and gantry
+heater are controlled by the TGPU via the stationary Common Fan Control
+(CFC) board. </P></LI><LI CLASS="bulletlist"><P>The Plenum Fans are controlled by the
+DCB via the rotating side CFC.</P></LI><LI CLASS="bulletlist"><P>The Detector rail heaters are controlled
+by the DHC using set points established by the DCB.</P></LI><LI CLASS="bulletlist"><P>The CFC and DCB boards accept messages
+via an RS232 interface and control fans/heaters as required.</P></LI><LI CLASS="bulletlist"><P>The CFC and Detector Heater Control
+(DHC) boards simply maintain the commanded value for fan speed or
+heater temperature.  Changes to these values are calculated in the
+TGPU for the stationary side CFC and DCB for the rotating side CFC
+and DHC.</P></LI></UL><P CLASS="sect1">The TGPU sends configuration information to the DCB.  The DCB
+then provides configuration, and control information to the rotating
+side CFC and DHC.  By using variable-speed fans in the Detector plenum,
+the VCT system mitigates the effects of the change in air temperature
+in the plenum, fan efficiency, system resistance and air density on
+the detector modules.  The top cover fans are also variable speed
+to regulate and minimize variation in the gantry air temperature.</P><P CLASS="sect1">See <A HREF="359001.htm#SL359065-359001">Section&nbsp;5</A> for CFC and <A HREF="359001.htm#SL359068-359001">Section&nbsp;6</A> for DHC board specific theory.</P><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e91"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">This theory document is the same for different system
+types. The ORP is called by a couple names depending on system type
+(ORP, ORPV, SCORP) but all refer to the same functional operation
+of the On-board Rotating Processor (ORP).</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><DIV CLASS="ILLUSTRATION" id="SL359071-359001"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Gantry Thermal block diagram</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/359001-359005.gif" BORDER="0" usemap="#SL359009-359001"></P></DIV><P CLASS="sect1">The Gantry contains 6 exhaust fans on the top covers, one gantry
+heater and a blower for controlling flow over the gantry heater. 
+There is a temperature sensor on the gantry heater exhaust.   </P><P CLASS="sect1">The detector has 5 fans and 3 temperature sensors in the plenum,
+3 rail heaters, 3 rail temperature sensors, and several temperature
+sensors in each Field Replaceable Detector Module (FRDM).  Access
+to all of these devices except for the detector module temperature
+sensors is via a CFC board.  The detector rail heaters and rail thermal
+sensor are additionally connected to the DHC board.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL2000604-359001">2&nbsp;&nbsp;Stationary Side Control<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The gantry stationary thermal devices are controlled by the
+thermal manager task on the TGPU.  The TGPU reads and sends commands
+to the stationary side CFC.  The TGPU gets temperature readings from
+the Detector plenum thermistors.  The path from the plenum thermistors
+to the TGPU is shown in <A HREF="javascript:winopen('359001illd0e94.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;1</A>.</P><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000605-359001">2.1&nbsp;&nbsp;Alarm Monitor<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">There is an alarm monitor function on the TGPU that is executed
+every 10 seconds unless the CFC is off line.  It reads the alarm status
+register of the CFC and reports any error. If the CFC is offline it
+is executed every 60 seconds and only checks to see if the CFC is
+re-connected.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000606-359001">2.2&nbsp;&nbsp;Gantry Heater Control<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The gantry heater blower fan is always on at a constant speed.
+ The duty cycle of the heater determines the temperature output. 
+The thermal manager in the TGPU uses configuration file parameters
+to determine the behavior of the gantry heater.  The TGPU checks the
+heater temperature at a rate determined by a configuration entry.
+  The TGPU checks for the following conditions:</P><UL><LI CLASS="bulletlist"><P>If the temperature is below the configured
+Setpoint the TGPU enables the heater.</P></LI><LI CLASS="bulletlist"><P>If the temperature is above the configured
+Setpoint the TGPU disables the heater.</P></LI><LI CLASS="bulletlist"><P>The TGPU will disable the heater if
+an error in the thermal sensor is detected.</P></LI></UL><P CLASS="sect2">The CFC receives on/off commands from the TGPU based on inlet
+air temperature feedback supplied to the CFC via a thermistor probe
+that will pass the information through the CFC to the TGPU via RS232
+communication.  The CFC then controls the solid state relay (SSR)
+on the gantry heater assembly to turn the heater on/off.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000610-359001">2.3&nbsp;&nbsp;Gantry Fan Control<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The thermal manager task on the TGPU sends a message to the
+DCB through the ORPV requesting plenum temperatures.  The plenum temperature
+data returned is sent through a digital filter on the TGPU with the
+results then averaged together.  The filtered average is used to determine
+the fan speeds for the gantry fans.  The fans are grouped in pairs
+for control speeds.  The groupings are the front fans, the rear fans
+and small booster fans (see <A HREF="javascript:winopen('359001illd0e139.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;2</A>).</P><DIV CLASS="ILLUSTRATION" id="SL359074-359001"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Gantry Fan Locations</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/359001-359007.gif" BORDER="0" usemap="#SL359010-359001"></P></DIV><P CLASS="sect2">Each pair is controlled separately.  The appropriate fan speed
+is determined through a lookup table of the filtered averaged plenum
+temperature.  The determined fan speed is sent to the CFC board that
+then sends a command voltage to the fans.  The CFC compares the commanded
+speed to the fan tach speed and adjusts the command voltage to set
+the fans at the requested speed.</P><P CLASS="sect2">The front fans will be stopped unless the plenum temperature
+reaches 30C.  it will then start at 35% speed and ramp to 90% speed
+as the plenum temperature goes to 35C.  </P><P CLASS="sect2">The rear fans only stop if the plenum temperature goes below
+24C.  Between 24 and 35 C the speed changes between 35% and 90%. 
+Note that the heater control tries to keep the plenum in the range
+of 30C +/- 5C, so it is unlikely that the rear fans will ever actually
+stop.</P><P CLASS="sect2">The booster fans will never stop spinning.  Between 22 and 35
+C the speed will vary between 35% and 65%.</P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL2000611-359001">3&nbsp;&nbsp;Rotating Side Control<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The primary duties of the rotating side thermal manager task
+are to control the Plenum fans and rail heaters.  It also monitors
+for failed devices via the CFC and DHC and provides temperature information
+to the stationary side.</P><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000612-359001">3.1&nbsp;&nbsp;Thermal Manager Task<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The Thermal manager task runs on the DCB and communicates directly
+to the CFC and indirectly to the DHC through the CFC.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000613-359001">3.2&nbsp;&nbsp;Detector Thermal Query<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The DCB must provide thermal information to the stationary side.
+ To minimize the timing impacts to the system, the thermal manager
+task will divide up the thermal data read into 3 stages. Stage 0 reads
+the plenum thermal sensors. Stage 1 reads the rail thermal sensors.
+ Stage 2 reads the actual plenum fan speeds. The data is put into
+the thermal data cache to be sent out every 10 seconds.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000614-359001">3.3&nbsp;&nbsp;Alarm Monitor<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The rotating side thermal manager checks the alarm status of
+the CFC and DHC boards.  If there are alarms appropriate errors are
+logged.  If the CFC or DHC is offline the thermal manager will periodically
+check to see when they are now online.  If the CFC has gone from offline
+to online the thermal manager will call the configure utility to download
+configuration data to the CFC and/or DHC.  The alarm monitor will
+execute every 10 seconds under normal conditions.  It will run once
+every 60 seconds if the CFC or DHC goes offline.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000615-359001">3.4&nbsp;&nbsp;Plenum Fan Control<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Plenum fan control executes as part of the thermal manager task.
+ The plenum fans are used to control detector module ASIC temperatures.
+ The average temperature of several modules are read in and used as
+feedback to a proportional integral derivative (PID) loop for control
+of the plenum fans.  The modules used are configurable.  Default detector
+modules used are the center 3 (28,29,30). The plenum temperature sensors
+are used to determine the set point for the PID loop.  In a process
+quite similar to the stationary side the plenum temperatures are read
+in, digitally filtered, averaged, then fed through a look up table
+(LUT) to determine the set point for the PID loop.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000616-359001">3.5&nbsp;&nbsp;DCB configuration<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Configuration data is sent to the DCB from the TGPU via the
+ORPV (or SCORP).  The CFC and DHC must be configured when they first
+come on line.  Data from the configuration message is sent by the
+DCB to initialize the CFC and DHC.  The CFC and DHC are not considered
+as online until the configuration data is available.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000617-359001">3.6&nbsp;&nbsp;Backup Mode<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">A legacy interface is maintained to inhibit system calibration
+if the detector temperature is not stable.  This function uses the
+same interface as the GDAS DHCB based Thermal Manager.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000618-359001">3.7&nbsp;&nbsp;Rail Heater Control<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Rail heater control is handled almost completely autonomously
+by the DHC.  The DCB only sets the desired temperature via the CFC
+at power up. The DCB communicates to the CFC via an RS232 interface
+that then sends information to the DHC.  All communications between
+the DHC and DCB go through the CFC.  The detector rail temperature
+is maintained at 38 degrees C for VDAS 64. For  VDAS 32, HDAS64 and
+HD_HDAS64 the rail temperature is 36 degrees C.</P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL359060-359001">4&nbsp;&nbsp;Control Sequence Summaries<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000619-359001">4.1&nbsp;&nbsp;Temperature Control Sequence (Detector Plenum)<SPAN CLASS="SECT2EFF"> </SPAN></H3><UL><LI CLASS="bulletlist"><P>DCB requests Field Replaceable Detector
+Module (FRDM) A/D board temperatures from the DIFB&#8217;s.</P></LI><LI CLASS="bulletlist"><P>DIFB&#8217;s supply FRDM A/D board
+temperatures to the DCB.</P></LI><LI CLASS="bulletlist"><P>DCB tells the Rotating CFC (RCFC) to
+change Fan Speed to a new supplied speed.</P></LI><LI CLASS="bulletlist"><P>RCFC checks fans tach and adjusts voltage
+to achieve and maintain the new speed.</P></LI><LI CLASS="bulletlist"><P>RCFC reports any Fan errors to the
+DCB.</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000625-359001">4.2&nbsp;&nbsp;Temperature Control Sequence (Detector Heater)<SPAN CLASS="SECT2EFF"> </SPAN></H3><UL><LI CLASS="bulletlist"><P>DHC receives detector temperature set
+point from DCB via RCFC. </P></LI><LI CLASS="bulletlist"><P>DHC monitors detector zone thermistors
+and turns heaters on or off to maintain detector rail temperature.</P></LI><LI CLASS="bulletlist"><P>DCB requests temperature data from
+DHC via RCFC for reporting on request.</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000629-359001">4.3&nbsp;&nbsp;Temperature Control Sequence (Gantry Cover Fans)<SPAN CLASS="SECT2EFF"> </SPAN></H3><UL><LI CLASS="bulletlist"><P>TGPU requests temperature data from
+the DCB via the ORPV. </P></LI><LI CLASS="bulletlist"><P>DCB requests temperature data from
+RCFC.</P></LI><LI CLASS="bulletlist"><P>RCFC reads Plenum temp thermistors
+and passes it to DCB.</P></LI><LI CLASS="bulletlist"><P>DCB sends the filtered average of 3
+sensors for the Plenum Temp data to the TGPU via ORPV (or SCORP). </P></LI><LI CLASS="bulletlist"><P>TGPU informs the Stationary CFC (SCFC)
+to change Fan speeds to a new supplied speed.</P></LI><LI CLASS="bulletlist"><P>SCFC checks fans tach and adjusts voltage
+to achieve and maintain the new speed. </P></LI><LI CLASS="bulletlist"><P>SCFC reports any Fan errors to the
+TGPU.</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000637-359001">4.4&nbsp;&nbsp;Temperature Control Sequence (Gantry Heater)<SPAN CLASS="SECT2EFF"> </SPAN></H3><UL><LI CLASS="bulletlist"><P>TGPU requests the Gantry heater assembly
+output temperature from the SCFC. </P></LI><LI CLASS="bulletlist"><P>SCFC reads gantry blower output temperature
+thermistor and reports it to the TGPU.</P></LI><LI CLASS="bulletlist"><P>TGPU determines from heater assembly
+thermistor data to turn heater on/off.</P></LI><LI CLASS="bulletlist"><P>TGPU informs the SCFC to turn the gantry
+heater (blower box) on/off.</P></LI><LI CLASS="bulletlist"><P>SCFC controls an SSR on the gantry
+heater assembly to turn heater on/off.</P></LI></UL></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL359065-359001">5&nbsp;&nbsp;Common Fan Control Board (CFC)<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000643-359001">5.1&nbsp;&nbsp;Default Mode<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">All fans will run at 1/2 speed, the gantry heater will be in
+the &#8220;Off&#8221; state, and the board will be ready for communication.
+The amber Default Mode LED will be lit. The CFC will stay in this
+state until a control communication is received and the hardware watchdog
+circuit is enabled.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000644-359001">5.2&nbsp;&nbsp;Hardware Watchdog<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">A &#8220;watchdog&#8221; function exists in hardware that will
+set and hold the board in &#8220;Default Mode&#8221; within 1 second
+on power up. The CPU, once initialized will write to the watchdog
+register continuously, which will allow variable fan speed and heater
+control. If the CPU does not continuously refresh watchdog within
+1.5 minutes, the board will enter the Default Mode with the heater
+disabled, and the fans set at &frac12; speed via hardware without
+any firmware interaction. The system is able to determine that the
+hardware watchdog failed and will post a message to the error log.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000645-359001">5.3&nbsp;&nbsp;Runtime Diagnostic self test<SPAN CLASS="SECT2EFF"> </SPAN></H3><UL><LI CLASS="bulletlist"><P>Detect and report open thermistors</P></LI><LI CLASS="bulletlist"><P>Detect and report shorted thermistors</P></LI><LI CLASS="bulletlist"><P>Detect and report Stationary Heater
+over-temp (open circuit when it should be closed)</P></LI><LI CLASS="bulletlist"><P>Memory Checksum or CRC check </P></LI></UL><P CLASS="sect2">The diagnostic self test will run on power on and also during
+regular operation at regular intervals timed at 1.15 seconds between
+tests. Test results will be communicated on request by firmware. This
+method allows firmware to query diagnostic results multiple times
+at multiple gantry positions while rotating. This will simplify diagnosis
+of rotation-related intermittent problems.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000650-359001">5.4&nbsp;&nbsp;48V power supply monitor circuit<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The CFC will monitor the 48V input at an accuracy of &plusmn;500mV
+and store the information in memory to be read by the host for diagnostic
+reporting.  If the voltage goes below 45V an error will be reported.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000651-359001">5.5&nbsp;&nbsp;Test Points and LEDs<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Test points and LEDs can only be seen after opening covers for
+the CFC assemblies. If the fans controlled by each CFC board are running,
+then the board has power and is alive.</P><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="SL2000652-359001"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">LEDs</SPAN> </P><table summary="LEDs" border="1"><colgroup><col width="29%"><col width="30%"><col width="41%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Label</td><td valign="">Color</td><td valign="">Description</td></tr><tr valign="top"><td valign="">D27</td><td valign="">Green</td><td valign="">48V+</td></tr><tr valign="top"><td valign="">D18</td><td valign="">Green</td><td valign="">Heartbeat (blinking)</td></tr></tbody></table></div></DIV><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="SL2000653-359001"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Test Points</SPAN> </P><table summary="Test Points" border="1"><colgroup><col width="44%"><col width="56%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Label</td><td valign="">Description</td></tr><tr valign="top"><td valign="">+12V</td><td valign="">12V on board power</td></tr><tr valign="top"><td valign="">+5V</td><td valign="">5V on board power</td></tr><tr valign="top"><td valign="">48V+</td><td valign="">48V incoming power</td></tr><tr valign="top"><td valign="">AGND 1-3</td><td valign="">Analog grounds</td></tr></tbody></table></div></DIV></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL359068-359001">6&nbsp;&nbsp;Detector Heater Control Board (DHC)<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000654-359001">6.1&nbsp;&nbsp;Overview<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The detector heater controller is designed to maintain the detector
+rails at a uniform temperature of 38 degrees Celsius for 64 slice
+VDAS and 36 degrees Celsius for 32 slice VDAS, 64 slice HDAS, and
+64 slice HD_HDAS. This is critical for controlling the photodiode
+ouput stability and preventing any changes to the rail temperature
+profile.  Changes in the rail temperature or the temperature profile
+can both lead to IQ errors due to poor diode temperature control.
+ In order to prevent EMI issues, the heater controller provides a
+constant filtered DC voltage to the rail heater zones. All PWM chopping
+of the input voltage is done within the controller. Also the communication
+of the temperature measurements of the rails will be done to CFC via
+the RS232 protocol.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000655-359001">6.2&nbsp;&nbsp;Boot up sequence and default mode<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Upon POWER ON, all heaters will start heating the detector and
+measurement will be made constantly by the DHC at every 1 seconds.
+The default value of the target heater set point will be 38C. Firmware
+override capability will be present for changing the set point, but
+reset of the system will set the heaters back to 38C.  Also there
+is a timeout feature of DHC with firmware in case that the DHC stops
+communication (type of watch-dog). This will be important to prevent
+damage to heaters in case DHC is faulty.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000656-359001">6.3&nbsp;&nbsp;Diagnostic self test<SPAN CLASS="SECT2EFF"> </SPAN></H3><UL><LI CLASS="bulletlist"><P>Detect and report open thermistors
+- In case of detecting open thermistor, the HEATER ZONE associated
+with the open thermistor will be SWITCHED OFF till the problem is
+solved (Power off). This will be reported to the error log.</P></LI><LI CLASS="bulletlist"><P>Detect and report shorted thermistors
+- In case of detecting an shorted thermistor, the HEATER ZONE associated
+with the shorted thermistor will be SWITCHED OFF till the problem
+is solved (Power off). This will be reported to the error log. </P></LI><LI CLASS="bulletlist"><P>Detect and report disconnected heaters,
+also reported to the error log.</P></LI><LI CLASS="bulletlist"><P>Detect and display open thermostat
+switch. This will happen in cases when none of the 3 heater zones
+are heating.</P></LI><LI CLASS="bulletlist"><P>Memory Checksum or CRC check (DCB Flag
+request)</P></LI></UL><P CLASS="sect2">The diagnostic self-test will run on POWER ON and also during
+regular operation at regular intervals timed at 1 second between tests.
+Test results will be communicated to the DCB on request. This method
+will allow the DCB to query diagnostic results multiple times at multiple
+gantry positions while rotating.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000662-359001">6.4&nbsp;&nbsp;Hardware Watchdog<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">A watchdog function exists in the hardware that will set and
+hold the board in &#8220;Default Mode&#8221;. Within 1 second of power
+up.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000663-359001">6.5&nbsp;&nbsp;48V Power Supply monitor circuit<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The DHC will monitor the 48V input at an accuracy of +/- 50mV
+and store the information to be read by the host for diagnostic reporting.
+ If the voltage goes below 45V an error will be reported.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2000664-359001">6.6&nbsp;&nbsp;Test Points, Fuses and LEDs<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="SL2000665-359001"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">LEDs</SPAN> </P><table summary="LEDs" border="1"><colgroup><col width="26%"><col width="26%"><col width="48%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Label</td><td valign="">Color</td><td valign="">Description</td></tr><tr valign="top"><td valign="">Power</td><td valign="">Green</td><td valign="">48V incoming power</td></tr><tr valign="top"><td valign="">Zone 1</td><td valign="">Orange-ON, Yellow-BAD</td><td valign="">Heater zone 1 (not used)</td></tr><tr valign="top"><td valign="">Zone 2</td><td valign="">Orange-ON, Yellow-BAD</td><td valign="">Heater zone 2 (low channel end)</td></tr><tr valign="top"><td valign="">Zone 3</td><td valign="">Orange-ON, Yellow-BAD</td><td valign="">Heater zone 3 (center zone)</td></tr><tr valign="top"><td valign="">Zone 4</td><td valign="">Orange-ON, Yellow-BAD</td><td valign="">Heater zone 4 (high channel end)</td></tr><tr valign="top"><td valign="">Zone 5</td><td valign="">Orange-ON, Yellow-BAD</td><td valign="">Heater zone 5 (not used)</td></tr></tbody></table></div></DIV><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="SL2000666-359001"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;4:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Test Points</SPAN> </P><table summary="Test Points" border="1"><colgroup><col width="44%"><col width="56%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Label</td><td valign="">Description</td></tr><tr valign="top"><td valign="">+12V</td><td valign="">12V on board power</td></tr><tr valign="top"><td valign="">+5V</td><td valign="">5V on board power</td></tr><tr valign="top"><td valign="">48V+</td><td valign="">48V incoming power</td></tr><tr valign="top"><td valign="">AGND 1-4</td><td valign="">Analog grounds</td></tr></tbody></table></div></DIV><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="SL2000667-359001"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;5:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Fuses</SPAN> </P><table summary="Fuses" border="1"><colgroup><col width="32%"><col width="68%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Label</td><td valign="">Description</td></tr><tr valign="top"><td valign="">F1</td><td valign="">125V 10A Slow blow, input power</td></tr><tr valign="top"><td valign="">F4</td><td valign="">125V 5A Slow blow, Heater zone</td></tr><tr valign="top"><td valign="">F5</td><td valign="">125V 2.5A Slow blow, Heater zone</td></tr><tr valign="top"><td valign="">F6</td><td valign="">125V 2.5A Slow blow, Heater zone</td></tr><tr valign="top"><td valign="">F7</td><td valign="">125V 2.5A Slow blow, Heater zone</td></tr><tr valign="top"><td valign="">F8</td><td valign="">125V 2.5A Slow blow, Heater zone</td></tr></tbody></table></div></DIV></DIV></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

@@ -1,0 +1,77 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Collimator Calibration</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/14/07</P></td></tr></table><H1 ID="top">Collimator Calibration </H1><OL><LI CLASS="numlist"><P>Enter Collimator Calibration through the Calibration menu
+on the Service Desktop. If you are not already on the Service Desktop, select
+the <SPAN CLASS="GUIBUTTON">[SERVICE DESKTOP]</SPAN> icon.</P></LI><LI CLASS="numlist"><P>Select the <SPAN CLASS="GUIBUTTON">[CALIBRATION]</SPAN> icon.</P></LI><LI CLASS="numlist"><P>Select <SPAN CLASS="GUIBUTTON">[COLLIMATOR CALIBRATION]</SPAN>. The
+calibration will check for any converter boards changes for boards 47 and
+48. If the board has been changed, Collimator Cal exits and posts a message
+informing the user to first run DAS Gain Cal.</P></LI><LI CLASS="numlist"><P>Collimator Cal also requires the Mylar window check before
+the cal can proceed to avoid corrupting the cal. If the check fails, the user
+can clean the Mylar window and retry or continue anyway. In either case, if
+the check succeeds or if the user ignores the failure and continue, the cal
+requires tube warm-up.</P></LI></OL><TABLE CLASS="ADMONdescriptive" CELLSPACING="0%" CELLPADDING="0%" ID="d0e49"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">For a full size version of this illustration, click on the pdf
+icon below.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><DIV CLASS="MEDIA"><CENTER><P CLASS="MEDIATITLE"><SPAN CLASS="MEDIAINTRO"><B>Media File&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="MEDIATITLE">Full Size Illustration: Collimator Cal Block Diagram</SPAN> </P></CENTER><CENTER><P CLASS="MEDIAOBJ"><A HREF="../media/38337-75029.pdf" TARGET="_blank"><IMG SRC="../icons/pdf.gif" BORDER="0" ALIGN="top" HSPACE="4" WIDTH="28" HEIGHT="31"></A></P></CENTER></DIV><DIV CLASS="ILLUSTRATION" id="I2-53-38337"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Collimator Cal Block Diagram</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/38337-38339.gif" BORDER="0" usemap="#SL38340-38337"></P></DIV><P CLASS="descriptive">MESSAGES AND POP-UPS</P><P CLASS="descriptive">Before DAS Gain or Collimator Cal come up, an attention box is posted
+asking the user to clear any obstruction in the path of the beam. Only when
+the user hits <SPAN CLASS="GUIBUTTON">[OK]</SPAN> will the cals proceed forward. Also
+after DAS Gain and Collimator Cals are done, each will post an attention box
+asking the user to run FastCal.</P><P CLASS="descriptive">COLLIMATOR CAL INFORMATIONAL MESSAGES</P><P CLASS="descriptive">Message 1: <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Please remove any obstruction in the path of the
+beam</FONT></SPAN>.</P><P CLASS="descriptive">Message 2: <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Converter boards have changed. Please first run
+DAS Gain Cal before running Collimator Cal</FONT></SPAN>.</P><P CLASS="descriptive">Message 3:<SPAN CLASS="SCRNFIX"><FONT FACE="COURIER"></FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Please check Mylar window and
+clean if necessary to assure proper scanner operation</FONT></SPAN>.</P><P CLASS="descriptive">Message 4: <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">User quit the tracking cal after the Mylar window
+check failed</FONT></SPAN>.</P><P CLASS="descriptive">Message 5 <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">User ignored the Mylar window check failure and continued
+with the tracking cal</FONT></SPAN>.</P><P CLASS="descriptive">Message 6: <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">DAS Gain Cal was not completed</FONT></SPAN>.</P><P CLASS="descriptive">Message 7: <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Collimator Cal was not completed</FONT></SPAN>.</P><P CLASS="descriptive">Message 8: <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">The Z-FET setting was changed for this scan</FONT></SPAN>.</P><P CLASS="descriptive">COLLIMATOR CALIBRATION</P><P CLASS="descriptive">A method has been devised of tracking the motion of the focal spot so
+that the collimator opening can be reduced, thus reducing dose.</P><P CLASS="descriptive">With collimator tracking, the position of the collimator is no longer
+a fixed function of aperture and focal spot size. The two cams, which operate
+independently, form the sides of the collimator and must move with the motion
+of the focal spot. Information regarding the focal spot position is sensed
+through special channels called the z-channels. The information from the z-channels
+is translated into the position of the beam on the detector at the iso channel.
+The translation process depends on calibration polynomials and operating points,
+which are determined by the Collimator Calibration process.</P><P CLASS="descriptive">DAS GAIN</P><P CLASS="descriptive">This program computes the DAS Gain correction factors needed for the
+z-channel ratio (which determines the focal spot and beam position) and for
+channel 762 (which monitors blocking for tracking). The z-channel ratio correction
+is used in Collimator Calibration. There are two sets of correction factors-one
+for each cam.</P><P CLASS="descriptive">CONVERTER BOARD CHECK</P><P CLASS="descriptive">First, the ID's of the converter boards used by channel 762 and the
+z-channels (boards 47&amp; 48) should be checked to see if they match the
+converter boards that were in place when the last DAS Gain Cal was performed.
+If there is no match, the user is directed to perform a DAS Gain Cal before
+doing Collimator Cal.</P><P CLASS="descriptive">MYLAR WINDOW CHECK</P><P CLASS="descriptive">Assuming the tube is warm when Collimator Cal is begun, the first scans
+should check if there is any contrast or other material on the Mylar window
+that will corrupt the calibrations. Four one-second rotating scans should
+be taken at 80 kvp, 20ma with aperture at 4x125, 4x250,4x375, and 4x500 respectively.
+If the 20 point filtered offset corrected channel 762 data vs views divided
+by the offset corrected view averaged value of channel 762 falls below 0.90
+for any scan, for any row, a message will be displayed to the user and a response
+from the user is needed before continuing. The user should be allowed to go
+ahead without further action, clean the Mylar window and repeat the blockage
+scan, or quit the operation completely. The message should say:</P><P CLASS="descriptive"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Please check Mylar window and clean if necessary to assure
+proper scanner operation.  Indicate if you want to repeat the check scan or
+continue with the Collimator Cal, or abort Collimator Cal.</FONT></SPAN></P><P CLASS="descriptive">SWEEP SCAN</P><P CLASS="descriptive">The information needed to perform calibration is obtained using sweep
+scans. The sweep scan is a stationary scan, with x-ray tube at 12 o'clock
+position, where the cam positions go through their entire range of motion
+in 37 incremental steps. At each step, which is a 100 views, the offset corrected
+view averaged data is collected for the data channels and the z-channels.
+This information with DAS, Gain is the basic information that is used to perform
+the calibration. Scans are only done at 120kv with the head bowtie. The time
+of these scans is 5.9 seconds, which allows for 37 steps at 100 views with
+time allowed to transition between the steps. The information from rows 2A
+and 1A are used to calibrate the cam on the A side while the cam on the B
+side uses the information from the B rows. The signals from side A should
+be monotonic, starting high and ending low, while the signals from side B
+are monotonic, starting low and ending high.</P><P CLASS="descriptive">COLLIMATOR CALIBRATION</P><P CLASS="descriptive">This is the major program that computes the calibration.</P><P CLASS="descriptive">The outputs to the cal database are: mapping sides A &amp; B, target
+position on iso channel, ratio range, and dose reduction. Some ID information
+that determines where the data goes is stored in the file with the other data:
+spot size, data channel fet, z channel fet, DAS Gain used, aperture size,
+and focal spot position. Also the ID numbers for the DAS Converter boards
+that are used by the z-channels and channel 762 need to be stored in the cal
+database. In measure mode, the channel positions the ratios, zratio, and dratio
+for both sides must be stored in addition to the other output.</P><P CLASS="descriptive">The Collimator Cal needs to be done after a detector change or tube
+change. If a converter board change has been made, affecting the z channel
+or channel 762 (boards 47&amp;48), or if the detector has been changed, the
+DAS Gain Cal should be done. Tube change does not require redoing the DAS
+Gain Cal. At the beginning of Collimator Cal, the serial numbers of the converter
+boards should be queried, and it should be determined if there has been a
+change since the last DAS Gain Cal was done. The software should force the
+user to leave collimator cal and perform DAS Gain Cal.</P><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

@@ -1,0 +1,43 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>camera.dev Contents Listing </TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><DIV CLASS="TABLE"><CENTER><P CLASS="TABLEINTRO" ID="T4-7-35618"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">camera.dev Contents Listing </SPAN> </P><table summary="camera.dev Contents Listing " border="1"><colgroup><col width="304"><col width="370"></colgroup><thead valign=""><tr valign="top"><th align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">CAMERA.DEV</FONT></SPAN> CONTENTS
+LISTING</th><th align="left" valign="top">DESCRIPTION</th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set dName {Dicom Camera}</FONT></SPAN></td><td align="left" valign="top">Sets the name that appears in
+manual composer and scanRx autofilm setup</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set dType digital</FONT></SPAN></td><td align="left" valign="top">Refers to 1 of {postscript,
+analogue, or digital}. For DICOM the dType is set to digital.</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set dQueueType DICM</FONT></SPAN></td><td align="left" valign="top">Refers to the Job type; can
+be {LP=postscript, LC=laser camera, or DICM} for DICOM print cameras.</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set ctype {Imation
+Print Server}</FONT></SPAN></td><td align="left" valign="top">DICOM camera type selected during
+Camera Installation</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set dQueueName dicom</FONT></SPAN></td><td align="left" valign="top">Sets the name that appears in
+the Filming Queue</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set defaultFormat 
+4x3_fid</FONT></SPAN></td><td align="left" valign="top">Default format for manual composer
+selected during Camera Installation</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set dHostName agfacamera</FONT></SPAN></td><td align="left" valign="top">Hostname of the print server
+entered during Camera Installation</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set dAppTitle DRYSTAR</FONT></SPAN></td><td align="left" valign="top">AE title of the print server
+entered during Camera Installation</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set medType BLUE</FONT></SPAN></td><td align="left" valign="top">Medium type selected during
+Camera Installation - can be one of BLUE FILM, CLEAR FILM, or PAPER - this
+element is sent during NCREATE of the Film Session.</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set destination MAGAZINE</FONT></SPAN></td><td align="left" valign="top">The destination for printed
+film selected in during Camera Installation. Can be one of MAGAZINE, PROCESSOR
+- this element is sent during NCREATE of the Film Session.</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set filmOrientation
+PORTRAIT</FONT></SPAN></td><td align="left" valign="top">The Orientation of image boxes
+on film selected during Camera Installation can be one of LANDSCAPE or PORTRAIT
+- this element is sent during NCREATE of the Film Box.</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set magType CUBIC</FONT></SPAN></td><td align="left" valign="top">The magnification of film selected
+during Camera Installation. Can be one of REPLICATE, BILINEAR, CUBIC, or NONE
+- this element is sent during NCREATE of the Film Box.</td></tr><tr valign="top"><td align="left" valign="top"><PRE>set minDensity 5
+set maxDensity 300
+set borderDensity BLACK
+set emptyDensity BLACK
+set smoothType 140
+set configuration
+PERCEPTION_LUT=200</PRE></td><td align="left" valign="top">These elements are sent during
+the NCREATE of the Film Box and will set the following values:<UL><LI CLASS="bulletlist">sets minimum Optical Density - film and camera type dependent.</LI><LI CLASS="bulletlist">sets Maximum Optical Density - film and camera type dependent.</LI><LI CLASS="bulletlist">sets border density</LI><LI CLASS="bulletlist">sets empty image density</LI><LI CLASS="bulletlist">sets the smoothing type when magType is set to CUBIC</LI><LI CLASS="bulletlist">sets configuration info. This value differs for all camera
+vendors who typically define the LUT for contrast.</LI></UL></td></tr><tr valign="top"><td align="left" valign="top"><PRE>pformat 1x1_fid
+pformat 2x1_fid
+pformat 2x2_fid
+pformat 3x2_fid
+pformat 3x3_fid
+pformat 4x3_fid
+pformat 5x3_fid
+pformat 4x4_fid
+pformat 5x4_fid</PRE></td><td align="left" valign="top">Manual film composer and auto
+film formats<TABLE CLASS="ADMONentry" CELLSPACING="0%" CELLPADDING="0%" ID="d0e584"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">DICOM defines film format as column vs. row, as opposed
+to GE&#8217;s Laser film format definition of row vs. column.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></td></tr></tbody></table></CENTER></DIV></BODY></HTML>

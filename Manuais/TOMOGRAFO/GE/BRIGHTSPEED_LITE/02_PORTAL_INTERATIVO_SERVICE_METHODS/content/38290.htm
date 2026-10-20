@@ -1,0 +1,95 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>FastCal</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/15/07</P></td></tr></table><H1 ID="top">FastCal </H1><P CLASS="descriptive">Like Tube Warmup, Fast Cal is another daily preparation function. Running
+Fast Cal generates new Acal, Sine, and Cosine vectors used in the preprocessing
+stages of image reconstruction. FastCal should be run daily to maintain optimal
+image quality.</P><P CLASS="descriptive">When FastCal is selected
+a gantry balance check is first performed.  The Gantry will rotate without
+warning after selecting FastCal when performing this balance check.  This
+check is to make sure the gantry balance condition is within Image Quality
+specifications necessary to get valid results from the FastCal scans. See <SPAN CLASS="MODULEREF"><A HREF="127238.htm#SL136131-127238"><I>Gantry Balance Check
+process</I></A></SPAN> for more details including check process flow.</P><P CLASS="descriptive"><SPAN CLASS="GUIBUTTON">[FASTCAL]</SPAN> includes
+additional heating scans required for Fast Calibration Scans. During <SPAN CLASS="GUIBUTTON">[FASTCAL]</SPAN> the
+following tests/calibrations are performed:</P><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353668884974">1&nbsp;&nbsp;DAS CONVERTER BOARD IDENTIFICATION CHECK<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Upon starting a FastCal operation,
+the ID's of the converter boards used by channel 762 and the z-channels (boards
+94, 95 &amp; 96) are checked to see if they match the converter boards that
+were in place when the last DAS Gain Cal was performed. If they do not match,
+the user is given the following message:</P><P CLASS="sect1"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Additional calibration scans are needed to adjust for gain
+changes.  After these scans are completed you must redo FastCal. After you
+have read this press</FONT></SPAN><SPAN CLASS="KEYBOARD">&lt;CONTINUE&gt;</SPAN>.</P><P CLASS="sect1"> If converter board check fails, a <SPAN CLASS="MODULEREF"><A HREF="38306.htm#SL58092-38306"><I>DAS Gain Calibration</I></A></SPAN> is
+required.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353668884987">2&nbsp;&nbsp;DIRTY MYLAR WINDOW SCAN<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The first scan taken should check to see if there is any contrast or
+other material on the Mylar window that will corrupt the calibration scans.
+Four one-second rotating scans, no tracking at this time, should be taken.
+The scan techniques are to be 80kvp, 20 ma, aperture 4 x 125, 4 x 250, 4 x
+375, and 4 x500 respectively. If the 20 point filtered offset corrected channel
+762 data vs views divided by the offset corrected view averaged value of channel
+762 falls below .90 for any scan, for any row, a message must be displayed
+to the user and a response from the user is needed before continuing. The
+user should be allowed to go ahead without further action, or clean the Mylar
+window and repeat the blockage scan. The message should say:</P><P CLASS="sect1"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Please check Mylar window and clean if necessary to assure
+proper scanner operation.  Indicate if you want to repeat the check scan or
+continue with the FastCal.</FONT></SPAN></P><P CLASS="sect1">Send message to GE sys log.</P><P CLASS="sect1">If continuing without cleaning the Mylar window, the calibration vectors
+may cause image artifacts.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353668884987-dup.1">3&nbsp;&nbsp;Tube Warm up scans<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">All tube warmup scans
+are dependent on the tube type in the system.  The tube type defines the temperatures
+used in each check and defines the number of scans and parameters used for
+the scans.</P><UL><LI CLASS="bulletlist"><P>Cold Warmup scans raise the target temperature to greater
+than or equal to a config specified Temperature called Cold Warmup (depending
+on tube type).</P></LI><LI CLASS="bulletlist"><P>Warmup1 scans raise the target temperature to greater than
+or equal to a config specified Temperature called Warmup1(depending on tube
+type).</P></LI><LI CLASS="bulletlist"><P>Warmup2 scans raise the target temperature to greater than
+or equal to a config specified Temperature called Warmup2(depending on tube
+type)  for FastCal.</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353668884988-dup.3">4&nbsp;&nbsp;CHECK TIME OF LAST COLLIMATOR CALIBRATIONS<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Check the last time Collimator Calibration was performed. If Collimator
+Cal was performed within 24 hours, it is not necessary to update the Collimator
+Cal parameters, and the system can skip all steps pertaining to Collimator
+Cal.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353668884988-dup.4">5&nbsp;&nbsp;COLLIMATOR CALIBRATION (SWEEP SCAN)<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Before the first standard FastCal scan is performed, but after tube
+warms up, a sweep scan is taken and a Collimator Calibration is performed
+for that technique. There are eight sweep scans-one for each aperture and
+focal spot size combination. One sweep scan is performed for every FastCal
+executed, and therefore the entire set of Collimator Cals refresh after eight
+FastCals are performed. Also, measure mode calculations are made, although
+only the results for large spot with 4x125 or 4x500 apertures are used.</P><P CLASS="sect1">The new Collimator Cal is compared to the old Collimator Cal in the
+following way:</P><OL><LI CLASS="numlist"><P>Consider the range of the ratios for the old data and pick
+three ratios: the two ratios 10% from either end of the range, and the ratio
+in the middle.</P></LI><LI CLASS="numlist"><P>Evaluate the new data at these three ratios, and compare to
+the values obtained with the old data.</P></LI><LI CLASS="numlist"><P>Store the new evaluated
+data to the history log. If the absolute values are greater than a tolerance,
+a message is posted telling the user that if this repeats over several days
+call service.  The user is then instructed to press a button to continue with
+FastCal.</P></LI></OL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353668884989-dup.4">6&nbsp;&nbsp;BLOCKED CHANNEL CALCULATION<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">During the FastCal scan, the offset corrected signals are view averaged
+for the inside rows (1A and 1B) for channel 762. These averaged signals are
+then normalized with respect to the mAs per view and the DAS Gain, and multiplied
+by a threshold value referred to as the &#8220;blocked channel threshold&#8221;.
+During regular scanning, the normalized signals for each view are compared
+to the values obtained from the FastCal scan. If the value during the patient
+scan is lower than the value computed during the FastCal scan, it is assumed
+that the corresponding row in channel 762 is blocked for the view, and tracking
+is put on hold.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353668884990">7&nbsp;&nbsp;FASTCAL SCAN<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">During the FastCal scans, tracking takes place. However, there is no
+checking for blockage of z channel. Since the FastCal procedure checks for
+beam obstruction, there should be no blockage. The DCB computes the focal
+spot position.</P><P CLASS="sect1">If a Fastcal has not
+been performed within the last 96 hours, a full Fastcal will be performed.
+ This is also true if the system detects a Detector, Collimator, or DAS card
+change since the last Fastcal.  If these conditions don&#8217;t apply a Quick
+Fastcal will be performed which performs half the scans of a full Fastcal
+alternating the Large and Small focal spots with each execution of Fastcal.
+ For example: Fastcal run on Day 1 in the morning will do small focal spot
+calibration, Day 2 will do a large focal spot calibration set of scans.  This
+alternating sequence is also true for back to back runs of Fastcal on the
+same day.</P><P CLASS="sect1">The flowchart in <A HREF="javascript:winopen('38290illd0e136.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;1</A> describes the sequence of
+actions when Fast Cal is selected and after the balance check has been run.</P><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e128"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">For a full size version of this illustration, click on the pdf
+icon below.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><DIV CLASS="MEDIA"><CENTER><P CLASS="MEDIATITLE"><SPAN CLASS="MEDIAINTRO"><B>Media File&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="MEDIATITLE">Full Size Illustration: FastCal Flowchart</SPAN> </P></CENTER><CENTER><P CLASS="MEDIAOBJ"><A HREF="../media/38290-136138.pdf" TARGET="_blank"><IMG SRC="../icons/pdf.gif" BORDER="0" ALIGN="top" HSPACE="4" WIDTH="28" HEIGHT="31"></A></P></CENTER></DIV><DIV CLASS="ILLUSTRATION" id="SL136146-38290"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">FastCal Flowchart</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/38290-136123.jpg" BORDER="0" usemap="#SL136141-38290"></P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353668885079">8&nbsp;&nbsp;DAILY IQ CHECK<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">FastCal also performs Daily IQ Check, which compares the center 30 channels
+of today&#8217;s FastCal vectors to yesterday&#8217;s. This is done to determine
+whether there is any significant change that could lead to an image artifact.
+If the limit check fails, a message is posted to the log and to a pop-up box
+on the screen. The database is updated regardless of whether the check passes
+or fails.</P><P CLASS="sect1">The following are the two circumstances that will cause the failure:</P><OL><LI CLASS="numlist"><P>A hardware change, either after changing the detector or changing
+the center four DAS Converter cards will cause a failure message on the next
+FastCal.</P><P>A hardware change will cause a significant change in the calibration
+vectors and trip the limit check. In this case, the error message on the first
+FastCal after the change can generally be ignored, provided the images look
+good.</P></LI><LI CLASS="numlist"><P>A real change in the gain of the center channels, which could
+lead to an image artifact.</P><P>The possible causes are contamination on the copper filter, tube port
+or bowtie filter or DAS. </P><P>Refer to the Troubleshooting tab for Diagnostics and Image Quality tools
+to use for troubleshooting.</P></LI></OL></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

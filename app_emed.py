@@ -120,6 +120,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("### PAINEL DE OPERAÇÕES")
 
 opcoes_menu = [
+    "🤖 EmedOnline (Triagem & Rota)",
     "📊 Mural & Despacho WhatsApp",
     "📋 Minhas Pendências (Técnico)",
     "📚 Manuais & Procedimentos",

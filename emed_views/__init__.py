@@ -15,10 +15,14 @@ from emed_views.administracao import (
     render_atualizar_km,
     render_editor_planilha,
 )
+from emed_views.manuais_tecnicos import render_manuais_tecnicos
+from emed_views.emedonline import render_emedonline
 
 VIEW_ROUTER = {
+    "🤖 EmedOnline (Triagem & Rota)": render_emedonline,
     "📊 Mural & Despacho WhatsApp": render_mural_despacho,
     "📋 Minhas Pendências (Técnico)": render_minhas_pendencias,
+    "📚 Manuais & Procedimentos": render_manuais_tecnicos,
     "📈 Gráficos & BI": render_graficos_bi,
     "⏳ Follow-up de Orçamentos": render_followup_orcamentos,
     "👥 Clientes & Equipamentos": render_clientes_equipamentos,
@@ -34,8 +38,10 @@ VIEW_ROUTER = {
 
 __all__ = [
     "verificar_e_renderizar_portal_qr",
+    "render_emedonline",
     "render_mural_despacho",
     "render_minhas_pendencias",
+    "render_manuais_tecnicos",
     "render_graficos_bi",
     "render_followup_orcamentos",
     "render_clientes_equipamentos",

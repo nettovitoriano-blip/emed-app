@@ -1,0 +1,67 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>VDARC/DARC Node OS Load Troubleshooting</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/14/07</P></td></tr></table><H1 ID="top">VDARC/DARC Node OS Load Troubleshooting </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="50%"><col width="50%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised:</td><td valign="">23 October 2006</td></tr></tbody></table></div></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669425381">1&nbsp;&nbsp;Overview<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Occasionally the VDARC/DARC Node OS will not load. This module steps
+through troubleshooting procedures to help diagnose and correct the problem.</P><P CLASS="sect1">This document applies to both DARC and VDARC Nodes. However, for simplicity's
+sake, all references will be simply &#8220;DARC Node&#8221;.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669425381-dup.1">2&nbsp;&nbsp;Requirements<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The dpcproxy server on the HOST needs to be running and the DARC Node
+LAN led should not be &#8216;hard-on&#8217; as this indicates the need to
+load the Serial Over LAN 	 
+(SOL)
+ CD
+(p/n 5193458) into the DARC Node and select the DARC Node reset button to
+accomplish the SOL load.</P><P CLASS="sect1">The DARC Node OS load still utilizes the telnet process and the above
+items are needed to make sure that happens.</P><P CLASS="sect1">The power cord must be installed and rear circuit breaker set to &#8220;ON&#8221;
+at the rear of the DARC Node. VAC Line Power is assumed to be &#8220;good&#8221;.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669425382">3&nbsp;&nbsp;Procedure<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669425382-dup.1">3.1&nbsp;&nbsp;SOL CD FLASH<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Verify the DARC Node front panel LAN led is not hard on - if it is then:</P><OL><LI CLASS="numlist"><P>Insert the SOL CD into the DARC Node and press the reset switch.</P></LI><LI CLASS="numlist"><P>The SOL CD will automatically eject when completed (after
+approximately 2 minutes or less).</P></LI></OL><TABLE CLASS="ADMONsect2" CELLSPACING="0%" CELLPADDING="0%" ID="d0e78"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Reset Work-Around: Insert the SOL CD into the DARC Node and press
+the DARC Node Power Button on the front of the DARC Node. The SOL CD will
+write/FLASH.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669425382-dup.4">3.2&nbsp;&nbsp;Telnet to the DARC from Host<SPAN CLASS="SECT2EFF"> </SPAN></H3><TABLE CLASS="ADMONsect2" CELLSPACING="0%" CELLPADDING="0%" ID="d0e84"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Telnet (telnet localhost 623) will not be successful unless the
+dpcproxy server on the HOST is running.  If the dpcproxy server is running
+the system will display that it is already running after the command line
+is entered or it will inform the user it has been started.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><OL><LI CLASS="numlist"><P>Open a Unix Shell</P></LI><LI CLASS="numlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@</FONT></SPAN><SPAN CLASS="SCRNVAR"><FONT FACE="COURIER"><I>hostname</I></FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">}</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>&nbsp;&nbsp;su&nbsp;
+-</B></FONT></SPAN></P></LI><LI CLASS="numlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Password:</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>&nbsp;&nbsp;#bigguy</B></FONT></SPAN></P></LI><LI CLASS="numlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@</FONT></SPAN><SPAN CLASS="SCRNVAR"><FONT FACE="COURIER"><I>hostname</I></FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">]</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>&nbsp;&nbsp;service
+&nbsp;cliservice &nbsp;start</B></FONT></SPAN></P></LI><LI CLASS="numlist"><P>Verify the telnet command from Host to the VDARC Node is successful:</P><OL TYPE="a"><LI CLASS="numlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[root@</FONT></SPAN><SPAN CLASS="SCRNVAR"><FONT FACE="COURIER"><I>hostname</I></FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">]</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B> &nbsp;telnet
+&nbsp;localhost &nbsp;623</B></FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">&nbsp;&nbsp;Trying 127.0.0.1... </FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">&nbsp;&nbsp;Connected to localhost.</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">&nbsp;&nbsp;Escape character is '^]'</FONT></SPAN></P></LI><LI CLASS="numlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Server:</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B> &nbsp;darc</B></FONT></SPAN></P></LI><LI CLASS="numlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Username: </FONT></SPAN><SPAN CLASS="KEYBOARD">&lt;Enter&gt;</SPAN></P></LI><LI CLASS="numlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Password:&nbsp;</FONT></SPAN><SPAN CLASS="KEYBOARD">&lt;Enter&gt;</SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">&nbsp;&nbsp;Login successful </FONT></SPAN>	&#8592; *** Indicates
+the SOL connection is established ***</P></LI><LI CLASS="numlist"><P>At the <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">dpccli&gt;</FONT></SPAN> prompt, type: <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>exit</B></FONT></SPAN></P></LI></OL></LI></OL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669425387-dup.1">3.3&nbsp;&nbsp;Definitions<SPAN CLASS="SECT2EFF"> </SPAN></H3><DL><DT><I>SOL</I>&nbsp;
+</DT><DD><P CLASS="def">Serial Over LAN </P></DD><DT><I>IPMI</I>&nbsp;
+</DT><DD><P CLASS="def">Intelligent Platform Management Interface </P></DD><DT><I>BMC</I>&nbsp;
+</DT><DD><P CLASS="def">Baseboard Management Controller </P></DD><DT><I>OC</I>&nbsp;
+</DT><DD><P CLASS="def">Host Computer</P></DD><DT><I>Westville</I>&nbsp;
+</DT><DD><P CLASS="def">Reference name for the original DARC/DARC2/VDARC/IG/VIG Nodes</P></DD><DT><I>Jarrell</I>&nbsp;
+</DT><DD><P CLASS="def">New style DARC/DARC2/VDARC/IG/VIG Nodes </P></DD></DL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669425388">3.4&nbsp;&nbsp;SOL version 2 (5193458) Overview<SPAN CLASS="SECT2EFF"> </SPAN></H3><TABLE CLASS="ADMONsect2" CELLSPACING="0%" CELLPADDING="0%" ID="d0e216"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Serial Over LAN version 2 (part number 5193458) works ONLY with
+4.3.16 or prior OS Software.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><P CLASS="sect2">The SOL CD restores the Baseboard Management Controller (BMC) settings
+on the DARC/DARC2/VDARC Node.  The BMC is the core of the Intelligent Platform
+Management Interface (IPMI). BMC/IPMI allows access to the DARC CPU via the
+OC/Host network interface provided the respective OC/Host and DARC interfaces
+are connected (Ethernet /LAN cable connection).</P><P CLASS="sect2">For successful communication between the OC/Host and the BMC on the
+DARC, the BMC must have user access enabled and have the address set to the
+same subnet as the OC/Host network interface. The DARC does not need to be
+on for communication to occur, however, the power cord must be inserted at
+the rear of the DARC Node being used and if a rear circuit breaker is present
+- it must be set to on. </P><P CLASS="sect2">The DARC BMC address is set to IP address of the DARC network interface
+(default 172.16.0.2) that is connected to the OC/Host network interface (default
+172.16.0.1).  </P><P CLASS="sect2">SOL access between the DARC and OC/Host is accomplished using the BMC
+on the DARC. SOL is typically used for accessing the BIOS menu on the DARC.
+SOL can also be used for cycling DARC power.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669425389">3.5&nbsp;&nbsp;SOL version 2 Usage - OS 4.3.16 DARC OS LOAD (or prior version of OS)<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">During the DARC OS load the script will attempt the DARC Subnet 172.16.0.2
+address. If that fails the 169.254.0 alternate DARC Subnet address (as specified
+in the LFC procedure) will be tried. If an address other than 172.16.0.2 or
+169.254.0.2 is used or another issue is present, a pop-up is present on the
+monitor and instructs the user to install the SOL CD. Do not close any windows
+at this time.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669425389-dup.1"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">SOL Service Pop-Up</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/521776-907491.jpg" BORDER="0" usemap="#SL907495-521776"></P></DIV><P CLASS="sect2">The SOL CD is installed in the DARC Node and the front panel buttons
+are utilized to reset the DARC Node. The SOL is then flashed/written to the
+BMC on the DARC Node. The SOL CD is ejected automatically. The <SPAN CLASS="GUIBUTTON">[OK]</SPAN> button
+on the pop-up is then selected and the DARC OS load continues.</P><P CLASS="sect2">If the DARC OS load fails again while attempting to utilize the IPMI
+Tool an additional pop-up will appear requesting the user to verify /set the
+DARC Node BOOT BIOS Utility Boot Order as specified in the LFC procedure for
+the specific type of DARC Node being utilized. </P><DIV CLASS="ILLUSTRATION" id="ov-1353669425404"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">SOL Attention Pop-Up</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/521776-907490.jpg" BORDER="0" usemap="#SL907496-521776"></P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669425418">3.6&nbsp;&nbsp;Additional Information<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Version 2 of the SOL disk now requests a DHCP address from the OC/Host
+in an attempt to match the DARC BMC address with the OC/Host subnet address.
+When the SOL Disk is booted it requests and receives a DHCP address, sets
+the BMC address and enables user access. It modifies a file on the DARC hard
+drive so the bmcscript service doesn't erroneously reset the BMC address. </P><P CLASS="sect2">If the OC and DARC are not connected, or a DHCP address is not received,
+the SOL disk will set the BMC address to 172.16.0.2. The SOL disk is then
+ejected and a reset issued to the DARC Node. </P><P CLASS="sect2">Version 2 of the SOL disk will work with either 'Westville' or 'Jarrell'
+DARC Node CPUs.  The difference between the Westville and Jarrell CPU from
+a BMC aspect is the BMC channel used.  On the Westville CPUs, BMC channel
+7 is used while on the Jarrell CPUs BMC channel number 1 is used. The SOL
+disk detects the BMC channel being used and sets the address accordingly.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669425418-dup.1">3.7&nbsp;&nbsp;Tutorial<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">For a basic tutorial on SOL, IPMI, CLI, Network Proxy and more, please
+refer to the <SPAN CLASS="MODULEREF"><A HREF="907457.htm#SL907460-907457" TARGET="_blank"><I>Serial Over LAN Tutorial</I></A></SPAN>.</P></DIV></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

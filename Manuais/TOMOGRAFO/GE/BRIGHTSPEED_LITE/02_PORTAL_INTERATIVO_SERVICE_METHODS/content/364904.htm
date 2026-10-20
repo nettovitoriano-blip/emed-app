@@ -1,0 +1,266 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>GOC4 Theory</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;3.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;3/19/08</P></td></tr></table><H1 ID="top">GOC4 Theory </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="50%"><col width="50%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised on:</td><td valign="">March 19, 2008</td></tr></tbody></table></div></DIV><P CLASS="descriptive">This module contains the following subsections:</P><UL><LI CLASS="bulletlist"><P><A HREF="364904.htm#SL379003-364904">Section&nbsp;1</A> - Data Acquisition / Recon Control
+2 (DA/RC2)</P></LI><LI CLASS="bulletlist"><P><A HREF="364904.htm#SL379006-364904">Section&nbsp;2</A> - Image Generation (IG) Computer</P></LI><LI CLASS="bulletlist"><P><A HREF="364904.htm#SL379009-364904">Section&nbsp;3</A> - SCSI Tower</P></LI><LI CLASS="bulletlist"><P><A HREF="364904.htm#SL379012-364904">Section&nbsp;4</A> - Global Operator Console 4th
+Version. Includes:</P><UL><LI CLASS="bulletlist"><P><A HREF="364904.htm#SL379015-364904">Section&nbsp;4.1</A> - Overview (GOC4)</P></LI><LI CLASS="bulletlist"><P><A HREF="364904.htm#SL364910-364904">Section&nbsp;4.2</A> - DARC2</P></LI><LI CLASS="bulletlist"><P><A HREF="364904.htm#SL379020-364904">Section&nbsp;4.3</A> - Image Generator (IG)</P></LI><LI CLASS="bulletlist"><P><A HREF="364904.htm#SL379023-364904">Section&nbsp;4.4</A> - IG Computer</P></LI><LI CLASS="bulletlist"><P><A HREF="364904.htm#SL379026-364904">Section&nbsp;4.5</A> - Reconstruction Acceleration
+Card (RAC)</P></LI><LI CLASS="bulletlist"><P><A HREF="364904.htm#SL379029-364904">Section&nbsp;4.6</A> - Power</P></LI><LI CLASS="bulletlist"><P><A HREF="364904.htm#SL379032-364904">Section&nbsp;4.7</A> - Intercom Component</P></LI><LI CLASS="bulletlist"><P><A HREF="364904.htm#SL379047-364904">Section&nbsp;4.8</A> - Cooling Package</P></LI><LI CLASS="bulletlist"><P><A HREF="364904.htm#SL379035-364904">Section&nbsp;4.9</A> - Service and Diagnostics</P></LI><LI CLASS="bulletlist"><P><A HREF="364904.htm#SL379038-364904">Section&nbsp;4.10</A> - Console Block Diagrams</P></LI></UL></LI></UL><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL379003-364904">1&nbsp;&nbsp;Data Acquisition / Recon Control 2 (DA/RC2)<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949715-364904">1.1&nbsp;&nbsp;Overview<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The DARC2 outlined in this specification consists only of what
+is commonly referred to as a rack-mount computer. The supplied DARC2
+will include a supplier hardware diagnostic CD, but will not include
+external peripherals such as keyboard, mouse, display monitor(s),
+or external cables. These external and peripheral functions will be
+provided by GE Healthcare unless agreed to and reflected in the respective
+part numbers. Agreements and system part numbers may also include
+the integration of GE Healthcare specified components into the DARC2,
+which will be outlined in this document and reflected in the respective
+part numbers. As an FDA governed and ISO compliant medical products
+OEM, controlled and documented configurations are of critical importance
+to GE Healthcare. </P><P CLASS="sect2">The requirements below are purposely specific to prevent supplier
+changes without advance notice and possible pre-qualification by GE
+Healthcare.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949716-364904">1.2&nbsp;&nbsp;Motherboard<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The DARC2 motherboard shall be an Intel&reg; Westville<SPAN CLASS="SUP"><SUP>TM</SUP></SPAN>, or equivalent, and shall meet the following requirements:</P><UL><LI CLASS="bulletlist"><P>Support Dual Intel&reg; Xeon<SPAN CLASS="SUP"><SUP>TM</SUP></SPAN> Socket604 processors (2.8GHz minimum)</P></LI><LI CLASS="bulletlist"><P>Onboard regulation of processor voltages</P></LI><LI CLASS="bulletlist"><P>Intel&reg; E750x chipset</P></LI><LI CLASS="bulletlist"><P>533Mhz Front Side Bus (FSB)</P></LI><LI CLASS="bulletlist"><P>Minimum of two (2) 10/100/1000 Mb onboard
+Ethernet ports</P></LI><LI CLASS="bulletlist"><P>2.0GB DDR-266 SDRAM&reg; memory using
+minimum two (2) 184-pin DIMM sockets</P></LI><LI CLASS="bulletlist"><P>Support Serial Over LAN (SOLAN)</P></LI><LI CLASS="bulletlist"><P>One (1) ATA100 interface</P></LI><LI CLASS="bulletlist"><P>One (1) UART, DB9 interface</P></LI><LI CLASS="bulletlist"><P>One (1) Serial, DB9 (male) interface</P></LI><LI CLASS="bulletlist"><P>One (1) Ultra320 SCSI controller capable
+of supporting externally connected peripherals</P></LI><LI CLASS="bulletlist"><P>Minimum of four (4) PCI-X expansion
+slots (100Mhz min.)</P></LI><LI CLASS="bulletlist"><P>BIOS configuration is specified in
+Appendix A - BIOS Configuration</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949730-364904">1.3&nbsp;&nbsp;PCI Expansion <SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The DARC2 shall include at least four (4) PCI-X expansion slots.</P><UL><LI CLASS="bulletlist"><P>Two (2) slots shall be able to accommodate
+full-height &#8220;short&#8221; cards</P></LI><LI CLASS="bulletlist"><P>One slot shall accommodate one of the
+following DAS Interface Processor (DIP) cards</P></LI></UL><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="170"><col width="131"><col width="192"></colgroup><tbody valign=""><tr valign="middle"><td align="center" valign="middle"><B>DARC2 Part No.</B></td><td align="center" valign="middle"><B>DIP Part No.</B></td><td align="center" valign="middle"><B>System</B></td></tr><tr valign="top"><td valign="">5114772</td><td valign="">2363229</td><td valign="">GRE 16 Slice MDAS</td></tr><tr valign="top"><td valign="">5114772-2</td><td valign="">2375741</td><td valign="">GRE 4/8 Slice MDAS</td></tr><tr valign="top"><td valign="">5114772-3</td><td valign="">2378286</td><td valign="">GRE 4 Slice SDAS</td></tr></tbody></table></div></DIV><UL><LI CLASS="bulletlist"><P>One slot shall accommodate a DB9 male
+serial port</P></LI><LI CLASS="bulletlist"><P>Any remaining slots shall be able to
+accommodate low-profile or &#8220;half height&#8221; cards</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949735-364904">1.4&nbsp;&nbsp;Disk Storage<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949736-364904">1.4.1&nbsp;&nbsp;Floppy Disk Drive<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The DARC2 does NOT require an internal 3.5&#8221;, half-height,
+1.44MB floppy diskette drive.</P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949737-364904">1.4.2&nbsp;&nbsp;System Boot Drive<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The DARC2 shall include one (1) internal hard disk drive as
+follows:</P><UL><LI CLASS="bulletlist"><P>5.25&#8221; half height form factor</P></LI><LI CLASS="bulletlist"><P>IDE ATA-100 interface</P></LI><LI CLASS="bulletlist"><P>Minimum unformatted capacity of 40GB</P></LI><LI CLASS="bulletlist"><P>Minimum rotational rate of 7,200 RPM</P></LI></UL></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949742-364904">1.4.3&nbsp;&nbsp;Scan Disk Drives<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The DARC2 shall include two (2) internal hard disk drives as
+follows:</P><TABLE CLASS="ADMONsect3" CELLSPACING="0%" CELLPADDING="0%" ID="d0e249"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">These disk drives replace the SDDA (Scan Data Disk Array)
+of the GOC3 Console. The SDDA is now combined with the DARC2.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><UL><LI CLASS="bulletlist"><P>5.25&#8221; half height form factor</P></LI><LI CLASS="bulletlist"><P>SCSI3 interface</P></LI><LI CLASS="bulletlist"><P>Minimum unformatted capacity of 36GB</P></LI><LI CLASS="bulletlist"><P>Minimum rotational rate of 15Krpm</P></LI><LI CLASS="bulletlist"><P>Qualified Drives </P></LI><LI CLASS="bulletlist"><P>Seagate ST336753LW/LC Firmware 006</P></LI></UL></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949749-364904">1.4.4&nbsp;&nbsp;DVD-ROM Drive<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The DARC2 shall include one (1) internal DVD-ROM drive as follows:</P><UL><LI CLASS="bulletlist"><P>5.25&#8221; &#8220;slim&#8221; form
+factor</P></LI><LI CLASS="bulletlist"><P>IDE (ATAPI) interface</P></LI><LI CLASS="bulletlist"><P>Minimum Rotational speed: 24X</P></LI><LI CLASS="bulletlist"><P>Minimum of 512K internal data buffer</P></LI><LI CLASS="bulletlist"><P>Read compatible with CD-R, CD-ROM,
+CM-ROM-XA, CD-I, CD Audio (CD-DA), PhotoCD Multi-session, CD-Extra,
+CD-Text, and DVD-ROM.</P></LI><LI CLASS="bulletlist"><P>Due to requirements of the GE Healthcare
+Operating System auto-loader this drive cannot be the master drive
+on the IDE BUS.</P></LI></UL></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949756-364904">1.5&nbsp;&nbsp;Input Output Connections<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949757-364904">1.5.1&nbsp;&nbsp;Ethernet Ports<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The DARC2 shall have four (4) external Ethernet port connections
+as follows:</P><UL><LI CLASS="bulletlist"><P>Ports may be motherboard-resident (e.g.
+two ports onboard the Intel&reg; Westville<SPAN CLASS="SUP"><SUP>TM</SUP></SPAN>)</P></LI><LI CLASS="bulletlist"><P>Ports may be added by using a low-profile,
+PCI-X expansion card as follows:</P><P>Intel&reg; PWLA8492MT (PBA# A92111-004, C29887-002 or C41421-003)</P></LI><LI CLASS="bulletlist"><P>IEEE 802.3 compatible 10/100/1000 MB/sec
+auto-sensing Ethernet</P></LI><LI CLASS="bulletlist"><P>Standard 8-pin RJ45 locking female
+connector mounted at rear of the chassis</P></LI><LI CLASS="bulletlist"><P>The Ethernet connector shall have the
+following pin assignments:</P></LI></UL><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="62"><col width="60"><col width="73"><col width="70"></colgroup><tbody valign=""><tr valign="top"><td valign="">Pin 1: </td><td valign="">TX +  </td><td valign="">Pin 5: </td><td valign="">DC -</td></tr><tr valign="top"><td valign="">Pin 2: </td><td valign="">TX -  </td><td valign="">Pin 6: </td><td valign="">RX -</td></tr><tr valign="top"><td valign="">Pin 3: </td><td valign="">RX +  </td><td valign="">Pin 7: </td><td valign="">DD +</td></tr><tr valign="top"><td valign="">Pin 4:</td><td valign="">DC+  </td><td valign="">Pin 8: </td><td valign="">DD </td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949763-364904">1.5.2&nbsp;&nbsp;SCSI Ports<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The DARC2 shall have one (1) external Ultra320 SCSI port consisting
+of a VHDCI68 female connector with captive #2-56 female screw jacks
+for cable attachment.</P><P CLASS="sect3">This port shall reside on the motherboard, protruding through
+the rear of the chassis, and shall be pulled from the SCSI BUS referenced
+in 3.2.11 above.</P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949764-364904">1.5.3&nbsp;&nbsp;Serial Ports<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The DARC2 shall have two (2) serial ports, assigned as follows:</P><UL><LI CLASS="bulletlist"><P>ttyS0 - pulled to a DB9 (male) interface
+at the rear of the chassis</P></LI><LI CLASS="bulletlist"><P>ttyS1 - redirected for serial-over-LAN
+requirements</P></LI></UL></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949767-364904">1.6&nbsp;&nbsp;External Switches and Indicators<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2"> The DARC2 shall include external switches and indicators on
+the chassis as follows:</P><UL><LI CLASS="bulletlist"><P>A pushbutton system POWER ON/OFF switch,
+which toggles system power ON or OFF when pressed or held.</P></LI><LI CLASS="bulletlist"><P>A pushbutton system RESET switch, accessible
+on the front of the chassis, that re-initializes all internal hardware
+without cycling power to the DARC2 (hard reset/soft boot).</P></LI><LI CLASS="bulletlist"><P>LED indicators shall be accessible
+and visible on the front of the chassis as follows:</P><UL><LI CLASS="bulletlist"><P>System power is ON - steady GREEN -
+labeled &#8220;I/O&#8221; or &#8220;Power&#8221;</P></LI><LI CLASS="bulletlist"><P>System error - flashing or steady RED
+- labeled &#8220;FLT&#8221;</P></LI><LI CLASS="bulletlist"><P>LAN Activity - flashing Yellow - labeled
+&#8220;LAN&#8221;</P></LI><LI CLASS="bulletlist"><P>Hard Disk Activity - flashing GREEN
+- labeled &#8220;HDD&#8221;</P></LI></UL></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949775-364904">1.7&nbsp;&nbsp;Environmental Requirements<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949776-364904">1.7.1&nbsp;&nbsp;Operating Environment<SPAN CLASS="SECT1EFF"> </SPAN></H4><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="165"><col width="308"></colgroup><tbody valign=""><tr valign="top"><td valign="">Temperature</td><td valign="">5&deg; - 35&deg; C (41&deg; - 95&deg; F)</td></tr><tr valign="top"><td valign="">Temperature Change</td><td valign="">3&deg; C per Hour (37.5&deg; F per Hour)</td></tr><tr valign="top"><td valign="">Relative Humidity</td><td valign="">10% - 90% (non-condensing)</td></tr><tr valign="top"><td valign="">Relative Humidity Change</td><td valign="">5% RH per hour</td></tr><tr valign="top"><td valign="">Noise</td><td valign="">Less than 45 dBa</td></tr><tr valign="top"><td valign="">Altitude</td><td valign="">10,000 feet above sea level</td></tr><tr valign="top"><td valign="">Shock Max</td><td valign="">20G @ less than 3ms (1/2 sine)</td></tr><tr valign="top"><td valign="">Vibration Max</td><td valign="">random 0.21G RMS</td></tr><tr valign="top"><td valign="">Temperature</td><td valign="">0&deg; to 50&deg; C (32&deg; to 122&deg; F)</td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949777-364904">1.7.2&nbsp;&nbsp;Operating Environment<SPAN CLASS="SECT1EFF"> </SPAN></H4><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="150"><col width="300"></colgroup><tbody valign=""><tr valign="top"><td valign="">Temperature</td><td valign="">0&deg; to 50&deg; C (32&deg; to 122&deg; F)</td></tr><tr valign="top"><td valign="">Temperature Change</td><td valign="">5&deg; C per Hour (41&deg; F per Hour)</td></tr><tr valign="top"><td valign="">Relative Humidity</td><td valign="">5% - 95% (non-condensing)</td></tr><tr valign="top"><td valign="">Relative Humidity Change</td><td valign="">5% RH per hour</td></tr><tr valign="top"><td valign="">Altitude</td><td valign="">40,000 feet above sea level</td></tr><tr valign="top"><td valign="">Shock</td><td valign="">80G @ less than 3ms (1/2 sine)</td></tr><tr valign="top"><td rowspan="2" valign="">Vibration</td><td valign="">2.09G RMS (random)</td></tr><tr valign="top"><td valign="">Max swept sine 0.5G RMS (0-peak)</td></tr></tbody></table></div></DIV></DIV></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL379006-364904">2&nbsp;&nbsp;Image Generation (IG) Computer<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949778-364904">2.1&nbsp;&nbsp;Overview<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The Image Generator (IG) outlined in this specification consists
+only of what is commonly referred to as the computer. The supplied
+IG will not include external peripherals such as keyboard, mouse,
+display monitor(s), or external cables. These external and peripheral
+functions will be provided by GE Healthcare unless agreed to and reflected
+in the respective part numbers. Agreements and system part numbers
+may also include the integration of GE Healthcare specified components
+into the IG which will be outlined in this document and reflected
+in the respective part numbers. As an FDA governed and ISO compliant
+medical products OEM, controlled and documented configurations are
+of critical importance to GE Healthcare. The requirements below are
+purposely specific to prevent supplier changes without advance notice
+and possible pre-qualification by GE Healthcare.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949779-364904">2.2&nbsp;&nbsp;Motherboard<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The IG motherboard shall be an Intel&reg; Westville<SPAN CLASS="SUP"><SUP>TM</SUP></SPAN>, or equivalent, and shall meet the following requirements:</P><UL><LI CLASS="bulletlist"><P>Support Dual Intel&reg; Xeon<SPAN CLASS="SUP"><SUP>TM</SUP></SPAN> Socket604 processors (2.8GHz minimum)</P></LI><LI CLASS="bulletlist"><P>Onboard regulation of processor voltages</P></LI><LI CLASS="bulletlist"><P>Intel&reg; E750x chipset</P></LI><LI CLASS="bulletlist"><P>533Mhz Front Side Bus (FSB)</P></LI><LI CLASS="bulletlist"><P>Minimum of one (1) 10/100/1000 Mb onboard
+ethernet port</P></LI><LI CLASS="bulletlist"><P>2.0GB DDR-266 SDRAM&reg; memory using
+minimum two (2) 184-pin DIMM sockets</P></LI><LI CLASS="bulletlist"><P>Support Serial Over LAN (SOLAN)</P></LI><LI CLASS="bulletlist"><P>One (1) PCI-X expansion slot (100Mhz
+min.) accommodating a riser card</P></LI><LI CLASS="bulletlist"><P>BIOS configuration shall be in accordance
+with details outlined in Appendix A of direction 2362872PSP</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949789-364904">2.3&nbsp;&nbsp;PCI Expansion<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The IG shall include at least one (1) PCI-X expansion slot capable
+of accommodating a full-height &#8220;short&#8221; card.</P><P CLASS="sect2">This expansion slot shall contain a Recon Accelerator Card (GE
+Healthcare part no. 2316826).</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949790-364904">2.4&nbsp;&nbsp;Floppy Disk Drive<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The IG shall contain one (1) internal 3.5&#8221;, half-height,
+1.44MB floppy diskette drive.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949791-364904">2.5&nbsp;&nbsp;Ethernet Ports<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The IG does not require Ethernet ports in addition to the board-resident
+port.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949792-364904">2.6&nbsp;&nbsp;Physical Size<SPAN CLASS="SECT2EFF"> </SPAN></H3><UL><LI CLASS="bulletlist"><P>Chassis type: Rack-mountable</P></LI><LI CLASS="bulletlist"><P>Mounting orientation: Horizontal</P></LI><LI CLASS="bulletlist"><P>Maximum chassis height: 1U (44.5mm/1.75&#8221;)</P></LI><LI CLASS="bulletlist"><P>Maximum chassis width: 19&#8221; Rack
+standard</P></LI><LI CLASS="bulletlist"><P>Maximum chassis depth: 508mm (20&#8221;)</P></LI><LI CLASS="bulletlist"><P>Maximum weight: 10 Kg (22 lbs)</P></LI><LI CLASS="bulletlist"><P>Internal signal and power harness drops
+must be sufficient to support maximum configuration above</P></LI><LI CLASS="bulletlist"><P>Handles shall be mounted at each side
+of the front of the chassis for ease of removal from a rack. Handles
+shall protrude no more than 20mm (3/4&#8221;) from the chassis front
+panel.</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949801-364904">2.7&nbsp;&nbsp;External Switches and Indicators<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The IG shall include external switches and indicators on the
+chassis as follows:</P><UL><LI CLASS="bulletlist"><P>A system pushbutton POWER ON/OFF switch
+which toggles system power ON or OFF when pressed or held.</P></LI><LI CLASS="bulletlist"><P>A pushbutton system RESET switch accessible
+on the front of the chassis that re-initializes all internal hardware
+without cycling power   to the IG (hard reset/soft boot).</P></LI><LI CLASS="bulletlist"><P>LED indicators shall be accessible
+and visible on the front of the chassis as follows:</P><UL><LI CLASS="bulletlist"><P>System power is ON - steady GREEN -
+labeled &#8220;I/O&#8221;</P></LI><LI CLASS="bulletlist"><P>System error - flashing or steady RED
+- labeled &#8220;FLT&#8221;</P></LI><LI CLASS="bulletlist"><P>LAN Activity - flashing GREEN - labeled
+&#8220;LAN&#8221;</P></LI></UL></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949808-364904">2.8&nbsp;&nbsp;Environmental Requirements<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949809-364904">2.8.1&nbsp;&nbsp;Operating Environment<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The IG shall operate within the following limits of environmental
+conditions:</P><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="163"><col width="257"></colgroup><tbody valign=""><tr valign="top"><td align="justify" valign="">Temperature</td><td valign="">0&deg; - 35&deg; C (32&deg; - 95&deg; F)</td></tr><tr valign="top"><td valign="">Temperature Change</td><td valign="">3&deg; C per Hour (37.5&deg; F per Hour)</td></tr><tr valign="top"><td valign="">Relative Humidity</td><td valign="">20% - 80% (non-condensing)</td></tr><tr valign="top"><td valign="">Relative Humidity Change</td><td valign="">5% RH per hour</td></tr><tr valign="top"><td valign="">Noise</td><td valign="">Less than 45 dB</td></tr><tr valign="top"><td valign="">Altitude</td><td valign="">10,000 feet above sea level</td></tr><tr valign="top"><td valign="">Vibration</td><td valign="">20G @ less than 3ms (1/2 sine)</td></tr><tr valign="top"><td valign="">Vibration Max</td><td valign="">Random 0.21G RMS</td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949810-364904">2.8.2&nbsp;&nbsp;Non-Operating Environment<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The IG shall sustain no permanent damage while in the following
+non-operating environment:</P><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="155"><col width="257"></colgroup><tbody valign=""><tr valign="top"><td align="justify" valign="">Temperature</td><td valign="">-34&deg; to 50&deg; C (-29&deg; to 122&deg; F)</td></tr><tr valign="top"><td valign="">Temperature Change</td><td valign="">5&deg; C per Hour (41&deg; F per Hour)</td></tr><tr valign="top"><td valign="">Relative Humidity</td><td valign="">10% - 95% (non-condensing)</td></tr><tr valign="top"><td valign="">Relative Humidity Change</td><td valign="">5% RH per hour</td></tr><tr valign="top"><td valign="">Altitude</td><td valign="">40,000 feet above sea level</td></tr><tr valign="top"><td valign="">Shock</td><td valign="">80G @ less than 3ms (1/2 sine)</td></tr><tr valign="top"><td valign="">Vibration</td><td valign="">2.09G RMS (random)</td></tr><tr valign="top"><td valign="">Vibration Max</td><td valign="">Random 0.5G RMS</td></tr></tbody></table></div></DIV></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949811-364904">2.9&nbsp;&nbsp;FRU<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">2362872 IG as defined herein including:</P><UL><LI CLASS="bulletlist"><P>Dual Intel&reg; Xeon<SPAN CLASS="SUP"><SUP>TM</SUP></SPAN> 2.8Ghz processors, 512KB L2 Cache, 2.0GB DDR200 SDRAM memory, etc.</P></LI><LI CLASS="bulletlist"><P>2316826 Recon Accelerator Card (RAC).</P></LI></UL></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL379009-364904">3&nbsp;&nbsp;SCSI Tower<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Two Bay External SCSI tower that is used on the Global Recon
+Engine Console. The tower will contain a MOD read/write device and
+a DVD-RAM drive.</P><DIV CLASS="ILLUSTRATION" id="SL1949814-364904"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">SCSI Tower (Exploded View) </SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/364904-190275.jpg" BORDER="0" usemap="#SL364906-364904"></P></DIV><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e763"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Click on the PDF icon below, to view the full version
+of the illustration.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><DIV CLASS="MEDIA"><CENTER><P CLASS="MEDIATITLE"><SPAN CLASS="MEDIAINTRO"><B>Media File&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="MEDIATITLE">SCSI Tower (Exploded View) </SPAN> </P></CENTER><CENTER><P CLASS="MEDIAOBJ"><A HREF="../media/364904-190277.pdf" TARGET="_blank"><IMG SRC="../icons/pdf.gif" BORDER="0" ALIGN="top" HSPACE="4" WIDTH="28" HEIGHT="31"></A></P></CENTER></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL379012-364904">4&nbsp;&nbsp;Global Operator Console 4th Version<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL379015-364904">4.1&nbsp;&nbsp;Overview (GOC4)<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The Global Operator Console 4th version (GOC4) consists of the
+following four (4) components. </P><UL><LI CLASS="bulletlist"><P>The Data Acquisition and Recon Control2
+(DARC2) Component - incorporates the Scan Data Disk Array (SDDA) component
+from the previous console GRE/GOC3.</P></LI><LI CLASS="bulletlist"><P>The Image Generator (IG) Component
+- Is the same as the previous console version GRE/GOC3.</P></LI><LI CLASS="bulletlist"><P>Intercom Component - Is now a standalone
+component removed from the GRE/GOC4 SDDA and redesigned for better
+reliability and volume control.</P></LI><LI CLASS="bulletlist"><P>Cooling Package, including:</P><UL><LI CLASS="bulletlist"><P>Fans</P></LI><LI CLASS="bulletlist"><P>Front and Rear Covers with Foam Insulation</P></LI><LI CLASS="bulletlist"><P>Air Filter</P></LI></UL></LI></UL><P CLASS="sect2">The DARC2 node receives raw data from the Data Acquisition System
+(DAS) through an on-board Data Interface processor (DIP) card, and
+stores that data in the Scan Data Disks located in the DARC2. The
+raw data is then delivered from the scan data disks in the DARC2 to
+the IG nodes. The IG nodes then create images using on-board processors
+and Recon Accelerator Cards (RAC). The images generated by the IG
+nodes are sent back to the DARC2 node, which gathers the images and
+sends them to the Host Computer.</P><P CLASS="sect2">Though each IG node will have a floppy boot disk, the DARC2
+node should be capable of booting all IG nodes in the GOC4 via Gigabit
+Ethernet, using Serial Over LAN (SOLAN) functionality.</P><P CLASS="sect2">The host computer for the GOC4 console will be an off-the-shelf,
+Linux-based system, which meets EMC requirements per CISPR 11.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL364910-364904">4.2&nbsp;&nbsp;DARC2<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The DARC2 node provides to the IG nodes not only boot code but
+all application code and parameters as well.</P><P CLASS="sect2">Key goals of the GOC4 are:</P><UL><LI CLASS="bulletlist"><P>Scalability - performance and cost
+are scalable</P></LI><LI CLASS="bulletlist"><P>Flexibility - new functions and features
+such as cone-beam back projection should be easy to implement</P></LI><LI CLASS="bulletlist"><P>Performance - the high-end configuration
+should support 12 frames per second 2D back projection</P></LI><LI CLASS="bulletlist"><P>Ability to Upgrade - it should be relatively
+easy to replace installed-base consoles</P></LI><LI CLASS="bulletlist"><P>Performance - general purpose processors
+should be used to take advantage of improving processor speeds in
+the industry</P></LI></UL><P CLASS="sect2">The overall performance scope of the GOC4 shall be as follows:</P><UL><LI CLASS="bulletlist"><P>Recon times: 4fps - 12fps @ 2D BP</P></LI><LI CLASS="bulletlist"><P>Latency: &lt; 2.0 seconds</P></LI><LI CLASS="bulletlist"><P>Image Matrix: &lt; 512 x 512 pixels</P></LI><LI CLASS="bulletlist"><P>2D BP: hardware and software support</P></LI><LI CLASS="bulletlist"><P>3D BP: not yet supported</P></LI></UL><P CLASS="sect2">The DARC2 node controls most of the GOC4 functions and data
+flow, the exception being actual image generation. This node should
+receive a reconstruction request from the host computer, recognize
+the recon mode, timing, parameters, and data, and be able to generate
+the image set.</P><P CLASS="sect2">The raw data is first restored from the disks. The DARC2 node
+then creates an image set and requests image generation from the IG
+node.</P><P CLASS="sect2">While most of the software components (e.g. Recon_Control, Data_Restore,
+Image_Buffer, and Data_Acq) reside on this node, the components related
+to image generation are calculated on the IG nodes. The DARC2 node
+may help with some light calculation tasks such as offset vector generation.</P><P CLASS="sect2">Main data flow of the DARC2 node is described as follows:</P><UL><LI CLASS="bulletlist"><P>Receive raw data from the Gantry</P></LI><LI CLASS="bulletlist"><P>Store the raw data to the scan data
+disks</P></LI><LI CLASS="bulletlist"><P>Restore the raw data from the scan
+data disks and transfer to IG nodes over GB Ethernet</P></LI><LI CLASS="bulletlist"><P>Take multi-image streams from the IG
+nodes and forward them through a single image stream to the host computer</P></LI></UL><P CLASS="sect2">The control flow is described more fully in the GRE Design Theory
+of Operation.</P><P CLASS="sect2">The DARC2 node is comprised of the following:</P><UL><LI CLASS="bulletlist"><P>DARC2 computer: a computer node using
+a high-performance PC server</P></LI><LI CLASS="bulletlist"><P>DARC2 disk: the OS and Recon Applications
+software are stored on this disk</P></LI><LI CLASS="bulletlist"><P>DIP card: the DAS Interface Processor
+card</P></LI><LI CLASS="bulletlist"><P>Gigabit Ethernet (GbE) card: to increase
+IG nodes additional GbE cards may be installed</P></LI><LI CLASS="bulletlist"><P>CD-ROM drive: will be used for software
+installation and stand-alone use</P></LI><LI CLASS="bulletlist"><P>Floppy drive: a 3&frac12;&#8221; floppy
+drive will be used for BIOS flash, if necessary</P></LI></UL><P CLASS="sect2">The DARC2 node is intended to be a highly independent module,
+which can be replaced with PC servers consisting of the same specifications,
+regardless of manufacturer or manufacturer location. </P><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949843-364904">4.2.1&nbsp;&nbsp;Motherboard<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The DARC2 node will take advantage of a standard, off-the-shelf
+motherboard, using dual microprocessors to increase processing density.
+The DARC2 node will use very high performance general-purpose processors,
+memory, and a server motherboard with GB Ethernet and SCSI port(s),
+and power supply.</P><UL><LI CLASS="bulletlist"><P>Dual Processors: Intel &reg; Xeon&#8482;
+or successor</P></LI><LI CLASS="bulletlist"><P>Memory: Min. four slots DDR-SDRAM (Min.
+2.0 GB)</P></LI><LI CLASS="bulletlist"><P>Form factor: SSI rack-mountable</P></LI><LI CLASS="bulletlist"><P>Onboard graphics chip and PS/2 port(s)
+are needed to support development and diagnostics</P></LI></UL></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949848-364904">4.2.2&nbsp;&nbsp;Chassis<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The chassis is a standard EIA 19" x 2U rack-mount with a max.
+depth of 20". The chassis have a cooling system capable of sufficiently
+dissipating heat created by the motherboard's dual processors.</P><P CLASS="sect3">Power Supply: ATX or SSI EEB compliant; input 100-120Vac / 200-240Vac,
+@ 50-60Hz, auto-detecting.</P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949849-364904">4.2.3&nbsp;&nbsp;Power On Switch/LED<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The DARC2 should boot up when AC power is provided to the components
+power supply without requiring a PWON signal toggle. Such a hardware
+switch is needed for installation power-on and recovery from unexpected
+BIOS power-on settings.</P><P CLASS="sect3">A power-on LED should indicate that the DARC2 power supply is
+providing DC output to the motherboard and should be mounted on the
+front of the chassis. Additional LED indicators such as on/off/blinking
+are more fully described in motherboard vendor specifications.</P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949850-364904">4.2.4&nbsp;&nbsp;Reset Switch<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The DARC2 should be able to be reset by a single hardware switch
+located on the front of the chassis.</P><TABLE CLASS="ADMONsect3" CELLSPACING="0%" CELLPADDING="0%" ID="d0e934"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">When the DIP card detects a PCI reset, all registers are
+cleared, causing the RHARD and X-ABORT relay to open.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949851-364904">4.2.5&nbsp;&nbsp;Disk Drives<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The DARC2 disk consists of a single SCSI or E-IDE disk and provides
+OS code, application programs, tables, and parameters to the GOC4.
+All nodes in the GOC4 are booted from this disk, which also has the
+swap partition area to the DARC2 node. This disk should be on a separate
+bus from the scan data disks.</P><UL><LI CLASS="bulletlist"><P>Rotation speed: 7,200 rpm or higher</P></LI><LI CLASS="bulletlist"><P>Interface: ATA100/133 (recommended)
+or newer; Ultra160/320 SCSI (acceptable)</P></LI><LI CLASS="bulletlist"><P>Capacity: 36GB or higher</P></LI><LI CLASS="bulletlist"><P>Form Factor: 1" height, 3&frac12;&#8221;
+HDD</P></LI><LI CLASS="bulletlist"><P>Connection: 40-pin ATA100, 80-pin SCA2,
+or HD68-pin</P></LI></UL></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949857-364904">4.2.6&nbsp;&nbsp;Scan Data Disks<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The high-speed Scan Data Disks are connected to the DARC2 node
+via an internal Ultra320 SCSI bus. To increase the disk read/write
+speeds software RAID0 (striping) is employed. The Scan Data Disk configuration
+may change according to the number of detector slices, DAS trigger
+rates, and/or IG performance.</P><UL><LI CLASS="bulletlist"><P>Rotation speed: 15,000rpm or higher</P></LI><LI CLASS="bulletlist"><P>Interface: Ultra320 SCSI or successor</P></LI><LI CLASS="bulletlist"><P>Capacity: 36GB or more per disk</P></LI><LI CLASS="bulletlist"><P>Form factor: 1" height x 3&frac12;&#8221;
+HDD</P></LI><LI CLASS="bulletlist"><P>Connection: HD68-pin, powered by 4-pin
+commercial Mate-N-Lok</P></LI><LI CLASS="bulletlist"><P>RAID0: striping up to four disks</P></LI></UL></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949864-364904">4.2.7&nbsp;&nbsp;DIP Card<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">This PCI DIP card supports almost the same functionality as
+the current DIP in that it converts the optical signal received from
+the Gantry into electrical raw data and writes that data to one of
+the double buffers on the card. When the received data count reaches
+a predetermined value it will switch over to the other buffer. The
+DARC2 then receives this data via the PCI bus.</P><P CLASS="sect3">This card supports 32bit, 33MHz, 3.3V I/O PCI bus interface
+with an FPGA, and should be able to support 333Mb/sec and/or 833Mb/sec
+data rate optical fiber interface.</P><P CLASS="sect3">Additional details can be found in the purchase spec. - 2363229PSP.</P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949865-364904">4.2.8&nbsp;&nbsp;DARC2 Gigabit Ethernet Card<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">Each IG node is to be connected to the DARC2 via an off-the-shelf
+Gigabit Ethernet (GbE) card connected to one of the DARC2's PCI-X
+slots. Depending on the number of optional IG nodes additional GbE
+cards may be added to the DARC2.</P><UL><LI CLASS="bulletlist"><P>Dual Gigabit Ethernet ports</P></LI><LI CLASS="bulletlist"><P>10Base-T, 100Base-TX, 1000Base-TX IEEE802.3ab
+compatible</P></LI><LI CLASS="bulletlist"><P>64bit, 66MHz (or higher) PCI-X interface</P></LI><LI CLASS="bulletlist"><P>Low profile form factor</P></LI></UL></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949870-364904">4.2.9&nbsp;&nbsp;DARC2 DVD-ROM Drive<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The DVD-ROM drive is used for software installation, system
+diagnostics, and to support stand-alone operation of the DARC2. </P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949871-364904">4.2.10&nbsp;&nbsp;DARC2 Floppy Drive<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">This 3&frac12;&#8221; floppy disk drive will be used for BIOS
+upgrades or for a boot disk, if necessary.</P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL379020-364904">4.3&nbsp;&nbsp;Image Generator (IG)<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The Image Generator (IG) component mounts an FPGA accelerator
+card (RAC card) on a PCI-X slot. The IG node works under the DARC2's
+supervision as a very high performance image generation calculator.
+When an IG node receives an image generation request from the DARC2
+it will perform image generation processes. (i.e. preprocess, filtered
+back projection and post process, etc.) When an image set is calculated,
+the IG node notifies the DARC2 and transfers the set of pixel image
+data to the DARC2 via Gigabit Ethernet. Because each IG node is connected
+to the DARC2 node directly, without a switching hub, the individual
+IG nodes do not communicate with each other nor do they share processing
+data.</P><P CLASS="sect2">The GOC4 may consist of several IG nodes of varying performance.
+For example, one node may be replaced by a later version IG node having
+higher frequency CPUs. The GOC4 hardware allows any combination of
+server performance among the IG nodes. Therefore, all IG nodes and
+DARC2 nodes have to respond to a hardware configuration inquiry.</P><P CLASS="sect2">The IG node consists of the following:</P><UL><LI CLASS="bulletlist"><P>IG computer: computer using a high-performance
+PC server</P></LI><LI CLASS="bulletlist"><P>RAC Card: Recon Accelerator Card plugged
+into a PCI-X slot in the IG computer</P></LI><LI CLASS="bulletlist"><P>Floppy drive: a 3&frac12;&#8221; floppy
+drive will be used for BIOS flash, if necessary</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL379023-364904">4.4&nbsp;&nbsp;IG Computer<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The IG computer will be identical to the DARC2 computer as described
+in <A HREF="364904.htm#SL364910-364904">Section&nbsp;4.2</A> (DARC2 Computer) above with the following exceptions:</P><UL><LI CLASS="bulletlist"><P>Chassis size: 19" rack-mount type EIA
+1U height x 20" max depth</P></LI><LI CLASS="bulletlist"><P>DVD-ROM Drive: the IG computer will
+not have a DVD-ROM drive</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL379026-364904">4.5&nbsp;&nbsp;Reconstruction Acceleration Card (RAC)<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">This &#8220;low-profile&#8221; PCI card accelerates the two-dimensional
+(2D) back-projection process of the GOC4 and is plugged into a 64bit,
+66MHz (533MB/sec) PCI-X slot on the IG node.</P><P CLASS="sect2">This parallel beam back-projector provides the GOC4 the ability
+to off-load the back-projection application from general-purpose processors
+to fully programmable hardware. This option dramatically increases
+the reconstruction performance per cost ratio.</P><P CLASS="sect2">Following are the high-level CTQs for the RAC card:</P><UL><LI CLASS="bulletlist"><P>Perform 2D parallel beam back-projection
+at &gt;6fps</P></LI><LI CLASS="bulletlist"><P>PCI-X low-profile compatible</P></LI><LI CLASS="bulletlist"><P>Communicate with IG computer through
+a go =&gt; complete protocol</P></LI><LI CLASS="bulletlist"><P>Support PCI and Mailbox interrupts</P></LI><LI CLASS="bulletlist"><P>Reconstruct any image matrix size up
+to 524,288 32bit pixels</P></LI><LI CLASS="bulletlist"><P>In-system programmable FPGA design
+via software download</P></LI></UL><P CLASS="sect2">The major elements of the RAC card consist of:</P><UL><LI CLASS="bulletlist"><P>Field Programmable Gate Array (FPGA)</P></LI><LI CLASS="bulletlist"><P>QDR&#8482; SRAM - creates two blocks
+of memory</P></LI><LI CLASS="bulletlist"><P>FLASH Memory - contains the FPGA's
+configuration code</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL379029-364904">4.6&nbsp;&nbsp;Power<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The DARC2, IG, nodes are each powered by an AC switching power
+supply internal to each chassis. Each node receives its AC power from
+a 120Vac single-phase outlet box internal to the console chassis.</P><P CLASS="sect2">A redundant power supply and/or UPS option does not need to
+be supported by each node. The NGPDU will provide 120Vac to the operator's
+console. The switching power supply internal to each node is required
+to allow &plusmn;5% stability.</P><P CLASS="sect2">These AC switching power supply in each node shall be SSI EPS12V,
+SSI EPS1U, SSI EPS2U, or ATX compliant.</P><UL><LI CLASS="bulletlist"><P>SSI EPS12V: 24-pin for motherboard,
+8-pin +12V for processor, 4-pin for peripherals</P></LI><LI CLASS="bulletlist"><P>SSI EPS1U: 62-pin edge finger for 1U
+chassis server</P></LI><LI CLASS="bulletlist"><P>SSI EPS2U: 24-pin for motherboard,
+8-pin +12V for processor, 4-pin for peripherals</P></LI><LI CLASS="bulletlist"><P>ATX: standard PC power supply, 20-pin
+for motherboard, 4-pin for peripherals</P></LI></UL><P CLASS="sect2">The table below lists the node, power supply wattage, input
+port (max current), and output port.</P><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="121" align="left"><col width="91" align="left"><col width="136" align="left"><col width="145" align="left"></colgroup><tbody valign=""><tr valign="middle"><td align="left" valign="middle">Power Supply</td><td align="left" valign="middle">Wattage</td><td align="left" valign="middle">Input Port</td><td align="left" valign="middle">Output Port</td></tr><tr valign="middle"><td align="left" valign="middle">DARC2 Node</td><td align="left" valign="middle">350-400 W</td><td align="left" valign="middle">3.3A @120 Vac</td><td align="left" valign="middle">3.3V, 5.0V, +12V, -12V, 5VSB</td></tr><tr valign="middle"><td align="left" valign="middle">IG Node</td><td align="left" valign="middle">300-350 W</td><td align="left" valign="middle">2.9A @ 120 Vac</td><td align="left" valign="middle">3.3V, 5.0V, +12V, -12V, 5VSB</td></tr><tr valign="middle"><td align="left" valign="middle">SDDA Node</td><td align="left" valign="middle">200 W</td><td align="left" valign="middle">1.7A @ 120 Vac</td><td align="left" valign="middle">5.0V, +12V, -12V</td></tr></tbody></table></div></DIV><P CLASS="sect2">A minimum of five outlets should be available for the GRE, excluding
+the host computer. Total AC power consumed by the GRE (excluding host
+computer and peripheral devices) is estimated below. This estimation
+assumes typical wattage while the IGs are calculating images.</P><UL><LI CLASS="bulletlist"><P>DARC2 + one (1) IG node ~ 700 W</P></LI><LI CLASS="bulletlist"><P>DARC2 + two (2) IG nodes ~ 1000 W</P></LI><LI CLASS="bulletlist"><P>DARC2 + three (3) IG nodes ~ 1300 W</P></LI></UL><P CLASS="sect2">The current SRU VME chassis requires a total of ~600W it is
+recommended that the operator console's total power requirements be
+calculated based upon a configuration utilizing three (3) IG nodes.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL379032-364904">4.7&nbsp;&nbsp;Intercom Component<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The intercom block has an audio amplifier circuit, enabling
+communication between the console operator and the patient on the
+table. This block also has sound source switching functionality.</P><P CLASS="sect2">The sound sources are:</P><UL><LI CLASS="bulletlist"><P>Console microphone on the SCIM (Operator's
+voice)</P></LI><LI CLASS="bulletlist"><P>Gantry microphone output (Patient's
+voice)</P></LI><LI CLASS="bulletlist"><P>Auto-voice L and R (output from the
+host computer)</P></LI></UL><P CLASS="sect2">These sound sources are multiplexed by the TALK button on the
+SCIM and by the Auto-voice output itself. The selected output signal
+goes to the following devices, based on prioritized logic.</P><UL><LI CLASS="bulletlist"><P>Table speaker</P></LI><LI CLASS="bulletlist"><P>Console speaker on the SCIM</P></LI><LI CLASS="bulletlist"><P>Auto-voice recording input on the host
+computer</P><P>Also refer to <SPAN CLASS="MODULEREF"><A HREF="366374.htm#SL366376-366374"><I>GOC4 Intercom Theory and
+Adjustments</I></A></SPAN>.</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL379047-364904">4.8&nbsp;&nbsp;Cooling Package<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The cooling package consists of three (3) components:</P><UL><LI CLASS="bulletlist"><P>Fan Assembly</P></LI><LI CLASS="bulletlist"><P>Front and Rear Covers, with Foam, for
+sound reduction and air flow control</P></LI><LI CLASS="bulletlist"><P>Air Filter</P></LI></UL><P CLASS="sect2">The Fan Assembly has perpendicular mounted larger fans than
+the GOC3 consoles. The Individual Fans are FRUs.</P><P CLASS="sect2">The Front and Rear covers are redesigned to accommodate the
+larger rear Fans, and are equipped with Insulating Foam, to both deaden
+noise and direct air flow for proper cooling.</P><P CLASS="sect2">The Air Filter is designed to capture room contaminates. It
+needs to be periodically cleaned (during a regular PM cycle).</P><P CLASS="sect2">The following diagrams illustrate the Cooling Package Components.</P><DIV CLASS="ILLUSTRATION" id="SL1949902-364904"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">GOC4 Cooling Fans</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/364904-379039.jpg" BORDER="0" usemap="#SL379043-364904"></P></DIV><DIV CLASS="ILLUSTRATION" id="SL1949903-364904"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">GOC4 Rear Cover, with Foam</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/364904-379041.jpg" BORDER="0" usemap="#SL379044-364904"></P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL379035-364904">4.9&nbsp;&nbsp;Service and Diagnostics<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The GOC41.0 supports two types of diagnostic, power-on test
+and offline test. The power-on test is a subset of offline test. This
+test sweeps devices condition and checks the motherboard and some
+devices BIST results at system power-on after OS booted. The offline
+test checks each device condition, interface, and environment more
+strictly. The GOC41.0 should recover most of diagnostic condition
+without whole sub-system reset except motherboard diagnostic.</P><P CLASS="sect2">The GOC41.0 supports some kind of diagnostic tools.</P><UL><LI CLASS="bulletlist"><P>Motherboard diagnostics, including
+memory test</P></LI><LI CLASS="bulletlist"><P>DIP diagnostic</P></LI><LI CLASS="bulletlist"><P>RAC BIST and/or diagnostic</P></LI><LI CLASS="bulletlist"><P>Scan Data Disk diagnostic (On the DARC2)</P></LI><LI CLASS="bulletlist"><P>Network / connectivity test</P></LI></UL><P CLASS="sect2">Assemblies are assigned as FRUs based on the likelihood of need
+for replacement and fixed-right- first-time (FRFT). The following
+is a breakdown of GOC4 FRUs:</P><UL><LI CLASS="bulletlist"><P>DA/RC2 node</P></LI><LI CLASS="bulletlist"><P>DIP Board</P></LI><LI CLASS="bulletlist"><P>IG node</P></LI><LI CLASS="bulletlist"><P>RAC Card</P></LI><LI CLASS="bulletlist"><P>ICPT Board </P></LI><LI CLASS="bulletlist"><P>Host Computer</P></LI></UL><P CLASS="sect2">A diagnostic tool must identify the error unit as FRU level.</P><P CLASS="sect2">The diagnostic tool supports system inquiry capability. These
+are some examples of inquiry items, CPU frequency, Memory capacity,
+Disk configuration, number of IG, etc.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL379038-364904">4.10&nbsp;&nbsp;Console Block Diagrams<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="ILLUSTRATION" id="SL1949915-364904"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;4:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">GRE High Level Hardware Level Data Flow</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/364904-366262.gif" BORDER="0" usemap="#SL366264-364904"></P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949916-364904">4.10.1&nbsp;&nbsp;Data Flow Dictionary<SPAN CLASS="SECT1EFF"> </SPAN></H4><OL><LI CLASS="numlist"><P>Gantry -&gt; DIP: Serial data receive
+from a fiber optic interface</P></LI><LI CLASS="numlist"><P>DIP -&gt; Disk: Scan Data Store</P></LI><LI CLASS="numlist"><P>Disk -&gt; Recon Control: Offset Data</P></LI><LI CLASS="numlist"><P>Disk -&gt; Data Restore: View Data</P></LI><LI CLASS="numlist"><P>Recon Control -&gt; IGs: Calibration Data,
+offset vector, tables, parameters</P></LI><LI CLASS="numlist"><P>Data Restore -&gt; IGs: View Data transfer
+from the DARC2 to each IG over gigabit Ethernet</P></LI><LI CLASS="numlist"><P>IGs -&gt; Image Buffer Create: Pixel image
+data and small header are transferred from the IG to the DA/RC2 over
+gigabit Ethernet</P></LI><LI CLASS="numlist"><P>Image Create -&gt; Image DB: DICOM image
+data and are transferred from the DA/RC2 to Host PC over gigabit Ethernet</P></LI></OL><DIV CLASS="ILLUSTRATION" id="SL1949925-364904"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;5:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">GRE Detail Hardware Level Data Flow</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/364904-366271.gif" BORDER="0" usemap="#SL366275-364904"></P></DIV><TABLE CLASS="ADMONsect3" CELLSPACING="0%" CELLPADDING="0%" ID="d0e1339"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Click on the PDF icon below, for a PDF version of the
+above illustration.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><DIV CLASS="MEDIA"><CENTER><P CLASS="MEDIATITLE"><SPAN CLASS="MEDIAINTRO"><B>Media File&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="MEDIATITLE">GRE Detail Hardware Level Data Flow</SPAN> </P></CENTER><CENTER><P CLASS="MEDIAOBJ"><A HREF="../media/364904-366273.pdf" TARGET="_blank"><IMG SRC="../icons/pdf.gif" BORDER="0" ALIGN="top" HSPACE="4" WIDTH="28" HEIGHT="31"></A></P></CENTER></DIV></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL1949927-364904">4.10.2&nbsp;&nbsp;Power Distribution<SPAN CLASS="SECT1EFF"> </SPAN></H4><DIV CLASS="ILLUSTRATION" id="SL1949928-364904"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;6:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Power Distribution</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/364904-366277.gif" BORDER="0" usemap="#SL366304-364904"></P></DIV><DIV CLASS="ILLUSTRATION" id="SL1949929-364904"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;7:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">GRE Interconnect Diagram</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/364904-366300.gif" BORDER="0" usemap="#SL366305-364904"></P></DIV><TABLE CLASS="ADMONsect3" CELLSPACING="0%" CELLPADDING="0%" ID="d0e1360"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Click on the PDF icon below, for a PDF version of the
+above illustration.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><DIV CLASS="MEDIA"><CENTER><P CLASS="MEDIATITLE"><SPAN CLASS="MEDIAINTRO"><B>Media File&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="MEDIATITLE">GRE Interconnect Diagram</SPAN> </P></CENTER><CENTER><P CLASS="MEDIAOBJ"><A HREF="../media/364904-366302.pdf" TARGET="_blank"><IMG SRC="../icons/pdf.gif" BORDER="0" ALIGN="top" HSPACE="4" WIDTH="28" HEIGHT="31"></A></P></CENTER></DIV></DIV></DIV></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

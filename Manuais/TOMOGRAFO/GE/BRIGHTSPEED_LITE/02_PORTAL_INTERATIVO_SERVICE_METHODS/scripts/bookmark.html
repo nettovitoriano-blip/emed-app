@@ -1,0 +1,16 @@
+<html>
+<head>
+<script language="JavaScript" src="../scripts/webmonk.gos"></script>
+<script language="JavaScript" src="../scripts/modules_init.js"></script>
+<script language="JavaScript" src="../scripts/bookmark.js"></script>
+    <script language="JavaScript">
+	  var theloc = WM_readCookie(ckbk);
+      var lastyear = new Date();
+      lastyear.setFullYear(lastyear.getFullYear() - 1);
+      WM_setCookie(ckbk,' ',lastyear.toGMTString(),"/");
+      window.location=theloc;
+    </script>
+</head>
+<body>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>DARC Node Commands and Troubleshooting</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;3.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;4/24/09</P></td></tr></table><H1 ID="top">DARC Node Commands and Troubleshooting </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="50%"><col width="50%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised:</td><td valign="">26 March 2009</td></tr></tbody></table></div></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1568347-1046440">1&nbsp;&nbsp;Overview<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">This document provides manual commands for DARC Node troubleshooting.
+Not every available command is listed. The first step is to verify
+communication between the Host and the DARC Node. After verifying
+that the communication exists to the DARC Node, DIP diagnostics may
+be performed. Memory size is important and may be checked: however,
+exact memory values expected are not discussed as this memory size
+value may change over time and with different types of DARC Nodes
+offered. It is currently (July, 2006) around 2 GBytes for Main memory.</P><P CLASS="sect1">Application software can be started to verify that Image Generation
+is running on each IG Node present and configured in the Operator
+Console. The DARC Node contains the software and hardware that controls
+the IG Nodes. The Image Generation check assists by determining if
+the IG Node(s) is up (as we determine up and ready for recon) and
+under DARC Control. Refer to the System Diagrams to understand connections
+between Nodes. Refer to the Command List to determine which commands
+can be performed.</P><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e53"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">It is important to understand that the DARC Node may not
+boot up properly due to a Disk Array issue.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e56"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">For All-In-One Console,
+There is no DARC node presence. CDIP card and scan data disks are
+mounted in Host computer. <p>For AIO console, it&#8217;s not necessary to run &#8220;rsh
+darc&#8221; for AIO console. All the commands ran on DARC node still
+can be ran on Host computer, but they are no use since DARC is not
+presence. Details please see below command list.</p></TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1568348-1046440">1.1&nbsp;&nbsp;Video Cable<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">A DARC / IG Node Troubleshooting Video cable is helpful when
+troubleshooting the Operator Console. Utilize this cable whenever
+attempting to troubleshoot the DARC and IG Nodes. The cable should
+not be connected at either end when the system is operating normally,
+since the video may take over the monitor and cause Customer confusion.
+Additionally, connecting only the Node end of the cable will result
+in EMC violations. Sometimes the DARC Node requires a keyboard connection
+(such as pressing <SPAN CLASS="GUIBUTTON">[Enter]</SPAN> to view DARC output).
+It is permitted to use the Operator Console keyboard when troubleshooting
+the DARC Node.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1568349-1046440">1.2&nbsp;&nbsp;Repower Process<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The IG Nodes require a manual re-power process so each IG Node
+present and configured (via LFC or a reconfig) can be initialized
+by the DARC Node. The Application software should be down during IG
+Node initialization. The DARC must successfully remote shell from
+the Host (rsh darc). LAN LED activity should be verified on each IG
+Node to ensure that an Ethernet communication between the DARC and
+IG Node is present. Then the front panel re-power sequence is performed
+for any IG Nodes that have been swapped (physical Node swap, or one
+end of the Ethernet cable between the Nodes), installed, or are having
+issues. The user should wait for the IG Nodes to successfully boot
+up. The user should then verify that each IG Node can be communicated
+with via the DARC Node (rsh ig#). If the remote shell to each IG Node
+is successful, then the user may decide to verify lhinv Main memory
+and perform the rac_menu -a diagnostic tool.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1568350-1046440">1.3&nbsp;&nbsp;Application Software<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Application software may be started and Image Generation should
+be verified as running. Verify that the prompt returned for each rsh
+ig# is as expected. If the prompt is not correct it is usually a software
+issue with the DARC Node, and a DARC software reload is the first
+step to correct the issue. If image_generation is not running on a
+specific IG Node, physically swap one end of the Ethernet cable and
+re-power the IG Nodes with Application software down. If the issue
+follows the IG Node, then a replacement IG Node may be ordered. Always
+verify the part number on the replacement hardware upon receipt of
+a FRU. The labels on shipping boxes can be incorrect (a PAR looks
+just like a IG Node but does not contain a rac board).</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1568351-1046440">1.4&nbsp;&nbsp;Host Software<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The Host software cannot be loaded (OS and Apps) after the DARC
+software. If the Host software load was started, the DARC software
+must follow. Failure to perform procedures in the specified order
+may result in startup issues. In this case, the ssh command from Host
+to DARC will fail and Application software will not launch properly.
+Additionally, if files on the Host for the DARC were not loaded properly,
+these files will be corrupted when they transfer to the DARC during
+the software load. If the -reload command fails to correct the problem,
+perform a LFC.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1568352-1046440">1.5&nbsp;&nbsp;Document Updating<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Updating documents in a timely manner is sometimes impossible.
+Always verify that all service packs are loaded after any DARC software
+reload. The setdate command is performed during an LFC twice. Verify
+that the Host and DARC date and time are synced up.</P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1568356-1046440">2&nbsp;&nbsp;Command List<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The following is a list of manual input commands.</P><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="50%" align="left"><col width="50%" align="left"></colgroup><tbody valign=""><tr valign="top"><td align="left" valign=""><PRE>[root@hostname] ifconfig</PRE></td><td align="left" valign=""><P CLASS="entry">Allows the user to determine what the Host understands
+in relation to the Ethernet Address / port for the DARC Node. When
+a DARC Node is configured /active in the system, look for RUNNING
+and verify that the address is correct. The connection is always port
+C on the Host. Even if you see RUNNING, there still could be a swapped
+connection (like DARC cable connected to Gantry and Gantry connected
+to DARC). Also, if the Host Apps is not loaded, there will only be
+the lO present.</P></td></tr><tr valign="top"><td align="left" valign=""><PRE>[root@hostname] ethtool -p eth#
+
+[root@darc] ethtool -p eth#
+
+[root@ig#] ethtool -p eth#
+</PRE></td><td align="left" valign=""><P CLASS="entry">The ethtool command allows the user to visually verify
+that the NIC is working. After the command is entered, the user will
+visually verify that one LED at the NIC is blinking much faster. To
+stop the process, press <SPAN CLASS="KEYBOARD">&lt;Ctrl-C&gt;</SPAN>. This can be performed
+on the host, DARC, or IG Node.</P></td></tr><tr valign="top"><td align="left" valign=""><PRE>[root@hostname]
+ipmitool -I lan -H darc -A
+NONE chassis power status</PRE></td><td align="left" valign=""><P CLASS="entry">The ipmitool may be available. This command allows the
+user to determine what the Host understands in relation to the power
+state for the DARC Node.</P></td></tr><tr valign="top"><td align="left" valign=""><PRE>[root@hostname] service darcpower start</PRE></td><td align="left" valign=""><P CLASS="entry">Restarts the DARC Node power. This is useful when the
+Host is up but the DARC was re-powered and does not seem to come up
+and ping in a timely manner.</P><TABLE CLASS="ADMONentry" CELLSPACING="0%" CELLPADDING="0%" ID="d0e134"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Not applicable for AIO console.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></td></tr><tr valign="top"><td align="left" valign=""><PRE>[root@hostname] service darcpower stop</PRE></td><td align="left" valign=""><P CLASS="entry">Turns off the DARC Node power.</P><TABLE CLASS="ADMONentry" CELLSPACING="0%" CELLPADDING="0%" ID="d0e145"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Not applicable for AIO console.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></td></tr><tr valign="top"><td align="left" valign=""><PRE>[root@darc] halt</PRE></td><td align="left" valign=""><P CLASS="entry">Halts the DARC Node so power can be turned off without
+losing files on the DARC or hardware.</P><TABLE CLASS="ADMONentry" CELLSPACING="0%" CELLPADDING="0%" ID="d0e156"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Not applicable for AIO console.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></td></tr><tr valign="top"><td align="left" valign=""><PRE>[root@hostname] service cliservice start</PRE></td><td align="left" valign=""><P CLASS="entry">Restarts or verifies that the cliservice dpcproxy server
+is running on the Host to allow for Serial Over LAN (SOL). Returning
+message will be either: &#8220;The dpcproxy is running,&#8221; or
+&#8220;dpcproxy cliservice has been restarted.&#8221;</P><TABLE CLASS="ADMONentry" CELLSPACING="0%" CELLPADDING="0%" ID="d0e167"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Not applicable for AIO console.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></td></tr><tr valign="top"><td align="left" valign=""><PRE>telnet localhost 623
+Server: darc
+Username: &lt;Enter&gt;
+Password: &lt;Enter&gt;
+Login successful
+dpccli&gt; exit
+</PRE></td><td align="left" valign=""><P CLASS="entry">Verifies dpcproxy server running / SOL connection.</P><TABLE CLASS="ADMONentry" CELLSPACING="0%" CELLPADDING="0%" ID="d0e178"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Not applicable for AIO
+console.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></td></tr><tr valign="top"><td align="left" valign=""><PRE>ping darc</PRE></td><td align="left" valign=""><P CLASS="entry">Press <SPAN CLASS="KEYBOARD">&lt;Ctrl-C&gt;</SPAN> to stop the ping process.</P><TABLE CLASS="ADMONentry" CELLSPACING="0%" CELLPADDING="0%" ID="d0e192"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Not applicable for AIO
+console.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></td></tr><tr valign="top"><td align="left" valign=""><PRE>rsh darc</PRE></td><td align="left" valign=""><P CLASS="entry">OS and Apps software must be loaded on the DARC Node.</P><TABLE CLASS="ADMONentry" CELLSPACING="0%" CELLPADDING="0%" ID="d0e203"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Not applicable for AIO
+console.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></td></tr><tr valign="top"><td align="left" valign=""><PRE>ssh darc</PRE></td><td align="left" valign=""><P CLASS="entry">OS and Apps software must be loaded on the Host first,
+then the DARC Node for this to work. See additional ssh commands.</P><TABLE CLASS="ADMONentry" CELLSPACING="0%" CELLPADDING="0%" ID="d0e214"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Not applicable for AIO
+console.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></td></tr><tr valign="top"><td align="left" valign=""><PRE>[root@hostname] rm -rf /usr/g/ctuser/.ssh/known_hosts
+[root@hostname] config_sshd
+[root@darc] service sshd start
+[root@darc] chkconfig sshd on
+</PRE></td><td align="left" valign=""><P CLASS="entry">Additional ssh related commands.</P></td></tr><tr valign="top"><td align="left" valign=""><PRE>cd /var/log
+more messages
+</PRE></td><td align="left" valign=""><P CLASS="entry">A status log on the DARC Node can assist in determining
+issues (used in conjunction with the log on the Host).</P></td></tr><tr valign="top"><td align="left" valign=""><PRE>lhinv</PRE></td><td align="left" valign=""><P CLASS="entry">Lists devices, memory.</P></td></tr><tr valign="top"><td align="left" valign=""><PRE>lhinv | grep Main</PRE></td><td align="left" valign=""><P CLASS="entry">Lists memory size (2048).</P></td></tr><tr valign="top"><td align="left" valign=""><PRE>cat /proc/mdstat</PRE></td><td align="left" valign="">&nbsp;</td></tr><tr valign="top"><td align="left" valign=""><PRE>telnet localhost 623
+Server: darc
+Username: &lt;Enter&gt;
+Password: &lt;Enter&gt;
+Login successful
+dpccli&gt; help
+</PRE></td><td align="left" valign=""><P CLASS="entry"> Shows the Help menu for commands / options.</P><TABLE CLASS="ADMONentry" CELLSPACING="0%" CELLPADDING="0%" ID="d0e263"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Not applicable for AIO console.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></td></tr><tr valign="top"><td align="left" valign=""><PRE>telnet localhost 623
+Server: darc
+Username: &lt;Enter&gt;
+Password: &lt;Enter&gt;
+Login successful
+dpccli&gt; reset
+ok
+console
+</PRE></td><td align="left" valign=""><P CLASS="entry">Verifies dpcproxy server running / SOL connection. Resets
+the DARC Node.</P><TABLE CLASS="ADMONentry" CELLSPACING="0%" CELLPADDING="0%" ID="d0e274"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Not
+applicable for AIO console.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></td></tr><tr valign="top"><td align="left" valign=""><PRE>telnet localhost 623
+Server: darc
+Username: &lt;Enter&gt;
+Password: &lt;Enter&gt;
+Login successful
+dpccli&gt; console
+</PRE></td><td align="left" valign=""><P CLASS="entry">Verifies dpcproxy server running / SOL connection. Lists
+the DARC Node information and current OS and kernel information.</P><TABLE CLASS="ADMONentry" CELLSPACING="0%" CELLPADDING="0%" ID="d0e285"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Not applicable for AIO
+console.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></td></tr><tr valign="top"><td align="left" valign=""><PRE>telnet localhost 623
+Server: darc
+Username: &lt;Enter&gt;
+Password: &lt;Enter&gt;
+Login successful
+dpccli&gt; sensors -v
+</PRE></td><td align="left" valign=""><P CLASS="entry">Verifies dpcproxy server running / SOL connection. Lists
+if power is on or off, as well as last or current voltage/temperature/fan
+information for the DARC Node.</P><TABLE CLASS="ADMONentry" CELLSPACING="0%" CELLPADDING="0%" ID="d0e296"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Not applicable for AIO console.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></td></tr><tr valign="top"><td align="left" valign=""><PRE>[root@darc] lsmod | grep dip</PRE></td><td align="left" valign=""><P CLASS="entry">Checks the existence of a DIP in the DARC Node.</P></td></tr><tr valign="top"><td align="left" valign=""><PRE>[ctuser@darc] DipDiag -x 1,2,3,4,5,6</PRE></td><td align="left" valign=""><P CLASS="entry">When this test is performed, ignore the H16 reference
+&#8220;creating H16 dip interface.&#8221; Because tests 7 and 8 require
+the installation of a loopback cable, they are not being performed.</P></td></tr><tr valign="top"><td align="left" valign=""><PRE>[root@darc] dmidecode | grep -i version
+
+[root@darc] dmidecode | grep Ver
+</PRE></td><td align="left" valign=""><P CLASS="entry">Shows DARC Node BIOS version as loaded by the vendor.</P><TABLE CLASS="ADMONentry" CELLSPACING="0%" CELLPADDING="0%" ID="d0e323"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Not applicable for AIO
+console.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></td></tr><tr valign="top"><td align="left" valign=""><PRE>uname -a</PRE></td><td align="left" valign=""><P CLASS="entry">Displays kernel name, hostname, kernel release and version,
+machine hardware name, and hardware platform.</P></td></tr><tr valign="top"><td align="left" valign=""><PRE>free -m</PRE></td><td align="left" valign=""><P CLASS="entry">Does not adequately display DARC Node total memory information,
+but does display used memory.</P></td></tr><tr valign="top"><td align="left" valign=""><PRE>cat /proc/meminfo</PRE></td><td align="left" valign=""><P CLASS="entry">Displays detailed memory information.</P></td></tr><tr valign="top"><td align="left" valign=""><PRE>df -h</PRE></td><td align="left" valign=""><P CLASS="entry">Displays partition information.</P></td></tr><tr valign="top"><td align="left" valign=""><PRE>cat /proc/devices</PRE></td><td align="left" valign=""><P CLASS="entry">Lists all devices detected by the system.</P></td></tr><tr valign="top"><td align="left" valign=""><PRE>[root@darc] dmidecode | less</PRE></td><td align="left" valign=""><P CLASS="entry">Shows the Motherboard version.</P></td></tr><tr valign="top"><td align="left" valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@host}</FONT></SPAN>&nbsp;&nbsp;&nbsp;&nbsp;<SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>ipmitool -I lan -H darc -P '' sel</B></FONT></SPAN></td><td align="left" valign=""><P CLASS="entry">Basic comm. over SOL, and log status.</P></td></tr><tr valign="top"><td align="left" valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@host}</FONT></SPAN><P CLASS="entry"></P><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>ipmitool
+-H darc -P '' chassis power status</B></FONT></SPAN>&nbsp;&nbsp;</td><td align="left" valign="">Check chassis power behavior at boot.</td></tr><tr valign="top"><td align="left" valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@host}</FONT></SPAN>&nbsp;&nbsp;&nbsp;&nbsp;<SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>ipmitool -H darc -P '' fru</B></FONT></SPAN></td><td align="left" valign="">Lists board components.</td></tr><tr valign="top"><td align="left" valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@host}</FONT></SPAN><P CLASS="entry"></P><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>ipmitool
+-H darc -P '' sdr type temp</B></FONT></SPAN>&nbsp;&nbsp;&nbsp;</td><td align="left" valign="">Component temperature checks.</td></tr><tr valign="top"><td align="left" valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@host}</FONT></SPAN><P CLASS="entry"></P><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>ipmitool
+-H darc -P '' sel list last 15</B></FONT></SPAN>&nbsp;&nbsp;</td><td align="left" valign="">Lists all board sensors. Many details. Look for OKs.</td></tr><tr valign="top"><td align="left" valign=""><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@host}</FONT></SPAN>&nbsp;&nbsp;&nbsp;&nbsp;<SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>ipmitool -H darc -P '' sdr</B></FONT></SPAN></td><td align="left" valign="">Simplified board sensors. Look for OKs.<P CLASS="entry">This has replaced
+sensors -v.</P></td></tr><tr valign="top"><td align="left" valign=""><PRE>[root@ig#] ps -leaf | grep -v grep | grep image_generation</PRE></td><td align="left" valign=""><P CLASS="entry">With APPS Up ONLY, provides a clue that recon is up and
+running on the specific IG Node. (Do not perform this command on the
+DARC Node - it is not updated properly there.)</P></td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1767608-1046440">3&nbsp;&nbsp;DIP Diagnostic Test<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">To verify the DARC Node DIP Board Diagnostics pass, as <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@</FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">darc}</FONT></SPAN> type: </P><P CLASS="sect1"><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>DipDiag -x 1,2,3,4,5,6</B></FONT></SPAN></P><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e455"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Because tests 7 and 8 require the installation of a loopback
+cable, they are not being performed.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e458"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">When this test is performed, ignore the H16 reference
+&#8220;creating H16 dip interface.&#8221;</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e461"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">For AIO console, there is
+no DARC presence. This command can be ran from host computer. The
+functionality is the same.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><PRE>12:05:40 opening LINUX device /dev/dip
+creating H16 dip interface	***Ignore H16 reference here ***
+DIP PN : 2326523 B	***Specific DIP Board and Revision identified here ***
+test 1 Passed X-ray Enable Relay
+test 2 Passed Test FEC Bit
+test 3 Passed Test EDDR Bit
+test 4 Passed Test Magic Number Register
+fill mem
+write to dip took 4.714 sec
+verifying memory
+read from dip took 19.469 sec
+test 5 Passed Memory Test
+test 6 Passed Interrupt Test
+1 loops 0 failures
+</PRE></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

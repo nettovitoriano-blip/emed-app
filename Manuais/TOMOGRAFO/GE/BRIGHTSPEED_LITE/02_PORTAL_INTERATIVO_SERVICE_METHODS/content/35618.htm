@@ -1,0 +1,267 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Sample Camera Logs</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/14/07</P></td></tr></table><H1 ID="top">Sample Camera Logs </H1><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct3-4-1-35618">1&nbsp;&nbsp;lclog - Laser Camera Log<SPAN CLASS="SECT1EFF"> </SPAN></H2><PRE>Successful Camera Initialization
+User_Msg... CODE----&gt; 301
+#301fname = /usr/g/ctuser/film/img41a000QY
+arg_copies = 1arg_format = 4x3_fidddasm952 interface was loaded...Set_Vendor_Bits...LcSyscall: cmd 30
+scsisleep duration=100000000nsLcgetResponse: ready 1
+Set_12_Line_Border pass...
+LcSyscall: cmd a4
+LcgetResponse: ready 1
+Clear_Alarm...LcSyscall: cmd 85
+LcgetResponse: ready 1
+Request_Status Called...LcSyscall: cmd 96
+LcgetResponse: ready 1
+LcSysrep: resp ``STA,1,RDY''
+LcSysrep(RQS): status160-&gt;STA,1,RDY
+LcSysrep: RDYLcSysrep():ALM 1,log_msg: code = 1 (logged_error = 0)
+LcSyscall: cmd 82
+LcgetResponse: ready 1
+LcSysrep: resp ``PAS''
+LcSysrep(ALI): status160-&gt;PAS
+Allocate_Device OK
+opening data file /usr/g/ctuser/film/img41a000QYSet_Greyscale...
+LcSyscall: cmd a5
+LcgetResponse: ready 1
+	Start of Print Job
+STATISTICS*************START PRINTING FILM****************/usr/g/ctuser/film/img41a000QYLcSyscall: cmd 90
+LcgetResponse: ready 1
+LcSysrep: resp ``PAS''
+LcSysrep(MAT): status160-&gt;PAS
+LcSyscall: cmd a3
+LcgetResponse: ready 1
+LcSysrep: resp ``PAS''
+LcSysrep(LUT): status160-&gt;PAS
+LcSyscall: cmd 9f
+LcgetResponse: ready 1
+LcSysrep: resp ``PAS''
+LcSysrep(WIM): status160-&gt;PAS
+Lc_clear_all:CMI...LcSyscall: cmd 86
+LcgetResponse: ready 1
+LcSysrep: resp ``PAS''
+LcSysrep(CLR): status160-&gt;PAS
+	Start of Image Acquisition Process
+lc_load_and_acquire: img-&gt;image_sx=512lc_load_and_acquire: img-&gt;image_sy=512lc_load_and_acquire: img-&gt;image_psize=0.000000main : zoomd = 0, zoomh = 0
+set_zoomd : ...set_zoomf...loading file /usr/g/ctuser/film/img41a000QYxxL952_vdbSetFormat pass...format = 12 zoom = 0.000000
+set_zoomd : ...set_zoomf...L952_vdbSetFormat leavingOLD SYTLE IMAGE ACQUISITION, NO RING BUFFERINGentering rbL952_lcamStore: fname = /usr/g/ctuser/film/img41a000QY, num_imgs=12, hdrlen =632entering rbL952_lcamStore: image_sx = 512,image_sy =512, image_deep= 8rbL952_lcamStore: nbchuncks = loop_var = 16 nblocks= 512 image_size =262144ACQUIRE IMAGE... Image_ID = 1
+LcSyscall: cmd 84
+LcgetResponse: ready 0
+LcgetResponse: ready 1
+LcSysrep: resp ``PAS''
+LcSysrep(AQU): status160-&gt;PAS
+ACQUIRE IMAGE... Image_ID = 2</PRE><P CLASS="sect1">Comment: The above 6 steps are repeated for each succeeding Image Acquisition.
+Image acquisition completed, begin Printing</P><PRE>LcSysrep(AQU): status160-&gt;PAS
+L952_vdbPrint: format = 12 print_copies = 1Define_Zone: format = 12set_zoomd : ...set_zoomf...xxDefine_Zone: format = 12 nb_zone = 4 nb_image_line 3xxDefine_Zone: set_zoomd = 0.000000 , set_zoomf = 0.000000scan_ssparam = dd
+xxDefine_Zone scanned ssparam = ddxxDefine_Zone: images_id[0] = 1xxDefine_Zone: images_id[1] = 2xxDefine_Zone: images_id[2] = 3Request_Status Called...LcSyscall: cmd 96
+LcgetResponse: ready 1
+LcSysrep: resp ``STA,1,RDY''
+LcSysrep(RQS): status160-&gt;STA,1,RDY
+LcSysrep: RDYLcSysrep():ALM 1,log_msg: code = 1 (logged_error = 0)
+LcSyscall: cmd 8b
+LcgetResponse: ready 1
+LcSysrep: resp ``PAS''
+LcSysrep(DZO): status160-&gt;PAS
+xxDefine_Zone scanned ssparam = ddxxDefine_Zone: images_id[0] = 5xxDefine_Zone: images_id[1] = 6xxDefine_Zone: images_id[2] = 7Request_Status Called...LcSyscall: cmd 96
+LcgetResponse: ready 1
+LcSysrep: resp ``STA,1,RDY''
+LcSysrep(RQS): status160-&gt;STA,1,RDY
+LcSysrep: RDYLcSysrep():ALM 1,log_msg: code = 1 (logged_error = 0)
+LcSyscall: cmd 8b
+LcgetResponse: ready 1
+LcSysrep: resp ``PAS''
+LcSysrep(DZO): status160-&gt;PAS
+xxDefine_Zone scanned ssparam = ddxxDefine_Zone: images_id[0] = 9xxDefine_Zone: images_id[1] = 10xxDefine_Zone: images_id[2] = 11Request_Status Called...LcSyscall: cmd 96
+LcgetResponse: ready 1
+LcSysrep: resp ``STA,1,RDY''
+LcSysrep(RQS): status160-&gt;STA,1,RDY
+LcSysrep: RDYLcSysrep():ALM 1,log_msg: code = 1 (logged_error = 0)
+LcSyscall: cmd 8b
+LcgetResponse: ready 1
+LcSysrep: resp ``PAS''
+LcSysrep(DZO): status160-&gt;PAS
+xxDefine_Zone scanned ssparam = ddxxDefine_Zone: images_id[0] = 13xxDefine_Zone: images_id[1] = 14xxDefine_Zone: images_id[2] = 15Request_Status Called...LcSyscall: cmd 96
+LcgetResponse: ready 1
+LcSysrep: resp ``STA,1,RDY''
+LcSysrep(RQS): status160-&gt;STA,1,RDY
+LcSysrep: RDYLcSysrep():ALM 1,log_msg: code = 1 (logged_error = 0)
+LcSyscall: cmd 8b
+LcgetResponse: ready 1
+LcSysrep: resp ``PAS''
+LcSysrep(DZO): status160-&gt;PAS
+Lc_set_up_to_print call...nbcopies= 1LcSyscall: cmd 9a
+LcgetResponse: ready 1
+LcSysrep: resp ``STC''
+LcSysrep(STP): status160-&gt;STC
+LcSysrep(STP): STC OK...
+EXPOSE...
+LcSyscall: cmd 8d
+LcgetResponse: ready 1
+LcSysrep: resp ``PTC''
+LcSysrep(EXP): status160-&gt;PTC
+camscan: (17:75 to 8b)  0x72 EXP 0xd  0x6 EOE 0xd &amp; 0xa  0xb  0xc PTC 0xd &amp; 0xa  0xb  0xc  0xa 
+camscan: dcr's 1
+LcSysrep(EXP): DCR...print_copies = 0User_Msg... CODE----&gt; 353
+#353</PRE><P CLASS="sect1">Comment: End of Print Job</P><PRE>STATISTICS:******END OF THIS JOB /usr/g/ctuser/film/img41a000QY Ready To Print new*******Release_Device...LcSyscall: cmd 95
+LcgetResponse: ready 1
+User_Msg... CODE----&gt; 350
+#350</PRE></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct3-4-2-35618">2&nbsp;&nbsp;dcplog - Dicom Print Log<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">dcplog Sample Output of a Successful 1on1 Film Job.</P><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e48"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">The output is broken up into sections with key film session actions.
+The dcplog includes the use of these acronyms in the following example:</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><DL><DT><I>SCP</I>&nbsp;
+</DT><DD><P CLASS="def">Service Class Provider: The camera, a receiver of images.</P></DD><DT><I>SCU</I>&nbsp;
+</DT><DD><P CLASS="def">Service Class User: The OC scanner, has ability to send images</P></DD><DT><I>calling AE title</I>&nbsp;
+</DT><DD><P CLASS="def">dcm_bind: AETitle = engbay26_DCP</P><P CLASS="def">called AE title - hostname - IP address port number of printer</P><P CLASS="def">map_app_title: title IMN host engctn1 ip-addr 3.7.52.164 port 2104</P><P CLASS="def">Print SCU (on the OC) requests an association with print SCP (print
+server at camera) using the IP address, port number and AE title. The SCU
+proposes abstract syntaxes (in this case print service class) along with transfer
+syntaxes used for each syntax and PDU transfer rate.</P></DD><DT><I>EstablishAssoc: DCM_OPEN_REQ Action success</I>&nbsp;
+</DT><DD><P CLASS="def">The Print SCP responds with an association acceptance. If the association
+has been accepted, the Dicom parameters (host, IP, AE, port correctly configured):</P></DD><DT><I>EstablishAssoc: OPEN_CONF received</I>&nbsp;
+</DT><DD><P CLASS="def">The SCU sends an NGET request to the SCP for printer status:</P></DD><DT><I>Starting the print session</I>&nbsp;
+</DT><DD><P CLASS="def">The SCP returns an NGET response status and printer status to the SCU:</P></DD></DL><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e94"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON"><UL><LI CLASS="bulletlist"><P>IF the SCP returns a NORMAL status to the SCU, the job continues.</P></LI><LI CLASS="bulletlist"><P>If the SCP returns an ERROR status to the SCU, the print job
+will fail.</P></LI><LI CLASS="bulletlist"><P>If the SCP returns a WARNING status, the job may fail or continue
+depending on status info. See table for list of supported status.</P></LI></UL></TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><PRE>NgetService: Event Received: DCM_NGET_END
+NgetService: Event Received: DCM_DATA</PRE><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="T4-5-35618"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Printer Events</SPAN> </P><table summary="Printer Events" border="1"><colgroup><col width="228"><col width="134"></colgroup><thead valign=""><tr valign="top"><th colspan="2" align="left" valign="top">PRINTER
+STATUS</th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top">SOP uid</td><td align="left" valign="top">&nbsp;</td></tr><tr valign="top"><td align="left" valign="top">Instance uid</td><td align="left" valign="top">&nbsp;</td></tr><tr valign="top"><td align="left" valign="top">Printer status</td><td align="left" valign="top">NORMAL</td></tr><tr valign="top"><td align="left" valign="top">status info</td><td align="left" valign="top">&nbsp;</td></tr><tr valign="top"><td align="left" valign="top">printer_name</td><td align="left" valign="top"> advt</td></tr><tr valign="top"><td align="left" valign="top">manufacturer</td><td align="left" valign="top"> AGFA</td></tr><tr valign="top"><td align="left" valign="top">model</td><td align="left" valign="top"> ADVT</td></tr><tr valign="top"><td align="left" valign="top">device serial number</td><td align="left" valign="top"> 123456</td></tr><tr valign="top"><td align="left" valign="top">software version</td><td align="left" valign="top"> Version 2.0 </td></tr><tr valign="top"><td align="left" valign="top">AETitle</td><td align="left" valign="top">IMN</td></tr></tbody></table></div></DIV><P CLASS="sect1">The SCU sends an NCREATE request to the SCP to create the film session.
+The Film session presentation consists of copies, priority of job, medium
+type, and film destination:</P><PRE>NcreateService: NCREATE BEG Action Success
+NcreateService: DCM DATA Action Success
+NcreateService: Waiting for Event
+NcreateService: Event received: DCM_RETURN_BUFF
+NcreateService: Waiting for Event</PRE><P CLASS="sect1">The SCP returns Ncreate RSP status to SCU along with instance uid for
+film session:</P><PRE>NcreateService: Event received: DCM_NCREATE_END
+NcreateService: Status is : 0
+film session instance uid 1.3.51.1
+film session instance uid 1.3.51.1
+filmbox ref sop uid 1.3.51.1</PRE><P CLASS="sect1">The SCU sends NCreate RQ to the SCP to create the film box. The presentation
+includes film format, orientation, magnification, film size:</P><PRE>NcreateService: NCREATE BEG Action Success
+NcreateService: DCM DATA Action Success
+NcreateService: Waiting for Event</PRE><P CLASS="sect1">The SCP returns NCREATE RSP status to the SCU along with referenced
+sop instance uid for film box and referenced SOP instance uids for each image
+box:</P><PRE>NcreateService: Event received: DCM_RETURN_BUFF
+NcreateService: Waiting for Event
+NcreateService: Event received: DCM_NCREATE_END
+NcreateService: Waiting for Event
+NcreateService: Event received: DCM_DATA
+filmbox instance uid 1.3.51.1.1</PRE><P CLASS="sect1">SCU sends NSET RQ to the SCP to set the image box. The presentation
+includes instance uid, image position on the film, number of Rows, Columns,
+Bits, and image pixel data:</P><PRE>NsetService: Event Received: DCM_RETURN_BUFF</PRE><P CLASS="sect1">SCP returns NSET RSP status to the SCU along with affected sop instance
+uid for image box:</P><PRE>NsetService: Event Received: DCM_NSET_END
+Image Attributes set</PRE><P CLASS="sect1">The SCU and SCP repeat the NSET RQ and NSET RSP for the image boxes
+until all images have been sent to the SCP. When all images have been sent,
+the SCU, it sends NACTION RQ to the SCP to print the film box with instance
+uid generated during the NCREATE. The SCP returns NACTION RSP to print the
+film:</P><PRE>NactionService: Event received: DCM_NACTION_END
+NactionService: Event received: DCM_DATA
+parse_data_set returned status 0x0
+Film Box sent to printer N - Action</PRE><P CLASS="sect1">The SCU sends NDELETE RQ to the SCP to delete the film box with instance
+uid generated during the NCREATE. SCP returns NDELETE RSP to delete the film
+box and returns the sop Instance of the film job:</P><PRE>NdeleteService: Event Received : DCM_NDELETE_END
+Film box instance deleted
+ref SOP C uid 1.2.840.10008.5.1.1.14
+ref SOP I uid 1.3.51.1.1.1.1
+Print Session successfully completed</PRE><P CLASS="sect1">The SCU sends RELEASE RQ to the SCP to release the association:</P><PRE>req close assoc
+CloseAssoc: DCM_CLOSE_REQ Action Success</PRE><P CLASS="sect1">The SCP returns RELEASE RP to release association:</P><PRE>close accepted</PRE></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct3-4-3-35618">3&nbsp;&nbsp;prslog - Printer Server Log<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="T4-6-35618"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">prslog Output </SPAN> </P><table summary="prslog Output " border="1"><colgroup><col width="328"><col width="349"></colgroup><thead valign=""><tr valign="top"><th align="left" valign="top">LOCATION</th><th align="left" valign="top">DESCRIPTION</th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top">OC: <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER"> /usr/g/ctuser/logfiles/prslog</FONT></SPAN></td><td align="left" valign="top">This is a running history log
+of print server initializations and shutdowns, and print jobs are started
+and completed.</td></tr><tr valign="top"><td colspan="2" align="center" valign="top">Example
+prslog output</td></tr><tr valign="top"><td colspan="2" align="center" valign="top">Successful
+print server initialization:</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1639&gt;&gt; Tue Aug 18 13:10:38 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[Server]&gt; initialization
+in progress for port PRSserver</FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1639&gt;&gt; Tue Aug 18 13:10:38 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[Server]&gt; ...initialization
+completed for port PRSserver</FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1674&gt;&gt; Tue Aug 18 13:11:02 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[PRSserver]&gt; Hello,
+I&#8217;m the print server, still alive on host engbay13</FONT></SPAN></td></tr><tr valign="top"><td colspan="2" align="center" valign="top">Successful
+print jobs running:</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1799&gt;&gt; Tue Aug 18 13:15:56 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[PRSserver]&gt; Print
+job started </FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1799&gt;&gt; Tue Aug 18 13:16:21 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Printed Ex: 1472 Se:
+103 Im: 1 </FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1799&gt;&gt; Tue Aug 18 13:16:21 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[PRSserver]&gt; Completed
+print job: Ex: 1472 Se: 103 Im: 1 </FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1817&gt;&gt; Tue Aug 18 13:16:50 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[PRSserver]&gt; Print
+job started </FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1817&gt;&gt; Tue Aug 18 13:17:16 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Printed Ex: 1472 Se:
+103 Im: 25 </FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1817&gt;&gt; Tue Aug 18 13:17:16 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[PRSserver]&gt; Completed
+print job: Ex: 1472 Se: 103 Im: 25 </FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1825&gt;&gt; Tue Aug 18 13:17:41 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[PRSserver]&gt; Print
+job started </FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1825&gt;&gt; Tue Aug 18 13:18:06 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Printed Ex: 1472 Se:
+103 Im: 49 </FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1825&gt;&gt; Tue Aug 18 13:18:06 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[PRSserver]&gt; Completed
+print job: Ex: 1472 Se: 103 Im: 49 </FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1831&gt;&gt; Tue Aug 18 13:18:33 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[PRSserver]&gt; Print
+job started </FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1831&gt;&gt; Tue Aug 18 13:18:59 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Printed Ex: 1472 Se:
+103 Im: 73 </FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1831&gt;&gt; Tue Aug 18 13:18:59 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[PRSserver]&gt; Completed
+print job: Ex: 1472 Se: 103 Im: 73 </FONT></SPAN></td></tr><tr valign="top"><td colspan="2" align="center" valign="top">Print
+server shutdown from Applications being brought down:</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1639&gt;&gt; Tue Aug 18 14:48:34 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[Server]&gt; Caught signal
+:  2</FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1674&gt;&gt; Tue Aug 18 14:48:35 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[Server]&gt; Caught signal
+:  2.</FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1639&gt;&gt; Tue Aug 18 14:48:41 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[Server]&gt; terminated </FONT></SPAN></td></tr><tr valign="top"><td colspan="2" align="center" valign="top">Successful
+print server initialization:</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1598&gt;&gt; Tue Aug 18 14:53:43 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[Server]&gt; initialization
+in progress for port PRSserver</FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1598&gt;&gt; Tue Aug 18 14:53:43 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[Server]&gt; ...initialization
+completed for port PRSserver</FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1636&gt;&gt; Tue Aug 18 14:54:09 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[PRSserver]&gt; Hello,
+I&#8217;m the print server, still alive on host engbay13</FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1902&gt;&gt; Tue Aug 18 15:15:40 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[PRSserver]&gt; Print
+job started </FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1902&gt;&gt; Tue Aug 18 15:16:06 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Printed Ex: 1476 Se:
+2 Im: 1 </FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1902&gt;&gt; Tue Aug 18 15:16:06 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[PRSserver]&gt; Completed
+print job: Ex: 1476 Se: 2 Im: 1 </FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1926&gt;&gt; Tue Aug 18 15:17:10 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[PRSserver]&gt; Print
+job started </FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1926&gt;&gt; Tue Aug 18 15:17:35 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Printed Ex: 1476 Se:
+2 Im: 16 </FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">MESSAGE from Process
+ 1926&gt;&gt; Tue Aug 18 15:17:35 1998</FONT></SPAN></td><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[PRSserver]&gt; Completed
+print job: Ex: 1476 Se: 2 Im: 16 </FONT></SPAN></td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct3-4-4-35618">4&nbsp;&nbsp;camera.dev (AGFA DICOM Print Camera)<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Enter the following:</P><OL><LI CLASS="numlist"><P>{ctuser@bayXX}[5] <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>cd /usr/g/ctuser/app-defaults/devices </B></FONT></SPAN><SPAN CLASS="GUIBUTTON">[ENTER]</SPAN></P></LI><LI CLASS="numlist"><P>{ctuser@bayXX}[6] <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>cat camera.dev </B></FONT></SPAN><SPAN CLASS="GUIBUTTON">[ENTER]</SPAN></P></LI></OL><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="T4-7-35618"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">camera.dev Contents Listing </SPAN> </P><table summary="camera.dev Contents Listing " border="1"><colgroup><col width="304"><col width="370"></colgroup><thead valign=""><tr valign="top"><th align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">CAMERA.DEV</FONT></SPAN> CONTENTS
+LISTING</th><th align="left" valign="top">DESCRIPTION</th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set dName {Dicom Camera}</FONT></SPAN></td><td align="left" valign="top">Sets the name that appears in
+manual composer and scanRx autofilm setup</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set dType digital</FONT></SPAN></td><td align="left" valign="top">Refers to 1 of {postscript,
+analogue, or digital}. For DICOM the dType is set to digital.</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set dQueueType DICM</FONT></SPAN></td><td align="left" valign="top">Refers to the Job type; can
+be {LP=postscript, LC=laser camera, or DICM} for DICOM print cameras.</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set ctype {Imation
+Print Server}</FONT></SPAN></td><td align="left" valign="top">DICOM camera type selected during
+Camera Installation</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set dQueueName dicom</FONT></SPAN></td><td align="left" valign="top">Sets the name that appears in
+the Filming Queue</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set defaultFormat 
+4x3_fid</FONT></SPAN></td><td align="left" valign="top">Default format for manual composer
+selected during Camera Installation</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set dHostName agfacamera</FONT></SPAN></td><td align="left" valign="top">Hostname of the print server
+entered during Camera Installation</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set dAppTitle DRYSTAR</FONT></SPAN></td><td align="left" valign="top">AE title of the print server
+entered during Camera Installation</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set medType BLUE</FONT></SPAN></td><td align="left" valign="top">Medium type selected during
+Camera Installation - can be one of BLUE FILM, CLEAR FILM, or PAPER - this
+element is sent during NCREATE of the Film Session.</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set destination MAGAZINE</FONT></SPAN></td><td align="left" valign="top">The destination for printed
+film selected in during Camera Installation. Can be one of MAGAZINE, PROCESSOR
+- this element is sent during NCREATE of the Film Session.</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set filmOrientation
+PORTRAIT</FONT></SPAN></td><td align="left" valign="top">The Orientation of image boxes
+on film selected during Camera Installation can be one of LANDSCAPE or PORTRAIT
+- this element is sent during NCREATE of the Film Box.</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">set magType CUBIC</FONT></SPAN></td><td align="left" valign="top">The magnification of film selected
+during Camera Installation. Can be one of REPLICATE, BILINEAR, CUBIC, or NONE
+- this element is sent during NCREATE of the Film Box.</td></tr><tr valign="top"><td align="left" valign="top"><PRE>set minDensity 5
+set maxDensity 300
+set borderDensity BLACK
+set emptyDensity BLACK
+set smoothType 140
+set configuration
+PERCEPTION_LUT=200</PRE></td><td align="left" valign="top">These elements are sent during
+the NCREATE of the Film Box and will set the following values:<UL><LI CLASS="bulletlist">sets minimum Optical Density - film and camera type dependent.</LI><LI CLASS="bulletlist">sets Maximum Optical Density - film and camera type dependent.</LI><LI CLASS="bulletlist">sets border density</LI><LI CLASS="bulletlist">sets empty image density</LI><LI CLASS="bulletlist">sets the smoothing type when magType is set to CUBIC</LI><LI CLASS="bulletlist">sets configuration info. This value differs for all camera
+vendors who typically define the LUT for contrast.</LI></UL></td></tr><tr valign="top"><td align="left" valign="top"><PRE>pformat 1x1_fid
+pformat 2x1_fid
+pformat 2x2_fid
+pformat 3x2_fid
+pformat 3x3_fid
+pformat 4x3_fid
+pformat 5x3_fid
+pformat 4x4_fid
+pformat 5x4_fid</PRE></td><td align="left" valign="top">Manual film composer and auto
+film formats<TABLE CLASS="ADMONentry" CELLSPACING="0%" CELLPADDING="0%" ID="d0e584"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">DICOM defines film format as column vs. row, as opposed
+to GE&#8217;s Laser film format definition of row vs. column.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct3-4-5-35618">5&nbsp;&nbsp;SdCPHosts (DICOM Print Only)<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Enter the following:</P><OL><LI CLASS="numlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@bayXX}[2]</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>cd /usr/g/ctuser/Prefs </B></FONT></SPAN><SPAN CLASS="GUIBUTTON">[ENTER]</SPAN></P></LI><LI CLASS="numlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@bayXX}[3] </FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>cat SdCPHosts </B></FONT></SPAN><SPAN CLASS="GUIBUTTON">[ENTER]</SPAN></P></LI></OL><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="T4-8-35618"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;4:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">SdCPHosts Contents Listing Example</SPAN> </P><table summary="SdCPHosts Contents Listing Example" border="1"><colgroup><col width="289"><col width="384"></colgroup><thead valign=""><tr valign="top"><th align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">SDCPHOSTS</FONT></SPAN> CONTENTS
+LISTING EXAMPLE</th><th align="left" valign="top">DESCRIPTION</th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">3.7.52.164</FONT></SPAN></td><td align="left" valign="top">The IP address of the camera,
+entered during Camera Installation</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">camera</FONT></SPAN></td><td align="left" valign="top">The hostname of the camera,
+entered during Camera Installation</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">PRINTSCP</FONT></SPAN></td><td align="left" valign="top">The AE (Applications Entity)
+Title, entered during Camera Installation</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">2106</FONT></SPAN></td><td align="left" valign="top">The TCP Listen Port number,
+entered during Camera Installation</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">ctn display</FONT></SPAN></td><td align="left" valign="top">A comment entered in the network
+comment field of Camera Installation.</td></tr></tbody></table></div></DIV></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

@@ -1,0 +1,279 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>GDAS-16 Theory</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/16/07</P></td></tr></table><H1 ID="top">GDAS-16 Theory </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="50%"><col width="50%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised:</td><td valign="">June 2004</td></tr></tbody></table></div></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669009309">1&nbsp;&nbsp;Overview<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The Global Data Acquisition System (GDAS) is a replacement for the MDAS
+currently used in the LightSpeed family of scanners. It comprises the following:</P><UL><LI CLASS="bulletlist"><P>96 converter cards, one DAS Control Board (DCB) distributed
+between three separate chassis.</P></LI><LI CLASS="bulletlist"><P>Two Power supply chassis - one Analog and one Digital.</P></LI><LI CLASS="bulletlist"><P>Fuse box assembly containing a single DAS fuse and switch.</P></LI><LI CLASS="bulletlist"><P>The three chassis interface directly to the detector via pin
+and socket connectors.</P></LI><LI CLASS="bulletlist"><P>Communications to the ORP is accomplished via the RCIB CAN
+bus.</P></LI><LI CLASS="bulletlist"><P>Scan data is transmitted via fiber optics to the DAS Interface
+Processor (DIP) located in the console. The 850 Mbaud slipring is the interface
+between the rotating and the stationary gantry.</P></LI><LI CLASS="bulletlist"><P>Inter chassis data transfer is performed via high speed serial
+bus. Refer to <A HREF="javascript:winopen('125042illd0e84.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;2</A>.</P></LI><LI CLASS="bulletlist"><P>DHCB communication is via RS232 interface.</P></LI></UL><P CLASS="sect1"><A HREF="javascript:winopen('125042illd0e79.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;1</A> below
+shows the block diagram of the GDAS utilizing the GEMS-IT power supply configuration.
+Electrically, the difference between the GEMS-IT and Astec power distribution
+is insignificant to the theoretical information provided in this document.</P><DIV CLASS="ILLUSTRATION" id="SL125083-125042"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">GDAS Block Diagram</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/125042-125044.gif" BORDER="0" usemap="#SL125080-125042"></P></DIV><DIV CLASS="ILLUSTRATION" id="SL125853-125042"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Data Flow - Serial Data Stream</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/125042-125046.gif" BORDER="0" usemap="#SL125084-125042"></P></DIV><P CLASS="sect1">DAS 16 Slice Serial Data Stream Board to Board Map.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669009359">2&nbsp;&nbsp;X-Ray detector output signals<SPAN CLASS="SECT1EFF"> </SPAN></H2><UL><LI CLASS="bulletlist"><P>The smallest element of the X-ray detector matrix is a detector
+pixel. The detector pixel has a current output that is proportional to the
+incident X-ray flux.</P></LI><LI CLASS="bulletlist"><P>Some applications will include the connection of multiple
+pixels in parallel to a single DAS preamplifier channel. The connection means
+is a FET switch array, that is external to the DAS and converter card and
+is in the detector assembly or module. The FET array will connect pixels in
+the &#8221;Z&#8221; direction, which is the direction normally parallel to
+the longitudinal axis of the patient. Up to eight pixels may be connected
+in this manner. The output of such interconnected pixels shall hereafter be
+referred to as a detector cell. If an application includes pixels, which are
+not connected to an output cell or preamplifier input, such pixels will be
+connected to electrical ground by the FET array, or in part of the DAS external
+to the Converter Board. The disconnected pixels will present a FET off impedance
+to the DAS.</P></LI><LI CLASS="bulletlist"><P>For most DAS channels, the detector cell aperture is one cell
+column or 1mm long in the azimuthal direction. However, some cell outputs
+will be electrically connected in either pairs or triplets in the azimuthal
+direction to form 2mm and 3mm cells. Detector cell so connected will be termed
+&#8220;ganged&#8221; cells. Because of the different source impedance associated
+with these cells, DAS performance will be affected or degraded. However, the
+Converter board preamplifier circuit shall be designed to be stable with the
+ganged source impedance cells.</P></LI><LI CLASS="bulletlist"><P>The Converter boards will receive the detector output signal
+on the same backplane connector as the rest of the DAS control and power connections.</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669009360-dup.2">3&nbsp;&nbsp;Converter Boards<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The GDAS-16 converter board processes low current signals from 128 X-ray
+detector photodiode outputs and converts these signals into two digital serial
+streams. One of these streams is for even numbered DAS channels (2,4,.......126,
+128) and the second stream is for the odd numbered DAS channels (1,3,5,.......,125,127).
+In the even digital stream, we have low even channels (2,4,......,62,64) and
+high even channels (66,68,......,126,128). Likewise, in the odd digital stream
+we have low odd channels (1,3,......,61,63) and high odd channels (65,67,......,125,127).</P><P CLASS="sect1">Specifically the converter board performs the following tasks:</P><UL><LI CLASS="bulletlist"><P>Integrate the low level current signals from 128 channels
+of a CT X-ray detector and convert them to 128 voltage/charge signals.</P></LI><LI CLASS="bulletlist"><P>Convert the 128 voltage/charge signals to serial 128 digital
+values.</P></LI><LI CLASS="bulletlist"><P>Setup the digital values for serial transmission and serially
+transmit the digital value.</P></LI><LI CLASS="bulletlist"><P>Receives control and configuration setup from the DAS Control
+Board (DCB) through a serial CAN interface bus.</P></LI><LI CLASS="bulletlist"><P>Perform a self-test on power-up.</P></LI></UL><P CLASS="sect1">The Converter boards provide the capability to receive data from a previous
+board on a daisy chain serial data stream, and retransmit such data interspersed
+with data acquisition data generated on the Converter board to either another
+downstream Converter board or the DCB. The Converter boards receive their
+control instructions from the DCB. These instructions include:</P><UL><LI CLASS="bulletlist"><P>Shift clock.</P></LI><LI CLASS="bulletlist"><P>Trigger signal.</P></LI><LI CLASS="bulletlist"><P>Converter CAN Bus communication for control information.</P></LI><LI CLASS="bulletlist"><P>Reset signal.</P></LI><LI CLASS="bulletlist"><P>External reference current.</P></LI></UL><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009362">3.1&nbsp;&nbsp;Control Interface<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The converter card shall be externally controlled using the following
+signals:</P><UL><LI CLASS="bulletlist"><P>S_TRIG (LVDS Differential pair view trigger signal): The nominal
+frequency range of this signal will be 984Hz to 2811Hz continuous. It is synchronized
+with the SH_CK signal defined below. S_Trig will be used by the converter
+board to initiate a data acquisition timing cycle for all the channels on
+the converter board. S_TRIG is sent by the DCB on the falling edge of the
+shift clock (SH_CK), and sampled by the converter cards on the rising edge
+of shift clock. The trigger signal is one SH_CK period wide.</P></LI><LI CLASS="bulletlist"><P>SH_CK: It is a LVDS differential pair input signal that is
+used with S_TRIG to generate all data acquisition timing signals for the converter
+board. It is the clock used to shift data off the Converter Board to the DAS
+Control Board, and is free running. Anticipated frequency of this clock is
+27-30 MHz.</P></LI><LI CLASS="bulletlist"><P>CV_RST (Converter Board Reset): It is a high level active
+signal that is activated by the DCB (DAS Control Board). It is a semi-hard
+reset for the converter board.</P></LI><LI CLASS="bulletlist"><P>CAN_Hi and CAN_Lo (Differential, bi-directional Signal Pair)
+used to implement the physical interface for the CAN control bus on the converter
+board.</P></LI><LI CLASS="bulletlist"><P>CV_FLT* (Converter Fault Not): This is an open collector or
+open drain (wire-or) output signal from the converter board(s) that is activated
+by the converter board DSP, whenever it detects on the converter board a variety
+of different fault conditions. This signal is received by the DCB (DAS Control
+Board) and processed. It is anticipated that the DCB will poll the converter
+board via the CAN bus to determine which board pulled the "CV_FLT" signal
+line low.</P></LI><LI CLASS="bulletlist"><P>IREF_EXT (Time Shared Tracker Current) This current is supplied
+from the DCB. This is a current reference of typically 1.0 microampere applied
+to the tracker channel input to correct for gain drift of a particular ASIC
+relative to all other ASICs in the final application system.</P></LI><LI CLASS="bulletlist"><P>ADDR 6:0 (Board Address): It is a seven line input bus that
+is used by the board to determine its CAN bus address. These inputs will be
+hard wired with unique addressed on the GDAS-16 backplane for each one of
+the Converter board slots.</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009363-dup.2">3.2&nbsp;&nbsp;Converter board calibrations<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">There are three calibrations done on the converter board prior to any
+scan. These are the internal and external gain calibration and the Alpha calibration.
+The DCB will report an error for a failure of any of these in the system error
+log. These calibrations are new with the GDAS-16 and do not replace any previous
+calibrations that were done on the MDAS in Fastcal or Detailed Cal. </P><OL><LI CLASS="numlist"><P>Internal gain calibration</P><P>The Internal calibration is a process that compares the current source
+of the tracker channel, one at a time, with of each of the 64 input channels
+for the ASIC. This is an on-board check for each ASIC on the converter boards.</P></LI><LI CLASS="numlist"><P>External gain calibration</P><P>The External calibration is a process that compares the external 1uA
+input current  reference (from the DCB) applied to the tracker channel input
+to correct for gain drift of a particular ASIC relative to all other ASICs
+on all other converter boards. </P></LI><LI CLASS="numlist"><P>Alpha Calibration</P><P>Linearization or alpha calibration is the process of determining the
+constants used for the ASIC's 4 input stages. Linearization is accomplished
+by processing several different known (relative) amounts of charge, observing
+the resulting stage counts, and solving for the coefficients that would yield
+the observed stage counts.</P></LI></OL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009364">3.3&nbsp;&nbsp;Input Power Requirements<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The Converter board uses the following power supply voltages: +5.0 Volt
+digital, +5.0 Volt Analog, and  -5.0 Volt Analog.</P><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="ov-1353669009364-dup.1"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Converter Board - Input Power Requirements</SPAN> </P><table summary="Converter Board - Input Power Requirements" border="1"><colgroup><col width="41%"><col width="20%"><col width="19%"><col width="20%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Characteristics</td><td valign="">+5V analog</td><td valign="">-5V analog</td><td valign="">+5V digital</td></tr><tr valign="top"><td valign="">Supply current (typical)</td><td valign="">30A</td><td valign="">50A</td><td valign="">60A</td></tr><tr valign="top"><td valign="">Voltage tolerance</td><td valign="">&plusmn; 10%</td><td valign="">&plusmn; 10%</td><td valign="">&plusmn; 5%</td></tr><tr valign="top"><td valign="">Maximum peak-to-peak noise and ripple <SPAN CLASS="SUP"><SUP>(1)</SUP></SPAN></td><td valign="">5mV</td><td valign="">&nbsp;</td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign="">Maximum RMS noise and ripple <SPAN CLASS="SUP"><SUP>(2)</SUP></SPAN></td><td valign="">0.5mV</td><td valign="">0.5mV</td><td valign="">&nbsp;</td></tr><tr valign="top"><td valign="">Maximum line regulation, 10% line voltage change</td><td valign="">&plusmn; 10%</td><td valign="">&plusmn; 10%</td><td valign="">&plusmn; 10%</td></tr><tr valign="top"><td valign="">Maximum load regulation, 50% load change</td><td valign="">&plusmn; 10%</td><td valign="">&plusmn; 10%</td><td valign="">&plusmn; 10%</td></tr><tr valign="top"><td valign="">Output transient response, maximum recovery to within 1% of initial
+set point with 50% load change</td><td valign="">50us</td><td valign="">50us</td><td valign="">50us</td></tr><tr valign="top"><td valign="">Maximum temperature coefficient</td><td valign="">-</td><td valign="">-</td><td valign="">-</td></tr><tr valign="top"><td valign="">Minimum adjustment range</td><td valign="">-</td><td valign="">-</td><td valign="">-</td></tr><tr valign="top"><td valign="">Over voltage limitation</td><td colspan="2" valign="">&plusmn;6.2V</td><td valign="">&plusmn;6.2V</td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009367">3.4&nbsp;&nbsp;Board Status LEDs<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">LEDs are provided on the Converter board to indicate the following conditions:</P><UL><LI CLASS="bulletlist"><P>DS1: Used to indicate board status and also illuminates on
+power up and reset.</P></LI><LI CLASS="bulletlist"><P>DS2: Used to indicate presence of a trigger signal.</P></LI><LI CLASS="bulletlist"><P>DS3: Used to indicate CAN communication.</P></LI><LI CLASS="bulletlist"><P>DS4: Not used</P></LI></UL><DIV CLASS="ILLUSTRATION" id="ov-1353669009368-dup.4"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Converter Card LED locations</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/279686-267669.jpg" BORDER="0" usemap="#SL267671-125042"></P></DIV><P CLASS="sect2">If the self-tests fail, the LED DS1 will flash to indicate an error
+was detected during the self-tests. The flashing will only occur until the
+DCB resets the fault line. The error detected will be reported to the system
+error log (gesyslog) on the console which will include the board number reporting
+the error. A single flash of the LED is just indicating a board reset and
+not an error. The error codes are:</P><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="ov-1353669009384"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Error codes and descriptions</SPAN> </P><table summary="Error codes and descriptions" border="1"><colgroup><col width="20%"><col width="22%"><col width="24%"><col width="34%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Board Error</td><td valign="">gesyslog error code</td><td valign="">gesyslog error text</td><td valign="">Suggested Action</td></tr><tr valign="top"><td valign="">FPGA Image Invalid </td><td valign="">260007924  </td><td valign="">DAS Converter Board(s) contain an invalid FPGA image.</td><td valign="">Rerun Flash download. If Flash download doesn't solve problem, replace
+converter board.</td></tr><tr valign="top"><td valign="">FPGA Config Failed </td><td valign="">260007925</td><td valign="">DAS Converter Board(s) failed to configure the FPGA.</td><td valign="">Replace Convertor board</td></tr><tr valign="top"><td valign="">DSP Application Image Invalid </td><td valign="">260007926</td><td valign="">DAS Converter Board(s) does not have a valid application image in flash. </td><td valign="">Rerun Flash download. If Flash download doesn't solve problem, replace
+converter board.</td></tr><tr valign="top"><td valign="">Invalid Flash Device </td><td valign="">260007927</td><td valign="">DAS Converter Board(s) has detected an invalid flash device. </td><td valign="">Replace Convertor board</td></tr><tr valign="top"><td valign="">Max Temperature Exceeded </td><td valign="">260007928</td><td valign="">DAS Converter Board(s) have exceeded the maximum temperature limit
+of 65 degrees C. </td><td valign="">Check DAS for defective fans. If temperature reading makes no sense,
+replaced board as temp sensor could be bad.</td></tr><tr valign="top"><td valign="">Register Access Failure </td><td valign="">260007929 </td><td valign="">DAS Converter Board(s) failed to write an ASIC register </td><td valign="">Replace Convertor board</td></tr><tr valign="top"><td valign="">Trim Table Read Failure </td><td valign="">260007930 </td><td valign="">DAS Converter Board(s) failed to read the ASIC Trim Table</td><td valign="">Replace Convertor board</td></tr><tr valign="top"><td valign="">Trim Table Write Failure</td><td valign="">260007931</td><td valign="">DAS Converter Board(s) failed to write the ASIC Trim Table </td><td valign="">Replace Convertor board</td></tr><tr valign="top"><td valign="">Trim Table Verify Failure </td><td valign="">260007932 </td><td valign="">DAS Converter Board(s) failed to verify the ASIC Trim Table</td><td valign="">Replace Convertor board</td></tr><tr valign="top"><td valign=""> Serial Out DP RAM Failure </td><td valign="">260007933 </td><td valign="">DAS Converter Board(s) encountered an error accessing dual port RAM. </td><td valign="">Replace Convertor board</td></tr><tr valign="top"><td valign="">Internal Gain Coefficient Error </td><td valign="">260007934</td><td valign="">DAS Converter Board(s) encountered an error during internal gain calibration. </td><td valign="">Check DAS for defective fans. If temperature reading makes no sense,
+replaced board as temp sensor could be bad.</td></tr><tr valign="top"><td valign="">External Gain Coefficient Error </td><td valign="">260007935</td><td valign="">DAS Converter Board(s) encountered an error during external gain calibration.</td><td valign="">Check DAS for defective fans. If temperature reading makes no sense,
+replaced board as temp sensor could be bad.</td></tr><tr valign="top"><td valign="">Linearity Coefficient Error </td><td valign="">260007936</td><td valign="">DAS Converter Board(s) encountered an error during alpha calibration. </td><td valign="">Check DAS for defective fans. If temperature reading makes no sense,
+replaced board as temp sensor could be bad.</td></tr><tr valign="top"><td valign="">Linearity Overflow Error </td><td valign="">260007937</td><td valign="">DAS Converter Board(s) encountered a stage overflow during alpha calibration.</td><td valign="">Check DAS for defective fans. If temperature reading makes no sense,
+replaced board as temp sensor could be bad.</td></tr><tr valign="top"><td valign="">Invalid Offset Trim Table</td><td valign=""> 260007938</td><td valign="">DAS Converter Board(s) contain an invalid offset trim table.</td><td valign="">Replace Convertor board</td></tr></tbody></table></div></DIV><P CLASS="sect2">The LED DS3 flashes during the CAN communications and DS2 flashes every
+time Trigger is received. </P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669009388">4&nbsp;&nbsp;DAS Control Board (DCB)<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The DCB is the main control board for the H16, 16-Slice GDAS Data Acquisition
+System (DAS). It packages all the converter card data into a single high-speed
+serial data stream, compatible with the receive function on the 16-Slice DAS
+Interface Processor (DIP).</P><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009388-dup.1">4.1&nbsp;&nbsp;Inputs<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353669009388-dup.2">4.1.1&nbsp;&nbsp;From Converter Boards<SPAN CLASS="SECT1EFF"> </SPAN></H4><UL><LI CLASS="bulletlist"><P>Inner Row Serial Data Streams for an 8-slice or a 16-slice
+system.</P></LI><LI CLASS="bulletlist"><P>Outer Row Serial Data Streams for a 16-slice system.</P></LI><LI CLASS="bulletlist"><P>Converter CAN Bus communication for status, faults, chassis
+temperature readings, and serial number information.</P></LI><LI CLASS="bulletlist"><P>Converter Board Fault Line</P></LI></UL></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353669009389-dup.3">4.1.2&nbsp;&nbsp;	From On-board Rotating Processor (ORP)<SPAN CLASS="SECT1EFF"> </SPAN></H4><UL><LI CLASS="bulletlist"><P>Input view triggers.</P></LI><LI CLASS="bulletlist"><P>KV and MA analog signals.</P></LI><LI CLASS="bulletlist"><P>RCIB CAN Bus communication for scan prescription information
+and FLASH download.</P></LI><LI CLASS="bulletlist"><P>RCIB CAN Fault Signal.</P></LI></UL></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353669009390">4.1.3&nbsp;&nbsp;	From Detector Heater Control Board (DHCB)<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">RS-232 Bus communication for status, faults, detector temperature readings,
+and detector identification information.</P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353669009390-dup.1">4.1.4&nbsp;&nbsp;	From Backplane<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">Power supply voltages.</P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009390-dup.2">4.2&nbsp;&nbsp;Outputs<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353669009390-dup.3">4.2.1&nbsp;&nbsp;To GDAS-16 converter Boards<SPAN CLASS="SECT1EFF"> </SPAN></H4><UL><LI CLASS="bulletlist"><P>Shift clock.</P></LI><LI CLASS="bulletlist"><P>Trigger signal.</P></LI><LI CLASS="bulletlist"><P>Converter CAN Bus communication for control information.</P></LI><LI CLASS="bulletlist"><P>Reset signal.</P></LI><LI CLASS="bulletlist"><P>External reference current.</P></LI></UL></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353669009391">4.2.2&nbsp;&nbsp;	To On-board Rotating Processor (ORP)<SPAN CLASS="SECT1EFF"> </SPAN></H4><UL><LI CLASS="bulletlist"><P>RCIB CAN Bus communication for DAS status, error, or scan
+complete information.</P></LI><LI CLASS="bulletlist"><P>RCIB CAN Fault Signal.</P></LI></UL></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353669009391-dup.3">4.2.3&nbsp;&nbsp;	To Detector Heater Control Board (DHCB)<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">RS-232 Bus communication for control information.</P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353669009391-dup.4">4.2.4&nbsp;&nbsp;	To Detector<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">FET Control signals.</P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353669009391-dup.5">4.2.5&nbsp;&nbsp;	To Slip-ring (and then on to the Scan Reconstruction Unit (SRU) )<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">High-speed serial data stream containing the view data with embedded
+FEC CRC.</P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009391-dup.6">4.3&nbsp;&nbsp;Processing<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The H16 GDAS DCB will perform the following functions:</P><UL><LI CLASS="bulletlist"><P>Interfaces with the ORP for Rx reception and scan completion
+via CAN bus.</P></LI><LI CLASS="bulletlist"><P>Sets up gain and offset trim and controls the converter cards,
+  via the converter CAN interface.</P></LI><LI CLASS="bulletlist"><P>Receives triggers and starts acquisitions with the converter
+cards.</P></LI><LI CLASS="bulletlist"><P>Performs serial-to-parallel conversion on data streams from
+the converter cards, does parity checking on the data, and runs it through
+a translation table for view data ordering.</P></LI><LI CLASS="bulletlist"><P>Adds Forward Error Correction (FEC) to the channel data and
+sends it across the slip-ring to the Scan Reconstruction Unit (SRU) via the
+high-speed serial data interface.</P></LI><LI CLASS="bulletlist"><P>Detects jitter and timeouts in the view trigger signal.</P></LI><LI CLASS="bulletlist"><P>Controls the operation of the Detector Heater Control Board
+and monitors the subsystem for faults.</P></LI><LI CLASS="bulletlist"><P>Monitors the power supply voltages to make sure they are within
+the software programmable limits.</P></LI><LI CLASS="bulletlist"><P>Acquires the kV and mA values for each scan.</P></LI><LI CLASS="bulletlist"><P>Controls the FET switch array in the detector to change the
+number and thickness of scan slices.</P></LI><LI CLASS="bulletlist"><P>Monitors the DAS subsystem for various faults.</P></LI><LI CLASS="bulletlist"><P>Stores and sums the z-axis reference channels, and performs
+calculations that control the collimator cam positioning. This is used to
+track the x-ray beam and keep it centered on the detector.</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009393-dup.2">4.4&nbsp;&nbsp;Host CAN Interface<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The DCB Host Interface will be used to control DAS operation and to
+communicate DAS status. All CAN signals will be optically isolated between
+the DCB and the network. The 16-Slice Right Backplane will have the 15-pin
+sub-D connector pair that supports the daisy-chained CAN interface. Proper
+termination must be attached to the unused port connector on the backplane.
+The DCB will implement a fault interface, called <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">RCIB_CAN_FLT</FONT></SPAN>,
+consisting of a twisted pair wire signal that is bi-directional to the DAS.
+Both input and output are optically isolated. The DAS will use this interface
+to detect an abort condition from other controllers and to initiate an abort
+to other controllers. When a fault is initiated or detected, the DAS will
+go into its fault sequence.</P><P CLASS="sect2">There are two methods to reset the DAS, via CAN message or reset bus.
+
+Both methods cause the DAS to go through the same reset sequence and timing.
+All DAS hardware is in a known and safe state upon exiting reset.</P><P CLASS="sect2">The DCB will implement a reset bus interface, called <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">RCIB_CAN_RST</FONT></SPAN>,
+consisting of a twisted pair wire signal that is optically isolated from the
+DAS. The DAS can only monitor but not drive the reset bus. The DCB will receive
+the external view trigger input, called <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">E_TRIG</FONT></SPAN>, from the
+ORP via a twisted pair wire. This input signal is optically isolated from
+the DAS. An inactive to active state transition for this signal signifies
+a trigger and will cause the DAS to begin scan/offset view data collection.
+The GDAS-16 will require &#8220;no data transmit&#8221; triggers to fill the
+data conversion pipeline in the GDAS-16 Converter Card. These triggers will
+be sent to the converter cards, but the data received by the DCB will not
+be transmitted to the DIP. Additionally, the GDAS-16 will require &#8220;post-triggers&#8221;
+to be generated by the DCB at the end of the scan to finish the data conversion
+in the GDAS-16 Converter Card.</P><P CLASS="sect2">Note that there is another CAN interface on the DCB for communication
+within the DAS to the converter cards.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009394">4.5&nbsp;&nbsp;Generator Interface<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Measured scan kV and mA are read by the X-ray Generation Subsystem and
+fed back to the DAS so they can be inserted into the view data stream. The
+Generator Interface is implemented on connector J32 located on the 16-Slice
+Right Backplane. Signals are routed from this connector to the DCB via the
+192-pin connector on the DCB. These signals are differentially driven by X-ray
+Generation and received by the DCB.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009394-dup.1">4.6&nbsp;&nbsp;Detector FET Control Interface<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The DCB will generate 18 signals to configure the detector FET MUX circuitry.
+Each of the following three groups of detector modules uses six of these signals
+for their MUX configurations: Z-axis Upper Detector (ZUFET), Data Channel
+Detector (DFET), and Z-axis Lower Detector (ZLFET).  These signals are set
+to 0 volts and -5.0 volts when they are in the OFF and ON states respectively.
+The desired state of these signals is left to firmware control prior to any
+scan or during system initialization. FET control signals are routed from
+the DCB to the backplane via the 192-pin connector on the DCB.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009394-dup.2">4.7&nbsp;&nbsp;Detector Heater Control Board Interface<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The DCB will communicate with the Detector Heater Control Board (DHCB)
+using an RS-232 serial communication interface. This interface will provide
+the path for the DCB to setup and control DHCB operation, to monitor the DHCB
+subsystem for faults, and to obtain detector temperature readings for inclusion
+in the view data stream. The serial interface will be a simplified 2-wire
+RS-232 implementation (with no hardware handshake capability) operating at
+19.2 kBaud. The setup includes 8-bit word length, no parity, and one stop
+bit.</P><P CLASS="sect2">On power-up, the DCB detects the presence of the DHCB in the system
+using a resistor located on the DHCB. The DCB will convert the resistance
+proportionally and compare the value to a pair of setpoint registers. If the
+presence of the DHCB is detected, the DCB will begin to communicate with the
+DHCB via the RS-232 interface. The Detector Heater Control Board Interface
+is implemented on a dedicated connector (J33) located on the 16-Slice Right
+Backplane. Signals are routed from the DCB to this connector via the 192-pin
+connector on the DCB. The signal voltages are a minimum of +/- 5VDC. Signal
+currents are on the order of 10mA.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009394-dup.3">4.8&nbsp;&nbsp;Test Points<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Test points on the DCB as shown in the table below:</P><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="ov-1353669009395"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Test points and description</SPAN> </P><table summary="Test points and description" border="1"><colgroup><col width="25%"><col width="21%"><col width="54%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Test Point</td><td valign="">Label</td><td valign="">Description</td></tr><tr valign="top"><td valign="">TP1</td><td valign="">TDO</td><td valign="">JTAG Data Output for FPGA programming</td></tr><tr valign="top"><td valign="">TP2</td><td valign="">LGND</td><td valign="">Digital Logic Ground</td></tr><tr valign="top"><td valign="">TP3</td><td valign="">VCC</td><td valign="">+5V Digital Power</td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009396">4.9&nbsp;&nbsp;LEDs<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">LEDs are provided on the DCB to indicate the following information:</P><UL><LI CLASS="bulletlist"><P>Power-on information. This LED will illuminate if the board
+is powered on.</P></LI><LI CLASS="bulletlist"><P>DCB in reset. This LED will illuminate if the DCB is in its
+reset condition and not booting.</P></LI><LI CLASS="bulletlist"><P>DCB active. This LED will blink a &#8220;heartbeat&#8221;
+if the DCB has booted and passed its power-up diagnostics.</P></LI><LI CLASS="bulletlist"><P>RCIB CAN status. This bank of LEDs will indicate RCIB CAN
+status and fault information.</P></LI><LI CLASS="bulletlist"><P>RCIB CAN fault. This LED will illuminate if there is a RCIB
+CAN fault condition.</P></LI><LI CLASS="bulletlist"><P>Serial Data Loopback error. This LED will illuminate if there
+is a serial data loopback receiver error.</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009397-dup.2">4.10&nbsp;&nbsp;Power-On and Warm-Up/DAS Temperature Characteristics <SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The maximum required elapsed time from power-on to full specified DAS
+performance is one (1) hour. Time to meet full specified DAS performance is
+computed on the basis of two minutes warm up per minute since power was last
+on, or 1 hour, whichever is less. However, under no conditions where the power
+has been temporarily turned off, shall the required warm-up (to meet full
+performance specification) be less than five (5) minutes.</P><P CLASS="sect2">Each Converter board has its own temperature sensor that is constantly
+monitored:</P><UL><LI CLASS="bulletlist"><P>If the temperature reaches 55&deg; Celsius, then a Warning
+Error message will be posted to the Status Area of the ExamRx Desktop and
+associated Error Message in the error log.</P></LI><LI CLASS="bulletlist"><P>If the temperature reaches 62&deg; Celsius, then the DAS will
+report an Over-Temperature Fault and will prevent further scanning until the
+DAS cools and is reset. Refer to <A HREF="javascript:winopen('125042illd0e745.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;4</A>.</P></LI></UL><DIV CLASS="ILLUSTRATION" id="SL125806-125042"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;4:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Temperature Sensor Indicators</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/279686-125801.gif" BORDER="0" usemap="#SL125803-125042"></P></DIV><P CLASS="sect2">Conditions that lead to DAS over-temperature faults include:</P><UL><LI CLASS="bulletlist"><P>Room Environment/Temperature.</P></LI><LI CLASS="bulletlist"><P>DAS cooling fans not working or Air Plenum not installed.</P></LI><LI CLASS="bulletlist"><P>DAS filters are dirty.</P></LI><LI CLASS="bulletlist"><P>Gantry fans not working properly.</P></LI></UL></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669009424-dup.4">5&nbsp;&nbsp;Power Supplies<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">All power supply configurations have outputs that are isolated from
+the 120VAC input by a transformer. Each power supply chassis has a primary
+output voltage that is key to the other outputs. If this primary voltage output
+looses regulation or fails, the other outputs from that supply are suspect.
+The primary output from a power supply chassis should be checked for any potential
+issue suspected for any voltage output from that chassis. For reference concerning
+this theoretical explanation of power supply operation, see <A HREF="javascript:winopen('125042illd0e772.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;5</A> for a block diagram of the GEMS-IT power
+supplies.</P><DIV CLASS="ILLUSTRATION" id="SL250286-125042"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;5:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">GDAS GEMS-IT Power Supply Block Diagram</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/279686-250271.jpg" BORDER="0" usemap="#SL250282-125042"></P></DIV><P CLASS="sect1">The Digital Supply has two isolated voltage outputs:</P><UL><LI CLASS="bulletlist"><P>+12V rated for 1.7 Amps</P></LI><LI CLASS="bulletlist"><P>+5V (5V_L) rated for 90 Amps. This output is the primary output
+for this chassis.</P></LI></UL><P CLASS="sect1">The DCB and GDAS-16 converter cards are powered from the +5V_L supply.
+The Schleifring slipring transceiver utilizes the +12V supply.</P><P CLASS="sect1">The Analog supply has three isolated voltage outputs:</P><UL><LI CLASS="bulletlist"><P>+5V rated for 37.1 Amps.</P></LI><LI CLASS="bulletlist"><P>-5V rated for 51.5 Amps. This output is the primary output
+for this chassis.</P></LI><LI CLASS="bulletlist"><P>+24V rated for 11.8 Amps continuous, 17.8 Amps momentary.</P><P>The Detector heater/cooler, DHCB, collimator, and ORP are all powered
+from the 24V supply. The Converter cards utilize the 5V supplies.</P></LI></UL><P CLASS="sect1">OUTPUT NOISE AND RIPPLE</P><UL><LI CLASS="bulletlist"><P>The analog supplies for the DAS should have noise and ripple
+less than 0.5mV rms.</P></LI><LI CLASS="bulletlist"><P>The +5V logic supply maximum ripple shall be 5 mV peak to
+peak.</P></LI><LI CLASS="bulletlist"><P>The +24V supply maximum ripple shall be 10 mV peak to peak.</P></LI></UL><P CLASS="sect1">OUTPUT VOLTAGE ADJUSTMENT</P><P CLASS="sect1">The +5V_L, +5V_A, and -5V_A outputs are adjustable by means of potentiometers
+and are easily accessible without cover removal. For both power supply configurations
+the use of the DASTools Aux channels test is required to correctly adjust
+the supplies and should be used as the reference for the voltage level seen
+by the DCB during power supply adjustment.</P><P CLASS="sect1">STATUS  INDICATORS AND POTENTIOMETERS</P><P CLASS="sect1">Visual indicators for each board indicating that the unit is energized
+are provided. Due to the load variations, it is necessary to provide manual
+voltage adjustment for the +5V_L output, and +/-5V outputs. See the tables
+below for available LEDs and adjustment pots.</P><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009450">5.1&nbsp;&nbsp;GEMS-IT Digital Supply<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="ov-1353669009450-dup.1"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;4:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Digital Supply Parameters</SPAN> </P><table summary="Digital Supply Parameters" border="1"><colgroup><col width="12%"><col width="13%"><col width="23%"><col width="14%"><col width="21%"><col width="17%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Lamp</td><td valign="">Type</td><td valign="">Location</td><td valign="">Color</td><td valign="">Description</td><td valign="">Visible</td></tr><tr valign="top"><td valign="">DS1</td><td valign="">Neon  Lamp</td><td valign="">Preregulator Bd</td><td valign="">Orange</td><td valign="">AC ON</td><td valign="">Internal</td></tr><tr valign="top"><td valign="">DS2</td><td valign="">Neon  Lamp</td><td valign="">Preregulator Bd</td><td valign="">Orange</td><td valign="">385V ON</td><td valign="">Internal</td></tr><tr valign="top"><td valign="">DS16</td><td valign="">LED</td><td valign="">Digital ADJ Bd</td><td valign="">Green</td><td valign="">+12V ON</td><td valign="">External</td></tr><tr valign="top"><td valign="">DS20</td><td valign="">LED</td><td valign="">Digital ADJ Bd</td><td valign="">Green</td><td valign="">+5V_L ON</td><td valign="">External</td></tr></tbody></table></div></DIV><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="16%"><col width="16%"><col width="21%"><col width="29%"><col width="18%"></colgroup><tbody valign=""><tr valign="top"><td valign="">POT</td><td valign="">Location</td><td valign="">Nominal Value</td><td valign="">Description</td><td valign="">Visible</td></tr><tr valign="top"><td valign="">R100</td><td valign="">Digital ADJ Bd</td><td valign="">10.36 Ohms</td><td valign="">+5V_L Output Adjustment</td><td valign="">External</td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009453">5.2&nbsp;&nbsp;GEMS-IT Analog Supply<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="ov-1353669009453-dup.1"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;5:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Analog Supply parameters</SPAN> </P><table summary="Analog Supply parameters" border="1"><colgroup><col width="13%"><col width="14%"><col width="18%"><col width="15%"><col width="20%"><col width="20%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Lamp</td><td valign="">Type</td><td valign="">Location</td><td valign="">Color</td><td valign="">Description</td><td valign="">Visible</td></tr><tr valign="top"><td valign="">DS2</td><td valign="">Neon  Lamp</td><td valign="">Input Analog Bd</td><td valign="">Orange</td><td valign="">385V ON</td><td valign="">Internal</td></tr><tr valign="top"><td valign="">DS18</td><td valign="">LED</td><td valign="">Analog ADJ Bd</td><td valign="">Green</td><td valign="">-5V ON</td><td valign="">External</td></tr><tr valign="top"><td valign="">DS15</td><td valign="">LED</td><td valign="">Analog ADJ Bd</td><td valign="">Green</td><td valign="">+5V ON</td><td valign="">External</td></tr><tr valign="top"><td valign="">DS __</td><td valign="">LED</td><td valign="">Digital ADJ Bd</td><td valign="">Green</td><td valign="">+24V ON</td><td valign="">External</td></tr></tbody></table></div></DIV><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="18%"><col width="20%"><col width="21%"><col width="21%"><col width="20%"></colgroup><tbody valign=""><tr valign="top"><td valign="">POT</td><td valign="">Location</td><td valign="">Nominal Value</td><td valign="">Description</td><td valign="">Visible</td></tr><tr valign="top"><td valign="">R3</td><td valign="">Analog ADJ Bd</td><td valign="">10.365 kOhms</td><td valign="">-5V Output Adjustment</td><td valign="">External</td></tr><tr valign="top"><td valign="">R4</td><td valign="">Analog ADJ Bd</td><td valign="">10.365 kOhms</td><td valign="">+5V Output Adjustment</td><td valign="">External</td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009457">5.3&nbsp;&nbsp;POWER SUPPLY COOLING<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The GEMS-IT power supplies require fans for cooling. The Astec power
+supply configuration does not. For the GEMS-IT power supply configuration,
+two fans in each power supply chassis are attached to a removable tray that
+can be replaced without removing the power supply from the rotating base.
+(There are no air filters to clean for either power supply configuration).
+The fans are connected by white molex connectors with an interlock line such
+that the supplies will not turn on if the fans are not connected. See <A HREF="javascript:winopen('125042illd0e1058.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;6</A> for details.</P><DIV CLASS="ILLUSTRATION" id="SL224714-125042"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;6:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">GDAS-16 Fan Tray Block Diagram</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/279686-224709.gif" BORDER="0" usemap="#SL224711-125042"></P></DIV><P CLASS="sect2">The power supplies have thermal sensors. The power supplies will shut
+off in an over temperature condition, then restart when temperature sensors
+detect a low enough temperature. This cycle can be about 5-10 minutes depending
+on many factors that affect the cooling.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669009485">5.4&nbsp;&nbsp;GDAS-16 Power Supply Dependencies<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">See <SPAN CLASS="MODULEREF"><A HREF="250374.htm#SL250384-250374"><I>GDAS-16
+Power Supply Troubleshooting</I></A></SPAN> for further information
+regarding power supply dependencies and how to isolate a problem.</P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669009498">6&nbsp;&nbsp;DAS Backplanes <SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The backplane used on the DAS is separated into three sections: Right,
+Center, and Left. The three backplane boards are connected via a ribbon cable,
+with a 100-pin connector on each board. The GDAS-16 backplane is different
+from the MDAS backplane in its structural features to allow use in faster
+gantry rotation speeds.</P><UL><LI CLASS="bulletlist"><P>Right Backplane</P><P>The Right backplane contains connectors for converter boards 1 through
+28. FET LEDs are located on the Right Backplane.</P><P>Also DCB communications with the ORP, Jedi Inverter, and Collimator
+control board connections.</P><P>DDIF Row A and B connections.</P></LI><LI CLASS="bulletlist"><P>Center Backplane</P><P>The Center backplane contains connectors for converter boards 29 through
+68. Test Points are available on the Center Backplane to measure Power Supply
+voltages.</P><P>DDIF Row A and B connections.</P></LI><LI CLASS="bulletlist"><P>Left Backplane</P><P>The Left backplane contains connectors for converter boards 69 through
+96. DDIF Row A and B connections.</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669009499-dup.1">7&nbsp;&nbsp;Backplane Protection<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The DAS backplanes have been subdivided into four sections each. Test
+points and load resistors have been added to protect the DAS backplanes from
+short circuit of the DVSS (-5v_a). This is the detector bias voltage that
+applies -5vdc to the FET switching array. This is not the FET Control lines
+circuitry. During normal system conditions the test points would read -5vdc
+referenced to DAS analog ground.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669009499-dup.2">8&nbsp;&nbsp;DAS Detector Interface (DDIF)<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The DDIF is a pin and socket interface. Both the DAS backplane and Detector
+Flex leads are female pins. The &#8220;Interposer&#8221; is a male to male
+interface. <A HREF="javascript:winopen('125042illd0e1113.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;7</A> shows
+the design features of this interface. The BGA or female connector is also
+on the DAS backplane (not shown) minus the backshell.</P><DIV CLASS="ILLUSTRATION" id="SL125833-125042"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;7:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">DAS Detector Interface (DDIF)</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/125042-125048.gif" BORDER="0" usemap="#SL125830-125042"></P></DIV><P CLASS="sect1">The Interposer uses four (4) large ground pins as guides to center the
+device in the BGA connectors. There are 150 pins per interface and 114 interfaces
+total, two per detector module. There are 128 data channels, six FET control
+lines, nine analog grounds, one signal ground, four shield grounds, one bias
+voltage line, and one unused pin. An analog isolation ground trace surrounds
+the bias and FET control lines. This is to ensure that no leakage currents
+can occur resulting in random FET control settings. The shield grounds perform
+EMI isolation. The signal ground reduces stray current induction onto the
+data lines.</P><P CLASS="sect1"><A HREF="javascript:winopen('125042illd0e1113.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;7</A> identifies
+the major components and design features of the DDIF.</P><DL><DT><I>BGA</I>&nbsp;
+</DT><DD><P CLASS="def">Circuit board material with female pins pressed in. Used on both the
+flex leads and MDAS 16 backplanes.</P></DD><DT><I>Back-shell</I>&nbsp;
+</DT><DD><P CLASS="def">A molded plastic part specifically designed to allow flex removal from
+the DDIF using the Flex Extraction Tool described in <A HREF="125042.htm#SL125848-125042">Section&nbsp;9</A>.</P></DD></DL><DL><DT><I>Interposer</I>&nbsp;
+</DT><DD><P CLASS="def">Circuit board material with male to male pins pressed in. Used to make
+the electrical connection between the flex leads and the MDAS 16 backplane
+BGA connectors. Four large diameter pins provide electrical grounds and a
+self guiding feature when inserting the Interposer onto the backplane BGA
+connector.</P></DD><DT><I>Dust Shield</I>&nbsp;
+</DT><DD><P CLASS="def">A molded plastic part designed for four basic functions.</P><P CLASS="def">Minimize dust contamination of the DDIF assembly.</P><P CLASS="def">Provide a positive locking feature to prevent the Interposer from loosening
+or falling off the DDIF during gantry rotation.</P><P CLASS="def">Provide a contact or guide point for the Flex Extraction Tool to press
+upon when removing flex leads from the DDIF.</P><P CLASS="def">Molded channel to aid in the attachment of the flex BGA to the Interposer
+and a positive locking feature to prevent the flex lead from loosening or
+falling off the DDIF during gantry rotation.</P></DD><DT><I>Retainer Clip</I>&nbsp;
+</DT><DD><P CLASS="def">A molded plastic part, with metal female threads, designed to secure
+the Dust Shield in place. Refer to <A HREF="javascript:winopen('125042illd0e1193.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;10</A>.</P></DD></DL><P CLASS="sect1"><A HREF="javascript:winopen('125042illd0e1177.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;8</A> shows
+the Interposer and BGA connector. Some features are:</P><UL><LI CLASS="bulletlist"><P>Interposer has four large diameter pins to aid in mating to
+the BGA.</P></LI><LI CLASS="bulletlist"><P>BGA connector has four large diameter pins that are coned
+to aid in mating to the Interposer.</P></LI></UL><DIV CLASS="ILLUSTRATION" id="SL125837-125042"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;8:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Interposer, Flex BGA, and Flex Back-shell</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/125042-125053.gif" BORDER="0" usemap="#SL125834-125042"></P></DIV><P CLASS="sect1"><A HREF="javascript:winopen('125042illd0e1185.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;9</A> shows
+the arrangement of the Right Backplane. The DCB and Convertor slots as well
+as the DDIF A and B row identification. The center and left backplanes are
+similar.</P><DIV CLASS="ILLUSTRATION" id="SL125841-125042"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;9:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">DAS Backplane Layout (Right Backplane Shown)</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/125042-125055.gif" BORDER="0" usemap="#SL125838-125042"></P></DIV><P CLASS="sect1"><A HREF="javascript:winopen('125042illd0e1193.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;10</A> highlights
+the Dust Shield Retainer clip. These clips can be replaced if needed.</P><DIV CLASS="ILLUSTRATION" id="SL125845-125042"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;10:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">DAS DDIF</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/125042-125069.gif" BORDER="0" usemap="#SL125842-125042"></P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL125848-125042">9&nbsp;&nbsp;DAS 16 DDIF Tools<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">See <SPAN CLASS="MODULEREF"><A HREF="166768.htm#SL176225-166768"><I>MDAS
+16 DDIF Tools</I></A></SPAN>.</P></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

@@ -1,0 +1,75 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>DCB Jumpers, LEDs, and Test Points</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/16/07</P></td></tr></table><H1 ID="top">DCB Jumpers, LEDs, and Test Points </H1><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669014301">1&nbsp;&nbsp;Board Layout<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669014301-dup.1">1.1&nbsp;&nbsp;Overview<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">There are three connectors on the MDAS 16 DCB for normal operation:
+A TX optical cable connector for high speed serial data transmission to the
+slip ring, a RX optical cable connector for external loop-back testing, and
+a backplane connector for data and control signals to/from the Converter cards,
+signals from the Generator, RS232 interface to the Detector
+Heater Control Board 	 
+(DHCB)
+.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669014302"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">DAS Control Board Layout</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/301517-301522.jpg" BORDER="0" usemap="#SL301523-301517"></P></DIV><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="ov-1353669014316"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">DAS Control Board - Switch. Connector &amp; Test Point Descriptions</SPAN> </P><table summary="DAS Control Board - Switch. Connector &amp; Test Point Descriptions" border="1"><colgroup><col width="21%"><col width="26%"><col width="53%"></colgroup><thead valign=""><tr valign="top"><th align="center" valign="top"><B>Item</B></th><th align="center" valign="top"><B>Label</B></th><th align="center" valign="top"><B>Description</B></th></tr></thead><tbody valign=""><tr valign="top"><td align="center" valign="top">S1</td><td align="left" valign="top">S1</td><td align="left" valign="top">DCB Board
+Reset switch</td></tr><tr valign="top"><td align="center" valign="top">&nbsp;</td><td align="left" valign="top">TX</td><td align="left" valign="top">Fiber
+Optic, High Speed Serial DAS Data Out</td></tr><tr valign="top"><td align="center" valign="top">&nbsp;</td><td align="left" valign="top">RX</td><td align="left" valign="top">Fiber
+optic, High Speed Serial DAS Data In. (For External loopback Testing Only)</td></tr><tr valign="top"><td align="center" valign="top">TP1</td><td align="left" valign="top">TDO</td><td align="left" valign="top">JTAG Data
+Output for FPGA Programming</td></tr><tr valign="top"><td align="center" valign="top">TP2</td><td align="left" valign="top">LGND</td><td align="left" valign="top">Digital
+Ground</td></tr><tr valign="top"><td align="center" valign="top">TP3</td><td align="left" valign="top">VCC</td><td align="left" valign="top">+5 VDC
+Digital</td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669014319">1.2&nbsp;&nbsp;Pushbutton Reset<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The push-button reset, S1, initiates a hard reset to all the board logic.
+This initializes all the hardware to a known state, and causes the Core 68332
+processor to reboot. The single FPGA, however, is only reconfigured from serial
+EEPROM at board power-up.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669014319-dup.1">1.3&nbsp;&nbsp;Test Points<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The DCB Has the following test points:</P><UL><LI CLASS="bulletlist"><P>TP1: JTAG Data Output for FPGA Programming</P></LI><LI CLASS="bulletlist"><P>TP2: Digital Ground</P></LI><LI CLASS="bulletlist"><P>TP3: +5V Digital Power</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669014320">1.4&nbsp;&nbsp;Jumpers<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The DCB will have a single jumper in a straight, 2-pin male, 0.1-inch
+spacing, header-type connector. The factory configuration for the jumper is
+OUT. The jumper will be located on the DCB and will be accessible only when
+the DCB is out of the DAS chassis or the right chassis end plate is off. The
+pinout for the jumper block is shown in Table&nbsp;2.</P><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="ov-1353669014320-dup.1"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Test Jumper Block Pinout</SPAN> </P><table summary="Test Jumper Block Pinout" border="1"><colgroup><col width="11%"><col width="20%"><col width="21%"><col width="48%"></colgroup><thead valign=""><tr valign="top"><th align="center" valign="top"><B>Pin
+Set</B></th><th align="center" valign="top"><B>Jumper
+IN</B></th><th align="center" valign="top"><B>Jumper
+OUT</B></th><th align="center" valign="top"><B>Definition</B></th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top">1-2</td><td align="left" valign="top">Boots
+the loader</td><td align="left" valign="top">Boots
+the ApplicationNormal Mode</td><td align="left" valign="top">When this
+jumper is IN, the RS-232 serial port on J48 on the 16 Slice right backplane
+is enabled at 19.2 kBaud, allowing interactive debugging with a dumb terminal
+or PC</td></tr></tbody></table></div></DIV></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669014321">2&nbsp;&nbsp;LEDs<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="ILLUSTRATION" id="ov-1353669014321-dup.1"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">DAS Control Board Layout - Reverse side, showing LEDs (at right)</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/301517-301525.jpg" BORDER="0" usemap="#SL301526-301517"></P></DIV><DIV CLASS="ILLUSTRATION" id="ov-1353669014337"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Pulse Sequence Example</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/301517-301519.jpg" BORDER="0" usemap="#SL301520-301517"></P></DIV><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="ov-1353669014349"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">DCB LED Descriptions </SPAN> </P><table summary="DCB LED Descriptions " border="1"><colgroup><col width="22%"><col width="58%"><col width="20%"></colgroup><thead valign=""><tr valign="top"><th align="center" valign="top"><B>LED</B></th><th align="center" valign="top"><B>Description</B></th><th align="center" valign="top"><B>Normal
+Status</B></th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top">Serial
+Data Loopback Error</td><td align="left" valign="top">This Green
+LED will be normally ON when there is no data being received in the RX port
+of the Fiber Optic Transceiver. [Monitors Diagnostic Fiber Optic Receive Port.]</td><td align="left" valign="top">On during
+Applications</td></tr><tr valign="top"><td align="left" valign="top">Power</td><td align="left" valign="top">This Green
+LED should remain ON at all times, if proper +5VDC is applied to the Controller
+board.</td><td align="left" valign="top">On</td></tr><tr valign="top"><td align="left" valign="top">Reset</td><td align="left" valign="top">This LED
+comes on when the board is reset and will turn Off after a successful reset.</td><td align="left" valign="top">Off</td></tr><tr valign="top"><td align="left" valign="top">Heartbeat</td><td align="left" valign="top">This LED
+will Flash a Error code if the micro-Controller Unit (MCU) fails boot-up.
+All other CAN LEDs will be turned ON. Refer to Boot-Up Error Code Table and
+Example of Pulse sequence display.</td><td align="left" valign="top">Flashing
+at 1 sec. interval</td></tr><tr valign="top"><td align="left" valign="top">RCIB CAN
+Fault</td><td align="left" valign="top">Represents
+the current or &#8220;Real&#8221; state of the fault line. If ON, the Fault
+Line is asserted. LED color is Yellow.</td><td align="left" valign="top">Off</td></tr><tr valign="top"><td align="left" valign="top">CAN Rx</td><td align="left" valign="top">This LED
+flashes during data receive on the CAN bus.</td><td align="left" valign="top">Off</td></tr><tr valign="top"><td align="left" valign="top">CAN 7</td><td align="left" valign="top">This LED
+will flash a error code sequence if a fault is detected while the DCB is running
+applications. Refer to Application Fault Error Code Table and Example of Pulse
+sequence display.</td><td align="left" valign="top">Off</td></tr><tr valign="top"><td rowspan="2" align="left" valign="top">CAN
+6</td><td align="left" valign="top">LED ON:
+DCB is connected to ORP</td><td rowspan="2" align="left" valign="top">On</td></tr><tr valign="top"><td align="left" valign="top">LED OFF:
+DCB is not connected to ORP</td></tr><tr valign="top"><td rowspan="2" align="left" valign="top">CAN
+5</td><td align="left" valign="top">LED ON:
+F/W thinks Fault line is asserted. Check GCAN LED for &#8220;Real&#8221; state
+of fault line.</td><td rowspan="2" align="left" valign="top">Off</td></tr><tr valign="top"><td align="left" valign="top">LED OFF:
+F/W thinks Fault line is Not asserted</td></tr><tr valign="top"><td rowspan="2" align="left" valign="top">CAN
+4</td><td align="left" valign="top">LED ON:
+F/W sends command to prep or monitor Fault Line. Check GCAN LED for &#8220;Real&#8221;
+state of fault line.</td><td rowspan="2" align="left" valign="top">On</td></tr><tr valign="top"><td align="left" valign="top">LED OFF:
+Fault line NOT Set</td></tr><tr valign="top"><td rowspan="2" align="left" valign="top">CAN
+3</td><td align="left" valign="top">LED ON:
+DCB in Shutdown</td><td rowspan="2" align="left" valign="top">Off</td></tr><tr valign="top"><td align="left" valign="top">LED OFF:
+Not in Shutdown</td></tr><tr valign="top"><td rowspan="2" align="left" valign="top">CAN
+2</td><td align="left" valign="top">LED ON:
+In collection of Scan Views</td><td rowspan="2" align="left" valign="top">Off</td></tr><tr valign="top"><td align="left" valign="top">LED OFF:
+Not in Scan View collection</td></tr><tr valign="top"><td rowspan="2" align="left" valign="top">CAN
+1</td><td align="left" valign="top">LED ON:
+In collection of Offsets</td><td rowspan="2" align="left" valign="top">Off</td></tr><tr valign="top"><td align="left" valign="top">LED OFF:
+Not in Offset collection</td></tr><tr valign="top"><td rowspan="2" align="left" valign="top">CAN
+0</td><td align="left" valign="top">LED ON:
+Trigger seen for View / Offsets</td><td rowspan="2" align="left" valign="top">Off</td></tr><tr valign="top"><td align="left" valign="top">LED OFF:
+No Triggers detected</td></tr></tbody></table></div></DIV></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

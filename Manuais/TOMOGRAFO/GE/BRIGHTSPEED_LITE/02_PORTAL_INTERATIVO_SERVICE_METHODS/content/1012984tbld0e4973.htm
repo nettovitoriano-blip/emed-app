@@ -1,0 +1,45 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Tube Spits Detection Errors</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><DIV CLASS="TABLE"><CENTER><P CLASS="TABLEINTRO" ID="SL1517403-1012984"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;8:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Tube Spits Detection Errors</SPAN> </P><table summary="Tube Spits Detection Errors" border="1"><colgroup><col width="61"><col width="61"><col width="138"><col width="150"><col width="203"></colgroup><tbody valign=""><tr valign="top"><td align="center" valign="">Error code (hex)</td><td align="center" valign="">Error code (dec)</td><td valign="">Message/explanation</td><td valign="">Potential cause</td><td valign="">Recommended action/ Troubleshooting guide</td></tr><tr valign="top"><td rowspan="2" align="center" valign="">30- 0305h</td><td rowspan="2" align="center" valign="">773d</td><td rowspan="2" valign="">FPGA problem (Restarting safety) Error occurring on safety line, while No root error present
+at the error inputs </td><td rowspan="2" align="left" valign="">1.&nbsp;&nbsp;&nbsp;&nbsp;
+External unknown cause (spikes). 2.&nbsp;&nbsp;&nbsp;&nbsp;
+PPC kV control board.</td><td rowspan="2" valign="">- Do a power and Grounding Check. Verify
+cabling and contacts. - If permanent or too frequent,
+replace PPC kV control board. </td></tr><tr valign="top"><td valign="">&nbsp;</td></tr><tr valign="top"><td rowspan="5" align="center" valign="">30- 0324h data=1* (see note)</td><td rowspan="5" align="center" valign="">804d data=1* (see note)</td><td rowspan="5" valign="">Tube spit (kV+ has dropped) kV drop/spit
+detected on Anode side</td><td rowspan="5" align="left" valign="">1.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Anode side Tube spit. 2.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Anode HV cable 3.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+HV tank</td><td rowspan="5" valign="">If too frequent: -
+Check HV cables and contacts in tube and generator sides (no black
+traces, grease or oil in them except on HV cable equipped with a mini
+connector for vascular tube) - Remove HV in generator
+side, fill HV receptacles with oil and run Open load kV test. (See
+diagnostic section). If test fails, replace HV tank. - Swap and connect HV cables. Run Open load kV test. (See diagnostic
+section) If test fails, replace anode HV cable. -
+Otherwise, tube problem (Anode side). Refer to x-ray tube maintenance
+manual or replace tube.</td><td class="auto-generated">&nbsp;</td></tr><tr valign="top"><td valign="">&nbsp;</td></tr><tr valign="top"><td valign="">&nbsp;</td></tr><tr valign="top"><td valign="">&nbsp;</td></tr><tr valign="top"><td valign="">&nbsp;</td></tr><tr valign="top"><td rowspan="5" align="center" valign="">30- 0324h data=2* (see note)</td><td rowspan="5" align="center" valign="">804d data=2* (see note)</td><td rowspan="5" valign="">Tube spit (kV- has dropped) kV drop/spit
+detected on cathode side</td><td rowspan="5" align="left" valign="">1.&nbsp;&nbsp;&nbsp;&nbsp;
+Cathode side Tube spit. 2.&nbsp;&nbsp;&nbsp;&nbsp;
+Cathode HV cable 3.&nbsp;&nbsp;&nbsp;&nbsp; HV tank</td><td rowspan="5" valign="">If too frequent: -
+Check HV cables and contacts in tube and generator sides (no black
+traces, grease or oil in them, except on HV cable equipped with a
+mini connector for vascular tube no black traces) -
+Remove HV in generator side, fill HV receptacles with oil and run
+Open load kV test. (See diagnostic section). If test fails, replace
+HV tank. - Swap and connect HV cables. Run Open load
+kV test. (See diagnostic section) If test fails, replace anode HV
+cable. - Otherwise, tube problem (Anode side). Refer
+to x-ray tube maintenance manual or replace tube.</td><td class="auto-generated">&nbsp;</td></tr><tr valign="top"><td valign="">&nbsp;</td></tr><tr valign="top"><td valign="">&nbsp;</td></tr><tr valign="top"><td valign="">&nbsp;</td></tr><tr valign="top"><td valign="">&nbsp;</td></tr><tr valign="top"><td align="center" valign="">30-</td><td align="center" valign="">&nbsp;</td><td valign="">Tube spit (kV+ and kV- dropped)</td><td rowspan="3" valign="">X-ray tube spit (arc, spark between
+anode and cathode)</td><td rowspan="3" valign="">Usual in tubes. If too frequent and
+varies with HV (occurs at high kV), refer to x-ray tube maintenance
+manual or replace tube.</td><td class="auto-generated">&nbsp;</td></tr><tr valign="top"><td align="center" valign="">0324h</td><td align="center" valign="">804d</td><td align="center" valign="">kV drop/spit detected</td><td class="auto-generated">&nbsp;</td></tr><tr valign="top"><td align="center" valign="">data=4*</td><td align="center" valign="">data=4*</td><td valign="">&nbsp;</td><td class="auto-generated">&nbsp;</td></tr><tr valign="top"><td align="center" valign="">30-</td><td align="center" valign="">&nbsp;</td><td valign="">kV regulation error</td><td align="left" valign="">1.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Smooth
+HV tube spits</td><td valign="">If permanent or too frequent </td><td class="auto-generated">&nbsp;</td></tr><tr valign="top"><td align="center" valign="">0324h</td><td align="center" valign="">804d</td><td valign="">This is a slow speed safety circuit in case of &#8220;smooth&#8221;
+spits or a case of a regulation problem.</td><td align="left" valign="">2.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PPC kV
+control board (HV regulation problem)</td><td valign="">- Check main fuses and  DC bus voltage  </td><td class="auto-generated">&nbsp;</td></tr><tr valign="top"><td align="center" valign="">&nbsp;</td><td align="center" valign="">&nbsp;</td><td valign="">&nbsp;</td><td align="left" valign="">3.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Too high
+line impedance</td><td valign="">- Run inverter diagnostics (See diagnostic section)</td><td class="auto-generated">&nbsp;</td></tr><tr valign="top"><td align="center" valign="">data=8*</td><td align="center" valign="">data=8*</td><td valign="">&nbsp;</td><td align="left" valign="">4.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Half of
+AC/DC capacitors open</td><td valign="">- Run Open load kV test. (See diagnostic section)</td><td class="auto-generated">&nbsp;</td></tr><tr valign="top"><td align="center" valign="">(see note)</td><td align="center" valign="">(see note)</td><td valign="">&nbsp;</td><td align="left" valign="">5.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Inverter
+(parallel inductor or filtering capacitors) </td><td valign="">- Troubleshoot tube and contacts of HV cable.</td><td class="auto-generated">&nbsp;</td></tr><tr valign="top"><td valign="">&nbsp;</td><td valign="">&nbsp;</td><td valign="">&nbsp;</td><td align="left" valign="">6.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; HV tank</td><td valign="">&nbsp;</td><td class="auto-generated">&nbsp;</td></tr><tr valign="top"><td valign="">&nbsp;</td><td valign="">&nbsp;</td><td valign="">&nbsp;</td><td align="left" valign="">7.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Tube (if
+filament is shorted)</td><td valign="">&nbsp;</td><td class="auto-generated">&nbsp;</td></tr><tr valign="top"><td align="center" valign="">30-</td><td align="center" valign="">&nbsp;</td><td rowspan="3" align="center" valign="">Warning , spit counter
+overflow</td><td rowspan="3" valign="">Too many spits</td><td rowspan="3" valign="">No action</td><td class="auto-generated">&nbsp;</td></tr><tr valign="top"><td align="center" valign="">0328h </td><td align="center" valign="">808d</td><td class="auto-generated">&nbsp;</td></tr><tr valign="top"><td align="center" valign="">&nbsp;</td><td valign="">&nbsp;</td><td class="auto-generated">&nbsp;</td></tr></tbody></table></CENTER></DIV></BODY></HTML>

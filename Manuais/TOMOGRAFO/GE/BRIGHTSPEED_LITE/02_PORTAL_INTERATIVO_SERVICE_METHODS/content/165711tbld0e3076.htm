@@ -1,0 +1,26 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>DCB LED Descriptions </TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><DIV CLASS="TABLE"><CENTER><P CLASS="TABLEINTRO" ID="T7-22-165711"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;14:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">DCB LED Descriptions </SPAN> </P><table summary="DCB LED Descriptions " border="1"><colgroup><col width="89"><col width="405"><col width="112"></colgroup><thead valign=""><tr valign="top"><th align="left" valign="top">LED</th><th align="left" valign="top">DESCRIPTION</th><th align="left" valign="top">NORMAL STATUS</th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top">Serial Data Loopback Error</td><td align="left" valign="top">This Green LED will be normally
+ON when there is no data being received in the RX port of the Fiber Optic
+Transceiver. [Monitors Diagnostic Fiber Optic Receive Port.]</td><td align="left" valign="top">On during Applications</td></tr><tr valign="top"><td align="left" valign="top">Power</td><td align="left" valign="top">This Green LED should remain
+ON at all times, if proper +5VDC is applied to the Controller board.</td><td align="left" valign="top">On</td></tr><tr valign="top"><td align="left" valign="top">Reset</td><td align="left" valign="top">This LED comes on when the board
+is reset and will turn Off after a successful reset.</td><td align="left" valign="top">Off</td></tr><tr valign="top"><td align="left" valign="top">Heartbeat</td><td align="left" valign="top">This LED will Flash a Error
+code if the micro-Controller Unit (MCU) fails boot-up. All other CAN LEDs
+will be turned ON. Refer to Boot-Up Error Code Table and Example of Pulse
+sequence display.</td><td align="left" valign="top">Flashing at 1 sec. interval</td></tr><tr valign="top"><td align="left" valign="top">RCIB CAN Fault</td><td align="left" valign="top">Represents the current or &#8220;Real&#8221;
+state of the fault line. If ON, the Fault Line is asserted. LED color is Yellow.</td><td align="left" valign="top">Off</td></tr><tr valign="top"><td align="left" valign="top">CAN Rx</td><td align="left" valign="top">This LED flashes during data
+receive on the CAN bus.</td><td align="left" valign="top">Off</td></tr><tr valign="top"><td align="left" valign="top">CAN 7</td><td align="left" valign="top">This LED will flash a error
+code sequence if a fault is detected while the DCB is running applications.
+Refer to Application Fault Error Code Table and Example of Pulse sequence
+display.</td><td align="left" valign="top">Off</td></tr><tr valign="top"><td align="left" valign="top">CAN 6</td><td align="left" valign="top">LED ON: DCB is connected to
+OBCLED OFF: DCB is not connected to OBC</td><td align="left" valign="top">On</td></tr><tr valign="top"><td align="left" valign="top">CAN 5</td><td align="left" valign="top">LED ON: F/W thinks Fault line
+is asserted. Check GCAN LED for &#8220;Real&#8221; state of fault line.LED
+OFF: F/W thinks Fault line is Not asserted</td><td align="left" valign="top">Off</td></tr><tr valign="top"><td align="left" valign="top">CAN 4</td><td align="left" valign="top">LED ON: F/W sends command to
+prep or monitor Fault Line. Check GCAN LED for &#8220;Real&#8221; state of
+fault line.LED OFF: Fault line NOT Set</td><td align="left" valign="top">On</td></tr><tr valign="top"><td align="left" valign="top">CAN 3</td><td align="left" valign="top">LED ON: DCB in ShutdownLED OFF:
+Not in Shutdown</td><td align="left" valign="top">Off</td></tr><tr valign="top"><td align="left" valign="top">CAN 2</td><td align="left" valign="top">LED ON: In collection of Scan
+ViewsLED OFF: Not in Scan View collection</td><td align="left" valign="top">Off</td></tr><tr valign="top"><td align="left" valign="top">CAN 1</td><td align="left" valign="top">LED ON: In collection of OffsetsLED
+OFF: Not in Offset collection</td><td align="left" valign="top">Off</td></tr><tr valign="top"><td align="left" valign="top">CAN 0</td><td align="left" valign="top">LED ON: Trigger seen for View
+/ OffsetsLED OFF: No Triggers detected</td><td align="left" valign="top">Off</td></tr></tbody></table></CENTER></DIV></BODY></HTML>

@@ -1,0 +1,43 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>testHighSpeed Script - GOC3/GOC4 Disk Array</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/14/07</P></td></tr></table><H1 ID="top">testHighSpeed Script - GOC3/GOC4 Disk Array </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col align="right" width="50%"><col width="50%"></colgroup><tbody valign=""><tr valign="top"><td align="right" valign="">Last Revised:</td><td valign="">20 September 2006</td></tr></tbody></table></div></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669085084">1&nbsp;&nbsp;Overview<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The DARC (or DARC2) Node mounts the Disk Array drives. The GOC3 SDDA
+houses two Scan Data Disk Drives and the Intercom / Prescribed Tilt Board.
+The GOC4 DARC2 Node houses the two Scan Data Disk Drives. This test verifies
+the SCSI cabling (internal or external) for the Disk Array. It writes data
+to the drives, then reads it back and verifies a checksum looking for dropped
+packets. It ensures the Disk Array RAID is able to transfer data at a rate
+equal to or greater than 75 MB/sec. This test shall be run with Applications
+down.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669085085">2&nbsp;&nbsp;Determine Software<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Confirm the Host Application Software is less than 06MW03.4. If the
+software is 06MW03.4 or greater, do NOT perform this procedure.</P><OL><LI CLASS="numlist"><P>Open a Unix Shell and type the following to verify Applications
+software version information. Examples are provided. The examples are not
+actual output. </P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@</FONT></SPAN><SPAN CLASS="SCRNVAR"><FONT FACE="COURIER"><I>hostname</I></FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">}</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B> &nbsp;swhwinfo</B></FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">(year)MW(fiscal week).(fiscal day).hardware revision info here </FONT></SPAN></P><P>Output must NOT be: <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">06MWxx.x</FONT></SPAN><SPAN CLASS="SCRNVAR"><FONT FACE="COURIER"><I>hardware revision
+info</I></FONT></SPAN> (or greater)</P></LI><LI CLASS="numlist"><P>If the software version is less than 06MWxx.x continue. If
+it is equal to 06MWxx.x or greater, do not continue.</P></LI></OL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669085086-dup.1">3&nbsp;&nbsp;testHighSpeed<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1"><SPAN CLASS="EFFSTRING"><FONT COLOR="#008000"><B>
+(For&nbsp;SDDA Only) 
+</B></FONT></SPAN>Visually verify the front panel SDDA
+LEDs for HD1 and HD2 blink during the test.</P><P CLASS="sect1">Open a Unix Shell and type the following:</P><P CLASS="sect1"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@</FONT></SPAN><SPAN CLASS="SCRNVAR"><FONT FACE="COURIER"><I>hostname</I></FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">}</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>&nbsp;&nbsp;rsh
+&nbsp;darc</B></FONT></SPAN></P><P CLASS="sect1"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Last login: Tue Oct  7 15:12:51 from oc</FONT></SPAN></P><P CLASS="sect1"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ctuser@darc ~]$</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B> &nbsp;cd &nbsp;/usr/g/bin</B></FONT></SPAN></P><P CLASS="sect1"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ctuser@darc bin]$</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B> &nbsp;ls &nbsp;test*</B></FONT></SPAN></P><P CLASS="sect1"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">testHighSpeed</FONT></SPAN></P><P CLASS="sect1"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ctuser@darc bin]$</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>&nbsp; ./testHighSpeed</B></FONT></SPAN></P><P CLASS="sect1">An example output is shown below:</P><PRE>Starting pass_number 1
+saving 1024 MB to disk
+1024 MB in 10.480 sec 97.710 MB/sec
+
+Starting pass_number 2
+saving 1024 MB to disk
+1024 MB in 10.030 sec 102.094 MB/sec
+
+Starting pass_number 3
+saving 1024 MB to disk
+1024 MB in 9.340 sec 109.636 MB/sec
+
+Starting pass_number 4
+saving 1024 MB to disk
+1024 MB in 8.150 sec 125.644 MB/sec
+
+Starting pass_number 5
+saving 1024 MB to disk
+1024 MB in 8.440 sec 121.327 MB/sec
+
+Average speed: 111.282 Mb/sec. testHighSpeed PASSED.
+
+</PRE><P CLASS="sect1"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ctuser@darc bin]$</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B> &nbsp;exit</B></FONT></SPAN></P><P CLASS="sect1"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">logout</FONT></SPAN></P></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

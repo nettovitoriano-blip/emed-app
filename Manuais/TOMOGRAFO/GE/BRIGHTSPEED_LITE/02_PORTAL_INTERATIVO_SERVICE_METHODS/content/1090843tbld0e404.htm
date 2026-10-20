@@ -1,0 +1,34 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Verify Disks and Mount State Command Example Output</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><DIV CLASS="TABLE"><CENTER><P CLASS="TABLEINTRO" ID="SL1525030-1090843"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;4:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Verify Disks and Mount State Command Example Output</SPAN> </P><table summary="Verify Disks and Mount State Command Example Output" border="1"><colgroup><col width="100%"></colgroup><tbody valign=""><tr valign="top"><td valign=""><PRE>[ctuser@hostname][2] df /raw_data
+Filesystem           1K-blocks      Used Available Use% Mounted on</PRE><P CLASS="entry"><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>/dev/md0</B></FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">          
+   286516224       5379572  281136652   2% /</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>raw_data</B></FONT></SPAN></P><PRE>
+[ctuser@hostname][3] df
+Filesystem           1K-blocks      Used Available Use% Mounted on
+/dev/sda3              281136652   4323584   2220672  67% /
+/dev/sda1               101086      8605     87262    9% /boot
+/dev/shm               4151624      310644   3840980  8% /dev/shm
+/dev/sda6             9765248       544     9764704   1% /usr/interchange
+/dev/sda7             11717120     1064     11716056  1% /data
+/dev/sda8             106699748    8490932  98208816  8% /user/g
+/dev/sdb5             143301964    310840  142991124  1% /user/g/sdc_image_pool
+/dev/md0              286516224    5379572  281136652 2% /raw_data
+
+[ctuser@hostname][4] cat /proc/scsi/scsi
+Attached devices:
+Host: scsi0 Channel: 00 Id: 00 Lun: 00</PRE><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Vendor: FUJITSU  Model: MBA3147RC</FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER"> Rev: HPF1</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Type:   Direct-Access                   
+ANSI SCSI revision: 05</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Host: scsi0
+Channel: 00 Id: 01 Lun: 00</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Vendor:
+FUJITSU  Model: MBA3147RC</FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER"> Rev: HPF1</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Type:   Direct-Access                    ANSI SCSI
+revision: 05</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Host: scsi0 Channel: 00
+Id: 02 Lun: 00</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Vendor: FUJITSU  Model:
+MBA3147RC</FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER"> Rev: HPF1</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Type:   Direct-Access                    ANSI SCSI revision: 05</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Host: scsi0 Channel: 00 Id: 03 Lun: 00</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Vendor: FUJITSU  Model: MBA3147RC</FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER"> Rev: HPF1</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Type:   Direct-Access
+                   ANSI SCSI revision: 05</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Host: scsi1 Channel: 00 Id: 03 Lun: 00</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Vendor: SONY  Model: SMO-F551-SD</FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER"> Rev: 1.05</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Type:   Optical Device                  
+ANSI SCSI revision: 02</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Host: scsi1
+Channel: 00 Id: 04 Lun: 00</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Vendor:
+MATSHITA  Model: DVD-RAM SW-9576S </FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER"> Rev: AN0J</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Type:   CD-ROM                   ANSI SCSI
+revision: 02</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Host: scsi2 Channel: 00
+Id: 00 Lun: 00</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Vendor: ATAPI  Model:
+DVD D  DH16D3S</FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER"> Rev: SH37</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Type:   CD-ROM                   ANSI SCSI revision: 05</FONT></SPAN></P></td></tr></tbody></table></CENTER></DIV></BODY></HTML>

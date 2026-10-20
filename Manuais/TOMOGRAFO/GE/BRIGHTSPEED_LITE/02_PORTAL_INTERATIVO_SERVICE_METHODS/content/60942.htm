@@ -1,0 +1,265 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Collimator Theory of Operation</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/14/07</P></td></tr></table><H1 ID="top">Collimator Theory of Operation </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="50%"><col width="50%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised:</td><td valign="">31 October 2005</td></tr></tbody></table></div></DIV><P CLASS="descriptive">The mechanics of the collimator are controlled by firmware. The Collimator
+Control Board (CCB) is the interface between the firmware and the mechanics.
+The basic function of the collimator is to set the x-ray beam width at the
+patient and provide filtering of the beam for the proper &#8220;hardness&#8221;.</P><P CLASS="descriptive">This module is split into the following sections:</P><UL><LI CLASS="bulletlist"><P><A HREF="60942.htm#SL86072-60942">Section&nbsp;1</A> - Collimator
+Control Board (CCB)</P></LI><LI CLASS="bulletlist"><P><A HREF="60942.htm#SL86082-60942">Section&nbsp;2</A> - Core
+Controller</P></LI><LI CLASS="bulletlist"><P><A HREF="60942.htm#SL86086-60942">Section&nbsp;3</A> - Gantry
+Controller Area Network (CAN)</P></LI></UL><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL86072-60942">1&nbsp;&nbsp;Collimator Control Board (CCB)<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">This Collimator Control Board has five major functions:</P><OL><LI CLASS="numlist"><P>The Core Controller for processing and control.</P></LI><LI CLASS="numlist"><P>Communications using the Controller Area Network (CAN) Interface
+with Fault &amp; Reset signals.</P></LI><LI CLASS="numlist"><P>CAM positioning.</P></LI><LI CLASS="numlist"><P>Filter positioning.</P></LI><LI CLASS="numlist"><P>Voltage regulation and referencing.</P></LI></OL><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996760-dup.5">1.1&nbsp;&nbsp;Major Function List<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2"><A HREF="javascript:winopen('60942tbld0e88.htm','Table','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Table&nbsp;1</A> lists the major
+functions of the CCB.</P><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="SL60945-60942"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Major Function List of CCB</SPAN> </P><table summary="Major Function List of CCB" border="1"><colgroup><col width="329"><col width="288"></colgroup><tbody valign=""><tr valign="top"><td align="left" valign="top">1.Core controller</td><td align="left" valign="top">9. Gantry CAN function</td></tr><tr valign="top"><td align="left" valign="top">2.CPU332</td><td align="left" valign="top">10.LED function</td></tr><tr valign="top"><td align="left" valign="top">3.Clock and Clock Loss circuitry</td><td align="left" valign="top">11.Exposure Command</td></tr><tr valign="top"><td align="left" valign="top">4.Reset Bus</td><td align="left" valign="top">12.Trigger Clock</td></tr><tr valign="top"><td align="left" valign="top">5.TPU and CAM drives</td><td align="left" valign="top">13.System Fault</td></tr><tr valign="top"><td align="left" valign="top">6.RS232</td><td align="left" valign="top">14.GCAN RESET</td></tr><tr valign="top"><td align="left" valign="top">7.Power Up Configuration</td><td align="left" valign="top">15.CAM drive</td></tr><tr valign="top"><td align="left" valign="top">8.FLASH and RAM</td><td align="left" valign="top">16.Filter Drive</td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996774">1.2&nbsp;&nbsp;Location of Parts<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2"><A HREF="javascript:winopen('60942illd0e142.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;1</A> shows the location
+of parts on the CCB.</P><DIV CLASS="ILLUSTRATION" id="SL60946-60942"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Location of Parts (CCB)</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/60942-60955.gif" BORDER="0" usemap="#SL60956-60942"></P></DIV></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL86082-60942">2&nbsp;&nbsp;Core Controller<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The &#8220;Core controller&#8221; shares functionality with the controller
+section of the Data Acquisition Control Board (DCB). The core section consists
+of the processor, clock and clock processing, RS232 circuitry, Flash memory
+and RAM.</P><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996801">2.1&nbsp;&nbsp;CPU332<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">This comes with a 16 MHz clock and the Standard TPU (Time Processor
+Unit) with enhanced PPWA (Period/Pulse-Width Accumulator). The TPU is essentially
+a dedicated processor for time related functions.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996802">2.2&nbsp;&nbsp;Clock and Clock Loss Circuitry<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The processor clock is derived off a 32.000MHz crystal oscillator, which
+is divided down to 16 Hz, which is fed into the processor. The clock runs
+through the processor and exits the chip at the CLKOUT pin before feeding
+the rest of the board. If the clock stops for over 9.9 mS, the missing pulse
+detector will pull the reset bus line low and set the clock loss bit in the
+Altera. This bit can only be reset by firmware command (or power cycling).</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996802-dup.1">2.3&nbsp;&nbsp;Reset Bus<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">There is one central Reset line on the CCB. This central line connects
+the CPU, the pushbutton reset, the external GCAN reset, the Background Debugging
+Mode connection, the Altera, and the 82527 CAN controller.</P><P CLASS="sect2">The external GCAN reset is applied by commanding GCAN_RST_P high relative
+to GCAN_RST_N. This puts the board into reset.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996802-dup.2">2.4&nbsp;&nbsp;CPU Signal Buffering/ Conditioning<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The CPU does not interface directly to any external devices. It buffers
+the signals through HCT244 devices. The following are inputs from external
+devices:</P><P CLASS="sect2">The CAM and Filter encoder signals are buffered inputs to the TPU as
+are the filter home switch and the DAS trigger signal. The Filter C pulse
+and the filter home switch are combined to form the filter home signal. The
+TPU is set up to decode the quadrature of the encoders and provides a 16 bit
+counter for each axis position.</P><P CLASS="sect2">The filter home switch contacts and the filter encoder C pulse are also
+buffered to the DATA bus through the &#8220;INREG&#8221; register (U24). That
+is the only register outside of the Altera used for data.</P><P CLASS="sect2">Outputs from the TPU are for the CAM and filter drives and these are
+buffered out through an HCT244.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996802-dup.3">2.5&nbsp;&nbsp;TPU and CAM Drives<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The TPU has a stepper motor control algorithm that is used for the CAM
+drives. The firmware sets of the TPU with the acceleration and deceleration
+rates and the step rate. When it sets the desired position the TPU takes care
+of the actual move. It is set up now for half step commands to the Vexta 5
+phase stepper driver at a rate of 2000 steps per second for a standard aperture
+move.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996803">2.6&nbsp;&nbsp;RS232<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The RS232 link is on the board purely for development reasons.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996803-dup.1">2.7&nbsp;&nbsp;Power-Up Configuration<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The Data3, Data9 are held low on reset to configure the 68332. Data3
+low on reset release configures the /CS6 pin to be ADDR19 so we can access
+1 MB of memory. Data9 low on release of reset turns the IRQ[7:1] lines into
+PortF outputs. Holding MODCLK low configures the 68332 to use an external
+clock source.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996803-dup.2">2.8&nbsp;&nbsp;FLASH and RAM<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The memory for the CCB consists of 8 Mbit (1 Mbyte) of 120 nS FLASH
+and the same amount of 55 nS RAM. The FLASH interfaces directly to the 68332.
+The RAM does not. The DCB uses the the same boot firmware. ADDR0 is not used
+on the memory. The read/write decode from the Altera handles the byte selection.</P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL86086-60942">3&nbsp;&nbsp;Gantry Controller Area Network (CAN)<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">A CAN (Controller Area
+Network) is used to communicate with the Inverter or the DAS. This is a serial
+link with a protocol and hardware interface. As part of our CAN physical connection
+we include application specific signals such as: GCAN (Gantry CAN) fault,
+Fault2, Exposure Command, Triggers and GCAN Reset.</P><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996804">3.1&nbsp;&nbsp;CAN Function<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The CAN controller chip is an Intel 82527. Firmware writes and reads
+from this chip to send and receive messages via the CAN. When pin 2 of the
+HCPL7101 is high, the output (pin 6) is high. The outputs (pins 6 and 7) of
+the 82C250 will be floating. This is the &#8220;recessive&#8221; bus state
+on the network. A logic zero from the 82527 will result in GCH (Gantry Can
+High) being pulled to high and GCL (Gantry Can Low) being pulled low.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996804-dup.1">3.2&nbsp;&nbsp;LED Function<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The 82527 has two ports on it: one is used as the data bus interface
+to the rest of the board; the other is used to light LEDs. The function of
+these LEDs are defined by firmware.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996804-dup.2">3.3&nbsp;&nbsp;Exposure Command<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The exposure
+command signal comes from the Inverter and is opto-coupled into the collimator
+control board. When Exposure_Command_P is high relative to Exposure_Command_N,
+the exposure command signal output of the opto-coupler is high. This signal
+goes into the Altera device and where the state of the signal is latched and
+an interrupt to the processor is created.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996805">3.4&nbsp;&nbsp;Trigger Clock<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">This
+signal also comes from the Inverter and is buffered through an HCT244 and
+sent to the TPU in the 68332.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996805-dup.1">3.5&nbsp;&nbsp;System Fault<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The CCB
+has three methods of telling the system it has a fault: by the CAN bus, the
+fault line driven by the CAN driver, and by the serial Fault2 line. When the
+firmware senses a fault, it writes to the Altera to create a GCAN_FLT_TX signal.
+This signal drives an isolated 82C250 CAN interface chip and opens a solid
+state relay. The relay opens the loopback line that runs from the Inverter,
+through the Collimator, through the DAS, back through the Collimator and the
+Inverter. These boards will detect an open and react to the fault. Both the
+GCAN FLT and the FAULT2 readback signals go to the Altera where they create
+an interrupt and are latched for reading by the firmware.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996805-dup.2">3.6&nbsp;&nbsp;GCAN Reset<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">This
+signal comes from the Inverter and is opto-coupled into the collimator control
+board. When GCAN_RST_P is high relative to GCAN_RST_N, the GCAN_RST* signal
+output of the optocoupler is low. This then creates a board Reset just as
+pushing the Reset pushbutton would do.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996805-dup.3">3.7&nbsp;&nbsp;CAM Drive<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The CAM drive function consists of the clockwise and counterclockwise
+pulse commands to the stepper motor driver, encoder feedback, the driver disable
+signal and the driver current cutback inhibit signal. The clockwise and counter-clockwise
+pulses are derived in the Altera from quadrature pulses created by the TPU
+in the 68332. The rate of these is under firmware control. The TPU also decodes
+the encoder signals to keep track of the count and direction of movement.</P><P CLASS="sect2">Two control signals from the 68332 are for controlling the behavior
+of the Vexta, 5 phase stepping motor driver. Essentially the 68332 writes
+to a register to set the signals CURR_HOLD and CAM_OFF_OUT.</P><P CLASS="sect2">When CURR_HOLD is high, it turns on FET Q35 and prevents the stepping
+motor driver from automatically decreasing its drive to the motor. Normally
+the current gets cut back by half after a move because it is not needed for
+acceleration and movement.</P><P CLASS="sect2">When the CAM_OFF_OUT signal goes high, it turns on a FET Q36, which
+turns off the stepping motor driver and allows the CAMS to &#8220;freewheel&#8221;.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996806">3.8&nbsp;&nbsp;Filter Drive<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The filter driver is a basic H-bridge with high side current sensing
+for each phase. Sensing the high side allows protection for output shorts
+to ground. The stepping signals come from the TPU and decoded by the Altera
+to sequence the high and low FET drive signals.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996806-dup.1">3.9&nbsp;&nbsp;Current Limit<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The current limit circuitry is the same for both phases. An instrumentation
+amplifier with high common mode rejection senses the current through an effective
+0.25 ohm resistance. The output of the amplifier is then fed into two comparators.
+One comparator is for pulse to pulse current limiting and the other is the
+short circuit latch comparator. For pulse to pulse current limit, the voltage
+regulators are divided down to create a reference voltage. This reference
+is fed into the comparator and when the output from the sensed current exceeds
+the reference, the comparator switches and shuts off a latch, which turns
+off the top FET. This cycles at a 15 kHz rate because of the clock into the
+latch.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996806-dup.2">3.10&nbsp;&nbsp;Short Circuit Function<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The short circuit protection circuitry uses the same concept as the
+pulse to pulse limit except on a short, the rate of rise of the current is
+so fast that the current sensed can rise to just over 10 A. This is limited
+by the 6.8 uH inductor on the board and the reverse recovery charge of the
+lower FET's parasitic diode. As the current passes the short circuit reference
+voltage, a comparator switches in a latch that cuts off drive to the top FETs.
+Only firmware can reset this latch so current stays off after a short until
+firmware commands otherwise.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996807">3.11&nbsp;&nbsp;Current Cut Back<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The Current Cut back function drops the current to the filter. This
+keeps the motor from unnecessarily dissipating power when it is not moving.
+The firmware can command this, which then turns on Q5. When Q5 is on, it drops
+the pulse to pulse current reference.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996807-dup.1">3.12&nbsp;&nbsp;Basic H-Bridge Function<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The H-bridge uses two high side gate driver chips per phase. These create
+floating voltages to drive the top FETs without transformers or optical circuitry.
+The resistor - diode combinations around the inverters which feed the gate
+driver chips and the gates of the FETs are set up to prevent "shoot through"
+or simultaneous conduction. This is prevented by turning on the FETs slow
+and turning them off fast. The SD signal into the ir2110 devices disables
+drive until a command occurs. Holding SD high disables the driver.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996807-dup.2">3.13&nbsp;&nbsp;Filter Home Switch<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The filter home switch tells the CCB when the filter is physically positioned
+&#8220;at home&#8221; of course. It does this by feeding back the normally
+open and normally closed contact signals, which can be read at register U24
+(Address 0x800000/1 in the memory map). When at home, the normally open switch
+is closed and the normally closed switch is closed.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996808">3.14&nbsp;&nbsp;Voltage Regulators and Reference Voltages<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The voltage regulators create voltages for the FET gate drivers (12V),
+and the instrumentation amp (&plusmn; 8V). The 8V signal is for the pulse
+to pulse and short circuit currents.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996808-dup.1">3.15&nbsp;&nbsp;Altera Functionality<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The Altera functionality is covered in the Programmable Device Logic
+(PDL) specification 2208487PDL.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996808-dup.2">3.16&nbsp;&nbsp;I/O Bit Map<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">With the exception of the INREG register (Address 0x800000), the input
+and output registers are in the Altera.</P><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353668996808-dup.3">3.16.1&nbsp;&nbsp;Output Register<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">Writing
+a logic one to bit one of the output register will reset the Fault interrupt
+regardless of the source of the interrupt. The interrupt is generated on the
+leading edge of the fault signals. There are two fault signals, one is from
+the CAN (controller area network) and this can also be commanded by firmware
+on the CCB. The fault signal is created by a break in the loopback wire of
+the CAN connectors. </P><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="T9-61-60942"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Collimator Output Registers </SPAN> </P><table summary="Collimator Output Registers " border="1"><colgroup><col width="72"><col width="246"><col width="168"><col width="191"></colgroup><thead valign=""><tr valign="top"><th align="left" valign="top">BIT</th><th align="left" valign="top">ADDRESS  FFA009</th><th colspan="2" align="left" valign="top">OUTPUT
+REGISTER</th></tr><tr valign="top"><th align="left" valign="top">&nbsp;</th><th align="left" valign="top">WRITE ONLY</th><th align="left" valign="top">LOW CONDITION</th><th align="left" valign="top">HIGH CONDITION</th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top">0</td><td align="left" valign="top">Fault Interrupt Reset</td><td align="left" valign="top">No Action</td><td align="left" valign="top">Clears Fault Interrupt</td></tr><tr valign="top"><td align="left" valign="top">1</td><td align="left" valign="top">&nbsp;</td><td align="left" valign="top">&nbsp;</td><td align="left" valign="top">&nbsp;</td></tr><tr valign="top"><td align="left" valign="top">2</td><td align="left" valign="top">&nbsp;</td><td align="left" valign="top">&nbsp;</td><td align="left" valign="top">&nbsp;</td></tr><tr valign="top"><td align="left" valign="top">3</td><td align="left" valign="top">&nbsp;</td><td align="left" valign="top">&nbsp;</td><td align="left" valign="top">&nbsp;</td></tr><tr valign="top"><td align="left" valign="top">4</td><td align="left" valign="top">&nbsp;</td><td align="left" valign="top">&nbsp;</td><td align="left" valign="top">&nbsp;</td></tr><tr valign="top"><td align="left" valign="top">5</td><td align="left" valign="top">&nbsp;</td><td align="left" valign="top">&nbsp;</td><td align="left" valign="top">&nbsp;</td></tr><tr valign="top"><td align="left" valign="top">6</td><td align="left" valign="top">&nbsp;</td><td align="left" valign="top">&nbsp;</td><td align="left" valign="top">&nbsp;</td></tr><tr valign="top"><td align="left" valign="top">7</td><td align="left" valign="top">&nbsp;</td><td align="left" valign="top">&nbsp;</td><td align="left" valign="top">&nbsp;</td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353668996812">3.16.2&nbsp;&nbsp;Z-Axis Tracking Timer<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">Within the Altera chip there is a timer-counter function. One function
+provides 125 kHz for the quadrature decode functions and 15.6 kHz to the filter
+amplifier circuitry on the CCB. Both these clocks are derived from the 16
+MHz crystal derived clock.</P><P CLASS="sect3">For the Z-Axis function there is a 14 bit &#8220;up&#8221; counter with
+a clock of 3906 Hz derived from the 16 MHz system clock. The timer function
+comes from the ability to load a digital comparator that compare the value
+loaded by firmware against the value of the counter. Firmware is given the
+capability of asynchronously loading the counter, clearing the counter and
+masking the interrupt that is generated when the compare and count value match.</P><P CLASS="sect3">There are 3 control signals that configure this function:</P><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="F9-54-60942"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Collimator Z-Axis Control Signals</SPAN> </P><table summary="Collimator Z-Axis Control Signals" border="1"><colgroup><col width="163"><col width="145"><col width="336"></colgroup><thead valign=""><tr valign="top"><th align="left" valign="top">CONTROL</th><th align="left" valign="top">ADDRESS</th><th align="left" valign="top">DESCRIPTION</th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">cntctlwr</FONT></SPAN></td><td align="left" valign="top">FFA00A</td><td align="left" valign="top">Clocks in the control bits that
+configure the counter.</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">cntlo_wr</FONT></SPAN></td><td align="left" valign="top">FFA00B</td><td align="left" valign="top">Clocks in the low byte of the
+14 bit compare word.</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">cnthi_wr</FONT></SPAN></td><td align="left" valign="top">FFA00C</td><td align="left" valign="top">Clocks in the high byte of the
+14 bit compare word</td></tr><tr valign="top"><td colspan="3" align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">cnctlwr</FONT></SPAN> is
+generated by a WRITE to address FFA00A<P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">cntlo_wr</FONT></SPAN> is
+generated by a WRITE to address FFA00B</P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">cnthi_wr</FONT></SPAN> is
+generated by a WRITE to address FFA00C</td></tr></tbody></table></div></DIV><P CLASS="sect3">The interrupt is generated when the count matches the compare value.</P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353668996814">3.16.3&nbsp;&nbsp;Collimator Register<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The collimator register is used for collimator specific functions. It
+allows the firmware to command and readback status on the filter drive amplifier
+currents and also allows the firmware to shut down the collimator cam drives.</P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996814-dup.1">3.17&nbsp;&nbsp;Z-Axis Tracking Overview<SPAN CLASS="SECT2EFF"> </SPAN></H3><UL><LI CLASS="bulletlist"><P>The purpose of tracking is to follow the focal spot so that
+the system can keep the umbra of the beam on the detector to reduce dose and
+still avoid artifacts.</P></LI><LI CLASS="bulletlist"><P>Dose reduction is approx. 40% less in the 4 x 1.25mm mode
+and 25% less in the 4 x 5.00 mode.</P></LI><LI CLASS="bulletlist"><P>Z-Axis tracking is needed because the focal spot moves in
+Z due to thermal changes in the tube, and in mechanical forces during Gantry
+rotation and tilt.</P></LI><LI CLASS="bulletlist"><P>Z-Axis tracking involves the X-Ray Tube Focal Spot, Collimator,
+Detector, DAS, DCB, CCB, and RCIB/GCAN Communication Networks.</P></LI></UL><DIV CLASS="ILLUSTRATION" id="I9-55-60942"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Typical Tracking Feedback Loop</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/60942-61430.jpg" BORDER="0" usemap="#SL61437-60942"></P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996832">3.18&nbsp;&nbsp;Collimator Tracking Control Loop Theory<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The purpose of tracking is to follow the focal spot so that we can keep
+the uniform X-ray of  the narrowest possible beam on the detector to reduce
+dose and still avoid artifacts. The focal spot moves in Z due to thermal changes
+in the tube and a mechanical forces during gantry rotation and tilt angle.
+Each cam is basically an independent system.</P><DIV CLASS="ILLUSTRATION" id="I9-56-60942"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Tracking Diagram</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/60942-61432.jpg" BORDER="0" usemap="#SL61438-60942"></P></DIV><OL><LI CLASS="numlist"><P>Select a safe operating point at the edges of the detector
+(target beam position at isocenter).</P></LI><LI CLASS="numlist"><P>Sample X-ray beam position every view and adjust collimator
+CAM positions every 20 ms. to keep the beam at the ISO center channel operating
+point.</P><OL TYPE="a"><LI CLASS="numlist"><P>Compute Z ratio for each side of the Z module (outer row)/
+(inner row). (Channels 763, 764, 765, 766, 767 &amp; 768.)</P></LI><LI CLASS="numlist"><P>Convert the ratio to a beam position at the Z module.</P></LI><LI CLASS="numlist"><P>Compute the focal spot position given the  beam position 
+on the Z module,  the cam position for the Z module, and geometric magnification
+factors at the Z module.</P></LI><LI CLASS="numlist"><P>Compute the new cam position for the isocenter channel  given
+the focal spot position and geometric magnification factors for the isocenter
+channel. During views when portions of the patient, patient table, IV line
+etc. block the Z module, the beam position measurement can not be used.</P></LI><LI CLASS="numlist"><P>We will compare DAS data channel 762 (data channel adjacent
+to the Z module) to an expected signal as a function of the measured mA, DAS
+gain, and trigger period. The Z module is blocked if either inner row is less
+than 0.9 times the expected value. During a blocked condition, the cams will
+hold constant at the last unblocked position.</P><TABLE CLASS="ADMONlistitem" CELLSPACING="0%" CELLPADDING="0%" ID="d0e520"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Transient conditions during a tube spit do not require special
+action.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></LI><LI CLASS="numlist"><P>Measure the beam position and readjust the collimator approximately
+every 20 ms.</P></LI></OL></LI><LI CLASS="numlist"><P>Scan aborts will occur when the following conditions exist.</P><OL TYPE="a"><LI CLASS="numlist"><P>Beam position on detector, non-blocked z-chnls condition,
+is out of tolerance by +/- 0.4 mm of desired position for more than 100 mSec.</P></LI><LI CLASS="numlist"><P>Signal Corruption of chnls 762 through 768, where zero or
+negative values (counts) are detected for more than 200 mSec OR generator
+mA feedback to DCB is less than 4 mA for more than 200 mSec.</P></LI><LI CLASS="numlist"><P>Focal spot length error for more than 4000 mSec</P></LI></OL></LI></OL><DIV CLASS="ILLUSTRATION" id="I9-57-60942"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;4:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Z Sensing Module</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/60942-64994.jpg" BORDER="0" usemap="#SL64997-60942"></P></DIV><TABLE CLASS="ADMONsect2" CELLSPACING="0%" CELLPADDING="0%" ID="d0e544"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Z module cells can be switched independently of the data channels
+to provide the optimum tracking z-ratio.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996868">3.19&nbsp;&nbsp;Tracking Loop Variables<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353668996868-dup.1">3.19.1&nbsp;&nbsp;Blocked Channel Check: 762<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The x-ray signal output of DAS Channel 762 is characterized during FASTCAL
+(Air Scan with No beam obstructions). During patient scanning, if the x-ray
+signal on DAS channel 762 falls below 10% of the signal characterized during
+FASTCAL, then it is considered &#8220;blocked&#8221; and the collimator CAMS
+will hold constant at the last &#8220;unblocked&#8221; position.</P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353668996868-dup.2">3.19.2&nbsp;&nbsp;Z-Channels<SPAN CLASS="SECT1EFF"> </SPAN></H4><UL><LI CLASS="bulletlist"><P>The Z-Channels are DAS channels 763, 764, 765, 766, 767 &amp;
+768.</P></LI><LI CLASS="bulletlist"><P>Each DAS Z-channel is a combination of 2 detector channels
+in the X direction.</P></LI><LI CLASS="bulletlist"><P>Z-Channels have a different Detector Row selection than Data
+channels.  This is selected by the Z-FET control lines.</P></LI><LI CLASS="bulletlist"><P>Beam position is determined by the following equation:</P></LI></UL><CENTER><P CLASS="EQUAT"><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/60942-60970.gif" BORDER="0" usemap="#SL60971-60942"></P></P></CENTER><P CLASS="sect3">The R value is then transformed into a 4th degree polynomial to find
+the Z-Axis Beam position, which determines beam width at detector (mmd) and
+ focal spot length (mmf).</P><P CLASS="sect3">mmd = millimeters at detector</P><P CLASS="sect3">mmf = focal spot length in millimeters.</P><TABLE CLASS="ADMONsect3" CELLSPACING="0%" CELLPADDING="0%" ID="d0e581"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Errors are reported by the system in umd (micrometers at detector)
+or umf, due to computational accuracy.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><PRE>OVERRIDES: value = {
+RX_OVERRIDES: value = 0xa
+FILAMENT_I: value =   0.0000
+ANODE_DAC: value = 0x0
+CATHODE_DAC: value = 0x0
+ROTORSPEED: value = ROTOR_SPEED_HIGH
+XRAY_DELAY_SEC: value =   0.0000
+
+XRAY_DURATION_SEC: value =   1.0000
+DCB_OVERRIDES: value = 0x20</PRE><P CLASS="sect3">Puts the DCB into over-ride mode so FET control can be selected.</P><PRE>CANNEDDCBPATTERNSELECTION: value = 0x0
+CANNEDCNVPATTERNSELECTION: value = 0x0
+AUTOCORRECTIONDISABLEMASK: value = 0x0
+INNERCHANNELCONTROL: value = 0x3</PRE><P CLASS="sect3">Controls the Center DAS Chassis FET configuration</P><P CLASS="sect3"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">OUTERCHANNELCONTROL: value = 0x3</FONT></SPAN></P><P CLASS="sect3">Controls the Right and Left DAS Chassis' FET configuration</P><P CLASS="sect3"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">ZCHANNELCONTROL: value = 0x9</FONT></SPAN></P><P CLASS="sect3">Controls the Z-Channel FET configuration (Channels 763, 764, 765, 766,
+767 &amp; 768)</P><P CLASS="sect3"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">INJECTEDDCVOLTAGE: value = 0x0</FONT></SPAN></P><P CLASS="sect3"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">CCB_OVERRIDES: value = 0x2</FONT></SPAN></P><P CLASS="sect3">Puts the collimator Control Board in over-ride mode</P><P CLASS="sect3"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">COLLIMATORWIDTH: value = 0x22c4</FONT></SPAN></P><P CLASS="sect3">Keeps the collimator Cams wide open to flood the Detector</P><TABLE CLASS="ADMONsect3" CELLSPACING="0%" CELLPADDING="0%" ID="d0e617"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Note:
+For illustrations of FET modes for Data and Z Channels, select the PDF icon, <A HREF="../media/60942-42228.pdf" TARGET="_blank"><IMG SRC="../icons/pdf.gif" BORDER="0" ALIGN="top" HSPACE="4" WIDTH="28" HEIGHT="31"></A>.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353668996898">3.19.3&nbsp;&nbsp;Focal Spot Length Check<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">During some conditions the Z module measurement can be corrupted due
+to a transient undetected blockage or due to a tracking loop malfunction.
+These conditions can be detected, identified by the DCB firmware, and reported
+to the gesyslog.</P><P CLASS="sect3">The focal spot length is computed on each sample interval from the measured
+Z and Cam positions.</P><UL><LI CLASS="bulletlist"><P>If Z measurements from each side are both valid, then the
+computed focal spot length should be close to the expected focal spot length
+from FastCal.</P></LI><LI CLASS="bulletlist"><P>If the computed focal spot length is not within tolerance
+of the focal spot length determined during Fast Cal then the control loop
+will hold the current cam positions.</P></LI><LI CLASS="bulletlist"><P>If the inconsistent length condition continues for more than
+400 msec without a normal blocked channel indication from channel 762, then
+the loop is assumed to be malfunctioning and the scan is aborted.</P></LI></UL><DIV CLASS="ILLUSTRATION" id="I9-60-60942"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;5:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Focal Spot Length Check</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/60942-65063.jpg" BORDER="0" usemap="#SL65069-60942"></P></DIV></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996913">3.20&nbsp;&nbsp;Special Tracking Characterizations<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353668996913-dup.1">3.20.1&nbsp;&nbsp;Mylar Window Check<SPAN CLASS="SECT1EFF"> </SPAN></H4><UL><LI CLASS="bulletlist"><P>Takes 4 scans (1 scan at each Patient Acquisition Mode). 
+If a 20 view average of channel 762 falls below .95 of the expected value,
+then an error prompt informs the user to check and clean the Mylar window.</P></LI><LI CLASS="bulletlist"><P>Scans are taken without tracking and the collimator fully
+open to flood all detector rows.</P></LI><LI CLASS="bulletlist"><P>Technique is 80KV / 20mA / 1 Sec. / Air Filter</P></LI><LI CLASS="bulletlist"><P>Mylar window check is completed before DAS Gain Cal, Collimator
+Cal, and FASTCAL.</P><P>For more information, see &#8220;Dirty Mylar Window Scan,&#8221; in <SPAN CLASS="MODULEREF"><A HREF="38290.htm#SL58964-38290"><I>FastCal</I></A></SPAN> procedure.</P></LI><LI CLASS="bulletlist"><P>Characterizes the differences in DAS Gain (gain ranges 1-31)
+for DAS channels 762 (used for blocked channel detection) and Z-Channels (763,
+764, 765, 766, 767 &amp; 768).</P></LI><LI CLASS="bulletlist"><P>The differences are a result of Pre-Amp Gain Capacitor tolerances
+on converter boards 47 and 48.</P></LI><LI CLASS="bulletlist"><P>The serial numbers of converter boards 47 and 48 are queried
+and stored during DAS Gain Cal. Collimator Cal and FASTCAL query the DAS and
+compare the serial numbers since the last time DAS Gain Cal was completed.</P></LI><LI CLASS="bulletlist"><P>A DAS Gain Cal is required whenever DAS Converter boards 47
+or 48 are swapped or changed.</P></LI></UL><P CLASS="sect3"><B>DESCRIPTION</B></P><P CLASS="sect3">DAS Gain calibration is required to support Z axis tracking. The ratio
+formed by the Z modules that is used as the basis for beam positioning is
+effected by the DAS gain selection. Capacitor tolerances on the DAS converter
+cards can change the ratio causing a beam position error. To avoid this error
+we measure the outer to inner row gain variation to develop a Z ratio correction
+factor for each gain selection.</P><P CLASS="sect3">DAS Gain Cal also determines a gain independent blocked channel threshold
+for the inner rows of DAS channel 762 for the tracking firmware. This gain
+factor is used to scale the gain normalized blocked channel scale factor to
+the proper level in the tracking firmware.</P><P CLASS="sect3">The DAS Gain cal flowchart is shown below. Before DAS Gain scans are
+taken, a mylar window check is done to ensure that the window is clean. Otherwise
+it can corrupt the tracking cals.</P><P CLASS="sect3">If the check succeeds, the DAS gain scans are taken and the cal proceeds
+forward. If the check fails, a pop-up is posted asking the user to provide
+inputs on whether they want to quit, continue anyway or retry the mylar window
+check after cleaning the mylar window.</P><DIV CLASS="ILLUSTRATION" id="I9-61-60942"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;6:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">DAS Gain Cal Block Diagram</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/60942-65110.jpg" BORDER="0" usemap="#SL65113-60942"></P></DIV><P CLASS="sect3"><B>DAS GAIN CAL SCANS</B></P><UL><LI CLASS="bulletlist"><P>DAS Gain Calibration consists of 31 scans that are taken consecutively.</P><P>Stationary / 120KV / 20mA / 0.3 Sec / Air / Gain 1</P><P>through</P><P>Stationary / 120KV / 20mA / 0.3 Sec / Air / Gain 31</P></LI><LI CLASS="bulletlist"><P>Processing is completed after all scans are completed.</P></LI><LI CLASS="bulletlist"><P>Total time is approximately 4 minutes.</P></LI><LI CLASS="bulletlist"><P>DAS Gain Cal takes 31 scans to collect signal data for all
+DAS channels at each of the 31 DAS gain settings using the DAS Gain protocol
+file.</P></LI></UL></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353668996940-dup.4">3.20.2&nbsp;&nbsp;Collimator Cal<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">Characterizes the beam position based on x-ray signal vs. collimator
+encoder position.</P><P CLASS="sect3">Eighteen Air scans are taken: one for each available application data
+collection mode.</P><UL><LI CLASS="bulletlist"><P>All scans with z-tracking off</P></LI><LI CLASS="bulletlist"><P>Scan time is 5.9 seconds</P></LI><LI CLASS="bulletlist"><P>Thin Twin is 6.5 seconds</P></LI><LI CLASS="bulletlist"><P>Stationary Scans</P></LI><LI CLASS="bulletlist"><P>Offset from Nominal: &plusmn;900 cts.</P></LI><LI CLASS="bulletlist"><P>#of views: 100 at each step</P></LI><LI CLASS="bulletlist"><P>Step size:  50 cts.</P></LI><LI CLASS="bulletlist"><P># of steps:  37</P></LI></UL><P CLASS="sect3">FASTCAL completes 1 Collimator Cal (Sweep) Scan each time FASTCAL is
+run.</P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668996942-dup.1">3.21&nbsp;&nbsp;Diagnostics Related to Z-Axis Tracking<SPAN CLASS="SECT2EFF"> </SPAN></H3><UL><LI CLASS="bulletlist"><P>Collimator Aperture Test <SPAN CLASS="MODULEREF">(see <A HREF="38840.htm#SL58273-38840"><I>Collimator Functional Diagnostic Tests</I></A>)</SPAN>.</P></LI><LI CLASS="bulletlist"><P>DAS Tools <SPAN CLASS="MODULEREF">(see <A HREF="175904.htm#SL183179-175904"><I>DAS Tools</I></A>)</SPAN></P></LI><LI CLASS="bulletlist"><P>DAS Tools</P></LI><LI CLASS="bulletlist"><P>Tracking
+Analysis. See <SPAN CLASS="MODULEREF"><A HREF="304462.htm#SL313487-304462"><I>Scan Data Analysis Tools (SCAN, Tracking dd, CAL)</I></A></SPAN></P></LI><LI CLASS="bulletlist"><P>Diagnostic Data Collection <SPAN CLASS="MODULEREF">(see <A HREF="38478.htm#SL65129-38478"><I>Diagnostic Data Collection Tool</I></A>)</SPAN>.</P><UL><LI CLASS="bulletlist"><P>FET Override mode</P></LI><LI CLASS="bulletlist"><P>Create and apply non-tracking Cal and DDC Scan</P></LI></UL></LI></UL><P CLASS="sect2"><B>Z-AXIS ERROR CODES</B></P><P CLASS="sect2">Many of these messages contain variable fields for which some text or
+values will be substituted.</P><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="T9-67-60942"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;4:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Z-AXIS Tracking Error Codes </SPAN> </P><table summary="Z-AXIS Tracking Error Codes " border="1"><colgroup><col width="141"><col width="324"><col width="96"><col width="116"></colgroup><thead valign=""><tr valign="top"><th align="left" valign="top">ERROR CODE</th><th align="left" valign="top">ERROR CODE TEXT</th><th align="left" valign="top">LOG LEVEL</th><th align="left" valign="top">HOST</th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top">260007445</td><td align="left" valign="top"><PRE>"%sUnable To Notify Z-Axis State Machine Of Event.\n\  Error code %d received."</PRE></td><td align="left" valign="top">log</td><td align="left" valign="top">myhost&gt;</td></tr><tr valign="top"><td align="left" valign="top">260007446</td><td align="left" valign="top"><PRE>"Z-Axis Configuration Table"</PRE></td><td align="left" valign="top">log</td><td align="left" valign="top">myhost&gt;</td></tr><tr valign="top"><td align="left" valign="top">260007447</td><td align="left" valign="top"><PRE>"%sThe DCB Z-Axis Hardware FAILED to Generate an Interrupt during the Self Test.\n\
+Possible DCB Z Axis Tracking Hardware Failure."</PRE></td><td align="left" valign="top">log</td><td align="left" valign="top">myhost&gt;</td></tr><tr valign="top"><td align="left" valign="top">260007448</td><td align="left" valign="top"><PRE>"%sThe DCB Z-Axis Hardware Generated an UNEXPECTED Interrupt during the Self Test.\n\
+Possible DCB Z Axis Tracking Hardware Failure."</PRE></td><td align="left" valign="top">log</td><td align="left" valign="top">myhost&gt;</td></tr><tr valign="top"><td align="left" valign="top">260007449</td><td align="left" valign="top"><PRE>"DCB Z Axis Circuitry Test"</PRE></td><td align="left" valign="top">log</td><td align="left" valign="top">myhost&gt;</td></tr><tr valign="top"><td align="left" valign="top">260007450</td><td align="left" valign="top"><PRE>"%sThe Beam Tracking Algorihtm Encountered a Division by Zero."</PRE></td><td align="left" valign="top">log</td><td align="left" valign="top">myhost&gt;</td></tr><tr valign="top"><td align="left" valign="top">260007451</td><td align="left" valign="top"><PRE>"%sThe Prescribed Scan Has Not Been Calibrated For Beam Tracking.\n\
+Data Setting: %d   Z Setting: %d"</PRE></td><td align="left" valign="top">log</td><td align="left" valign="top">myhost&gt;</td></tr><tr valign="top"><td align="left" valign="top">260007452</td><td align="left" valign="top"><PRE>"%sA Beam Tracking Feedback Message Contained an Invalid Move Sequence Number.\n\
+This Indicates a Z-Axis Move Was Potentially Skipped.\n\
+Update   Seq #: %d\n\
+Expected Seq #: %d"</PRE></td><td align="left" valign="top">log</td><td align="left" valign="top">myhost&gt;</td></tr><tr valign="top"><td align="left" valign="top">260007453</td><td align="left" valign="top"><PRE>"%sTwo Or More Tracking Messages Are Outstanding From The Collimator.\n\
+Current Sequence #: %d"</PRE></td><td align="left" valign="top">log</td><td align="left" valign="top">myhost&gt;</td></tr><tr valign="top"><td align="left" valign="top">260007454</td><td align="left" valign="top"><PRE>"%sBeam Tracking Calculated A Focal Spot Size That Has Exceeded The WARNING Tolerance.\n\
+Tolerance      : %6d umf\n\
+Caclulated Size: %6d umf\n\
+Nominal Size   : %6d umf"
+</PRE></td><td align="left" valign="top">log</td><td align="left" valign="top">myhost&gt;</td></tr><tr valign="top"><td align="left" valign="top">260007455</td><td align="left" valign="top"><PRE>"%sBeam Tracking Calculated A Focal Spot Size That Has Exceeded The ABORT Tolerance.\n\
+Tolerance      : %6d umf\n\
+Caclulated Size: %6d umf\n\
+Nominal Size   : %6d umf"</PRE></td><td align="left" valign="top">log</td><td align="left" valign="top">myhost&gt;</td></tr><tr valign="top"><td align="left" valign="top">260007456</td><td align="left" valign="top"><PRE>"%sBeam Tracking Control Loop Error Exceeded The WARNING Tolerance.\n\
+Tolerance      : %6d umd\n\
+Control Error  : %6d umd\n\
+Beam Side      : %b"</PRE></td><td align="left" valign="top">log</td><td align="left" valign="top">myhost&gt;</td></tr><tr valign="top"><td align="left" valign="top">260007457</td><td align="left" valign="top"><PRE>"%sBeam Tracking Control Loop Error Exceeded The ABORT Tolerance.\n\
+Tolerance      : %6d umd\n\
+Control Error  : %6d umd\n\
+Beam Side      : %b"</PRE></td><td align="left" valign="top">log</td><td align="left" valign="top">myhost&gt;</td></tr><tr valign="top"><td align="left" valign="top">260007458</td><td align="left" valign="top"><PRE>&#8220;A Side&#8221;</PRE></td><td align="left" valign="top">log</td><td align="left" valign="top">myhost</td></tr><tr valign="top"><td align="left" valign="top">260007459</td><td align="left" valign="top"><PRE>&#8220;B Side&#8221;</PRE></td><td align="left" valign="top">log</td><td align="left" valign="top">myhost</td></tr><tr valign="top"><td align="left" valign="top">260007460</td><td align="left" valign="top"><PRE>"%sScan ABORT -- Beam Tracking Detected Signal Corruption.\v\
+mA Level: %ld\v\
+Z Channels   : %ld, %ld, %ld, %ld\v\
+Offset Vector: %ld, %ld, %ld, %ld"</PRE></td><td align="left" valign="top">log</td><td align="left" valign="top">myhost</td></tr></tbody></table></div></DIV></DIV></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

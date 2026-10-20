@@ -1,0 +1,18 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Troubleshooting</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><DIV CLASS="TABLE"><CENTER><P CLASS="TABLEINTRO" ID="SL1907123-188909"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Troubleshooting</SPAN> </P><table summary="Troubleshooting" border="1"><colgroup><col width="44%"><col width="56%"></colgroup><tbody valign=""><tr valign="top"><td align="center" valign="">Issue</td><td align="center" valign="">Resolution/Comments</td></tr><tr valign="top"><td valign="">Gantry Rotation Characterization tool tells me &#8220;Value
+entered is invalid&#8221;</td><td valign="">Check the value you are typing in to make sure it is a number
+and does not include any characters such as &#8220;mm&#8221;.  Only
+the signed number entry is allowed.</td></tr><tr valign="top"><td valign="">Gantry Rotation Characterization tool tells me &#8220;Entered
+value plus current offset is outside the acceptable range for total
+gantry offset correction.&#8221;</td><td valign="">This means that the current offset correction in firmware plus
+the number you just entered is outside the allowable limits for the
+offset correction.  This range is +/- 35 mm total offset which corresponds
+to +/- 5 degrees gantry rotation offset. Measure the distance again,
+typical values will be less than 20 mm. Check to make sure the table
+is properly leveled.</td></tr><tr valign="top"><td valign="">The image tilt seems to be changing in the opposite direction
+I expect.</td><td valign="">Entered offset is either missing the negative &#8220;-&#8220;
+value indication or you are not subtracting the location of the line
+from the location of the top edge of the phantom. </td></tr></tbody></table></CENTER></DIV></BODY></HTML>

@@ -1,0 +1,48 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Definitions within Scan Analysis</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/15/07</P></td></tr></table><H1 ID="top">Definitions within Scan Analysis </H1><DL><DT><I>dd File (Diagnostic Data File)</I>&nbsp;
+</DT><DD><P CLASS="def">dd files are a result file from some type of operation on the scan data
+file. dd files are typically some form of view summed file that may have had
+some specific type of processing applied to it. For example, the processing
+applied to the raw data to calculate the position of the pin in ISO alignment
+results in a temporary file that is a view summed result that could be saved
+as a dd file. As long as two dd files have the same number of data elements
+in them, the two files may be added, subtracted, multiplied, or divided with
+each other.</P></DD><DT><I>Detector Macro Row</I>&nbsp;
+</DT><DD><P CLASS="def">One detector output row for each of the four 4x1.25, 4x2.5, 4x3.75,
+or 4x5 acquisition mode combinations for the detector. For most of the analysis
+functions, this provides either four selections for the detector row to be
+examined, or four sets of data results that correspond to the detector rows
+2A, 1A, 1B, 2B. </P><P CLASS="def">Refer to for <SPAN CLASS="MODULEREF"><A HREF="163134.htm#SL166092-163134"><I>Watson16 Detector Theory</I></A></SPAN>further
+information.</P></DD><DT><I>Means and Standard Deviation File (MSD)</I>&nbsp;
+</DT><DD><P CLASS="def">This is usually the result of combining two or more views mathematically,
+which results in mean values for each channel in the views and an associated
+standard deviation for each channel in the views. In essence all of the user
+selected views in a scan file are summed together, resulting in a single &#8220;master
+view&#8221; that contains the averaged data from all of the views. The mean
+values represent the average data value from the channels, and the standard
+deviation values represent the amount of variability for that channel&#8217;s
+data values across all of the views. The higher the standard deviation, the
+more the channel output varied from view to view.</P></DD><DT><I>Scan Header </I>&nbsp;
+</DT><DD><P CLASS="def">This is the information contained within the scan file that identifies
+the specific settings in effect when that scan file was created. The scan
+header includes information at several levels, including: Exam, Series, and
+Scan. Information identifying the technique selections, scan time, acquisition
+mode, and many others may be found in the scan header.</P></DD><DT><I>Cal Vectors</I>&nbsp;
+</DT><DD><P CLASS="def">Within scan analysis, the cal vectors are only those vectors contained
+within the scan data file at the time that the scan was taken.</P></DD><DT><I>Aux Channels</I>&nbsp;
+</DT><DD><P CLASS="def">The auxiliary channels are data sampling &#8220;channels&#8221; in the
+MDAS that provide a way to place other data into the view besides the patient
+information coming from the detector. These include: Power Supply, Temperature,
+kV, mA, and other analog data values. These analog signals are sampled at
+the same rate as the patient image data and are a snapshot of those values
+at each view sample time.</P></DD><DT><I>Z-Axis Channels</I>&nbsp;
+</DT><DD><P CLASS="def">These are some special purpose channels built into the detector that
+are used for several different special operations related to determining the
+x-ray beam position on the detector.</P></DD><DT><I>VVC (Views vs Channels)</I>&nbsp;
+</DT><DD><P CLASS="def">This is a way to graphically represent the data values from each channel
+for each view of data from the MDAS as a shade of grey. The display will have
+the views stacked vertically and the channels arranged across the display
+horizontally.</P></DD></DL><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

@@ -1,0 +1,193 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Troubleshooting DICOM Print Camera Problems</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/14/07</P></td></tr></table><H1 ID="top">Troubleshooting DICOM Print Camera Problems </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="50%"><col width="50%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised:</td><td valign="">Sept 2, 2004</td></tr></tbody></table></div></DIV><P CLASS="descriptive">LOG OF ERROR AND FILMING STATUS</P><P CLASS="descriptive">During DICOM Print filming, the system writes to two camera logfiles, <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">dcplog</FONT></SPAN> and <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">prslog</FONT></SPAN>.
+When a print job starts, the dicom information is logged to <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">~ctuser/logfiles/dcplog</FONT></SPAN>.
+The print job information is logged to <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">~ctuser/logfiles/prslog</FONT></SPAN>.
+The called AE title/host/IP/port number is taken from <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">~ctuser/Prefs/SdCPHosts</FONT></SPAN> file.</P><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct3-3-1-35612">1&nbsp;&nbsp;dcplog<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">This logfile contains dicom print filming sequence and Printer status
+information for the most recent print session job. Each time a new print job
+is performed, the status information for that latest job will overwrite the
+previous one.</P><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669069268">1.1&nbsp;&nbsp;Printer Status Area in the dcplog report<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The Printer Status area in the log report will either be NORMAL, WARNING,
+or FAILURE. In the event of a WARNING or FAILURE, the Status Info field attempted
+to identify the root cause.</P><P CLASS="sect2">NORMAL - print job was successful, no problems.</P><P CLASS="sect2">WARNING - one of three conditions can happen:</P><OL><LI CLASS="numlist"><P>The job aborts and the status info field indicates SUPPLY
+FULL, RECEIVER FULL, or FILM JAM. (See part 3 below for FILM JAM example.)</P></LI><LI CLASS="numlist"><P>The job continues and Warning is posted to the operator if
+Status Info field reports SUPPLY LOW.</P></LI><LI CLASS="numlist"><P>The job continues and a Warning is not posted to the operator,
+but the message is put in dcplog file.</P><TABLE CLASS="ADMONlistitem" CELLSPACING="0%" CELLPADDING="0%" ID="d0e84"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">What gets reported is dependent upon the camera type and the camera
+server&#8217;s ability to report it.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><P>FAILURE - the print job has aborted; see Status Info field for more
+information.</P></LI></OL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669069269-dup.1">1.2&nbsp;&nbsp;Dcplog example of a print job leading up to a Film Jam<SPAN CLASS="SECT2EFF"> </SPAN></H3><PRE>{ctuser@engbayXX}[17] cd /usr/g/ctusr/logfiles
+{ctuser@engbayXX}[18] more dcplog
+_[40;1H_[K# DICOM print_scu pid: 5463
+print_scu -aIMN -hcamera -c1 -f1x1_fid -p/usr/g/ctuser/film/img21a0017f -d/usr/g/ctuser/app-defaults/devices/camera.dev 
+dcm_bind: AETitle = engbay26_DCP
+map_app_title: title IMN host camera ip-addr 3.7.52.164 port 2104
+EstablishAssoc: DCM_OPEN_REQ Action success
+EstablishAssoc: OPEN_CONF received
+Starting the print session
+NgetService: Event Received : DCM_NGET_END
+NgetService: Event Received : DCM_DATA</PRE><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="SL-2-35612"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Printer FILM JAM </SPAN> </P><table summary="Printer FILM JAM " border="1"><colgroup><col width="228"><col width="387"></colgroup><thead valign=""><tr valign="top"><th colspan="2" align="left" valign="top">PRINTER
+STATUS</th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top">SOP uid</td><td align="left" valign="top">&nbsp;</td></tr><tr valign="top"><td align="left" valign="top">Instance uid</td><td align="left" valign="top">&nbsp;</td></tr><tr valign="top"><td align="left" valign="top">Printer Status</td><td align="left" valign="top">WARNING &#8592;</td></tr><tr valign="top"><td align="left" valign="top">status info</td><td align="left" valign="top">FILM JAM &#8592;</td></tr><tr valign="top"><td align="left" valign="top">printer_name</td><td align="left" valign="top">advt</td></tr><tr valign="top"><td align="left" valign="top">manufacturer</td><td align="left" valign="top">AGFA</td></tr><tr valign="top"><td align="left" valign="top">model</td><td align="left" valign="top">ADVT</td></tr><tr valign="top"><td align="left" valign="top">device serial number</td><td align="left" valign="top">123456</td></tr><tr valign="top"><td align="left" valign="top">software version</td><td align="left" valign="top">Version 2.0</td></tr><tr valign="top"><td align="left" valign="top">Warning</td><td align="left" valign="top">Media jam. Failed during the
+print session, status -1. Job stopped here.</td></tr><tr valign="top"><td align="left" valign="top">CloseAssoc</td><td align="left" valign="top">DCM_CLOSE_REQ Action Success</td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669069272">1.3&nbsp;&nbsp;Known error reported from Nget with Imation Cameras that should not
+be troubleshot:<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The prslog reports:</P><PRE>MESSAGE from Process 2059 &gt;&gt; Wed Aug 19 10:03:48 1998  [PRSserver]&gt; Print job started
+Message from Process 2060 &gt;&gt; NgetService: N-GET response received with failure/warning Status
+Message from Process 2060 &gt;&gt; AETitle: IMN_PrintServer
+Message from Process 2060 &gt;&gt; Print Session successfully completed</PRE><P CLASS="sect2">The dcplog reports:</P><PRE>NgetService: N-GET response received with failure/warning Status  &#776;the known error.</PRE><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="T4-3-35612"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Imation Print Report </SPAN> </P><table summary="Imation Print Report " border="1"><colgroup><col width="184"><col width="196"></colgroup><thead valign=""><tr valign="top"><th colspan="2" align="left" valign="top">PRINTER
+STATUS</th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top">SOP uid</td><td align="left" valign="top">:</td></tr><tr valign="top"><td align="left" valign="top">Instance uid</td><td align="left" valign="top">&nbsp;</td></tr><tr valign="top"><td align="left" valign="top">Printer status</td><td align="left" valign="top"> NORMAL</td></tr><tr valign="top"><td align="left" valign="top">status info</td><td align="left" valign="top">&nbsp;</td></tr><tr valign="top"><td align="left" valign="top">printer_name</td><td align="left" valign="top">IMN_LaserImager</td></tr><tr valign="top"><td align="left" valign="top">manufacturer</td><td align="left" valign="top">Imation</td></tr><tr valign="top"><td align="left" valign="top">model</td><td align="left" valign="top">M8700</td></tr><tr valign="top"><td align="left" valign="top">device serial number</td><td align="left" valign="top">&nbsp;</td></tr><tr valign="top"><td align="left" valign="top">software version</td><td align="left" valign="top">1.5b4</td></tr><tr valign="top"><td align="left" valign="top">AETitle</td><td align="left" valign="top">IMN_PrintServer</td></tr></tbody></table></div></DIV><P CLASS="sect2">What Imation supports:</P><P CLASS="sect2">Imation supports the following six elements/attributes:</P><PRE>&gt; (0x21100010, CS, &#8221;NORMAL&#8221;)  # Printer Status OK
+&gt; (0x21100020, CS, &#8221;&#8221;)  # Printer Status Info OK
+&gt; (0x21100030, LO, &#8221;IMN_LaserImager&#8221;)  # Printer Name OK
+&gt; (0x00080070, LO, &#8221;Imation&#8221;)  # Manufacturer OK
+&gt; (0x00081090, LO, &#8221;M8700&#8221;)  # Manufacturer&#8217;s Model Name OK
+&gt; (0x00181020, LO, &#8221;1.5b4&#8221;)  # Software Versions OK</PRE><P CLASS="sect2">The Bug:</P><P CLASS="sect2">Nget is requesting status from these three additional elements that
+are not supported:</P><PRE>&gt;  (0x00181000, LO, &#8221;&#8221;)  # Device Serial Number
+&gt;  (0x00181200, DA, &#8221;&#8221;)  # Date of Last Calibration
+&gt;  (0x00181201, TM, &#8221;&#8221;)  # Time of Last Calibration</PRE><P CLASS="sect2">The Fix:</P><P CLASS="sect2">Instruct Camera FE to disable the above three elements that are not
+supported. </P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669069276">1.4&nbsp;&nbsp;Communication and Network Error Troubleshooting<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The most common types of network errors that can occur with DICOM Print
+are a:</P><UL><LI CLASS="bulletlist"><P>DCM Network error and</P></LI><LI CLASS="bulletlist"><P>DCM Protocol error.</P></LI></UL><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL35789-35612">1.4.1&nbsp;&nbsp;DCM Network Errors<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">Successful network communications to the camera are dependent on a correctly
+configured IP Address and Port Number. Any errors associated with the network
+log as a &#8220;DCM Network Error&#8221; in the &#8220;type&#8221; field in
+the dcplog report, as shown in the example below. Use ping and snoop to discover
+the root cause, covered in the troubleshooting steps below.</P><P CLASS="sect3">Example of dcplog with a DCM Network Error:</P><P CLASS="sect3"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@engbayXX}[3] </FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>cd /usr/g/ctusr/logfiles</B></FONT></SPAN></P><P CLASS="sect3"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@engbayXX}[4] </FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>more dcplog</B></FONT></SPAN></P><PRE>_[40;1H_[K# DICOM print_scu pid: 5498
+print_scu -aIMN -hcamera -c1 -f1x1_fid -p/usr/g/ctuser/film/img22a0017f -d/usr/g/ctuser/app-defaults/devices/camera.dev 
+dcm_bind: AETitle = engbay26_DCP
+map_app_title: title IMN host camera ip-addr 3.7.52.164 port 2104
+EstablishAssoc: DCM_OPEN_REQ Action success</PRE><P CLASS="sect3">Errors logged beyond this point of failure may be a result of this Error:</P><P CLASS="sect3">DCM kernel lower level error:</P><PRE>type = 508 -- DCM network error    &#776; ERROR
+code = 114 -- lost transport connection
+ul_code = 52, reason = 0, source = 0, reject = 0
+filename = kernel/D_assoc.c  line = 3051
+Failed to contact printer, status 114</PRE><P CLASS="sect3">Steps for troubleshooting a DCM Network Error:</P><OL><LI CLASS="numlist"><P>Verify correct IP Address and Port Number are correct in the
+Install Camera GUI.</P><TABLE CLASS="ADMONlistitem" CELLSPACING="0%" CELLPADDING="0%" ID="d0e293"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">If the IP Address and Port Number are correct, the remote application
+(camera server) may not be running.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></LI><LI CLASS="numlist"><P>Verify Applications restarted after running Install Camera
+from Service Desktop Utilities.</P></LI><LI CLASS="numlist"><P>Verify on the OC in /usr/g/ctuser/SdCPHosts the IP Address
+and Port Number are correct.</P><P>Enter the following:</P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">ctuser@bayXX}[2]</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>cd  /usr/g/ctuser/Prefs</B></FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">ctuser@bayXX}[3]</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>cat SdCPHosts</B></FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">3.7.52.164 camera  IMN 2106 ctn display</FONT></SPAN></P></LI><LI CLASS="numlist"><P>Ping to the camera&#8217;s IP address, and check for packet
+loss. A successful ping indicates a good physical connection and IP Address.
+Port number can still be bad; proceed to next step.</P><P>Example of successful ping:</P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@engbayXX}[5] ping 3.7.52.164</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">PING 3.7.52.164 (3.7.52.164): 56 data bytes</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">64 bytes from 3.7.52.164: icmp_seq=0 ttl=255 time=0.927 ms</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">64 bytes from 3.7.52.164: icmp_seq=1 ttl=255 time=1.079 ms</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">64 bytes from 3.7.52.164: icmp_seq=2 ttl=255 time=1.090 ms</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">64 bytes from 3.7.52.164: icmp_seq=3 ttl=255 time=1.070 ms</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">64 bytes from 3.7.52.164: icmp_seq=4 ttl=255 time=1.048 ms</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">64 bytes from 3.7.52.164: icmp_seq=5 ttl=255 time=1.073 ms</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">64 bytes from 3.7.52.164: icmp_seq=6 ttl=255 time=1.199 ms</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">----3.7.52.164 PING Statistics----</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">7 packets transmitted, 7 packets received, 0% packet loss</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">round-trip min/avg/max = 0.927/1.069/1.199 ms</FONT></SPAN></P></LI><LI CLASS="numlist"><P>If you are unable to successfully ping the camera, use the
+snoop tool to monitor what is going on with communication packets during a
+print job. Snoop will read the number of responses from the server while attempting
+to do a print job. In Example A below, there is only one summary line being
+reported, (one outbound), and NO inbound response indicating the remote camera
+host (engctnl) cannot be reached. Refer to <A HREF="35612.htm#SL35861-35612">Section&nbsp;2</A> for snoop and its usage.</P><P>Example: Example A:</P><P><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>snoop  -SVta  3.7.52.164</B></FONT></SPAN> &#8592;where <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>3.7.52.164</B></FONT></SPAN> in
+this case is the  camera &lt;IP address&gt;</P><P>Using device ef0 (promiscuous mode)</P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">14:46:19.250400  engbay26 -&gt; engctn1 length: 58  ETHER Type=0800
+(IP), size = 58 bytes</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">14:46:19.250400  engbay26 -&gt; engctn1 length: 58  IP D=3.7.52.164
+S=3.7.52.151 LEN=44, ID=57050</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">14:46:19.250400 engbay26 -&gt; engctn1 length: 58  TCP D=2106
+S=1192 Syn Seq=1001039841 Len=0 Win=16384</FONT></SPAN></P></LI><LI CLASS="numlist"><P>If there are only two summary lines, (Example B below) one
+outbound and one inbound, this indicates that we can successfully ping the
+remote camera host, (IP Address is good) but the remote application is either
+not running (i.e. the machine is up, the application that acts as the print
+server is not running), or the wrong port number is being used. Refer to <A HREF="35612.htm#SL35861-35612">Section&nbsp;2</A> for snoop and its usage.</P><P>Example B:</P><P>snoop -SVta 3.7.52.164 &#8592; where 3.7.52.164 in this case is the camera
+&lt;IP address&gt;</P><P>Using device ef0 (promiscuous mode)</P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">14:46:19.250400  engbay26 -&gt; engctn1 length: 58  ETHER Type=0800
+(IP), size = 58 bytes</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">14:46:19.250400  engbay26 -&gt; engctn1  length: 58  IP  D=3.7.52.164
+S=3.7.52.151 LEN=44, ID=57050</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">14:46:19.250400  engbay26 -&gt; engctn1 length: 58  TCP D=2106
+S=1192 Syn Seq=1001039841 Len=0 Win=16384</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">________________________________</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">14:46:19.251971  engctn1 -&gt; engbay26 length: 60  ETHER Type=0800
+(IP), size = 60 bytes</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">14:46:19.251971  engctn1 -&gt; engbay26 length: 60  IP  D=3.7.52.151
+S=3.7.52.164 LEN=40, ID=10027</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">14:46:19.251971  engctn1 -&gt; engbay26 length: 60  TCP D=1192
+S=2106 Rst Ack=1001039842 Win=0</FONT></SPAN></P><P>Example C below shows what would be logged in the dcplog with incorrect
+port number problem. This is really a tcp initialization error, attempting
+to open an association, the remote host is up and running but the port number
+is wrong. Note: this same error can also be caused by the remote application
+(camera server) not running.</P><P>Example C:</P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@engbayXX}[17] cd /usr/g/ctusr/logfiles</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@engbayXX}[18] more dcplog</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER"># DICOM print_scu pid: 2523</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">print_scu -aIMN -hengctn1 -c1 -f1x1_fid -p./1on1 -d./camera.dev </FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">dcm_bind: AETitle = engbay26_DCP</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">map_app_title: title IMN host engctn1 ip-addr 3.7.52.164 port
+2106</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">EstablishAssoc: DCM_OPEN_REQ Action success</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Errors logged beyond this point of failure may be a result
+of this Error:</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">DCM kernel lower level error: </FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">type = 508 -- DCM network error   " ERROR</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">code = 114 -- lost transport connection</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">ul_code = 52, reason = 0, source = 0, reject = 0</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">filename = kernel/D_assoc.c  line = 3051</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Failed to contact printer, status 114</FONT></SPAN></P></LI></OL></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL35764-35612">1.4.2&nbsp;&nbsp;DCM Protocol Error<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">A DCM Protocol Error indicates a problem with calling parameters when
+trying to open an association. They can be caused by having an incorrect AE
+Title configuration. The errors reported by a print server are only as good
+as the dicom implementation of that server. The Imation server will accept
+any called AE title. The Kodak mlp190 accepts any called AE title. The AGFA
+however, requires the AE to match. The following examples display what is
+reported in the dcplog, with an incorrect AE Title on an AGFA system (Example
+D), and what snoop reports (Example E).</P><P CLASS="sect3">Example D:</P><PRE>cd /usr/g/ctuser/logfiles
+more dcplog
+print_scu -aIMN1 -hengctn1 -c1 -f1x1_fid -p./1on1 -d./camera.dev
+# DICOM print_scu pid: 2492
+print_scu -aIMN1 -hengctn1 -c1 -f1x1_fid -p./1on1 -d./camera.dev 
+dcm_bind: AETitle = engbay26_DCP
+map_app_title: title IMN1 host engctn1 ip-addr 3.7.52.164 port 2106
+EstablishAssoc: DCM_OPEN_REQ Action success
+Errors logged beyond this point of failure may be a result of this Error:
+DCM kernel lower level error: 
+type = 507 -- DCM Protocol error  ERROR
+code = 166 -- invalid PDU parameter value
+ul_code = 37, reason = 0, source = 0, reject = 0
+filename = kernel/D_assoc.c  line = 3051
+DCM kernel lower level error: 
+type = 503 -- DCM Kernel integrity errors
+code = 136 -- error with the dicom upper layer
+ul_code = 22, reason = 0, source = 0, reject = 0
+filename = kernel/D_assoc.c  line = 500
+Fatal DCM error: 136
+dcm_deinit: Kernel Deinit Failed
+Failed to contact printer, status 166</PRE><P CLASS="sect3">Example E:</P><P CLASS="sect3">The number of packets, outbound and inbound with length of ~60 and ~500
+indicates that the remote application is running, but it is not allowing the
+SCU (Service Class User, i.e. the OC) to open an association. This also indicates
+the IP Address and Port Number is correct.</P><P CLASS="sect3"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">engbay26 2# </FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>snoop -SVta</B></FONT></SPAN><SPAN CLASS="INPUTVAR"><FONT FACE="COURIER"><B><I>&lt;camera
+IP address&gt;</I></B></FONT></SPAN></P><P CLASS="sect3">Using device ef0 (promiscuous mode)</P><PRE>15:10:36.357083     engbay26 -&gt; engctn1      length:   58  ETHER Type=0800 (IP), size = 58 bytes
+15:10:36.357083     engbay26 -&gt; engctn1      length:   58  IP  D=3.7.52.164 S=3.7.52.151 LEN=44, ID=59135
+15:10:36.357083     engbay26 -&gt; engctn1      length:   58  TCP D=2106 S=1209 Syn Seq=1188358241 Len=0 Win=16384
+________________________________
+15:10:36.358280      engctn1 -&gt; engbay26     length:   60  ETHER Type=0800 (IP), size = 60 bytes
+15:10:36.358280      engctn1 -&gt; engbay26     length:   60  IP  D=3.7.52.151 S=3.7.52.164 LEN=44, ID=37125
+15:10:36.358280      engctn1 -&gt; engbay26     length:   60  TCP D=1209 S=2106 Syn Ack=1188358242 Seq=1847802416 Len=0 Win=8760
+________________________________
+15:10:36.358390     engbay26 -&gt; engctn1      length:   54  ETHER Type=0800 (IP), size = 54 bytes
+15:10:36.358390     engbay26 -&gt; engctn1      length:   54  IP  D=3.7.52.164 S=3.7.52.151 LEN=40, ID=59137
+15:10:36.358390     engbay26 -&gt; engctn1      length:   54  TCP D=2106 S=1209     Ack=1847802417 Seq=1188358242 Len=0 Win=16060
+________________________________
+15:10:36.361533     engbay26 -&gt; engctn1      length:  456  ETHER Type=0800 (IP), size = 456 bytes
+15:10:36.361533     engbay26 -&gt; engctn1      length:  456  IP  D=3.7.52.164 S=3.7.52.151 LEN=442, ID=59138
+15:10:36.361533     engbay26 -&gt; engctn1      length:  456  TCP D=2106 S=1209     Ack=1847802417 Seq=1188358242 Len=402 Win=16060
+________________________________
+15:10:36.412509      engctn1 -&gt; engbay26     length:   60  ETHER Type=0800 (IP), size = 60 bytes
+15:10:36.412509      engctn1 -&gt; engbay26     length:   60  IP  D=3.7.52.151 S=3.7.52.164 LEN=40, ID=37126
+15:10:36.412509      engctn1 -&gt; engbay26     length:   60  TCP D=1209 S=2106     Ack=1188358644 Seq=1847802417 Len=0 Win=8760
+________________________________
+15:10:36.424127      engctn1 -&gt; engbay26     length:   64  ETHER Type=0800 (IP), size = 64 bytes
+15:10:36.424127      engctn1 -&gt; engbay26     length:   64  IP  D=3.7.52.151 S=3.7.52.164 LEN=50, ID=37127
+15:10:36.424127      engctn1 -&gt; engbay26     length:   64  TCP D=1209 S=2106     Ack=1188358644 Seq=1847802417 Len=10 Win=8760
+________________________________
+15:10:36.424376     engbay26 -&gt; engctn1      length:   64  ETHER Type=0800 (IP), size = 64 bytes
+15:10:36.424376     engbay26 -&gt; engctn1      length:   64  IP  D=3.7.52.164 S=3.7.52.151 LEN=50, ID=59141
+15:10:36.424376     engbay26 -&gt; engctn1      length:   64  TCP D=2106 S=1209     Ack=1847802427 Seq=1188358644 Len=10 Win=16060
+________________________________
+15:10:36.428902      engctn1 -&gt; engbay26     length:   60  ETHER Type=0800 (IP), size = 60 bytes
+15:10:36.428902      engctn1 -&gt; engbay26     length:   60  IP  D=3.7.52.151 S=3.7.52.164 LEN=40, ID=37128
+15:10:36.428902      engctn1 -&gt; engbay26     length:   60  TCP D=1209 S=2106 Fin Ack=1188358654 Seq=1847802427 Len=0 Win=8760
+________________________________
+15:10:36.428975     engbay26 -&gt; engctn1      length:   54  ETHER Type=0800 (IP), size = 54 bytes
+15:10:36.428975     engbay26 -&gt; engctn1      length:   54  IP  D=3.7.52.164 S=3.7.52.151 LEN=40, ID=59143
+15:10:36.428975     engbay26 -&gt; engctn1      length:   54  TCP D=2106 S=1209     Ack=1847802428 Seq=1188358654 Len=0 Win=16060
+________________________________</PRE><TABLE CLASS="ADMONsect3" CELLSPACING="0%" CELLPADDING="0%" ID="d0e487"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">If the AE title is correct, the server may have a security feature
+that requires that the local host be registered on the remote host.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><P CLASS="sect3">Image Packet Transfer, Output From <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>snoop</B></FONT></SPAN></P><P CLASS="sect3">This is an excerpt from a snoop output representing actual image packets,
+(length ~1514), being transferred to the camera:</P><PRE>________________________________
+12:19:58.436211     engbay26 -&gt; engctn1      length: 1514  ETHER Type=0800 (IP), size = 1514 bytes
+12:19:58.436211     engbay26 -&gt; engctn1      length: 1514  IP  D=3.7.52.164 S=3.7.52.151 LEN=1500, ID=38793
+12:19:58.436211     engbay26 -&gt; engctn1      length: 1514  TCP D=2106 S=1511     Ack=3095191028 Seq=1815234494 Len=1460 Win=16060
+________________________________
+12:19:58.436256     engbay26 -&gt; engctn1      length: 1514  ETHER Type=0800 (IP), size = 1514 bytes
+12:19:58.436256     engbay26 -&gt; engctn1      length: 1514  IP  D=3.7.52.164 S=3.7.52.151 LEN=1500, ID=38794
+12:19:58.436256     engbay26 -&gt; engctn1      length: 1514  TCP D=2106 S=1511     Ack=3095191028 Seq=1815235954 Len=1460 Win=1606</PRE></DIV></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL35861-35612">2&nbsp;&nbsp;Snoop<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Snoop (<SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">snoop</FONT></SPAN>) is the troubleshooting tool that monitors
+all the communication and image packets inbound and outbound to the camera
+during a print job (depending on switch settings). The packet size length
+is important in understanding what is being transferred. A length size of
+&lt; 500 indicates requests and responses between the scanner and the print
+server. These are from the NGET (printer status), and NCREATE (film session
+and film box). A series of packet lengths of about 1500 indicates an image
+transfer in progress. This applies to both dicom print and dicom send.</P><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="SL-4-35612"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Steps for Starting a Snoop Session </SPAN> </P><table summary="Steps for Starting a Snoop Session " border="1"><colgroup><col width="289"><col width="382"></colgroup><thead valign=""><tr valign="top"><th align="left" valign="top">STEP</th><th align="left" valign="top">COMMENT</th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top">1. Open up a Linux (or Unix)
+shell</td><td align="left" valign="top">From Desktop, select Linux (or
+Unix) Shell</td></tr><tr valign="top"><td align="left" valign="top">2. Become root.</td><td align="left" valign="top"><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>su  -</B></FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top">3. Start the snoop session in
+the shell and set it up to display outgoing and incoming packets.</td><td align="left" valign="top"><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>snoop -SVta </B></FONT></SPAN><SPAN CLASS="INPUTVAR"><FONT FACE="COURIER"><B><I>&lt;camera
+ip address&gt;</I></B></FONT></SPAN></td></tr><tr valign="top"><td align="left" valign="top">4. Send a DICOM Print job to
+the camera</td><td align="left" valign="top">In ImageWorks desktop, display
+an image and drag/drop the image into the film composer and Print it.</td></tr><tr valign="top"><td align="left" valign="top">5. Observe the output packets
+of data being sent and received.</td><td align="left" valign="top">Length sizes &lt; 500 = communication
+request between the scanner and the print server. <P CLASS="entry">Length sizes ~1500
+= the image packet size being sent.</P></td></tr></tbody></table></div></DIV><P CLASS="sect1">The following examples show common uses of snoop. See Number 3, below,
+for a description of snoop usage and switch descriptions. Typical use examples:</P><OL><LI CLASS="numlist"><P>How to display outgoing and in-going packets:</P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@bayXX}[3] </FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>su  -</B></FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">password</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">bayxx 1# </FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>snoop -SVta  &lt;camera ip address&gt;</B></FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Using device ef0 (promiscuous mode)       </FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">15:00:18.606959     engbay26 -&gt; engctn1      length:   58 
+ETHER Type=0800 (IP), size = 58 bytes</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">15:00:18.606959     engbay26 -&gt; engctn1      length:   58 
+IP  D=3.7.52.164 S=3.7.52.151 LEN=44, ID=59593</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">15:00:18.606959     engbay26 -&gt; engctn1      length:   58 
+TCP D=2104 S=3565 Syn Seq=1295817451 Len=0 Win=16384</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">15:00:18.608481      engctn1 -&gt; engbay26     length:   60 
+ETHER Type=0800 (IP), size = 60 bytes</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">15:00:18.608481      engctn1 -&gt; engbay26     length:   60 
+IP  D=3.7.52.151 S=3.7.52.164 LEN=40, ID=33153</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">15:00:18.608481      engctn1 -&gt; engbay26     length:   60 
+TCP D=3565 S=2104 Rst Ack=1295817452 Win=0</FONT></SPAN></P></LI><LI CLASS="numlist"><P>How to display incoming packets only:</P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{ctuser@bayXX}[3] </FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>su -</B></FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">password</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">bayxx 1# </FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>snoop -SPVta </B></FONT></SPAN><SPAN CLASS="INPUTVAR"><FONT FACE="COURIER"><B><I>&lt;camera
+ip address&gt;</I></B></FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Using device ef0 (promiscuous mode)       </FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">14:58:54.506391      engctn1 -&gt; engbay26     length:   60 
+ETHER Type=0800 (IP), size = 60 bytes</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">14:58:54.506391      engctn1 -&gt; engbay26     length:   60 
+IP  D=3.7.52.151 S=3.7.52.164 LEN=40, ID=14589</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">14:58:54.506391      engctn1 -&gt; engbay26     length:   60 
+TCP D=3563 S=2104 Rst Ack=1285065404 Win=0</FONT></SPAN></P></LI><LI CLASS="numlist"><P>Usage for snoop:</P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -a ]  # Listen to packets on audio</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -d device ]  # settable to le?, ie?, bf?, tr?</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -s snaplen ]  # Truncate packets</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -c count ]  # Quit after count packets</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -P ]  # Turn OFF promiscuous mode</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -D ]  # Report dropped packets</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -S ]  # Report packet size</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -i file ]  # Read previously captured packets</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -o file ]  # Capture packets in file</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -n file ]  # Load addr-to-name table from file</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -N ]  # Create addr-to-name table</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -t  r|a|d ]  # Time: Relative, Absolute or Delta</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -v ]  # Verbose packet display</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -V ]  # Show all summary lines</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -p first[,last] ]  # Select packet(s) to display</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -x offset[,length] ]  # Hex dump from offset for length</FONT></SPAN></P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ -C ]  # Print packet filter code</FONT></SPAN></P><P>For additional information, refer to the manual page for snoop. To do
+so, open a Unix shell, and enter the following:</P><P><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>su  -</B></FONT></SPAN></P><P><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>password</B></FONT></SPAN></P><P><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>man snoop</B></FONT></SPAN></P></LI></OL></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

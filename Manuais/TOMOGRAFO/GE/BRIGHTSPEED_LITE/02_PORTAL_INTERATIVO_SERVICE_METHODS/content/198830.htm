@@ -1,0 +1,57 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>DICOM Troubleshooting</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/14/07</P></td></tr></table><H1 ID="top">DICOM Troubleshooting </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="50%"><col width="50%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised:</td><td valign="">03 November, 2003</td></tr></tbody></table></div></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669075013">1&nbsp;&nbsp;Overview<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The following is a summary of troubleshooting information for DICOM
+print that was gathered during software testing and validation of the DICOM
+print feature.</P><P CLASS="sect1">There is also a significant amount of additional troubleshooting
+procedures, and the theory of the DICOM print feature in the System Service
+Manual. If you have problems installing a DICOM print camera, read the information
+in System Service Manual.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669075013-dup.1">2&nbsp;&nbsp;Error Bringing Up the Camera Installation/Filming Application<SPAN CLASS="SECT1EFF"> </SPAN></H2><UL><LI CLASS="bulletlist"><P>Symptom: After creating/modifying the DICOM print camera the
+install camera interface does not come up and the filming application indicates
+it cannot bring up the film composer.</P><P>Cause: The configuration field contains invalid information such as
+a back-slash (\) as the final character in the field or brackets (<SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">{}</FONT></SPAN>).</P></LI><LI CLASS="bulletlist"><P>Solution: The camera.dev file in <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">~ctuser/app-defaults/devices</FONT></SPAN> must
+be manually edited to remove the offending characters in the set configuration
+line. Invalid characters include the following:</P><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">\{}</FONT></SPAN></P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669075014-dup.2">3&nbsp;&nbsp;Configuration Information Field<SPAN CLASS="SECT1EFF"> </SPAN></H2><UL><LI CLASS="bulletlist"><P>Symptom: Cannot view the entire configuration field (&gt; 25
+characters)</P></LI><LI CLASS="bulletlist"><P>Solution: Hold down the middle mouse button and move the field
+contents</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669075015">4&nbsp;&nbsp;Need to Set DASM Print Attributes Not Supported by S/W<SPAN CLASS="SECT1EFF"> </SPAN></H2><UL><LI CLASS="bulletlist"><P>Symptom: User wants the white border around each image box
+ON/OFF permanently for this system and it cannot be set as the default for
+the camera.</P></LI><LI CLASS="bulletlist"><P>Solution: Using your favorite editor, add the following line
+to the camera.dev file located in <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">~ctuser/app-defaults/devices</FONT></SPAN> after
+the DICOM print device has been otherwise configured.</P><P>For Trim Off - set &nbsp;&nbsp;	<SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">TRIM NO</FONT></SPAN></P><P>For Trim On - set 	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">TRIM YES</FONT></SPAN></P></LI><LI CLASS="bulletlist"><P>Symptom: DICOM print camera supports multiple film sizes and
+the user only wants to print if the film size is correct for LightSpeed (14x17).
+[Otherwise the camera will queue the films or return an error causing the
+queue to pause (based upon the DICOM print camera specifications).]</P></LI><LI CLASS="bulletlist"><P>Solution: Using your favorite editor, add the following line
+to the camera.dev file located in <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">~ctuser/app-defaults/devices</FONT></SPAN> after
+the DICOM print device has been otherwise configured.</P><P>To force a 14x17 film size - set 	&nbsp;&nbsp;<SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">filmSize 14INX17IN</FONT></SPAN></P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669075016-dup.2">5&nbsp;&nbsp;Need to Prevent DICOM Print Attributes from Being Sent to DICOM Print
+camera<SPAN CLASS="SECT1EFF"> </SPAN></H2><UL><LI CLASS="bulletlist"><P>Symptom: Some DICOM print attributes are optional, and may
+result in fatal errors. For example, the Fuji camera does not support the
+Empty Image Density parameter for the film box.</P></LI><LI CLASS="bulletlist"><P>Solution: Using your favorite editor, add the following line(s)
+to the camera.dev file located in <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">~ctuser/app-defaults/devices</FONT></SPAN> after
+the DICOM print device has been otherwise configured.</P><UL><LI CLASS="bulletlist"><P>To prevent sending the Smoothing Parameter set &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">FB_Smooth
+FALSE</FONT></SPAN></P></LI><LI CLASS="bulletlist"><P>To prevent sending the Border Density set &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">FB_Border FALSE</FONT></SPAN></P></LI><LI CLASS="bulletlist"><P>To prevent sending the Empty Image Density set&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;<SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">FB_EID FALSE</FONT></SPAN></P></LI><LI CLASS="bulletlist"><P>To prevent sending the Minimum Density set &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">FB_MinD FALSE</FONT></SPAN></P></LI><LI CLASS="bulletlist"><P>To prevent sending the Trim Parameter set &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FB_Trim
+FALSE</P></LI></UL></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669075019-dup.1">6&nbsp;&nbsp;Error Trying to Connect to the DICOM Print Camera<SPAN CLASS="SECT1EFF"> </SPAN></H2><UL><LI CLASS="bulletlist"><P>Symptom: DICOM print server can be reached (ping), but Application
+error indicates <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">&#8220;Unable to start filming interface&#8221;</FONT></SPAN>,
+and the help message talks about running the <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">install.dasm</FONT></SPAN> (Association
+Error)</P></LI><LI CLASS="bulletlist"><P>Solution: The system is unable to complete the association.
+Check the <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">AE Title</FONT></SPAN> and the <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Port number</FONT></SPAN> of
+the DICOM print server and correct them through the Install Camera procedure.</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669075020-dup.2">7&nbsp;&nbsp;Film Composer Error Not Usable<SPAN CLASS="SECT1EFF"> </SPAN></H2><UL><LI CLASS="bulletlist"><P>Symptom: Film composer error displays <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">&#8220;unrecognized
+status - code 0&#8221;</FONT></SPAN></P></LI><LI CLASS="bulletlist"><P>Solution: Review the log file, the attention, and the status
+windows. These areas have the correct filming status (for example, &#8220;film
+jam&#8221; and &#8220;supply empty&#8221;).</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669075021">8&nbsp;&nbsp;Debugging Connection Issues Difficult<SPAN CLASS="SECT1EFF"> </SPAN></H2><UL><LI CLASS="bulletlist"><P>Symptom: The time-outs for the DICOM print are very long,
+which means that you need to wait a long time before you know the application
+is not working.</P></LI><LI CLASS="bulletlist"><P>Solution: The time-outs for the DICOM print were setup to
+ensure that the system would work regardless of whether the DICOM print camera
+was on a LAN or a WAN halfway around the world. The DICOM print time-outs
+for the association and DIMSE classes (for example, &#8220;N-GET, N-DELETE&#8221;)
+can be modified within the DICOM print camera installation. They can be reduced
+down to 90 seconds.</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669075022">9&nbsp;&nbsp;DICOM Print Error on N-GET Time-out Confusing<SPAN CLASS="SECT1EFF"> </SPAN></H2><UL><LI CLASS="bulletlist"><P>Symptom: When the N-GET time-out goes off, the error message
+in the <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">prslog</FONT></SPAN> file will be <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">&#8220;Could not get
+printer status, invalid command sequence for N-GET&#8221;</FONT></SPAN>.</P></LI><LI CLASS="bulletlist"><P>Solution: When the user sees the above error they may want
+to consider that the issue may be an inactivity timer on the N-GET DIMSE service.</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669075022-dup.3">10&nbsp;&nbsp;DICOM Print Camera Slide Support<SPAN CLASS="SECT1EFF"> </SPAN></H2><UL><LI CLASS="bulletlist"><P>Symptom: Current implementation of DICOM print does not allow
+selection of slide format.</P></LI><LI CLASS="bulletlist"><P>Solution: Feature is not currently supported. It may be supported
+in future releases.</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669075023-dup.1">11&nbsp;&nbsp;Confusion on Film Format Notation<SPAN CLASS="SECT1EFF"> </SPAN></H2><UL><LI CLASS="bulletlist"><P>Symptom: GEMS Laser Camera and DICOM Print film format notations
+are opposite.</P></LI><LI CLASS="bulletlist"><P>Solution:</P><UL><LI CLASS="bulletlist"><P>GEMS Laser Camera film format notation has always been row
+x col (for example, 12 on 1 = 4x3)</P></LI><LI CLASS="bulletlist"><P>DICOM Print Standard film format notation is col x row (for
+example, 12 on 1 = 3x4)</P></LI></UL></LI></UL></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>
