@@ -73,7 +73,8 @@ SUGESTOES_SEPARACAO_POR_ATIVIDADE = {
         "itens": [
             "FER-001: Multímetro Especial até 1000V (Aferição Fotocélula / AEC & Mamógrafo)",
             "FER-004: Medidor Radiométrico Multi-Parâmetro (kVp, Dose, Tempo, CSR)",
-            "FER-005: Fantoma de Resolução Espacial e Baixo Contraste (QA RX / Mamografia)",
+            "FER-005: Kit de Mamografia (com Phantom de Mamografia)",
+            "FER-017: Kit de Alinhamento de Colimador (Beam Alignment Tools)",
             "FER-009: Trena Laser Métrica Digital",
         ],
     },
@@ -101,7 +102,7 @@ SUGESTOES_SEPARACAO_POR_ATIVIDADE = {
             "PEC-010: Interface Box / Fonte de Alimentação do Detector DR",
             "PEC-009: Baterias Sobressalentes e Carregador para Flat Panel Wi-Fi",
             "PEC-011: Cabos de Comunicação Tether Cable e Rede Cat6 Blindados",
-            "FER-005: Fantoma de Resolução Espacial e Baixo Contraste",
+            "FER-017: Kit de Alinhamento de Colimador (Beam Alignment Tools)",
             "CON-004: Álcool Isopropílico 99% ESD e Panos de Microfibra",
         ],
     },
@@ -109,7 +110,7 @@ SUGESTOES_SEPARACAO_POR_ATIVIDADE = {
         "nome": "SUGESTÃO: INSTALAÇÃO & MONTAGEM MECÂNICA PESADA",
         "itens": [
             "FER-008: Nível a Laser Autonivelante com Tripé",
-            "FER-016: Furadeira de Impacto / Martelete SDS + Brocas de Vídea",
+            "FER-016: Kit Furadeira de Impacto com Brocas (5, 8, 10 e 12mm)",
             "FER-009: Trena Laser Métrica Digital",
             "FER-010: Torquímetro Calibrado com Jogo de Soquetes",
             "FER-003: Osciloscópio Digital Portátil com Pontas HV",
@@ -485,6 +486,20 @@ def atualizar_status_solicitacao_peca(db_path, id_pedido, novo_status):
                     cur.execute(
                         "UPDATE estoque_pecas SET quantidade = quantidade + ? WHERE codigo = ?",
                         (qtd_dev, cod_str)
+                    )
+                except Exception:
+                    pass
+        elif ("ESTORNADO" not in novo_status_up and "DEVOLVIDO" not in novo_status_up) and ("ESTORNADO" in status_atual or "DEVOLVIDO" in status_atual):
+            # Se estava devolvido e voltou a ficar em posse do técnico, deduz novamente do estoque
+            partes = [p.strip() for p in itens_str.split(",") if "x " in p and "(" in p]
+            for p in partes:
+                try:
+                    qtd_str = p.split("x ")[0].strip()
+                    cod_str = p.split("(")[-1].replace(")", "").strip()
+                    qtd_sub = int(qtd_str)
+                    cur.execute(
+                        "UPDATE estoque_pecas SET quantidade = max(0, quantidade - ?) WHERE codigo = ?",
+                        (qtd_sub, cod_str)
                     )
                 except Exception:
                     pass

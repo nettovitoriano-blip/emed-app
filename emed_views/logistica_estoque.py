@@ -98,52 +98,96 @@ def render_solicitacao_pecas(ctx: AppContext):
     equipa_tecnica = ctx.equipa_tecnica
 
     st.markdown("### 🧰 Quadro Geral de Ferramentas, Kits & Instrumentos Disponíveis")
-    st.caption("Visão em tempo real de instrumentos e ferramentas no Almoxarifado EMED para consulta rápida de toda a equipe.")
+    st.caption("Visão em tempo real de instrumentos, kits e ferramentas no Almoxarifado EMED para consulta rápida de toda a equipe técnica antes de intervenções.")
 
     df_est_quadro = carregar_estoque(ctx.db_name)
+    df_sol_ativas = carregar_solicitacoes(ctx.db_name)
+    if not df_sol_ativas.empty:
+        df_sol_ativas = df_sol_ativas[~df_sol_ativas['status_pedido'].fillna('').str.contains('DEVOLVIDO|CANCELADO|ESTORNADO|APLICADO', case=False)]
+
     if not df_est_quadro.empty:
         df_ferramentas = df_est_quadro[df_est_quadro['tipo_item'].fillna('').str.contains('INSTRUMENTO|FERRAMENTA', case=False)]
         if not df_ferramentas.empty:
+            total_ferr = len(df_ferramentas)
+            disp_ferr = sum(1 for _, r in df_ferramentas.iterrows() if limpar_int(r.get('quantidade'), 0) > 0)
+            uso_ferr = total_ferr - disp_ferr
+
+            m_col1, m_col2, m_col3 = st.columns(3)
+            with m_col1:
+                st.metric("Total de Ferramentas & Kits Cadastrados", f"{total_ferr} itens")
+            with m_col2:
+                st.metric("🟢 Disponíveis no Almoxarifado", f"{disp_ferr} itens")
+            with m_col3:
+                st.metric("🔴 Em Uso com Técnicos", f"{uso_ferr} itens")
+
+            filtro_busca_ferr = st.text_input("🔍 Pesquisar ferramenta, kit ou instrumento no quadro:", placeholder="Ex: Multímetro, Mamografia, Colimador, Furadeira, Talha, Osciloscópio...")
+            
+            df_exibicao_f = df_ferramentas
+            if filtro_busca_ferr.strip():
+                df_exibicao_f = df_ferramentas[
+                    df_ferramentas['nome_peca'].str.contains(filtro_busca_ferr, case=False, na=False) |
+                    df_ferramentas['codigo'].str.contains(filtro_busca_ferr, case=False, na=False)
+                ]
+
             cols_q = st.columns(4)
-            for idx_f, (_, r_ferr) in enumerate(df_ferramentas.iterrows()):
+            for idx_f, (_, r_ferr) in enumerate(df_exibicao_f.iterrows()):
                 nome_f = r_ferr['nome_peca']
                 cod_f = r_ferr['codigo']
                 qtd_f = limpar_int(r_ferr.get('quantidade'), 0)
-                disp_cor = "#10b981" if qtd_f > 0 else "#ef4444"
-                disp_txt = f"🟢 {qtd_f} DISPONÍVEL" if qtd_f > 0 else "🔴 EM USO / ESGOTADO"
+
+                # Identifica qual técnico está com este kit ou ferramenta
+                tecs_com_item = []
+                if not df_sol_ativas.empty:
+                    for _, r_sol in df_sol_ativas.iterrows():
+                        txt_itens = (str(r_sol.get('itens_solicitados', '')) + " " + str(r_sol.get('instrumentos_solicitados', ''))).upper()
+                        if cod_f.upper() in txt_itens or nome_f.upper() in txt_itens:
+                            tecs_com_item.append(str(r_sol.get('tecnico', '')).upper())
+
+                if tecs_com_item:
+                    disp_cor = "#ef4444"
+                    disp_bg = "rgba(239, 68, 68, 0.15)"
+                    tecs_unicos = ", ".join(sorted(list(set(tecs_com_item))))
+                    disp_txt = f"🔴 COM: {tecs_unicos}"
+                elif qtd_f > 0:
+                    disp_cor = "#10b981"
+                    disp_bg = "rgba(16, 185, 129, 0.12)"
+                    disp_txt = f"🟢 {qtd_f} DISPONÍVEL"
+                else:
+                    disp_cor = "#ef4444"
+                    disp_bg = "rgba(239, 68, 68, 0.12)"
+                    disp_txt = "🔴 EM USO NO CAMPO"
+
                 with cols_q[idx_f % 4]:
                     st.markdown(f"""
                         <div style="background: #1e293b; border-radius: 8px; padding: 12px; margin-bottom: 12px; border: 1px solid #334155; border-top: 3px solid {disp_cor}; min-height: 110px;">
-                            <div style="font-size: 11px; color: #94a3b8; font-weight: bold;">{cod_f}</div>
-                            <div style="font-size: 12px; font-weight: 700; color: #f8fafc; margin: 4px 0 6px 0; line-height: 1.3;">{nome_f[:50]}...</div>
-                            <div style="font-size: 11.5px; font-weight: 800; color: {disp_cor};">{disp_txt}</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 11px; color: #94a3b8; font-weight: bold;">{cod_f}</span>
+                                <span style="background: {disp_bg}; color: {disp_cor}; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">{disp_txt}</span>
+                            </div>
+                            <div style="font-size: 12px; font-weight: 700; color: #f8fafc; margin: 6px 0 6px 0; line-height: 1.3;">{nome_f[:55]}</div>
                         </div>
                     """, unsafe_allow_html=True)
     
     st.markdown("---")
-    st.markdown("### 📦 Formulário de Solicitação de Peças, Consumíveis e Instrumentos")
+    st.markdown("### 📦 Cautela & Retirada de Ferramental, Kits e Peças")
     st.info(
-        "Marque os itens necessários para o atendimento em campo ou para a bancada interna. "
-        "O sistema valida e reserva as quantidades online em tempo real na base de dados do Almoxarifado."
+        "Selecione o **Técnico que está com o material** e tique os itens retirados do Almoxarifado. "
+        "Não é necessário indicar o destino do hospital: o controle é focado diretamente na posse do técnico."
     )
 
     df_est_atual = carregar_estoque(ctx.db_name)
     lista_t_sol = sorted(list(equipa_tecnica.keys()))
-    clientes_sol = sorted([c for c in df['cliente'].unique() if str(c).strip() != '' and "NENHUM" not in str(c).upper()])
-    destinos_disponiveis = ["LABORATÓRIO / BANCADA INTERNA EMED", "USO GERAL / VIATURA / FERRAMENTARIA"] + clientes_sol
 
     with st.form("form_solicitacao_almoxarifado"):
-        c_sol1, c_sol2 = st.columns(2)
-        with c_sol1:
-            usr_sol_up = ctx.usuario_atual.upper()
-            idx_sol_u = lista_t_sol.index(usr_sol_up) if usr_sol_up in lista_t_sol else 0
-            tec_solicitante = st.selectbox("Técnico Solicitante", lista_t_sol, index=idx_sol_u)
-        with c_sol2:
-            cli_destino_sol = st.selectbox(
-                "Hospital / Cliente ou Setor de Destino",
-                destinos_disponiveis,
-                help="Selecione o cliente de destino ou direcione para a bancada do Laboratório Interno da EMED."
-            )
+        usr_sol_up = ctx.usuario_atual.upper()
+        idx_sol_u = lista_t_sol.index(usr_sol_up) if usr_sol_up in lista_t_sol else 0
+        tec_solicitante = st.selectbox(
+            "👨‍🔧 Técnico com o Material / Responsável pela Retirada *",
+            lista_t_sol,
+            index=idx_sol_u,
+            help="Tique o técnico que está saindo ou trabalhando com este material."
+        )
+        cli_destino_sol = f"COM O TÉCNICO ({tec_solicitante})"
 
         st.markdown("#### ☑️ Ticagem de Materiais, Instrumentos e Peças em Estoque")
         itens_ticados = []
@@ -287,7 +331,7 @@ def render_solicitacao_pecas(ctx: AppContext):
                         """, (
                             tec_solicitante, cli_destino_sol, resumo_itens_str,
                             instrumentos_extras_sol.strip().upper(),
-                            "RESERVADO / ENVIADO AO ESTOQUE", data_ped_agora
+                            "ENTREGUE AO TÉCNICO / EM CAMPO", data_ped_agora
                         ))
 
                 if erro_conflito:
@@ -296,43 +340,57 @@ def render_solicitacao_pecas(ctx: AppContext):
                     st.cache_data.clear()
                     inst_txt_msg = instrumentos_extras_sol.strip().upper() if instrumentos_extras_sol.strip() else 'NENHUM'
                     msg_almox = (
-                        f"📦 *NOVA SOLICITAÇÃO DE MATERIAL & INSTRUMENTOS - EMED*\n\n"
-                        f"👨‍🔧 *Técnico:* {tec_solicitante}\n"
-                        f"🏥 *Destino:* {cli_destino_sol}\n"
-                        f"📅 *Data/Hora:* {data_ped_agora}\n\n"
-                        f"🛠️ *Materiais Reservados no Sistema:*\n{resumo_itens_str}\n\n"
-                        f"📐 *Instrumentos Solicitados:*\n{inst_txt_msg}\n"
+                        f"📦 *RETIRADA DE FERRAMENTAL / MATERIAL - EMED*\n\n"
+                        f"👨‍🔧 *Técnico Responsável:* {tec_solicitante}\n"
+                        f"📅 *Data/Hora:* {data_ped_agora}\n"
+                        f"📌 *Situação:* EM POSSE DO TÉCNICO / EM CAMPO\n\n"
+                        f"🛠️ *Materiais com o Técnico:*\n{resumo_itens_str}\n\n"
+                        f"📐 *Kits / Observações:*\n{inst_txt_msg}\n"
                     )
                     link_wpp_est = f"https://wa.me/558593333333?text={urllib.parse.quote(msg_almox)}"
-                    st.success("✅ Estoque atualizado em tempo real! Os itens foram reservados para si.")
+                    st.success(f"✅ Material registrado com sucesso na posse do técnico {tec_solicitante}!")
                     st.markdown(f"""
                         <a href="{link_wpp_est}" target="_blank" style="background:#25d366; color:white; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight:bold; display:inline-block; margin-top:8px;">
-                            📲 Enviar Mensagem de Separação para o Estoque (WhatsApp)
+                            📲 Enviar Comprovativo de Retirada para o Almoxarifado (WhatsApp)
                         </a>
                     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("#### 📋 Histórico Recente & Gestão Circular de Reservas do Almoxarifado")
+    st.markdown("#### 📋 Histórico de Posse & Gestão Circular do Almoxarifado")
+    st.caption("Acompanhe com qual técnico cada kit e ferramenta se encontra e confirme a devolução ao estoque com 1 clique.")
     df_sol_hist = carregar_solicitacoes(ctx.db_name)
-    st.dataframe(df_sol_hist, use_container_width=True, hide_index=True)
-
     if not df_sol_hist.empty:
-        with st.expander("🔄 Gerir Status de Reserva (Confirmar Entrega / Aplicação ou Estornar Peças ao Estoque)"):
+        df_sol_vis = df_sol_hist.copy()
+        cols_renomear = {
+            "id": "#",
+            "tecnico": "Técnico com a Posse",
+            "itens_solicitados": "Itens com o Técnico",
+            "instrumentos_solicitados": "Kits / Observações",
+            "status_pedido": "Situação da Carga",
+            "data_pedido": "Data Retirada"
+        }
+        cols_exibir = [c for c in cols_renomear.keys() if c in df_sol_vis.columns]
+        df_sol_vis_show = df_sol_vis[cols_exibir].rename(columns=cols_renomear)
+        st.dataframe(df_sol_vis_show, use_container_width=True, hide_index=True)
+
+        with st.expander("🔄 Devolver Material ao Almoxarifado / Alterar Situação da Posse", expanded=True):
             with st.form("form_gestao_status_reserva"):
                 opcoes_ped = [
-                    f"#{r['id']} | {r['tecnico']} -> {r['destino_cliente']} ({r['itens_solicitados']}) [{r['status_pedido']}]"
+                    f"#{r['id']} | Técnico: {r['tecnico']} | Itens: {r['itens_solicitados']} [{r['status_pedido']}]"
                     for _, r in df_sol_hist.iterrows()
                 ]
-                ped_escolhido = st.selectbox("Selecione o Pedido de Reserva:", opcoes_ped)
+                ped_escolhido = st.selectbox("Selecione o Registro de Carga:", opcoes_ped)
                 novo_st_ped = st.selectbox(
-                    "Nova Situação do Pedido:",
+                    "Nova Situação da Carga:",
                     [
-                        "ENTREGUE / APLICADO EM CAMPO",
-                        "CANCELADO / ESTORNADO (DEVOLVIDO AO ESTOQUE)",
-                        "RESERVADO / ENVIADO AO ESTOQUE"
-                    ]
+                        "DEVOLVIDO AO ESTOQUE / BAIXA DE RETORNO",
+                        "ENTREGUE AO TÉCNICO / EM CAMPO",
+                        "A SEPARAR / AGUARDANDO ALMOXARIFADO",
+                        "APLICADO EM DEFINITIVO NO CLIENTE / BAIXADO",
+                    ],
+                    help="Selecione 'DEVOLVIDO AO ESTOQUE' quando o técnico devolver a ferramenta ou sobra de peça para restabelecer imediatamente o saldo no almoxarifado."
                 )
-                if st.form_submit_button("💾 Atualizar Status da Reserva", type="primary"):
+                if st.form_submit_button("💾 Atualizar Status da Posse / Confirmar Devolução", type="primary"):
                     id_ped_alvo = int(ped_escolhido.split("|")[0].replace("#", "").strip())
                     ok_st, msg_st = atualizar_status_solicitacao_peca(ctx.db_name, id_ped_alvo, novo_st_ped)
                     if ok_st:
