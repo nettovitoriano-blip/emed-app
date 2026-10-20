@@ -54,16 +54,16 @@ def _buscar_cliente_por_cnpj_ou_nome(df: pd.DataFrame, termo_busca: str):
 
 
 def _detectar_modalidade(nome_equip: str, texto_defeito: str = "") -> str:
-    """Classifica a modalidade do equipamento para triagem técnica personalizada."""
+    """Classifica a modalidade do equipamento para triagem técnica personalizada conforme a taxonomia da EMED."""
     texto = (str(nome_equip) + " " + str(texto_defeito)).upper()
     if any(k in texto for k in ["TOMOGRA", "CT", "BRIGHTSPEED", "SOMATOM", "OPTIMA", "REVOLUTION", "LIGHTSPEED", "EMOTION", "GANTRY", "CHILLER"]):
         return "TOMOGRAFIA"
     if any(k in texto for k in ["ARCO", "C-ARM", "BV PULSERA", "BV ENDURA", "ZIEHM", "OEC", "FLUORO"]):
         return "ARCO CIRÚRGICO"
-    if any(k in texto for k in ["MAMO", "SENOGRAPHE", "SELENIA", "MAMMOMAT", "DIAMOND", "COMPRESSOR"]):
+    if any(k in texto for k in ["MAMO", "SENOGRAPHE", "SELENIA", "MAMMOMAT", "DIAMOND", "COMPRESSOR", "PLUMBIFERO"]):
         return "MAMOGRAFIA"
-    if any(k in texto for k in ["ULTRA", "USG", "ECOGRAFO", "LOGIQ", "VOLUSON", "VIVID", "AFFINITI", "EPIQ", "SONOSITE"]):
-        return "ULTRASSOM"
+    if any(k in texto for k in ["DENSITO", "LUNAR", "PRODIGY", "DPX", "HOLOGIC", "DISCOVERY", "SHUTTER"]):
+        return "DENSITOMETRIA"
     if any(k in texto for k in ["RAIO", "RX", "ESTATIVA", "BUCKY", "COLIMADOR", "GERADOR", "TUBO", "MULTIX", "XR", "RAD", "FREIO", "MESA"]):
         return "RAIO-X"
     return "OUTROS"
@@ -73,19 +73,18 @@ def _obter_dica_rapida_it(equipamento: str, relato: str) -> str:
     """Verifica se há orientações de primeiro nível baseadas nos POPs e ITs da EMED."""
     txt = (str(equipamento) + " " + str(relato)).upper()
     
-    if any(w in txt for w in ["FREIO", "ESTATIVA", "PORTA TUBO", "PORTA-TUBO", "DESTRAV", "TRILHO", "HORIZONTAL", "VERTICAL"]):
+    if any(w in txt for w in ["FREIO", "ESTATIVA", "PORTA TUBO", "PORTA-TUBO", "DESTRAV", "TRILHO", "HORIZONTAL", "VERTICAL", "SOLTO", "LIVRE"]):
         return (
-            "💡 **Orientação da Engenharia Clínica EMED (Estativa & Freios Eletromagnéticos):** "
-            "Se o freio horizontal/vertical não destravar, repare se ao pressionar o botão da manopla escuta-se o clique da bobina. "
-            "Caso **todos** os freios da sala estejam inoperantes (estativa e mesa travadas), a causa raiz costuma ser na fonte geral 24V DC. "
-            "Se for **apenas um movimento específico**, nossa equipe levará a bobina e o microswitch para substituição imediata na primeira visita."
+            "💡 **Orientação da Engenharia Clínica EMED (Estativa & Eletrofreios):** "
+            "Se o freio não estiver segurando (movimento livre) ou travar no trilho, verifique se ao apertar o botão da manopla escuta-se o estalo da bobina solenoide. "
+            "Se **todos** os freios da sala (mesa e estativa) estiverem inoperantes, a falha provável é na fonte de alimentação dos freios. "
+            "Se for **apenas um movimento específico**, nossa equipe levará a bobina solenoide e o botão de acionamento para substituição imediata."
         )
     elif "BRIVO" in txt or "TOMO" in txt or "CT385" in txt or "BRIGHTSPEED" in txt or "SOMATOM" in txt or "OPTIMA" in txt:
         if any(w in txt for w in ["TRAV", "REINIC", "COMUNIC", "GANTRY", "ERRO", "CHILLER"]):
             return (
                 "💡 **Dica da Engenharia Clínica EMED (POP-03 / IT-05):** "
-                "Para tomógrafos, caso ainda não tenha tentado, "
-                "verifique se o disjuntor de emergência do console ou a chave geral do Gantry "
+                "Para tomógrafos, verifique se o disjuntor de emergência do console ou a chave geral do Gantry "
                 "não foram acionados acidentalmente. Um ciclo de reinicialização de 60 segundos "
                 "no PDU costuma restaurar o barramento de comunicação."
             )
@@ -99,22 +98,23 @@ def _obter_dica_rapida_it(equipamento: str, relato: str) -> str:
     elif "ARCO" in txt or "C-ARM" in txt or "PULSERA" in txt or "ZIEHM" in txt:
         return (
             "💡 **Orientação Técnica EMED (Arco Cirúrgico):** "
-            "Verifique se o cabo umbilical entre o carrinho de monitores e o estativo em C está bem fixado "
+            "Verifique se o cabo umbilical entre o carrinho dos monitores e o estativo em C está bem fixado "
             "e se os freios manuais das articulações orbitais estão soltos manualmente."
         )
-    elif "ULTRA" in txt or "USG" in txt or "VOLUSON" in txt or "LOGIQ" in txt:
-        if any(w in txt for w in ["TRANSDUTOR", "CONGEL", "IMAGEM", "FREEZE"]):
-            return (
-                "💡 **Dica da Engenharia Clínica EMED:** "
-                "Desconecte e reconecte o transdutor na porta de travamento com o equipamento pausado (Freeze). "
-                "Verifique se o conector de travamento mecânico está 100% encaixado."
-            )
     elif "MAMO" in txt or "SELENIA" in txt or "SENOGRAPHE" in txt:
         return (
             "💡 **Orientação Técnica EMED (Mamografia):** "
             "Se o compressor não responder, verifique se a liberação de emergência manual foi girada "
             "e teste o pedal alternativo."
         )
+    elif "DENSITO" in txt or "LUNAR" in txt or "PRODIGY" in txt:
+        return (
+            "💡 **Orientação Técnica EMED (Densitometria Óssea):** "
+            "Verifique se o braço C desliza livremente sobre a mesa de exames e se a comunicação "
+            "com o computador do software está ativa."
+        )
+            
+    return ""
             
     return ""
 
@@ -302,77 +302,67 @@ def render_emedonline(ctx: AppContext):
 
             if modalidade == "RAIO-X":
                 st.markdown("#### ⚡ 3.1 Triagem Técnica Específica para Sistema de Raio-X (Checklist em 5 Segundos)")
-                st.caption("Perguntas focadas em estativa porta-tubo, freios eletromagnéticos, comando e alimentação:")
+                st.caption("Perguntas diretas sobre alimentação, estativa porta-tubo e eletrofreios:")
 
                 c_chk1, c_chk2 = st.columns(2)
                 with c_chk1:
-                    nome_p1 = "Rede / Gerador"
+                    nome_p1 = "Alimentação Elétrica"
                     chk_1 = st.radio(
-                        "⚡ 1. Alimentação Elétrica / Gerador de Alta Tensão:",
+                        "⚡ 1. Alimentação Elétrica (Quadro de Força):",
                         [
-                            "🟢 Fornecimento elétrico normal (Painel de comando energizado)",
-                            "🟡 Sim, houve oscilações / queda, mas a rede já estabilizou",
-                            "🔴 Disjuntor geral do comando desarmou / Sem energia no painel",
+                            "🟢 Não foi observada oscilação (Fornecimento elétrico normal)",
+                            "🟡 Houve oscilações na rede elétrica, mas o quadro já estabilizou",
+                            "🔴 Sim, houve desarme de disjuntor no quadro de força",
                         ],
                         index=0,
-                        help="Verifica se o comando do Raio-X recebe alimentação adequada da sala."
+                        help="Houve oscilação na rede elétrica? Se sim, algum disjuntor desarmou?"
                     )
-                    nome_p2 = "Freios / Movimentação"
+                    nome_p2 = "Estativa & Eletrofreio"
                     chk_2 = st.radio(
-                        "🧲 2. Estativa Porta-Tubo & Freios Eletromagnéticos:",
+                        "🧲 2. Estativa Porta-Tubo & Eletrofreio:",
                         [
-                            "🟢 Todos os movimentos e freios deslizam perfeitamente",
-                            "⚠️ Apenas esse freio/movimento relatado está travado (outros eixos liberam)",
-                            "🚨 Todos os freios travados (estativa e mesa sem destravar)",
+                            "🟢 Movimento normal (Freio atuando e segurando)",
+                            "⚠️ Movimento totalmente solto / livre (o freio não segura a estativa)",
+                            "⚠️ O movimento chega a travar em algum ponto do trilho ou patina?",
+                            "🚨 Todos os freios da sala (estativa e mesa) pararam de atuar (possível fonte de alimentação)",
                         ],
-                        index=1 if any(w in (defeito_digitado or "").upper() for w in ["FREIO", "ESTATIVA", "TRAVA", "HORIZONTAL", "VERTICAL"]) else 0,
-                        help="Indica se é falha pontual de uma bobina/solenoide ou falha geral da fonte 24V de freios."
+                        index=1 if any(w in (defeito_digitado or "").upper() for w in ["FREIO", "ESTATIVA", "TRAVA", "HORIZONTAL", "VERTICAL", "SOLTO", "LIVRE"]) else 0,
+                        help="Identifica se o freio não segura (estativa solta), se emperra no trilho ou se é falha geral da fonte de alimentação."
                     )
 
                 with c_chk2:
-                    nome_p3 = "Botão / Resposta Sonora"
+                    nome_p3 = "Botão & Resposta Sonora"
                     chk_3 = st.radio(
                         "🔊 3. Botão de Acionamento & Resposta Sonora do Freio:",
                         [
-                            "🟢 Escuta o estalo/clique da bobina ao apertar o botão (mas movimento continua pesado)",
-                            "🔇 Não escuta nenhum clique/ruído ao apertar (botão sem resposta / sem sinal elétrico)",
-                            "⚠️ Escuta ruído contínuo, zumbido anormal ou vibração na estativa",
-                            "❌ Botão de comando quebrado, emperrado ou solto",
+                            "🟢 Escuta o estalo/clique da bobina solenoide ao apertar o botão",
+                            "🔇 Não escuta nenhum clique/ruído ao apertar o botão (sem resposta elétrica)",
+                            "⚠️ Escuta ruído contínuo, zumbido anormal ou vibração",
+                            "❌ Botão de comando com defeito físico, solto ou emperrado",
                         ],
                         index=0,
-                        help="Ajuda o técnico a saber se a causa é elétrica (botão/fio espiral) ou mecânica (bobina/regulagem)."
-                    )
-                    nome_p4 = "Painel / Emissão RX"
-                    chk_4 = st.radio(
-                        "☢️ 4. Painel de Comando & Liberação de Raio-X:",
-                        [
-                            "🟢 Painel operacional e realiza disparo normal (falha restrita à mecânica/freio)",
-                            "⚠️ Painel com aviso de interlock/porta aberta ou bloqueio de feixe",
-                            "❌ Painel travado com código de erro ou apagado",
-                        ],
-                        index=0,
-                        help="Informa se o equipamento ainda realiza exames ou se a emissão está bloqueada."
+                        help="Determina se a falha é elétrica no botão/cabo ou mecânica no eletrofreio/ajuste."
                     )
 
             elif modalidade == "TOMOGRAFIA":
                 st.markdown("#### ⚡ 3.1 Triagem Técnica Específica para Tomógrafo (Checklist em 5 Segundos)")
-                st.caption("Perguntas focadas em PDU, Gantry, Console e Refrigeração:")
+                st.caption("Perguntas focadas em Quadro de Força, PDU, Gantry, Mesa e Console:")
 
                 c_chk1, c_chk2 = st.columns(2)
                 with c_chk1:
-                    nome_p1 = "Rede / PDU"
+                    nome_p1 = "Quadro / PDU / Estabilizador"
                     chk_1 = st.radio(
-                        "⚡ 1. Alimentação Geral, PDU e Nobreak da Console:",
+                        "⚡ 1. Alimentação Elétrica (Quadro de Força, PDU / Estabilizador):",
                         [
-                            "🟢 Fornecimento normal (PDU e Nobreak operacionais)",
+                            "🟢 Fornecimento normal (PDU e Nobreak/Estabilizador operacionais)",
                             "🟡 Houve oscilações de rede / gerador, mas já estabilizou",
                             "🔴 Disjuntor principal do PDU caiu ou Nobreak em alarme sonoro",
                         ],
                         index=0,
                     )
-                    nome_p2 = "Gantry / Rotação"
+                    nome_p2 = "Gantry & Mesa"
                     chk_2 = st.radio(
-                        "🌀 2. Gantry & Mesa de Paciente:",
+                        "🌀 2. Gantry & Mesa de Exames:",
                         [
                             "🟢 Gantry energizado, rotação livre e mesa movimenta normalmente",
                             "⚠️ Gantry bloqueado por interlock/comunicação ou parada de emergência",
@@ -382,36 +372,26 @@ def render_emedonline(ctx: AppContext):
                     )
 
                 with c_chk2:
-                    nome_p3 = "Console / Reconstrução"
+                    nome_p3 = "Console de Operação"
                     chk_3 = st.radio(
-                        "🖥️ 3. Console de Operação & Sistema de Reconstrução:",
+                        "🖥️ 3. Console de Operação & Software:",
                         [
-                            "🔄 Sim, reiniciamos a console e a mensagem de erro persiste",
-                            "⚠️ Não reiniciamos por precaução técnica",
-                            "❌ Console travada na inicialização / Não carrega software de exame",
-                        ],
-                        index=0,
-                    )
-                    nome_p4 = "Chiller / Temperatura"
-                    chk_4 = st.radio(
-                        "🌡️ 4. Temperatura, Chiller e Sinais Físicos:",
-                        [
-                            "🟢 Temperatura estável (Sem alertas térmicos no display)",
-                            "⚠️ Alerta de temperatura alta no tubo ou chiller em alarme no display",
-                            "🚨 Ruído mecânico anormal, vibração excessiva ou odor atípico",
+                            "🟢 Console inicializa normalmente e abre tela de exames",
+                            "🔄 Reiniciamos a console e a mensagem de erro persiste",
+                            "❌ Console congelada / Não carrega o software de exame",
                         ],
                         index=0,
                     )
 
             elif modalidade == "ARCO CIRÚRGICO":
                 st.markdown("#### ⚡ 3.1 Triagem Técnica para Arco Cirúrgico (C-Arm)")
-                st.caption("Perguntas focadas em articulações, freios do braço em C, pedal e imagem:")
+                st.caption("Perguntas focadas em alimentação, braço em C, pedal e carrinho dos monitores:")
 
                 c_chk1, c_chk2 = st.columns(2)
                 with c_chk1:
-                    nome_p1 = "Alimentação Sala"
+                    nome_p1 = "Alimentação & Cabo"
                     chk_1 = st.radio(
-                        "⚡ 1. Alimentação Elétrica da Sala & Cabo de Força:",
+                        "⚡ 1. Alimentação Elétrica & Cabo Umbilical / Interligação:",
                         [
                             "🟢 Cabo e conexões elétricas normais (Carrinho energizado)",
                             "🟡 Oscilação na rede da sala cirúrgica",
@@ -419,9 +399,9 @@ def render_emedonline(ctx: AppContext):
                         ],
                         index=0,
                     )
-                    nome_p2 = "Freios Braço C"
+                    nome_p2 = "Braço em C"
                     chk_2 = st.radio(
-                        "🦾 2. Articulações e Freios Manuais do Braço em C:",
+                        "🦾 2. Braço em C (Movimentos Orbitais & Freios Manuais):",
                         [
                             "🟢 Todos os freios e movimentos orbitais/angulares livres",
                             "⚠️ Freio orbital ou angular específico duro/travado",
@@ -431,46 +411,36 @@ def render_emedonline(ctx: AppContext):
                     )
 
                 with c_chk2:
-                    nome_p3 = "Pedal / Disparo"
+                    nome_p3 = "Monitores & Pedal"
                     chk_3 = st.radio(
-                        "🦶 3. Pedal de Disparo & Comandos de Fluoroscopia:",
+                        "🦶 3. Carrinho dos Monitores & Pedal de Disparo:",
                         [
-                            "🟢 Pedal e acionamento manual respondem normalmente",
+                            "🟢 Imagem nítida nos monitores e pedal acionando normalmente",
                             "⚠️ Pedal falhando intermitente ou cabo com mau contato",
-                            "❌ Bloqueio de emissão de RX / Erro de fluoroscopia no display",
-                        ],
-                        index=0,
-                    )
-                    nome_p4 = "Monitores / Imagem"
-                    chk_4 = st.radio(
-                        "📺 4. Monitores de Vídeo e Sinal de Imagem:",
-                        [
-                            "🟢 Imagem nítida nos dois monitores cirúrgicos",
-                            "⚠️ Ruído na imagem, cintilação ou listras na tela",
-                            "❌ Sem sinal de vídeo / Monitores pretos",
+                            "❌ Sem sinal de vídeo nos monitores ou erro de fluoroscopia",
                         ],
                         index=0,
                     )
 
             elif modalidade == "MAMOGRAFIA":
                 st.markdown("#### ⚡ 3.1 Triagem Técnica para Mamógrafo")
-                st.caption("Perguntas focadas em compressor, pedais, braço e detector:")
+                st.caption("Perguntas focadas em Quadro de Força, Gantry, Compressor e Painel:")
 
                 c_chk1, c_chk2 = st.columns(2)
                 with c_chk1:
-                    nome_p1 = "Alimentação / Gerador"
+                    nome_p1 = "Quadro de Força"
                     chk_1 = st.radio(
-                        "⚡ 1. Alimentação do Gerador e Painel de Controle:",
+                        "⚡ 1. Quadro de Força & Alimentação Elétrica:",
                         [
-                            "🟢 Alimentação normal e painel operacional",
+                            "🟢 Alimentação normal e disjuntores ligados",
                             "🟡 Instabilidade momentânea na rede elétrica",
-                            "🔴 Disjuntor desarmou / Sistema não inicializa",
+                            "🔴 Disjuntor desarmou no quadro de força / Sistema apagado",
                         ],
                         index=0,
                     )
-                    nome_p2 = "Compressor / Bucky"
+                    nome_p2 = "Gantry & Compressor"
                     chk_2 = st.radio(
-                        "🗜️ 2. Sistema de Compressão & Descompressão:",
+                        "🗜️ 2. Gantry & Sistema de Compressão da Mama:",
                         [
                             "🟢 Compressor sobe e desce suavemente",
                             "⚠️ Prato de compressão duro ou não sobe",
@@ -480,72 +450,52 @@ def render_emedonline(ctx: AppContext):
                     )
 
                 with c_chk2:
-                    nome_p3 = "Pedais / Movimento"
+                    nome_p3 = "Painel & Biombo"
                     chk_3 = st.radio(
-                        "🦶 3. Pedais de Comando e Botões do Braço:",
+                        "🖥️ 3. Painel de Operação & Vidro Plumbífero:",
                         [
-                            "🟢 Pedais e botões respondem de imediato",
-                            "⚠️ Um dos pedais sem contato ou com falha intermitente",
-                            "❌ Sem resposta motora ao acionar pedais",
-                        ],
-                        index=0,
-                    )
-                    nome_p4 = "Detector / Disparo"
-                    chk_4 = st.radio(
-                        "☢️ 4. Emissão de Feixe & Detector Digital:",
-                        [
-                            "🟢 Detector calibrado e liberado para disparo",
-                            "⚠️ Erro de comunicação com detector digital",
-                            "❌ Bloqueio de exposição de Raio-X",
+                            "🟢 Painel respondendo e intertravamento de segurança íntegro",
+                            "⚠️ Mensagem de erro no painel ou botão com mau contato",
+                            "❌ Painel travado / Sem resposta aos comandos de exposição",
                         ],
                         index=0,
                     )
 
-            elif modalidade == "ULTRASSOM":
-                st.markdown("#### ⚡ 3.1 Triagem Específica para Equipamento de Ultrassom")
-                st.caption("Perguntas focadas em transdutores, teclado/trackball, boot e imagem:")
+            elif modalidade == "DENSITOMETRIA":
+                st.markdown("#### ⚡ 3.1 Triagem Técnica para Densitometria Óssea")
+                st.caption("Perguntas focadas em Fonte HV, Mesa, Braço C, Shutter e Software:")
 
                 c_chk1, c_chk2 = st.columns(2)
                 with c_chk1:
-                    nome_p1 = "Alimentação / Boot"
+                    nome_p1 = "Fonte HV & Alimentação"
                     chk_1 = st.radio(
-                        "⚡ 1. Inicialização & Alimentação Elétrica:",
+                        "⚡ 1. Fonte de Alta Tensão & Alimentação Elétrica:",
                         [
-                            "🟢 Liga normalmente direto na tomada/estabilizador",
-                            "⚠️ Desliga sozinho durante o exame ou falha de bateria",
-                            "🔴 Aparelho não dá sinal de força / Fonte inoperante",
+                            "🟢 Alimentação estável e fonte de alta tensão sem desarme",
+                            "🟡 Oscilação momentânea na rede elétrica",
+                            "🔴 Fonte de alta tensão desarmada / Sem alimentação",
                         ],
                         index=0,
                     )
-                    nome_p2 = "Transdutores"
+                    nome_p2 = "Mesa, Braço C & Shutter"
                     chk_2 = st.radio(
-                        "🩺 2. Reconhecimento de Transdutores:",
+                        "🦴 2. Mesa de Exames & Braço C (Shutter/Colimador):",
                         [
-                            "🟢 Todos os transdutores operando perfeitamente",
-                            "⚠️ Apenas um transdutor específico com falha (outros funcionam)",
-                            "🚨 Conector danificado, cabo cortado ou cristal trincado",
+                            "🟢 Braço C desliza suavemente sobre a mesa e shutter abre normal",
+                            "⚠️ Movimento do braço C pesado/patinando ou shutter emperrado",
+                            "🚨 Braço C totalmente travado ou colimador bloqueado",
                         ],
                         index=0,
                     )
 
                 with c_chk2:
-                    nome_p3 = "Painel / Teclado"
+                    nome_p3 = "Computador & Cabos HV"
                     chk_3 = st.radio(
-                        "🖱️ 3. Painel, Teclado e Trackball:",
+                        "💻 3. Computador com Software & Cabos de Alta Tensão:",
                         [
-                            "🟢 Controles suaves e respondendo ao toque",
-                            "⚠️ Trackball travando ou botões de ganho emperrados",
-                            "❌ Software travado na tela de inicialização / Sem resposta",
-                        ],
-                        index=0,
-                    )
-                    nome_p4 = "Imagem / Monitor"
-                    chk_4 = st.radio(
-                        "📺 4. Qualidade de Imagem no Monitor:",
-                        [
-                            "🟢 Imagem ultrassonográfica limpa (modo B/Doppler)",
-                            "⚠️ Linhas pretas verticais (dropouts) ou ruído estático na tela",
-                            "❌ Tela apagada / Chuvisco sem imagem de eco",
+                            "🟢 Software comunica normalmente com o equipamento",
+                            "⚠️ Erro de comunicação serial/USB entre computador e mesa",
+                            "❌ Software trava na calibração diária ou falha nos cabos HV",
                         ],
                         index=0,
                     )
@@ -556,45 +506,35 @@ def render_emedonline(ctx: AppContext):
 
                 c_chk1, c_chk2 = st.columns(2)
                 with c_chk1:
-                    nome_p1 = "Rede Elétrica"
+                    nome_p1 = "Alimentação Elétrica"
                     chk_1 = st.radio(
-                        "⚡ 1. Houve oscilação na rede elétrica ou falta de energia no prédio?",
+                        "⚡ 1. Alimentação Elétrica (Quadro de Força):",
                         [
                             "🟢 Não foi observada oscilação (Fornecimento normal)",
                             "🟡 Sim, houve oscilações / queda, mas a rede já estabilizou",
-                            "🔴 Sim, faltou energia no prédio / instabilidade no gerador",
+                            "🔴 Sim, houve desarme de disjuntor no quadro",
                         ],
                         index=0,
                     )
-                    nome_p2 = "Disjuntor / Alimentação"
+                    nome_p2 = "Mecânica & Estrutura"
                     chk_2 = st.radio(
-                        "🔌 2. O disjuntor do equipamento ou nobreak desarmou?",
+                        "⚙️ 2. Funcionamento Mecânico & Estrutural:",
                         [
-                            "🟢 Normal (Nenhum desarme ou alarme sonoro)",
-                            "⚠️ Sim, disjuntor desarmou ou nobreak em alarme",
-                            "❓ Não observado / Sem acesso ao quadro",
+                            "🟢 Movimentação mecânica normal",
+                            "⚠️ Travamento ou folga em movimento específico",
+                            "🚨 Equipamento totalmente imobilizado",
                         ],
                         index=0,
                     )
 
                 with c_chk2:
-                    nome_p3 = "Reinicialização"
+                    nome_p3 = "Painel & Comandos"
                     chk_3 = st.radio(
-                        "🔄 3. Foi realizada tentativa de reinicialização (desligar e ligar)?",
+                        "🖥️ 3. Painel de Controle & Comandos:",
                         [
-                            "🔄 Sim, reiniciamos e o erro persistiu",
-                            "⚠️ Não reiniciamos por precaução",
-                            "❌ Sistema travado / Não desliga",
-                        ],
-                        index=0,
-                    )
-                    nome_p4 = "Sinais Físicos"
-                    chk_4 = st.radio(
-                        "🌡️ 4. Notou ruído mecânico anormal, aquecimento ou cheiro atípico?",
-                        [
-                            "🟢 Nenhum ruído ou aquecimento (Erro apenas no display)",
-                            "⚠️ Alerta de temperatura no display",
-                            "🚨 Ruído mecânico anormal ou odor característico",
+                            "🟢 Comandos e botões respondendo normalmente",
+                            "🔄 Reiniciamos o equipamento e o erro persistiu",
+                            "❌ Painel inoperante ou travado na inicialização",
                         ],
                         index=0,
                     )
@@ -662,8 +602,7 @@ def render_emedonline(ctx: AppContext):
                     checklist_resumo = (
                         f"[{nome_p1}: {chk_1}] "
                         f"[{nome_p2}: {chk_2}] "
-                        f"[{nome_p3}: {chk_3}] "
-                        f"[{nome_p4}: {chk_4}]"
+                        f"[{nome_p3}: {chk_3}]"
                     )
 
                     novo_chamado = {
@@ -735,8 +674,7 @@ def render_emedonline(ctx: AppContext):
                             f"*TRIAGEM TÉCNICA ({modalidade}):*\n"
                             f"• {nome_p1}: {chk_1}\n"
                             f"• {nome_p2}: {chk_2}\n"
-                            f"• {nome_p3}: {chk_3}\n"
-                            f"• {nome_p4}: {chk_4}\n\n"
+                            f"• {nome_p3}: {chk_3}\n\n"
                             f"🧰 Kit Sugerido: {kit_sugerido.get('nome')}\n"
                             f"Solicitante: {nome_solicitante} ({contato_solicitante})\n"
                             f"Técnico Programado: {tec_sugerido}\n"

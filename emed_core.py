@@ -127,14 +127,22 @@ KITS_INSTRUMENTOS_POR_SITUACAO = {
         ],
     },
     "FREIOS / MECÂNICA": {
-        "nome": "KIT 6: MECÂNICA & FREIOS ELETROMAGNÉTICOS (RAIO-X / ESTATIVA)",
+        "nome": "KIT 6: MECÂNICA & ELETROFREIOS (RAIO-X / ESTATIVA)",
         "itens": [
-            "Multímetro True RMS (Teste de Alimentação 24V DC / Continuidade)",
-            "Kit de Bobinas Solenoides Sobressalentes (Freio Horizontal e Vertical)",
-            "Microswitches / Chaves Fim de Curso de Acionamento da Manopla",
-            "Jogo de Chaves Allen (Métricas e Polegadas) para Ajuste de Pastilhas",
-            "Spray Limpa Contatos e Desengripante Mecânico Não-Resinoso",
-            "Fiação Flexível / Conectores de Trava para Chicote Espiralado",
+            "Bobinas Solenoides / Eletrofreio Sobressalentes",
+            "Botões de Acionamento / Microswitches de Reposição",
+            "Jogo de Chaves Allen (Métricas e Polegadas) para Ajuste Mecânico",
+            "Cabo de Alimentação / Chicote Flexível",
+            "Kit Limpeza Padrão (Limpa-Contatos Elétricos, Desengripante, Veja, Panos e Aspirador)",
+        ],
+    },
+    "DENSITOMETRIA": {
+        "nome": "KIT 7: DENSITOMETRIA ÓSSEA (BRAÇO C / SHUTTER / CABOS HV)",
+        "itens": [
+            "Kit Mecânico para Braço C e Shutter/Colimador",
+            "Cabos de Alta Tensão (HV) Sobressalentes",
+            "Fantoma Oficial de Calibração de Densidade Óssea",
+            "Kit Limpeza Padrão (Limpa-Contatos Elétricos, Desengripante, Veja, Panos e Aspirador)",
         ],
     },
 }
@@ -145,15 +153,16 @@ def obter_kit_por_servico(tipo_servico: str, defeito: str = "") -> dict:
     texto_busca = ((tipo_servico or "") + " " + (defeito or "")).upper()
     if any(k in texto_busca for k in ["FREIO", "ESTATIVA", "PORTA TUBO", "PORTA-TUBO", "TRILHO", "MECANIC"]):
         return KITS_INSTRUMENTOS_POR_SITUACAO["FREIOS / MECÂNICA"]
+    if any(k in texto_busca for k in ["DENSITO", "LUNAR", "PRODIGY", "SHUTTER"]):
+        return KITS_INSTRUMENTOS_POR_SITUACAO["DENSITOMETRIA"]
     for chave, dados in KITS_INSTRUMENTOS_POR_SITUACAO.items():
         if chave in texto_busca:
             return dados
     return {
         "nome": "KIT GERAL DE ATENDIMENTO",
         "itens": [
-            "Multímetro Digital True RMS",
             "Maleta de Ferramentas Manuais Básica",
-            "Álcool Isopropílico e Pano ESD",
+            "Kit Limpeza Padrão (Limpa-Contatos, Desengripante, Veja, Panos e Aspirador)",
             "EPI Padrão",
         ]
     }
