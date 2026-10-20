@@ -118,8 +118,9 @@ KITS_INSTRUMENTOS_POR_SITUACAO = {
         ],
     },
     "CALIBRAÇÃO / QA": {
-        "nome": "KIT 5: CALIBRAÇÃO & CONTROLE DE QUALIDADE (QA)",
+        "nome": "KIT 5: CALIBRAÇÃO, QA & FOTOCÉLULA (AEC)",
         "itens": [
+            "Multímetro Especial até 1000V (Aferição de Tensão na Fotocélula / AEC)",
             "Medidor de Radiação Multi-Parâmetro (kVp, Dose, Tempo, CSR)",
             "Fantoma de Resolução Espacial e Baixo Contraste",
             "Trena Métrica e Posicionador Radiográfico",
@@ -131,7 +132,6 @@ KITS_INSTRUMENTOS_POR_SITUACAO = {
         "itens": [
             "Bobinas Solenoides / Eletrofreio Sobressalentes",
             "Botões de Acionamento / Microswitches de Reposição",
-            "Jogo de Chaves Allen (Métricas e Polegadas) para Ajuste Mecânico",
             "Cabo de Alimentação / Chicote Flexível",
             "Kit Limpeza Padrão (Limpa-Contatos Elétricos, Desengripante, Veja, Panos e Aspirador)",
         ],
@@ -145,16 +145,30 @@ KITS_INSTRUMENTOS_POR_SITUACAO = {
             "Kit Limpeza Padrão (Limpa-Contatos Elétricos, Desengripante, Veja, Panos e Aspirador)",
         ],
     },
+    "SISTEMA DIGITAL": {
+        "nome": "KIT 8: SISTEMAS DIGITAIS (DR / CR & WORKSTATION)",
+        "itens": [
+            "Interface Box / Fonte de Alimentação do Detector DR",
+            "Baterias Sobressalentes e Carregador para Flat Panel Wi-Fi",
+            "Cabos de Comunicação / Tether Cable e Rede Cat6 Blindados",
+            "Fantoma de Resolução e Contraste para Imagem Digital",
+            "Kit Limpeza Óptica e Telas de Fósforo (Pano ESD e Álcool Isopropílico)",
+        ],
+    },
 }
 
 
 def obter_kit_por_servico(tipo_servico: str, defeito: str = "") -> dict:
     """Retorna o Kit de Instrumentos mais indicado com base no tipo de serviço e no relato técnico."""
     texto_busca = ((tipo_servico or "") + " " + (defeito or "")).upper()
+    if any(k in texto_busca for k in ["FOTOCEL", "FOTO-CEL", "AEC", "1000V"]):
+        return KITS_INSTRUMENTOS_POR_SITUACAO["CALIBRAÇÃO / QA"]
     if any(k in texto_busca for k in ["FREIO", "ESTATIVA", "PORTA TUBO", "PORTA-TUBO", "TRILHO", "MECANIC"]):
         return KITS_INSTRUMENTOS_POR_SITUACAO["FREIOS / MECÂNICA"]
     if any(k in texto_busca for k in ["DENSITO", "LUNAR", "PRODIGY", "SHUTTER"]):
         return KITS_INSTRUMENTOS_POR_SITUACAO["DENSITOMETRIA"]
+    if any(k in texto_busca for k in ["DR", "CR", "FLAT PANEL", "DETECTOR", "DIGITALIZADOR", "CHASSI", "CASSETE", "WORKSTATION", "DICOM"]):
+        return KITS_INSTRUMENTOS_POR_SITUACAO["SISTEMA DIGITAL"]
     for chave, dados in KITS_INSTRUMENTOS_POR_SITUACAO.items():
         if chave in texto_busca:
             return dados

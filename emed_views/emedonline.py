@@ -56,6 +56,8 @@ def _buscar_cliente_por_cnpj_ou_nome(df: pd.DataFrame, termo_busca: str):
 def _detectar_modalidade(nome_equip: str, texto_defeito: str = "") -> str:
     """Classifica a modalidade do equipamento para triagem técnica personalizada conforme a taxonomia da EMED."""
     texto = (str(nome_equip) + " " + str(texto_defeito)).upper()
+    if any(k in texto for k in ["DR", "CR", "FLAT PANEL", "DETECTOR", "DIGITALIZADOR", "CASSETE", "CHASSI", "NEUVISION", "AGFA", "FUJI", "KONICA", "CARESTREAM", "WORKSTATION"]):
+        return "SISTEMA DIGITAL (DR / CR)"
     if any(k in texto for k in ["TOMOGRA", "CT", "BRIGHTSPEED", "SOMATOM", "OPTIMA", "REVOLUTION", "LIGHTSPEED", "EMOTION", "GANTRY", "CHILLER"]):
         return "TOMOGRAFIA"
     if any(k in texto for k in ["ARCO", "C-ARM", "BV PULSERA", "BV ENDURA", "ZIEHM", "OEC", "FLUORO"]):
@@ -80,6 +82,12 @@ def _obter_dica_rapida_it(equipamento: str, relato: str) -> str:
             "Se **todos** os freios da sala (mesa e estativa) estiverem inoperantes, a falha provável é na fonte de alimentação dos freios. "
             "Se for **apenas um movimento específico**, nossa equipe levará a bobina solenoide e o botão de acionamento para substituição imediata."
         )
+    elif any(w in txt for w in ["DR", "CR", "FLAT PANEL", "DETECTOR", "CHASSI", "CASSETE", "DIGITALIZADOR"]):
+        return (
+            "💡 **Orientação Técnica EMED (Sistemas Digitais DR / CR):** "
+            "Para DR: verifique se a interface box está energizada e se o Wi-Fi do painel conectou na workstation. "
+            "Para CR: verifique se o chassi foi inserido com a trava no sentido correto e se o leitor não está em ciclo de apagamento."
+        )
     elif "BRIVO" in txt or "TOMO" in txt or "CT385" in txt or "BRIGHTSPEED" in txt or "SOMATOM" in txt or "OPTIMA" in txt:
         if any(w in txt for w in ["TRAV", "REINIC", "COMUNIC", "GANTRY", "ERRO", "CHILLER"]):
             return (
@@ -89,7 +97,7 @@ def _obter_dica_rapida_it(equipamento: str, relato: str) -> str:
                 "no PDU costuma restaurar o barramento de comunicação."
             )
     elif "RAIO" in txt or "LOTUS" in txt or "HF500" in txt or "RX" in txt or "MULTIX" in txt:
-        if any(w in txt for w in ["DISPAR", "COLIM", "EMISS", "GERADOR", "KV", "MAS", "FEIXE"]):
+        if any(w in txt for w in ["DISPAR", "COLIM", "EMISS", "GERADOR", "KV", "MAS", "FEIXE", "FOTOCEL"]):
             return (
                 "💡 **Dica da Engenharia Clínica EMED (POP-Lotus HF500 / IT-RX):** "
                 "Para sistemas de Raio-X, confirme se o botão de disparo de 2 estágios está com o cabo íntegro "
@@ -496,6 +504,46 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Software comunica normalmente com o equipamento",
                             "⚠️ Erro de comunicação serial/USB entre computador e mesa",
                             "❌ Software trava na calibração diária ou falha nos cabos HV",
+                        ],
+                        index=0,
+                    )
+
+            elif modalidade == "SISTEMA DIGITAL (DR / CR)":
+                st.markdown("#### ⚡ 3.1 Triagem Técnica para Sistemas Digitais (DR / CR)")
+                st.caption("Perguntas focadas em Detector Flat Panel, Leitora CR, Interface Box e Workstation:")
+
+                c_chk1, c_chk2 = st.columns(2)
+                with c_chk1:
+                    nome_p1 = "Alimentação & Rede"
+                    chk_1 = st.radio(
+                        "⚡ 1. Alimentação Elétrica & Comunicação de Rede:",
+                        [
+                            "🟢 Alimentação e rede normais (Computador e detector/leitora comunicando)",
+                            "⚠️ Erro de rede / Falha de comunicação entre o detector/leitora e o PC",
+                            "🔴 Equipamento não liga / Fonte de alimentação ou Interface Box sem energia",
+                        ],
+                        index=0,
+                    )
+                    nome_p2 = "Detector DR / Leitora CR"
+                    chk_2 = st.radio(
+                        "📸 2. Detector Flat Panel (DR) ou Leitora de Chassi (CR):",
+                        [
+                            "🟢 Detector/Leitora lê e transfere a imagem normalmente",
+                            "⚠️ DR: Detector desconectando, bateria fraca ou cabo com mau contato",
+                            "⚠️ CR: Chassi enroscou/travou no mecanismo da leitora de fósforo",
+                            "🚨 Detector DR sofreu queda/impacto ou placa de fósforo do CR arranhada",
+                        ],
+                        index=0,
+                    )
+
+                with c_chk2:
+                    nome_p3 = "Software & Imagem"
+                    chk_3 = st.radio(
+                        "💻 3. Software de Aquisição (Workstation) & Imagem:",
+                        [
+                            "🟢 Imagem nítida e processamento DICOM normal",
+                            "⚠️ Artefatos na imagem (linhas pretas/brancas, manchas ou corte de borda)",
+                            "❌ Software travado na tela de captura / Imagem não carrega",
                         ],
                         index=0,
                     )
