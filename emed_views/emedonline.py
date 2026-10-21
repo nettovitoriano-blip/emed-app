@@ -159,8 +159,73 @@ def _obter_dica_rapida_it(equipamento: str, relato: str) -> str:
         )
             
     return ""
-            
-    return ""
+
+
+def _organizar_rotas_inteligentes(df_ativos: pd.DataFrame, equipa_tecnica: dict):
+    """
+    Agrupa chamados ativos geograficamente por Hospital/Unidade e Polo Regional.
+    Calcula economia de deslocamento, ferramentas consolidadas e técnico sugerido por proximidade.
+    """
+    if df_ativos.empty:
+        return []
+
+    df_temp = df_ativos.copy()
+    df_temp["cli_norm"] = df_temp["cliente"].astype(str).str.strip().str.upper()
+    df_temp["cid_norm"] = df_temp["cidade"].astype(str).str.strip().str.upper()
+
+    grupos = []
+    for (cli, cid), g in df_temp.groupby(["cli_norm", "cid_norm"]):
+        qtd_chamados = len(g)
+        primeira_linha = g.iloc[0]
+        end = limpar_texto(primeira_linha.get("endereco"), "")
+        uf = limpar_texto(primeira_linha.get("estado"), "CE")
+        
+        # Identifica se há máquina parada
+        tem_parada = any("PARADO" in str(r.get("condicao_inicial", "")).upper() for _, r in g.iterrows())
+        
+        # Sugere técnico próximo por proximidade de sede/cidade
+        tec_sugerido = "A DEFINIR"
+        for t_nome, t_info in equipa_tecnica.items():
+            s_cidade = str(t_info.get("sede", "")).upper()
+            p_cidade = str(t_info.get("partida", "")).upper()
+            if s_cidade in cid or p_cidade in cid or cid in s_cidade or cid in p_cidade:
+                tec_sugerido = t_nome
+                break
+        
+        if tec_sugerido == "A DEFINIR" and equipa_tecnica:
+            tecs_atuais = [str(r.get("tecnico_responsavel", "")).strip().upper() for _, r in g.iterrows() if str(r.get("tecnico_responsavel", "")).strip().upper() not in ["A DEFINIR", "N/D", ""]]
+            tec_sugerido = tecs_atuais[0] if tecs_atuais else list(equipa_tecnica.keys())[0]
+
+        # Consolidar kits necessários para toda a rota sem duplicar
+        kits_consolidados = []
+        for _, r in g.iterrows():
+            inst = str(r.get("instrumento_necessario", "")).strip()
+            if inst and inst != "N/D" and inst not in kits_consolidados:
+                kits_consolidados.append(inst)
+            else:
+                mod_it = _detectar_modalidade(r.get("equipamento", ""), r.get("defeito_relatado", ""))
+                kit_auto = obter_kit_por_servico(r.get("tipo_servico", "CORRETIVA"), f"{mod_it} {r.get('equipamento', '')} {r.get('defeito_relatado', '')}")
+                nome_k = kit_auto.get("nome", "MALETA DE CALIBRAÇÃO PADRÃO")
+                if nome_k not in kits_consolidados:
+                    kits_consolidados.append(nome_k)
+
+        grupos.append({
+            "cliente": cli,
+            "cidade": cid,
+            "estado": uf,
+            "endereco": end,
+            "qtd": qtd_chamados,
+            "tem_parada": tem_parada,
+            "indices": g.index.tolist(),
+            "df_sub": g,
+            "tec_sugerido": tec_sugerido,
+            "kits": kits_consolidados,
+            "economia_viagens": max(0, qtd_chamados - 1)
+        })
+
+    # Ordena: Rotas com mais chamados primeiro (maior economia de deslocamento), depois as com máquinas paradas
+    grupos.sort(key=lambda x: (x["qtd"], 1 if x["tem_parada"] else 0), reverse=True)
+    return grupos
 
 
 def render_emedonline(ctx: AppContext):
@@ -939,62 +1004,231 @@ def render_emedonline(ctx: AppContext):
     # =========================================================================
     with aba_despacho:
         st.markdown("### 🗺️ Gestão de Corretivas & Otimização de Rotas")
-        st.caption("Acompanhe os chamados abertos e reordene as rotas dos técnicos em tempo real.")
+        st.caption("O sistema avalia a localização dos chamados ativos, agrupa atendimentos no mesmo local/polo e permite o despacho em bloco para o técnico disponível.")
 
         df_ativos = df[df["status"].astype(str).str.upper().isin(["ATIVO", "EM ATENDIMENTO"])]
-        
+
         if df_ativos.empty:
             st.info("ℹ️ Não existem chamados pendentes de atendimento no momento.")
         else:
-            st.markdown(f"**Total de Chamados Ativos:** `{len(df_ativos)}`")
-            
-            for idx_a, row_a in df_ativos.iterrows():
-                id_os_a = obter_id_os(idx_a, row_a)
-                cli_a = limpar_texto(row_a.get("cliente"), "N/D")
-                eq_a = limpar_texto(row_a.get("equipamento"), "N/D")
-                def_a = limpar_texto(row_a.get("defeito_relatado"), limpar_texto(row_a.get("pendencias"), "-"))
-                tec_a = limpar_texto(row_a.get("tecnico_responsavel"), "A DEFINIR")
-                cid_a = limpar_texto(row_a.get("cidade"), "FORTALEZA")
-                end_a = limpar_texto(row_a.get("endereco"), "")
-                cond_ini_a = limpar_texto(row_a.get("condicao_inicial"), "OPERACIONAL")
-                foto_a = limpar_texto(row_a.get("foto_evidencia"), "")
+            rotas_agrupadas = _organizar_rotas_inteligentes(df_ativos, equipa_tecnica)
+            total_economia = sum(r["economia_viagens"] for r in rotas_agrupadas)
+            paradas_total = sum(1 for _, r in df_ativos.iterrows() if "PARADO" in str(r.get("condicao_inicial", "")).upper())
 
-                cor_borda = "#ef4444" if "PARADO" in cond_ini_a.upper() else "#38bdf8"
-                badge_status = "🔴 MÁQUINA PARADA" if "PARADO" in cond_ini_a.upper() else "🟡 FALHA PARCIAL"
+            # Indicadores no Topo
+            col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
+            with col_kpi1:
+                st.metric("Total de Chamados Ativos", len(df_ativos))
+            with col_kpi2:
+                st.metric("Rotas Geográficas Propostas", len(rotas_agrupadas))
+            with col_kpi3:
+                st.metric("Viagens Economizadas", f"⚡ {total_economia} viagens", help="Deslocamentos poupados ao agrupar múltiplos equipamentos no mesmo local/cidade.")
+            with col_kpi4:
+                st.metric("Máquinas Críticas Paradas", f"🚨 {paradas_total}")
 
-                with st.expander(f"OS #{id_os_a} | {badge_status} | {cli_a} — {eq_a} [Técnico: {tec_a}]"):
-                    c_det1, c_det2 = st.columns([2.5, 1.5])
-                    with c_det1:
-                        st.markdown(f"**Cliente:** `{cli_a}` | **Cidade:** `{cid_a}`")
-                        st.markdown(f"**Endereço:** {end_a}")
-                        st.markdown(f"**Defeito Relatado:** {def_a}")
-                        pre_at_txt = limpar_texto(row_a.get("pre_atendimento"), "")
-                        if "REDE ELÉTRICA" in pre_at_txt or "ENERGIA:" in pre_at_txt:
-                            st.caption(f"⚡ **Diagnóstico Preliminar:** {pre_at_txt}")
-                        st.markdown(f"**Técnico Atual Designado:** `{tec_a}`")
-                        
-                        # Link para Waze / Google Maps
-                        if end_a:
-                            end_encoded = urllib.parse.quote(f"{end_a}, {cid_a}")
-                            st.markdown(
-                                f"""
-                                <div style="margin-top: 10px;">
-                                    <a href="https://www.google.com/maps/search/?api=1&query={end_encoded}" target="_blank" style="text-decoration: none; background: #0f766e; color: #fff; padding: 6px 12px; border-radius: 5px; font-size: 12px; font-weight: bold; margin-right: 8px;">
-                                        📍 Ver no Google Maps
-                                    </a>
-                                    <a href="https://waze.com/ul?q={end_encoded}" target="_blank" style="text-decoration: none; background: #0284c7; color: #fff; padding: 6px 12px; border-radius: 5px; font-size: 12px; font-weight: bold;">
-                                        🚗 Navegar pelo Waze
-                                    </a>
-                                </div>
-                                """,
-                                unsafe_allow_html=True,
+            st.markdown("---")
+
+            sub_aba_rotas, sub_aba_individual = st.tabs([
+                "🧠 1. Rotas Otimizadas & Despacho em Bloco",
+                "📋 2. Todos os Chamados Ativos (Visão Detalhada)"
+            ])
+
+            with sub_aba_rotas:
+                st.markdown("#### 🚗 Sugestões de Rotas por Proximidade e Mesmo Estabelecimento")
+                st.info("💡 **Inteligência de Rota:** Chamados para a mesma instituição ou cidade foram agrupados. Escolha o técnico disponível para despachar a rota inteira com 1 clique.")
+
+                lista_tecnicos_nomes = sorted(list(equipa_tecnica.keys()))
+                if not lista_tecnicos_nomes:
+                    lista_tecnicos_nomes = ["NETTO", "ANTONIO", "GABRIEL", "SÉRGIO", "ARQUIMEDES", "TONY", "JAIR", "FELIPE"]
+
+                for num_r, r_info in enumerate(rotas_agrupadas, 1):
+                    cli_r = r_info["cliente"]
+                    cid_r = r_info["cidade"]
+                    uf_r = r_info["estado"]
+                    end_r = r_info["endereco"]
+                    qtd_r = r_info["qtd"]
+                    df_r = r_info["df_sub"]
+                    tec_sug_r = r_info["tec_sugerido"]
+
+                    icone_alerta = "🚨" if r_info["tem_parada"] else "🟢"
+                    badge_economia = f"⚡ Economia de {r_info['economia_viagens']} viagens!" if r_info['economia_viagens'] > 0 else "Atendimento Pontual"
+                    titulo_card = (
+                        f"Rota #{num_r}: {cli_r} — {cid_r}/{uf_r} ({qtd_r} Equipamentos | {badge_economia})"
+                    )
+
+                    with st.expander(f"{icone_alerta} {titulo_card}", expanded=(num_r <= 3)):
+                        c_col1, c_col2 = st.columns([2.5, 1.5])
+                        with c_col1:
+                            st.markdown(f"**Instituição / Cliente:** `{cli_r}`")
+                            st.markdown(f"📍 **Cidade / Polo:** `{cid_r} - {uf_r}` | **Endereço:** {end_r or 'Não informado'}")
+                            
+                            # Tabela de Equipamentos na Rota
+                            st.markdown("##### ⚙️ Equipamentos agrupados nesta rota:")
+                            itens_tabela = []
+                            for idx_sub, row_sub in df_r.iterrows():
+                                id_os_sub = obter_id_os(idx_sub, row_sub)
+                                eq_sub = row_sub.get("equipamento", "N/D")
+                                srv_sub = row_sub.get("tipo_servico", "CORRETIVA")
+                                def_sub = limpar_texto(row_sub.get("defeito_relatado"), limpar_texto(row_sub.get("pendencias"), "-"))
+                                cond_sub = "🔴 PARADO" if "PARADO" in str(row_sub.get("condicao_inicial", "")).upper() else "🟡 OPERANDO"
+                                tec_atual_sub = row_sub.get("tecnico_responsavel", "A DEFINIR")
+                                itens_tabela.append({
+                                    "OS #": f"#{id_os_sub}",
+                                    "Equipamento": eq_sub,
+                                    "Serviço": srv_sub,
+                                    "Condição": cond_sub,
+                                    "Defeito Relatado": def_sub[:45] + ("..." if len(def_sub) > 45 else ""),
+                                    "Técnico Atual": tec_atual_sub
+                                })
+                            st.dataframe(pd.DataFrame(itens_tabela), use_container_width=True, hide_index=True)
+
+                            # Ferramentas consolidadas
+                            kits_txt = "; ".join(r_info["kits"]) if r_info["kits"] else "Maleta Padrão"
+                            st.markdown(f"🧰 **Ferramental & Kits a Separar para toda a rota:** `{kits_txt}`")
+
+                        with c_col2:
+                            st.markdown("##### 👤 Despacho da Rota Completa:")
+                            st.caption(f"📍 Sugestão por proximidade geográfica: **{tec_sug_r}**")
+
+                            idx_tec_default = lista_tecnicos_nomes.index(tec_sug_r) if tec_sug_r in lista_tecnicos_nomes else 0
+                            tec_selecionado_rota = st.selectbox(
+                                "Técnico disponível para a rota:",
+                                lista_tecnicos_nomes,
+                                index=idx_tec_default,
+                                key=f"sel_tec_rota_{num_r}_{cli_r[:10]}"
                             )
 
-                    with c_det2:
-                        if foto_a and os.path.exists(foto_a):
-                            st.image(foto_a, caption="Foto do Erro / Painel enviada na triagem", use_container_width=True)
-                        else:
-                            st.caption("Sem foto anexada pelo solicitante.")
+                            btn_despachar_rota = st.button(
+                                f"🚀 Despachar {qtd_r} Chamados para {tec_selecionado_rota}",
+                                type="primary",
+                                key=f"btn_despacho_rota_{num_r}_{cli_r[:10]}",
+                                use_container_width=True
+                            )
+
+                            if btn_despachar_rota:
+                                tel_novo = equipa_tecnica.get(tec_selecionado_rota, {}).get("tel", "558532542929")
+                                for idx_os_m in r_info["indices"]:
+                                    df.at[idx_os_m, "tecnico_responsavel"] = tec_selecionado_rota
+                                    df.at[idx_os_m, "telefone_tecnico"] = tel_novo
+                                    df.at[idx_os_m, "confirmado"] = "SIM"
+
+                                if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
+                                    st.cache_data.clear()
+                                    
+                                    # Aciona separação consolidada no almoxarifado
+                                    todos_eqs = ", ".join(df_r["equipamento"].dropna().unique())
+                                    ok_s, msg_s = acionar_separacao_automatica_almoxarifado(
+                                        ctx.db_name,
+                                        tec_selecionado_rota,
+                                        cli_r,
+                                        todos_eqs,
+                                        "ROTA CONSOLIDADA",
+                                        kits_txt,
+                                        os_id=f"ROTA-{num_r}"
+                                    )
+                                    
+                                    st.success(f"🎉 **Rota {cli_r} ({qtd_r} Chamados) despachada com sucesso para {tec_selecionado_rota}!**")
+                                    if ok_s:
+                                        st.info(f"📦 {msg_s}")
+
+                                    # Mensagem formatada para envio via WhatsApp
+                                    msg_rota_wpp = (
+                                        f"🚗 *ROTA OTIMIZADA EMED • {cli_r.upper()}*\n"
+                                        f"📍 Cidade: {cid_r} - {uf_r}\n"
+                                        f"👤 Técnico: {tec_selecionado_rota}\n"
+                                        f"Total de Equipamentos na Rota: {qtd_r}\n\n"
+                                        f"*SEQUÊNCIA DE ATENDIMENTOS:*\n"
+                                    )
+                                    for idx_sub, row_sub in df_r.iterrows():
+                                        id_os_sub = obter_id_os(idx_sub, row_sub)
+                                        eq_sub = row_sub.get("equipamento", "N/D")
+                                        srv_sub = row_sub.get("tipo_servico", "CORRETIVA")
+                                        cond_sub = "🔴 PARADO" if "PARADO" in str(row_sub.get("condicao_inicial", "")).upper() else "🟡 OPERANDO"
+                                        msg_rota_wpp += f"• *OS #{id_os_sub}*: {eq_sub} [{srv_sub}] — {cond_sub}\n"
+
+                                    msg_rota_wpp += f"\n🧰 *KITS A RETIRAR NO ALMOXARIFADO:*\n{kits_txt}\n"
+                                    if end_r:
+                                        msg_rota_wpp += f"\n📍 *Endereço:* {end_r}\n"
+                                        link_map = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(f'{end_r}, {cid_r}')}"
+                                        msg_rota_wpp += f"🗺️ *Navegação:* {link_map}"
+
+                                    tel_limpo = tel_novo.replace('+', '').replace('-', '').replace(' ', '').replace('(', '').replace(')', '')
+                                    link_wpp_final = f"https://wa.me/{tel_limpo or '558532542929'}?text={urllib.parse.quote(msg_rota_wpp)}"
+
+                                    st.markdown(f"""
+                                        <div style="margin-top: 10px;">
+                                            <a href="{link_wpp_final}" target="_blank" style="background:#25d366; color:white; padding:10px 14px; border-radius:8px; text-decoration:none; font-weight:bold; display:inline-block; font-size:13px;">
+                                                📲 Enviar Rota Pronta no WhatsApp do Técnico
+                                            </a>
+                                        </div>
+                                    """, unsafe_allow_html=True)
+                                    st.rerun()
+
+                            # Links de Navegação Waze / Maps
+                            if end_r:
+                                end_encoded = urllib.parse.quote(f"{end_r}, {cid_r}")
+                                st.markdown(
+                                    f"""
+                                    <div style="margin-top: 12px;">
+                                        <a href="https://www.google.com/maps/search/?api=1&query={end_encoded}" target="_blank" style="text-decoration: none; background: #0f766e; color: #fff; padding: 5px 10px; border-radius: 5px; font-size: 11px; font-weight: bold; margin-right: 6px;">
+                                            📍 Google Maps
+                                        </a>
+                                        <a href="https://waze.com/ul?q={end_encoded}" target="_blank" style="text-decoration: none; background: #0284c7; color: #fff; padding: 5px 10px; border-radius: 5px; font-size: 11px; font-weight: bold;">
+                                            🚗 Waze
+                                        </a>
+                                    </div>
+                                    """,
+                                    unsafe_allow_html=True,
+                                )
+
+            # Aba 2: Todos os chamados individuais
+            with sub_aba_individual:
+                st.markdown("#### 📋 Todos os Chamados Ativos (Visão Detalhada)")
+                for idx_a, row_a in df_ativos.iterrows():
+                    id_os_a = obter_id_os(idx_a, row_a)
+                    cli_a = limpar_texto(row_a.get("cliente"), "N/D")
+                    eq_a = limpar_texto(row_a.get("equipamento"), "N/D")
+                    def_a = limpar_texto(row_a.get("defeito_relatado"), limpar_texto(row_a.get("pendencias"), "-"))
+                    tec_a = limpar_texto(row_a.get("tecnico_responsavel"), "A DEFINIR")
+                    cid_a = limpar_texto(row_a.get("cidade"), "FORTALEZA")
+                    end_a = limpar_texto(row_a.get("endereco"), "")
+                    cond_ini_a = limpar_texto(row_a.get("condicao_inicial"), "OPERACIONAL")
+                    foto_a = limpar_texto(row_a.get("foto_evidencia"), "")
+
+                    badge_status = "🔴 MÁQUINA PARADA" if "PARADO" in cond_ini_a.upper() else "🟡 FALHA PARCIAL"
+
+                    with st.expander(f"OS #{id_os_a} | {badge_status} | {cli_a} — {eq_a} [Técnico: {tec_a}]"):
+                        c_det1, c_det2 = st.columns([2.5, 1.5])
+                        with c_det1:
+                            st.markdown(f"**Cliente:** `{cli_a}` | **Cidade:** `{cid_a}`")
+                            st.markdown(f"**Endereço:** {end_a}")
+                            st.markdown(f"**Defeito Relatado:** {def_a}")
+                            pre_at_txt = limpar_texto(row_a.get("pre_atendimento"), "")
+                            if "REDE ELÉTRICA" in pre_at_txt or "ENERGIA:" in pre_at_txt:
+                                st.caption(f"⚡ **Diagnóstico Preliminar:** {pre_at_txt}")
+                            st.markdown(f"**Técnico Atual Designado:** `{tec_a}`")
+                            
+                            if end_a:
+                                end_encoded = urllib.parse.quote(f"{end_a}, {cid_a}")
+                                st.markdown(
+                                    f"""
+                                    <div style="margin-top: 10px;">
+                                        <a href="https://www.google.com/maps/search/?api=1&query={end_encoded}" target="_blank" style="text-decoration: none; background: #0f766e; color: #fff; padding: 6px 12px; border-radius: 5px; font-size: 12px; font-weight: bold; margin-right: 8px;">
+                                            📍 Ver no Google Maps
+                                        </a>
+                                        <a href="https://waze.com/ul?q={end_encoded}" target="_blank" style="text-decoration: none; background: #0284c7; color: #fff; padding: 6px 12px; border-radius: 5px; font-size: 12px; font-weight: bold;">
+                                            🚗 Navegar pelo Waze
+                                        </a>
+                                    </div>
+                                    """,
+                                    unsafe_allow_html=True,
+                                )
+
+                        with c_det2:
+                            if foto_a and os.path.exists(foto_a):
+                                st.image(foto_a, caption="Foto do Erro / Painel enviada na triagem", use_container_width=True)
+                            else:
+                                st.caption("Sem foto anexada pelo solicitante.")
 
     # =========================================================================
     # ABA 3: GERADOR DE ETIQUETAS QR CODE POR EQUIPAMENTO
