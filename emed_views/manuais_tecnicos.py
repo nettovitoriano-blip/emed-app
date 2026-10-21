@@ -27,8 +27,123 @@ DICIONARIO_VIDEOS_ITS = {
     "IT_RXM_SHIM_001_Manutencao_Descarga_Capacitores_MobileDaRt_MX8.md": "Video_IT_RXM_SHIM001_Descarga_Capacitores_MobileDaRt_MX8.mp4",
     "IT_RXM_SHIM_002_Calibracao_Manopla_Balanca_Sensor_Braco_MX8.md": "Video_IT_RXM_SHIM002_Calibracao_Manopla_Sensor_Braco_MX8.mp4",
     "IT_RXM_SHIM_003_Instalacao_Montagem_Comissionamento_MobileDaRt_MX8.md": "Video_IT_RXM_SHIM003_Instalacao_Montagem_MobileDaRt_MX8.mp4",
-    "IT_RXD_NEU_001_Instalacao_Software_Configuracao_DR_NeuVision550M.md": "Video_IT_RXD_NEU001_Instalacao_Software_DR_NeuVision550M.mp4"
+    "IT_RXD_NEU_001_Instalacao_Software_Configuracao_DR_NeuVision550M.md": "Video_IT_RXD_NEU001_Instalacao_Software_DR_NeuVision550M.mp4",
+    "IT_RX_LOT_001_Vistoria_Pre_Instalacao_Adequacao_Sala_HF500M.md": "Video_IT_RX_LOT001_Vistoria_Pre_Instalacao_HF500M.mp4",
+    "01_Manual_Pre_Instalacao_Oficial_Lotus_HF500M.pdf": "Video_IT_RX_LOT001_Vistoria_Pre_Instalacao_HF500M.mp4",
+    "02_Formulario_Vistoria_Pre_Instalacao_Lotus_HF500M_eMED.pdf": "Video_IT_RX_LOT001_Vistoria_Pre_Instalacao_HF500M.mp4",
+    "IT_RXM_SHIM_004_Roteiro_Mestre_Instalacao_Comissionamento_31_Passos_MX8_MX9.md": "Video_IT_RXM_SHIM003_Instalacao_Montagem_MobileDaRt_MX8.mp4",
+    "IT_RXM_SHIM_004_Roteiro_Mestre_Instalacao_Comissionamento_31_Passos_MX8_MX9.pdf": "Video_IT_RXM_SHIM003_Instalacao_Montagem_MobileDaRt_MX8.mp4"
 }
+
+
+def _localizar_video_do_documento(caminho_doc: str, video_nome: str = None) -> str:
+    """
+    Localiza o arquivo de vídeo MP4 vinculado a uma IT ou manual técnico.
+    Prioridade 1: Mesmo diretório onde o documento reside (lado a lado / colocated para pen drive).
+    Prioridade 2: Subpasta Videos_Treinamento_ITs no mesmo nível ou níveis superiores.
+    Prioridade 3: Diretório raiz do sistema e fallback global.
+    """
+    if not video_nome:
+        nome_arq = os.path.basename(caminho_doc)
+        video_nome = DICIONARIO_VIDEOS_ITS.get(nome_arq)
+    if not video_nome:
+        return None
+
+    pasta_doc = os.path.dirname(caminho_doc)
+
+    # 1. Checa se o vídeo está fisicamente lado a lado com o documento na mesma pasta
+    lado_a_lado = os.path.join(pasta_doc, video_nome)
+    if os.path.exists(lado_a_lado):
+        return lado_a_lado
+
+    # 2. Varre subindo as pastas em busca de Videos_Treinamento_ITs ou do próprio arquivo
+    curr = pasta_doc
+    while curr and len(curr) > 5:
+        possivel_pasta = os.path.join(curr, "Videos_Treinamento_ITs")
+        if os.path.exists(possivel_pasta):
+            cand = os.path.join(possivel_pasta, video_nome)
+            if os.path.exists(cand):
+                return cand
+        cand_root = os.path.join(curr, video_nome)
+        if os.path.exists(cand_root):
+            return cand_root
+        pai = os.path.dirname(curr)
+        if pai == curr:
+            break
+        curr = pai
+
+    # 3. Fallbacks para pastas fixas eMED
+    base_fixa = r"c:\Users\vitor\OneDrive\Desktop\Sistema Emed"
+    f1 = os.path.join(base_fixa, "Videos_Treinamento_ITs", video_nome)
+    if os.path.exists(f1):
+        return f1
+    f2 = os.path.join(base_fixa, video_nome)
+    if os.path.exists(f2):
+        return f2
+
+    return None
+
+
+def _renderizar_bloco_video_vinculado(caminho_video: str, doc_key: str = "doc"):
+    """Renderiza o player integrado e estilizado do vídeo de treinamento vinculado ao documento."""
+    if not caminho_video or not os.path.exists(caminho_video):
+        return
+
+    nome_video = os.path.basename(caminho_video)
+    tamanho_mb = os.path.getsize(caminho_video) / (1024 * 1024)
+
+    st.markdown(
+        f"""
+        <div style="background: linear-gradient(135deg, #101c3d, #1a2c5b); border: 2px solid #7209b7; padding: 14px 18px; border-radius: 10px; margin: 15px 0 12px 0;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 2rem;">🎬</span>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <h4 style="margin: 0; color: #64dfdf; font-weight: 700;">Vídeo Oficial de Treinamento & Apoio em Campo</h4>
+                            <span style="background: #7209b7; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">FULL HD 1080p</span>
+                            <span style="background: #0ea5e9; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">OFFLINE PRONTO</span>
+                        </div>
+                        <span style="font-size: 0.85rem; color: #cbd5e1;">Passo a passo narrado em português, torques de fábrica, medições críticas e normas de segurança eMED</span>
+                    </div>
+                </div>
+                <div style="font-size: 0.8rem; color: #94a3b8; text-align: right;">
+                    Arquivo Local: <code style="color: #67e8f9;">{nome_video}</code> ({tamanho_mb:.1f} MB)
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.video(caminho_video)
+
+    # Botão de download offline direto do vídeo MP4
+    try:
+        with open(caminho_video, "rb") as f_vid:
+            bytes_vid = f_vid.read()
+        col_dl, col_space = st.columns([1.2, 2.8])
+        with col_dl:
+            st.download_button(
+                label=f"💾 Baixar Vídeo MP4 p/ Pen Drive ({tamanho_mb:.1f} MB)",
+                data=bytes_vid,
+                file_name=nome_video,
+                mime="video/mp4",
+                key=f"dl_vid_{doc_key}_{nome_video}",
+                use_container_width=True
+            )
+    except Exception:
+        pass
+
+def _gerar_link_whatsapp(texto: str, telefone: str = "") -> str:
+    """Gera link para envio direto no WhatsApp Web / Mobile."""
+    import urllib.parse
+    texto_enc = urllib.parse.quote(texto)
+    tel_limpo = re.sub(r'\D', '', telefone) if telefone else ""
+    if tel_limpo:
+        return f"https://api.whatsapp.com/send?phone={tel_limpo}&text={texto_enc}"
+    return f"https://api.whatsapp.com/send?text={texto_enc}"
+
 
 
 DICIONARIO_NOMES_AMIGAVEIS = {
@@ -92,6 +207,13 @@ DICIONARIO_NOMES_AMIGAVEIS = {
     "IT_RXM_SHIM_003_Instalacao_Montagem_Comissionamento_MobileDaRt_MX8.md": "🚀 IT-03: Roteiro Completo de Instalação, Montagem Mecânica & Comissionamento (Shimadzu MX8)",
     "IT_RXM_SHIM_004_Troca_Baterias_Calibracao_Tensao_MobileDaRt_MX8.md": "🔋 IT-04: Procedimento de Substituição do Banco de Baterias & Calibração de Tensão Mode 7 (Shimadzu MX8)",
     "IT_RXM_SHIM_005_Troca_Monobloco_Tubo_Centracao_Colimador_MX8.md": "🎯 IT-05: Substituição do Monobloco do Tubo de Raio-X & Centração Óptica do Colimador (Shimadzu MX8)",
+    "IT_RXM_SHIM_004_Roteiro_Mestre_Instalacao_Comissionamento_31_Passos_MX8_MX9.md": "🚀 IT-04: Roteiro Mestre de Instalação, Montagem Mecânica & Comissionamento Digital em 31 Passos (MobileDaRt MX8 / MX9)",
+    "IT_RXM_SHIM_004_Roteiro_Mestre_Instalacao_Comissionamento_31_Passos_MX8_MX9.pdf": "🚀 IT-04: Roteiro Mestre de Instalação em 31 Passos (MobileDaRt MX8 / MX9 - PDF Oficial)",
+    "1. MX8_Installation_Common_Section_M503-E404K.pdf": "📘 Manual de Instalação Geral MX8/MX9 (M503-E404K - Common Section 716p)",
+    "2. MX8_Installation_DR_Part_M503-E410L.pdf": "📘 Manual de Instalação Digital DR MX8/MX9 (M503-E410L - DR Part & Vxvue 642p)",
+    "01.pdf": "📑 Manual Rápido de Montagem Mecânica & TAPs MX8 (Extrato Oficial)",
+    "02.pdf": "📑 Manual Rápido de Instalação DR & Vxvue MX8 (Extrato Oficial)",
+    "Indice de Instalação.xlsx": "📊 Planilha Índice de Instalação em 31 Passos (Shimadzu MX8/MX9)",
 
     # Lotus Raio-X Fixo (HF500M / Família HF)
     "01_Manual_Usuario_Familia_HF_Parte_1.pdf": "📖 Manual do Usuário e Operação - Família HF Raio-X Fixo (Lotus)",
@@ -179,6 +301,11 @@ def _escanear_arvore_manuais(pasta_base: str):
         for f in files:
             if f.lower().endswith(extensoes_permitidas):
                 caminho_completo = os.path.join(root, f)
+                # Se for PDF gerado para uma IT que já possui o arquivo Markdown na mesma pasta, pula para não duplicar card
+                if f.lower().endswith(".pdf"):
+                    base_name = os.path.splitext(f)[0]
+                    if os.path.exists(os.path.join(root, base_name + ".md")):
+                        continue
                 rel_path = os.path.relpath(caminho_completo, pasta_base)
                 partes = rel_path.split(os.sep)
 
@@ -254,6 +381,11 @@ def _renderizar_leitor_pdf(caminho_pdf: str, doc_key: str):
     """Exibe o leitor de PDF inline com busca interna de texto, navegação rápida e renderização de alta fidelidade."""
     try:
         import pymupdf
+
+        # Verificação e Exibição do Vídeo Técnico Vinculado ao Documento PDF
+        caminho_video_pdf = _localizar_video_do_documento(caminho_pdf)
+        if caminho_video_pdf:
+            _renderizar_bloco_video_vinculado(caminho_video_pdf, doc_key=f"pdf_top_{doc_key}")
         doc_pdf = pymupdf.open(caminho_pdf)
         total_paginas = len(doc_pdf)
 
@@ -262,12 +394,24 @@ def _renderizar_leitor_pdf(caminho_pdf: str, doc_key: str):
             st.session_state[sess_key_pag] = 0
 
         # Barra Superior de Controles e Paginação
-        col_win, col_prev, col_info, col_next, col_jump = st.columns([1.5, 0.9, 1.3, 0.9, 1.4])
+        col_win, col_wa, col_prev, col_info, col_next, col_jump = st.columns([1.3, 1.1, 0.8, 1.2, 0.8, 1.2])
 
         with col_win:
-            if st.button("🖥️ Abrir no App do Windows", key=f"btn_win_{doc_key}", use_container_width=True):
+            if st.button("🖥️ App Windows", key=f"btn_win_{doc_key}", use_container_width=True):
                 _abrir_no_sistema_operacional(caminho_pdf)
                 st.toast("Manual aberto no leitor do Windows!", icon="📄")
+
+        with col_wa:
+            with st.popover("📲 WhatsApp", use_container_width=True):
+                nome_pdf = os.path.basename(caminho_pdf)
+                msg_wa = (
+                    f"🏥 *eMED Engenharia Clínica*\n"
+                    f"📄 *Manual / Documento:* {nome_pdf}\n"
+                    f"Consulte o documento oficial na Biblioteca Técnica eMED."
+                )
+                tel_pdf = st.text_input("Telefone com DDD:", placeholder="Ex: 11999998888", key=f"tel_wa_pdf_{doc_key}")
+                link_wa = _gerar_link_whatsapp(msg_wa, tel_pdf)
+                st.link_button("🚀 Abrir WhatsApp", link_wa, use_container_width=True)
 
         pag_atual = st.session_state[sess_key_pag] + 1
 
@@ -373,16 +517,48 @@ def _renderizar_leitor_markdown(caminho_md: str, doc_key: str = "it"):
         with open(caminho_md, "r", encoding="utf-8") as f:
             conteudo = f.read()
 
-        col_it_info, col_it_busca = st.columns([1.5, 2.5])
-        with col_it_info:
-            st.markdown(
-                """
-                <div style="background: rgba(0, 180, 216, 0.1); border-left: 3px solid #00b4d8; padding: 6px 12px; border-radius: 4px; font-weight: 600; color: #caf0f8; font-size: 0.88rem;">
-                    📋 Instrução de Trabalho em Português
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+        col_it_dl, col_it_wa, col_it_busca = st.columns([1.4, 1.1, 1.9])
+        with col_it_dl:
+            caminho_pdf_it = os.path.splitext(caminho_md)[0] + ".pdf"
+            if os.path.exists(caminho_pdf_it):
+                try:
+                    with open(caminho_pdf_it, "rb") as f_it_p:
+                        dados_it_pdf = f_it_p.read()
+                    st.download_button(
+                        label="📄 Baixar IT em PDF Oficial",
+                        data=dados_it_pdf,
+                        file_name=os.path.basename(caminho_pdf_it),
+                        mime="application/pdf",
+                        key=f"dl_pdf_leitor_{doc_key}",
+                        use_container_width=True
+                    )
+                except Exception:
+                    pass
+            else:
+                try:
+                    with open(caminho_md, "rb") as f_it_m:
+                        dados_it_md = f_it_m.read()
+                    st.download_button(
+                        label="📥 Baixar IT (.md)",
+                        data=dados_it_md,
+                        file_name=os.path.basename(caminho_md),
+                        mime="text/markdown",
+                        key=f"dl_md_leitor_{doc_key}",
+                        use_container_width=True
+                    )
+                except Exception:
+                    pass
+        with col_it_wa:
+            with st.popover("📲 WhatsApp", use_container_width=True):
+                nome_it = os.path.basename(caminho_md)
+                msg_it_wa = (
+                    f"🏥 *eMED Engenharia Clínica & Manutenção*\n"
+                    f"📋 *Instrução de Trabalho:* {nome_it}\n"
+                    f"Documento técnico homologado para suporte de campo eMED."
+                )
+                tel_it = st.text_input("Telefone com DDD:", placeholder="Ex: 11999998888", key=f"tel_wa_md_{doc_key}")
+                link_it_wa = _gerar_link_whatsapp(msg_it_wa, tel_it)
+                st.link_button("🚀 Abrir WhatsApp", link_it_wa, use_container_width=True)
         with col_it_busca:
             busca_it = st.text_input(
                 "Buscar termo nesta IT:",
@@ -400,38 +576,9 @@ def _renderizar_leitor_markdown(caminho_md: str, doc_key: str = "it"):
                 st.info(f"O termo '{termo}' não foi encontrado nesta instrução.")
 
         # Verificação e Exibição do Vídeo Oficial de Treinamento da IT
-        nome_arq_md = os.path.basename(caminho_md)
-        video_nome = DICIONARIO_VIDEOS_ITS.get(nome_arq_md)
-        pasta_doc = os.path.dirname(caminho_md)
-        caminho_video = None
-        curr = pasta_doc
-        while curr and len(curr) > 5:
-            possivel_pasta = os.path.join(curr, "Videos_Treinamento_ITs")
-            if os.path.exists(possivel_pasta):
-                if video_nome and os.path.exists(os.path.join(possivel_pasta, video_nome)):
-                    caminho_video = os.path.join(possivel_pasta, video_nome)
-                    break
-            curr = os.path.dirname(curr)
-
-        if caminho_video and os.path.exists(caminho_video):
-            st.markdown(
-                """
-                <div style="background: linear-gradient(135deg, #101c3d, #1a2c5b); border: 2px solid #7209b7; padding: 14px 18px; border-radius: 10px; margin: 15px 0 10px 0;">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <span style="font-size: 1.8rem;">🎬</span>
-                            <div>
-                                <h4 style="margin: 0; color: #64dfdf; font-weight: 700;">Vídeo Oficial de Treinamento & Apoio em Campo (Full HD 1080p)</h4>
-                                <span style="font-size: 0.85rem; color: #cbd5e1;">Passo a passo narrado em português, torques de fábrica, EPIs e procedimento oficial eMed</span>
-                            </div>
-                        </div>
-                        <span style="background: #7209b7; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 700;">1080p HD</span>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-            st.video(caminho_video)
+        caminho_video = _localizar_video_do_documento(caminho_md)
+        if caminho_video:
+            _renderizar_bloco_video_vinculado(caminho_video, doc_key=f"md_top_{doc_key}")
 
         # Resolução e Embutimento Automático de Imagens Locais (assets) em Base64
         pasta_doc = os.path.dirname(caminho_md)
@@ -472,7 +619,7 @@ def _renderizar_leitor_markdown(caminho_md: str, doc_key: str = "it"):
 # ==============================================================================
 
 def _obter_catalogo_videos(base_dir: str) -> list:
-    """Retorna a lista completa e estruturada dos 30 vídeos de treinamento e tutoriais da eMED."""
+    """Retorna a lista completa e estruturada dos 31 vídeos de treinamento e tutoriais da eMED."""
     pasta_its_videos = os.path.join(base_dir, "Videos_Treinamento_ITs")
 
     catalogo = [
@@ -723,6 +870,19 @@ def _obter_catalogo_videos(base_dir: str) -> list:
             "duracao_aprox": "01:50",
             "descricao": "Roteiro para descarregamento, remoção dos suportes e cintas de transporte, ajuste dos taps do autotransformador P1/P2 para rede 220V e aquecimento prévio de tubo tUbeUP em 13 passos.",
             "tags": ["shimadzu", "mx8", "instalação", "taps", "warm-up", "comissionamento"]
+        },
+        {
+            "id": "VID_IT_RX_01",
+            "codigo_it": "IT_RX_LOT_01",
+            "arquivo": "Video_IT_RX_LOT001_Vistoria_Pre_Instalacao_HF500M.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-RX-01: Vistoria Técnica de Pré-Instalação & Adequação da Sala Lotus HF500M",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Raio-X Fixo Lotus HF500M (Alta Frequência)",
+            "it_arquivo": "IT_RX_LOT_001_Vistoria_Pre_Instalacao_Adequacao_Sala_HF500M.md",
+            "duracao_aprox": "02:15",
+            "descricao": "Diretrizes e critérios de aceitação pré-instalação: alimentação trifásica 380V / 60kVA, disjuntor de 100A, cabos 25 mm², aterramento TN-S < 5 Ω, blindagem radiológica 2,0 mm Pb, infraestrutura de canaletas subterrâneas e checklist Gatekeeper eMED.",
+            "tags": ["lotus", "hf500m", "pré-instalação", "vistoria", "elétrica", "blindagem", "gatekeeper", "chumbo"]
         },
 
         # --- LOGISTICA, KITS & ALMOXARIFADO ---
@@ -1256,6 +1416,149 @@ def _render_acervo_manuais(ctx: AppContext, pasta_manuais: str, catalogo: list):
         st.info("Nenhum manual encontrado para os filtros selecionados.")
 
 
+
+def _render_central_pre_instalacao(ctx: AppContext):
+    """Renderiza a Central Oficial de Vistorias, Adequação de Sala e Fichas de Pré-Instalação para Clientes."""
+    st.markdown("### 🏗️ Central de Vistorias, Adequação de Sala & Pré-Instalação Hospitalar")
+    st.markdown(
+        "Acesso prioritário a **Formulários de Vistoria de Pré-Instalação homologados pela eMED**, "
+        "Dossiês de Engenharia Clínica para Adequação de Salas de Exames, Manuais de Fábrica e "
+        "ferramenta de **compartilhamento direto de diretrizes com clientes via WhatsApp**."
+    )
+
+    base_p = ctx.base_dir
+    pasta_lotus_pdf = os.path.join(base_p, "Manuais", "RAIO-X", "LOTUS", "HF500M", "02_MANUAIS_OFICIAIS_PDF")
+    pasta_lotus_it = os.path.join(base_p, "Manuais", "RAIO-X", "LOTUS", "HF500M", "01_INSTRUCOES_DE_TRABALHO")
+    
+    arq_formulario_pdf = os.path.join(pasta_lotus_pdf, "02_Formulario_Vistoria_Pre_Instalacao_Lotus_HF500M_eMED.pdf")
+    arq_manual_fabrica_pdf = os.path.join(pasta_lotus_pdf, "01_Manual_Pre_Instalacao_Oficial_Lotus_HF500M.pdf")
+    arq_it_vistoria_md = os.path.join(pasta_lotus_it, "IT_RX_LOT_001_Vistoria_Pre_Instalacao_Adequacao_Sala_HF500M.md")
+    arq_it_vistoria_pdf = os.path.join(pasta_lotus_it, "IT_RX_LOT_001_Vistoria_Pre_Instalacao_Adequacao_Sala_HF500M.pdf")
+    arq_video_pre = os.path.join(pasta_lotus_pdf, "Video_IT_RX_LOT001_Vistoria_Pre_Instalacao_HF500M.mp4")
+
+    # Banner de Destaque
+    st.markdown(
+        """
+        <div style="background: linear-gradient(135deg, #0a2540, #13395e); border: 2px solid #00b4d8; border-radius: 12px; padding: 18px 22px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <span style="background: #00b4d8; color: #001e3d; font-weight: 800; font-size: 0.78rem; padding: 4px 10px; border-radius: 4px; text-transform: uppercase;">Protocolo Homologado</span>
+                    <h3 style="color: #ffffff; margin: 8px 0 4px 0; font-weight: 700;">📋 Ficha Oficial de Vistoria de Pré-Instalação - Raio-X Lotus HF500M</h3>
+                    <p style="color: #cbd5e1; margin: 0; font-size: 0.92rem;">Documento executivo de 4 páginas com selo Gatekeeper eMED de liberação de infraestrutura, elétrica, blindagem radiológica e climatização.</p>
+                </div>
+                <div style="text-align: right;">
+                    <span style="background: #7209b7; color: white; padding: 4px 12px; border-radius: 6px; font-weight: 700; font-size: 0.85rem;">Versão 2.0 Oficial</span>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Vídeo Oficial de Pré-Instalação se existir
+    if os.path.exists(arq_video_pre):
+        _renderizar_bloco_video_vinculado(arq_video_pre, doc_key="pre_inst_top")
+
+    # Colunas de Ação do Formulário
+    col_pdf_actions, col_wa_cliente = st.columns([1.1, 1.3])
+
+    with col_pdf_actions:
+        st.markdown("#### 📄 Documentos para Download & Leitura")
+        
+        # 1. Formulário de Vistoria eMED (4 Páginas)
+        if os.path.exists(arq_formulario_pdf):
+            tamanho_mb = os.path.getsize(arq_formulario_pdf) / (1024 * 1024)
+            with open(arq_formulario_pdf, "rb") as f_form:
+                bytes_form = f_form.read()
+            st.download_button(
+                label=f"📥 Baixar Ficha de Vistoria eMED ({tamanho_mb:.2f} MB)",
+                data=bytes_form,
+                file_name="02_Formulario_Vistoria_Pre_Instalacao_Lotus_HF500M_eMED.pdf",
+                mime="application/pdf",
+                key="btn_dl_ficha_pre_inst",
+                use_container_width=True
+            )
+        
+        # 2. Manual de Fábrica Lotus
+        if os.path.exists(arq_manual_fabrica_pdf):
+            tam_fab_mb = os.path.getsize(arq_manual_fabrica_pdf) / (1024 * 1024)
+            with open(arq_manual_fabrica_pdf, "rb") as f_man:
+                bytes_man = f_man.read()
+            st.download_button(
+                label=f"📖 Baixar Manual Oficial de Fábrica ({tam_fab_mb:.2f} MB)",
+                data=bytes_man,
+                file_name="01_Manual_Pre_Instalacao_Oficial_Lotus_HF500M.pdf",
+                mime="application/pdf",
+                key="btn_dl_manual_fabrica_pre",
+                use_container_width=True
+            )
+
+        # 3. IT-01 Vistoria (PDF)
+        if os.path.exists(arq_it_vistoria_pdf):
+            with open(arq_it_vistoria_pdf, "rb") as f_it:
+                bytes_it = f_it.read()
+            st.download_button(
+                label=f"🔬 Baixar IT-01 de Vistoria em PDF",
+                data=bytes_it,
+                file_name="IT_RX_LOT_001_Vistoria_Pre_Instalacao_Adequacao_Sala_HF500M.pdf",
+                mime="application/pdf",
+                key="btn_dl_it01_pre",
+                use_container_width=True
+            )
+
+        # Botão para alternar visualização do PDF da Ficha
+        if "view_ficha_pre" not in st.session_state:
+            st.session_state["view_ficha_pre"] = False
+        lbl_view_ficha = "Fechar Leitor de PDF" if st.session_state["view_ficha_pre"] else "👁️ Visualizar Ficha de Vistoria Inline"
+        if st.button(lbl_view_ficha, key="btn_toggle_ficha_view", use_container_width=True):
+            st.session_state["view_ficha_pre"] = not st.session_state["view_ficha_pre"]
+            st.rerun()
+
+    with col_wa_cliente:
+        st.markdown("#### 📲 Compartilhar Diretrizes com o Cliente (WhatsApp)")
+        with st.container(border=True):
+            cliente_nome = st.text_input("Nome do Cliente / Hospital / Clínica:", value="Hospital / Clínica Parceira", key="pre_cli_nome")
+            cliente_tel = st.text_input("WhatsApp do Responsável da Engenharia / Obra:", placeholder="Ex: 11988887777", key="pre_cli_tel")
+            
+            st.markdown("**Parâmetros Críticos Inclusos na Mensagem:**")
+            st.markdown(
+                """
+                * ⚡ **Alimentação:** Trifásica 380V ± 10%, 60 Hz (Transformador ≥ 60 kVA dedicado)
+                * 🔌 **Proteção Elétrica:** Disjuntor 100A Curva C | Condutores de cobre ≥ 25 mm²
+                * ⚡ **Aterramento:** Malha TN-S exclusiva com resistência R < 5,0 Ω
+                * 🛡️ **Blindagem Radiológica:** Baritagem ou chumbo ≥ 2,0 mm Pb nas paredes e porta
+                * 📏 **Dutos & Canaletas:** Canaletas subterrâneas 20x15 cm com tampa bipartida
+                """
+            )
+
+            msg_cliente_wa = (
+                f"🏥 *eMED ENGENHARIA CLÍNICA - DIRETRIZES OFICIAIS DE PRÉ-INSTALAÇÃO*\n\n"
+                f"Prezado(a) responsável de *{cliente_nome}*,\n\n"
+                f"Para viabilizar a entrega e instalação segura do sistema de Raio-X Fixo *Lotus HF500M*, "
+                f"encaminhamos os requisitos obrigatórios de adequação de sala homologados pela engenharia eMED:\n\n"
+                f"⚡ *Rede Elétrica:* Trifásica 380V (±10%), 60 Hz, transformador dedicado ≥ 60 kVA\n"
+                f"🔌 *Proteção & Cabos:* Disjuntor termomagnético Curva C de 100A e condutores de 25 mm²\n"
+                f"⚡ *Aterramento:* Sistema TN-S com resistência R < 5,0 Ω (livre de harmônicos)\n"
+                f"🛡️ *Proteção Radiológica:* Blindagem com espessura equivalente ≥ 2,0 mm Pb\n"
+                f"📏 *Infraestrutura Civil:* Canaletas subterrâneas 20x15 cm para cabos de alta tensão\n"
+                f"❄️ *Climatização:* Ar-condicionado 24.000 BTU/h (faixa térmica: 20°C a 24°C)\n\n"
+                f"📋 A *Ficha de Vistoria de Pré-Instalação Oficial eMED* completa e o Manual de Fábrica "
+                f"estão disponíveis para consulta. Favor acusar o recebimento."
+            )
+
+            link_cliente_wa = _gerar_link_whatsapp(msg_cliente_wa, cliente_tel)
+            st.link_button("🚀 Enviar Diretrizes ao Cliente no WhatsApp", link_cliente_wa, use_container_width=True)
+
+    # Exibição Inline do PDF se ativado
+    if st.session_state.get("view_ficha_pre", False):
+        st.markdown("---")
+        st.markdown("### 📑 Leitor Integrado: Ficha de Vistoria de Pré-Instalação eMED")
+        if os.path.exists(arq_formulario_pdf):
+            _renderizar_leitor_pdf(arq_formulario_pdf, doc_key="ficha_pre_inst_full")
+        else:
+            st.error("Arquivo PDF da Ficha de Vistoria não encontrado no caminho padrão.")
+
+
 def render_manuais_tecnicos(ctx: AppContext):
     """Renderiza a View de Consulta de Manuais Técnicos e Procedimentos com navegação em sub-abas limpas."""
     st.markdown("## 📚 Biblioteca Técnica & Videoteca de Treinamento eMED")
@@ -1267,14 +1570,18 @@ def render_manuais_tecnicos(ctx: AppContext):
     pasta_manuais = _obter_caminho_manuais(ctx)
     catalogo = _escanear_arvore_manuais(pasta_manuais)
 
-    tab_manuais, tab_videoteca, tab_upload = st.tabs([
-        "📚 Acervo de Manuais & POPs",
-        "🎬 Videoteca & Treinamentos de Campo (30 Vídeos)",
+    tab_manuais, tab_pre_instalacao, tab_videoteca, tab_upload = st.tabs([
+        "📚 Acervo de Manuais & ITs",
+        "🏗️ Pré-Instalação & Vistorias (Clientes)",
+        "🎬 Videoteca & Treinamentos de Campo (31 Vídeos)",
         "📤 Central de Ingestão & Upload"
     ])
 
     with tab_manuais:
         _render_acervo_manuais(ctx, pasta_manuais, catalogo)
+
+    with tab_pre_instalacao:
+        _render_central_pre_instalacao(ctx)
 
     with tab_videoteca:
         _render_videoteca_tecnica(ctx)
@@ -1379,10 +1686,16 @@ def _render_lista_cards(docs: list, ocorrencias_busca: dict = None):
                 if doc["caminho"] in ocorrencias_busca:
                     badge_busca = f" &nbsp;|&nbsp; <span style='background: #e76f51; color: white; padding: 2px 7px; border-radius: 4px; font-size: 0.82rem; font-weight: 700;'>🎯 {ocorrencias_busca[doc['caminho']]} ocorrência(s) no conteúdo</span>"
 
+                vid_vinculado = _localizar_video_do_documento(doc["caminho"])
+                badge_video = ""
+                if vid_vinculado:
+                    badge_video = " &nbsp;|&nbsp; <span style='background: #7209b7; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.80rem; font-weight: 700;'>🎬 Vídeo Técnico Vinculado</span>"
+
                 st.markdown(
                     f"`{tipo_badge}` &nbsp;|&nbsp; "
                     f"💾 `{doc['tamanho_mb']:.2f} MB` &nbsp;|&nbsp; "
                     f"🕒 Atualizado em: `{doc['data_mod']}`"
+                    f"{badge_video}"
                     f"{badge_busca}",
                     unsafe_allow_html=True
                 )
@@ -1519,6 +1832,18 @@ def _render_lista_cards(docs: list, ocorrencias_busca: dict = None):
                         * **Calibração de Tensão Mode 7.6:** Entrar no modo de serviço do MX8, medir tensão real com multímetro calibrado e inserir valor exato no painel.
                         * **Registro do Novo Banco Mode 7.11:** Resetar contador de vida útil e inserir código da nova data de fabricação das baterias.
                         """)
+                elif "31_passos" in doc["nome_arquivo"].lower() or "shim_004_roteiro" in doc["nome_arquivo"].lower():
+                    with st.expander("🚀 Parâmetros Críticos da Instalação em 31 Passos (Shimadzu MX8 / MX9)"):
+                        st.markdown(r"""
+                        * **TAPs de Entrada (220V):** P1 = `A0` e P2 = `A220` (Padrão de fábrica é 100V! Risco grave de queima).
+                        * **Placa XCONT-2018:** SW1 (Tubo 32kW), SW2 (VXvue DR), SW4 (Baud rate 115200 bps).
+                        * **Calibração FVR (Filamento):** 2 pontos a $80	ext{ kV}$ (mA mínimo e máximo) + checagem em 40, 60, 80, 100, 125 e $133	ext{ kV}$.
+                        * **Drive de DVD para Setup:** Conectar EXCLUSIVAMENTE na porta USB direita do chassi (proibido usar hub esquerdo).
+                        * **Credenciais Windows & McAfee:** Usuário `Administrator` / Senha: `Shimadzu` (com "S" maiúsculo).
+                        * **Rede & Wi-Fi:** AP Aruba 5GHz (Canal 149 - 5745 MHz) | IP Detector Vieworks: `192.168.12.100` | PC: `192.168.12.10`.
+                        * **McAfee MEC:** Criar Whitelist (`MEC_menu.htm`), executar `LockPC` e verificar status `Locked` com `sadmin status`.
+                        * **Backup Ghost:** Imagem final `MX8_COMMISSIONED_FINAL.GHO` gravada em D: e em pendrive do técnico.
+                        """)
                 elif "shim_005" in doc["nome_arquivo"].lower() or "monobloco" in doc["nome_arquivo"].lower():
                     with st.expander("🎯 Parâmetros Críticos do Tubo & Colimador (Shimadzu MobileDaRt MX8)"):
                         st.markdown(r"""
@@ -1549,20 +1874,59 @@ def _render_lista_cards(docs: list, ocorrencias_busca: dict = None):
                         """)
 
             with col_acoes:
-                # Botão de Download
-                try:
-                    with open(doc["caminho"], "rb") as f_down:
-                        dados_bytes = f_down.read()
-                    st.download_button(
-                        label="📥 Baixar Documento (.pdf / .md)",
-                        data=dados_bytes,
-                        file_name=doc["nome_arquivo"],
-                        mime="text/markdown" if doc["tipo"] == "MARKDOWN" else "application/pdf",
-                        key=f"btn_dl_{doc['rel_path']}_{idx}",
-                        use_container_width=True
+                # Identifica se existe PDF oficial (mesmo para arquivos Markdown de IT)
+                caminho_pdf_oficial = None
+                if doc["tipo"] == "MARKDOWN":
+                    possivel_pdf = os.path.splitext(doc["caminho"])[0] + ".pdf"
+                    if os.path.exists(possivel_pdf):
+                        caminho_pdf_oficial = possivel_pdf
+                elif doc["tipo"] == "PDF":
+                    caminho_pdf_oficial = doc["caminho"]
+
+                # Botão de Download em PDF Oficial (Preferencial)
+                if caminho_pdf_oficial and os.path.exists(caminho_pdf_oficial):
+                    try:
+                        with open(caminho_pdf_oficial, "rb") as f_pdf:
+                            dados_pdf = f_pdf.read()
+                        st.download_button(
+                            label="📄 Baixar PDF Oficial",
+                            data=dados_pdf,
+                            file_name=os.path.basename(caminho_pdf_oficial),
+                            mime="application/pdf",
+                            key=f"btn_dl_pdf_{doc['rel_path']}_{idx}",
+                            use_container_width=True
+                        )
+                    except Exception as e:
+                        st.error(f"Erro PDF: {e}")
+                else:
+                    try:
+                        with open(doc["caminho"], "rb") as f_down:
+                            dados_bytes = f_down.read()
+                        st.download_button(
+                            label="📥 Baixar Documento",
+                            data=dados_bytes,
+                            file_name=doc["nome_arquivo"],
+                            mime="text/markdown" if doc["tipo"] == "MARKDOWN" else "application/pdf",
+                            key=f"btn_dl_{doc['rel_path']}_{idx}",
+                            use_container_width=True
+                        )
+                    except Exception as e:
+                        st.error(f"Erro: {e}")
+
+                # Botão de Compartilhamento WhatsApp
+                with st.popover("📲 WhatsApp", use_container_width=True):
+                    st.markdown(f"**Compartilhar Documento via WhatsApp**")
+                    msg_wa = (
+                        f"🏥 *eMED Engenharia Clínica & Manutenção Hospitalar*\n"
+                        f"📋 *Documento:* {doc['titulo_amigavel']}\n"
+                        f"📁 *Categoria:* {doc['categoria']} | {doc['modelo']}\n"
+                        f"💾 *Formato:* {'PDF Oficial eMED' if caminho_pdf_oficial else doc['tipo']}\n\n"
+                        f"Para acessar o documento completo e o vídeo oficial de treinamento, "
+                        f"consulte a Biblioteca Técnica eMED."
                     )
-                except Exception as e:
-                    st.error(f"Erro: {e}")
+                    tel_wa = st.text_input("Nº Telefone (com DDD):", placeholder="Ex: 11999998888", key=f"wa_tel_{doc['rel_path']}_{idx}")
+                    link_wa = _gerar_link_whatsapp(msg_wa, tel_wa)
+                    st.link_button("🚀 Abrir WhatsApp", link_wa, use_container_width=True)
 
                 # Botão de Leitura / Visualização Inline
                 chave_view = f"view_doc_{doc['rel_path']}_{idx}"
@@ -1574,37 +1938,19 @@ def _render_lista_cards(docs: list, ocorrencias_busca: dict = None):
                     st.session_state[chave_view] = not st.session_state[chave_view]
                     st.rerun()
 
-                # Botão de Vídeo da IT
-                nome_arq_it = doc["nome_arquivo"]
-                video_it_nome = DICIONARIO_VIDEOS_ITS.get(nome_arq_it)
-                caminho_vid_it = None
-                if video_it_nome:
-                    base_p = r"c:\Users\vitor\OneDrive\Desktop\Sistema Emed"
-                    p1 = os.path.join(base_p, "Videos_Treinamento_ITs", video_it_nome)
-                    p2 = os.path.join(base_p, video_it_nome)
-                    if os.path.exists(p1):
-                        caminho_vid_it = p1
-                    elif os.path.exists(p2):
-                        caminho_vid_it = p2
-
-                if caminho_vid_it:
+                # Botão de Vídeo da IT ou Documento se existir
+                if vid_vinculado:
                     chave_vid = f"view_vid_{doc['rel_path']}_{idx}"
                     if chave_vid not in st.session_state:
                         st.session_state[chave_vid] = False
-                    lbl_vid = "Ocultar Vídeo" if st.session_state[chave_vid] else "🎬 Vídeo da IT"
+                    lbl_vid = "Ocultar Vídeo" if st.session_state[chave_vid] else "🎬 Assistir Vídeo IT"
                     if st.button(lbl_vid, key=f"btn_vid_{doc['rel_path']}_{idx}", use_container_width=True):
                         st.session_state[chave_vid] = not st.session_state[chave_vid]
                         st.rerun()
 
-            # Área de exibição inline de Vídeo da IT
-            if caminho_vid_it and st.session_state.get(chave_vid, False):
-                st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #091322, #16243b); border-left: 4px solid #00b4d8; padding: 12px 18px; border-radius: 6px; margin: 10px 0;">
-                    <span style="color: #38bdf8; font-weight: 700; font-size: 0.95rem;">🎬 Vídeo-Treinamento Narrado:</span>
-                    <span style="color: #f1f5f9; font-size: 0.95rem; margin-left: 8px;">{doc['titulo_amigavel']}</span>
-                </div>
-                """, unsafe_allow_html=True)
-                st.video(caminho_vid_it)
+            # Área de exibição inline de Vídeo da IT / Documento
+            if vid_vinculado and st.session_state.get(chave_vid, False):
+                _renderizar_bloco_video_vinculado(vid_vinculado, doc_key=f"card_{doc['rel_path']}_{idx}")
 
             # Área de exibição inline do Documento
             if st.session_state.get(chave_view, False):

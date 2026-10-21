@@ -228,6 +228,362 @@ def _organizar_rotas_inteligentes(df_ativos: pd.DataFrame, equipa_tecnica: dict)
     return grupos
 
 
+
+def _obter_perguntas_triagem_dinamica(modalidade: str, defeito: str, equip: str):
+    """Analisa o relato do cliente e gera perguntas cirúrgicas e específicas para o defeito relatado."""
+    txt = (defeito or "").upper()
+    eq_up = (equip or "").upper()
+
+    # 1. Mamografia - Compressão e Pedais
+    if re.search(r'\b(COMPRESSOR|COMPRESSAO|COMPRESSÃO|PEDAL|PRATO|DESCOMPRESSAO|DESCOMPRESSÃO|DAN|ESPESSURA)\b', txt) and ("MAMO" in modalidade or "MAMO" in eq_up):
+        return {
+            "categoria": "SISTEMA DE COMPRESSÃO & PEDAIS (MAMOGRAFIA)",
+            "icone": "🗜️",
+            "focada": True,
+            "desc": "Perguntas adaptadas especificamente para acionamento por pedais, descompressão rápida e célula de carga:",
+            "p1": {
+                "nome": "Acionamento dos Pedais",
+                "pergunta": "🦶 1. Resposta aos Pedais de Elevação/Descida:",
+                "opcoes": [
+                    "⚠️ Falha apenas no pedal esquerdo (o pedal direito e botões manuais do gantry operam)",
+                    "⚠️ Falha apenas no pedal direito (o pedal esquerdo e botões manuais do gantry operam)",
+                    "🚨 Ambos os pedais falham (apenas botões manuais do gantry respondem)",
+                    "❌ Nem pedais nem botões manuais respondem (sistema de compressão inerte)",
+                    "🟢 Movimento normal por pedais e botoeira",
+                ],
+                "help": "Identifica se o problema é microswitch/cabo do pedal ou circuito de potência da compressão."
+            },
+            "p2": {
+                "nome": "Descompressão de Emergência",
+                "pergunta": "🛑 2. Descompressão Rápida de Emergência:",
+                "opcoes": [
+                    "🟢 Botão vermelho de liberação destrava o acrílico imediatamente",
+                    "⚠️ Descompressão mecânica pesada, emperrando ou lenta",
+                    "🚨 Botão de emergência travado (risco de prender paciente)",
+                    "⚪ Não testado / Não se aplica",
+                ],
+                "help": "Verifica item crítico de segurança biológica da paciente."
+            },
+            "p3": {
+                "nome": "Medição de Força e Espessura",
+                "pergunta": "🔢 3. Display Digital de Força (daN) e Espessura (mm):",
+                "opcoes": [
+                    "🟢 Display marca valores coerentes com a compressão aplicada",
+                    "⚠️ Valores oscilam sem parar ou congelam durante o avanço",
+                    "❌ Display zerado ou mensagem de erro de célula de carga / fotocélula",
+                    "⚪ Não se aplica",
+                ],
+                "help": "Avalia o sensor de calibração radiométrica da mama."
+            }
+        }
+
+    # 2. Qualidade de Imagem, Artefatos e Detectores
+    if re.search(r'\b(ARTEFATO|ARTEFATOS|MANCHA|MANCHAS|RISCO|RISCOS|LISTRA|LISTRAS|LINHA|LINHAS|ANEL|ANEIS|ANÉIS|FANTOMA|PHANTOM|AIR CAL|CALIBRACAO|CALIBRAÇÃO|PIXEL|PIXELS)\b', txt):
+        return {
+            "categoria": "QUALIDADE DE IMAGEM & DETECTORES",
+            "icone": "🔬",
+            "focada": True,
+            "desc": "Perguntas focadas em artefatos visuais, aquecimento diário e calibração de detectores:",
+            "p1": {
+                "nome": "Padrão Visual do Defeito",
+                "pergunta": "🔬 1. Formato e Padrão Visual do Defeito:",
+                "opcoes": [
+                    "⚠️ Artefato em anel concêntrico circular (típico de canal de detector DAS / TC)",
+                    "⚠️ Linhas retas pretas ou brancas verticais (típico de pixel defeituoso / Flat Panel)",
+                    "⚠️ Mancha difusa, sombreamento ou perda homogênea de contraste",
+                    "⚪ Outro padrão não listado / Não se aplica",
+                ],
+                "help": "Ajuda a distinguir falha de DAS/detector de desgaste de tubo."
+            },
+            "p2": {
+                "nome": "Calibração Diária (Warm-up / Air Cal)",
+                "pergunta": "🌀 2. Rotina de Calibração Diária (Warm-up / Air Calibration):",
+                "opcoes": [
+                    "🟢 Aquecimento de tubo e calibração de ar executados com sucesso hoje",
+                    "⚠️ Erro interrompeu a calibração de ar no meio do processo",
+                    "❌ Não foi possível realizar o Warm-up (tubo frio ou bloqueado)",
+                    "⚪ Procedimento não realizado hoje",
+                ],
+                "help": "Verifica se a tabela de ganho e offset foi atualizada."
+            },
+            "p3": {
+                "nome": "Comportamento com Phantom",
+                "pergunta": "🎯 3. Comportamento no Phantom de Calibração Oficial:",
+                "opcoes": [
+                    "🚨 O defeito se reproduz claramente nas imagens do Phantom oficial",
+                    "🟢 Artefato só aparece em pacientes específicos ou técnicas de alta dose",
+                    "⚪ Phantom indisponível no momento para teste",
+                ],
+                "help": "Comprova a necessidade de calibração física pelo engenheiro."
+            }
+        }
+
+    # 3. Disparo, Alta Tensão, Tubo e Gerador
+    if re.search(r'\b(DISPARO|DISPARAR|DISPARANDO|NAO DISPARA|NÃO DISPARA|KV|KVP|MA|MAS|FILAMENTO|SOBRECORRENTE|OVERCURRENT|GERADOR|ALTA TENSAO|ALTA TENSÃO|TUBO|FAISCA|FAÍSCA|402|INTERLOCK)\b', txt):
+        return {
+            "categoria": "DISPARO, GERADOR & ALTA TENSÃO",
+            "icone": "💥",
+            "focada": True,
+            "desc": "Perguntas cirúrgicas sobre aceleração de rotor, disparo de alta tensão e intertravamentos:",
+            "p1": {
+                "nome": "1º Estágio (Prep / Rotor)",
+                "pergunta": "⚡ 1. Resposta ao 1º Estágio (Prep / Ready):",
+                "opcoes": [
+                    "🟢 Rotor acelera suavemente e luz de Pronto (Ready) acende no console",
+                    "⚠️ Rotor acelera mas a luz de Ready não acende (bloqueio de interlock)",
+                    "🔇 Não escuta o rotor acelerar ao pressionar o 1º estágio",
+                    "⚪ Nenhuma das opções / Não se aplica",
+                ],
+                "help": "Distingue falha de partida de anodo de erro de disparo."
+            },
+            "p2": {
+                "nome": "2º Estágio (Disparo / Emissão)",
+                "pergunta": "💥 2. Resposta ao 2º Estágio (Disparo de Raios-X):",
+                "opcoes": [
+                    "⚠️ Acusa código de erro / alarme sonoro exatamente no momento do disparo",
+                    "🔴 Queda imediata de disjuntor / Faíscamento perceptível no gerador ou cabos HV",
+                    "🔇 Sem nenhum disparo, aviso de interlock persistente no painel",
+                    "🟢 Disparo ocorre mas imagem sai totalmente branca/escura",
+                ],
+                "help": "Determina sobrecorrente, falha no inversor JEDI ou disparo em vazio."
+            },
+            "p3": {
+                "nome": "Intertravamento de Segurança",
+                "pergunta": "🛡️ 3. Sensores de Porta & Intertravamento de Segurança:",
+                "opcoes": [
+                    "🟢 Sensor da porta da sala fecha e comuta o circuito normalmente",
+                    "⚠️ Alerta de 'Porta Aberta' ou 'Interlock Aberto' não apaga no console",
+                    "⚪ Não se aplica / Não verificado",
+                ],
+                "help": "Impede deslocamento desnecessário por simples chave de porta solta."
+            }
+        }
+
+    # 4. Movimentação, Mesa, Estativa e Freios
+    if re.search(r'\b(FREIO|FREIOS|TRAVA|TRAVAS|TRAVOU|TRAVADO|TRAVADA|EMPERRADO|EMPERRADA|ESTATIVA|MESA|NAO SOBE|NÃO SOBE|NAO DESCE|NÃO DESCE|HORIZONTAL|VERTICAL|TILT|SOLTO|SOLTA|CURSO|TRILHO)\b', txt):
+        return {
+            "categoria": "MECÂNICA, MOVIMENTAÇÃO & FREIOS",
+            "icone": "⚙️",
+            "focada": True,
+            "desc": "Perguntas adaptadas para acionamento de motores, eletrofreios e curso dos trilhos:",
+            "p1": {
+                "nome": "Comando de Movimento",
+                "pergunta": "⚙️ 1. Resposta Elétrica ao Comando de Movimento (Botoeira / Pedal):",
+                "opcoes": [
+                    "🟢 Escuta o clique do relé/contator e o motor tenta girar",
+                    "🔇 Silêncio total ao apertar o botão (sem resposta elétrica)",
+                    "⚠️ Escuta zumbido contínuo ou o motor patina sem movimentar o conjunto",
+                    "⚪ Nenhuma das opções / Não se aplica",
+                ],
+                "help": "Avalia botão, fonte de alimentação ou motor elétrico."
+            },
+            "p2": {
+                "nome": "Eletrofreios e Travas",
+                "pergunta": "🧲 2. Atuação dos Eletrofreios ou Travas Mecânicas:",
+                "opcoes": [
+                    "🟢 Freios liberam e seguram com firmeza",
+                    "⚠️ Freio solto / livre (não segura o movimento, conjunto desliza sozinho)",
+                    "🚨 Freio permanentemente bloqueado (não destrava nem com botão manual)",
+                    "⚪ Nenhuma das opções / Outro comportamento",
+                ],
+                "help": "Diferencia bobina de freio queimada de desgaste de sapata."
+            },
+            "p3": {
+                "nome": "Curso e Fim de Curso",
+                "pergunta": "📏 3. Posição de Travamento no Curso / Trilhos:",
+                "opcoes": [
+                    "🟢 Curso livre em toda a extensão",
+                    "⚠️ Travou exatamente no batente / fim de curso (chave fim-de-curso acionada)",
+                    "🚨 Travamento no meio do percurso mecânico (possível obstáculo mecânico ou rolamento)",
+                    "⚪ Não se aplica",
+                ],
+                "help": "Determina se a falha é mecânica ou microswitch fim-de-curso."
+            }
+        }
+
+    # 5. Software, Console e Comunicação
+    if re.search(r'\b(CONSOLE|SOFTWARE|MONITOR|TELA PRETA|BOOT|WINDOWS|LINUX|COMMUNICATION|REDE|WORKSTATION|HOST|DICOM)\b', txt) or ("TRAV" in txt and any(k in txt for k in ["CONSOLE", "TELA", "SOFTWARE"])):
+        return {
+            "categoria": "CONSOLE, SOFTWARE & COMUNICAÇÃO",
+            "icone": "🖥️",
+            "focada": True,
+            "desc": "Perguntas específicas sobre inicialização do SO, mensagens de erro e barramento de rede:",
+            "p1": {
+                "nome": "Inicialização do Sistema",
+                "pergunta": "💻 1. Inicialização do Sistema Operacional & Software:",
+                "opcoes": [
+                    "🟢 Computador liga e carrega o Windows/Linux normalmente",
+                    "🔄 Computador liga, mas o software de aquisição médica não abre ou congela no boot",
+                    "❌ Computador não dá vídeo / Tela preta / Bips contínuos na placa-mãe",
+                    "⚪ Nenhuma das opções / Outro comportamento",
+                ],
+                "help": "Distingue problema de PC/hardware de falha na aplicação médica."
+            },
+            "p2": {
+                "nome": "Código de Erro no Painel",
+                "pergunta": "💬 2. Mensagem Exata de Erro no Painel / Console:",
+                "opcoes": [
+                    "⚠️ Erro de comunicação ('Communication Error' / 'Host unreachable' / 'Link Down')",
+                    "⚠️ Erro de banco de dados DICOM ou disco cheio (Disk Full / Archive Error)",
+                    "❌ Erro fatal de hardware de aquisição (Board Failure / Gantry Error)",
+                    "⚪ Nenhuma mensagem de erro visível, apenas travamento silencioso",
+                ],
+                "help": "Direciona a IT correta para o técnico levar cabos ou placas."
+            },
+            "p3": {
+                "nome": "Links de Fibra e Rede",
+                "pergunta": "🔌 3. Cabos de Comunicação & Rede / Fibra Óptica:",
+                "opcoes": [
+                    "🟢 LEDs de rede/fibra óptica piscando normalmente entre console e gantry/gerador",
+                    "🔴 LED de link apagado no cabo de fibra / placa de rede sem sinal",
+                    "⚪ Não verificado / Não se aplica",
+                ],
+                "help": "Verifica integridade do barramento de dados."
+            }
+        }
+
+    # 6. Temperatura, Chiller e Óleo
+    if re.search(r'\b(AQUECENDO|QUENTE|TEMPERATURA|CHILLER|OLEO|ÓLEO|VAZAMENTO|FUMACA|FUMAÇA|CHEIRO|COOLER|OVERHEAT)\b', txt):
+        return {
+            "categoria": "ARREFECIMENTO, TEMPERATURA & FLUIDOS",
+            "icone": "🌡️",
+            "focada": True,
+            "desc": "Perguntas adaptadas para monitoramento térmico, chiller e estanqueidade de óleo:",
+            "p1": {
+                "nome": "Alerta Térmico",
+                "pergunta": "🌡️ 1. Alerta de Temperatura & Disparo do Sensor Térmico:",
+                "opcoes": [
+                    "⚠️ Alerta de temperatura alta surge após poucos exames consecutivos",
+                    "🔴 Mensagem de superaquecimento (Overheat) surge logo ao ligar a frio",
+                    "🟢 Alerta térmico não apareceu (sistema acusa erro diferente)",
+                    "⚪ Não se aplica",
+                ],
+                "help": "Distingue superaquecimento real de termostato defeituoso."
+            },
+            "p2": {
+                "nome": "Óleo e Vazamento",
+                "pergunta": "💧 2. Nível de Fluido, Óleo Dielétrico & Vazamentos:",
+                "opcoes": [
+                    "🟢 Sem nenhum vestígio de vazamento no chão ou na carcaça",
+                    "⚠️ Mancha de óleo dielétrico perceptível ou cheiro característico de queimado",
+                    "🔴 Vazamento ativo visível com gotejamento pelo fole de dilatação do tubo",
+                    "⚪ Não se aplica",
+                ],
+                "help": "Evita dano catastrófico ao monobloco por perda de isolamento."
+            },
+            "p3": {
+                "nome": "Chiller e Ventilação",
+                "pergunta": "❄️ 3. Chiller Externo & Circulação de Arrefecimento:",
+                "opcoes": [
+                    "🟢 Bomba do chiller e ventoinhas funcionando com fluxo normal",
+                    "⚠️ Bomba do chiller não liga ou indicador de fluxo (flow switch) em alarme",
+                    "⚪ Equipamento com arrefecimento passivo / sem chiller dedicado",
+                ],
+                "help": "Avalia o circuito externo de refrigeração líquida."
+            }
+        }
+
+    # 7. Preventiva Programada
+    if re.search(r'\b(PREVENTIVA|REVISAO|REVISÃO|ROTINA|ANUAL|PERIODICA|PERIÓDICA)\b', txt):
+        return {
+            "categoria": "REVISÃO PREVENTIVA PROGRAMADA",
+            "icone": "📋",
+            "focada": True,
+            "desc": "Perguntas de alinhamento operacional para planejamento da manutenção preventiva:",
+            "p1": {
+                "nome": "Condição Operacional",
+                "pergunta": "🏥 1. Condição Clínica Operacional Atual do Equipamento:",
+                "opcoes": [
+                    "🟢 100% Operacional (Realizando exames normalmente, sem falhas)",
+                    "🟡 Operando com pequenas restrições ou ruídos que podem aguardar a revisão",
+                    "🔴 Equipamento parado / inoperante precisando de manutenção corretiva urgente",
+                ],
+                "help": "Define se o técnico deve ir com kit de preventiva ou de emergência."
+            },
+            "p2": {
+                "nome": "Disponibilidade da Sala",
+                "pergunta": "⏱️ 2. Disponibilidade da Sala de Exames para a Manutenção:",
+                "opcoes": [
+                    "🟢 Sala estará totalmente liberada no horário agendado (sem pacientes)",
+                    "🟡 Sala precisará ser compartilhada com plantão de urgência se houver",
+                    "⚪ A definir com a coordenação médica do hospital",
+                ],
+                "help": "Garante aproveitamento máximo das horas técnicas."
+            },
+            "p3": {
+                "nome": "Itens Secundários a Revisar",
+                "pergunta": "📐 3. Itens Secundários a Revisar nesta Preventiva:",
+                "opcoes": [
+                    "🟢 Preventiva de rotina completa conforme POP padrão",
+                    "⚠️ Incluir ajuste mecânico específico ou reaperto estrutural",
+                    "⚠️ Incluir calibração radiométrica com Phantom e laudo de conformidade",
+                ],
+                "help": "Direciona ferramentas e Phantoms necessários para a rota."
+            }
+        }
+
+    # Fallback Padrão por Modalidade
+    mod_up = modalidade.upper()
+    if "TOMOGRAF" in mod_up:
+        cat_padrao = "TOMÓGRAFO (CT)"
+        ico_padrao = "🌀"
+    elif "MAMO" in mod_up:
+        cat_padrao = "MAMÓGRAFO"
+        ico_padrao = "🗜️"
+    elif "ARCO" in mod_up:
+        cat_padrao = "ARCO CIRÚRGICO (C-ARM)"
+        ico_padrao = "🦾"
+    elif "DENSITO" in mod_up:
+        cat_padrao = "DENSITOMETRIA ÓSSEA"
+        ico_padrao = "🦴"
+    elif "DIGITAL" in mod_up or "DR" in mod_up or "CR" in mod_up:
+        cat_padrao = "SISTEMAS DIGITAIS (DR / CR)"
+        ico_padrao = "📸"
+    else:
+        cat_padrao = "SISTEMA DE RAIO-X"
+        ico_padrao = "🩻"
+
+    return {
+        "categoria": f"CHECKLIST TÉCNICO - {cat_padrao}",
+        "icone": ico_padrao,
+        "focada": False,
+        "desc": f"Checklist em 5 segundos focado nos componentes críticos de {cat_padrao}:",
+        "p1": {
+            "nome": "Alimentação Elétrica",
+            "pergunta": "⚡ 1. Alimentação Elétrica (Quadro de Força / PDU):",
+            "opcoes": [
+                "🟢 Não foi observada oscilação (Fornecimento elétrico normal)",
+                "🟡 Houve oscilações na rede elétrica, mas o quadro já estabilizou",
+                "🔴 Sim, houve desarme de disjuntor no quadro de força ou PDU",
+                "⚪ Nenhuma das opções / Não se aplica",
+            ],
+            "help": "Houve oscilação na rede elétrica? Se sim, algum disjuntor desarmou?"
+        },
+        "p2": {
+            "nome": "Mecânica e Movimentação",
+            "pergunta": f"{ico_padrao} 2. Funcionamento Mecânico & Estrutural:",
+            "opcoes": [
+                "🟢 Movimentação mecânica normal",
+                "⚠️ Travamento ou folga em movimento específico",
+                "🚨 Equipamento totalmente imobilizado",
+                "⚪ Nenhuma das opções / Outro comportamento",
+            ],
+            "help": "Avalia integridade do trilho, colunas e gantry."
+        },
+        "p3": {
+            "nome": "Painel de Controle e Comandos",
+            "pergunta": "🖥️ 3. Painel de Controle & Comandos:",
+            "opcoes": [
+                "🟢 Comandos e botões respondendo normalmente",
+                "🔄 Reiniciamos o equipamento e o erro persistiu",
+                "❌ Painel inoperante ou travado na inicialização",
+                "⚪ Nenhuma das opções / Não se aplica",
+            ],
+            "help": "Determina se a falha é de software ou botoeira física."
+        }
+    }
+
+
 def render_emedonline(ctx: AppContext):
     """Módulo EmedOnline: Triagem Técnica Humanizada, Pré-Atendimento e Roteamento Inteligente."""
     df = ctx.df
@@ -444,307 +800,50 @@ def render_emedonline(ctx: AppContext):
                     help="Identificada automaticamente pelo modelo do equipamento. Você pode alterar manualmente caso deseje outro checklist."
                 )
 
-            if modalidade == "RAIO-X":
-                st.markdown("##### 🩻 Checklist Técnico para Sistema de Raio-X")
-                st.caption("Perguntas diretas sobre alimentação elétrica, estativa porta-tubo e eletrofreios:")
+            triagem_info = _obter_perguntas_triagem_dinamica(modalidade, defeito_digitado, equip_escolhido)
+            p1_dados = triagem_info["p1"]
+            p2_dados = triagem_info["p2"]
+            p3_dados = triagem_info["p3"]
+            cat_nome = triagem_info["categoria"]
+            cat_ico = triagem_info["icone"]
+            cat_desc = triagem_info["desc"]
+            is_focada = triagem_info.get("focada", False)
 
-                c_chk1, c_chk2 = st.columns(2)
-                with c_chk1:
-                    nome_p1 = "Alimentação Elétrica"
-                    chk_1 = st.radio(
-                        "⚡ 1. Alimentação Elétrica (Quadro de Força):",
-                        [
-                            "🟢 Não foi observada oscilação (Fornecimento elétrico normal)",
-                            "🟡 Houve oscilações na rede elétrica, mas o quadro já estabilizou",
-                            "🔴 Sim, houve desarme de disjuntor no quadro de força",
-                            "⚪ Nenhuma das opções / Não se aplica",
-                        ],
-                        index=0,
-                        help="Houve oscilação na rede elétrica? Se sim, algum disjuntor desarmou?"
-                    )
-                    nome_p2 = "Estativa & Eletrofreio"
-                    chk_2 = st.radio(
-                        "🧲 2. Estativa Porta-Tubo & Eletrofreio:",
-                        [
-                            "🟢 Movimento normal (Freio atuando e segurando)",
-                            "⚠️ Movimento totalmente solto / livre (o freio não segura a estativa)",
-                            "⚠️ O movimento chega a travar em algum ponto do trilho ou patina?",
-                            "🚨 Todos os freios da sala (estativa e mesa) pararam de atuar (possível fonte de alimentação)",
-                            "⚪ Nenhuma das opções / Outro comportamento",
-                        ],
-                        index=1 if any(w in (defeito_digitado or "").upper() for w in ["FREIO", "ESTATIVA", "TRAVA", "HORIZONTAL", "VERTICAL", "SOLTO", "LIVRE"]) else 0,
-                        help="Identifica se o freio não segura (estativa solta), se emperra no trilho ou se é falha geral da fonte de alimentação."
-                    )
-
-                with c_chk2:
-                    nome_p3 = "Botão & Resposta Sonora"
-                    chk_3 = st.radio(
-                        "🔊 3. Botão de Acionamento & Resposta Sonora do Freio:",
-                        [
-                            "🟢 Escuta o estalo/clique da bobina solenoide ao apertar o botão",
-                            "🔇 Não escuta nenhum clique/ruído ao apertar o botão (sem resposta elétrica)",
-                            "⚠️ Escuta ruído contínuo, zumbido anormal ou vibração",
-                            "❌ Botão de comando com defeito físico, solto ou emperrado",
-                            "⚪ Nenhuma das opções / Não se aplica",
-                        ],
-                        index=0,
-                        help="Determina se a falha é elétrica no botão/cabo ou mecânica no eletrofreio/ajuste."
-                    )
-
-            elif modalidade == "TOMOGRAFIA":
-                st.markdown("##### 🌀 Checklist Técnico para Tomógrafo (CT)")
-                st.caption("Perguntas focadas em Quadro de Força, PDU, Gantry, Mesa e Console:")
-
-                c_chk1, c_chk2 = st.columns(2)
-                with c_chk1:
-                    nome_p1 = "Quadro / PDU / Estabilizador"
-                    chk_1 = st.radio(
-                        "⚡ 1. Alimentação Elétrica (Quadro de Força, PDU / Estabilizador):",
-                        [
-                            "🟢 Fornecimento normal (PDU e Nobreak/Estabilizador operacionais)",
-                            "🟡 Houve oscilações de rede / gerador, mas já estabilizou",
-                            "🔴 Disjuntor principal do PDU caiu ou Nobreak em alarme sonoro",
-                            "⚪ Nenhuma das opções / Não se aplica",
-                        ],
-                        index=0,
-                    )
-                    nome_p2 = "Gantry & Mesa"
-                    chk_2 = st.radio(
-                        "🌀 2. Gantry & Mesa de Exames:",
-                        [
-                            "🟢 Gantry energizado, rotação livre e mesa movimenta normalmente",
-                            "⚠️ Gantry bloqueado por interlock/comunicação ou parada de emergência",
-                            "🚨 Mesa travada ou ruído anormal/vibração durante a rotação do Gantry",
-                            "⚪ Nenhuma das opções / Outro comportamento",
-                        ],
-                        index=0,
-                    )
-
-                with c_chk2:
-                    nome_p3 = "Console de Operação"
-                    chk_3 = st.radio(
-                        "🖥️ 3. Console de Operação & Software:",
-                        [
-                            "🟢 Console inicializa normalmente e abre tela de exames",
-                            "🔄 Reiniciamos a console e a mensagem de erro persiste",
-                            "❌ Console congelada / Não carrega o software de exame",
-                            "⚪ Nenhuma das opções / Não se aplica",
-                        ],
-                        index=0,
-                    )
-
-            elif modalidade == "ARCO CIRÚRGICO":
-                st.markdown("##### 🦾 Checklist Técnico para Arco Cirúrgico (C-Arm)")
-                st.caption("Perguntas focadas em alimentação, braço em C, pedal e carrinho dos monitores:")
-
-                c_chk1, c_chk2 = st.columns(2)
-                with c_chk1:
-                    nome_p1 = "Alimentação & Cabo"
-                    chk_1 = st.radio(
-                        "⚡ 1. Alimentação Elétrica & Cabo Umbilical / Interligação:",
-                        [
-                            "🟢 Cabo e conexões elétricas normais (Carrinho energizado)",
-                            "🟡 Oscilação na rede da sala cirúrgica",
-                            "🔴 Aparelho sem força / Nobreak do carrinho em alarme",
-                            "⚪ Nenhuma das opções / Não se aplica",
-                        ],
-                        index=0,
-                    )
-                    nome_p2 = "Braço em C"
-                    chk_2 = st.radio(
-                        "🦾 2. Braço em C (Movimentos Orbitais & Freios Manuais):",
-                        [
-                            "🟢 Todos os freios e movimentos orbitais/angulares livres",
-                            "⚠️ Freio orbital ou angular específico duro/travado",
-                            "🚨 Braço em C totalmente bloqueado em todos os eixos",
-                            "⚪ Nenhuma das opções / Outro comportamento",
-                        ],
-                        index=0,
-                    )
-
-                with c_chk2:
-                    nome_p3 = "Monitores & Pedal"
-                    chk_3 = st.radio(
-                        "🦶 3. Carrinho dos Monitores & Pedal de Disparo:",
-                        [
-                            "🟢 Imagem nítida nos monitores e pedal acionando normalmente",
-                            "⚠️ Pedal falhando intermitente ou cabo com mau contato",
-                            "❌ Sem sinal de vídeo nos monitores ou erro de fluoroscopia",
-                            "⚪ Nenhuma das opções / Não se aplica",
-                        ],
-                        index=0,
-                    )
-
-            elif modalidade == "MAMOGRAFIA":
-                st.markdown("##### 🗜️ Checklist Técnico para Mamógrafo")
-                st.caption("Perguntas focadas em Quadro de Força, Gantry, Compressor e Painel:")
-
-                c_chk1, c_chk2 = st.columns(2)
-                with c_chk1:
-                    nome_p1 = "Quadro de Força"
-                    chk_1 = st.radio(
-                        "⚡ 1. Quadro de Força & Alimentação Elétrica:",
-                        [
-                            "🟢 Alimentação normal e disjuntores ligados",
-                            "🟡 Instabilidade momentânea na rede elétrica",
-                            "🔴 Disjuntor desarmou no quadro de força / Sistema apagado",
-                            "⚪ Nenhuma das opções / Não se aplica",
-                        ],
-                        index=0,
-                    )
-                    nome_p2 = "Gantry & Compressor"
-                    chk_2 = st.radio(
-                        "🗜️ 2. Gantry & Sistema de Compressão da Mama:",
-                        [
-                            "🟢 Compressor sobe e desce suavemente",
-                            "⚠️ Falha no pedal de compressão (manual ou outro pedal funcional)",
-                            "⚠️ Prato de compressão duro ou não sobe",
-                            "🚨 Descompressão automática travada ou acionada em emergência",
-                            "⚪ Nenhuma das opções / Outro comportamento",
-                        ],
-                        index=0,
-                    )
-
-                with c_chk2:
-                    nome_p3 = "Painel & Biombo"
-                    chk_3 = st.radio(
-                        "🖥️ 3. Painel de Operação & Vidro Plumbífero:",
-                        [
-                            "🟢 Painel respondendo e intertravamento de segurança íntegro",
-                            "⚠️ Mensagem de erro no painel ou botão com mau contato",
-                            "❌ Painel travado / Sem resposta aos comandos de exposição",
-                            "⚪ Nenhuma das opções / Não se aplica",
-                        ],
-                        index=0,
-                    )
-
-            elif modalidade == "DENSITOMETRIA":
-                st.markdown("##### 🦴 Checklist Técnico para Densitometria Óssea")
-                st.caption("Perguntas focadas em Fonte HV, Mesa, Braço C, Shutter e Software:")
-
-                c_chk1, c_chk2 = st.columns(2)
-                with c_chk1:
-                    nome_p1 = "Fonte HV & Alimentação"
-                    chk_1 = st.radio(
-                        "⚡ 1. Fonte de Alta Tensão & Alimentação Elétrica:",
-                        [
-                            "🟢 Alimentação estável e fonte de alta tensão sem desarme",
-                            "🟡 Oscilação momentânea na rede elétrica",
-                            "🔴 Fonte de alta tensão desarmada / Sem alimentação",
-                            "⚪ Nenhuma das opções / Não se aplica",
-                        ],
-                        index=0,
-                    )
-                    nome_p2 = "Mesa, Braço C & Shutter"
-                    chk_2 = st.radio(
-                        "🦴 2. Mesa de Exames & Braço C (Shutter/Colimador):",
-                        [
-                            "🟢 Braço C desliza suavemente sobre a mesa e shutter abre normal",
-                            "⚠️ Movimento do braço C pesado/patinando ou shutter emperrado",
-                            "🚨 Braço C totalmente travado ou colimador bloqueado",
-                            "⚪ Nenhuma das opções / Outro comportamento",
-                        ],
-                        index=0,
-                    )
-
-                with c_chk2:
-                    nome_p3 = "Computador & Cabos HV"
-                    chk_3 = st.radio(
-                        "💻 3. Computador com Software & Cabos de Alta Tensão:",
-                        [
-                            "🟢 Software comunica normalmente com o equipamento",
-                            "⚠️ Erro de comunicação serial/USB entre computador e mesa",
-                            "❌ Software trava na calibração diária ou falha nos cabos HV",
-                            "⚪ Nenhuma das opções / Não se aplica",
-                        ],
-                        index=0,
-                    )
-
-            elif modalidade == "SISTEMA DIGITAL (DR / CR)":
-                st.markdown("##### 📸 Checklist Técnico para Sistemas Digitais (DR / CR)")
-                st.caption("Perguntas focadas em Detector Flat Panel, Leitora CR, Interface Box e Workstation:")
-
-                c_chk1, c_chk2 = st.columns(2)
-                with c_chk1:
-                    nome_p1 = "Alimentação & Rede"
-                    chk_1 = st.radio(
-                        "⚡ 1. Alimentação Elétrica & Comunicação de Rede:",
-                        [
-                            "🟢 Alimentação e rede normais (Computador e detector/leitora comunicando)",
-                            "⚠️ Erro de rede / Falha de comunicação entre o detector/leitora e o PC",
-                            "🔴 Equipamento não liga / Fonte de alimentação ou Interface Box sem energia",
-                            "⚪ Nenhuma das opções / Não se aplica",
-                        ],
-                        index=0,
-                    )
-                    nome_p2 = "Detector DR / Leitora CR"
-                    chk_2 = st.radio(
-                        "📸 2. Detector Flat Panel (DR) ou Leitora de Chassi (CR):",
-                        [
-                            "🟢 Detector/Leitora lê e transfere a imagem normalmente",
-                            "⚠️ DR: Detector desconectando, bateria fraca ou cabo com mau contato",
-                            "⚠️ CR: Chassi enroscou/travou no mecanismo da leitora de fósforo",
-                            "🚨 Detector DR sofreu queda/impacto ou placa de fósforo do CR arranhada",
-                            "⚪ Nenhuma das opções / Outro comportamento",
-                        ],
-                        index=0,
-                    )
-
-                with c_chk2:
-                    nome_p3 = "Software & Imagem"
-                    chk_3 = st.radio(
-                        "💻 3. Software de Aquisição (Workstation) & Imagem:",
-                        [
-                            "🟢 Imagem nítida e processamento DICOM normal",
-                            "⚠️ Artefatos na imagem (linhas pretas/brancas, manchas ou corte de borda)",
-                            "❌ Software travado na tela de captura / Imagem não carrega",
-                            "⚪ Nenhuma das opções / Não se aplica",
-                        ],
-                        index=0,
-                    )
-
+            if is_focada:
+                st.markdown(f"""
+                <div style="background: rgba(14, 165, 233, 0.15); border-left: 5px solid #0ea5e9; padding: 12px 16px; border-radius: 8px; margin-bottom: 14px;">
+                    <div style="color: #38bdf8; font-weight: 800; font-size: 14px;">🎯 TRIAGEM CIRÚRGICA DETECTADA: {cat_ico} {cat_nome}</div>
+                    <div style="color: #cbd5e1; font-size: 13px; margin-top: 3px;">{cat_desc}</div>
+                </div>
+                """, unsafe_allow_html=True)
             else:
-                st.markdown("##### ⚙️ Checklist Rápido de Campo (Diagnóstico Geral)")
-                st.caption("Marque as condições básicas observadas para direcionar o diagnóstico técnico:")
+                st.markdown(f"##### {cat_ico} {cat_nome}")
+                st.caption(cat_desc)
 
-                c_chk1, c_chk2 = st.columns(2)
-                with c_chk1:
-                    nome_p1 = "Alimentação Elétrica"
-                    chk_1 = st.radio(
-                        "⚡ 1. Alimentação Elétrica (Quadro de Força):",
-                        [
-                            "🟢 Não foi observada oscilação (Fornecimento normal)",
-                            "🟡 Sim, houve oscilações / queda, mas a rede já estabilizou",
-                            "🔴 Sim, houve desarme de disjuntor no quadro",
-                            "⚪ Nenhuma das opções / Não se aplica",
-                        ],
-                        index=0,
-                    )
-                    nome_p2 = "Mecânica & Estrutura"
-                    chk_2 = st.radio(
-                        "⚙️ 2. Funcionamento Mecânico & Estrutural:",
-                        [
-                            "🟢 Movimentação mecânica normal",
-                            "⚠️ Travamento ou folga em movimento específico",
-                            "🚨 Equipamento totalmente imobilizado",
-                            "⚪ Nenhuma das opções / Outro comportamento",
-                        ],
-                        index=0,
-                    )
-
-                with c_chk2:
-                    nome_p3 = "Painel & Comandos"
-                    chk_3 = st.radio(
-                        "🖥️ 3. Painel de Controle & Comandos:",
-                        [
-                            "🟢 Comandos e botões respondendo normalmente",
-                            "🔄 Reiniciamos o equipamento e o erro persistiu",
-                            "❌ Painel inoperante ou travado na inicialização",
-                            "⚪ Nenhuma das opções / Não se aplica",
-                        ],
-                        index=0,
-                    )
-
+            c_chk1, c_chk2 = st.columns(2)
+            with c_chk1:
+                nome_p1 = p1_dados["nome"]
+                chk_1 = st.radio(
+                    p1_dados["pergunta"],
+                    p1_dados["opcoes"],
+                    index=0,
+                    help=p1_dados.get("help", "")
+                )
+                nome_p2 = p2_dados["nome"]
+                chk_2 = st.radio(
+                    p2_dados["pergunta"],
+                    p2_dados["opcoes"],
+                    index=0,
+                    help=p2_dados.get("help", "")
+                )
+            with c_chk2:
+                nome_p3 = p3_dados["nome"]
+                chk_3 = st.radio(
+                    p3_dados["pergunta"],
+                    p3_dados["opcoes"],
+                    index=0,
+                    help=p3_dados.get("help", "")
+                )
             st.markdown("---")
             st.markdown("#### 📸 3.2 Foto do Painel & Dados do Solicitante")
             col_foto1, col_foto2 = st.columns(2)

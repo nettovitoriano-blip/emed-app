@@ -156,11 +156,11 @@ opcoes_menu = [
     "🎫 Abertura de Chamados & OS",
     "📦 Solicitação de Peças & Ferramentas",
     "🗺️ Mapa & Planeamento de Rotas",
+    "🚨 Gestão de Pendências",
     "📦 Gestão de Estoque & Peças"
 ]
 
 if st.session_state.perfil == "Gestor":
-    opcoes_menu.insert(6, "🚨 Gestão de Pendências")
     opcoes_menu.extend([
         "⚙️ Gestão & Administração",
         "🚗 Atualizar Quilometragem (Opcional)",

@@ -1353,6 +1353,24 @@ def _render_execucao_os_ativas(ctx: AppContext):
                         placeholder="EX: LEVAR MULTÍMETRO FLUKE, PHANTOM E PLACA FONTE",
                         key=f"inst_prox_{idx_os}"
                     )
+                    opcoes_gravidade_pend = [
+                        "🟢 Nenhuma pendência restante (Equipamento 100% liberado)",
+                        "🟡 PROGRAMADA (Equipamento funcional / aguarda até a próxima preventiva)",
+                        "🔴 URGÊNCIA / CRÍTICA (Equipamento inoperante ou risco iminente de parada)"
+                    ]
+                    idx_grav_def = 0
+                    if "PARADO" in condicao_fim_os or "INTERDITADO" in condicao_fim_os:
+                        idx_grav_def = 2
+                    elif "RESTRIÇÃO" in condicao_fim_os or (inst_prox_visita.strip() and inst_prox_visita.strip().upper() not in ["N/D", "NENHUM", ""]):
+                        idx_grav_def = 1
+
+                    gravidade_pendencia_sel = st.radio(
+                        "🚨 Triagem da Pendência / Demanda Automática ao Almoxarifado:",
+                        opcoes_gravidade_pend,
+                        index=idx_grav_def,
+                        key=f"grav_pend_{idx_os}",
+                        help="Se houver peça necessária ou pendência restante, o Almoxarifado receberá a demanda automaticamente no fechamento com esta prioridade."
+                    )
                     observacoes_gerais_in = st.text_area(
                         "📝 Observações Gerais & Recomendações Técnicas ao Hospital (Fica registado na OS)",
                         value=obs_ger_atual,
@@ -1638,11 +1656,43 @@ def _render_execucao_os_ativas(ctx: AppContext):
                         resumo_diag = f" | [DIAGNÓSTICO: {problemas_encontrados_in.strip().upper()}]" if problemas_encontrados_in.strip() else ""
                         msg_cobranca_resumo = ""
 
+                        # Triagem e disparo automático de demanda para o Almoxarifado/Estoque
+                        tem_pendencia_ativa = (
+                            "Nenhuma pendência" not in gravidade_pendencia_sel and
+                            inst_prox_visita.strip() and
+                            inst_prox_visita.strip().upper() not in ["N/D", "NENHUM", ""]
+                        )
+                        prioridade_almox = "URGENTE" if "URGÊNCIA" in gravidade_pendencia_sel else "PROGRAMADA"
+                        if tem_pendencia_ativa:
+                            status_demanda = f"A SEPARAR ({prioridade_almox} - DEMANDA DE CAMPO)"
+                            try:
+                                with get_db_connection(ctx.db_name) as conn:
+                                    cur = conn.cursor()
+                                    cur.execute("""
+                                        INSERT INTO solicitacoes_pecas
+                                        (tecnico, destino_cliente, itens_solicitados, instrumentos_solicitados, status_pedido, data_pedido)
+                                        VALUES (?, ?, ?, ?, ?, ?)
+                                    """, (
+                                        novo_tec_exec,
+                                        row_os.get('cliente', ''),
+                                        f"DEMANDA DE CAMPO [{prioridade_almox}]: {inst_prox_visita.strip().upper()}",
+                                        f"Equipamento: {row_os.get('equipamento', '')} | OS #{id_os_ativa} | Triagem: {gravidade_pendencia_sel}",
+                                        status_demanda,
+                                        datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+                                    ))
+                                    conn.commit()
+                            except Exception:
+                                pass
+
                         if fechar_definitivo and not em_observacao:
-                            df.at[idx_os, 'pendencias'] = f"[CONCLUÍDO - {etapa_executada_fecho}] {relatorio_com_peca}{resumo_diag} | [{resumo_pag}]"
+                            if tem_pendencia_ativa:
+                                df.at[idx_os, 'pendencias'] = f"[CONCLUÍDO COM PENDÊNCIA: {prioridade_almox}] {inst_prox_visita.strip().upper()} | {relatorio_com_peca}{resumo_diag} | [{resumo_pag}]"
+                                df.at[idx_os, 'instrumento_necessario'] = f"[{prioridade_almox}] {inst_prox_visita.strip().upper()}"
+                            else:
+                                df.at[idx_os, 'pendencias'] = f"[CONCLUÍDO - {etapa_executada_fecho}] {relatorio_com_peca}{resumo_diag} | [{resumo_pag}]"
+                                df.at[idx_os, 'condicao_final'] = 'LIBERADO PARA USO NORMAL'
+                                df.at[idx_os, 'instrumento_necessario'] = ''
                             df.at[idx_os, 'status'] = 'CONCLUÍDO'
-                            df.at[idx_os, 'condicao_final'] = 'LIBERADO PARA USO NORMAL'
-                            df.at[idx_os, 'instrumento_necessario'] = ''
 
                             # Atualiza status na tabela clientes_equipamentos do SQLite
                             try:
@@ -1693,7 +1743,8 @@ def _render_execucao_os_ativas(ctx: AppContext):
                             )
                             msg_cobranca_resumo = msg_obs
                         else:
-                            df.at[idx_os, 'pendencias'] = f"[PENDÊNCIA ATIVA - {novo_tec_exec}] {relatorio_com_peca}{resumo_diag} (ETAPA REALIZADA: {etapa_executada_fecho})"
+                            pend_txt_base = f"[{prioridade_almox}] {inst_prox_visita.strip().upper()} | " if tem_pendencia_ativa else ""
+                            df.at[idx_os, 'pendencias'] = f"{pend_txt_base}[ATENDIDO: {novo_tec_exec}] {relatorio_com_peca}{resumo_diag} (ETAPA REALIZADA: {etapa_executada_fecho})"
                             df.at[idx_os, 'status'] = 'ATIVO'
                             df.at[idx_os, 'instrumento_necessario'] = inst_prox_visita.strip().upper()
 
@@ -1703,6 +1754,8 @@ def _render_execucao_os_ativas(ctx: AppContext):
                                 st.success(f"🎉 ORDEM DE SERVIÇO #{id_os_ativa} CONCLUÍDA E FECHADA COM SUCESSO!")
                             else:
                                 st.success(f"✅ Ordem de Serviço #{id_os_ativa} atualizada com sucesso!")
+                            if tem_pendencia_ativa:
+                                st.success(f"📦 Demanda de peça enviada automaticamente para o Almoxarifado com prioridade [{prioridade_almox}]!")
                             if msg_cobranca_resumo:
                                 st.info(msg_cobranca_resumo)
                             st.rerun()

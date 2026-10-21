@@ -25,74 +25,227 @@ from emed_services import (
 )
 
 
-def render_gestao_pendencias(ctx: AppContext):
-    if ctx.perfil_atual != "Gestor":
-        st.warning("⚠️ Acesso restrito ao perfil Gestor.")
-        return
+import datetime
+import urllib.parse
+import pandas as pd
+import streamlit as st
 
+def render_gestao_pendencias(ctx: AppContext):
     df = ctx.df
     equipa_tecnica = ctx.equipa_tecnica
+    hoje = ctx.hoje
 
-    st.markdown("### 🚨 Painel Central de Pendências & Direcionamento de Técnicos (Modo Gestor)")
-    st.info("Visão exclusiva da Gestão: acompanhe todas as pendências abertas e direcione-as rapidamente para o técnico disponível.")
+    # Permite visualização por qualquer colaborador na TV do laboratório/oficina
+    st.markdown("""
+        <div style="background: linear-gradient(135deg, #0b132b 0%, #1c2541 60%, #102a43 100%); 
+                    border-radius: 12px; padding: 18px 24px; border: 1.5px solid #3a506b; 
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <h2 style="color: #64dfdf; margin: 0; font-size: 26px; font-weight: 800; letter-spacing: 0.5px;">
+                        🚨 MURAL TV & GESTÃO DE PENDÊNCIAS
+                    </h2>
+                    <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 14px;">
+                        Painel operacional de monitoramento contínuo para a TV do Laboratório, Bancada e Gestão.
+                    </p>
+                </div>
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid #334155; padding: 6px 14px; border-radius: 8px; text-align: right;">
+                    <span style="color: #64dfdf; font-weight: bold; font-size: 13px;">🕒 SISTEMA ATIVO</span>
+                    <div style="color: #cbd5e1; font-size: 11px;">EMED Eletromedicina</div>
+                </div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
 
-    df_pend = df[df['status'].fillna('ATIVO').astype(str).str.upper() == 'ATIVO']
-    if df_pend.empty:
-        st.success("🎉 Sem pendências ativas no momento.")
+    # Controles Superiores da TV (Auto-refresh e Modo de Exibição)
+    c_ctl1, c_ctl2, c_ctl3 = st.columns([2.5, 1.2, 1.3])
+    with c_ctl1:
+        st.caption("Visão coletiva em tempo real: acompanhe chamados críticos, peças em separação e rotas programadas.")
+    with c_ctl2:
+        modo_tv_ampliado = st.toggle("📺 Modo TV (Cards Grandes)", value=True, key="modo_tv_zoom")
+    with c_ctl3:
+        auto_refresh_tv = st.toggle("⏱️ Auto-Refresh TV (60s)", value=False, key="auto_refresh_tv_toggle")
+        if auto_refresh_tv:
+            st.markdown("<script>setTimeout(function(){ window.location.reload(); }, 60000);</script>", unsafe_allow_html=True)
+            st.caption("🟢 Atualização contínua a cada 60s ativa.")
+
+    # Filtra chamados ativos no sistema
+    df_pend = df[df['status'].fillna('ATIVO').astype(str).str.upper().isin(['ATIVO', 'EM ATENDIMENTO', 'EM OBSERVAÇÃO'])].copy()
+
+    # Classificação das pendências
+    def _classificar_item(row):
+        pend = str(row.get('pendencias', '')).upper()
+        cond = str(row.get('condicao_inicial', '')).upper()
+        inst = str(row.get('instrumento_necessario', '')).upper()
+        tipo = str(row.get('tipo_servico', '')).upper()
+        
+        if any(k in pend for k in ['URGENTE', 'CRÍTICO', 'CRITICO', 'EMERGÊNCIA', 'EMERGENCIA']) or any(k in cond for k in ['PARADO', 'INOPERANTE']):
+            return 'CRÍTICA'
+        if any(k in pend for k in ['PEÇA', 'PECA', 'ALMOXARIFADO', 'SEPARAÇÃO', 'SEPARACAO', 'COMPRA']) or any(k in inst for k in ['PEC-', 'PLACA', 'TUBO', 'FONTE', 'PEÇA']):
+            return 'ALMOXARIFADO'
+        if any(k in pend for k in ['PROGRAMADA', 'PREVENTIVA', 'AGUARDA']) or 'PREVENTIVA' in tipo:
+            return 'PROGRAMADA'
+        return 'NORMAL'
+
+    df_pend['categoria_tv'] = df_pend.apply(_classificar_item, axis=1)
+
+    total_pend = len(df_pend)
+    qtd_criticas = len(df_pend[df_pend['categoria_tv'] == 'CRÍTICA'])
+    qtd_pecas = len(df_pend[df_pend['categoria_tv'] == 'ALMOXARIFADO'])
+    qtd_programadas = len(df_pend[df_pend['categoria_tv'] == 'PROGRAMADA'])
+
+    # Big Metrics / KPIs Estilo TV
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.markdown(f"""
+            <div style="background: rgba(239, 68, 68, 0.15); border: 2px solid #ef4444; border-radius: 10px; padding: 12px; text-align: center;">
+                <div style="color: #ef4444; font-size: 28px; font-weight: 900; line-height: 1.1;">{qtd_criticas}</div>
+                <div style="color: #fca5a5; font-size: 13px; font-weight: 700; margin-top: 4px;">🚨 CRÍTICAS / PARADO</div>
+            </div>
+        """, unsafe_allow_html=True)
+    with m2:
+        st.markdown(f"""
+            <div style="background: rgba(245, 158, 11, 0.15); border: 2px solid #f59e0b; border-radius: 10px; padding: 12px; text-align: center;">
+                <div style="color: #f59e0b; font-size: 28px; font-weight: 900; line-height: 1.1;">{qtd_pecas}</div>
+                <div style="color: #fde68a; font-size: 13px; font-weight: 700; margin-top: 4px;">📦 AGUARDA PEÇA / ESTOQUE</div>
+            </div>
+        """, unsafe_allow_html=True)
+    with m3:
+        st.markdown(f"""
+            <div style="background: rgba(59, 130, 246, 0.15); border: 2px solid #3b82f6; border-radius: 10px; padding: 12px; text-align: center;">
+                <div style="color: #3b82f6; font-size: 28px; font-weight: 900; line-height: 1.1;">{qtd_programadas}</div>
+                <div style="color: #bfdbfe; font-size: 13px; font-weight: 700; margin-top: 4px;">📅 PREVENTIVAS / ROTA</div>
+            </div>
+        """, unsafe_allow_html=True)
+    with m4:
+        st.markdown(f"""
+            <div style="background: rgba(16, 185, 129, 0.15); border: 2px solid #10b981; border-radius: 10px; padding: 12px; text-align: center;">
+                <div style="color: #10b981; font-size: 28px; font-weight: 900; line-height: 1.1;">{total_pend}</div>
+                <div style="color: #a7f3d0; font-size: 13px; font-weight: 700; margin-top: 4px;">🛠️ TOTAL EM ATENDIMENTO</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Filtros Rápidos
+    opcoes_filtro_tv = [
+        f"🚨 TODAS AS PENDÊNCIAS ({total_pend})",
+        f"🔴 CRÍTICAS / PARADO ({qtd_criticas})",
+        f"📦 AGUARDA PEÇAS ({qtd_pecas})",
+        f"📅 PROGRAMADAS / ROTA ({qtd_programadas})"
+    ]
+    filtro_sel = st.radio("Filtrar Painel:", opcoes_filtro_tv, horizontal=True)
+
+    if "CRÍTICAS" in filtro_sel:
+        df_exibir = df_pend[df_pend['categoria_tv'] == 'CRÍTICA']
+    elif "AGUARDA PEÇAS" in filtro_sel:
+        df_exibir = df_pend[df_pend['categoria_tv'] == 'ALMOXARIFADO']
+    elif "PROGRAMADAS" in filtro_sel:
+        df_exibir = df_pend[df_pend['categoria_tv'] == 'PROGRAMADA']
     else:
-        for idx_p, row_p in df_pend.iterrows():
-            id_os_p = obter_id_os(idx_p, row_p)
-            cli_p = limpar_texto(row_p.get('cliente'), 'N/D')
-            eq_p = limpar_texto(row_p.get('equipamento'), 'N/D')
-            tec_p = limpar_texto(row_p.get('tecnico_responsavel'), 'A DEFINIR')
-            pend_p = limpar_texto(row_p.get('pendencias'), 'Sem descrição')
-            inst_p = limpar_texto(row_p.get('instrumento_necessario'), 'Nenhum especificado')
-            etapa_p = limpar_texto(row_p.get('etapa_preventiva'), 'Geral')
+        df_exibir = df_pend
 
+    if df_exibir.empty:
+        st.success("🎉 Nenhuma pendência na categoria selecionada no momento!")
+        return
+
+    # Renderização dos Cards da TV
+    cols_por_linha = 1 if not modo_tv_ampliado else 2
+    colunas_cards = st.columns(cols_por_linha)
+
+    for i_card, (idx_p, row_p) in enumerate(df_exibir.iterrows()):
+        col_atual = colunas_cards[i_card % cols_por_linha]
+        id_os_p = obter_id_os(idx_p, row_p)
+        cli_p = limpar_texto(row_p.get('cliente'), 'N/D')
+        cid_p = limpar_texto(row_p.get('cidade'), 'CE')
+        uf_p = limpar_texto(row_p.get('estado'), 'CE')
+        eq_p = limpar_texto(row_p.get('equipamento'), 'N/D')
+        tec_p = limpar_texto(row_p.get('tecnico_responsavel'), 'A DEFINIR')
+        pend_p = limpar_texto(row_p.get('pendencias'), 'Sem descrição')
+        inst_p = limpar_texto(row_p.get('instrumento_necessario'), '')
+        srv_p = limpar_texto(row_p.get('tipo_servico'), 'MANUTENÇÃO')
+        categ = row_p.get('categoria_tv', 'NORMAL')
+
+        # Estilo por prioridade
+        if categ == 'CRÍTICA':
+            borda_cor = '#ef4444'
+            fundo_badge = 'rgba(239, 68, 68, 0.25)'
+            lbl_badge = '🚨 CRÍTICO / EQUIPAMENTO PARADO'
+            cor_badge = '#fca5a5'
+        elif categ == 'ALMOXARIFADO':
+            borda_cor = '#f59e0b'
+            fundo_badge = 'rgba(245, 158, 11, 0.25)'
+            lbl_badge = '📦 AGUARDANDO PEÇA / ALMOXARIFADO'
+            cor_badge = '#fde68a'
+        elif categ == 'PROGRAMADA':
+            borda_cor = '#3b82f6'
+            fundo_badge = 'rgba(59, 130, 246, 0.25)'
+            lbl_badge = '🟡 PROGRAMADA (AGUARDA PRÓXIMA ROTA)'
+            cor_badge = '#bfdbfe'
+        else:
+            borda_cor = '#64dfdf'
+            fundo_badge = 'rgba(100, 223, 223, 0.2)'
+            lbl_badge = '🛠️ ATENDIMENTO EM ANDAMENTO'
+            cor_badge = '#64dfdf'
+
+        tec_badge_cor = '#10b981' if tec_p != 'A DEFINIR' else '#ef4444'
+
+        with col_atual:
             st.markdown(f"""
-                <div style="background: #1c2541; border-left: 6px solid #f59e0b; padding: 15px; border-radius: 8px; margin-bottom: 8px;">
-                    <h4 style="margin: 0 0 5px 0; color: #64dfdf;">🏥 OS #{id_os_p} | {cli_p} — ⚙️ {eq_p}</h4>
-                    <p style="margin: 4px 0;"><strong>Técnico Atual:</strong> {tec_p} | <strong>Etapa Preventiva:</strong> {etapa_p}</p>
-                    <p style="margin: 4px 0;"><strong>Pendência:</strong> <span style="color: #fca5a5;">{pend_p}</span></p>
-                    <p style="margin: 4px 0; color: #64dfdf;"><strong>📐 Instrumento / Material Requerido:</strong> {inst_p}</p>
+                <div style="background: #1c2541; border: 2px solid {borda_cor}; border-left: 8px solid {borda_cor}; 
+                            border-radius: 10px; padding: 16px; margin-bottom: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="background: {fundo_badge}; color: {cor_badge}; font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 6px; border: 1px solid {borda_cor};">
+                            {lbl_badge}
+                        </span>
+                        <span style="color: #94a3b8; font-size: 13px; font-weight: bold;">OS #{id_os_p} • {srv_p}</span>
+                    </div>
+                    <h3 style="margin: 0 0 4px 0; color: #ffffff; font-size: 19px; font-weight: 800;">
+                        🏥 {cli_p}
+                    </h3>
+                    <div style="color: #94a3b8; font-size: 13px; margin-bottom: 8px;">📍 {cid_p} - {uf_p}</div>
+                    <div style="background: rgba(15, 23, 42, 0.6); padding: 10px 12px; border-radius: 8px; border: 1px solid #334155; margin-bottom: 10px;">
+                        <div style="color: #64dfdf; font-weight: 700; font-size: 14px; margin-bottom: 4px;">
+                            ⚙️ {eq_p}
+                        </div>
+                        <div style="color: #f1f5f9; font-size: 14px; line-height: 1.4;">
+                            <strong>Relato / Pendência:</strong> {pend_p}
+                        </div>
+                        {f'<div style="color: #fde68a; font-size: 13px; margin-top: 4px;"><strong>📦 Demanda / Peça:</strong> {inst_p}</div>' if inst_p and inst_p != "N/D" else ''}
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+                        <span style="color: #cbd5e1;">
+                            👨‍🔧 Técnico: <strong style="color: {tec_badge_cor};">{tec_p}</strong>
+                        </span>
+                    </div>
                 </div>
             """, unsafe_allow_html=True)
 
-            with st.expander(f"👉 Direcionar / Mudar Técnico ou Instrumento da OS #{id_os_p} ({cli_p})"):
-                with st.form(f"form_gestor_dir_{idx_p}"):
-                    c_gd1, c_gd2 = st.columns(2)
-                    lista_t_gestor = sorted(list(equipa_tecnica.keys()))
-                    with c_gd1:
-                        idx_tg = lista_t_gestor.index(tec_p.upper()) if tec_p.upper() in lista_t_gestor else 0
-                        novo_t_dir = st.selectbox(
-                            "Direcionar para o Técnico:",
-                            lista_t_gestor,
-                            index=idx_tg,
-                            key=f"gd_tec_{idx_p}"
-                        )
-                        novo_inst_dir = st.text_input(
-                            "Instrumento / Ferramenta Obrigatória:",
-                            value="" if inst_p == "Nenhum especificado" else inst_p,
-                            key=f"gd_inst_{idx_p}"
-                        )
-                    with c_gd2:
-                        nova_desc_dir = st.text_input(
-                            "Atualizar Instrução da Pendência:",
-                            value=pend_p,
-                            key=f"gd_desc_{idx_p}"
-                        )
-                        confirmar_dir = st.selectbox("Marcar como Confirmado na Escala?", ["SIM", "NÃO"], index=0, key=f"gd_conf_{idx_p}")
+            # Ações de Gestão (para o Gestor direcionar ou alterar técnico)
+            if ctx.perfil_atual == "Gestor":
+                with st.expander(f"⚙️ Ações de Gestão OS #{id_os_p} ({cli_p})"):
+                    with st.form(f"form_tv_gestor_{idx_p}"):
+                        c_tg1, c_tg2 = st.columns(2)
+                        lista_t_gestor = sorted(list(equipa_tecnica.keys()))
+                        with c_tg1:
+                            idx_tg = lista_t_gestor.index(tec_p.upper()) if tec_p.upper() in lista_t_gestor else 0
+                            novo_t_dir = st.selectbox("Atribuir Técnico:", lista_t_gestor, index=idx_tg, key=f"tv_tec_{idx_p}")
+                            novo_inst_dir = st.text_input("Atualizar Demanda de Peça / Kit:", value="" if inst_p == "Nenhum especificado" else inst_p, key=f"tv_inst_{idx_p}")
+                        with c_tg2:
+                            nova_desc_dir = st.text_input("Atualizar Instrução da Pendência:", value=pend_p, key=f"tv_desc_{idx_p}")
+                            confirmar_dir = st.selectbox("Confirmado na Escala?", ["SIM", "NÃO"], index=0, key=f"tv_conf_{idx_p}")
 
-                    if st.form_submit_button("💾 Direcionar OS para o Técnico", type="primary"):
-                        df.at[idx_p, 'tecnico_responsavel'] = novo_t_dir
-                        df.at[idx_p, 'telefone_tecnico'] = equipa_tecnica.get(novo_t_dir, {}).get("tel", "")
-                        df.at[idx_p, 'instrumento_necessario'] = novo_inst_dir.strip().upper()
-                        df.at[idx_p, 'pendencias'] = nova_desc_dir.strip().upper()
-                        df.at[idx_p, 'confirmado'] = confirmar_dir
-                        if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
-                            st.cache_data.clear()
-                            st.success(f"✅ Pendência direcionada para {novo_t_dir} com sucesso!")
-                            st.rerun()
+                        if st.form_submit_button("💾 Salvar Alteração na OS", type="primary"):
+                            df.at[idx_p, 'tecnico_responsavel'] = novo_t_dir
+                            df.at[idx_p, 'telefone_tecnico'] = equipa_tecnica.get(novo_t_dir, {}).get("tel", "")
+                            df.at[idx_p, 'instrumento_necessario'] = novo_inst_dir.strip().upper()
+                            df.at[idx_p, 'pendencias'] = nova_desc_dir.strip().upper()
+                            df.at[idx_p, 'confirmado'] = confirmar_dir
+                            if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
+                                st.cache_data.clear()
+                                st.success("✅ Pendência atualizada!")
+                                st.rerun()
+
 
 
 def render_solicitacao_pecas(ctx: AppContext):
