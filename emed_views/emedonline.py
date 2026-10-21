@@ -532,6 +532,7 @@ def render_emedonline(ctx: AppContext):
                         "🗜️ 2. Gantry & Sistema de Compressão da Mama:",
                         [
                             "🟢 Compressor sobe e desce suavemente",
+                            "⚠️ Falha no pedal de compressão (manual ou outro pedal funcional)",
                             "⚠️ Prato de compressão duro ou não sobe",
                             "🚨 Descompressão automática travada ou acionada em emergência",
                             "⚪ Nenhuma das opções / Outro comportamento",
@@ -746,13 +747,27 @@ def render_emedonline(ctx: AppContext):
                     st.rerun()
 
             else:
-                # Botão de Envio de Chamado
-                col_b1, col_b2 = st.columns([1.5, 2.5])
+                # Botão de Envio de Chamado Dinâmico conforme a Criticidade
+                is_urgente = "Totalmente Parado" in estado_operacional
+                is_preventiva = "Preventiva" in estado_operacional
+
+                if is_urgente:
+                    btn_label = "🚀 Confirmar Abertura de Chamado Emergencial"
+                    btn_help = "Prioridade Máxima: Equipamento parado, sem atendimento a pacientes."
+                elif is_preventiva:
+                    btn_label = "📅 Confirmar Agendamento de Preventiva (com Reparo de Pendência)"
+                    btn_help = "Prioridade P3: Equipamento funcional, pendência será tratada na rota da preventiva programada."
+                else:
+                    btn_label = "🔧 Confirmar Abertura de Chamado Técnico Programado"
+                    btn_help = "Prioridade P2: Equipamento operando com restrições."
+
+                col_b1, col_b2 = st.columns([2.0, 2.0])
                 with col_b1:
                     confirmou_envio = st.button(
-                        "🚀 Confirmar Abertura de Chamado Emergencial",
+                        btn_label,
                         type="primary",
                         use_container_width=True,
+                        help=btn_help,
                     )
 
                 if confirmou_envio:
@@ -784,10 +799,19 @@ def render_emedonline(ctx: AppContext):
                                 with open(caminho_foto_final, "wb") as f:
                                     f.write(arquivo_foto.getbuffer())
 
-                            # Define a criticidade
-                            is_urgente = "Totalmente Parado" in estado_operacional
-                            tag_prioridade = "P1 - EMERGÊNCIA MÉDICA" if is_urgente else "P2 - PROGRAMADO"
-                            cond_ini = "PARADO (INOPERANTE)" if is_urgente else "OPERANDO COM FALHA"
+                            # Define a criticidade e classificação de serviço
+                            if is_urgente:
+                                tag_prioridade = "P1 - EMERGÊNCIA MÉDICA"
+                                cond_ini = "PARADO (INOPERANTE)"
+                                tipo_servico = "CORRETIVA"
+                            elif is_preventiva:
+                                tag_prioridade = "P3 - PREVENTIVA PROGRAMADA"
+                                cond_ini = "OPERACIONAL COM PENDÊNCIA (AGUARDA PREVENTIVA)"
+                                tipo_servico = "PREVENTIVA COM REPARO"
+                            else:
+                                tag_prioridade = "P2 - PROGRAMADO"
+                                cond_ini = "OPERANDO COM FALHA"
+                                tipo_servico = "CORRETIVA"
 
                             # Verifica equipe próxima por cidade
                             tec_sugerido = "EQUIPE EMED PLANTÃO"
@@ -797,7 +821,8 @@ def render_emedonline(ctx: AppContext):
                                     tec_sugerido = t_nome
                                     break
 
-                            kit_sugerido = obter_kit_por_servico("CORRETIVA", defeito_digitado)
+                            # Kit sugerido inteligente considerando modalidade e defeito
+                            kit_sugerido = obter_kit_por_servico(tipo_servico, f"{modalidade} {equip_escolhido} {defeito_digitado}")
                             checklist_resumo = (
                                 f"[{nome_p1}: {chk_1}] "
                                 f"[{nome_p2}: {chk_2}] "
@@ -810,7 +835,7 @@ def render_emedonline(ctx: AppContext):
                                 "estado": uf_cli.upper(),
                                 "equipamento": equip_escolhido.strip().upper(),
                                 "endereco": end_cli.strip().upper(),
-                                "tipo_servico": "CORRETIVA",
+                                "tipo_servico": tipo_servico,
                                 "data_agendamento": datetime.now().strftime("%Y-%m-%d"),
                                 "tecnico_responsavel": tec_sugerido,
                                 "tecnico_auxiliar": "NENHUM (INDIVIDUAL)",
@@ -837,7 +862,7 @@ def render_emedonline(ctx: AppContext):
                                 "endereco_fiscal": end_cli,
                                 "tipo_contrato": limpar_texto(primeira_linha.get("tipo_contrato"), "CONTRATO"),
                                 "instrumento_necessario": kit_sugerido.get("nome", "MALETA DE CALIBRAÇÃO PADRÃO"),
-                                "etapa_preventiva": f"CORRETIVA EMEDONLINE ({modalidade})",
+                                "etapa_preventiva": f"PREVENTIVA / CALIBRAÇÃO ({modalidade})" if is_preventiva else f"CORRETIVA EMEDONLINE ({modalidade})",
                                 "orcamento_anexo": "",
                                 "condicao_pagamento": "",
                                 "valor_os": 0.0,
@@ -867,18 +892,25 @@ def render_emedonline(ctx: AppContext):
                                     tec_sugerido,
                                     cliente_selecionado,
                                     equip_escolhido,
-                                    "CORRETIVA / TRIAGEM",
+                                    "PREVENTIVA / CALIBRAÇÃO" if is_preventiva else "CORRETIVA / TRIAGEM",
                                     f"[{kit_sugerido.get('nome')}] {itens_kit_str}",
                                     os_id=num_os_gerada
                                 )
                                 
                                 # Mensagem objetiva para despacho e alinhamento da equipe
+                                if is_preventiva:
+                                    titulo_whats = f"📅 *AGENDAMENTO PREVENTIVA COM PENDÊNCIA • OS #{num_os_gerada}*"
+                                    status_whats = "Equipamento Operacional (Resolver na Preventiva)"
+                                else:
+                                    titulo_whats = f"🚨 *CHAMADO EMEDONLINE • OS #{num_os_gerada}*"
+                                    status_whats = cond_ini
+
                                 msg_whats = (
-                                    f"🚨 *CHAMADO EMEDONLINE • OS #{num_os_gerada}*\n"
+                                    f"{titulo_whats}\n"
                                     f"Cliente: {cliente_selecionado}\n"
                                     f"Equipamento: {equip_escolhido} ({modalidade})\n"
-                                    f"Prioridade: {cond_ini}\n"
-                                    f"Defeito: {defeito_digitado.strip()}\n\n"
+                                    f"Prioridade: {status_whats}\n"
+                                    f"Defeito / Pendência: {defeito_digitado.strip()}\n\n"
                                     f"*TRIAGEM TÉCNICA ({modalidade}):*\n"
                                     f"• {nome_p1}: {chk_1}\n"
                                     f"• {nome_p2}: {chk_2}\n"
