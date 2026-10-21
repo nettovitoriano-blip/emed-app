@@ -444,20 +444,22 @@ def aplicar_peca_os_idempotente(db_path, nome_peca, qtd_aplicada, ref_anterior="
 
     with get_db_connection(db_path) as conn:
         cur = conn.cursor()
-        cur.execute("SELECT quantidade FROM estoque_pecas WHERE nome_peca = ?", (nome_peca,))
+        cur.execute("SELECT quantidade FROM estoque_pecas WHERE UPPER(nome_peca) = ?", (nome_peca.strip().upper(),))
         row = cur.fetchone()
         if not row:
-            return False, f"⚠️ Peça '{nome_peca}' não localizada no estoque!", ref_anterior
+            # Peça aplicada via preenchimento manual (avulsa / fora do estoque formal)
+            # Permite o registro completo na OS e segue o fluxo sem travar o fechamento
+            return True, f"[PEÇA MANUAL: {nova_ref}]", nova_ref
         saldo_atual = int(row[0])
         if int(qtd_aplicada) > saldo_atual:
             return (
                 False,
-                f"⚠️ Saldo insuficiente para '{nome_peca}'! Disponível: {saldo_atual} un.",
+                f"⚠️ Saldo insuficiente para '{nome_peca}' no estoque! Disponível: {saldo_atual} un.",
                 ref_anterior
             )
         cur.execute(
-            "UPDATE estoque_pecas SET quantidade = quantidade - ? WHERE nome_peca = ?",
-            (int(qtd_aplicada), nome_peca)
+            "UPDATE estoque_pecas SET quantidade = quantidade - ? WHERE UPPER(nome_peca) = ?",
+            (int(qtd_aplicada), nome_peca.strip().upper())
         )
     return True, f"[PEÇA APLICADA: {nova_ref}]", nova_ref
 

@@ -954,8 +954,36 @@ def _render_execucao_os_ativas(ctx: AppContext):
 
     if df_os_ativas.empty:
         st.info("ℹ️ Não existem ordens de serviço ativas no momento.")
+        return
+
+    # Seletor de Foco Rápido de OS (Abre a OS desejada em foco total com alta performance)
+    opcoes_foco = ["📋 VER TODAS AS ORDENS ATIVAS (EXPANDERS)"] + [
+        f"⚡ OS #{obter_id_os(i, r)} | {limpar_texto(r.get('cliente'))} — {limpar_texto(r.get('equipamento'))} [{limpar_texto(r.get('tipo_servico'))}]"
+        for i, r in df_os_ativas.iterrows()
+    ]
+
+    col_foc1, col_foc2 = st.columns([3, 1])
+    with col_foc1:
+        foco_escolhido = st.selectbox(
+            "🎯 Foco de Atendimento (Selecione a OS para abrir diretamente em tela cheia com alta velocidade):",
+            opcoes_foco,
+            index=0,
+            key="sel_foco_os_ativa"
+        )
+    with col_foc2:
+        st.caption(f"Total: **{len(df_os_ativas)} OS ativas** no sistema.")
+
+    if foco_escolhido != "📋 VER TODAS AS ORDENS ATIVAS (EXPANDERS)":
+        id_str = foco_escolhido.split("|")[0].replace("⚡ OS #", "").strip()
+        df_os_render = df_os_ativas[df_os_ativas.index.astype(str) == id_str]
+        if df_os_render.empty:
+            df_os_render = df_os_ativas[df_os_ativas['id'].astype(str) == id_str]
+        if df_os_render.empty:
+            df_os_render = df_os_ativas
     else:
-        for idx_os, row_os in df_os_ativas.iterrows():
+        df_os_render = df_os_ativas
+
+        for idx_os, row_os in df_os_render.iterrows():
             id_os_ativa = obter_id_os(idx_os, row_os)
             tec_resp_os = limpar_texto(row_os.get('tecnico_responsavel'), 'A DEFINIR').upper()
             cli_os_atual = limpar_texto(row_os.get('cliente'), '')
@@ -980,7 +1008,7 @@ def _render_execucao_os_ativas(ctx: AppContext):
             txt_aux_ativo = f" + Aux: {tec_aux_os_atual}" if tec_aux_os_atual else ""
 
             titulo_os_ativa = f"🛠️ OS #{id_os_ativa} | {cli_os_atual} — Equipamento: {eq_os_atual} [{srv_os_atual}] [Técnico: {tec_resp_os}{txt_aux_ativo}]"
-            with st.expander(titulo_os_ativa):
+            with st.expander(titulo_os_ativa, expanded=(len(df_os_render) == 1)):
                 logo_atv_b64 = _obter_logo_base64()
                 bloco_logo_atv = (
                     f'<div style="background:#ffffff; padding:4px 8px; border-radius:6px; display:inline-flex; align-items:center;">'
@@ -1069,7 +1097,7 @@ def _render_execucao_os_ativas(ctx: AppContext):
                     "🚨 4. Pendências & Obs.",
                     "📸 5. Fotos, Vídeo & Anexos",
                     "✍️ 6. Assinatura, E-mail & Fecho"
-                ])
+                ], key=f"tabs_os_modular_{id_os_ativa}_{idx_os}")
 
                 with m_tab1:
                     st.markdown("##### 🏥 Dados do Cliente, Endereço, Tipo de Serviço & Defeito Relatado")
@@ -1201,13 +1229,40 @@ def _render_execucao_os_ativas(ctx: AppContext):
                             key=f"chk_pop_ms_{idx_os}"
                         )
                     with c_s2:
+                        st.markdown("###### 📦 Peça ou Componente Aplicado")
                         pecas_disponiveis = df_estoque['nome_peca'].tolist() if not df_estoque.empty else []
-                        peca_selecionada = st.selectbox(
-                            "Selecione a Peça Aplicada do Estoque (Baixa Automática)",
-                            ["NENHUMA PEÇA"] + pecas_disponiveis,
-                            key=f"peca_{idx_os}"
+
+                        modo_peca = st.radio(
+                            "Origem da Peça Utilizada:",
+                            [
+                                "📦 Estoque Cadastrado",
+                                "✍️ Preenchimento Manual (Avulsa / Não Listada)",
+                                "❌ Nenhuma Peça"
+                            ],
+                            horizontal=True,
+                            key=f"modo_peca_{idx_os}"
                         )
-                        qtd_aplicada = st.number_input("Quantidade Aplicada", min_value=1, value=1, key=f"qtd_peca_{idx_os}")
+
+                        if "Estoque" in modo_peca:
+                            peca_selecionada = st.selectbox(
+                                "Selecione a Peça do Estoque:",
+                                ["NENHUMA PEÇA"] + pecas_disponiveis,
+                                key=f"peca_{idx_os}"
+                            )
+                        elif "Manual" in modo_peca:
+                            peca_man_val = st.text_input(
+                                "Digite o Nome / Código da Peça Aplicada: *",
+                                placeholder="Ex: BOBINA SOLENOIDE 24V, FUSÍVEL 15A CERÂMICO, TECLADO...",
+                                key=f"peca_man_txt_{idx_os}"
+                            )
+                            peca_selecionada = peca_man_val.strip().upper() if peca_man_val.strip() else "NENHUMA PEÇA"
+                        else:
+                            peca_selecionada = "NENHUMA PEÇA"
+
+                        if peca_selecionada != "NENHUMA PEÇA":
+                            qtd_aplicada = st.number_input("Quantidade Aplicada", min_value=1, value=1, key=f"qtd_peca_{idx_os}")
+                        else:
+                            qtd_aplicada = 1
 
                         tipo_aplicacao_peca = "DEFINITIVA"
                         dias_obs_in = 3
@@ -1334,6 +1389,50 @@ def _render_execucao_os_ativas(ctx: AppContext):
                         if orc_salvo_at:
                             st.caption(f"📎 Orçamento atual: `{os.path.basename(orc_salvo_at)}`")
 
+                    st.markdown("<br/>", unsafe_allow_html=True)
+                    if st.button("📸 Salvar Fotos e Vídeos Anexados Imediatamente", key=f"btn_salvar_fotos_tab5_{idx_os}", use_container_width=True):
+                        pasta_uploads = os.path.join(ctx.base_dir, "uploads_os")
+                        os.makedirs(pasta_uploads, exist_ok=True)
+                        salvou_anexo = False
+                        if foto_antes_up is not None:
+                            p_f_ant = os.path.join(pasta_uploads, f"ANTES_OS{id_os_ativa}_{foto_antes_up.name}")
+                            with open(p_f_ant, "wb") as f:
+                                f.write(foto_antes_up.getbuffer())
+                            df.at[idx_os, 'foto_evidencia'] = p_f_ant
+                            salvou_anexo = True
+                        if foto_depois_up is not None:
+                            p_f_dep = os.path.join(pasta_uploads, f"DEPOIS_OS{id_os_ativa}_{foto_depois_up.name}")
+                            with open(p_f_dep, "wb") as f:
+                                f.write(foto_depois_up.getbuffer())
+                            df.at[idx_os, 'foto_depois'] = p_f_dep
+                            salvou_anexo = True
+                        if video_exec_up is not None:
+                            p_vid = os.path.join(pasta_uploads, f"VID_OS{id_os_ativa}_{video_exec_up.name}")
+                            with open(p_vid, "wb") as f:
+                                f.write(video_exec_up.getbuffer())
+                            df.at[idx_os, 'video_evidencia'] = p_vid
+                            salvou_anexo = True
+                        if formulario_exec_up is not None:
+                            p_form = os.path.join(pasta_uploads, f"FORM_OS{id_os_ativa}_{formulario_exec_up.name}")
+                            with open(p_form, "wb") as f:
+                                f.write(formulario_exec_up.getbuffer())
+                            df.at[idx_os, 'formulario_anexo'] = p_form
+                            salvou_anexo = True
+                        if orcamento_fecho_up is not None:
+                            p_orc = os.path.join(pasta_uploads, f"ORC_OS{id_os_ativa}_{orcamento_fecho_up.name}")
+                            with open(p_orc, "wb") as f:
+                                f.write(orcamento_fecho_up.getbuffer())
+                            df.at[idx_os, 'orcamento_anexo'] = p_orc
+                            salvou_anexo = True
+
+                        if salvou_anexo:
+                            salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel)
+                            st.cache_data.clear()
+                            st.success("✅ Mídias e anexos gravados com sucesso nesta OS!")
+                            st.rerun()
+                        else:
+                            st.warning("⚠️ Selecione ou fotografe pelo menos um arquivo antes de salvar.")
+
                 with m_tab6:
                     st.markdown("##### 💰 Faturamento & ✍️ Coleta de Assinatura")
                     c_fat1, c_fat2 = st.columns(2)
@@ -1376,10 +1475,11 @@ def _render_execucao_os_ativas(ctx: AppContext):
 
                     with col_as2:
                         st.markdown("###### 🏥 2. Assinatura do Cliente (Pelo Celular)")
+                        resp_pre_salvo = limpar_texto(row_os.get('assinatura_cliente'), limpar_texto(row_os.get('responsavel_hospital'), ''))
                         assinatura_cliente_input = st.text_input(
                             "Nome e Cargo/Setor do Responsável no Hospital *",
-                            value=limpar_texto(row_os.get('assinatura_cliente'), ''),
-                            placeholder="EX: DR. CARLOS / ENF. MARIA - RADIOLOGIA",
+                            value=resp_pre_salvo,
+                            placeholder="EX: DR. CARLOS / ENF. MARIA / SRA. DAMARES",
                             key=f"as_cli_{idx_os}"
                         )
                         label_input_sig = renderizar_quadro_assinatura_cliente(idx_os)
@@ -1391,148 +1491,195 @@ def _render_execucao_os_ativas(ctx: AppContext):
                             key=f"sig_b64_{idx_os}"
                         )
 
+                    st.markdown("---")
+                    st.markdown("###### 🏁 Desfecho & Ação Imediata")
+                    opcoes_fecho_tab6 = [
+                        "✅ CONCLUÍDO (Fechar OS Agora — Equipamento Liberado & Faturar)",
+                        "🔬 DEIXAR EM OBSERVAÇÃO (Equipamento / Peça em Teste — Não Faturar)",
+                        "🚨 DEIXAR PENDÊNCIA ATIVA (Agendar Retorno da Equipe)"
+                    ]
+                    status_fecho_tab6 = st.radio(
+                        "Status Final da Intervenção:",
+                        opcoes_fecho_tab6,
+                        index=0,
+                        key=f"status_fecho_tab6_{idx_os}"
+                    )
+
+                    btn_concluir_tab6 = st.button(
+                        f"🏁 Concluir e Fechar Ordem de Serviço #{id_os_ativa} Agora",
+                        key=f"btn_concluir_tab6_{idx_os}",
+                        type="primary",
+                        use_container_width=True
+                    )
+
                 st.markdown("---")
-                if st.button("💾 Gravar Ordem de Serviço Modular, Atualizar Estoque e Faturamento", key=f"btn_finalizar_os_{idx_os}", type="primary", use_container_width=True):
-                    texto_relatorio_base = obs_tecnico_final.strip() or problemas_encontrados_in.strip()
-                    if not assinatura_cliente_input.strip() or not texto_relatorio_base:
-                        st.error("⚠️ Preencha os Serviços Executados (Aba 3) e o Nome do Responsável no Hospital (Aba 6)!")
+                btn_finalizar_os = st.button(
+                    f"💾 Salvar Modificações da OS #{id_os_ativa} (Gravar Todas as Abas)",
+                    key=f"btn_finalizar_os_{idx_os}",
+                    use_container_width=True
+                )
+
+                if btn_concluir_tab6 or btn_finalizar_os:
+                    status_escolhido_efetivo = status_fecho_tab6 if btn_concluir_tab6 else status_fecho_escolha
+                    texto_relatorio_base = (
+                        obs_tecnico_final.strip()
+                        or problemas_encontrados_in.strip()
+                        or def_rel_atual.strip()
+                        or "MANUTENÇÃO E REVISÃO TÉCNICA EXECUTADA CONFORME PROTOCOLO EMED."
+                    )
+                    resp_final_cli = (
+                        assinatura_cliente_input.strip()
+                        or limpar_texto(row_os.get('responsavel_hospital'), '')
+                        or "RESPONSÁVEL DO SETOR / HOSPITAL"
+                    )
+
+                    ref_peca_ant = limpar_texto(row_os.get('peca_baixada_ref'), '')
+                    ok_peca, tag_peca, nova_ref_peca = aplicar_peca_os_idempotente(
+                        ctx.db_name,
+                        peca_selecionada,
+                        int(qtd_aplicada),
+                        ref_peca_ant
+                    )
+                    if not ok_peca:
+                        st.error(tag_peca)
                     else:
-                        ref_peca_ant = limpar_texto(row_os.get('peca_baixada_ref'), '')
-                        ok_peca, tag_peca, nova_ref_peca = aplicar_peca_os_idempotente(
-                            ctx.db_name,
-                            peca_selecionada,
-                            int(qtd_aplicada),
-                            ref_peca_ant
-                        )
-                        if not ok_peca:
-                            st.error(tag_peca)
+                        if tag_peca and tag_peca not in texto_relatorio_base.upper():
+                            relatorio_com_peca = f"{texto_relatorio_base.upper()} | {tag_peca}"
                         else:
-                            if tag_peca and tag_peca not in texto_relatorio_base.upper():
-                                relatorio_com_peca = f"{texto_relatorio_base.upper()} | {tag_peca}"
-                            else:
-                                relatorio_com_peca = texto_relatorio_base.upper()
+                            relatorio_com_peca = texto_relatorio_base.upper()
 
-                            pasta_uploads = os.path.join(ctx.base_dir, "uploads_os")
-                            os.makedirs(pasta_uploads, exist_ok=True)
+                        pasta_uploads = os.path.join(ctx.base_dir, "uploads_os")
+                        os.makedirs(pasta_uploads, exist_ok=True)
 
-                            if foto_antes_up is not None:
-                                caminho_f_ant = os.path.join(pasta_uploads, f"ANTES_OS{id_os_ativa}_{foto_antes_up.name}")
-                                with open(caminho_f_ant, "wb") as f:
-                                    f.write(foto_antes_up.getbuffer())
-                                df.at[idx_os, 'foto_evidencia'] = caminho_f_ant
+                        if foto_antes_up is not None:
+                            caminho_f_ant = os.path.join(pasta_uploads, f"ANTES_OS{id_os_ativa}_{foto_antes_up.name}")
+                            with open(caminho_f_ant, "wb") as f:
+                                f.write(foto_antes_up.getbuffer())
+                            df.at[idx_os, 'foto_evidencia'] = caminho_f_ant
 
-                            if foto_depois_up is not None:
-                                caminho_f_dep = os.path.join(pasta_uploads, f"DEPOIS_OS{id_os_ativa}_{foto_depois_up.name}")
-                                with open(caminho_f_dep, "wb") as f:
-                                    f.write(foto_depois_up.getbuffer())
-                                df.at[idx_os, 'foto_depois'] = caminho_f_dep
+                        if foto_depois_up is not None:
+                            caminho_f_dep = os.path.join(pasta_uploads, f"DEPOIS_OS{id_os_ativa}_{foto_depois_up.name}")
+                            with open(caminho_f_dep, "wb") as f:
+                                f.write(foto_depois_up.getbuffer())
+                            df.at[idx_os, 'foto_depois'] = caminho_f_dep
 
-                            if video_exec_up is not None:
-                                caminho_vid_exec = os.path.join(pasta_uploads, f"VID_OS{id_os_ativa}_{video_exec_up.name}")
-                                with open(caminho_vid_exec, "wb") as f:
-                                    f.write(video_exec_up.getbuffer())
-                                df.at[idx_os, 'video_evidencia'] = caminho_vid_exec
+                        if video_exec_up is not None:
+                            caminho_vid_exec = os.path.join(pasta_uploads, f"VID_OS{id_os_ativa}_{video_exec_up.name}")
+                            with open(caminho_vid_exec, "wb") as f:
+                                f.write(video_exec_up.getbuffer())
+                            df.at[idx_os, 'video_evidencia'] = caminho_vid_exec
 
-                            if formulario_exec_up is not None:
-                                caminho_form_exec = os.path.join(pasta_uploads, f"FORM_OS{id_os_ativa}_{formulario_exec_up.name}")
-                                with open(caminho_form_exec, "wb") as f:
-                                    f.write(formulario_exec_up.getbuffer())
-                                df.at[idx_os, 'formulario_anexo'] = caminho_form_exec
+                        if formulario_exec_up is not None:
+                            caminho_form_exec = os.path.join(pasta_uploads, f"FORM_OS{id_os_ativa}_{formulario_exec_up.name}")
+                            with open(caminho_form_exec, "wb") as f:
+                                f.write(formulario_exec_up.getbuffer())
+                            df.at[idx_os, 'formulario_anexo'] = caminho_form_exec
 
-                            if orcamento_fecho_up is not None:
-                                caminho_orc_fecho = os.path.join(pasta_uploads, f"ORC_OS{id_os_ativa}_{orcamento_fecho_up.name}")
-                                with open(caminho_orc_fecho, "wb") as f:
-                                    f.write(orcamento_fecho_up.getbuffer())
-                                df.at[idx_os, 'orcamento_anexo'] = caminho_orc_fecho
+                        if orcamento_fecho_up is not None:
+                            caminho_orc_fecho = os.path.join(pasta_uploads, f"ORC_OS{id_os_ativa}_{orcamento_fecho_up.name}")
+                            with open(caminho_orc_fecho, "wb") as f:
+                                f.write(orcamento_fecho_up.getbuffer())
+                            df.at[idx_os, 'orcamento_anexo'] = caminho_orc_fecho
 
-                            fechar_definitivo = "CONCLUÍDO" in status_fecho_escolha
-                            resumo_pag = f"{opcao_faturamento} — VALOR FINAL: R$ {valor_final_faturar:,.2f}"
-                            str_aux_final = ", ".join([t for t in novos_tecs_aux if t != novo_tec_exec])
+                        fechar_definitivo = ("CONCLUÍDO" in status_escolhido_efetivo) or btn_concluir_tab6
+                        em_observacao = ("OBSERVAÇÃO" in status_escolhido_efetivo) and not btn_concluir_tab6
+                        resumo_pag = f"{opcao_faturamento} — VALOR FINAL: R$ {valor_final_faturar:,.2f}"
+                        str_aux_final = ", ".join([t for t in novos_tecs_aux if t != novo_tec_exec])
 
-                            df.at[idx_os, 'endereco'] = endereco_exec_in.strip().upper()
-                            df.at[idx_os, 'email'] = email_exec_in.strip()
-                            df.at[idx_os, 'tipo_servico'] = tipo_srv_exec_in.strip().upper()
-                            df.at[idx_os, 'tecnico_responsavel'] = novo_tec_exec
-                            df.at[idx_os, 'tecnico_auxiliar'] = str_aux_final
-                            df.at[idx_os, 'telefone_tecnico'] = equipa_tecnica.get(novo_tec_exec, {}).get("tel", "")
-                            df.at[idx_os, 'etapa_preventiva'] = etapa_executada_fecho
-                            df.at[idx_os, 'checklist_pop'] = ", ".join(checklist_pop_sel)
-                            df.at[idx_os, 'condicao_inicial'] = condicao_ini_os
-                            df.at[idx_os, 'defeito_relatado'] = defeito_relatado_in.strip().upper()
-                            df.at[idx_os, 'causa_raiz'] = causa_raiz_in
-                            df.at[idx_os, 'problemas_encontrados'] = problemas_encontrados_in.strip().upper()
-                            df.at[idx_os, 'parametros_medidos'] = parametros_medidos_in.strip().upper()
-                            df.at[idx_os, 'servico_executado'] = relatorio_com_peca
-                            df.at[idx_os, 'observacoes_gerais'] = observacoes_gerais_in.strip().upper()
-                            df.at[idx_os, 'condicao_final'] = condicao_fim_os
-                            df.at[idx_os, 'condicao_pagamento'] = resumo_pag
-                            df.at[idx_os, 'valor_os'] = float(valor_final_faturar)
-                            df.at[idx_os, 'assinatura_cliente'] = assinatura_cliente_input.strip().upper()
-                            df.at[idx_os, 'assinatura_cliente_img'] = assinatura_cli_b64.strip()
-                            df.at[idx_os, 'assinatura_tecnico'] = ass_padrao_tec.strip().upper()
-                            df.at[idx_os, 'peca_baixada_ref'] = nova_ref_peca
+                        df.at[idx_os, 'endereco'] = endereco_exec_in.strip().upper()
+                        df.at[idx_os, 'email'] = email_exec_in.strip()
+                        df.at[idx_os, 'tipo_servico'] = tipo_srv_exec_in.strip().upper()
+                        df.at[idx_os, 'tecnico_responsavel'] = novo_tec_exec
+                        df.at[idx_os, 'tecnico_auxiliar'] = str_aux_final
+                        df.at[idx_os, 'telefone_tecnico'] = equipa_tecnica.get(novo_tec_exec, {}).get("tel", "")
+                        df.at[idx_os, 'etapa_preventiva'] = etapa_executada_fecho
+                        df.at[idx_os, 'checklist_pop'] = ", ".join(checklist_pop_sel)
+                        df.at[idx_os, 'condicao_inicial'] = condicao_ini_os
+                        df.at[idx_os, 'defeito_relatado'] = defeito_relatado_in.strip().upper()
+                        df.at[idx_os, 'causa_raiz'] = causa_raiz_in
+                        df.at[idx_os, 'problemas_encontrados'] = problemas_encontrados_in.strip().upper()
+                        df.at[idx_os, 'parametros_medidos'] = parametros_medidos_in.strip().upper()
+                        df.at[idx_os, 'servico_executado'] = relatorio_com_peca
+                        df.at[idx_os, 'observacoes_gerais'] = observacoes_gerais_in.strip().upper()
+                        df.at[idx_os, 'condicao_final'] = condicao_fim_os
+                        df.at[idx_os, 'condicao_pagamento'] = resumo_pag
+                        df.at[idx_os, 'valor_os'] = float(valor_final_faturar)
+                        df.at[idx_os, 'assinatura_cliente'] = resp_final_cli.upper()
+                        df.at[idx_os, 'assinatura_cliente_img'] = assinatura_cli_b64.strip()
+                        df.at[idx_os, 'assinatura_tecnico'] = ass_padrao_tec.strip().upper()
+                        df.at[idx_os, 'peca_baixada_ref'] = nova_ref_peca
 
-                            fechar_definitivo = "CONCLUÍDO" in status_fecho_escolha
-                            em_observacao = "OBSERVAÇÃO" in status_fecho_escolha or (peca_selecionada != "NENHUMA PEÇA" and "TESTE" in tipo_aplicacao_peca)
+                        resumo_diag = f" | [DIAGNÓSTICO: {problemas_encontrados_in.strip().upper()}]" if problemas_encontrados_in.strip() else ""
+                        msg_cobranca_resumo = ""
 
-                            resumo_diag = f" | [DIAGNÓSTICO: {problemas_encontrados_in.strip().upper()}]" if problemas_encontrados_in.strip() else ""
-                            msg_cobranca_resumo = ""
+                        if fechar_definitivo and not em_observacao:
+                            df.at[idx_os, 'pendencias'] = f"[CONCLUÍDO - {etapa_executada_fecho}] {relatorio_com_peca}{resumo_diag} | [{resumo_pag}]"
+                            df.at[idx_os, 'status'] = 'CONCLUÍDO'
+                            df.at[idx_os, 'condicao_final'] = 'LIBERADO PARA USO NORMAL'
+                            df.at[idx_os, 'instrumento_necessario'] = ''
 
-                            if fechar_definitivo and not em_observacao:
-                                df.at[idx_os, 'pendencias'] = f"[CONCLUÍDO - {etapa_executada_fecho}] {relatorio_com_peca}{resumo_diag} | [{resumo_pag}]"
-                                df.at[idx_os, 'status'] = 'CONCLUÍDO'
-                                df.at[idx_os, 'instrumento_necessario'] = ''
+                            # Atualiza status na tabela clientes_equipamentos do SQLite
+                            try:
+                                with get_db_connection(ctx.db_name) as conn:
+                                    cur = conn.cursor()
+                                    cur.execute("UPDATE clientes_equipamentos SET status = 'CONCLUÍDO' WHERE id = ?", (int(id_os_ativa),))
+                                    conn.commit()
+                            except Exception:
+                                pass
 
-                                # 1. Baixa definitiva no estoque + atualização de status + sequência imediata ao fluxo de cobrança
-                                ok_cob, msg_cob = registrar_aplicacao_definitiva_e_fluxo_cobranca(
-                                    ctx.db_name,
-                                    id_os_ativa,
-                                    row_os.get('cliente', ''),
-                                    row_os.get('equipamento', ''),
-                                    novo_tec_exec,
-                                    peca_selecionada,
-                                    int(qtd_aplicada),
-                                    valor_final_faturar,
-                                    condicao_pagamento=opcao_faturamento,
-                                    tipo_contrato=row_os.get('tipo_contrato', 'CONTRATO')
+                            # 1. Baixa definitiva no estoque + atualização de status + sequência imediata ao fluxo de cobrança
+                            ok_cob, msg_cob = registrar_aplicacao_definitiva_e_fluxo_cobranca(
+                                ctx.db_name,
+                                id_os_ativa,
+                                row_os.get('cliente', ''),
+                                row_os.get('equipamento', ''),
+                                novo_tec_exec,
+                                peca_selecionada,
+                                int(qtd_aplicada),
+                                valor_final_faturar,
+                                condicao_pagamento=opcao_faturamento,
+                                tipo_contrato=row_os.get('tipo_contrato', 'CONTRATO')
+                            )
+                            msg_cobranca_resumo = msg_cob
+
+                            if agendar_prox_ciclo:
+                                df, _ = agendar_proxima_etapa_circular(
+                                    df,
+                                    df.loc[idx_os],
+                                    etapa_executada_fecho,
+                                    dias_ciclo=30
                                 )
-                                msg_cobranca_resumo = msg_cob
+                        elif em_observacao:
+                            df.at[idx_os, 'status'] = 'EM OBSERVAÇÃO'
+                            df.at[idx_os, 'pendencias'] = f"[EM OBSERVAÇÃO - {dias_obs_in} DIAS] Peça {nova_ref_peca} em teste clínico. Critério: {criterio_obs_in}"
+                            df.at[idx_os, 'instrumento_necessario'] = f"MONITORAR TESTE: {nova_ref_peca}"
 
-                                if agendar_prox_ciclo:
-                                    df, _ = agendar_proxima_etapa_circular(
-                                        df,
-                                        df.loc[idx_os],
-                                        etapa_executada_fecho,
-                                        dias_ciclo=30
-                                    )
-                            elif em_observacao:
-                                df.at[idx_os, 'status'] = 'EM OBSERVAÇÃO'
-                                df.at[idx_os, 'pendencias'] = f"[EM OBSERVAÇÃO - {dias_obs_in} DIAS] Peça {nova_ref_peca} em teste clínico. Critério: {criterio_obs_in}"
-                                df.at[idx_os, 'instrumento_necessario'] = f"MONITORAR TESTE: {nova_ref_peca}"
+                            ok_obs, msg_obs = registrar_peca_em_teste_observacao(
+                                ctx.db_name,
+                                id_os_ativa,
+                                row_os.get('cliente', ''),
+                                row_os.get('equipamento', ''),
+                                novo_tec_exec,
+                                peca_selecionada,
+                                int(qtd_aplicada),
+                                dias_observacao=dias_obs_in,
+                                criterio_teste=criterio_obs_in
+                            )
+                            msg_cobranca_resumo = msg_obs
+                        else:
+                            df.at[idx_os, 'pendencias'] = f"[PENDÊNCIA ATIVA - {novo_tec_exec}] {relatorio_com_peca}{resumo_diag} (ETAPA REALIZADA: {etapa_executada_fecho})"
+                            df.at[idx_os, 'status'] = 'ATIVO'
+                            df.at[idx_os, 'instrumento_necessario'] = inst_prox_visita.strip().upper()
 
-                                ok_obs, msg_obs = registrar_peca_em_teste_observacao(
-                                    ctx.db_name,
-                                    id_os_ativa,
-                                    row_os.get('cliente', ''),
-                                    row_os.get('equipamento', ''),
-                                    novo_tec_exec,
-                                    peca_selecionada,
-                                    int(qtd_aplicada),
-                                    dias_observacao=dias_obs_in,
-                                    criterio_teste=criterio_obs_in
-                                )
-                                msg_cobranca_resumo = msg_obs
+                        if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
+                            st.cache_data.clear()
+                            if fechar_definitivo:
+                                st.success(f"🎉 ORDEM DE SERVIÇO #{id_os_ativa} CONCLUÍDA E FECHADA COM SUCESSO!")
                             else:
-                                df.at[idx_os, 'pendencias'] = f"[PENDÊNCIA ATIVA - {novo_tec_exec}] {relatorio_com_peca}{resumo_diag} (ETAPA REALIZADA: {etapa_executada_fecho})"
-                                df.at[idx_os, 'status'] = 'ATIVO'
-                                df.at[idx_os, 'instrumento_necessario'] = inst_prox_visita.strip().upper()
-
-                            if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
-                                st.cache_data.clear()
-                                st.success("✅ Salvo com sucesso! Ordem de Serviço concluída!")
-                                if msg_cobranca_resumo:
-                                    st.info(msg_cobranca_resumo)
-                                st.rerun()
+                                st.success(f"✅ Ordem de Serviço #{id_os_ativa} atualizada com sucesso!")
+                            if msg_cobranca_resumo:
+                                st.info(msg_cobranca_resumo)
+                            st.rerun()
 
 
 def render_chamados_os(ctx: AppContext):
