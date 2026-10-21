@@ -1,3 +1,4 @@
+import re
 import io
 import os
 import base64
@@ -55,21 +56,54 @@ def _buscar_cliente_por_cnpj_ou_nome(df: pd.DataFrame, termo_busca: str):
 
 
 def _detectar_modalidade(nome_equip: str, texto_defeito: str = "") -> str:
-    """Classifica a modalidade do equipamento para triagem técnica personalizada conforme a taxonomia da EMED."""
-    texto = (str(nome_equip) + " " + str(texto_defeito)).upper()
-    if any(k in texto for k in ["DR", "CR", "FLAT PANEL", "DETECTOR", "DIGITALIZADOR", "CASSETE", "CHASSI", "NEUVISION", "AGFA", "FUJI", "KONICA", "CARESTREAM", "WORKSTATION"]):
-        return "SISTEMA DIGITAL (DR / CR)"
-    if any(k in texto for k in ["TOMOGRA", "CT", "BRIGHTSPEED", "SOMATOM", "OPTIMA", "REVOLUTION", "LIGHTSPEED", "EMOTION", "GANTRY", "CHILLER"]):
+    """Classifica com rigor a modalidade do equipamento médico para triagem técnica personalizada conforme a taxonomia da EMED.
+    Utiliza regex com limites de palavras (\b) para evitar falsos positivos (ex: 'COMPACTO' contendo 'CT').
+    """
+    nome_up = str(nome_equip or "").upper().strip()
+    def_up = str(texto_defeito or "").upper().strip()
+
+    # 1. Avaliação primária pelo Nome do Equipamento
+    if nome_up:
+        # Mamografia ('MM', 'MAMO', 'MAMÓGRAFO', 'SENOGRAPHE', 'MAMMOMAT', etc.)
+        if re.search(r'\b(MM|MAMO|MAMOGRAFO|MAMÓGRAFO|SENOGRAPHE|SELENIA|MAMMOMAT|DIAMOND)\b', nome_up):
+            return "MAMOGRAFIA"
+
+        # Densitometria ('DO', 'DENSITO', 'DENSITOMETRIA', 'LUNAR', 'PRODIGY', etc.)
+        if re.search(r'\b(DO|DENSITO|DENSITOMETRIA|DENSITOMETRO|DENSITÔMETRO|LUNAR|PRODIGY|DPX|HOLOGIC|DISCOVERY)\b', nome_up):
+            return "DENSITOMETRIA"
+
+        # Arco Cirúrgico ('ARCO', 'C-ARM', 'CARM', 'BV PULSERA', etc.)
+        if re.search(r'\b(ARCO|C-ARM|CARM|BV PULSERA|BV ENDURA|ZIEHM|OEC|FLUORO|FLUOROSCOPIA)\b', nome_up):
+            return "ARCO CIRÚRGICO"
+
+        # Tomografia ('TC', 'TOMOGRA', 'TOMOGRAFO', 'BRIGHTSPEED', etc.)
+        # JAMAIS casa com COMPACTO ou COMPACT
+        if re.search(r'\b(TOMOGRA|TOMOGRAFO|TOMÓGRAFO|TOMOGRAFIA|BRIGHTSPEED|BRIGTHSPEED|SOMATOM|OPTIMA|REVOLUTION|LIGHTSPEED|EMOTION|GANTRY)\b', nome_up):
+            return "TOMOGRAFIA"
+        if re.search(r'\b(TC|CT)\b', nome_up) and not re.search(r'\b(COMPACTO|COMPACT)\b', nome_up):
+            return "TOMOGRAFIA"
+
+        # Sistema Digital puro (Flat Panel, Detector DR, etc.)
+        if re.search(r'\b(FLAT PANEL|DETECTOR DR|DIGITALIZADOR CR|NEUVISION)\b', nome_up):
+            return "SISTEMA DIGITAL (DR / CR)"
+
+        # Raio-X Convencional / Móvel / Fixo
+        if re.search(r'\b(RAIO|RAIO-X|RAIO X|RX|COMPACTO|ALTUS|INTERCAL|ESTATIVA|BUCKY|COLIMADOR|GERADOR|TUBO|MULTIX|XR|XR6000|TRANSP|MOVEL|MÓVEL)\b', nome_up):
+            return "RAIO-X"
+
+    # 2. Avaliação secundária pelo relato do defeito (se o equipamento for 'Outro' ou genérico)
+    if re.search(r'\b(GANTRY|CHILLER|SLIPRING)\b', def_up):
         return "TOMOGRAFIA"
-    if any(k in texto for k in ["ARCO", "C-ARM", "BV PULSERA", "BV ENDURA", "ZIEHM", "OEC", "FLUORO"]):
-        return "ARCO CIRÚRGICO"
-    if any(k in texto for k in ["MAMO", "SENOGRAPHE", "SELENIA", "MAMMOMAT", "DIAMOND", "COMPRESSOR", "PLUMBIFERO"]):
+    if re.search(r'\b(COMPRESSOR|ACRILICO|CASSETE MAMO)\b', def_up):
         return "MAMOGRAFIA"
-    if any(k in texto for k in ["DENSITO", "LUNAR", "PRODIGY", "DPX", "HOLOGIC", "DISCOVERY", "SHUTTER"]):
-        return "DENSITOMETRIA"
-    if any(k in texto for k in ["RAIO", "RX", "ESTATIVA", "BUCKY", "COLIMADOR", "GERADOR", "TUBO", "MULTIX", "XR", "RAD", "FREIO", "MESA"]):
+    if re.search(r'\b(ARCO|BRACO EM C|BRAÇO EM C)\b', def_up):
+        return "ARCO CIRÚRGICO"
+    if re.search(r'\b(ESTATIVA|COLIMADOR|BUCKY|FREIO|SOLENOIDE|PEDAL DE FREIO)\b', def_up):
         return "RAIO-X"
-    return "OUTROS"
+    if re.search(r'\b(FLAT PANEL|DETECTOR|CASSETE)\b', def_up):
+        return "SISTEMA DIGITAL (DR / CR)"
+
+    return "RAIO-X"
 
 
 def _obter_dica_rapida_it(equipamento: str, relato: str) -> str:
@@ -294,9 +328,21 @@ def render_emedonline(ctx: AppContext):
             st.markdown("---")
             st.markdown("#### 3. O que está acontecendo com o equipamento?")
 
+            # Placeholder dinâmico e contextualizado pela modalidade do equipamento selecionado
+            mod_sugerida = _detectar_modalidade(equip_escolhido, "")
+            placeholders_por_mod = {
+                "RAIO-X": "Ex: A estativa não para de descer / freio solto, movimento travando no trilho ou o equipamento não emite feixe de raios-x...",
+                "TOMOGRAFIA": "Ex: Tomógrafo não emite feixe, erro de intertravamento no gantry ou PDU desarmado...",
+                "MAMOGRAFIA": "Ex: Prato de compressão travado / não sobe, falha no pedal ou erro no biombo...",
+                "ARCO CIRÚRGICO": "Ex: Movimento orbital do braço em C travando ou monitores sem sinal de fluoroscopia...",
+                "DENSITOMETRIA": "Ex: Braço C não calibra na inicialização ou shutter/feixe colimado com falha...",
+                "SISTEMA DIGITAL (DR / CR)": "Ex: Detector Flat Panel desconectado da workstation ou leitora CR com chassi preso...",
+            }
+            ph_texto = placeholders_por_mod.get(mod_sugerida, "Ex: Descreva o problema observado no equipamento...")
+
             defeito_digitado = st.text_area(
                 "Descreva com suas palavras o defeito apresentado ou código de erro na tela: *",
-                placeholder="Ex: O tomógrafo parou de emitir feixe no meio do exame e apareceu mensagem de erro de comunicação do gantry...",
+                placeholder=ph_texto,
                 height=100,
             )
 
@@ -307,11 +353,34 @@ def render_emedonline(ctx: AppContext):
                     st.info(dica_it)
 
             st.markdown("---")
-            modalidade = _detectar_modalidade(equip_escolhido, defeito_digitado)
+            modalidade_auto = _detectar_modalidade(equip_escolhido, defeito_digitado)
+
+            modalidades_opcoes = [
+                "RAIO-X",
+                "TOMOGRAFIA",
+                "MAMOGRAFIA",
+                "ARCO CIRÚRGICO",
+                "DENSITOMETRIA",
+                "SISTEMA DIGITAL (DR / CR)",
+                "OUTRO",
+            ]
+            idx_mod_padrao = modalidades_opcoes.index(modalidade_auto) if modalidade_auto in modalidades_opcoes else 0
+
+            col_mod_tit, col_mod_sel = st.columns([2.6, 1.4])
+            with col_mod_tit:
+                st.markdown(f"#### ⚡ 3.1 Triagem Técnica Específica — {modalidade_auto}")
+                st.caption("Checklist em 5 segundos focado nos componentes críticos desta modalidade:")
+            with col_mod_sel:
+                modalidade = st.selectbox(
+                    "Modalidade Detectada:",
+                    modalidades_opcoes,
+                    index=idx_mod_padrao,
+                    help="Identificada automaticamente pelo modelo do equipamento. Você pode alterar manualmente caso deseje outro checklist."
+                )
 
             if modalidade == "RAIO-X":
-                st.markdown("#### ⚡ 3.1 Triagem Técnica Específica para Sistema de Raio-X (Checklist em 5 Segundos)")
-                st.caption("Perguntas diretas sobre alimentação, estativa porta-tubo e eletrofreios:")
+                st.markdown("##### 🩻 Checklist Técnico para Sistema de Raio-X")
+                st.caption("Perguntas diretas sobre alimentação elétrica, estativa porta-tubo e eletrofreios:")
 
                 c_chk1, c_chk2 = st.columns(2)
                 with c_chk1:
@@ -354,7 +423,7 @@ def render_emedonline(ctx: AppContext):
                     )
 
             elif modalidade == "TOMOGRAFIA":
-                st.markdown("#### ⚡ 3.1 Triagem Técnica Específica para Tomógrafo (Checklist em 5 Segundos)")
+                st.markdown("##### 🌀 Checklist Técnico para Tomógrafo (CT)")
                 st.caption("Perguntas focadas em Quadro de Força, PDU, Gantry, Mesa e Console:")
 
                 c_chk1, c_chk2 = st.columns(2)
@@ -393,7 +462,7 @@ def render_emedonline(ctx: AppContext):
                     )
 
             elif modalidade == "ARCO CIRÚRGICO":
-                st.markdown("#### ⚡ 3.1 Triagem Técnica para Arco Cirúrgico (C-Arm)")
+                st.markdown("##### 🦾 Checklist Técnico para Arco Cirúrgico (C-Arm)")
                 st.caption("Perguntas focadas em alimentação, braço em C, pedal e carrinho dos monitores:")
 
                 c_chk1, c_chk2 = st.columns(2)
@@ -432,7 +501,7 @@ def render_emedonline(ctx: AppContext):
                     )
 
             elif modalidade == "MAMOGRAFIA":
-                st.markdown("#### ⚡ 3.1 Triagem Técnica para Mamógrafo")
+                st.markdown("##### 🗜️ Checklist Técnico para Mamógrafo")
                 st.caption("Perguntas focadas em Quadro de Força, Gantry, Compressor e Painel:")
 
                 c_chk1, c_chk2 = st.columns(2)
@@ -471,7 +540,7 @@ def render_emedonline(ctx: AppContext):
                     )
 
             elif modalidade == "DENSITOMETRIA":
-                st.markdown("#### ⚡ 3.1 Triagem Técnica para Densitometria Óssea")
+                st.markdown("##### 🦴 Checklist Técnico para Densitometria Óssea")
                 st.caption("Perguntas focadas em Fonte HV, Mesa, Braço C, Shutter e Software:")
 
                 c_chk1, c_chk2 = st.columns(2)
@@ -510,7 +579,7 @@ def render_emedonline(ctx: AppContext):
                     )
 
             elif modalidade == "SISTEMA DIGITAL (DR / CR)":
-                st.markdown("#### ⚡ 3.1 Triagem Técnica para Sistemas Digitais (DR / CR)")
+                st.markdown("##### 📸 Checklist Técnico para Sistemas Digitais (DR / CR)")
                 st.caption("Perguntas focadas em Detector Flat Panel, Leitora CR, Interface Box e Workstation:")
 
                 c_chk1, c_chk2 = st.columns(2)
@@ -550,7 +619,7 @@ def render_emedonline(ctx: AppContext):
                     )
 
             else:
-                st.markdown("#### ⚡ 3.1 Triagem Rápida de Campo (Checklist em 5 Segundos)")
+                st.markdown("##### ⚙️ Checklist Rápido de Campo (Diagnóstico Geral)")
                 st.caption("Marque as condições básicas observadas para direcionar o diagnóstico técnico:")
 
                 c_chk1, c_chk2 = st.columns(2)
