@@ -89,6 +89,9 @@ flowchart TD
    - Desconecte com cuidado os **2 cabos flat tipo fita (*ribbon cables*)** conectados à placa, pressionando as abas plásticas laterais dos conectores.
    - Identifique e desconecte todos os conectores de chicotes elétricos discretos plugados na placa.
 5. Com a chave canhão sextavada, desrosqueie as **7 porcas de retenção** que fixam a placa aos espaçadores metálicos roscados.
+
+![Diagrama Oficial de Posição das 7 Porcas e Conexões da Programmed KV Control Board (GE 1074628)](assets/kv_control_board_layout.gif)
+
 6. Puxe a placa cuidadosamente para fora, segurando apenas pelas bordas laterais.
 7. Guarde a placa substituída dentro da bolsa blindada antiestática para envio ao laboratório.
 

@@ -8,8 +8,8 @@ from emed_core import (
     calcular_status_calibracao,
     obter_resumo_alarmes_calibracao,
 )
-from emed_services import (
-    AppContext,
+from emed_services.context import AppContext
+from emed_services.repositories import (
     carregar_estoque,
     atualizar_calibracao_instrumento,
     atualizar_calibracao_equipamento_cliente,

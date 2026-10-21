@@ -21,15 +21,23 @@ from emed_services import (
     montar_equipa_tecnica,
     salvar_dados_seguro,
 )
+import emed_services as _srv_all
+import emed_services.repositories as _srv_repo
 import emed_ui.styles as _ui_styles
 import emed_ui.components as _ui_comp
 import emed_views.chamados_os as _vw_os
 import emed_views.manuais_tecnicos as _vw_manuais
+import emed_views.alarmes_calibracao as _vw_alarmes
+import emed_views.logistica_estoque as _vw_logistica
 import emed_views as _vw_all
+importlib.reload(_srv_repo)
+importlib.reload(_srv_all)
 importlib.reload(_ui_styles)
 importlib.reload(_ui_comp)
 importlib.reload(_vw_os)
 importlib.reload(_vw_manuais)
+importlib.reload(_vw_alarmes)
+importlib.reload(_vw_logistica)
 importlib.reload(_vw_all)
 from emed_ui.styles import inject_custom_css
 from emed_ui.components import renderizar_area_trabalho_icones

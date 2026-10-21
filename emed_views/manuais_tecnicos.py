@@ -1,5 +1,6 @@
 # emed_views/manuais_tecnicos.py - Módulo de Consulta de Manuais, ITs e Procedimentos Técnicos
 import os
+import re
 import base64
 import datetime
 import webbrowser
@@ -26,6 +27,7 @@ DICIONARIO_NOMES_AMIGAVEIS = {
     "IT_11_Calibracao_Colimador_Aberturas_e_Detailed_Cal_GE.md": "🔬 IT-11: Calibração das Aberturas do Colimador & Detailed Calibration",
     "IT_12_Seguranca_Rotacao_Gantry_e_Varreduras_HHS_GE.md": "🛡️ IT-12: Segurança de Rotação, Varreduras Térmicas HHS & Estabilidade",
     "IT_13_Substituicao_Placa_KV_Control_Board_GE_BrightSpeed.md": "⚡ IT-13: Substituição da Placa Controladora de Alta Tensão (KV Control Board GE)",
+    "IT_14_Substituicao_Controlador_Rotacao_Axial_Drive_GE_BrightSpeed.md": "⚙️ IT-14: Substituição do Controlador de Rotação do Gantry (Axial Drive Controller GE)",
     
     # Brivo CT385 - Calibrações e Procedimentos
     "01_Procedimento_Troca_de_Tubo_Gantry.pdf": "01. Procedimento Oficial de Troca do Tubo de Raio-X no Gantry",
@@ -338,13 +340,34 @@ def _renderizar_leitor_markdown(caminho_md: str, doc_key: str = "it"):
             else:
                 st.info(f"O termo '{termo}' não foi encontrado nesta instrução.")
 
+        # Resolução e Embutimento Automático de Imagens Locais (assets) em Base64
+        pasta_doc = os.path.dirname(caminho_md)
+        def _sub_img(match):
+            alt_txt = match.group(1)
+            img_rel = match.group(2)
+            caminho_img = os.path.normpath(os.path.join(pasta_doc, img_rel))
+            if os.path.exists(caminho_img):
+                ext = os.path.splitext(caminho_img)[1].lower().replace(".", "")
+                if ext == "jpg":
+                    ext = "jpeg"
+                mime = f"image/{ext}"
+                try:
+                    with open(caminho_img, "rb") as f_img:
+                        b64 = base64.b64encode(f_img.read()).decode("utf-8")
+                    return f'<div style="text-align: center; margin: 18px 0;"><img src="data:{mime};base64,{b64}" style="max-width: 95%; border: 2px solid #00b4d8; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.6);"><br><span style="display: inline-block; margin-top: 6px; font-size: 0.88rem; color: #caf0f8; font-weight: 600; background: rgba(0, 180, 216, 0.15); padding: 2px 10px; border-radius: 4px;">📷 {alt_txt}</span></div>'
+                except Exception:
+                    pass
+            return match.group(0)
+
+        conteudo_render = re.sub(r'!\[(.*?)\]\((.*?)\)', _sub_img, conteudo)
+
         st.markdown(
             f"""
             <div style="background: #111a36; border: 1px solid #3a506b; padding: 25px; border-radius: 8px; margin-top: 10px;">
             """,
             unsafe_allow_html=True
         )
-        st.markdown(conteudo)
+        st.markdown(conteudo_render, unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Erro ao ler instrução de trabalho: {e}")
@@ -644,6 +667,16 @@ def _render_lista_cards(docs: list, ocorrencias_busca: dict = None):
                         * **Firmware:** Executar *Flash Download* após religar para gravar firmware na NVRAM da nova placa.
                         * **Restauração de Parâmetros:** *Restore Runtime Parameters* (ou *Initialize Database* se sem backup).
                         * **Calibrações Mandatórias:** Rotation Safety Check, Meter Verification, Filament Calibration, HHS Scans e QA Fantom H2O ($0 \pm 4\text{ HU}$).
+                        """)
+                elif "axial_drive" in doc["nome_arquivo"].lower() or "it_14" in doc["nome_arquivo"].lower():
+                    with st.expander("⚡ Parâmetros Críticos do Axial Drive / Rotação (GE BrightSpeed)"):
+                        st.markdown(r"""
+                        * **Part Number Oficial GE:** `5344401` (Controlador Titan 2010).
+                        * **Torque Parafusos M6 (Suporte Inferior):** **$8,0\text{ N}\cdot\text{m}$ ($70\text{ lb}\cdot\text{in}$)**.
+                        * **Conexões de Potência:** X4 (Alimentação da régua), X3 (Resistor de Frenagem), X2 (Motor Axial).
+                        * **Conexões de Sinal/KIM:** X10 (Resolver/Feedback), X1 (Comando KIM), X7/X8 (Comunicação), X12 (Comunicação 3ª via).
+                        * **Confirmação no Display:** O display digital DEVE exibir **`o2`** ao ligar a chave 120VAC.
+                        * **Aviso de Queimadura:** O resistor de frenagem dinâmica atinge temperaturas altíssimas; aguarde esfriar antes de tocar.
                         """)
                 elif "neuvision" in doc["nome_arquivo"].lower() or "neu_001" in doc["nome_arquivo"].lower():
                     with st.expander("⚡ Parâmetros Críticos e Senhas (Neusoft NeuVision 550M Plus)"):
