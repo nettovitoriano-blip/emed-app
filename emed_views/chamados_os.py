@@ -767,6 +767,18 @@ def _render_historico_concluidas(ctx: AppContext):
                         key=f"wa_dest_c_{idx_c}",
                     )
 
+                link_aval_google = st.text_input(
+                    "⭐ Link de Avaliação Google (Pesquisa de Satisfação)",
+                    value=st.session_state.get("link_google_avaliacao", "https://g.page/r/EMED_Eletromedicina/review"),
+                    key=f"lk_aval_g_{idx_c}",
+                    help="Cole aqui o link do seu perfil do Google Meu Negócio para o cliente avaliar e subir a nota da EMED."
+                )
+                if link_aval_google:
+                    st.session_state.link_google_avaliacao = link_aval_google.strip()
+
+                bloco_aval_txt = f"\n\n⭐ *SUA AVALIAÇÃO É MUITO IMPORTANTE!*\nAjude a EMED a manter o padrão de excelência hospitalar avaliando nosso atendimento com 5 estrelas no Google:\n👉 {link_aval_google.strip()}" if link_aval_google.strip() else ""
+                bloco_aval_em = f"\n\n⭐ SUA AVALIAÇÃO É MUITO IMPORTANTE!\nAvalie o atendimento da EMED no Google: {link_aval_google.strip()}" if link_aval_google.strip() else ""
+
                 assunto_email = f"Ordem de Servico #{id_os_c} Concluida - EMED Eletromedicina ({cli_nome_c})"
                 corpo_email = (
                     f"Prezado(a) {cli_resp_c} ({cli_nome_c}),\n\n"
@@ -780,7 +792,8 @@ def _render_historico_concluidas(ctx: AppContext):
                     f"• Formulário / Checklist POP: {chk_pop_h or 'Realizado'}\n"
                     f"• Observações: {obs_ger_h}\n"
                     f"• Pendências / Status Final: {cond_f_h}\n"
-                    f"• Assinatura Responsável Local: {ass_cli_hist}\n\n"
+                    f"• Assinatura Responsável Local: {ass_cli_hist}"
+                    f"{bloco_aval_em}\n\n"
                     f"Atenciosamente,\n"
                     f"EMED ELETROMEDICINA LTDA.\n"
                     f"Eletromedicina, Manutenção em Equipamentos de Diagnóstico por Imagem\n"
@@ -811,7 +824,8 @@ def _render_historico_concluidas(ctx: AppContext):
                     f"📝 *Observações:* {obs_ger_h}\n"
                     f"🏁 *Condição Final:* {cond_f_h}\n"
                     f"✍️ *Recebido/Assinado por:* {ass_cli_hist}\n\n"
-                    f"✅ *STATUS:* OS CONCLUÍDA\n"
+                    f"✅ *STATUS:* OS CONCLUÍDA"
+                    f"{bloco_aval_txt}\n\n"
                     f"🌐 *CNPJ: 03.611.974/0001-08 — EMED Eletromedicina*"
                 )
                 num_wa_limpo = "".join(ch for ch in whats_dest_in if ch.isdigit())

@@ -466,17 +466,690 @@ def _renderizar_leitor_markdown(caminho_md: str, doc_key: str = "it"):
         st.error(f"Erro ao ler instrução de trabalho: {e}")
 
 
-def render_manuais_tecnicos(ctx: AppContext):
-    """Renderiza a View de Consulta de Manuais Técnicos e Procedimentos com navegação em sub-abas limpas."""
-    st.markdown("## 📚 Biblioteca Técnica Oficial: Manuais, POPs & ITs de Campo")
+
+# ==============================================================================
+# CATALOGO OFICIAL DE VIDEOS DE TREINAMENTO TECNICO & OPERACIONAL eMED
+# ==============================================================================
+
+def _obter_catalogo_videos(base_dir: str) -> list:
+    """Retorna a lista completa e estruturada dos 30 vídeos de treinamento e tutoriais da eMED."""
+    pasta_its_videos = os.path.join(base_dir, "Videos_Treinamento_ITs")
+
+    catalogo = [
+        # --- TREINAMENTOS TECNICOS DE ITS DE CAMPO ---
+        {
+            "id": "VID_IT_01",
+            "codigo_it": "IT_01",
+            "arquivo": "Video_IT01_Troca_Tubo_GE_Brivo385.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-01: Troca do Tubo de Raio-X & Pipeline Completo de Calibração",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Tomógrafo GE Brivo CT385 / BrightSpeed",
+            "it_arquivo": "IT_01_Troca_de_Tubo_GE_Brivo385.md",
+            "duracao_aprox": "03:45",
+            "descricao": "Roteiro prático passo a passo para içamento com guincho, fixação dos parafusos M10 e M12 com torquímetro calibrado, conexão dos receptáculos de alta tensão com óleo dielétrico e calibração completa no Service Desktop (mA, Filamento, POR, BOW, ISO e QA Fantom).",
+            "tags": ["tubo", "ge", "brivo", "brightspeed", "calibração", "alinhamento", "loto", "gantry"]
+        },
+        {
+            "id": "VID_IT_02",
+            "codigo_it": "IT_02",
+            "arquivo": "Video_IT02_Manutencao_Preventiva_BrightSpeed.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-02: Manutenção Preventiva Programada (PM Schedules A, B, C e D)",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Tomógrafo GE BrightSpeed Series",
+            "it_arquivo": "IT_02_Manutencao_Preventiva_GE_BrightSpeed.md",
+            "duracao_aprox": "02:15",
+            "descricao": "Procedimento completo de revisão preventiva periódica: lubrificação de guias, filtros de ar do duto e gantry, vedações térmicas, verificação das baterias de backup e testes de segurança de rotação.",
+            "tags": ["preventiva", "pm", "brightspeed", "limpeza", "filtros", "baterias", "revisão"]
+        },
+        {
+            "id": "VID_IT_03",
+            "codigo_it": "IT_03",
+            "arquivo": "Video_IT03_Troca_Tubo_BrightSpeed.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-03: Troca de Tubo de Raio-X & Alinhamento Óptico",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Tomógrafo GE BrightSpeed Lite & Select",
+            "it_arquivo": "IT_03_Troca_de_Tubo_GE_BrightSpeed.md",
+            "duracao_aprox": "02:10",
+            "descricao": "Procedimento de substituição do tubo no BrightSpeed com foco nas conexões de refrigeração de óleo, torque de sustentação mecânica, reset de contadores de exposição e alinhamento óptico do colimador.",
+            "tags": ["tubo", "brightspeed", "colimador", "óptico", "refrigeração"]
+        },
+        {
+            "id": "VID_IT_04",
+            "codigo_it": "IT_04",
+            "arquivo": "Video_IT04_Balanceamento_Gantry_GE.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-04: Balanceamento Estático & Dinâmico do Gantry",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Tomógrafos GE (Brivo CT385 & BrightSpeed)",
+            "it_arquivo": "IT_04_Balanceamento_Gantry_GE.md",
+            "duracao_aprox": "01:50",
+            "descricao": "Medição de vibração angular com sensor de aceleração, cálculo da matriz de distribuição de massa nos anéis de latão e torqueamento dos parafusos de fixação a 160 N·m.",
+            "tags": ["balanceamento", "gantry", "vibração", "torque", "pesos", "latão"]
+        },
+        {
+            "id": "VID_IT_05",
+            "codigo_it": "IT_05",
+            "arquivo": "Video_IT05_Diagnostico_Ajuste_SlipRing_GE.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-05: Diagnóstico, Limpeza & Ajuste do Slip Ring e HSDCD",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Tomógrafos GE (Brivo CT385 & BrightSpeed)",
+            "it_arquivo": "IT_05_Diagnostico_Ajuste_SlipRing_GE.md",
+            "duracao_aprox": "01:45",
+            "descricao": "Inspeção do desgaste das escovas de grafite (limite útil 5 mm), calibração do entreferro (air-gap) de 1,41 mm da antena HSDCD e higienização a seco exclusivamente com aspirador com filtro HEPA.",
+            "tags": ["slipring", "escovas", "hsdcd", "airgap", "antena", "grafite", "750v"]
+        },
+        {
+            "id": "VID_IT_06",
+            "codigo_it": "IT_06",
+            "arquivo": "Video_IT06_Alinhamentos_Opticos_Colimador_Detector_GE.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-06: Alinhamentos Ópticos do Colimador & Detector (BOW / CBF)",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Tomógrafos GE (Brivo CT385 & BrightSpeed)",
+            "it_arquivo": "IT_06_Alinhamentos_Opticos_Colimador_Detector_GE.md",
+            "duracao_aprox": "01:55",
+            "descricao": "Centralização do feixe de raios-X ativo sobre a janela do colimador (Beam on Window - BOW) e alinhamento micrométrico dos filtros anatômicos Bowtie (CBF) e rastreamento sagital (SAG).",
+            "tags": ["colimador", "detector", "bow", "cbf", "óptico", "bowtie"]
+        },
+        {
+            "id": "VID_IT_07",
+            "codigo_it": "IT_07",
+            "arquivo": "Video_IT07_Guia_Ferramenta_Gerador_JEDI_GE.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-07: Guia Prático da Ferramenta de Calibração do Gerador JEDI",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Gerador de Alta Tensão JEDI (GE CT)",
+            "it_arquivo": "IT_07_Guia_Ferramenta_Gerador_JEDI_GE.md",
+            "duracao_aprox": "01:40",
+            "descricao": "Operação passo a passo do utilitário JEDI Generator Tool: conexão serial, calibração de corrente de filamento (mA), curvas de resposta térmica e rotinas de backup e restauração de parâmetros da NVRAM.",
+            "tags": ["jedi", "gerador", "alta tensão", "filamento", "ma", "nvram", "backup"]
+        },
+        {
+            "id": "VID_IT_08",
+            "codigo_it": "IT_08",
+            "arquivo": "Video_IT08_Verificacao_Tanque_HV_e_QA_GE.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-08: Verificação do Tanque HV, Medidores & Teste Final de QA",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Tomógrafos GE (Brivo CT385 & BrightSpeed)",
+            "it_arquivo": "IT_08_Verificacao_Tanque_HV_e_QA_GE.md",
+            "duracao_aprox": "01:50",
+            "descricao": "Medição dos resistores divisores de feedback de alta tensão, verificação da escala de kV/mA e protocolo final de aceitação no phantom de água (Número de CT da água em 0 ± 4 HU e uniformidade espacial).",
+            "tags": ["tanque", "alta tensão", "qa", "phantom", "água", "hu", "ruído"]
+        },
+        {
+            "id": "VID_IT_09",
+            "codigo_it": "IT_09",
+            "arquivo": "Video_IT09_Alinhamento_Plano_de_Rotacao_POR_GE.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-09: Alinhamento do Plano de Rotação (Plane of Rotation - POR)",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Tomógrafos GE (Brivo CT385 & BrightSpeed)",
+            "it_arquivo": "IT_09_Alinhamento_Plano_de_Rotacao_POR_GE.md",
+            "duracao_aprox": "01:45",
+            "descricao": "Instalação da ferramenta de alinhamento com relógio comparador para garantir paralelismo estrito do tubo em relação ao plano de rotação dos detectores com deflexão máxima de 0,08 mm.",
+            "tags": ["por", "plano de rotação", "geometria", "calços", "relógio comparador"]
+        },
+        {
+            "id": "VID_IT_10",
+            "codigo_it": "IT_10",
+            "arquivo": "Video_IT10_Alinhamento_Isocentro_Mecanico_e_HOT_ISO_GE.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-10: Alinhamento do Isocentro Mecânico & HOT ISO Ativo",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Tomógrafos GE (Brivo CT385 & BrightSpeed)",
+            "it_arquivo": "IT_10_Alinhamento_Isocentro_Mecanico_e_HOT_ISO_GE.md",
+            "duracao_aprox": "01:50",
+            "descricao": "Ajuste de coincidência entre os projetores de luz laser (sagital, coronal e axial), o centro mecânico do túnel da gantry e o feixe de raios-X em emissão ativa (HOT ISO Alignment).",
+            "tags": ["isocentro", "laser", "hot iso", "geometria", "centro mecânico"]
+        },
+        {
+            "id": "VID_IT_11",
+            "codigo_it": "IT_11",
+            "arquivo": "Video_IT11_Calibracao_Colimador_e_Detailed_Cal_GE.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-11: Calibração de Aberturas do Colimador & Detailed Calibration",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Tomógrafos GE (Brivo CT385 & BrightSpeed)",
+            "it_arquivo": "IT_11_Calibracao_Colimador_Aberturas_e_Detailed_Cal_GE.md",
+            "duracao_aprox": "01:45",
+            "descricao": "Calibração dos motores de passo do colimador para todas as aberturas nominais de espessura de corte (0,625 mm a 20 mm) e execução da rotina automatizada Detailed Calibration no console.",
+            "tags": ["colimador", "aberturas", "detailed cal", "espessura de corte"]
+        },
+        {
+            "id": "VID_IT_12",
+            "codigo_it": "IT_12",
+            "arquivo": "Video_IT12_Seguranca_Rotacao_Gantry_e_Varreduras_HHS_GE.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-12: Segurança de Rotação do Gantry & Varreduras HHS",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Tomógrafos GE (Brivo CT385 & BrightSpeed)",
+            "it_arquivo": "IT_12_Seguranca_Rotacao_Gantry_e_Varreduras_HHS_GE.md",
+            "duracao_aprox": "01:50",
+            "descricao": "Conferência prévia de desengate da trava mecânica de rotação, verificação das chaves de intertravamento de segurança e execução de sequências de alta potência HHS para estabilização térmica.",
+            "tags": ["segurança", "rotação", "hhs", "estresse", "intertravamento", "gantry lock"]
+        },
+        {
+            "id": "VID_IT_13",
+            "codigo_it": "IT_13",
+            "arquivo": "Video_IT13_Substituicao_Placa_KV_Control_Board_GE.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-13: Substituição da Placa KV Control Board (JEDI)",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Tomógrafo GE BrightSpeed Series",
+            "it_arquivo": "IT_13_Substituicao_Placa_KV_Control_Board_GE_BrightSpeed.md",
+            "duracao_aprox": "01:45",
+            "descricao": "Procedimento detalhado de desmontagem da tampa frontal da Power Unit, backup dos parâmetros de calibração via JEDI Tool, troca física da placa, download do firmware Flash e restauração.",
+            "tags": ["kv control", "jedi", "placa", "power unit", "firmware", "loto"]
+        },
+        {
+            "id": "VID_IT_14",
+            "codigo_it": "IT_14",
+            "arquivo": "Video_IT14_Substituicao_Controlador_Axial_Drive_GE.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-14: Substituição do Controlador Axial Drive (Titan 2010)",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Tomógrafo GE BrightSpeed Series",
+            "it_arquivo": "IT_14_Substituicao_Controlador_Rotacao_Axial_Drive_GE_BrightSpeed.md",
+            "duracao_aprox": "01:45",
+            "descricao": "Substituição do inversor de frequência do motor de rotação P/N 5344401, reconexão dos bornes X1 a X12, torque M6 de 8,0 N·m e checagem do status operacional 'o2' no display frontal.",
+            "tags": ["axial drive", "titan", "motor", "giro", "inversor", "5344401"]
+        },
+        {
+            "id": "VID_IT_15",
+            "codigo_it": "IT_15",
+            "arquivo": "Video_IT15_Caracterizacao_Mesa_Paciente_e_Tilt_GE.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-15: Caracterização da Mesa do Paciente & Calibração do Tilt",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Tomógrafo GE BrightSpeed Series",
+            "it_arquivo": "IT_15_Caracterizacao_Mesa_Paciente_e_Tilt_Gantry_GE_BrightSpeed.md",
+            "duracao_aprox": "01:50",
+            "descricao": "Procedimento com blocos de batente para caracterização de contagem longitudinal do berço (18,3 µm/count), pontos de elevação vertical (950 mm e 650 mm) e centralização de tensão do potenciômetro de Tilt (2,50V com chave S4).",
+            "tags": ["mesa", "tilt", "potenciômetro", "elevação", "berço", "s4", "caracterização"]
+        },
+        {
+            "id": "VID_IT_RXD_01",
+            "codigo_it": "IT_RXD_01",
+            "arquivo": "Video_IT_RXD_NEU001_Instalacao_Software_DR_NeuVision550M.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-RXD-01: Instalação Software DR & Rede Wi-Fi Canon",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Raio-X Digital Neusoft NeuVision 550M Plus",
+            "it_arquivo": "IT_RXD_NEU_001_Instalacao_Software_Configuracao_DR_NeuVision550M.md",
+            "duracao_aprox": "01:50",
+            "descricao": "Configuração completa da estação de aquisição DR: credenciais de acesso, comutação da chave de serviço Sedecal SW7, pareamento óptico infravermelho e configuração de rede Wi-Fi 5GHz da Canon.",
+            "tags": ["neusoft", "dr", "canon", "sedecal", "wi-fi", "sw7", "infravermelho"]
+        },
+        {
+            "id": "VID_IT_RXM_01",
+            "codigo_it": "IT_RXM_01",
+            "arquivo": "Video_IT_RXM_SHIM001_Descarga_Capacitores_MobileDaRt_MX8.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-RXM-01: Manutenção & Descarga Segura de Capacitores de 32kW",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Raio-X Móvel Shimadzu MobileDaRt Evolution MX8",
+            "it_arquivo": "IT_RXM_SHIM_001_Manutencao_Descarga_Capacitores_MobileDaRt_MX8.md",
+            "duracao_aprox": "02:30",
+            "descricao": "Protocolo obrigatório de segurança contra choques de alta energia: isolamento das baterias, conexão do plugue de descarga resistiva CN1 e comprovação de tensão residual menor que 5V com voltímetro.",
+            "tags": ["shimadzu", "mx8", "capacitores", "descarga", "segurança", "alta tensão"]
+        },
+        {
+            "id": "VID_IT_RXM_02",
+            "codigo_it": "IT_RXM_02",
+            "arquivo": "Video_IT_RXM_SHIM002_Calibracao_Manopla_Sensor_Braco_MX8.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-RXM-02: Calibração da Manopla com Balança FSR & Sensor do Braço",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Raio-X Móvel Shimadzu MobileDaRt Evolution MX8",
+            "it_arquivo": "IT_RXM_SHIM_002_Calibracao_Manopla_Balanca_Sensor_Braco_MX8.md",
+            "duracao_aprox": "01:50",
+            "descricao": "Calibração dos resistores de sensibilidade à força (FSR) da manopla com dinamômetro de tração para avanço/recuo proporcional e ajuste da barreira óptica PH1 de travamento do braço articulado.",
+            "tags": ["shimadzu", "mx8", "manopla", "fsr", "tração", "braço", "dinamômetro"]
+        },
+        {
+            "id": "VID_IT_RXM_03",
+            "codigo_it": "IT_RXM_03",
+            "arquivo": "Video_IT_RXM_SHIM003_Instalacao_Montagem_MobileDaRt_MX8.mp4",
+            "pasta": pasta_its_videos,
+            "titulo": "IT-RXM-03: Instalação Mecânica, Montagem & Comissionamento",
+            "categoria": "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "equipamento": "Raio-X Móvel Shimadzu MobileDaRt Evolution MX8",
+            "it_arquivo": "IT_RXM_SHIM_003_Instalacao_Montagem_Comissionamento_MobileDaRt_MX8.md",
+            "duracao_aprox": "01:50",
+            "descricao": "Roteiro para descarregamento, remoção dos suportes e cintas de transporte, ajuste dos taps do autotransformador P1/P2 para rede 220V e aquecimento prévio de tubo tUbeUP em 13 passos.",
+            "tags": ["shimadzu", "mx8", "instalação", "taps", "warm-up", "comissionamento"]
+        },
+
+        # --- LOGISTICA, KITS & ALMOXARIFADO ---
+        {
+            "id": "VID_LOG_01",
+            "arquivo": "Video_Tutorial_Fluxo_Kits_Separacao_Entrega_Devolucao.mp4",
+            "pasta": base_dir,
+            "titulo": "Fluxo de Kits de Ferramentas: Separação, Envio, Entrega e Devolução",
+            "categoria": "🧰 Peças, Kits & Almoxarifado",
+            "equipamento": "Almoxarifado & Ferramentaria eMED",
+            "duracao_aprox": "04:50",
+            "descricao": "Protocolo operacional de ponta a ponta: requisição da maleta de calibração pelo técnico, separação com checklist de itens e lacre de segurança, entrega em campo e conferência rigorosa de devolução.",
+            "tags": ["kits", "ferramentas", "almoxarifado", "logística", "devolução", "lacre"]
+        },
+        {
+            "id": "VID_LOG_02",
+            "arquivo": "Video_Tutorial_Solicitacao_Pecas_Baseada_na_IT.mp4",
+            "pasta": base_dir,
+            "titulo": "Solicitação de Peças e Insumos Críticos com Base na IT",
+            "categoria": "🧰 Peças, Kits & Almoxarifado",
+            "equipamento": "Sistema eMED / Gestão de Peças",
+            "duracao_aprox": "02:20",
+            "descricao": "Como o engenheiro ou técnico de campo localiza os Part Numbers oficiais catalogados nas tabelas das Instruções de Trabalho e abre a requisição com prioridade e previsão de entrega.",
+            "tags": ["peças", "requisição", "part number", "estoque", "it", "almoxarifado"]
+        },
+
+        # --- SISTEMA EMED & GESTAO DE OS ---
+        {
+            "id": "VID_SIS_01",
+            "arquivo": "Video_Apresentacao_Sistema_Emed_PRO.mp4",
+            "pasta": base_dir,
+            "titulo": "Apresentação Geral e Arquitetura do Sistema eMED PRO",
+            "categoria": "💻 Operação do Sistema eMED & OS",
+            "equipamento": "Plataforma eMED",
+            "duracao_aprox": "03:25",
+            "descricao": "Visão geral das capacidades do ecossistema eMED: triagem inteligente por IA, painel de despacho automático via WhatsApp, relatórios de BI, controle de SLA e rastreabilidade total de manutenções.",
+            "tags": ["sistema", "apresentação", "visão geral", "pro", "bi", "sla"]
+        },
+        {
+            "id": "VID_SIS_02",
+            "arquivo": "Video_Apresentacao_Sistema_Emed_Real.mp4",
+            "pasta": base_dir,
+            "titulo": "Demonstração do Sistema eMED em Operação Real",
+            "categoria": "💻 Operação do Sistema eMED & OS",
+            "equipamento": "Plataforma eMED",
+            "duracao_aprox": "03:00",
+            "descricao": "Demonstração prática do fluxo de trabalho diário: entrada de chamado crítico de hospital, alocação do técnico mais próximo pela rota, atualização de status de campo e encerramento com laudo.",
+            "tags": ["operação real", "atendimento", "demonstração", "chamados", "hospital"]
+        },
+        {
+            "id": "VID_SIS_03",
+            "arquivo": "Video_Tutorial_Abertura_OS_Manual.mp4",
+            "pasta": base_dir,
+            "titulo": "Tutorial: Abertura e Gestão Manual de Ordens de Serviço (OS)",
+            "categoria": "💻 Operação do Sistema eMED & OS",
+            "equipamento": "Módulo de Ordens de Serviço",
+            "duracao_aprox": "02:30",
+            "descricao": "Como preencher uma Ordem de Serviço completa: dados do cliente, modalidade, sintomas relatados, prioridade, vínculo com contrato de manutenção e despacho para o corpo técnico.",
+            "tags": ["os", "ordem de serviço", "abertura", "preventiva", "corretiva", "despacho"]
+        },
+        {
+            "id": "VID_SIS_04",
+            "arquivo": "Video_Tutorial_Cliente_Abertura_EmedOnline.mp4",
+            "pasta": base_dir,
+            "titulo": "Tutorial do Cliente: Abertura de Chamados via eMED Online",
+            "categoria": "💻 Operação do Sistema eMED & OS",
+            "equipamento": "Portal do Cliente / eMED Online",
+            "duracao_aprox": "02:30",
+            "descricao": "Treinamento para os clientes hospitalares: como acessar o portal web dedicado, relatar paradas de equipamentos de imagem, anexar registros fotográficos de códigos de erro e acompanhar o SLA.",
+            "tags": ["cliente", "portal", "abertura", "triagem", "online", "chamado"]
+        },
+
+        # --- MODULO FISCAL & FATURAMENTO ---
+        {
+            "id": "VID_FISC_01",
+            "arquivo": "Video_Guia_Completo_Cliente_EmedOnline_Com_NotaFiscal.mp4",
+            "pasta": base_dir,
+            "titulo": "Guia Completo: Portal do Cliente com Módulo Fiscal Integrado",
+            "categoria": "🧾 Módulo Fiscal & Portal do Cliente",
+            "equipamento": "Portal do Cliente & Fiscal",
+            "duracao_aprox": "03:30",
+            "descricao": "Fluxo integrado que conecta o cliente ao setor financeiro: aprovação do relatório técnico de visita, geração da fatura e disponibilização da Nota Fiscal de Serviços (NFS-e) para download.",
+            "tags": ["fiscal", "faturamento", "cliente", "nfs-e", "ciclo", "financeiro"]
+        },
+        {
+            "id": "VID_FISC_02",
+            "arquivo": "Video_Tutorial_Emissao_Nota_Fiscal.mp4",
+            "pasta": base_dir,
+            "titulo": "Tutorial: Emissão de Notas Fiscais e Faturamento Desacoplado",
+            "categoria": "🧾 Módulo Fiscal & Portal do Cliente",
+            "equipamento": "Módulo Fiscal eMED",
+            "duracao_aprox": "01:45",
+            "descricao": "Como o setor financeiro seleciona as ordens de serviço executadas, aplica alíquotas de impostos (ISS, PIS, COFINS, IRRF), transmite a NFS-e e emite boletos de cobrança.",
+            "tags": ["nota fiscal", "fiscal", "nfs-e", "faturamento", "impostos", "iss"]
+        },
+
+        # --- GESTAO DE FROTAS & KM ---
+        {
+            "id": "VID_FROT_01",
+            "arquivo": "Video_Gestao_Frota_KM_e_Incentivo_ao_Zelo.mp4",
+            "pasta": base_dir,
+            "titulo": "Gestão de Frota, Apontamento de KM & Programa de Zelo com Veículos",
+            "categoria": "🚗 Gestão de Frotas & KM",
+            "equipamento": "Gestão de Frotas eMED",
+            "duracao_aprox": "03:10",
+            "descricao": "Políticas da frota de veículos eMED: rotina de apontamento de quilometragem, check de calibragem e nível de óleo, condução segura e funcionamento do Programa de Incentivo ao Zelo.",
+            "tags": ["frota", "km", "veículos", "zelo", "combustível", "premiação"]
+        },
+        {
+            "id": "VID_FROT_02",
+            "arquivo": "Video_Rotina_Semanal_Frota_KM_eMed.mp4",
+            "pasta": base_dir,
+            "titulo": "Rotina Semanal de Controle e Auditoria de KM da Frota",
+            "categoria": "🚗 Gestão de Frotas & KM",
+            "equipamento": "Gestão de Frotas eMED",
+            "duracao_aprox": "02:05",
+            "descricao": "Metodologia de fechamento semanal dos trajetos dos técnicos, conciliação de cartões de combustível com rotas hospitalares e identificação de desvios operacionais.",
+            "tags": ["rotina semanal", "auditoria", "km", "frota", "controle", "combustível"]
+        },
+        {
+            "id": "VID_FROT_03",
+            "arquivo": "Video_Tutorial_Gestao_Frota_KM.mp4",
+            "pasta": base_dir,
+            "titulo": "Tutorial Rápido: Apontamento de Quilometragem no Aplicativo",
+            "categoria": "🚗 Gestão de Frotas & KM",
+            "equipamento": "Módulo de Quilometragem",
+            "duracao_aprox": "01:50",
+            "descricao": "Tutorial direto para o técnico no smartphone: como tirar a foto do painel do carro, digitar o hodômetro de saída e chegada e submeter a rota em menos de 1 minuto.",
+            "tags": ["hodômetro", "km", "apontamento", "app", "rápido", "celular"]
+        }
+    ]
+
+    for v in catalogo:
+        caminho_completo = os.path.join(v["pasta"], v["arquivo"])
+        v["caminho"] = caminho_completo
+        if os.path.exists(caminho_completo):
+            v["tamanho_mb"] = os.path.getsize(caminho_completo) / (1024 * 1024)
+            v["existe"] = True
+        else:
+            v["tamanho_mb"] = 0.0
+            v["existe"] = False
+
+    return catalogo
+
+
+def _render_videoteca_tecnica(ctx: AppContext):
+    """Renderiza a Central Oficial de Vídeos de Treinamento e Tutoriais do Sistema eMED."""
+    catalogo_videos = _obter_catalogo_videos(ctx.base_dir)
+
+    st.markdown("### 🎬 Videoteca de Treinamento Técnico & Operacional eMED")
     st.markdown(
-        "Acesso padronizado, catalogado e em língua portuguesa aos manuais de fábrica, instruções de "
-        "trabalho (ITs) e roteiros de calibração para a equipe de engenharia clínica da **eMED Eletromedicina**."
+        "Acervo multimídia com **30 produções audiovisuais narradas com inteligência artificial neural e passo a passo visual**, "
+        "focadas em instruções de trabalho de campo (ITs), rotinas de calibração, operação de ferramentas e protocolos do sistema."
     )
 
-    pasta_manuais = _obter_caminho_manuais(ctx)
-    catalogo = _escanear_arvore_manuais(pasta_manuais)
+    # Painel de Métricas Rápidas
+    total_videos = len(catalogo_videos)
+    qtd_its = sum(1 for v in catalogo_videos if "ITs" in v["categoria"])
+    qtd_pecas = sum(1 for v in catalogo_videos if "Peças" in v["categoria"] or "Kits" in v["categoria"])
+    qtd_sistema = sum(1 for v in catalogo_videos if "Sistema" in v["categoria"])
+    qtd_frota_fiscal = sum(1 for v in catalogo_videos if "Frota" in v["categoria"] or "Fiscal" in v["categoria"])
 
+    m1, m2, m3, m4, m5 = st.columns(5)
+    m1.metric("🎥 Total de Vídeos", f"{total_videos} Aulas")
+    m2.metric("🔬 ITs de Campo", f"{qtd_its} Procedimentos")
+    m3.metric("🧰 Peças & Kits", f"{qtd_pecas} Tutoriais")
+    m4.metric("💻 Sistema eMED", f"{qtd_sistema} Guias")
+    m5.metric("🚗 Frota & Fiscal", f"{qtd_frota_fiscal} Protocolos")
+
+    st.markdown("<hr style='border: 0.5px solid #1e293b; margin: 15px 0;'>", unsafe_allow_html=True)
+
+    # Filtros e Pesquisa
+    c_cat, c_busca = st.columns([1.6, 2.4])
+    with c_cat:
+        categorias_lista = [
+            "TODAS AS CATEGORIAS",
+            "🔬 Treinamentos Técnicos de ITs (Campo)",
+            "🧰 Peças, Kits & Almoxarifado",
+            "💻 Operação do Sistema eMED & OS",
+            "🧾 Módulo Fiscal & Portal do Cliente",
+            "🚗 Gestão de Frotas & KM"
+        ]
+        cat_escolhida = st.selectbox("🎯 Filtrar por Categoria", categorias_lista, key="sb_cat_video")
+
+    with c_busca:
+        termo_v = st.text_input("🔍 Pesquisar na Videoteca...", placeholder="Ex: tubo, slipring, alinhamento, mx8, brivo, km, nota fiscal, kits...", key="txt_busca_video").strip().lower()
+
+    # Filtragem dos Vídeos
+    videos_filtrados = []
+    for v in catalogo_videos:
+        if cat_escolhida != "TODAS AS CATEGORIAS" and v["categoria"] != cat_escolhida:
+            continue
+        if termo_v:
+            texto_busca = f"{v['titulo']} {v['descricao']} {v.get('equipamento', '')} {' '.join(v.get('tags', []))}".lower()
+            if termo_v not in texto_busca:
+                continue
+        videos_filtrados.append(v)
+
+    # Inicialização do Vídeo em Destaque
+    if "video_destaque_id" not in st.session_state:
+        st.session_state.video_destaque_id = "VID_IT_01"
+
+    # Vídeo em Destaque / Player Principal ("Cinema Mode")
+    vid_destaque = next((v for v in catalogo_videos if v["id"] == st.session_state.video_destaque_id), None)
+    if not vid_destaque and videos_filtrados:
+        vid_destaque = videos_filtrados[0]
+
+    if vid_destaque and vid_destaque.get("existe"):
+        with st.container():
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #091322, #132238); border: 2px solid #00b4d8; border-radius: 10px; padding: 18px 22px; margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                    <span style="background: #00b4d8; color: #020c1b; font-weight: 700; font-size: 0.8rem; padding: 3px 12px; border-radius: 12px; text-transform: uppercase;">
+                        {vid_destaque['categoria']}
+                    </span>
+                    <span style="color: #94a3b8; font-size: 0.85rem;">
+                        ⏱️ Duração: <b>{vid_destaque.get('duracao_aprox', '02:30')}</b> &nbsp;|&nbsp; 💾 Arquivo: <b>{vid_destaque['tamanho_mb']:.2f} MB</b>
+                    </span>
+                </div>
+                <h3 style="color: #f8fafc; margin: 10px 0 6px 0; font-weight: 700;">{vid_destaque['titulo']}</h3>
+                <p style="color: #cbd5e1; font-size: 0.95rem; margin-bottom: 12px; line-height: 1.5;">{vid_destaque['descricao']}</p>
+                <div style="color: #38bdf8; font-size: 0.88rem; font-weight: 600; margin-bottom: 12px;">
+                    🔬 Equipamento / Escopo: <span style="color: #e2e8f0; font-weight: 400;">{vid_destaque.get('equipamento', 'Geral')}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            col_vid_play, col_vid_actions = st.columns([3.2, 1.2])
+            with col_vid_play:
+                st.video(vid_destaque["caminho"])
+
+            with col_vid_actions:
+                st.markdown("##### Opções de Estudo")
+                try:
+                    with open(vid_destaque["caminho"], "rb") as f_vdown:
+                        bytes_v = f_vdown.read()
+                    st.download_button(
+                        label="📥 Baixar MP4 Offline",
+                        data=bytes_v,
+                        file_name=vid_destaque["arquivo"],
+                        mime="video/mp4",
+                        key="btn_dl_destaque",
+                        use_container_width=True,
+                        help="Baixe este vídeo para assistir no celular durante viagens de atendimento sem sinal 4G."
+                    )
+                except Exception as e:
+                    st.error(f"Erro ao carregar download: {e}")
+
+                if vid_destaque.get("it_arquivo"):
+                    st.info(f"📄 **IT Relacionada:**\n`{vid_destaque['it_arquivo']}`\n\nConsulte o roteiro completo com todas as tolerâncias na aba **Acervo de Manuais & POPs**.")
+
+    st.markdown("<hr style='border: 0.5px solid #1e293b; margin: 25px 0 15px 0;'>", unsafe_allow_html=True)
+    st.markdown(f"#### 📺 Catálogo Geral de Vídeos ({len(videos_filtrados)} encontrados)")
+
+    if not videos_filtrados:
+        st.info("Nenhum vídeo encontrado para os filtros selecionados.")
+        return
+
+    # Renderiza os cards de vídeos em lista limpa
+    for idx_v, vid in enumerate(videos_filtrados):
+        with st.container():
+            c_icon, c_info, c_btns = st.columns([0.4, 3.2, 1.4])
+
+            with c_icon:
+                st.markdown("### 🎬")
+
+            with c_info:
+                st.markdown(f"##### **{vid['titulo']}**")
+                st.markdown(
+                    f"<span style='background: #1e293b; color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600;'>{vid['categoria']}</span> &nbsp;|&nbsp; "
+                    f"🏥 <span style='color: #cbd5e1; font-size: 0.85rem;'>{vid.get('equipamento', 'Geral')}</span> &nbsp;|&nbsp; "
+                    f"⏱️ `{vid.get('duracao_aprox', '02:00')}` &nbsp;|&nbsp; "
+                    f"💾 `{vid['tamanho_mb']:.2f} MB`",
+                    unsafe_allow_html=True
+                )
+                st.markdown(f"<p style='color: #94a3b8; font-size: 0.9rem; margin-top: 6px; line-height: 1.4;'>{vid['descricao']}</p>", unsafe_allow_html=True)
+
+            with c_btns:
+                # Botão para reproduzir no topo (Cinema Mode)
+                if st.button("🎬 Assistir no Topo", key=f"btn_destaque_{vid['id']}", use_container_width=True):
+                    st.session_state.video_destaque_id = vid["id"]
+                    st.rerun()
+
+                # Botão de visualização inline
+                chave_inline = f"inline_vid_{vid['id']}"
+                if chave_inline not in st.session_state:
+                    st.session_state[chave_inline] = False
+
+                lbl_inline = "Fechar Vídeo" if st.session_state[chave_inline] else "▶️ Reproduzir Aqui"
+                if st.button(lbl_inline, key=f"btn_inline_{vid['id']}", use_container_width=True):
+                    st.session_state[chave_inline] = not st.session_state[chave_inline]
+                    st.rerun()
+
+                # Botão de Download
+                try:
+                    with open(vid["caminho"], "rb") as f_dl:
+                        dados_v = f_dl.read()
+                    st.download_button(
+                        label="📥 Baixar MP4",
+                        data=dados_v,
+                        file_name=vid["arquivo"],
+                        mime="video/mp4",
+                        key=f"btn_dl_card_{vid['id']}",
+                        use_container_width=True
+                    )
+                except Exception:
+                    pass
+
+            if st.session_state.get(chave_inline, False):
+                st.markdown(f"<div style='margin-top: 10px; border-top: 1px dashed #334155; padding-top: 12px;'>", unsafe_allow_html=True)
+                st.video(vid["caminho"])
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            st.markdown("<hr style='border: 0.5px solid #1e293b; margin: 12px 0;'>", unsafe_allow_html=True)
+
+
+def _render_central_upload(pasta_manuais: str):
+    """Renderiza a Central de Ingestão e Organização Automática de Novos Manuais e Procedimentos."""
+    st.markdown("### 📤 Central de Ingestão e Organização Automática de Novos Manuais")
+    st.markdown(
+        "Utilize este assistente para cadastrar e categorizar novos manuais de serviço, catálogos e "
+        "procedimentos na arquitetura padrão do Sistema eMED. Os arquivos serão organizados "
+        "automaticamente na estrutura de pastas físicas e indexados em tempo real na biblioteca."
+    )
+
+    with st.form("form_upload_manual", clear_on_submit=True):
+        arquivos_up = st.file_uploader(
+            "Selecione um ou mais manuais/documentos (PDF, Markdown, DOCX ou ZIP)",
+            type=["pdf", "md", "doc", "docx", "zip"],
+            accept_multiple_files=True
+        )
+
+        c_u1, c_u2 = st.columns(2)
+        with c_u1:
+            tipo_eqp = st.selectbox(
+                "Tipo de Equipamento (Modalidade)",
+                [
+                    "TOMOGRAFO",
+                    "RAIO-X",
+                    "RAIO-X_DIGITAL",
+                    "RAIO-X_MOVEL",
+                    "ARCO_CIRURGICO",
+                    "MAMOGRAFO",
+                    "ULTRASSOM",
+                    "RESSONANCIA_MAGNETICA",
+                    "HEMODINAMICA",
+                    "OUTRO"
+                ]
+            )
+            if tipo_eqp == "OUTRO":
+                tipo_eqp_custom = st.text_input("Especifique a Nova Modalidade", placeholder="Ex: DENSITOMETRO")
+                tipo_final = tipo_eqp_custom.strip().upper().replace(" ", "_") if tipo_eqp_custom else "OUTRO"
+            else:
+                tipo_final = tipo_eqp
+
+        with c_u2:
+            fab_opcoes = [
+                "GE",
+                "SIEMENS",
+                "PHILIPS",
+                "SHIMADZU",
+                "LOTUS",
+                "NEUSOFT",
+                "CANON",
+                "TOSHIBA",
+                "HOLOGIC",
+                "MINDRAY",
+                "SEDECAL",
+                "VMI",
+                "ZIEHM",
+                "CARESTREAM",
+                "AGFA",
+                "HITACHI",
+                "SAMSUNG",
+                "DRAEGER",
+                "OUTRO"
+            ]
+            fab_sel = st.selectbox("Fabricante", fab_opcoes)
+            if fab_sel == "OUTRO":
+                fab_custom = st.text_input("Especifique o Fabricante", placeholder="Ex: KONICA_MINOLTA")
+                fab_final = fab_custom.strip().upper().replace(" ", "_") if fab_custom else "GERAL"
+            else:
+                fab_final = fab_sel
+
+        c_m1, c_m2 = st.columns(2)
+        with c_m1:
+            modelo_nome = st.text_input("Nome do Modelo / Família", placeholder="Ex: OPTIMA_CT540, MAGNETOM_ESSENZA, CIOS_SELECT...")
+        with c_m2:
+            sub_sel = st.selectbox(
+                "Subgrupo / Destino",
+                [
+                    "01_INSTRUCOES_DE_TRABALHO",
+                    "02_MANUAIS_OFICIAIS_PDF",
+                    "02_MANUAIS_DE_SERVICO_E_INSTALACAO",
+                    "02_MANUAIS_DE_OPERACAO",
+                    "03_SOFTWARE_E_UTILITARIOS",
+                    "04_ESQUEMAS_ELETRICOS",
+                    "05_NOTAS_TECNICAS",
+                    "OUTRO"
+                ]
+            )
+            if sub_sel == "OUTRO":
+                sub_custom = st.text_input("Nome da Pasta do Subgrupo", placeholder="Ex: 06_CALIBRACOES_ESPECIAIS")
+                sub_final = sub_custom.strip().upper().replace(" ", "_") if sub_custom else "02_MANUAIS_OFICIAIS_PDF"
+            else:
+                sub_final = sub_sel
+
+        submeter = st.form_submit_button("📥 Processar e Organizar na Biblioteca", type="primary")
+
+        if submeter and arquivos_up:
+            mod_limpo = modelo_nome.strip().upper().replace(" ", "_") if modelo_nome else "GERAL"
+            pasta_destino = os.path.join(pasta_manuais, tipo_final, fab_final, mod_limpo, sub_final)
+            os.makedirs(pasta_destino, exist_ok=True)
+
+            salvos = []
+            for arq in arquivos_up:
+                caminho_salvo = os.path.join(pasta_destino, arq.name)
+                with open(caminho_salvo, "wb") as f_out:
+                    f_out.write(arq.getbuffer())
+                salvos.append(arq.name)
+
+            st.success(f"✅ Sucesso! {len(salvos)} documento(s) salvo(s) e indexado(s) em `{tipo_final}/{fab_final}/{mod_limpo}/{sub_final}`: {', '.join(salvos)}")
+            st.rerun()
+
+
+def _render_acervo_manuais(ctx: AppContext, pasta_manuais: str, catalogo: list):
+    """Renderiza a navegação, filtros e catálogo de manuais e ITs."""
     if not catalogo:
         st.warning(f"Nenhum documento encontrado na pasta `{pasta_manuais}`.")
         return
@@ -490,7 +1163,7 @@ def render_manuais_tecnicos(ctx: AppContext):
 
     # Modelos / Sub-linhas (Nível 2)
     modelos_disponiveis = sorted(list(set(d["modelo"] for d in docs_cat if d["modelo"] != "GERAL")))
-    
+
     col_mod, col_busca, col_deep = st.columns([1, 1.8, 1.2])
     with col_mod:
         if modelos_disponiveis:
@@ -513,15 +1186,15 @@ def render_manuais_tecnicos(ctx: AppContext):
     for d in docs_cat:
         if mod_selecionado != "TODOS OS MODELOS" and d["modelo"] != mod_selecionado:
             continue
-        
+
         match_direto = False
         if not termo_limpo:
             match_direto = True
         else:
             # 1. Busca por Metadados (Nome, Título, Categoria, Subgrupo)
-            if (termo_limpo in d["titulo_amigavel"].lower() or 
-                termo_limpo in d["nome_arquivo"].lower() or 
-                termo_limpo in d["subgrupo"].lower() or 
+            if (termo_limpo in d["titulo_amigavel"].lower() or
+                termo_limpo in d["nome_arquivo"].lower() or
+                termo_limpo in d["subgrupo"].lower() or
                 termo_limpo in d["categoria"].lower()):
                 match_direto = True
 
@@ -556,35 +1229,6 @@ def render_manuais_tecnicos(ctx: AppContext):
     caminho_portal_bs = os.path.join(pasta_manuais, "TOMOGRAFO", "GE", "BRIGHTSPEED_LITE", "02_PORTAL_INTERATIVO_SERVICE_METHODS", "frameset.htm")
     tem_portal_bs = os.path.exists(caminho_portal_bs)
 
-    # Central de Vídeos de Treinamento Técnico e Operacional
-    videos_disponiveis = [
-        ("🎬 Troca de Tubo de Raio-X & Calibração (IT-01 Brivo CT385)", "Video_Treinamento_IT01_Brivo385_Final.mp4", "Video_Treinamento_IT01_Piloto.mp4"),
-        ("📦 Requisição de Peças com Base na IT", "Video_Tutorial_Solicitacao_Pecas_Baseada_na_IT.mp4", None),
-        ("🧰 Fluxo de Kits de Ferramentas (Separação & Devolução)", "Video_Tutorial_Fluxo_Kits_Separacao_Entrega_Devolucao.mp4", None),
-        ("🚗 Gestão de Frota e Apontamento de KM", "Video_Gestao_Frota_KM_e_Incentivo_ao_Zelo.mp4", None),
-    ]
-
-    videos_reais = []
-    for titulo, arq_primario, arq_secundario in videos_disponiveis:
-        p1 = os.path.join(ctx.base_dir, arq_primario)
-        if os.path.exists(p1):
-            videos_reais.append((titulo, p1))
-        elif arq_secundario:
-            p2 = os.path.join(ctx.base_dir, arq_secundario)
-            if os.path.exists(p2):
-                videos_reais.append((titulo, p2))
-
-    if videos_reais and (mod_selecionado in ("TODOS OS MODELOS", "BRIVO CT385") or "TOMOGRAFO" in cat_selecionada or cat_selecionada == "TODAS AS CATEGORIAS"):
-        with st.expander(f"🎬 Central de Vídeos de Treinamento Técnico e Procedimentos ({len(videos_reais)} disponíveis)"):
-            if len(videos_reais) == 1:
-                st.markdown(f"**{videos_reais[0][0]}**")
-                st.video(videos_reais[0][1])
-            else:
-                titulos_v = [v[0] for v in videos_reais]
-                v_sel = st.selectbox("Selecione o Vídeo de Treinamento para Assistir", titulos_v, key="sb_video_treinamento")
-                caminho_v_sel = next(v[1] for v in videos_reais if v[0] == v_sel)
-                st.video(caminho_v_sel)
-
     # Submenus / Abas Organizadoras
     subgrupos_presentes = sorted(list(set(d["subgrupo"] for d in docs_filtrados)))
 
@@ -611,36 +1255,32 @@ def render_manuais_tecnicos(ctx: AppContext):
     else:
         st.info("Nenhum manual encontrado para os filtros selecionados.")
 
-    # Upload de Novo Manual com Organização Automática
-    st.markdown("---")
-    with st.expander("📤 Enviar Novo Manual ou Procedimento para a Biblioteca"):
-        with st.form("form_upload_manual", clear_on_submit=True):
-            st.markdown("##### Upload de Documento Técnico (PDF ou Markdown)")
-            novo_arquivo = st.file_uploader("Selecione o arquivo do manual", type=["pdf", "md", "doc", "docx"])
-            c_u1, c_u2 = st.columns(2)
-            with c_u1:
-                cat_up = st.text_input("Categoria Principal (ex: TOMOGRAFO/GE, RAIO-X/LOTUS)", value="TOMOGRAFO/GE")
-            with c_u2:
-                mod_up = st.text_input("Modelo e Pasta de Destino (ex: OPTIMA_540/01_INSTRUCOES_DE_TRABALHO)", value="OPTIMA_540/01_INSTRUCOES_DE_TRABALHO")
-            
-            submeter = st.form_submit_button("Salvar e Organizar na Base", type="primary")
-            if submeter and novo_arquivo:
-                partes_cat = [p.strip().upper().replace(" ", "_") for p in cat_up.split("/")]
-                partes_mod = [p.strip().upper().replace(" ", "_") for p in mod_up.split("/")]
-                pasta_alvo = os.path.join(pasta_manuais, *partes_cat, *partes_mod)
-                os.makedirs(pasta_alvo, exist_ok=True)
-                
-                caminho_final = os.path.join(pasta_alvo, novo_arquivo.name)
-                with open(caminho_final, "wb") as f_out:
-                    f_out.write(novo_arquivo.getbuffer())
-                
-                st.success(f"✅ Arquivo `{novo_arquivo.name}` salvo e catalogado com sucesso em `{os.path.relpath(pasta_alvo, pasta_manuais)}`!")
-                st.rerun()
 
+def render_manuais_tecnicos(ctx: AppContext):
+    """Renderiza a View de Consulta de Manuais Técnicos e Procedimentos com navegação em sub-abas limpas."""
+    st.markdown("## 📚 Biblioteca Técnica & Videoteca de Treinamento eMED")
+    st.markdown(
+        "Acesso integrado a Manuais de Fábrica, Instruções de Trabalho (ITs), "
+        "Procedimentos de Calibração e **Videoteca Oficial com 30 Vídeos Narrados de Treinamento**."
+    )
 
-_SERVER_THREAD = None
-_SERVER_PORT = 8585
+    pasta_manuais = _obter_caminho_manuais(ctx)
+    catalogo = _escanear_arvore_manuais(pasta_manuais)
 
+    tab_manuais, tab_videoteca, tab_upload = st.tabs([
+        "📚 Acervo de Manuais & POPs",
+        "🎬 Videoteca & Treinamentos de Campo (30 Vídeos)",
+        "📤 Central de Ingestão & Upload"
+    ])
+
+    with tab_manuais:
+        _render_acervo_manuais(ctx, pasta_manuais, catalogo)
+
+    with tab_videoteca:
+        _render_videoteca_tecnica(ctx)
+
+    with tab_upload:
+        _render_central_upload(pasta_manuais)
 
 def _garantir_servidor_portal_ge(caminho_frameset: str):
     """Garante a execução de um micro-servidor HTTP local para permitir a navegação por frames sem bloqueio de segurança."""
@@ -914,7 +1554,7 @@ def _render_lista_cards(docs: list, ocorrencias_busca: dict = None):
                     with open(doc["caminho"], "rb") as f_down:
                         dados_bytes = f_down.read()
                     st.download_button(
-                        label="📥 Baixar Arquivo",
+                        label="📥 Baixar Documento (.pdf / .md)",
                         data=dados_bytes,
                         file_name=doc["nome_arquivo"],
                         mime="text/markdown" if doc["tipo"] == "MARKDOWN" else "application/pdf",
@@ -934,7 +1574,39 @@ def _render_lista_cards(docs: list, ocorrencias_busca: dict = None):
                     st.session_state[chave_view] = not st.session_state[chave_view]
                     st.rerun()
 
-            # Área de exibição inline
+                # Botão de Vídeo da IT
+                nome_arq_it = doc["nome_arquivo"]
+                video_it_nome = DICIONARIO_VIDEOS_ITS.get(nome_arq_it)
+                caminho_vid_it = None
+                if video_it_nome:
+                    base_p = r"c:\Users\vitor\OneDrive\Desktop\Sistema Emed"
+                    p1 = os.path.join(base_p, "Videos_Treinamento_ITs", video_it_nome)
+                    p2 = os.path.join(base_p, video_it_nome)
+                    if os.path.exists(p1):
+                        caminho_vid_it = p1
+                    elif os.path.exists(p2):
+                        caminho_vid_it = p2
+
+                if caminho_vid_it:
+                    chave_vid = f"view_vid_{doc['rel_path']}_{idx}"
+                    if chave_vid not in st.session_state:
+                        st.session_state[chave_vid] = False
+                    lbl_vid = "Ocultar Vídeo" if st.session_state[chave_vid] else "🎬 Vídeo da IT"
+                    if st.button(lbl_vid, key=f"btn_vid_{doc['rel_path']}_{idx}", use_container_width=True):
+                        st.session_state[chave_vid] = not st.session_state[chave_vid]
+                        st.rerun()
+
+            # Área de exibição inline de Vídeo da IT
+            if caminho_vid_it and st.session_state.get(chave_vid, False):
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #091322, #16243b); border-left: 4px solid #00b4d8; padding: 12px 18px; border-radius: 6px; margin: 10px 0;">
+                    <span style="color: #38bdf8; font-weight: 700; font-size: 0.95rem;">🎬 Vídeo-Treinamento Narrado:</span>
+                    <span style="color: #f1f5f9; font-size: 0.95rem; margin-left: 8px;">{doc['titulo_amigavel']}</span>
+                </div>
+                """, unsafe_allow_html=True)
+                st.video(caminho_vid_it)
+
+            # Área de exibição inline do Documento
             if st.session_state.get(chave_view, False):
                 if doc["tipo"] == "MARKDOWN":
                     _renderizar_leitor_markdown(doc["caminho"], f"{doc['rel_path']}_{idx}")

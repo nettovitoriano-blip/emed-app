@@ -353,6 +353,67 @@ def salvar_dataframe_transacional(dataframe, db_path, excel_path=None, backup_pa
     return True
 
 
+def obter_url_base_sistema(fallback_url: str = None) -> str:
+    """Retorna a URL base pública acessível do sistema para geração de links e QR Codes utilizáveis no celular.
+    
+    Ordem de prioridade:
+    1. URL personalizada definida na sessão (ex: domínio próprio)
+    2. Header da requisição web atual (se acessado via Cloudflare / proxy reverso)
+    3. URL pública do túnel Cloudflare ativo em execução na máquina
+    4. IP da rede local (ex: http://192.168.X.X:8501) para uso no mesmo Wi-Fi
+    5. Fallback informado ou localhost
+    """
+    try:
+        import streamlit as st
+        # 1. Customização manual na sessão
+        if "url_base_publica_custom" in st.session_state and st.session_state.url_base_publica_custom:
+            return str(st.session_state.url_base_publica_custom).strip().rstrip("/")
+
+        # 2. Captura automática via headers do Streamlit
+        headers = getattr(st.context, "headers", {})
+        host = headers.get("x-forwarded-host") or headers.get("host")
+        proto = headers.get("x-forwarded-proto", "https" if host and ("trycloudflare.com" in host or "https" in str(host)) else "http")
+        if host and "localhost" not in host and "127.0.0.1" not in host:
+            return f"{proto}://{host}"
+    except Exception:
+        pass
+
+    # 3. Fallback explícito passado
+    if fallback_url and "localhost" not in fallback_url and "127.0.0.1" not in fallback_url:
+        return fallback_url.rstrip("/")
+
+    # 4. Procura túnel Cloudflare ativo nos logs
+    try:
+        import glob
+        import re
+        task_logs = glob.glob(r"C:\Users\vitor\.gemini\antigravity\brain\*\.system_generated\tasks\task-*.log")
+        for log_f in sorted(task_logs, key=os.path.getmtime, reverse=True):
+            try:
+                with open(log_f, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                    if "trycloudflare.com" in content:
+                        m = re.search(r"https://[a-zA-Z0-9\-\.]+\.trycloudflare\.com", content)
+                        if m:
+                            return m.group(0).rstrip("/")
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # 5. IP da rede local (Wi-Fi do hospital/empresa)
+    try:
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+        return f"http://{local_ip}:8501"
+    except Exception:
+        pass
+
+    return fallback_url.rstrip("/") if fallback_url else "http://localhost:8501"
+
+
 def obter_id_os(idx, row):
     val_id = limpar_int(row.get("id"), 0)
     return val_id if val_id > 0 else int(idx)

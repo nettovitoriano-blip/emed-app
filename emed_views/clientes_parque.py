@@ -2,7 +2,7 @@ import io
 import urllib.parse
 import pandas as pd
 import streamlit as st
-from emed_core import limpar_texto, get_db_connection
+from emed_core import limpar_texto, get_db_connection, obter_url_base_sistema
 from emed_services import (
     AppContext,
     carregar_clientes_internos,
@@ -297,7 +297,8 @@ def render_clientes_equipamentos(ctx: AppContext):
                             if st.session_state.get(f"ver_qr_{i_eq}", False):
                                 q_eq = urllib.parse.quote(eq_desc)
                                 q_cli = urllib.parse.quote(cliente_nome)
-                                url_portal_qr = f"http://localhost:8501/?equipamento_qr={q_eq}&cliente_qr={q_cli}"
+                                base_url_qr = obter_url_base_sistema()
+                                url_portal_qr = f"{base_url_qr}/?equipamento_qr={q_eq}&cliente_qr={q_cli}"
                                 try:
                                     import qrcode
                                     qr_obj = qrcode.QRCode(version=1, box_size=6, border=2)
@@ -306,12 +307,13 @@ def render_clientes_equipamentos(ctx: AppContext):
                                     img_qr = qr_obj.make_image(fill_color="#0B3B60", back_color="white")
                                     buf = io.BytesIO()
                                     img_qr.save(buf, format="PNG")
-                                    st.image(buf.getvalue(), width=150)
+                                    st.image(buf.getvalue(), width=160)
                                 except Exception:
                                     img_qr_api = f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={urllib.parse.quote(url_portal_qr)}"
-                                    st.image(img_qr_api, width=150)
-                                st.caption("📱 Etiqueta QR Code do Equipamento (Histórico de OS + Abertura de Chamado).")
-                                if st.button("👁️ Testar Visão do Cliente (Abrir Portal QR)", key=f"sim_qr_{i_eq}"):
+                                    st.image(img_qr_api, width=160)
+                                st.caption("📱 **Etiqueta QR Code do Equipamento** (Aponte a câmera do celular).")
+                                st.markdown(f"<small style='word-break: break-all; color: #94a3b8;'>🔗 Link: <a href='{url_portal_qr}' target='_blank'>{url_portal_qr}</a></small>", unsafe_allow_html=True)
+                                if st.button("👁️ Testar Visão do Cliente no Navegador", key=f"sim_qr_{i_eq}"):
                                     st.session_state.simulando_qr_eq = eq_desc
                                     st.session_state.simulando_qr_cli = cliente_nome
                                     st.rerun()
