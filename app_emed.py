@@ -45,6 +45,8 @@ from emed_ui.components import renderizar_area_trabalho_icones
 from emed_views import verificar_e_renderizar_portal_qr, VIEW_ROUTER
 
 # Configuração da Página do Sistema EMED com Tema Escuro Nativo
+VERSAO_SISTEMA = "v1.2 (Produção Estável)"
+
 st.set_page_config(
     page_title="EMED - Gestão de Equipamentos e Frota",
     page_icon="🏥",
@@ -120,6 +122,7 @@ if st.sidebar.button(
 
 st.sidebar.markdown(f"### 👤 Utilizador: {st.session_state.utilizador}")
 st.sidebar.markdown(f"**Perfil:** `{st.session_state.perfil}`")
+st.sidebar.caption(f"🏷️ Sistema EMED `{VERSAO_SISTEMA}`")
 
 if st.sidebar.button("🔄 Trocar de Técnico / Sair", type="secondary", use_container_width=True):
     st.session_state.autenticado = False
@@ -257,7 +260,7 @@ acao = st.session_state.menu_acao_ativa
 st.markdown(
     f"""
     <div style="background: linear-gradient(90deg, #1c2541 0%, #0b132b 100%); border-left: 4px solid #64dfdf; border-top: 1px solid #3a506b; border-right: 1px solid #3a506b; border-bottom: 1px solid #3a506b; border-radius: 8px; padding: 8px 14px; margin-top: 6px; margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between;">
-        <span style="color: #64dfdf !important; font-weight: 700; font-size: 14px;">📍 MÓDULO EM EXIBIÇÃO: <span style="color: #ffffff !important;">{acao}</span></span>
+        <span style="color: #64dfdf !important; font-weight: 700; font-size: 14px;">📍 MÓDULO EM EXIBIÇÃO: <span style="color: #ffffff !important;">{acao}</span> <span style="background: #0284c7; color: #ffffff; padding: 2px 7px; border-radius: 4px; font-size: 11px; margin-left: 8px; font-weight: 600;">v1.2</span></span>
         <span style="color: #94a3b8 !important; font-size: 12px;">👤 {st.session_state.utilizador} ({st.session_state.perfil})</span>
     </div>
     """,
