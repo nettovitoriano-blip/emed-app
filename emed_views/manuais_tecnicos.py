@@ -8,6 +8,29 @@ import streamlit as st
 from emed_services import AppContext
 
 
+DICIONARIO_VIDEOS_ITS = {
+    "IT_01_Troca_de_Tubo_GE_Brivo385.md": "Video_IT01_Troca_Tubo_GE_Brivo385.mp4",
+    "IT_02_Manutencao_Preventiva_GE_BrightSpeed.md": "Video_IT02_Manutencao_Preventiva_BrightSpeed.mp4",
+    "IT_03_Troca_de_Tubo_GE_BrightSpeed.md": "Video_IT03_Troca_Tubo_BrightSpeed.mp4",
+    "IT_04_Balanceamento_Gantry_GE.md": "Video_IT04_Balanceamento_Gantry_GE.mp4",
+    "IT_05_Diagnostico_Ajuste_SlipRing_GE.md": "Video_IT05_Diagnostico_Ajuste_SlipRing_GE.mp4",
+    "IT_06_Alinhamentos_Opticos_Colimador_Detector_GE.md": "Video_IT06_Alinhamentos_Opticos_Colimador_Detector_GE.mp4",
+    "IT_07_Guia_Ferramenta_Gerador_JEDI_GE.md": "Video_IT07_Guia_Ferramenta_Gerador_JEDI_GE.mp4",
+    "IT_08_Verificacao_Tanque_HV_e_QA_GE.md": "Video_IT08_Verificacao_Tanque_HV_e_QA_GE.mp4",
+    "IT_09_Alinhamento_Plano_de_Rotacao_POR_GE.md": "Video_IT09_Alinhamento_Plano_de_Rotacao_POR_GE.mp4",
+    "IT_10_Alinhamento_Isocentro_Mecanico_e_HOT_ISO_GE.md": "Video_IT10_Alinhamento_Isocentro_Mecanico_e_HOT_ISO_GE.mp4",
+    "IT_11_Calibracao_Colimador_Aberturas_e_Detailed_Cal_GE.md": "Video_IT11_Calibracao_Colimador_e_Detailed_Cal_GE.mp4",
+    "IT_12_Seguranca_Rotacao_Gantry_e_Varreduras_HHS_GE.md": "Video_IT12_Seguranca_Rotacao_Gantry_e_Varreduras_HHS_GE.mp4",
+    "IT_13_Substituicao_Placa_KV_Control_Board_GE_BrightSpeed.md": "Video_IT13_Substituicao_Placa_KV_Control_Board_GE.mp4",
+    "IT_14_Substituicao_Controlador_Rotacao_Axial_Drive_GE_BrightSpeed.md": "Video_IT14_Substituicao_Controlador_Axial_Drive_GE.mp4",
+    "IT_15_Caracterizacao_Mesa_Paciente_e_Tilt_Gantry_GE_BrightSpeed.md": "Video_IT15_Caracterizacao_Mesa_Paciente_e_Tilt_GE.mp4",
+    "IT_RXM_SHIM_001_Manutencao_Descarga_Capacitores_MobileDaRt_MX8.md": "Video_IT_RXM_SHIM001_Descarga_Capacitores_MobileDaRt_MX8.mp4",
+    "IT_RXM_SHIM_002_Calibracao_Manopla_Balanca_Sensor_Braco_MX8.md": "Video_IT_RXM_SHIM002_Calibracao_Manopla_Sensor_Braco_MX8.mp4",
+    "IT_RXM_SHIM_003_Instalacao_Montagem_Comissionamento_MobileDaRt_MX8.md": "Video_IT_RXM_SHIM003_Instalacao_Montagem_MobileDaRt_MX8.mp4",
+    "IT_RXD_NEU_001_Instalacao_Software_Configuracao_DR_NeuVision550M.md": "Video_IT_RXD_NEU001_Instalacao_Software_DR_NeuVision550M.mp4"
+}
+
+
 DICIONARIO_NOMES_AMIGAVEIS = {
     # Raio-X Lotus HF500M
     "01_Manual_Pre_Instalacao_Oficial_Lotus_HF500M.pdf": "📖 Manual Oficial de Pré-Instalação Lotus HF500M (Fábrica)",
@@ -29,6 +52,7 @@ DICIONARIO_NOMES_AMIGAVEIS = {
     "IT_13_Substituicao_Placa_KV_Control_Board_GE_BrightSpeed.md": "⚡ IT-13: Substituição da Placa Controladora de Alta Tensão (KV Control Board GE)",
     "IT_14_Substituicao_Controlador_Rotacao_Axial_Drive_GE_BrightSpeed.md": "⚙️ IT-14: Substituição do Controlador de Rotação do Gantry (Axial Drive Controller GE)",
     "IT_15_Caracterizacao_Mesa_Paciente_e_Tilt_Gantry_GE_BrightSpeed.md": "📐 IT-15: Caracterização da Mesa do Paciente (IN/OUT, UP/DOWN) & Calibração do Tilt do Gantry (GE)",
+    "IT_16_Substituicao_Modulos_IGBT_Inversor_Alta_Tensao_GE_BrightSpeed.md": "⚡ IT-16: Diagnóstico & Substituição dos Módulos IGBT no Inversor JEDI (GE)",
     
     # Brivo CT385 - Calibrações e Procedimentos
     "01_Procedimento_Troca_de_Tubo_Gantry.pdf": "01. Procedimento Oficial de Troca do Tubo de Raio-X no Gantry",
@@ -340,6 +364,40 @@ def _renderizar_leitor_markdown(caminho_md: str, doc_key: str = "it"):
                 st.success(f"🎯 O termo **'{termo}'** foi encontrado **{ocorrencias} vez(es)** na instrução abaixo:")
             else:
                 st.info(f"O termo '{termo}' não foi encontrado nesta instrução.")
+
+        # Verificação e Exibição do Vídeo Oficial de Treinamento da IT
+        nome_arq_md = os.path.basename(caminho_md)
+        video_nome = DICIONARIO_VIDEOS_ITS.get(nome_arq_md)
+        pasta_doc = os.path.dirname(caminho_md)
+        caminho_video = None
+        curr = pasta_doc
+        while curr and len(curr) > 5:
+            possivel_pasta = os.path.join(curr, "Videos_Treinamento_ITs")
+            if os.path.exists(possivel_pasta):
+                if video_nome and os.path.exists(os.path.join(possivel_pasta, video_nome)):
+                    caminho_video = os.path.join(possivel_pasta, video_nome)
+                    break
+            curr = os.path.dirname(curr)
+
+        if caminho_video and os.path.exists(caminho_video):
+            st.markdown(
+                """
+                <div style="background: linear-gradient(135deg, #101c3d, #1a2c5b); border: 2px solid #7209b7; padding: 14px 18px; border-radius: 10px; margin: 15px 0 10px 0;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.8rem;">🎬</span>
+                            <div>
+                                <h4 style="margin: 0; color: #64dfdf; font-weight: 700;">Vídeo Oficial de Treinamento & Apoio em Campo (Full HD 1080p)</h4>
+                                <span style="font-size: 0.85rem; color: #cbd5e1;">Passo a passo narrado em português, torques de fábrica, EPIs e procedimento oficial eMed</span>
+                            </div>
+                        </div>
+                        <span style="background: #7209b7; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 700;">1080p HD</span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            st.video(caminho_video)
 
         # Resolução e Embutimento Automático de Imagens Locais (assets) em Base64
         pasta_doc = os.path.dirname(caminho_md)
@@ -686,6 +744,16 @@ def _render_lista_cards(docs: list, ocorrencias_busca: dict = None):
                         * **Mesa Elevação (UP / DOWN):** Ponto 1 = $950,0 \pm 0,5\text{ mm}$ | Ponto 2 = $650,0 \pm 0,5\text{ mm}$ | Limite mecânico inferior | LED `POT_ADJ UP` verde no topo.
                         * **Tilt do Gantry (Potenciômetro):** Tensão de centro a $0^\circ$ = $2,50 \pm 0,20\text{V DC}$ (ajuste mecânico na polia de 32 dentes).
                         * **Calibração de Tilt no Console:** *Mechanical Calibration* -> Ativar chave **`S4` em ON** no Gantry para passo fino (Obrigatório retornar a **OFF** ao final!).
+                        """)
+                elif "igbt" in doc["nome_arquivo"].lower() or "it_16" in doc["nome_arquivo"].lower():
+                    with st.expander("⚡ Parâmetros Críticos dos Módulos IGBT / Inversor JEDI (GE BrightSpeed)"):
+                        st.markdown(r"""
+                        * **Topologia:** Inversor hipo-ressonante (2 IGBTs em Half-Bridge para Lite / 4 IGBTs em paralelo para Select/16).
+                        * **Barramento DC:** Tensão de até **$750\text{V DC}$** (LOTO obrigatório; comprovar $V_{DC} < 5\text{V}$ com multímetro antes de tocar).
+                        * **Torque Base IGBT / Dissipador:** Etapa 1 a **$1,5\text{ N}\cdot\text{m}$** -> Etapa 2 cruzada a **$3,0$ a $3,5\text{ N}\cdot\text{m}$**.
+                        * **Torque Bornes de Barramento (M5/M6):** **$2,5$ a $3,0\text{ N}\cdot\text{m}$**.
+                        * **Pasta Térmica:** Película ultrafina uniforme ($50-100\ \mu\text{m}$) aplicada com espátula plástica.
+                        * **Teste Obrigatório Pós-Troca:** *No Load kV Test* em rampa escalonada ($60\text{ kV} \rightarrow 140\text{ kV}$) antes de liberar filamento.
                         """)
                 elif "neuvision" in doc["nome_arquivo"].lower() or "neu_001" in doc["nome_arquivo"].lower():
                     with st.expander("⚡ Parâmetros Críticos e Senhas (Neusoft NeuVision 550M Plus)"):

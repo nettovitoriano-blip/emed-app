@@ -741,14 +741,18 @@ def converter_teste_em_aplicacao_definitiva_e_cobranca(
                 qtd_app = 1
             nome_peca_final = partes[1].strip()
 
-        # Atualiza status da OS para CONCLUÍDO
+        # Atualiza status da OS para CONCLUÍDO e grava o valor final aprovado
         cur.execute("""
             UPDATE clientes_equipamentos SET
                 status = 'CONCLUÍDO',
+                valor_os = ?,
+                condicao_pagamento = ?,
                 peca_baixada_ref = ?,
                 pendencias = ?
             WHERE id = ?
         """, (
+            float(val_final),
+            str(condicao_pagamento),
             f"{qtd_app}x {nome_peca_final}",
             f"[CONCLUÍDO - PROPOSTA APROVADA] Peça {nome_peca_final} validada e aplicada em definitivo.",
             int(os_id)
