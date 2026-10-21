@@ -95,7 +95,7 @@ SUGESTOES_SEPARACAO_POR_ATIVIDADE = {
     "CALIBRAÇÃO DE DENSITOMETRIA": {
         "nome": "SUGESTÃO: CALIBRAÇÃO & MANUTENÇÃO EM DENSITOMETRIA ÓSSEA",
         "itens": [
-            "FER-006: Fantoma Oficial de Calibração de Densidade Óssea",
+            "FER-006: Phantom Oficial de Calibração de Densidade Óssea",
             "PEC-003: Cabos de Alta Tensão (HV) Sobressalentes",
             "CON-003: Kit Limpeza Padrão (Limpa-Contatos Elétricos, Desengripante, Veja, Panos e Aspirador)",
         ],
@@ -135,7 +135,7 @@ SUGESTOES_SEPARACAO_POR_ATIVIDADE = {
     "PREVENTIVA PADRÃO": {
         "nome": "SUGESTÃO: MANUTENÇÃO PREVENTIVA PADRÃO & POP",
         "itens": [
-            "FER-005: Fantomas de Calibração Padrão (Cabeça / Corpo / QA)",
+            "FER-005: Phantoms de Calibração Padrão (Cabeça / Corpo / QA)",
             "FER-002: Multímetro Digital Calibrado True RMS",
             "FER-011: Alicate Amperímetro DC/AC True RMS",
             "CON-005: Graxa Especial para Rolamentos e SlipRing",

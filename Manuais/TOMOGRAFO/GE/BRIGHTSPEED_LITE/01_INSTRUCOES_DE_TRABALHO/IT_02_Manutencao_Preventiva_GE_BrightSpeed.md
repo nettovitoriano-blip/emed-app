@@ -29,7 +29,7 @@ O protocolo é dividido em 4 ciclos periódicos (**Schedules A, B, C e D**), cob
 * Pistola de graxa com graxa recomendada GE (Beacon 325 ou Klüber Microlube GL 261 para rolamento do gantry).
 * Torquímetro dinamométrico calibrado com pontas sextavadas/Allen.
 * Multímetro digital True-RMS Cat III 600V.
-* Fantoma de Controle de Qualidade GE QA Phantom com suporte de mesa.
+* Phantom de Controle de Qualidade GE QA Phantom com suporte de mesa.
 
 ---
 
@@ -117,11 +117,11 @@ O protocolo é dividido em 4 ciclos periódicos (**Schedules A, B, C e D**), cob
 ---
 
 ### FASE 6: Teste de Controle de Qualidade de Imagem (QA Test)
-1. Instale o fantoma padrão de controle de qualidade GE no suporte de mesa alinhado aos lasers do gantry.
+1. Instale o phantom padrão de controle de qualidade GE no suporte de mesa alinhado aos lasers do gantry.
 2. Execute o protocolo automatizado de **QA Daily / Weekly**:
    * **Número de CT da Água:** Deve estar exatamente em **$0 \pm 4\text{ HU}$**.
    * **Ruído da Imagem (*Noise*):** Conforme limite do modelo (desvio padrão $\le 3.5\text{ HU}$).
-   * **Uniformidade Espacial:** Diferença entre o centro do fantoma e as 4 bordas (superior, inferior, esquerda e direita) **$\le 2,0\text{ HU}$**.
+   * **Uniformidade Espacial:** Diferença entre o centro do phantom e as 4 bordas (superior, inferior, esquerda e direita) **$\le 2,0\text{ HU}$**.
    * **Espessura de Corte (*Slice Thickness*):** Desvio inferior a $\pm 0,5\text{ mm}$.
 
 ---
@@ -137,7 +137,7 @@ O protocolo é dividido em 4 ciclos periódicos (**Schedules A, B, C e D**), cob
 | **05** | Lubrificação dos fusos e trilhos da mesa do paciente | `[ ] OK` `[ ] NOK` | Movimento macio sem ruído |
 | **06** | Teste de todos os botões de emergência (*E-Stop*) | `[ ] OK` `[ ] NOK` | Frenagem instantânea confirmada |
 | **07** | Reaperto das conexões elétricas e aterramento na PDU | `[ ] OK` `[ ] NOK` | Torque verificado em todos os bornes |
-| **08** | Teste de QA com Fantoma (Água em $0 \pm 4\text{ HU}$) | `[ ] OK` `[ ] NOK` | Valor central medido: `_____ HU` |
+| **08** | Teste de QA com Phantom (Água em $0 \pm 4\text{ HU}$) | `[ ] OK` `[ ] NOK` | Valor central medido: `_____ HU` |
 
 * **Técnico Responsável:** \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_  
 * **Data da Execução:** \_\_\_\_ / \_\_\_\_ / 2026 &nbsp;&nbsp;|&nbsp;&nbsp; **Próximo Ciclo Recomendado:** Trimestral (Schedule posterior)

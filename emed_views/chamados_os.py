@@ -1336,7 +1336,7 @@ def _render_execucao_os_ativas(ctx: AppContext):
                     inst_prox_visita = st.text_input(
                         "📐 Pendência / Instrumento ou Peça necessária para a próxima visita (se ficar pendente)",
                         value=inst_os_atual,
-                        placeholder="EX: LEVAR MULTÍMETRO FLUKE, FANTOMA E PLACA FONTE",
+                        placeholder="EX: LEVAR MULTÍMETRO FLUKE, PHANTOM E PLACA FONTE",
                         key=f"inst_prox_{idx_os}"
                     )
                     observacoes_gerais_in = st.text_area(

@@ -5,7 +5,7 @@
 ---
 
 ### 1. OBJETIVO & APLICAÇÃO
-Padronizar a verificação dos divisores e resistores de realimentação (*feedback resistors*) do Tanque de Alta Tensão (HV Tank), a aferição dos circuitos medidores de kV/mA e a realização do Teste de Garantia da Qualidade (QA Test) com fantoma de água para liberação clínica do equipamento.
+Padronizar a verificação dos divisores e resistores de realimentação (*feedback resistors*) do Tanque de Alta Tensão (HV Tank), a aferição dos circuitos medidores de kV/mA e a realização do Teste de Garantia da Qualidade (QA Test) com phantom de água para liberação clínica do equipamento.
 
 ---
 
@@ -13,7 +13,7 @@ Padronizar a verificação dos divisores e resistores de realimentação (*feedb
 * **Osciloscópio Digital Portátil (Mínimo 100 MHz, 2 canais isolados)** com pontas de prova 10X compensadas;
 * **Divisor de Alta Tensão de Teste (HV Bleeder) com cabo terra para o chassi GND do Gantry**;
 * **Chave de Gancho / Spanner Wrench para anéis de travamento dos cabos de alta tensão**;
-* **Fantoma de QA de Água GE (QA Phantom)** e suporte de mesa;
+* **Phantom de QA de Água GE (QA Phantom)** e suporte de mesa;
 * **Óleo dielétrico de reposição e panos sem fiapos (*lint-free*)**.
 
 ---
@@ -72,7 +72,7 @@ O QA Test é o protocolo oficial que valida a integridade diagnóstica do feixe 
 ```mermaid
 flowchart TD
     A[Reconectar Cabos HV no Tubo com Óleo Dielétrico] --> B[Instalar Coberturas do Gantry]
-    B --> C[Montar Suporte e Fantoma de Água QA na Mesa]
+    B --> C[Montar Suporte e Phantom de Água QA na Mesa]
     C --> D[Centralizar com Laser Sagital e Coronal]
     D --> E[Executar Protocolo QA no Console]
     E --> F[Análise dos Números de CT e Ruído Desvio Padrão]
@@ -84,8 +84,8 @@ flowchart TD
 #### 4.1 Passo a Passo do Teste de QA
 1. Reinstale os cabos HV no tubo (aplique camada nova de óleo isolante para expulsar o ar dos receptáculos).
 2. Trave os anéis com a chave de gancho e recoloque todas as tampas do Gantry.
-3. Posicione o suporte do fantoma na cabeceira da mesa do paciente.
-4. Instale o **Fantoma Cilíndrico de Água** e alinhe o centro exato com as cruzes laser de posicionamento interno e externo.
+3. Posicione o suporte do phantom na cabeceira da mesa do paciente.
+4. Instale o **Phantom Cilíndrico de Água** e alinhe o centro exato com as cruzes laser de posicionamento interno e externo.
 5. No software clínico (ImageWorks / Exam Browser):
    * Selecione o exame de controle de qualidade: **`QA Examination`**;
    * Pressione **[Move to Scan]** e em seguida **[Start]** no console;
@@ -95,7 +95,7 @@ flowchart TD
 
 | Parâmetro Medido | Região de Interesse (ROI) | Especificação de Fábrica | Tolerância de Campo eMED |
 | :--- | :--- | :--- | :--- |
-| **Número de CT da Água** | Centro do fantoma ($200\text{ mm}^2$) | $\mathbf{0,0\text{ HU}} \pm 3,0\text{ HU}$ | $\mathbf{0,0\text{ HU}} \pm \mathbf{4,0\text{ HU}}$ |
+| **Número de CT da Água** | Centro do phantom ($200\text{ mm}^2$) | $\mathbf{0,0\text{ HU}} \pm 3,0\text{ HU}$ | $\mathbf{0,0\text{ HU}} \pm \mathbf{4,0\text{ HU}}$ |
 | **Ruído da Imagem (Desvio Padrão - SD)** | ROI central em corte de 5 mm | $< 3,8\text{ HU}$ | $\le 4,2\text{ HU}$ |
 | **Uniformidade de Campo** | Diferença Centro vs. Periferia | $\Delta \le 3,0\text{ HU}$ | $\Delta \le 4,0\text{ HU}$ |
 | **Artefatos Visuais** | Imagem inteira em janela estreita (W:100 / L:0) | **Zero anéis concêntricos ou faixas** | **Sem linhas de centelhamento (*streaks*)** |

@@ -290,7 +290,7 @@ def render_solicitacao_pecas(ctx: AppContext):
         instrumentos_extras_sol = st.text_area(
             "📐 Instrumentos & Ferramentas a Separar pelo Almoxarifado:",
             value=texto_sug_padrao,
-            placeholder="EX: MULTÍMETRO 1000V, OSCILOSCÓPIO, FANTOMA DE RESOÇÃO, TALHA, NÍVEL LASER...",
+            placeholder="EX: MULTÍMETRO 1000V, OSCILOSCÓPIO, PHANTOM DE RESOLUÇÃO, TALHA, NÍVEL LASER...",
             height=110
         )
 

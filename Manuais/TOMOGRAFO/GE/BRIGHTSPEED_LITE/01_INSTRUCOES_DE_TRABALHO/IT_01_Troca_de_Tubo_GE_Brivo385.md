@@ -150,7 +150,7 @@ Após a montagem física, o técnico deve executar os 18 procedimentos de softwa
 | **14** | `Detailed Calibration.pdf` | Calibração Detalhada de Detectores | Ganhos, offsets e calibração de ar (*Air Cal*) para cada kV/espessura. |
 | **15** | *N Number Check* | Conferência dos Coeficientes N | Verificação de uniformidade numérica dos canais do detector. |
 | **16** | `System Scanning Test.pdf` | Teste Completo de Varredura | Varredura clínica em modos axial e helicoidal em todas as velocidades. |
-| **17** | `Quality Assurance Test.pdf` | Teste de Controle de Qualidade (QA) | Varredura com fantoma de água (número de Hounsfield 0 ± 4 HU, ruído, MTF). |
+| **17** | `Quality Assurance Test.pdf` | Teste de Controle de Qualidade (QA) | Varredura com phantom de água (número de Hounsfield 0 ± 4 HU, ruído, MTF). |
 | **18** | `Save System State` | Salvamento do Estado do Sistema | Gravação do backup integral das novas tabelas de calibração no disco e pendrive. |
 
 ---
@@ -159,7 +159,7 @@ Após a montagem física, o técnico deve executar os 18 procedimentos de softwa
 
 O tomógrafo GE Brivo CT385 somente será liberado para uso em pacientes quando:
 1. Todos os 18 testes de reteste e calibração forem concluídos com status **PASSED** sem códigos de erro no log do sistema;
-2. O teste de QA com fantoma padrão apresentar:
+2. O teste de QA com phantom padrão apresentar:
    * Água: **0 ± 4 HU**
    * Ruído (*Noise*): Dentro dos desvios especificados no manual de aceitação;
    * Uniformidade espacial: Diferença centro-borda < 2 HU;

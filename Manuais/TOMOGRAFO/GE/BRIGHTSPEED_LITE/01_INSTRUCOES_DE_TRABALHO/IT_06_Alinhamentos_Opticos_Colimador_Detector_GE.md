@@ -17,7 +17,7 @@ Padronizar o roteiro de alinhamento geométrico, centragem do feixe de Raio-X (*
 * **Torquímetros de Precisão:**
   * Torquímetro para parafusos M14 (capacidade até **$96\text{ N}\cdot\text{m}$**);
   * Torquímetro padrão para parafusos de flange M8 (**$30,5\text{ N}\cdot\text{m}$**) e trava M6 (**$13,5\text{ N}\cdot\text{m}$**).
-* **Fantoma de Alinhamento e Centralizador Laser** (Luzes de posicionamento validadas).
+* **Phantom de Alinhamento e Centralizador Laser** (Luzes de posicionamento validadas).
 
 ---
 
@@ -95,4 +95,4 @@ O alinhamento CBF (*Collimator Beam Filter*) assegura que os filtros de feixe de
 * [ ] Parafusos de fixação do detector torquiados a **$30,5\text{ N}\cdot\text{m}$** (M8) e **$13,5\text{ N}\cdot\text{m}$** (M6);
 * [ ] Fixadores M14 do colimador torquiados a **$96,0\text{ N}\cdot\text{m}$**;
 * [ ] Relógio comparador e suportes magnéticos removidos do Gantry antes de qualquer rotação rápida;
-* [ ] Imagem do fantoma de QA livre de artefatos em anel (*ring artifacts*) ou bandas de sombreamento.
+* [ ] Imagem do phantom de QA livre de artefatos em anel (*ring artifacts*) ou bandas de sombreamento.

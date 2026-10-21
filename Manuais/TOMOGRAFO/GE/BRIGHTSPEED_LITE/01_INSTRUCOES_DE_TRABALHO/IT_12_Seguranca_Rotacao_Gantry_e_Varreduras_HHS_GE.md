@@ -51,7 +51,7 @@ As varreduras HHS submetem o tubo de Raio-X a uma carga térmica progressiva e c
 ### 4. PROCEDIMENTO 3: TESTE DE VARREDURA E ESTABILIDADE DO SISTEMA (SYSTEM SCANNING TEST)
 
 O teste de estabilidade simula uma rotina pesada de exames de pronto-socorro / hospital geral:
-1. Monte o fantoma de água no centro do gantry;
+1. Monte o phantom de água no centro do gantry;
 2. Programe uma rotina de **20 exames contínuos** simulando protocolos de Crânio, Tórax e Abdome Total;
 3. Execute a sequência completa;
 4. **Critérios de Aprovação:**

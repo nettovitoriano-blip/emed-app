@@ -13,7 +13,7 @@ Padronizar a calibração eletromecânica dos atuadores de fatiamento do colimad
 ### 2. FERRAMENTAS & REQUISITOS PRELIMINARES
 * Sala de exames climatizada com temperatura estabilizada entre **$20^\circ\text{C}$ e $24^\circ\text{C}$**;
 * Tubo de Raio-X aquecido (*Tube Warm-up* realizado há menos de 1 hora);
-* Fantoma de Calibração de Ar GE (*Air Calibration Space* desobstruído - mesa recuada e sem nenhum objeto dentro do túnel do gantry).
+* Phantom de Calibração de Ar GE (*Air Calibration Space* desobstruído - mesa recuada e sem nenhum objeto dentro do túnel do gantry).
 
 ---
 

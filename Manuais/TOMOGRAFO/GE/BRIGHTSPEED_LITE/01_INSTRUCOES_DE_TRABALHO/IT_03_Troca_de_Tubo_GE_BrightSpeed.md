@@ -126,7 +126,7 @@ Conclua executando a esteira de calibrações no software de serviço:
 4. `Calibração de Filamento (Small e Large Focus)`
 5. `Balanceamento Dinâmico do Gantry`
 6. `Air Cal & Detailed Calibration`
-7. `QA Test Final com Fantoma (Água: 0 ± 4 HU)`.
+7. `QA Test Final com Phantom (Água: 0 ± 4 HU)`.
 
 ---
 *eMED Eletromedicina Ltda. • Suporte Técnico e Engenharia Clínica*
