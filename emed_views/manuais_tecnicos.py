@@ -28,6 +28,7 @@ DICIONARIO_NOMES_AMIGAVEIS = {
     "IT_12_Seguranca_Rotacao_Gantry_e_Varreduras_HHS_GE.md": "🛡️ IT-12: Segurança de Rotação, Varreduras Térmicas HHS & Estabilidade",
     "IT_13_Substituicao_Placa_KV_Control_Board_GE_BrightSpeed.md": "⚡ IT-13: Substituição da Placa Controladora de Alta Tensão (KV Control Board GE)",
     "IT_14_Substituicao_Controlador_Rotacao_Axial_Drive_GE_BrightSpeed.md": "⚙️ IT-14: Substituição do Controlador de Rotação do Gantry (Axial Drive Controller GE)",
+    "IT_15_Caracterizacao_Mesa_Paciente_e_Tilt_Gantry_GE_BrightSpeed.md": "📐 IT-15: Caracterização da Mesa do Paciente (IN/OUT, UP/DOWN) & Calibração do Tilt do Gantry (GE)",
     
     # Brivo CT385 - Calibrações e Procedimentos
     "01_Procedimento_Troca_de_Tubo_Gantry.pdf": "01. Procedimento Oficial de Troca do Tubo de Raio-X no Gantry",
@@ -677,6 +678,14 @@ def _render_lista_cards(docs: list, ocorrencias_busca: dict = None):
                         * **Conexões de Sinal/KIM:** X10 (Resolver/Feedback), X1 (Comando KIM), X7/X8 (Comunicação), X12 (Comunicação 3ª via).
                         * **Confirmação no Display:** O display digital DEVE exibir **`o2`** ao ligar a chave 120VAC.
                         * **Aviso de Queimadura:** O resistor de frenagem dinâmica atinge temperaturas altíssimas; aguarde esfriar antes de tocar.
+                        """)
+                elif "caracterizacao_mesa" in doc["nome_arquivo"].lower() or "it_15" in doc["nome_arquivo"].lower():
+                    with st.expander("⚡ Parâmetros Críticos de Caracterização da Mesa e Tilt (GE BrightSpeed)"):
+                        st.markdown(r"""
+                        * **Mesa Longitudinal (IN / OUT):** Instalar blocos frontal e traseiro no trilho direito -> Placa GTCB `MODE_SEL` em SERVICE -> LED `CRDL` -> ABS count $\approx 18,3\ \mu\text{m/count}$.
+                        * **Mesa Elevação (UP / DOWN):** Ponto 1 = $950,0 \pm 0,5\text{ mm}$ | Ponto 2 = $650,0 \pm 0,5\text{ mm}$ | Limite mecânico inferior | LED `POT_ADJ UP` verde no topo.
+                        * **Tilt do Gantry (Potenciômetro):** Tensão de centro a $0^\circ$ = $2,50 \pm 0,20\text{V DC}$ (ajuste mecânico na polia de 32 dentes).
+                        * **Calibração de Tilt no Console:** *Mechanical Calibration* -> Ativar chave **`S4` em ON** no Gantry para passo fino (Obrigatório retornar a **OFF** ao final!).
                         """)
                 elif "neuvision" in doc["nome_arquivo"].lower() or "neu_001" in doc["nome_arquivo"].lower():
                     with st.expander("⚡ Parâmetros Críticos e Senhas (Neusoft NeuVision 550M Plus)"):

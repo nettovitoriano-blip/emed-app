@@ -1205,3 +1205,37 @@ def obter_resumo_alarmes_calibracao(db_path: str) -> dict:
 
     return resumo
 
+
+def atualizar_calibracao_instrumento(db_path: str, codigo: str, data_ultima: str, data_validade: str, certificado: str, saldo_creditos: str = "") -> tuple:
+    try:
+        with get_db_connection(db_path) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE estoque_pecas 
+                SET data_ultima_calibracao = ?,
+                    data_validade_calibracao = ?,
+                    certificado_calibracao = ?,
+                    saldo_creditos = ?
+                WHERE codigo = ?
+            """, (data_ultima.strip(), data_validade.strip(), certificado.strip().upper(), saldo_creditos.strip(), codigo.strip()))
+        return True, "✅ Calibração / Créditos do instrumento atualizados com sucesso!"
+    except Exception as ex:
+        return False, f"Erro ao atualizar calibração: {ex}"
+
+
+def atualizar_calibracao_equipamento_cliente(db_path: str, os_id: int, data_ultima: str, data_validade: str, certificado: str) -> tuple:
+    try:
+        with get_db_connection(db_path) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE clientes_equipamentos
+                SET data_ultima_calibracao = ?,
+                    data_validade_calibracao = ?,
+                    certificado_calibracao = ?
+                WHERE id = ?
+            """, (data_ultima.strip(), data_validade.strip(), certificado.strip().upper(), int(os_id)))
+        return True, "✅ Calibração do equipamento cliente atualizada com sucesso!"
+    except Exception as ex:
+        return False, f"Erro ao atualizar calibração do cliente: {ex}"
+
+
