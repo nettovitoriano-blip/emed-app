@@ -53,6 +53,10 @@ DICIONARIO_NOMES_AMIGAVEIS = {
     "IT_14_Substituicao_Controlador_Rotacao_Axial_Drive_GE_BrightSpeed.md": "⚙️ IT-14: Substituição do Controlador de Rotação do Gantry (Axial Drive Controller GE)",
     "IT_15_Caracterizacao_Mesa_Paciente_e_Tilt_Gantry_GE_BrightSpeed.md": "📐 IT-15: Caracterização da Mesa do Paciente (IN/OUT, UP/DOWN) & Calibração do Tilt do Gantry (GE)",
     "IT_16_Substituicao_Modulos_IGBT_Inversor_Alta_Tensao_GE_BrightSpeed.md": "⚡ IT-16: Diagnóstico & Substituição dos Módulos IGBT no Inversor JEDI (GE)",
+    "IT_17_Guia_Comandos_Linux_Terminal_e_Diagnostico_GE_CT.md": "💻 IT-17: Guia de Comandos Linux, Scripts de Serviço & Diagnóstico Avançado (GE CT)",
+    "IT_18_Calibracao_e_Troca_Detector_DAS_Pancake_GE_CT.md": "🔬 IT-18: Substituição, Conexões e Calibração do Detector Pancake DAS - PDAS (GE CT)",
+    "IT_19_Substituicao_Alinhamento_Colimador_Motorizado_GE_CT.md": "🎯 IT-19: Substituição, Montagem com Guincho e Alinhamento do Colimador Motorizado (GE CT)",
+    "IT_20_Manutencao_Troca_Fluido_Motor_Hidraulico_Tilt_GE_CT.md": "🔧 IT-20: Manutenção, Verificação de Nível, Sangria e Ajuste de Velocidade do Tilt Hidráulico (GE CT)",
     
     # Brivo CT385 - Calibrações e Procedimentos
     "01_Procedimento_Troca_de_Tubo_Gantry.pdf": "01. Procedimento Oficial de Troca do Tubo de Raio-X no Gantry",
@@ -86,24 +90,34 @@ DICIONARIO_NOMES_AMIGAVEIS = {
     "IT_RXM_SHIM_001_Manutencao_Descarga_Capacitores_MobileDaRt_MX8.md": "⚡ IT-01: Manutenção, Diagnóstico de Falhas & Descarga de Capacitores (Shimadzu MX8)",
     "IT_RXM_SHIM_002_Calibracao_Manopla_Balanca_Sensor_Braco_MX8.md": "🎯 IT-02: Calibração da Manopla com Balança (FSR) & Sensor do Braço no Catcher (Andar Frente/Trás)",
     "IT_RXM_SHIM_003_Instalacao_Montagem_Comissionamento_MobileDaRt_MX8.md": "🚀 IT-03: Roteiro Completo de Instalação, Montagem Mecânica & Comissionamento (Shimadzu MX8)",
+    "IT_RXM_SHIM_004_Troca_Baterias_Calibracao_Tensao_MobileDaRt_MX8.md": "🔋 IT-04: Procedimento de Substituição do Banco de Baterias & Calibração de Tensão Mode 7 (Shimadzu MX8)",
+    "IT_RXM_SHIM_005_Troca_Monobloco_Tubo_Centracao_Colimador_MX8.md": "🎯 IT-05: Substituição do Monobloco do Tubo de Raio-X & Centração Óptica do Colimador (Shimadzu MX8)",
 
-    # Lotus Família HF
+    # Lotus Raio-X Fixo (HF500M / Família HF)
     "01_Manual_Usuario_Familia_HF_Parte_1.pdf": "📖 Manual do Usuário e Operação - Família HF Raio-X Fixo (Lotus)",
+    "IT_RX_LOT_001_Vistoria_Pre_Instalacao_Adequacao_Sala_HF500M.md": "🏗️ IT-01: Vistoria Pré-Instalação, Infraestrutura Elétrica & Adequação da Sala (Lotus HF500M)",
+    "IT_RX_LOT_002_Calibracao_kV_mA_Tempo_Manutencao_Familia_HF.md": "🔬 IT-02: Calibração de kV, mA, Tempo e Alinhamento Óptico do Colimador (Família HF)",
 
     # Neusoft NeuVision 550M
     "01_Manual_Instalacao_Software_NeuVision_550M_Plus.pdf": "💻 Manual de Instalação do Software DR NeuVision 550M Plus (Fábrica Neusoft)",
-    "IT_RXD_NEU_001_Instalacao_Software_Configuracao_DR_NeuVision550M.md": "💻 IT-01: Instalação de Software, Configuração Sedecal & Wi-Fi Canon (NeuVision 550M/Plus)"
+    "IT_RXD_NEU_001_Instalacao_Software_Configuracao_DR_NeuVision550M.md": "💻 IT-01: Instalação de Software, Configuração Sedecal & Wi-Fi Canon (NeuVision 550M/Plus)",
+    "IT_RXD_NEU_002_Calibracao_Flat_Field_Ganho_Offset_Canon_CXDI.md": "🔬 IT-02: Calibração de Campo Plano (Flat Field), Ganho, Offset e Mapeamento de Pixels Defeituosos Canon CXDI"
 }
 
 DICIONARIO_SUBGRUPOS = {
     "01_INSTRUCOES_DE_TRABALHO": "📋 INSTRUÇÕES DE TRABALHO (ITs)",
     "02_CALIBRACOES_E_PROCEDIMENTOS_OFICIAIS": "🔬 CALIBRAÇÕES E PROCEDIMENTOS OFICIAIS",
     "03_SOFTWARE_E_UTILITARIOS_LINUX": "💻 SOFTWARE E UTILITÁRIOS LINUX",
+    "03_SOFTWARE_E_UTILITARIOS": "💻 SOFTWARE & UTILITÁRIOS",
     "02_PORTAL_INTERATIVO_SERVICE_METHODS": "🌐 PORTAL INTERATIVO SERVICE METHODS",
     "02_MANUAIS_DE_SERVICO_E_INSTALACAO": "📚 MANUAIS DE SERVIÇO & INSTALAÇÃO",
+    "02_MANUAIS_DE_SERVICO": "📘 MANUAIS DE SERVIÇO TÉCNICO",
     "02_MANUAIS_OFICIAIS_PDF": "📚 MANUAIS DE FÁBRICA OFICIAIS (PDF)",
+    "02_MANUAIS_DE_OPERACAO": "📖 MANUAIS DE OPERAÇÃO",
     "01_MANUAIS_DE_OPERACAO": "📖 MANUAIS DE OPERAÇÃO",
     "01_MANUAIS_DE_SOFTWARE_DR": "📚 MANUAIS DE FÁBRICA OFICIAIS (PDF)",
+    "04_ESQUEMAS_ELETRICOS": "⚡ ESQUEMAS ELÉTRICOS & DIAGRAMAS",
+    "05_NOTAS_TECNICAS": "📝 NOTAS TÉCNICAS & ALERTAS DE FÁBRICA",
     "HF500M": "📄 MANUAIS E VISTORIA PRÉ-INSTALAÇÃO",
     "LOTUS": "📄 MANUAIS E VISTORIA PRÉ-INSTALAÇÃO"
 }
@@ -127,8 +141,23 @@ def _formatar_nome_amigavel(nome_arquivo: str) -> str:
 
 
 def _formatar_subgrupo_amigavel(raw_subgrupo: str) -> str:
-    """Retorna um título claro para a aba do submenu."""
-    return DICIONARIO_SUBGRUPOS.get(raw_subgrupo, raw_subgrupo.replace("_", " ").upper())
+    """Retorna um título claro e elegante para a aba do submenu."""
+    if raw_subgrupo in DICIONARIO_SUBGRUPOS:
+        return DICIONARIO_SUBGRUPOS[raw_subgrupo]
+    limpo = re.sub(r'^\d+[\s_-]*', '', raw_subgrupo).replace("_", " ").upper()
+    if "INSTRU" in limpo or "IT" in limpo:
+        return f"📋 {limpo}"
+    elif "MANUAL" in limpo or "OFICIA" in limpo:
+        return f"📚 {limpo}"
+    elif "CALIBR" in limpo or "PROCED" in limpo:
+        return f"🔬 {limpo}"
+    elif "SOFT" in limpo or "UTIL" in limpo:
+        return f"💻 {limpo}"
+    elif "ESQUEMA" in limpo or "ELETR" in limpo:
+        return f"⚡ {limpo}"
+    elif "VISTORIA" in limpo or "PRE" in limpo:
+        return f"🏗️ {limpo}"
+    return limpo
 
 
 def _escanear_arvore_manuais(pasta_base: str):
@@ -156,15 +185,20 @@ def _escanear_arvore_manuais(pasta_base: str):
                 # Tratamento de subdiretórios com Categoria / Fabricante / Modelo / Submenu
                 # Ex: TOMOGRAFO / GE / BRIVO_CT385 / 01_INSTRUCOES_DE_TRABALHO / file.md (len = 5)
                 # Ex: RAIO-X / LOTUS / HF500M / file.pdf (len = 4)
-                if len(partes) >= 5 and partes[1].upper() in ("GE", "SIEMENS", "PHILIPS", "CANON", "TOSHIBA", "SHIMADZU", "LOTUS", "NEUSOFT"):
+                if len(partes) >= 5:
                     categoria = f"{partes[0].replace('_', ' ').upper()} ({partes[1].upper()})"
                     modelo = partes[2].replace("_", " ").upper()
                     raw_sub = partes[3]
                     subgrupo = _formatar_subgrupo_amigavel(raw_sub)
-                elif len(partes) == 4 and partes[1].upper() in ("GE", "SIEMENS", "PHILIPS", "CANON", "TOSHIBA", "SHIMADZU", "LOTUS", "NEUSOFT"):
-                    categoria = f"{partes[0].replace('_', ' ').upper()} ({partes[1].upper()})"
-                    modelo = partes[2].replace("_", " ").upper()
-                    subgrupo = "📄 MANUAIS E VISTORIA PRÉ-INSTALAÇÃO"
+                elif len(partes) == 4:
+                    if partes[1].upper() in ("GE", "SIEMENS", "PHILIPS", "CANON", "TOSHIBA", "SHIMADZU", "LOTUS", "NEUSOFT", "HOLOGIC", "MINDRAY", "SEDECAL", "VMI", "ZIEHM", "CARESTREAM", "AGFA", "HITACHI", "SAMSUNG", "DRAEGER"):
+                        categoria = f"{partes[0].replace('_', ' ').upper()} ({partes[1].upper()})"
+                        modelo = partes[2].replace("_", " ").upper()
+                        subgrupo = "📚 MANUAIS DE FÁBRICA OFICIAIS (PDF)"
+                    else:
+                        categoria = partes[0].replace("_", " ").upper()
+                        modelo = partes[1].replace("_", " ").upper()
+                        subgrupo = _formatar_subgrupo_amigavel(partes[2])
                 elif len(partes) == 3:
                     categoria = partes[0].replace("_", " ").upper()
                     modelo = partes[1].replace("_", " ").upper()
@@ -522,11 +556,34 @@ def render_manuais_tecnicos(ctx: AppContext):
     caminho_portal_bs = os.path.join(pasta_manuais, "TOMOGRAFO", "GE", "BRIGHTSPEED_LITE", "02_PORTAL_INTERATIVO_SERVICE_METHODS", "frameset.htm")
     tem_portal_bs = os.path.exists(caminho_portal_bs)
 
-    # Player de Vídeo de Treinamento Piloto (caso modelo Brivo ou Geral)
-    caminho_video = os.path.join(ctx.base_dir, "Video_Treinamento_IT01_Piloto.mp4")
-    if os.path.exists(caminho_video) and (mod_selecionado in ("TODOS OS MODELOS", "BRIVO CT385") or "TOMOGRAFO" in cat_selecionada):
-        with st.expander("🎬 Assistir ao Vídeo de Treinamento Técnico: Procedimento IT-01 (Troca de Tubo Piloto)"):
-            st.video(caminho_video)
+    # Central de Vídeos de Treinamento Técnico e Operacional
+    videos_disponiveis = [
+        ("🎬 Troca de Tubo de Raio-X & Calibração (IT-01 Brivo CT385)", "Video_Treinamento_IT01_Brivo385_Final.mp4", "Video_Treinamento_IT01_Piloto.mp4"),
+        ("📦 Requisição de Peças com Base na IT", "Video_Tutorial_Solicitacao_Pecas_Baseada_na_IT.mp4", None),
+        ("🧰 Fluxo de Kits de Ferramentas (Separação & Devolução)", "Video_Tutorial_Fluxo_Kits_Separacao_Entrega_Devolucao.mp4", None),
+        ("🚗 Gestão de Frota e Apontamento de KM", "Video_Gestao_Frota_KM_e_Incentivo_ao_Zelo.mp4", None),
+    ]
+
+    videos_reais = []
+    for titulo, arq_primario, arq_secundario in videos_disponiveis:
+        p1 = os.path.join(ctx.base_dir, arq_primario)
+        if os.path.exists(p1):
+            videos_reais.append((titulo, p1))
+        elif arq_secundario:
+            p2 = os.path.join(ctx.base_dir, arq_secundario)
+            if os.path.exists(p2):
+                videos_reais.append((titulo, p2))
+
+    if videos_reais and (mod_selecionado in ("TODOS OS MODELOS", "BRIVO CT385") or "TOMOGRAFO" in cat_selecionada or cat_selecionada == "TODAS AS CATEGORIAS"):
+        with st.expander(f"🎬 Central de Vídeos de Treinamento Técnico e Procedimentos ({len(videos_reais)} disponíveis)"):
+            if len(videos_reais) == 1:
+                st.markdown(f"**{videos_reais[0][0]}**")
+                st.video(videos_reais[0][1])
+            else:
+                titulos_v = [v[0] for v in videos_reais]
+                v_sel = st.selectbox("Selecione o Vídeo de Treinamento para Assistir", titulos_v, key="sb_video_treinamento")
+                caminho_v_sel = next(v[1] for v in videos_reais if v[0] == v_sel)
+                st.video(caminho_v_sel)
 
     # Submenus / Abas Organizadoras
     subgrupos_presentes = sorted(list(set(d["subgrupo"] for d in docs_filtrados)))
@@ -754,6 +811,81 @@ def _render_lista_cards(docs: list, ocorrencias_busca: dict = None):
                         * **Torque Bornes de Barramento (M5/M6):** **$2,5$ a $3,0\text{ N}\cdot\text{m}$**.
                         * **Pasta Térmica:** Película ultrafina uniforme ($50-100\ \mu\text{m}$) aplicada com espátula plástica.
                         * **Teste Obrigatório Pós-Troca:** *No Load kV Test* em rampa escalonada ($60\text{ kV} \rightarrow 140\text{ kV}$) antes de liberar filamento.
+                        """)
+                elif "linux" in doc["nome_arquivo"].lower() or "it_17" in doc["nome_arquivo"].lower():
+                    with st.expander("💻 Comandos de Terminal & Diagnóstico Linux GE CT"):
+                        st.markdown(r"""
+                        * **Diagnóstico de Hardware:** `checkHW` (status geral), `showRev` (versões de firmware), `ping_nodes` (comunicação CAN/Ethernet gantry).
+                        * **Controle de Processos do Scanner:** `stopall` (derruba todos os daemons de aquisição), `starthost` (reinicia stack completa do host).
+                        * **Logs & Monitoramento:** `tail -f /usr/g/service/log/syslog` | `viewErrorLog` | `dmesg | grep -i err`.
+                        * **Reset Rápido de Nós:** `reset_gantry_nodes` (reinicializa nós do Slipring, Colimador, Gerador JEDI sem reiniciar o Linux).
+                        """)
+                elif "pancake" in doc["nome_arquivo"].lower() or "detector" in doc["nome_arquivo"].lower() or "it_18" in doc["nome_arquivo"].lower():
+                    with st.expander("🔬 Parâmetros Críticos do Pancake DAS & Detector (GE BrightSpeed / Brivo)"):
+                        st.markdown(r"""
+                        * **Part Numbers:** DCB `5317077` | Módulos Conversores ADB Kit `2344539` | Fonte PDAS `5488054`.
+                        * **Cuidado Antiestático:** Uso de Field ESD Kit + **Ferramenta de Extração Flex** obrigatória (NUNCA puxar flex manualmente).
+                        * **Torques:** Parafusos M4 ADB = **$2,3\text{ N}\cdot\text{m}$** | M8 Fonte = **$19,2\text{ N}\cdot\text{m}$** | M10 Filtro = **$38,4\text{ N}\cdot\text{m}$**.
+                        * **Estabilização Térmica Obrigatória:** Mínimo de **1 hora (60 min)** de gantry ligada antes de rodar `DAS Tools` ou calibrações. Placas frias reprovam em *Offset Drift* / *Pop Noise*.
+                        * **Critério de Ruído:** Desvio padrão de ruído dos canais $\sigma_{\text{ruído}} < 1,20\ \text{LSB}$ no teste de ruído estático.
+                        """)
+                elif "colimador" in doc["nome_arquivo"].lower() or "it_19" in doc["nome_arquivo"].lower():
+                    with st.expander("🎯 Parâmetros Críticos do Colimador Motorizado (GE BrightSpeed / Brivo)"):
+                        st.markdown(r"""
+                        * **Part Number Colimador:** `5140001-6` | CCB Control Board `2189441` | Peso $\approx 25\text{ kg}$ (Guincho obrigatório).
+                        * **Torque Parafusos Estruturais (6x M14):** Pré-carga **$40\text{ N}\cdot\text{m}$** -> Aperto final em cruz **$110\text{ N}\cdot\text{m} \pm 5\text{ N}\cdot\text{m}$** com Loctite 242.
+                        * **Conexões CCB:** J2 (Came e microchaves), J3 (Motor do filtro Bowtie), J11 (Alimentação e barramento de dados).
+                        * **Alinhamentos Ópticos Obrigatórios:** POR (Plano de rotação $\le 0,08\text{ mm}$), BOW (Feixe na janela, assimetria $\le 1,5\%$), CBF/SAG.
+                        * **Calibração de Software:** `Collimator Calibration` -> `Detailed Calibration` -> `Fast Calibration`.
+                        """)
+                elif "fluido" in doc["nome_arquivo"].lower() or "it_20" in doc["nome_arquivo"].lower():
+                    with st.expander("🔧 Parâmetros Críticos do Tilt Hidráulico (GE BrightSpeed / Brivo)"):
+                        st.markdown(r"""
+                        * **Posição Obrigatória de Checagem/Enchimento:** Gantry totalmente inclinada para trás (**$-30^\circ$ / Full Backward**). Se aberta em pé ou para frente, haverá derramamento de óleo pressurizado!
+                        * **Fluido Oficial:** Óleo mineral GE P/N `2227239` (vermelho).
+                        * **Nível na Vareta (Dipstick):** Chave Allen de 5 mm limpa com álcool -> **$15\text{ mm} \pm 2\text{ mm}$** na haste.
+                        * **Vedação:** Exatamente 2 voltas completas de fita Teflon nova na rosca do bujão M6.
+                        * **Velocidade Nominal:** **$1,0^\circ/\text{s} \pm 0,05^\circ/\text{s}$** ($25\text{ s}$ para $25^\circ$). Ajustar válvulas de avanço (Forward) e recuo (Backward).
+                        """)
+                elif "lot_001" in doc["nome_arquivo"].lower() or "adequacao_sala" in doc["nome_arquivo"].lower():
+                    with st.expander("🏗️ Parâmetros Elétricos & Sala de Exames (Lotus HF500M)"):
+                        st.markdown(r"""
+                        * **Potência & Alimentação:** Rede trifásica $380\text{V} \pm 10\%$, Transformador dedicado $\ge 60\text{ kVA}$.
+                        * **Proteção & Cabos:** Disjuntor termomagnético Curva C de **$100\text{A}$** | Condutores de alimentação $\ge 25\text{ mm}^2$ (cobre).
+                        * **Aterramento:** Resistência máxima $\le 5,0\ \Omega$ (preferencialmente $< 2,0\ \Omega$, livre de ruído elétrico).
+                        * **Blindagem Radiológica:** Baritagem ou chumbo $\ge 2,0\text{ mm Pb}$ nas paredes e porta radiológica com visor plumbífero.
+                        """)
+                elif "lot_002" in doc["nome_arquivo"].lower() or "familia_hf" in doc["nome_arquivo"].lower():
+                    with st.expander("🔬 Tolerâncias de Calibração & Manutenção (Lotus Família HF)"):
+                        st.markdown(r"""
+                        * **Tolerância de Tensão ($kV_p$):** Erro máximo $\le \pm 5\%$ do valor nominal programado no console.
+                        * **Reprodutibilidade do Tempo:** Coeficiente de variação $CV \le 0,05$ entre 10 disparos consecutivos.
+                        * **Alinhamento do Campo Óptico x Radiação:** Desvio total de bordas $\le 2\%$ da distância foco-filme (DFF $100\text{ cm} \rightarrow \le 20\text{ mm}$).
+                        * **Linearidade da Corrente ($mA$ / $mAs$):** Coeficiente de linearidade $CL \le 0,10$.
+                        """)
+                elif "neu_002" in doc["nome_arquivo"].lower() or "flat_field" in doc["nome_arquivo"].lower():
+                    with st.expander("🔬 Calibração de Campo Plano e Defeitos (Canon CXDI / NeuVision 550M)"):
+                        st.markdown(r"""
+                        * **Condições Iniciais:** Detector ligado há no mínimo 30 minutos em temperatura ambiente estabilizada ($20-25^\circ\text{C}$).
+                        * **Offset / Dark Current:** Calibração sem radiação (medição de corrente de fuga e ruído de fundo dos sensores).
+                        * **Flat Field Gain Calibration:** 5 disparos homogêneos a $70\text{ kV}$, $200\text{ mA}$, $100\text{ ms}$ com filtro de cobre de $1,5\text{ mm Cu}$ no colimador.
+                        * **Defect Pixel Map:** Mapeamento de pixels mortos/quentes e interpolação bi-linear (nenhum cluster $> 3\times 3$ no centro da imagem).
+                        """)
+                elif "shim_004" in doc["nome_arquivo"].lower() or "baterias" in doc["nome_arquivo"].lower():
+                    with st.expander("🔋 Parâmetros Críticos do Banco de Baterias (Shimadzu MobileDaRt MX8)"):
+                        st.markdown(r"""
+                        * **Banco de Baterias:** 20 baterias seladas chumbo-ácido de alta corrente ($12\text{V}$ cada em série, nominal $240\text{V DC}$).
+                        * **Torque dos Terminais:** **$4,0\text{ a }4,5\text{ N}\cdot\text{m}$** (aperto uniforme com chave dinamométrica isolada).
+                        * **Calibração de Tensão Mode 7.6:** Entrar no modo de serviço do MX8, medir tensão real com multímetro calibrado e inserir valor exato no painel.
+                        * **Registro do Novo Banco Mode 7.11:** Resetar contador de vida útil e inserir código da nova data de fabricação das baterias.
+                        """)
+                elif "shim_005" in doc["nome_arquivo"].lower() or "monobloco" in doc["nome_arquivo"].lower():
+                    with st.expander("🎯 Parâmetros Críticos do Tubo & Colimador (Shimadzu MobileDaRt MX8)"):
+                        st.markdown(r"""
+                        * **Porca de Fixação do Braço Telescópico:** FU Lock Nut AW04 (torque de pré-carga e ajuste de folga axial).
+                        * **Equalização de Balanço da Mola:** Aferir esforço vertical com balança de mola: força de elevação/descida deve ser $\le 15\text{ N}$ em todo o curso.
+                        * **Alinhamento Óptico do Colimador:** Erro de coincidência entre campo luminoso e campo de raios-X $\le 1,0\text{ mm}$ a $1\text{ m}$ DFF.
+                        * **Iluminância do Campo de Luz:** Mínimo de **$160\text{ lux}$** a $1\text{ metro}$ de distância focal.
                         """)
                 elif "neuvision" in doc["nome_arquivo"].lower() or "neu_001" in doc["nome_arquivo"].lower():
                     with st.expander("⚡ Parâmetros Críticos e Senhas (Neusoft NeuVision 550M Plus)"):

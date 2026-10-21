@@ -1,3 +1,4 @@
+import io
 import urllib.parse
 import pandas as pd
 import streamlit as st
@@ -297,8 +298,18 @@ def render_clientes_equipamentos(ctx: AppContext):
                                 q_eq = urllib.parse.quote(eq_desc)
                                 q_cli = urllib.parse.quote(cliente_nome)
                                 url_portal_qr = f"http://localhost:8501/?equipamento_qr={q_eq}&cliente_qr={q_cli}"
-                                img_qr_api = f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={urllib.parse.quote(url_portal_qr)}"
-                                st.image(img_qr_api, width=150)
+                                try:
+                                    import qrcode
+                                    qr_obj = qrcode.QRCode(version=1, box_size=6, border=2)
+                                    qr_obj.add_data(url_portal_qr)
+                                    qr_obj.make(fit=True)
+                                    img_qr = qr_obj.make_image(fill_color="#0B3B60", back_color="white")
+                                    buf = io.BytesIO()
+                                    img_qr.save(buf, format="PNG")
+                                    st.image(buf.getvalue(), width=150)
+                                except Exception:
+                                    img_qr_api = f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={urllib.parse.quote(url_portal_qr)}"
+                                    st.image(img_qr_api, width=150)
                                 st.caption("📱 Etiqueta QR Code do Equipamento (Histórico de OS + Abertura de Chamado).")
                                 if st.button("👁️ Testar Visão do Cliente (Abrir Portal QR)", key=f"sim_qr_{i_eq}"):
                                     st.session_state.simulando_qr_eq = eq_desc
