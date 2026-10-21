@@ -17,6 +17,9 @@ from emed_core import (
     obter_kit_por_servico,
     acionar_separacao_automatica_almoxarifado,
     registrar_aplicacao_definitiva_e_fluxo_cobranca,
+    registrar_peca_em_teste_observacao,
+    converter_teste_em_aplicacao_definitiva_e_cobranca,
+    retirar_peca_teste_e_devolver_estoque,
 )
 from emed_services import (
     AppContext,
@@ -1206,6 +1209,26 @@ def _render_execucao_os_ativas(ctx: AppContext):
                         )
                         qtd_aplicada = st.number_input("Quantidade Aplicada", min_value=1, value=1, key=f"qtd_peca_{idx_os}")
 
+                        tipo_aplicacao_peca = "DEFINITIVA"
+                        dias_obs_in = 3
+                        criterio_obs_in = ""
+                        if peca_selecionada != "NENHUMA PEÇA":
+                            tipo_aplicacao_peca = st.radio(
+                                "Finalidade da Aplicação da Peça:",
+                                [
+                                    "🟢 INSTALAÇÃO DEFINITIVA (Proposta/Orçamento Aprovado — Faturar)",
+                                    "🟡 PEÇA EM TESTE / OBSERVAÇÃO (Diagnóstico em Aberto — Não Faturar Ainda)"
+                                ],
+                                key=f"tipo_app_peca_{idx_os}",
+                                help="Selecione 'PEÇA EM TESTE' caso o equipamento precise rodar em observação clínica antes do cliente aprovar a proposta definitiva."
+                            )
+                            if "TESTE" in tipo_aplicacao_peca:
+                                c_obs1, c_obs2 = st.columns(2)
+                                with c_obs1:
+                                    dias_obs_in = st.number_input("Prazo em Observação (dias):", min_value=1, max_value=30, value=3, key=f"dias_obs_{idx_os}")
+                                with c_obs2:
+                                    criterio_obs_in = st.text_input("Critério de Teste / Sintoma a Monitorar:", value="Validar ausência de falha sob carga", key=f"crit_obs_{idx_os}")
+
                     obs_tecnico_final = st.text_area(
                         "🛠️ Serviços Executados / Solução Técnica Aplicada *",
                         value=srv_exec_atual,
@@ -1216,13 +1239,17 @@ def _render_execucao_os_ativas(ctx: AppContext):
 
                 with m_tab4:
                     st.markdown("##### 🚨 Status de Pendências, Condição de Saída & Observações ao Cliente")
+                    opcoes_fecho_lista = [
+                        "✅ CONCLUÍDO (Fechar OS — Proposta Aprovada / Gerar Cobrança)",
+                        "🔬 DEIXAR EM OBSERVAÇÃO (Equipamento / Peça em Teste de Diagnóstico — Não Faturar)",
+                        "🚨 DEIXAR PENDÊNCIA ATIVA (Mantém alerta ligado para próxima intervenção)"
+                    ]
+                    idx_fecho_def = 1 if (peca_selecionada != "NENHUMA PEÇA" and "TESTE" in tipo_aplicacao_peca) else 0
                     status_fecho_escolha = st.radio(
                         "Resultado desta Intervenção:",
-                        [
-                            "✅ CONCLUÍDO (Fechar OS e Gerar Documento de Faturamento)",
-                            "🚨 DEIXAR PENDÊNCIA ATIVA (Mantém alerta ligado para próxima intervenção)"
-                        ],
-                        horizontal=True,
+                        opcoes_fecho_lista,
+                        index=idx_fecho_def,
+                        horizontal=False,
                         key=f"rad_st_{idx_os}"
                     )
                     opcoes_cond_fim = [
@@ -1445,9 +1472,13 @@ def _render_execucao_os_ativas(ctx: AppContext):
                             df.at[idx_os, 'assinatura_tecnico'] = ass_padrao_tec.strip().upper()
                             df.at[idx_os, 'peca_baixada_ref'] = nova_ref_peca
 
+                            fechar_definitivo = "CONCLUÍDO" in status_fecho_escolha
+                            em_observacao = "OBSERVAÇÃO" in status_fecho_escolha or (peca_selecionada != "NENHUMA PEÇA" and "TESTE" in tipo_aplicacao_peca)
+
                             resumo_diag = f" | [DIAGNÓSTICO: {problemas_encontrados_in.strip().upper()}]" if problemas_encontrados_in.strip() else ""
                             msg_cobranca_resumo = ""
-                            if fechar_definitivo:
+
+                            if fechar_definitivo and not em_observacao:
                                 df.at[idx_os, 'pendencias'] = f"[CONCLUÍDO - {etapa_executada_fecho}] {relatorio_com_peca}{resumo_diag} | [{resumo_pag}]"
                                 df.at[idx_os, 'status'] = 'CONCLUÍDO'
                                 df.at[idx_os, 'instrumento_necessario'] = ''
@@ -1474,6 +1505,23 @@ def _render_execucao_os_ativas(ctx: AppContext):
                                         etapa_executada_fecho,
                                         dias_ciclo=30
                                     )
+                            elif em_observacao:
+                                df.at[idx_os, 'status'] = 'EM OBSERVAÇÃO'
+                                df.at[idx_os, 'pendencias'] = f"[EM OBSERVAÇÃO - {dias_obs_in} DIAS] Peça {nova_ref_peca} em teste clínico. Critério: {criterio_obs_in}"
+                                df.at[idx_os, 'instrumento_necessario'] = f"MONITORAR TESTE: {nova_ref_peca}"
+
+                                ok_obs, msg_obs = registrar_peca_em_teste_observacao(
+                                    ctx.db_name,
+                                    id_os_ativa,
+                                    row_os.get('cliente', ''),
+                                    row_os.get('equipamento', ''),
+                                    novo_tec_exec,
+                                    peca_selecionada,
+                                    int(qtd_aplicada),
+                                    dias_observacao=dias_obs_in,
+                                    criterio_teste=criterio_obs_in
+                                )
+                                msg_cobranca_resumo = msg_obs
                             else:
                                 df.at[idx_os, 'pendencias'] = f"[PENDÊNCIA ATIVA - {novo_tec_exec}] {relatorio_com_peca}{resumo_diag} (ETAPA REALIZADA: {etapa_executada_fecho})"
                                 df.at[idx_os, 'status'] = 'ATIVO'

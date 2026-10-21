@@ -64,7 +64,7 @@ def render_alarmes_calibracao(ctx: AppContext):
     # -------------------------------------------------------------
     with aba1:
         st.markdown("#### 🔬 Instrumentos com Calibração Rastreável ou Créditos Anuais")
-        st.caption("Acompanhe multímetros 1000V, dosímetros radiométricos, fantomas de QA e torquímetros calibrados.")
+        st.caption("Acompanhe multímetros 1000V, osciloscópios, dong's de ativação/licença e instrumentos de calibração radiológica.")
 
         df_estoque = carregar_estoque(db_path)
         if not df_estoque.empty and "requer_calibracao" in df_estoque.columns:
@@ -112,7 +112,7 @@ def render_alarmes_calibracao(ctx: AppContext):
                     ["TODOS OS INSTRUMENTOS", "🔴 VENCIDOS", "🟡 VENCENDO EM ATÉ 30 DIAS", "🟢 EM DIA"]
                 )
             with c_f2:
-                busca_inst = st.text_input("🔍 Buscar Instrumento:", placeholder="Ex: Multímetro, Dosímetro, Fantoma...")
+                busca_inst = st.text_input("🔍 Buscar Instrumento:", placeholder="Ex: Multímetro, Osciloscópio, Dong's, Medidor...")
 
             df_filtrado_inst = df_proc_inst.copy()
             if "VENCIDOS" in filtro_st_inst:

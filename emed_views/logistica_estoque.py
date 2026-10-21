@@ -12,6 +12,7 @@ from emed_core import (
     SUGESTOES_SEPARACAO_POR_ATIVIDADE,
     KITS_INSTRUMENTOS_POR_SITUACAO,
     calcular_status_calibracao,
+    obter_resumo_alarmes_calibracao,
 )
 from emed_services import (
     AppContext,
@@ -344,17 +345,19 @@ def render_solicitacao_pecas(ctx: AppContext):
     st.caption("Ao devolver a ferramenta ou sobra de peça à empresa, clique em 'Devolver' para restabelecer imediatamente a disponibilidade no quadro.")
     df_sol_hist = carregar_solicitacoes(ctx.db_name)
     if not df_sol_hist.empty:
-        df_em_campo = df_sol_hist[~df_sol_hist['status_pedido'].fillna('').str.contains('DEVOLVIDO|CANCELADO|ESTORNADO', case=False)]
+        df_em_campo = df_sol_hist[~df_sol_hist['status_pedido'].fillna('').str.contains('DEVOLVIDO|CANCELADO|ESTORNADO|APLICADO', case=False)]
         if not df_em_campo.empty:
-            st.markdown("##### 🔴 Materiais Atualmente com Técnicos (Clique para Devolver):")
+            st.markdown("##### 🔴 Materiais em Campo ou em Teste no Cliente (Clique para Devolver):")
             for _, r_campo in df_em_campo.iterrows():
                 id_c = r_campo['id']
                 tec_c = r_campo['tecnico']
                 itens_c = r_campo['itens_solicitados']
                 data_c = r_campo.get('data_pedido', '')
+                st_p_c = r_campo.get('status_pedido', '')
+                tag_st = "🟡 [EM TESTE NO CLIENTE]" if "TESTE" in str(st_p_c).upper() else "🔴 [EM CAMPO]"
                 col_info_c, col_btn_c = st.columns([3.8, 1.4])
                 with col_info_c:
-                    st.markdown(f"**👨‍🔧 {tec_c}** | `{data_c}` | 🛠️ {itens_c}")
+                    st.markdown(f"**{tag_st} 👨‍🔧 {tec_c}** | `{data_c}` | 🛠️ {itens_c}")
                 with col_btn_c:
                     if st.button("📥 Devolver ao Almoxarifado", key=f"btn_dev_rapido_{id_c}", type="primary"):
                         ok_dev, msg_dev = atualizar_status_solicitacao_peca(ctx.db_name, id_c, "DEVOLVIDO AO ESTOQUE / BAIXA DE RETORNO")
@@ -434,75 +437,108 @@ def render_mapa_rotas(ctx: AppContext):
 def render_gestao_estoque(ctx: AppContext):
     st.markdown("### 📦 Controlo do Almoxarifado, Ferramentas & Peças Comerciais EMED")
 
+    resumo_al = obter_resumo_alarmes_calibracao(ctx.db_name)
+    qtd_urgentes = resumo_al.get("total_alarmes_urgentes", 0)
+    rotulo_alarmes = f"⏰ Alarmes de Calibração & Créditos ({qtd_urgentes} 🚨)" if qtd_urgentes > 0 else "⏰ Alarmes de Calibração & Créditos"
+
+    opcoes_abas_almox = [
+        "📋 Catálogo Geral do Almoxarifado",
+        rotulo_alarmes,
+        "➕ Cadastrar / Editar Item",
+        "🔧 Baixa de Consumíveis (Uso Interno)"
+    ]
+
+    idx_default = 0
+    if st.session_state.get("aba_almoxarifado_ativa") == "alarmes":
+        idx_default = 1
+        st.session_state.aba_almoxarifado_ativa = None
+
+    aba_sel = st.radio(
+        "Navegação do Almoxarifado:",
+        opcoes_abas_almox,
+        index=idx_default,
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+
     df_est_view = carregar_estoque(ctx.db_name)
-    if df_est_view.empty:
-        st.info("Nenhuma peça registada no estoque.")
-    else:
-        # Métricas de Categorias do Almoxarifado
-        qtd_total = len(df_est_view)
-        qtd_inst = len(df_est_view[df_est_view['tipo_item'].fillna('').str.contains('INSTRUMENTO|FERRAMENTA', case=False)])
-        qtd_pec = len(df_est_view[df_est_view['tipo_item'].fillna('').str.contains('COMERCIAL|PEÇA', case=False)])
-        qtd_con = len(df_est_view[df_est_view['tipo_item'].fillna('').str.contains('CONSUM|LIMPEZA', case=False)])
 
-        m_col1, m_col2, m_col3, m_col4 = st.columns(4)
-        m_col1.metric("📦 Total de Itens", f"{qtd_total} itens")
-        m_col2.metric("🔬 Instrumentos & Ferramentas", f"{qtd_inst} un.")
-        m_col3.metric("⚙️ Peças de Reposição (OS)", f"{qtd_pec} un.")
-        m_col4.metric("🧪 Consumíveis & Limpeza", f"{qtd_con} un.")
+    if aba_sel == "📋 Catálogo Geral do Almoxarifado":
+        if df_est_view.empty:
+            st.info("Nenhuma peça registada no estoque.")
+        else:
+            if qtd_urgentes > 0:
+                st.markdown(f"""
+                    <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid #ef4444; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #ef4444; font-weight: bold; font-size: 13.5px;">🚨 Existem {qtd_urgentes} alarmes de calibração / créditos anuais ativos no almoxarifado!</span>
+                        <span style="color: #cbd5e1; font-size: 12px;">Consulte a aba "{rotulo_alarmes}".</span>
+                    </div>
+                """, unsafe_allow_html=True)
 
-        st.markdown("#### 📋 Catálogo Geral do Almoxarifado")
-        filtro_aba_est = st.radio(
-            "Filtrar Visualização do Almoxarifado:",
-            ["TODOS OS ITENS", "🔬 INSTRUMENTOS & FERRAMENTARIA", "⚙️ PEÇAS DE REPOSIÇÃO (OS)", "🧪 CONSUMÍVEIS & LIMPEZA"],
-            horizontal=True
-        )
+            # Métricas de Categorias do Almoxarifado
+            qtd_total = len(df_est_view)
+            qtd_inst = len(df_est_view[df_est_view['tipo_item'].fillna('').str.contains('INSTRUMENTO|FERRAMENTA', case=False)])
+            qtd_pec = len(df_est_view[df_est_view['tipo_item'].fillna('').str.contains('COMERCIAL|PEÇA', case=False)])
+            qtd_con = len(df_est_view[df_est_view['tipo_item'].fillna('').str.contains('CONSUM|LIMPEZA', case=False)])
 
-        df_filtrado_view = df_est_view.copy()
-        if "INSTRUMENTOS" in filtro_aba_est:
-            df_filtrado_view = df_filtrado_view[df_filtrado_view['tipo_item'].fillna('').str.contains('INSTRUMENTO|FERRAMENTA', case=False)]
-        elif "PEÇAS" in filtro_aba_est:
-            df_filtrado_view = df_filtrado_view[df_filtrado_view['tipo_item'].fillna('').str.contains('COMERCIAL|PEÇA', case=False)]
-        elif "CONSUMÍVEIS" in filtro_aba_est:
-            df_filtrado_view = df_filtrado_view[df_filtrado_view['tipo_item'].fillna('').str.contains('CONSUM|LIMPEZA', case=False)]
+            m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+            m_col1.metric("📦 Total de Itens", f"{qtd_total} itens")
+            m_col2.metric("🔬 Instrumentos & Ferramentas", f"{qtd_inst} un.")
+            m_col3.metric("⚙️ Peças de Reposição (OS)", f"{qtd_pec} un.")
+            m_col4.metric("🧪 Consumíveis & Limpeza", f"{qtd_con} un.")
 
-        df_est_mostra = df_filtrado_view.copy()
-        custo_num = pd.to_numeric(df_est_mostra['preco_custo'], errors='coerce').fillna(0.0)
-        mc_num = pd.to_numeric(df_est_mostra['margem_contrato'], errors='coerce').fillna(30.0)
-        ma_num = pd.to_numeric(df_est_mostra['margem_avulso'], errors='coerce').fillna(60.0)
-        df_est_mostra['Preço Venda Contrato (R$)'] = (custo_num * (1 + mc_num / 100.0)).round(2)
-        df_est_mostra['Preço Venda Avulso (R$)'] = (custo_num * (1 + ma_num / 100.0)).round(2)
+            st.markdown("#### 📋 Catálogo Geral do Almoxarifado")
+            filtro_aba_est = st.radio(
+                "Filtrar Visualização do Almoxarifado:",
+                ["TODOS OS ITENS", "🔬 INSTRUMENTOS & FERRAMENTARIA", "⚙️ PEÇAS DE REPOSIÇÃO (OS)", "🧪 CONSUMÍVEIS & LIMPEZA"],
+                horizontal=True
+            )
 
-        if 'data_validade_calibracao' in df_est_mostra.columns:
-            def _obter_badge_cal(row):
-                req_cal = str(row.get('requer_calibracao', '0')) in ['1', 'True', 'true']
-                dt_val = row.get('data_validade_calibracao')
-                req_cred = str(row.get('requer_creditos', '0')) in ['1', 'True', 'true']
-                saldo = row.get('saldo_creditos')
+            df_filtrado_view = df_est_view.copy()
+            if "INSTRUMENTOS" in filtro_aba_est:
+                df_filtrado_view = df_filtrado_view[df_filtrado_view['tipo_item'].fillna('').str.contains('INSTRUMENTO|FERRAMENTA', case=False)]
+            elif "PEÇAS" in filtro_aba_est:
+                df_filtrado_view = df_filtrado_view[df_filtrado_view['tipo_item'].fillna('').str.contains('COMERCIAL|PEÇA', case=False)]
+            elif "CONSUMÍVEIS" in filtro_aba_est:
+                df_filtrado_view = df_filtrado_view[df_filtrado_view['tipo_item'].fillna('').str.contains('CONSUM|LIMPEZA', case=False)]
 
-                partes = []
-                if req_cal or (pd.notna(dt_val) and str(dt_val).strip()):
-                    if pd.notna(dt_val) and str(dt_val).strip():
-                        res = calcular_status_calibracao(str(dt_val))
-                        partes.append(f"{res['badge']} (Venc: {dt_val})")
-                    else:
-                        partes.append("⚠️ Sem data")
+            df_est_mostra = df_filtrado_view.copy()
+            custo_num = pd.to_numeric(df_est_mostra['preco_custo'], errors='coerce').fillna(0.0)
+            mc_num = pd.to_numeric(df_est_mostra['margem_contrato'], errors='coerce').fillna(30.0)
+            ma_num = pd.to_numeric(df_est_mostra['margem_avulso'], errors='coerce').fillna(60.0)
+            df_est_mostra['Preço Venda Contrato (R$)'] = (custo_num * (1 + mc_num / 100.0)).round(2)
+            df_est_mostra['Preço Venda Avulso (R$)'] = (custo_num * (1 + ma_num / 100.0)).round(2)
 
-                if req_cred:
-                    partes.append(f"💳 {saldo or 0} créditos")
+            if 'data_validade_calibracao' in df_est_mostra.columns:
+                def _obter_badge_cal(row):
+                    req_cal = str(row.get('requer_calibracao', '0')) in ['1', 'True', 'true']
+                    dt_val = row.get('data_validade_calibracao')
+                    req_cred = str(row.get('requer_creditos', '0')) in ['1', 'True', 'true']
+                    saldo = row.get('saldo_creditos')
 
-                return " | ".join(partes) if partes else "—"
+                    partes = []
+                    if req_cal or (pd.notna(dt_val) and str(dt_val).strip()):
+                        if pd.notna(dt_val) and str(dt_val).strip():
+                            res = calcular_status_calibracao(str(dt_val))
+                            partes.append(f"{res['badge']} (Venc: {dt_val})")
+                        else:
+                            partes.append("⚠️ Sem data")
 
-            df_est_mostra['Calibração & Créditos'] = df_est_mostra.apply(_obter_badge_cal, axis=1)
+                    if req_cred:
+                        partes.append(f"💳 {saldo or 0} créditos")
 
-        st.dataframe(df_est_mostra, use_container_width=True, hide_index=True)
+                    return " | ".join(partes) if partes else "—"
 
-    st.markdown("---")
-    aba_est1, aba_est2 = st.tabs([
-        "➕ Cadastrar / Editar Peça ou Consumível",
-        "🔧 Dar Baixa de Consumível (Uso Interno / Sem Nota de Saída)"
-    ])
+                df_est_mostra['Calibração & Créditos'] = df_est_mostra.apply(_obter_badge_cal, axis=1)
 
-    with aba_est1:
+            st.dataframe(df_est_mostra, use_container_width=True, hide_index=True)
+
+    elif aba_sel == rotulo_alarmes:
+        from emed_views.alarmes_calibracao import render_alarmes_calibracao
+        render_alarmes_calibracao(ctx)
+
+    elif aba_sel == "➕ Cadastrar / Editar Item":
+        st.markdown("#### ➕ Cadastrar / Editar Item no Almoxarifado")
         if not df_est_view.empty:
             lista_pecas_fmt = (df_est_view['codigo'].astype(str) + " - " + df_est_view['nome_peca'].astype(str)).tolist()
             opcoes_pecas_ed = ["➕ CADASTRAR NOVO ITEM"] + lista_pecas_fmt
@@ -639,8 +675,8 @@ def render_gestao_estoque(ctx: AppContext):
                 st.success("🗑️ Item excluído do estoque!")
                 st.rerun()
 
-    with aba_est2:
-        st.markdown("##### 🔧 Baixa de Consumíveis para Manutenções do Dia a Dia ou Uso Interno na Empresa")
+    elif aba_sel == "🔧 Baixa de Consumíveis (Uso Interno)":
+        st.markdown("#### 🔧 Baixa de Consumíveis para Manutenções do Dia a Dia ou Uso Interno na Empresa")
         st.caption("Utilize para dar saída em abraçadeiras, fitas isolantes, álcool isopropílico, parafusos, solda, etc., sem nota fiscal de saída.")
         if df_est_view.empty:
             st.info("Cadastre itens no estoque primeiro.")

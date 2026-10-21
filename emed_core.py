@@ -618,6 +618,217 @@ def registrar_aplicacao_definitiva_e_fluxo_cobranca(
     return True, resumo_cobranca
 
 
+def registrar_peca_em_teste_observacao(
+    db_path,
+    os_id,
+    cliente,
+    equipamento,
+    tecnico,
+    nome_peca,
+    qtd_aplicada,
+    dias_observacao=3,
+    criterio_teste=""
+):
+    """
+    Registra a instalação de uma peça em caráter de teste para finalização de diagnóstico,
+    colocando o equipamento em observação SEM cobrança imediata ao cliente.
+    """
+    if not nome_peca or nome_peca == "NENHUMA PEÇA":
+        return False, "Nenhuma peça indicada para teste."
+
+    qtd = int(qtd_aplicada) if qtd_aplicada else 1
+    nome_peca_limpo = str(nome_peca).strip().upper()
+    ref_teste = f"{qtd}x {nome_peca_limpo} [EM TESTE DE DIAGNÓSTICO]"
+    dias_n = int(dias_observacao or 3)
+    criterio_txt = str(criterio_teste).strip().upper() if criterio_teste else "FINALIZAR DIAGNÓSTICO EM OBSERVAÇÃO"
+
+    with get_db_connection(db_path) as conn:
+        cur = conn.cursor()
+
+        # 1. Garante que a peça é reservada no estoque físico para não ser entregue a outro técnico
+        cur.execute("SELECT codigo, quantidade FROM estoque_pecas WHERE UPPER(nome_peca) = ? OR UPPER(codigo) = ?", (nome_peca_limpo, nome_peca_limpo))
+        r_pec = cur.fetchone()
+        cod_p = r_pec[0] if r_pec else "PEC-000"
+        saldo_p = int(r_pec[1]) if r_pec and r_pec[1] is not None else 0
+
+        # Deduz saldo físico temporário (está na máquina do cliente em teste)
+        if saldo_p >= qtd:
+            cur.execute("UPDATE estoque_pecas SET quantidade = max(0, quantidade - ?) WHERE codigo = ?", (qtd, cod_p))
+
+        # 2. Registra na tabela solicitacoes_pecas como em observação/teste
+        agora_str = datetime.datetime.now().strftime('%d/%m/%Y %H:%M')
+        cur.execute("""
+            SELECT id FROM solicitacoes_pecas
+            WHERE (UPPER(destino_cliente) LIKE ? OR UPPER(destino_cliente) LIKE ?)
+            AND UPPER(status_pedido) NOT LIKE '%APLICADO%'
+            ORDER BY id DESC LIMIT 1
+        """, (f"%OS #{os_id}%", f"%{str(cliente).strip().upper()}%"))
+        
+        row_sol = cur.fetchone()
+        status_obs = f"PEÇA EM TESTE NO CLIENTE ({dias_n} DIAS OBSERVAÇÃO)"
+        if row_sol:
+            cur.execute("""
+                UPDATE solicitacoes_pecas 
+                SET status_pedido = ?,
+                    itens_solicitados = ?,
+                    instrumentos_solicitados = ?
+                WHERE id = ?
+            """, (status_obs, f"{ref_teste} ({cod_p})", f"TESTE CLÍNICO: {criterio_txt}", row_sol[0]))
+        else:
+            cur.execute("""
+                INSERT INTO solicitacoes_pecas 
+                (tecnico, destino_cliente, itens_solicitados, instrumentos_solicitados, status_pedido, data_pedido)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                str(tecnico).upper(),
+                f"{cliente} ({equipamento}) [OS #{os_id}]".upper(),
+                f"{ref_teste} ({cod_p})",
+                f"TESTE CLÍNICO: {criterio_txt}",
+                status_obs,
+                agora_str
+            ))
+
+        # 3. Atualiza na tabela clientes_equipamentos: status = 'EM OBSERVAÇÃO'
+        nova_pendencia = f"[EM TESTE: {ref_teste}] OBSERVAÇÃO POR {dias_n} DIAS. CRITÉRIO: {criterio_txt}"
+        cur.execute("""
+            UPDATE clientes_equipamentos SET
+                status = 'EM OBSERVAÇÃO',
+                peca_baixada_ref = ?,
+                pendencias = ?
+            WHERE id = ?
+        """, (ref_teste, nova_pendencia, int(os_id)))
+
+    msg = (
+        f"🔬 Peça '{nome_peca_limpo}' instalada em caráter de teste! "
+        f"Equipamento colocado em observação por {dias_n} dias. "
+        f"Não foi gerada cobrança imediata ao cliente (aguardando validação do teste e proposta aprovada)."
+    )
+    return True, msg
+
+
+def converter_teste_em_aplicacao_definitiva_e_cobranca(
+    db_path,
+    os_id,
+    valor_total_os=None,
+    condicao_pagamento="FATURAMENTO BOLETO BANCÁRIO"
+):
+    """
+    Após o período de teste e validação da proposta com o cliente:
+    Converte a peça em teste para APLICAÇÃO DEFINITIVA, conclui a OS e encaminha para cobrança/faturamento.
+    """
+    with get_db_connection(db_path) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT cliente, equipamento, tecnico_responsavel, peca_baixada_ref, valor_os, tipo_contrato 
+            FROM clientes_equipamentos WHERE id = ?
+        """, (int(os_id),))
+        row = cur.fetchone()
+        if not row:
+            return False, f"OS #{os_id} não encontrada."
+
+        cliente, equip, tec, peca_ref, val_os_bd, tp_contrato = row
+        val_final = float(valor_total_os) if valor_total_os is not None else float(val_os_bd or 0)
+
+        # Extrai nome da peça limpo de peca_baixada_ref
+        peca_pura = str(peca_ref or "").replace("[EM TESTE DE DIAGNÓSTICO]", "").replace("[EM TESTE/OBSERVAÇÃO]", "").strip()
+        qtd_app = 1
+        nome_peca_final = peca_pura
+        if "x " in peca_pura:
+            partes = peca_pura.split("x ", 1)
+            try:
+                qtd_app = int(partes[0].strip())
+            except Exception:
+                qtd_app = 1
+            nome_peca_final = partes[1].strip()
+
+        # Atualiza status da OS para CONCLUÍDO
+        cur.execute("""
+            UPDATE clientes_equipamentos SET
+                status = 'CONCLUÍDO',
+                peca_baixada_ref = ?,
+                pendencias = ?
+            WHERE id = ?
+        """, (
+            f"{qtd_app}x {nome_peca_final}",
+            f"[CONCLUÍDO - PROPOSTA APROVADA] Peça {nome_peca_final} validada e aplicada em definitivo.",
+            int(os_id)
+        ))
+
+    # Executa a baixa definitiva contábil e encaminhamento para faturamento
+    ok_cob, msg_cob = registrar_aplicacao_definitiva_e_fluxo_cobranca(
+        db_path,
+        os_id,
+        cliente,
+        equip,
+        tec,
+        nome_peca_final,
+        qtd_app,
+        val_final,
+        condicao_pagamento=condicao_pagamento,
+        tipo_contrato=tp_contrato or "CONTRATO"
+    )
+    return True, f"🎉 Proposta aprovada! {msg_cob}"
+
+
+def retirar_peca_teste_e_devolver_estoque(
+    db_path,
+    os_id,
+    motivo="Teste não validou o defeito / Proposta não aprovada"
+):
+    """
+    Caso o teste não solucione a falha ou o cliente não aprove o orçamento:
+    O técnico retira a peça do cliente e estorna o saldo de volta ao Almoxarifado.
+    """
+    with get_db_connection(db_path) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT cliente, equipamento, tecnico_responsavel, peca_baixada_ref 
+            FROM clientes_equipamentos WHERE id = ?
+        """, (int(os_id),))
+        row = cur.fetchone()
+        if not row:
+            return False, f"OS #{os_id} não encontrada."
+
+        cliente, equip, tec, peca_ref = row
+        peca_pura = str(peca_ref or "").replace("[EM TESTE DE DIAGNÓSTICO]", "").replace("[EM TESTE/OBSERVAÇÃO]", "").strip()
+        qtd_dev = 1
+        nome_peca_dev = peca_pura
+        if "x " in peca_pura:
+            partes = peca_pura.split("x ", 1)
+            try:
+                qtd_dev = int(partes[0].strip())
+            except Exception:
+                qtd_dev = 1
+            nome_peca_dev = partes[1].strip()
+
+        # 1. Estorna a peça de volta em estoque_pecas
+        cur.execute("""
+            UPDATE estoque_pecas 
+            SET quantidade = quantidade + ? 
+            WHERE UPPER(nome_peca) = ? OR UPPER(codigo) = ?
+        """, (qtd_dev, nome_peca_dev.upper(), nome_peca_dev.upper()))
+
+        # 2. Atualiza em solicitacoes_pecas para 'DEVOLVIDO AO ESTOQUE / BAIXA DE RETORNO'
+        cur.execute("""
+            UPDATE solicitacoes_pecas 
+            SET status_pedido = 'DEVOLVIDO AO ESTOQUE / BAIXA DE RETORNO',
+                instrumentos_solicitados = ?
+            WHERE (UPPER(destino_cliente) LIKE ? OR UPPER(destino_cliente) LIKE ?)
+            AND UPPER(status_pedido) LIKE '%TESTE%'
+        """, (f"RETIRADA DE TESTE: {motivo.upper()}", f"%OS #{os_id}%", f"%{str(cliente).strip().upper()}%"))
+
+        # 3. Retorna a OS para ATIVO mantendo o relato da retirada
+        cur.execute("""
+            UPDATE clientes_equipamentos SET
+                status = 'ATIVO',
+                peca_baixada_ref = '',
+                pendencias = ?
+            WHERE id = ?
+        """, (f"[PEÇA DE TESTE RETIRADA] {nome_peca_dev} devolvida ao estoque. Motivo: {motivo.upper()}", int(os_id)))
+
+    return True, f"🔄 Peça '{nome_peca_dev}' estornada com sucesso! Saldo recomposto no Almoxarifado e OS mantida em aberto para novo direcionamento."
+
+
 def atualizar_status_solicitacao_peca(db_path, id_pedido, novo_status):
     with get_db_connection(db_path) as conn:
         cur = conn.cursor()

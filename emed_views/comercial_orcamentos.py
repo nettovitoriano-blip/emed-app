@@ -1,6 +1,12 @@
 import urllib.parse
 import streamlit as st
-from emed_core import limpar_texto, obter_id_os, calcular_dias_aguardando_orcamento
+from emed_core import (
+    limpar_texto,
+    obter_id_os,
+    calcular_dias_aguardando_orcamento,
+    converter_teste_em_aplicacao_definitiva_e_cobranca,
+    retirar_peca_teste_e_devolver_estoque,
+)
 from emed_services import AppContext, salvar_dados_seguro
 
 
@@ -78,3 +84,83 @@ def render_followup_orcamentos(ctx: AppContext):
                         st.cache_data.clear()
                         st.success(f"✅ Orçamento da OS #{id_os_orc} aprovado! Serviço liberado na escala técnica.")
                         st.rerun()
+
+    st.markdown("---")
+    st.markdown("### 🔬 Equipamentos em Observação & Peças em Teste Clínico (Diagnóstico em Aberto)")
+    st.caption("Acompanhe peças instaladas temporariamente para finalização de diagnóstico. Não faturadas até validação do teste e aprovação da proposta.")
+
+    df_obs = df[df['status'].astype(str).str.upper().isin(['EM OBSERVAÇÃO', 'EM OBSERVACAO'])].copy()
+    if df_obs.empty:
+        st.info("ℹ️ Não existem equipamentos com peças em teste/observação no momento.")
+    else:
+        for idx_b, row_b in df_obs.iterrows():
+            id_os_b = obter_id_os(idx_b, row_b)
+            cli_b = limpar_texto(row_b.get('cliente'), 'N/D')
+            cid_b = limpar_texto(row_b.get('cidade'), 'N/D')
+            eq_b = limpar_texto(row_b.get('equipamento'), 'N/D')
+            peca_teste_b = limpar_texto(row_b.get('peca_baixada_ref'), 'PEÇA EM TESTE')
+            pend_b = limpar_texto(row_b.get('pendencias'), 'EQUIPAMENTO EM OBSERVAÇÃO')
+            tec_b = limpar_texto(row_b.get('tecnico_responsavel'), 'TÉCNICO')
+            val_os_b = float(row_b.get('valor_os') or 0)
+            cont_b = limpar_texto(row_b.get('contato_responsavel'), '')
+            tel_limpo_b = ''.join(filter(str.isdigit, cont_b))
+
+            st.markdown(f"""
+                <div style="background: #111e38; border-left: 6px solid #f59e0b; padding: 16px; border-radius: 8px; margin-bottom: 14px; border: 1px solid #1e293b;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size: 16px; font-weight: bold; color: #64dfdf;">🏥 OS #{id_os_b} | {cli_b} ({cid_b}) — ⚙️ {eq_b}</span>
+                        <span style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; padding: 3px 10px; border-radius: 12px; font-weight: 800; font-size: 12px;">🟡 EM TESTE / OBSERVAÇÃO</span>
+                    </div>
+                    <div style="margin-top: 8px; color: #f8fafc; font-size: 13.5px;">
+                        🔬 <b>Peça em Teste de Diagnóstico:</b> <code>{peca_teste_b}</code><br/>
+                        👨‍🔧 <b>Técnico Responsável:</b> {tec_b} | 💰 <b>Valor Previsto se Aprovado:</b> R$ {val_os_b:,.2f}<br/>
+                        📋 <b>Critério / Situação do Teste:</b> {pend_b}
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+            msg_obs_wpp = (
+                f"Olá! Entramos em contacto da *EMED Eletromedicina* sobre o equipamento *{eq_b}* em *{cli_b}*, "
+                f"onde instalamos a peça *{peca_teste_b}* para período de teste e observação clínica. "
+                f"Gostaríamos de saber como o equipamento tem se comportado na rotina de exames para alinharmos os próximos passos."
+            )
+            encoded_wpp_obs = urllib.parse.quote(msg_obs_wpp)
+
+            c_act1, c_act2, c_act3 = st.columns([1.5, 1.5, 1.2])
+            with c_act1:
+                if st.button(f"✅ Proposta Aprovada / Efetivar Venda (OS #{id_os_b})", key=f"btn_aprov_teste_{idx_b}", type="primary"):
+                    ok_conv, msg_conv = converter_teste_em_aplicacao_definitiva_e_cobranca(
+                        ctx.db_name,
+                        id_os_b,
+                        valor_total_os=val_os_b,
+                        condicao_pagamento=row_b.get('condicao_pagamento', 'FATURAMENTO BOLETO BANCÁRIO')
+                    )
+                    if ok_conv:
+                        st.cache_data.clear()
+                        st.success(msg_conv)
+                        st.rerun()
+                    else:
+                        st.error(msg_conv)
+
+            with c_act2:
+                if st.button(f"🔄 Teste Inconclusivo / Retirar Peça e Devolver ao Estoque (OS #{id_os_b})", key=f"btn_retira_teste_{idx_b}"):
+                    ok_ret, msg_ret = retirar_peca_teste_e_devolver_estoque(
+                        ctx.db_name,
+                        id_os_b,
+                        motivo="Defeito sanado por outro meio / Cliente optou por não adquirir a peça"
+                    )
+                    if ok_ret:
+                        st.cache_data.clear()
+                        st.success(msg_ret)
+                        st.rerun()
+                    else:
+                        st.error(msg_ret)
+
+            with c_act3:
+                if tel_limpo_b:
+                    link_wpp_obs = f"https://wa.me/{tel_limpo_b}?text={encoded_wpp_obs}"
+                    st.markdown(f"""
+                        <a href="{link_wpp_obs}" target="_blank" style="background: #25d366; color: white; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; display: inline-block;">
+                            📲 Follow-up WhatsApp
+                        </a>
+                    """, unsafe_allow_html=True)

@@ -19,9 +19,16 @@ from emed_views.manuais_tecnicos import render_manuais_tecnicos
 from emed_views.emedonline import render_emedonline
 from emed_views.alarmes_calibracao import render_alarmes_calibracao
 
+
+def _render_alarmes_almoxarifado(ctx):
+    import streamlit as st
+    st.session_state.aba_almoxarifado_ativa = "alarmes"
+    render_gestao_estoque(ctx)
+
+
 VIEW_ROUTER = {
     "🤖 EmedOnline (Triagem & Rota)": render_emedonline,
-    "⏰ Alarmes de Calibração & Créditos": render_alarmes_calibracao,
+    "⏰ Alarmes de Calibração & Créditos": _render_alarmes_almoxarifado,
     "📊 Mural & Despacho WhatsApp": render_mural_despacho,
     "📋 Minhas Pendências (Técnico)": render_minhas_pendencias,
     "📚 Manuais & Procedimentos": render_manuais_tecnicos,

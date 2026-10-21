@@ -113,6 +113,19 @@ def init_db(db_name: str = DB_NAME, caminho_excel: str = CAMINHO_EXCEL):
             except Exception:
                 pass
 
+        # Regras de calibração padrão: multímetro, osciloscópio, dong's e instrumentos de calibração
+        try:
+            cur.execute("""
+                UPDATE estoque_pecas 
+                SET requer_calibracao = 0, requer_creditos = 0, data_ultima_calibracao = '', data_validade_calibracao = '', certificado_calibracao = ''
+                WHERE codigo IN ('FER-005', 'FER-006', 'FER-007', 'FER-010', 'FER-017')
+            """)
+            cur.execute("UPDATE estoque_pecas SET requer_calibracao = 1, requer_creditos = 0 WHERE codigo IN ('FER-001', 'FER-002', 'FER-003')")
+            cur.execute("UPDATE estoque_pecas SET requer_calibracao = 1, requer_creditos = 1 WHERE codigo = 'FER-004'")
+            cur.execute("UPDATE estoque_pecas SET requer_creditos = 1 WHERE codigo = 'FER-018'")
+        except Exception:
+            pass
+
         cur.execute("SELECT COUNT(*) FROM tecnicos")
         if cur.fetchone()[0] == 0:
             dados_iniciais_tecs = [
@@ -162,6 +175,7 @@ def init_db(db_name: str = DB_NAME, caminho_excel: str = CAMINHO_EXCEL):
             ("FER-015", "GIGA DE COMUNICAÇÃO JEDI & CABOS DE SERVIÇO (TOMOGRAFIA)", 2, 4500.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
             ("FER-016", "KIT FURADEIRA DE IMPACTO COM BROCAS (5, 8, 10 E 12MM)", 2, 1100.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
             ("FER-017", "KIT DE ALINHAMENTO DE COLIMADOR (BEAM ALIGNMENT TOOLS & CAMPO LUMINOSO)", 2, 3800.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
+            ("FER-018", "DONGLES & DONG'S DE LICENÇA (SERVICE KEYS DR/CT/MAMO)", 2, 3500.00, 0.0, 0.0, "INSTRUMENTO / FERRAMENTA"),
 
             # PEÇAS DE REPOSIÇÃO (COMERCIAIS / OS)
             ("PEC-001", "TUBO DE RAIOS-X", 2, 15000.00, 25.0, 50.0, "PEÇA COMERCIAL (OS)"),

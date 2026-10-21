@@ -126,15 +126,15 @@ if resumo_alarmes["total_alarmes_urgentes"] > 0:
             <div style="color: #cbd5e1; font-size: 11px; margin-top: 3px;">Calibrações ou créditos anuais vencidos ou vencendo este mês.</div>
         </div>
     """, unsafe_allow_html=True)
-    if st.sidebar.button("⏰ Abrir Painel de Alarmes", key="btn_sidebar_jump_alarmes", use_container_width=True):
-        st.session_state.menu_acao_ativa = "⏰ Alarmes de Calibração & Créditos"
+    if st.sidebar.button("📦 Ver Alarmes no Almoxarifado", key="btn_sidebar_jump_alarmes", use_container_width=True):
+        st.session_state.menu_acao_ativa = "📦 Gestão de Estoque & Peças"
+        st.session_state.aba_almoxarifado_ativa = "alarmes"
         st.rerun()
 
 st.sidebar.markdown("### PAINEL DE OPERAÇÕES")
 
 opcoes_menu = [
     "🤖 EmedOnline (Triagem & Rota)",
-    "⏰ Alarmes de Calibração & Créditos",
     "📊 Mural & Despacho WhatsApp",
     "📋 Minhas Pendências (Técnico)",
     "📚 Manuais & Procedimentos",
