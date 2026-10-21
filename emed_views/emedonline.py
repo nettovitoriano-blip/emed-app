@@ -391,6 +391,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Não foi observada oscilação (Fornecimento elétrico normal)",
                             "🟡 Houve oscilações na rede elétrica, mas o quadro já estabilizou",
                             "🔴 Sim, houve desarme de disjuntor no quadro de força",
+                            "⚪ Nenhuma das opções / Não se aplica",
                         ],
                         index=0,
                         help="Houve oscilação na rede elétrica? Se sim, algum disjuntor desarmou?"
@@ -403,6 +404,7 @@ def render_emedonline(ctx: AppContext):
                             "⚠️ Movimento totalmente solto / livre (o freio não segura a estativa)",
                             "⚠️ O movimento chega a travar em algum ponto do trilho ou patina?",
                             "🚨 Todos os freios da sala (estativa e mesa) pararam de atuar (possível fonte de alimentação)",
+                            "⚪ Nenhuma das opções / Outro comportamento",
                         ],
                         index=1 if any(w in (defeito_digitado or "").upper() for w in ["FREIO", "ESTATIVA", "TRAVA", "HORIZONTAL", "VERTICAL", "SOLTO", "LIVRE"]) else 0,
                         help="Identifica se o freio não segura (estativa solta), se emperra no trilho ou se é falha geral da fonte de alimentação."
@@ -417,6 +419,7 @@ def render_emedonline(ctx: AppContext):
                             "🔇 Não escuta nenhum clique/ruído ao apertar o botão (sem resposta elétrica)",
                             "⚠️ Escuta ruído contínuo, zumbido anormal ou vibração",
                             "❌ Botão de comando com defeito físico, solto ou emperrado",
+                            "⚪ Nenhuma das opções / Não se aplica",
                         ],
                         index=0,
                         help="Determina se a falha é elétrica no botão/cabo ou mecânica no eletrofreio/ajuste."
@@ -435,6 +438,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Fornecimento normal (PDU e Nobreak/Estabilizador operacionais)",
                             "🟡 Houve oscilações de rede / gerador, mas já estabilizou",
                             "🔴 Disjuntor principal do PDU caiu ou Nobreak em alarme sonoro",
+                            "⚪ Nenhuma das opções / Não se aplica",
                         ],
                         index=0,
                     )
@@ -445,6 +449,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Gantry energizado, rotação livre e mesa movimenta normalmente",
                             "⚠️ Gantry bloqueado por interlock/comunicação ou parada de emergência",
                             "🚨 Mesa travada ou ruído anormal/vibração durante a rotação do Gantry",
+                            "⚪ Nenhuma das opções / Outro comportamento",
                         ],
                         index=0,
                     )
@@ -457,6 +462,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Console inicializa normalmente e abre tela de exames",
                             "🔄 Reiniciamos a console e a mensagem de erro persiste",
                             "❌ Console congelada / Não carrega o software de exame",
+                            "⚪ Nenhuma das opções / Não se aplica",
                         ],
                         index=0,
                     )
@@ -474,6 +480,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Cabo e conexões elétricas normais (Carrinho energizado)",
                             "🟡 Oscilação na rede da sala cirúrgica",
                             "🔴 Aparelho sem força / Nobreak do carrinho em alarme",
+                            "⚪ Nenhuma das opções / Não se aplica",
                         ],
                         index=0,
                     )
@@ -484,6 +491,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Todos os freios e movimentos orbitais/angulares livres",
                             "⚠️ Freio orbital ou angular específico duro/travado",
                             "🚨 Braço em C totalmente bloqueado em todos os eixos",
+                            "⚪ Nenhuma das opções / Outro comportamento",
                         ],
                         index=0,
                     )
@@ -496,6 +504,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Imagem nítida nos monitores e pedal acionando normalmente",
                             "⚠️ Pedal falhando intermitente ou cabo com mau contato",
                             "❌ Sem sinal de vídeo nos monitores ou erro de fluoroscopia",
+                            "⚪ Nenhuma das opções / Não se aplica",
                         ],
                         index=0,
                     )
@@ -513,6 +522,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Alimentação normal e disjuntores ligados",
                             "🟡 Instabilidade momentânea na rede elétrica",
                             "🔴 Disjuntor desarmou no quadro de força / Sistema apagado",
+                            "⚪ Nenhuma das opções / Não se aplica",
                         ],
                         index=0,
                     )
@@ -523,6 +533,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Compressor sobe e desce suavemente",
                             "⚠️ Prato de compressão duro ou não sobe",
                             "🚨 Descompressão automática travada ou acionada em emergência",
+                            "⚪ Nenhuma das opções / Outro comportamento",
                         ],
                         index=0,
                     )
@@ -535,6 +546,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Painel respondendo e intertravamento de segurança íntegro",
                             "⚠️ Mensagem de erro no painel ou botão com mau contato",
                             "❌ Painel travado / Sem resposta aos comandos de exposição",
+                            "⚪ Nenhuma das opções / Não se aplica",
                         ],
                         index=0,
                     )
@@ -552,6 +564,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Alimentação estável e fonte de alta tensão sem desarme",
                             "🟡 Oscilação momentânea na rede elétrica",
                             "🔴 Fonte de alta tensão desarmada / Sem alimentação",
+                            "⚪ Nenhuma das opções / Não se aplica",
                         ],
                         index=0,
                     )
@@ -562,6 +575,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Braço C desliza suavemente sobre a mesa e shutter abre normal",
                             "⚠️ Movimento do braço C pesado/patinando ou shutter emperrado",
                             "🚨 Braço C totalmente travado ou colimador bloqueado",
+                            "⚪ Nenhuma das opções / Outro comportamento",
                         ],
                         index=0,
                     )
@@ -574,6 +588,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Software comunica normalmente com o equipamento",
                             "⚠️ Erro de comunicação serial/USB entre computador e mesa",
                             "❌ Software trava na calibração diária ou falha nos cabos HV",
+                            "⚪ Nenhuma das opções / Não se aplica",
                         ],
                         index=0,
                     )
@@ -591,6 +606,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Alimentação e rede normais (Computador e detector/leitora comunicando)",
                             "⚠️ Erro de rede / Falha de comunicação entre o detector/leitora e o PC",
                             "🔴 Equipamento não liga / Fonte de alimentação ou Interface Box sem energia",
+                            "⚪ Nenhuma das opções / Não se aplica",
                         ],
                         index=0,
                     )
@@ -602,6 +618,7 @@ def render_emedonline(ctx: AppContext):
                             "⚠️ DR: Detector desconectando, bateria fraca ou cabo com mau contato",
                             "⚠️ CR: Chassi enroscou/travou no mecanismo da leitora de fósforo",
                             "🚨 Detector DR sofreu queda/impacto ou placa de fósforo do CR arranhada",
+                            "⚪ Nenhuma das opções / Outro comportamento",
                         ],
                         index=0,
                     )
@@ -614,6 +631,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Imagem nítida e processamento DICOM normal",
                             "⚠️ Artefatos na imagem (linhas pretas/brancas, manchas ou corte de borda)",
                             "❌ Software travado na tela de captura / Imagem não carrega",
+                            "⚪ Nenhuma das opções / Não se aplica",
                         ],
                         index=0,
                     )
@@ -631,6 +649,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Não foi observada oscilação (Fornecimento normal)",
                             "🟡 Sim, houve oscilações / queda, mas a rede já estabilizou",
                             "🔴 Sim, houve desarme de disjuntor no quadro",
+                            "⚪ Nenhuma das opções / Não se aplica",
                         ],
                         index=0,
                     )
@@ -641,6 +660,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Movimentação mecânica normal",
                             "⚠️ Travamento ou folga em movimento específico",
                             "🚨 Equipamento totalmente imobilizado",
+                            "⚪ Nenhuma das opções / Outro comportamento",
                         ],
                         index=0,
                     )
@@ -653,6 +673,7 @@ def render_emedonline(ctx: AppContext):
                             "🟢 Comandos e botões respondendo normalmente",
                             "🔄 Reiniciamos o equipamento e o erro persistiu",
                             "❌ Painel inoperante ou travado na inicialização",
+                            "⚪ Nenhuma das opções / Não se aplica",
                         ],
                         index=0,
                     )
