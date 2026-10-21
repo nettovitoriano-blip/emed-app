@@ -512,21 +512,41 @@ def registrar_aplicacao_definitiva_e_fluxo_cobranca(
     nome_peca_limpo = str(nome_peca).strip().upper()
     ref_peca = f"{qtd}x {nome_peca_limpo}"
 
+    import re
+    match_cod = re.search(r"(PEC-\d+|FER-\d+|CON-\d+)", nome_peca_limpo)
+    cod_encontrado = match_cod.group(1) if match_cod else None
+
     with get_db_connection(db_path) as conn:
         cur = conn.cursor()
 
         # 1. Obter dados de preço da peça em estoque_pecas
-        cur.execute("""
-            SELECT codigo, preco_custo, margem_contrato, margem_avulso, quantidade 
-            FROM estoque_pecas 
-            WHERE UPPER(nome_peca) = ? OR UPPER(codigo) = ?
-        """, (nome_peca_limpo, nome_peca_limpo))
-        row_peca = cur.fetchone()
+        if cod_encontrado:
+            cur.execute("""
+                SELECT codigo, preco_custo, margem_contrato, margem_avulso, quantidade 
+                FROM estoque_pecas 
+                WHERE codigo = ?
+            """, (cod_encontrado,))
+            row_peca = cur.fetchone()
+        else:
+            cur.execute("""
+                SELECT codigo, preco_custo, margem_contrato, margem_avulso, quantidade 
+                FROM estoque_pecas 
+                WHERE UPPER(nome_peca) = ? OR UPPER(codigo) = ?
+            """, (nome_peca_limpo, nome_peca_limpo))
+            row_peca = cur.fetchone()
 
-        cod_peca = row_peca[0] if row_peca else "PEC-000"
+        cod_peca = row_peca[0] if row_peca else (cod_encontrado or "PEC-000")
         preco_custo = float(row_peca[1]) if row_peca and row_peca[1] is not None else 0.0
         m_contrato = float(row_peca[2]) if row_peca and row_peca[2] is not None else 25.0
         m_avulso = float(row_peca[3]) if row_peca and row_peca[3] is not None else 50.0
+
+        # Baixa física definitiva no estoque_pecas
+        if row_peca and cod_peca != "PEC-000":
+            cur.execute("""
+                UPDATE estoque_pecas 
+                SET quantidade = MAX(0, quantidade - ?) 
+                WHERE codigo = ?
+            """, (qtd, cod_peca))
 
         margem_aplicada = m_contrato if "CONTRATO" in str(tipo_contrato).upper() else m_avulso
         valor_un_venda = round(preco_custo * (1 + margem_aplicada / 100.0), 2)
@@ -648,9 +668,18 @@ def registrar_peca_em_teste_observacao(
         cur = conn.cursor()
 
         # 1. Garante que a peça é reservada no estoque físico para não ser entregue a outro técnico
-        cur.execute("SELECT codigo, quantidade FROM estoque_pecas WHERE UPPER(nome_peca) = ? OR UPPER(codigo) = ?", (nome_peca_limpo, nome_peca_limpo))
-        r_pec = cur.fetchone()
-        cod_p = r_pec[0] if r_pec else "PEC-000"
+        import re
+        match_cod = re.search(r"(PEC-\d+|FER-\d+|CON-\d+)", nome_peca_limpo)
+        cod_encontrado = match_cod.group(1) if match_cod else None
+
+        if cod_encontrado:
+            cur.execute("SELECT codigo, quantidade FROM estoque_pecas WHERE codigo = ?", (cod_encontrado,))
+            r_pec = cur.fetchone()
+        else:
+            cur.execute("SELECT codigo, quantidade FROM estoque_pecas WHERE UPPER(nome_peca) = ? OR UPPER(codigo) = ?", (nome_peca_limpo, nome_peca_limpo))
+            r_pec = cur.fetchone()
+
+        cod_p = r_pec[0] if r_pec else (cod_encontrado or "PEC-000")
         saldo_p = int(r_pec[1]) if r_pec and r_pec[1] is not None else 0
 
         # Deduz saldo físico temporário (está na máquina do cliente em teste)
