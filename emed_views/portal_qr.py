@@ -122,22 +122,34 @@ def verificar_e_renderizar_portal_qr(ctx: AppContext):
                         'pre_atendimento': f"[ERRO: {q_erro.strip().upper() if q_erro else 'N/D'}]",
                         'tipo_contrato': 'CONTRATO'
                     }
-                    df = pd.concat([df, pd.DataFrame([nova_os_qr])], ignore_index=True)
-                    if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
-                        st.cache_data.clear()
-                        st.success("✅ Chamado registado com sucesso na central da EMED!")
-                        msg_wpp_qr = (
-                            f"🚨 *NOVO CHAMADO VIA QR CODE - EMED*\n"
-                            f"🏥 *Hospital:* {q_hosp.upper()}\n"
-                            f"⚙️ *Equipamento:* {eq_portal_ativo}\n"
-                            f"⚠️ *Urgência:* {q_urg}\n"
-                            f"👤 *Solicitante:* {q_resp.upper()} ({q_tel})\n"
-                            f"📝 *Relato:* {q_relato.upper()}"
-                        )
-                        link_wpp_central = f"https://wa.me/5585988888888?text={urllib.parse.quote(msg_wpp_qr)}"
-                        st.markdown(f"""
-                            <a href="{link_wpp_central}" target="_blank" style="background:#25d366; color:white; padding:10px 20px; border-radius:8px; text-decoration:none; font-weight:bold; display:inline-block;">
-                                📲 Notificar Plantão EMED no WhatsApp
-                            </a>
-                        """, unsafe_allow_html=True)
+                    # Trava anti-duplicação: checa se já existe chamado ativo idêntico para o cliente e equipamento
+                    chamado_duplicado = df[
+                        (df['cliente'].astype(str).str.strip().str.upper() == q_hosp.strip().upper()) &
+                        (df['equipamento'].astype(str).str.strip().str.upper() == str(eq_portal_ativo).strip().upper()) &
+                        (df['status'].astype(str).str.upper().isin(['ATIVO', 'EM ATENDIMENTO'])) &
+                        (df['defeito_relatado'].astype(str).str.strip().str.upper() == q_relato.strip().upper())
+                    ]
+                    if not chamado_duplicado.empty:
+                        idx_exist = chamado_duplicado.index[-1]
+                        id_exist = obter_id_os(idx_exist, chamado_duplicado.iloc[-1])
+                        st.warning(f"⚠️ **Atenção:** Já existe um chamado ativo em andamento para este equipamento (**OS #{id_exist}**). Abertura duplicada bloqueada.")
+                    else:
+                        df = pd.concat([df, pd.DataFrame([nova_os_qr])], ignore_index=True)
+                        if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
+                            st.cache_data.clear()
+                            st.success("✅ Chamado registado com sucesso na central da EMED!")
+                            msg_wpp_qr = (
+                                f"🚨 *NOVO CHAMADO VIA QR CODE - EMED*\n"
+                                f"🏥 *Hospital:* {q_hosp.upper()}\n"
+                                f"⚙️ *Equipamento:* {eq_portal_ativo}\n"
+                                f"⚠️ *Urgência:* {q_urg}\n"
+                                f"👤 *Solicitante:* {q_resp.upper()} ({q_tel})\n"
+                                f"📝 *Relato:* {q_relato.upper()}"
+                            )
+                            link_wpp_central = f"https://wa.me/5585988888888?text={urllib.parse.quote(msg_wpp_qr)}"
+                            st.markdown(f"""
+                                <a href="{link_wpp_central}" target="_blank" style="background:#25d366; color:white; padding:10px 20px; border-radius:8px; text-decoration:none; font-weight:bold; display:inline-block;">
+                                    📲 Notificar Plantão EMED no WhatsApp
+                                </a>
+                            """, unsafe_allow_html=True)
     st.stop()

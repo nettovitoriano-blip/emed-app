@@ -2,6 +2,7 @@ import re
 import io
 import os
 import base64
+import hashlib
 import urllib.parse
 import pandas as pd
 import streamlit as st
@@ -701,156 +702,205 @@ def render_emedonline(ctx: AppContext):
 
             st.markdown("<br/>", unsafe_allow_html=True)
             
-            # Botão de Envio de Chamado
-            col_b1, col_b2 = st.columns([1.5, 2.5])
-            with col_b1:
-                confirmou_envio = st.button(
-                    "🚀 Confirmar Abertura de Chamado Emergencial",
-                    type="primary",
-                    use_container_width=True,
-                )
+            # Assinatura da solicitação para trava anti-duplicação e debounce de cliques
+            hash_submissao = hashlib.md5(
+                f"{cliente_selecionado.strip().upper()}|{equip_escolhido.strip().upper()}|{defeito_digitado.strip().upper()}".encode("utf-8")
+            ).hexdigest()
 
-            if confirmou_envio:
-                if not defeito_digitado.strip():
-                    st.error("⚠️ Por favor, informe o defeito apresentado pelo equipamento para abrir o chamado.")
-                else:
-                    # Salva a foto se houver
-                    pasta_uploads = os.path.join(ctx.base_dir, "uploads_os")
-                    os.makedirs(pasta_uploads, exist_ok=True)
-                    caminho_foto_final = ""
-                    if arquivo_foto is not None:
-                        nome_arq_foto = f"FOTO_EMEDONLINE_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{arquivo_foto.name}"
-                        caminho_foto_final = os.path.join(pasta_uploads, nome_arq_foto)
-                        with open(caminho_foto_final, "wb") as f:
-                            f.write(arquivo_foto.getbuffer())
+            # Se já abriu esta OS nesta sessão, exibe o cartão de sucesso com opção de abrir outro chamado
+            if st.session_state.get("ultimo_emedonline_hash") == hash_submissao:
+                num_os_gerada = st.session_state.get("ultimo_emedonline_os", "N/D")
+                info_chamado = st.session_state.get("ultimo_emedonline_info", {})
+                tec_sugerido = info_chamado.get("tec_sugerido", "EQUIPE EMED PLANTÃO")
+                link_wpp = info_chamado.get("link_wpp", "")
+                msg_sep = info_chamado.get("msg_sep", "")
+                ok_sep = info_chamado.get("ok_sep", False)
 
-                    # Define a criticidade
-                    is_urgente = "Totalmente Parado" in estado_operacional
-                    tag_prioridade = "P1 - EMERGÊNCIA MÉDICA" if is_urgente else "P2 - PROGRAMADO"
-                    cond_ini = "PARADO (INOPERANTE)" if is_urgente else "OPERANDO COM FALHA"
+                st.success(f"🎉 **Chamado Aberto com Sucesso! Ordem de Serviço Nº #{num_os_gerada} emitida.**")
+                if ok_sep and msg_sep:
+                    st.info(f"📦 {msg_sep}")
 
-                    # Verifica equipe próxima por cidade
-                    tec_sugerido = "EQUIPE EMED PLANTÃO"
-                    for t_nome, t_dados in equipa_tecnica.items():
-                        cidade_tec = t_dados.get("sede", "FORTALEZA").upper()
-                        if cidade_tec in cid_cli.upper():
-                            tec_sugerido = t_nome
-                            break
-
-                    kit_sugerido = obter_kit_por_servico("CORRETIVA", defeito_digitado)
-                    checklist_resumo = (
-                        f"[{nome_p1}: {chk_1}] "
-                        f"[{nome_p2}: {chk_2}] "
-                        f"[{nome_p3}: {chk_3}]"
+                if link_wpp:
+                    st.markdown(
+                        f"""
+                        <div style="background: #064e3b; border: 1.5px solid #10b981; border-radius: 8px; padding: 14px; margin-top: 10px;">
+                            <h4 style="color: #6ee7b7; margin:0 0 6px 0;">✅ O que acontece agora?</h4>
+                            <ul style="color: #e2e8f0; font-size: 13.5px; margin: 0 0 10px 0; padding-left: 20px;">
+                                <li>A OS já foi pré-preenchida com os dados do cliente, defeito e foto.</li>
+                                <li>O técnico designado (<b>{tec_sugerido}</b>) foi notificado para encaixe em rota.</li>
+                                <li>No local, o técnico precisará apenas lançar o serviço executado e as peças utilizadas.</li>
+                            </ul>
+                            <a href="{link_wpp}" target="_blank" style="display: inline-block; background: #25d366; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; text-decoration: none;">
+                                💬 Notificar Central EMED via WhatsApp
+                            </a>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
                     )
 
-                    novo_chamado = {
-                        "cliente": cliente_selecionado.strip().upper(),
-                        "cidade": cid_cli.upper(),
-                        "estado": uf_cli.upper(),
-                        "equipamento": equip_escolhido.strip().upper(),
-                        "endereco": end_cli.strip().upper(),
-                        "tipo_servico": "CORRETIVA",
-                        "data_agendamento": datetime.now().strftime("%Y-%m-%d"),
-                        "tecnico_responsavel": tec_sugerido,
-                        "tecnico_auxiliar": "NENHUM (INDIVIDUAL)",
-                        "telefone_tecnico": equipa_tecnica.get(tec_sugerido, {}).get("telefone", "(85) 3254-2929"),
-                        "responsavel_hospital": (nome_solicitante or resp_cli).strip().upper(),
-                        "contato_responsavel": (contato_solicitante or tel_cli).strip(),
-                        "confirmado": "SIM",
-                        "pendencias": f"[{tag_prioridade}] {defeito_digitado.strip().upper()}",
-                        "status": "ATIVO",
-                        "checkin_hora": "",
-                        "checkout_hora": "",
-                        "tempo_atendimento": "",
-                        "checklist_pop": f"{nome_p1[:10]}: {chk_1[:25]} | {nome_p2[:10]}: {chk_2[:25]} | {nome_p3[:10]}: {chk_3[:25]}",
-                        "assinatura_cliente": "",
-                        "assinatura_tecnico": f"{tec_sugerido} - CFT",
-                        "pre_atendimento": f"[EMEDONLINE - {modalidade}] {defeito_digitado.strip()} | {checklist_resumo} | Solicitante: {nome_solicitante}",
-                        "foto_evidencia": caminho_foto_final,
-                        "video_evidencia": "",
-                        "formulario_anexo": "",
-                        "cnpj": cnpj_cli,
-                        "cep": limpar_texto(primeira_linha.get("cep"), ""),
-                        "email": limpar_texto(primeira_linha.get("email"), ""),
-                        "whatsapp": contato_solicitante or tel_cli,
-                        "endereco_fiscal": end_cli,
-                        "tipo_contrato": limpar_texto(primeira_linha.get("tipo_contrato"), "CONTRATO"),
-                        "instrumento_necessario": kit_sugerido.get("nome", "MALETA DE CALIBRAÇÃO PADRÃO"),
-                        "etapa_preventiva": f"CORRETIVA EMEDONLINE ({modalidade})",
-                        "orcamento_anexo": "",
-                        "condicao_pagamento": "",
-                        "valor_os": 0.0,
-                        "defeito_relatado": defeito_digitado.strip().upper(),
-                        "condicao_inicial": cond_ini,
-                        "problemas_encontrados": "",
-                        "causa_raiz": "",
-                        "servico_executado": "",
-                        "parametros_medidos": "",
-                        "observacoes_gerais": f"Chamado aberto via EmedOnline ({modalidade}) em {datetime.now().strftime('%d/%m/%Y %H:%M')}.",
-                        "condicao_final": "EM ATENDIMENTO",
-                        "foto_depois": "",
-                        "assinatura_cliente_img": "",
-                        "peca_baixada_ref": "",
-                    }
+                st.markdown("<br/>", unsafe_allow_html=True)
+                if st.button("➕ Abrir Outro Chamado Técnico", type="secondary"):
+                    st.session_state.pop("ultimo_emedonline_hash", None)
+                    st.session_state.pop("ultimo_emedonline_os", None)
+                    st.session_state.pop("ultimo_emedonline_info", None)
+                    st.rerun()
 
-                    df_novo = pd.concat([df, pd.DataFrame([novo_chamado])], ignore_index=True)
-                    if salvar_dados_seguro(df_novo, ctx.db_name, ctx.caminho_excel):
-                        st.cache_data.clear()
-                        novo_idx = df_novo.index[-1]
-                        num_os_gerada = obter_id_os(novo_idx, pd.Series(novo_chamado))
+            else:
+                # Botão de Envio de Chamado
+                col_b1, col_b2 = st.columns([1.5, 2.5])
+                with col_b1:
+                    confirmou_envio = st.button(
+                        "🚀 Confirmar Abertura de Chamado Emergencial",
+                        type="primary",
+                        use_container_width=True,
+                    )
 
-                        # Acionamento Automático do Almoxarifado para separação
-                        itens_kit_str = ", ".join(kit_sugerido.get("itens", []))
-                        ok_sep, msg_sep = acionar_separacao_automatica_almoxarifado(
-                            ctx.db_name,
-                            tec_sugerido,
-                            cliente_selecionado,
-                            equip_escolhido,
-                            "CORRETIVA / TRIAGEM",
-                            f"[{kit_sugerido.get('nome')}] {itens_kit_str}",
-                            os_id=num_os_gerada
-                        )
-                        
-                        st.balloons()
-                        st.success(f"🎉 **Chamado Aberto com Sucesso! Ordem de Serviço Nº #{num_os_gerada} emitida.**")
-                        if ok_sep:
-                            st.info(f"📦 {msg_sep}")
-                        
-                        # Mensagem objetiva para despacho e alinhamento da equipe
-                        msg_whats = (
-                            f"🚨 *CHAMADO EMEDONLINE • OS #{num_os_gerada}*\n"
-                            f"Cliente: {cliente_selecionado}\n"
-                            f"Equipamento: {equip_escolhido} ({modalidade})\n"
-                            f"Prioridade: {cond_ini}\n"
-                            f"Defeito: {defeito_digitado.strip()}\n\n"
-                            f"*TRIAGEM TÉCNICA ({modalidade}):*\n"
-                            f"• {nome_p1}: {chk_1}\n"
-                            f"• {nome_p2}: {chk_2}\n"
-                            f"• {nome_p3}: {chk_3}\n\n"
-                            f"🧰 Kit Sugerido: {kit_sugerido.get('nome')}\n"
-                            f"Solicitante: {nome_solicitante} ({contato_solicitante})\n"
-                            f"Técnico Programado: {tec_sugerido}\n"
-                            f"Local: {end_cli}"
-                        )
-                        link_wpp = f"https://wa.me/558532542929?text={urllib.parse.quote(msg_whats)}"
-                        
-                        st.markdown(
-                            f"""
-                            <div style="background: #064e3b; border: 1.5px solid #10b981; border-radius: 8px; padding: 14px; margin-top: 10px;">
-                                <h4 style="color: #6ee7b7; margin:0 0 6px 0;">✅ O que acontece agora?</h4>
-                                <ul style="color: #e2e8f0; font-size: 13.5px; margin: 0 0 10px 0; padding-left: 20px;">
-                                    <li>A OS já foi pré-preenchida com os dados do cliente, defeito e foto.</li>
-                                    <li>O técnico designado (<b>{tec_sugerido}</b>) foi notificado para encaixe em rota.</li>
-                                    <li>No local, o técnico precisará apenas lançar o serviço executado e as peças utilizadas.</li>
-                                </ul>
-                                <a href="{link_wpp}" target="_blank" style="display: inline-block; background: #25d366; color: #fff; font-weight: bold; padding: 8px 14px; border-radius: 6px; text-decoration: none;">
-                                    💬 Notificar Central EMED via WhatsApp
-                                </a>
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
-                        )
+                if confirmou_envio:
+                    if not defeito_digitado.strip():
+                        st.error("⚠️ Por favor, informe o defeito apresentado pelo equipamento para abrir o chamado.")
+                    else:
+                        # TRAVA ANTI-DUPLICAÇÃO: Checa se já existe chamado ativo idêntico (evita cliques rápidos / duplicidade)
+                        chamado_duplicado = df[
+                            (df["cliente"].astype(str).str.strip().str.upper() == cliente_selecionado.strip().upper()) &
+                            (df["equipamento"].astype(str).str.strip().str.upper() == equip_escolhido.strip().upper()) &
+                            (df["status"].astype(str).str.upper().isin(["ATIVO", "EM ATENDIMENTO"])) &
+                            (df["defeito_relatado"].astype(str).str.strip().str.upper() == defeito_digitado.strip().upper())
+                        ]
+                        if not chamado_duplicado.empty:
+                            idx_existente = chamado_duplicado.index[-1]
+                            num_os_existente = obter_id_os(idx_existente, chamado_duplicado.iloc[-1])
+                            st.session_state["ultimo_emedonline_hash"] = hash_submissao
+                            st.session_state["ultimo_emedonline_os"] = num_os_existente
+                            st.warning(f"⚠️ **Chamado já existente:** Já existe uma OS ativa em andamento para este equipamento com este mesmo relato (**OS #{num_os_existente}**). Criação duplicada evitada.")
+                            st.rerun()
+                        else:
+                            # Salva a foto se houver
+                            pasta_uploads = os.path.join(ctx.base_dir, "uploads_os")
+                            os.makedirs(pasta_uploads, exist_ok=True)
+                            caminho_foto_final = ""
+                            if arquivo_foto is not None:
+                                nome_arq_foto = f"FOTO_EMEDONLINE_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{arquivo_foto.name}"
+                                caminho_foto_final = os.path.join(pasta_uploads, nome_arq_foto)
+                                with open(caminho_foto_final, "wb") as f:
+                                    f.write(arquivo_foto.getbuffer())
+
+                            # Define a criticidade
+                            is_urgente = "Totalmente Parado" in estado_operacional
+                            tag_prioridade = "P1 - EMERGÊNCIA MÉDICA" if is_urgente else "P2 - PROGRAMADO"
+                            cond_ini = "PARADO (INOPERANTE)" if is_urgente else "OPERANDO COM FALHA"
+
+                            # Verifica equipe próxima por cidade
+                            tec_sugerido = "EQUIPE EMED PLANTÃO"
+                            for t_nome, t_dados in equipa_tecnica.items():
+                                cidade_tec = t_dados.get("sede", "FORTALEZA").upper()
+                                if cidade_tec in cid_cli.upper():
+                                    tec_sugerido = t_nome
+                                    break
+
+                            kit_sugerido = obter_kit_por_servico("CORRETIVA", defeito_digitado)
+                            checklist_resumo = (
+                                f"[{nome_p1}: {chk_1}] "
+                                f"[{nome_p2}: {chk_2}] "
+                                f"[{nome_p3}: {chk_3}]"
+                            )
+
+                            novo_chamado = {
+                                "cliente": cliente_selecionado.strip().upper(),
+                                "cidade": cid_cli.upper(),
+                                "estado": uf_cli.upper(),
+                                "equipamento": equip_escolhido.strip().upper(),
+                                "endereco": end_cli.strip().upper(),
+                                "tipo_servico": "CORRETIVA",
+                                "data_agendamento": datetime.now().strftime("%Y-%m-%d"),
+                                "tecnico_responsavel": tec_sugerido,
+                                "tecnico_auxiliar": "NENHUM (INDIVIDUAL)",
+                                "telefone_tecnico": equipa_tecnica.get(tec_sugerido, {}).get("telefone", "(85) 3254-2929"),
+                                "responsavel_hospital": (nome_solicitante or resp_cli).strip().upper(),
+                                "contato_responsavel": (contato_solicitante or tel_cli).strip(),
+                                "confirmado": "SIM",
+                                "pendencias": f"[{tag_prioridade}] {defeito_digitado.strip().upper()}",
+                                "status": "ATIVO",
+                                "checkin_hora": "",
+                                "checkout_hora": "",
+                                "tempo_atendimento": "",
+                                "checklist_pop": f"{nome_p1[:10]}: {chk_1[:25]} | {nome_p2[:10]}: {chk_2[:25]} | {nome_p3[:10]}: {chk_3[:25]}",
+                                "assinatura_cliente": "",
+                                "assinatura_tecnico": f"{tec_sugerido} - CFT",
+                                "pre_atendimento": f"[EMEDONLINE - {modalidade}] {defeito_digitado.strip()} | {checklist_resumo} | Solicitante: {nome_solicitante}",
+                                "foto_evidencia": caminho_foto_final,
+                                "video_evidencia": "",
+                                "formulario_anexo": "",
+                                "cnpj": cnpj_cli,
+                                "cep": limpar_texto(primeira_linha.get("cep"), ""),
+                                "email": limpar_texto(primeira_linha.get("email"), ""),
+                                "whatsapp": contato_solicitante or tel_cli,
+                                "endereco_fiscal": end_cli,
+                                "tipo_contrato": limpar_texto(primeira_linha.get("tipo_contrato"), "CONTRATO"),
+                                "instrumento_necessario": kit_sugerido.get("nome", "MALETA DE CALIBRAÇÃO PADRÃO"),
+                                "etapa_preventiva": f"CORRETIVA EMEDONLINE ({modalidade})",
+                                "orcamento_anexo": "",
+                                "condicao_pagamento": "",
+                                "valor_os": 0.0,
+                                "defeito_relatado": defeito_digitado.strip().upper(),
+                                "condicao_inicial": cond_ini,
+                                "problemas_encontrados": "",
+                                "causa_raiz": "",
+                                "servico_executado": "",
+                                "parametros_medidos": "",
+                                "observacoes_gerais": f"Chamado aberto via EmedOnline ({modalidade}) em {datetime.now().strftime('%d/%m/%Y %H:%M')}.",
+                                "condicao_final": "EM ATENDIMENTO",
+                                "foto_depois": "",
+                                "assinatura_cliente_img": "",
+                                "peca_baixada_ref": "",
+                            }
+
+                            df_novo = pd.concat([df, pd.DataFrame([novo_chamado])], ignore_index=True)
+                            if salvar_dados_seguro(df_novo, ctx.db_name, ctx.caminho_excel):
+                                st.cache_data.clear()
+                                novo_idx = df_novo.index[-1]
+                                num_os_gerada = obter_id_os(novo_idx, pd.Series(novo_chamado))
+
+                                # Acionamento Automático do Almoxarifado para separação
+                                itens_kit_str = ", ".join(kit_sugerido.get("itens", []))
+                                ok_sep, msg_sep = acionar_separacao_automatica_almoxarifado(
+                                    ctx.db_name,
+                                    tec_sugerido,
+                                    cliente_selecionado,
+                                    equip_escolhido,
+                                    "CORRETIVA / TRIAGEM",
+                                    f"[{kit_sugerido.get('nome')}] {itens_kit_str}",
+                                    os_id=num_os_gerada
+                                )
+                                
+                                # Mensagem objetiva para despacho e alinhamento da equipe
+                                msg_whats = (
+                                    f"🚨 *CHAMADO EMEDONLINE • OS #{num_os_gerada}*\n"
+                                    f"Cliente: {cliente_selecionado}\n"
+                                    f"Equipamento: {equip_escolhido} ({modalidade})\n"
+                                    f"Prioridade: {cond_ini}\n"
+                                    f"Defeito: {defeito_digitado.strip()}\n\n"
+                                    f"*TRIAGEM TÉCNICA ({modalidade}):*\n"
+                                    f"• {nome_p1}: {chk_1}\n"
+                                    f"• {nome_p2}: {chk_2}\n"
+                                    f"• {nome_p3}: {chk_3}\n\n"
+                                    f"🧰 Kit Sugerido: {kit_sugerido.get('nome')}\n"
+                                    f"Solicitante: {nome_solicitante} ({contato_solicitante})\n"
+                                    f"Técnico Programado: {tec_sugerido}\n"
+                                    f"Local: {end_cli}"
+                                )
+                                link_wpp = f"https://wa.me/558532542929?text={urllib.parse.quote(msg_whats)}"
+                                
+                                # Salva na sessão para persistência e bloqueio de novos envios
+                                st.session_state["ultimo_emedonline_hash"] = hash_submissao
+                                st.session_state["ultimo_emedonline_os"] = num_os_gerada
+                                st.session_state["ultimo_emedonline_info"] = {
+                                    "tec_sugerido": tec_sugerido,
+                                    "link_wpp": link_wpp,
+                                    "ok_sep": ok_sep,
+                                    "msg_sep": msg_sep,
+                                }
+                                st.balloons()
+                                st.rerun()
 
     # =========================================================================
     # ABA 2: CENTRAL DE DESPACHO & ROTAS (VISÃO GESTOR / LOGÍSTICA)

@@ -501,37 +501,49 @@ def _render_criar_nova_os(ctx: AppContext):
                     'foto_depois': '',
                     'assinatura_cliente_img': ''
                 }
-                df = pd.concat([df, pd.DataFrame([nova_os])], ignore_index=True)
-                if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
-                    st.cache_data.clear()
-                    novo_idx = df.index[-1]
-                    id_os_gerada = obter_id_os(novo_idx, pd.Series(nova_os))
+                # Trava anti-duplicação: checa se já existe chamado ativo idêntico para o cliente e equipamento
+                chamado_duplicado = df[
+                    (df['cliente'].astype(str).str.strip().str.upper() == chamado_cliente.strip().upper()) &
+                    (df['equipamento'].astype(str).str.strip().str.upper() == equipamento_final.strip().upper()) &
+                    (df['status'].astype(str).str.upper().isin(['ATIVO', 'EM ATENDIMENTO'])) &
+                    (df['defeito_relatado'].astype(str).str.strip().str.upper() == chamado_relato.strip().upper())
+                ]
+                if not chamado_duplicado.empty:
+                    idx_exist = chamado_duplicado.index[-1]
+                    id_exist = obter_id_os(idx_exist, chamado_duplicado.iloc[-1])
+                    st.warning(f"⚠️ **Atenção:** Já existe uma OS ativa idêntica em andamento para este equipamento (**OS #{id_exist}**). Abertura duplicada bloqueada.")
+                else:
+                    df = pd.concat([df, pd.DataFrame([nova_os])], ignore_index=True)
+                    if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
+                        st.cache_data.clear()
+                        novo_idx = df.index[-1]
+                        id_os_gerada = obter_id_os(novo_idx, pd.Series(nova_os))
 
-                    # Acionamento Automático do Almoxarifado para o Técnico Selecionado
-                    ok_sep, msg_sep = acionar_separacao_automatica_almoxarifado(
-                        ctx.db_name,
-                        chamado_tec,
-                        chamado_cliente,
-                        equipamento_final,
-                        chamado_tipo,
-                        instrumento_abertura,
-                        os_id=id_os_gerada
-                    )
+                        # Acionamento Automático do Almoxarifado para o Técnico Selecionado
+                        ok_sep, msg_sep = acionar_separacao_automatica_almoxarifado(
+                            ctx.db_name,
+                            chamado_tec,
+                            chamado_cliente,
+                            equipamento_final,
+                            chamado_tipo,
+                            instrumento_abertura,
+                            os_id=id_os_gerada
+                        )
 
-                    st.session_state.aviso_almox_pendente = {
-                        "tecnico": chamado_tec,
-                        "cliente": chamado_cliente,
-                        "tipo": chamado_tipo,
-                        "kit": kit_sugerido["nome"],
-                        "itens": kit_sugerido["itens"],
-                        "data": pd.to_datetime(chamado_data).strftime('%d/%m/%Y'),
-                        "os_id": id_os_gerada,
-                        "msg_sep": msg_sep,
-                    }
-                    st.success(f"✅ Salvo com sucesso! Ordem de Serviço #{id_os_gerada} emitida.")
-                    if ok_sep:
-                        st.info(f"📦 {msg_sep}")
-                    st.rerun()
+                        st.session_state.aviso_almox_pendente = {
+                            "tecnico": chamado_tec,
+                            "cliente": chamado_cliente,
+                            "tipo": chamado_tipo,
+                            "kit": kit_sugerido["nome"],
+                            "itens": kit_sugerido["itens"],
+                            "data": pd.to_datetime(chamado_data).strftime('%d/%m/%Y'),
+                            "os_id": id_os_gerada,
+                            "msg_sep": msg_sep,
+                        }
+                        st.success(f"✅ Salvo com sucesso! Ordem de Serviço #{id_os_gerada} emitida.")
+                        if ok_sep:
+                            st.info(f"📦 {msg_sep}")
+                        st.rerun()
 
 
 def _render_historico_concluidas(ctx: AppContext):
