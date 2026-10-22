@@ -12,6 +12,7 @@ from emed_core import (
     obter_id_os,
     obter_kit_por_servico,
     acionar_separacao_automatica_almoxarifado,
+    obter_url_base_sistema,
 )
 from emed_services import (
     AppContext,
@@ -1556,7 +1557,7 @@ def render_emedonline(ctx: AppContext):
         cnpj_etiqueta = limpar_texto(df_cli_et.iloc[0].get("cnpj") if not df_cli_et.empty else "", "03.611.974/0001-08")
         
         # URL da nuvem permanente da EMED com auto-preenchimento
-        base_url_cloud = "https://emed-app.streamlit.app"
+        base_url_cloud = obter_url_base_sistema()
         url_chamado_qr = f"{base_url_cloud}/?cliente_qr={urllib.parse.quote(cli_etiqueta)}&equipamento_qr={urllib.parse.quote(eq_etiqueta)}&cnpj={urllib.parse.quote(cnpj_etiqueta)}"
         
         # Link WhatsApp direto pré-formatado

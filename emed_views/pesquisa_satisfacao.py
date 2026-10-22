@@ -12,7 +12,17 @@ import streamlit as st
 from emed_core import limpar_texto, obter_id_os
 from emed_services import AppContext
 
-URL_GOOGLE_REVIEW_OFICIAL = "https://search.google.com/local/writereview?placeid=ChIJ_EMED_SERVICOS_HOSPITALARES_CE"
+URL_GOOGLE_REVIEW_OFICIAL = "https://www.google.com/search?q=EMED+Eletromedicina+Hospitalar+Fortaleza#lrd=0x0:0x0,3,,,"
+
+def obter_url_google_review() -> str:
+    """Retorna o link oficial para avaliação Google, priorizando link customizado da empresa."""
+    try:
+        import streamlit as st
+        if "link_google_avaliacao" in st.session_state and st.session_state.link_google_avaliacao:
+            return st.session_state.link_google_avaliacao.strip()
+    except Exception:
+        pass
+    return URL_GOOGLE_REVIEW_OFICIAL
 
 
 def inicializar_tabela_satisfacao(db_name: str):
@@ -205,6 +215,7 @@ def render_pesquisa_satisfacao(ctx: AppContext):
 
         with col_dir:
             st.markdown("#### 🚀 Impulsionador de Avaliações Google")
+            url_g_atual = obter_url_google_review()
             if nota_escolhida >= 4:
                 st.markdown(f"""
                     <div style="background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%); border: 2px solid #60a5fa; border-radius: 12px; padding: 20px; text-align: center;">
@@ -214,7 +225,7 @@ def render_pesquisa_satisfacao(ctx: AppContext):
                             Sua opinião positiva nos motiva a continuar entregando a melhor engenharia clínica do Ceará.
                             <b>Ajude-nos a subir nossa nota no Google</b> compartilhando este elogio em apenas 1 clique:
                         </p>
-                        <a href="{URL_GOOGLE_REVIEW_OFICIAL}" target="_blank" style="display: inline-block; background: #f59e0b; color: #000; font-weight: 900; font-size: 15px; padding: 12px 22px; border-radius: 8px; text-decoration: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-top: 10px;">
+                        <a href="{url_g_atual}" target="_blank" style="display: inline-block; background: #f59e0b; color: #000; font-weight: 900; font-size: 15px; padding: 12px 22px; border-radius: 8px; text-decoration: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-top: 10px;">
                             ⭐ Avaliar a EMED no Google Meu Negócio
                         </a>
                     </div>
@@ -229,6 +240,16 @@ def render_pesquisa_satisfacao(ctx: AppContext):
                         </p>
                     </div>
                 """, unsafe_allow_html=True)
+
+        with st.expander("⚙️ Configurar Link Oficial do Google Meu Negócio"):
+            custom_g = st.text_input(
+                "URL Perfil Google:",
+                value=st.session_state.get("link_google_avaliacao", URL_GOOGLE_REVIEW_OFICIAL),
+                key="cfg_url_g_input",
+                help="Cole o link curto gerado pelo Google Meu Negócio da EMED"
+            )
+            if custom_g and custom_g.strip():
+                st.session_state.link_google_avaliacao = custom_g.strip()
 
         if btn_salvar_pesquisa:
             clicou_g = 1 if nota_escolhida >= 4 else 0

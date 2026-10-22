@@ -224,9 +224,21 @@ if os.path.exists(CAMINHO_EXCEL):
     except Exception:
         pass
 
-with st.sidebar.expander("📱 Conectar Celular (QR Code)"):
+with st.sidebar.expander("📱 Conectar Celular (QR Code)", expanded=False):
     st.markdown("**Acesso Nuvem 24/7:**")
-    url_oficial = "https://emed-app.streamlit.app"
+    from emed_core import obter_url_base_sistema
+    url_detectada = obter_url_base_sistema()
+    url_custom = st.text_input(
+        "🔗 URL Nuvem (Celular):",
+        value=st.session_state.get("url_sistema_publica", url_detectada),
+        key="input_url_publica",
+        help="Link público Cloudflare ou domínio próprio da EMED para acesso móvel."
+    )
+    if url_custom and url_custom.strip():
+        st.session_state.url_sistema_publica = url_custom.strip().rstrip("/")
+    else:
+        st.session_state.url_sistema_publica = url_detectada
+    url_oficial = st.session_state.url_sistema_publica
     try:
         import qrcode
         import io
@@ -241,8 +253,8 @@ with st.sidebar.expander("📱 Conectar Celular (QR Code)"):
         caminho_qr = os.path.join(BASE_DIR, "qrcode_permanente_nuvem.png")
         if os.path.exists(caminho_qr):
             st.image(caminho_qr, caption="Aponte a câmera do celular")
-    st.markdown(f"[🌐 Abrir no Celular]({url_oficial})")
-    st.caption("Acesso direto na nuvem sem necessidade de computador ligado.")
+    st.markdown(f"[🌐 **Abrir Sistema no Celular**]({url_oficial})")
+    st.caption(f"Link ativo: `{url_oficial}`")
 
 # Cabeçalho Principal com Logo Ampliada e Centralizada
 col1, col_logo, col3 = st.columns([0.5, 5.0, 0.5])

@@ -14,8 +14,9 @@ import streamlit as st
 from emed_core import limpar_texto, obter_id_os
 from emed_services import AppContext, salvar_dados_seguro
 from emed_views.emedonline import _obter_perguntas_triagem_dinamica, _detectar_modalidade
+from emed_views.chamados_os import _gerar_html_os_formatada
 from emed_views.conciliacao_pix import gerar_payload_pix, gerar_qr_code_pix_base64
-from emed_views.pesquisa_satisfacao import registrar_pesquisa, URL_GOOGLE_REVIEW_OFICIAL
+from emed_views.pesquisa_satisfacao import registrar_pesquisa, URL_GOOGLE_REVIEW_OFICIAL, obter_url_google_review
 
 
 def render_portal_cliente(ctx: AppContext):
@@ -178,6 +179,17 @@ def render_portal_cliente(ctx: AppContext):
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
+
+                if "CONCLU" in st_os:
+                    html_os = _gerar_html_os_formatada(str(num_os), r_os, getattr(ctx, "equipa_tecnica", {}))
+                    st.download_button(
+                        label="📄 Baixar Folha de OS Assinada (PDF/HTML)",
+                        data=html_os,
+                        file_name=f"OS_{num_os}.html",
+                        mime="text/html",
+                        key=f"dl_os_cliente_{idx_os}_{num_os}",
+                        use_container_width=True,
+                    )
 
     # =========================================================================
     # TAB 2: ABRIR NOVO CHAMADO
@@ -416,12 +428,13 @@ def render_portal_cliente(ctx: AppContext):
                     st.success("Obrigado pelo seu feedback!")
                     st.balloons()
         with col_fb2:
+            url_g_client = obter_url_google_review()
             if nota_cli >= 4:
                 st.markdown(f"""
                     <div style="background: #172554; border: 1.5px solid #3b82f6; border-radius: 10px; padding: 18px; text-align: center;">
                         <h4 style="color: #93c5fd; margin: 0 0 6px 0;">🌟 Ajude-nos no Google!</h4>
                         <p style="color: #cbd5e1; font-size: 13px;">Compartilhe sua avaliação pública na página da EMED no Google Meu Negócio em apenas 1 clique:</p>
-                        <a href="{URL_GOOGLE_REVIEW_OFICIAL}" target="_blank" style="display: inline-block; background: #fbbf24; color: #000; font-weight: 800; padding: 10px 18px; border-radius: 6px; text-decoration: none;">
+                        <a href="{url_g_client}" target="_blank" style="display: inline-block; background: #fbbf24; color: #000; font-weight: 800; padding: 10px 18px; border-radius: 6px; text-decoration: none;">
                             ⭐ Avaliar no Google Meu Negócio
                         </a>
                     </div>
