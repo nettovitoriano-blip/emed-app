@@ -34,6 +34,9 @@ for _mod_name in [
     "emed_views.chamados_os",
     "emed_views.manuais_tecnicos",
     "emed_views.emedonline",
+    "emed_views.portal_cliente",
+    "emed_views.conciliacao_pix",
+    "emed_views.pesquisa_satisfacao",
     "emed_views",
 ]:
     if _mod_name in sys.modules:
@@ -148,6 +151,9 @@ st.sidebar.markdown("### PAINEL DE OPERAÇÕES")
 
 opcoes_menu = [
     "🤖 EmedOnline (Triagem & Rota)",
+    "🏥 Portal do Cliente (Autoatendimento)",
+    "💳 Conciliação Bancária & Pagamentos PIX",
+    "⭐ Pesquisa de Satisfação & Google Reviews",
     "📊 Mural & Despacho WhatsApp",
     "📋 Minhas Pendências (Técnico)",
     "📚 Manuais & Procedimentos",

@@ -18,6 +18,9 @@ from emed_views.administracao import (
 from emed_views.manuais_tecnicos import render_manuais_tecnicos
 from emed_views.emedonline import render_emedonline
 from emed_views.alarmes_calibracao import render_alarmes_calibracao
+from emed_views.portal_cliente import render_portal_cliente
+from emed_views.conciliacao_pix import render_conciliacao_pix
+from emed_views.pesquisa_satisfacao import render_pesquisa_satisfacao
 
 
 def _render_alarmes_almoxarifado(ctx):
@@ -28,6 +31,9 @@ def _render_alarmes_almoxarifado(ctx):
 
 VIEW_ROUTER = {
     "🤖 EmedOnline (Triagem & Rota)": render_emedonline,
+    "🏥 Portal do Cliente (Autoatendimento)": render_portal_cliente,
+    "💳 Conciliação Bancária & Pagamentos PIX": render_conciliacao_pix,
+    "⭐ Pesquisa de Satisfação & Google Reviews": render_pesquisa_satisfacao,
     "⏰ Alarmes de Calibração & Créditos": _render_alarmes_almoxarifado,
     "📊 Mural & Despacho WhatsApp": render_mural_despacho,
     "📋 Minhas Pendências (Técnico)": render_minhas_pendencias,
@@ -48,6 +54,9 @@ VIEW_ROUTER = {
 __all__ = [
     "verificar_e_renderizar_portal_qr",
     "render_emedonline",
+    "render_portal_cliente",
+    "render_conciliacao_pix",
+    "render_pesquisa_satisfacao",
     "render_alarmes_calibracao",
     "render_mural_despacho",
     "render_minhas_pendencias",
