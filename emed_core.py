@@ -1571,3 +1571,114 @@ def gerar_sugestao_relatorio_clinico(equipamento: str, defeito: str = "", tipo_s
         "TESTES DE FUNCIONALIDADE, CALIBRAÇÃO DE PARÂMETROS OPERACIONAIS E VERIFICAÇÃO DE SEGURANÇA. "
         "EQUIPAMENTO AVALIADO E LIBERADO PARA USO NORMAL CONFORME PADRÕES DA ENGENHARIA BIOMÉDICA."
     )
+
+
+def obter_checklist_acoes_sugeridas(equipamento: str, defeito: str = "") -> list:
+    """Retorna itens práticos de checklist de intervenção para o técnico marcar no celular."""
+    eq_norm = str(equipamento).upper().replace("Ó", "O").replace("Ã", "A").replace("Õ", "O").replace("É", "E")
+    def_norm = str(defeito).upper().replace("Ó", "O").replace("Ã", "A").replace("Õ", "O").replace("É", "E")
+
+    # 1. Tomografia
+    if any(k in eq_norm for k in ["TOMO", "TC", "BRIGHTSPEED", "BRIVO", "OPTIMA"]):
+        if any(w in def_norm for w in ["MESA", "UP", "DOWN", "SUBIDA", "DESCIDA", "ELEVACAO", "TRAV"]):
+            return [
+                "Desmontagem e remoção dos painéis laterais de proteção da mesa",
+                "Inspeção visual dos trilhos, correntes e cabos de sustentação mecânica",
+                "Limpeza química e desengraxe das guias lineares verticais",
+                "Aplicação de graxa sintética de alta viscosidade nos rolamentos e guias",
+                "Ajuste de tensão mecânica da correia e fuso de acionamento",
+                "Calibração dos potenciômetros e encoders de elevação (up/down)",
+                "Ajuste e teste de acionamento dos limit switches (sensores de fim de curso)",
+                "Teste de movimentação contínua em curso completo sem ruídos ou travamento",
+                "Teste funcional com carga nominal de 150 kg com retorno suave",
+                "Liberação do equipamento para a equipe clínica conforme POP-EMED-TC-004",
+            ]
+        elif any(w in def_norm for w in ["TUBO", "KV", "MA", "DISPARO", "ALTA TENSAO", "ARCING", "GERADOR", "JEDI"]):
+            return [
+                "Verificação visual e teste de isolação das conexões e buchas de alta tensão (HV cables)",
+                "Checagem do nível, fluxo e temperatura do óleo de arrefecimento do monobloco",
+                "Leitura e limpeza do histórico de erros de arcing no gerador JEDI e console",
+                "Calibração da corrente de filamento e tensão de aceleração (kVp / mA)",
+                "Execução do protocolo de aquecimento progressivo do ânodo (warm-up)",
+                "Calibração de ar nos detectores (Air Calibration / DAS)",
+                "Verificação dos intertravamentos de segurança e paradas de emergência do Gantry",
+                "Disparos de validação de qualidade de feixe e homogeneidade",
+            ]
+        else:
+            return [
+                "Abertura das tampas do Gantry e aspiração de poeira/resíduos internos",
+                "Inspeção visual das escovas e pistas do slip-ring com medição de desgaste",
+                "Limpeza técnica especializada dos trilhos e anéis de contato do slip-ring",
+                "Checagem do sistema de refrigeração líquida e arrefecimento do Gantry",
+                "Alinhamento e teste dos lasers de posicionamento sagital, coronal e axial",
+                "Aferição de segurança elétrica: resistência de terra e corrente de fuga (NBR IEC 60601)",
+                "Execução de calibração periódica de detectores e teste de homogeneidade de imagem",
+                "Equipamento 100% operacional e liberado para rotina de exames",
+            ]
+
+    # 2. Mamografia
+    elif any(k in eq_norm for k in ["MAMO", "SENOGRAPHE", "LILLY", "SELENIA"]):
+        if any(w in def_norm for w in ["COMPRESS", "PEDAL", "FORCA", "DANO"]):
+            return [
+                "Desmontagem da tampa da coluna e inspeção da caixa de redução da compressão",
+                "Inspeção mecânica das engrenagens, fusos e lubrificação com graxa técnica",
+                "Teste de continuidade elétrica e resposta nos microswitches dos pedais de acionamento",
+                "Calibração da célula de carga e ajuste da força máxima de compressão (limite 18 daN)",
+                "Teste funcional do sistema de descompressão automática de emergência",
+                "Alinhamento da bandeja de compressão e teste de paralelismo com o receptor de imagem",
+                "Aferição da fotocélula (AEC) em fantoma acrílico padrão",
+                "Certificação dos parâmetros de compressão conforme requisitos da RDC 611/ANVISA",
+            ]
+        else:
+            return [
+                "Inspeção mecânica geral do braço C e travamentos angulares",
+                "Aferição dos eletrofreios de rotação e verificação de folgas mecânicas",
+                "Limpeza e higienização técnica da mesa de exame e bandejas de compressão",
+                "Teste dos pedais de controle e comandos no painel da workstation",
+                "Controle de qualidade de imagem radiográfica com fantoma de mamografia padrão",
+                "Verificação de reprodutibilidade e linearidade de dose do feixe",
+                "Equipamento liberado e em conformidade técnica para exames clínicos",
+            ]
+
+    # 3. Raio-X
+    elif any(k in eq_norm for k in ["RAIO", "RX", "LOTUS", "SHIMADZU", "MOBILEDART", "NEUVISION"]):
+        if any(w in def_norm for w in ["FREIO", "ESTATIVA", "MESA", "CABO", "PESO"]):
+            return [
+                "Inspeção visual e teste de tração nos cabos de aço de sustentação do contrapeso",
+                "Regulagem de pressão e alinhamento das sapatas dos eletrofreios longitudinal e vertical",
+                "Limpeza técnica e lubrificação das colunas de deslizamento e roldanas",
+                "Verificação dos botões de liberação de freios no comando do colimador",
+                "Teste de movimentação suave em toda a extensão do curso da estativa e mesa",
+                "Reaperto de parafusos estruturais e verificação de batentes de fim de curso",
+                "Trava mecânica e elétrica testada com carga e validada",
+            ]
+        elif any(w in def_norm for w in ["COLIMADOR", "LUZ", "CAMPO", "LAMPADA"]):
+            return [
+                "Abertura do conjunto colimador e substituição da lâmpada de projeção halógena",
+                "Limpeza e ajuste do espelho refletor interno e lâminas de chumbo",
+                "Calibração de coincidência do campo de luz com o campo de radiação X (tolerância < 2%)",
+                "Aferição do temporizador automático de desligamento da luz do colimador",
+                "Verificação dos botões de ajuste de abertura de campo transversal e longitudinal",
+                "Disparos de radiografia teste com chassi/detector para validação de bordas",
+            ]
+        else:
+            return [
+                "Inspeção geral da estativa, mesa de exames e cabeçote monobloco",
+                "Aferição radiométrica de kVp, mA e tempo com multímetro calibrado",
+                "Teste de repetibilidade e linearidade da taxa de kerma no ar (RDC 611)",
+                "Checagem do estado dos cabos de alta tensão e aterramento de carcaça",
+                "Revisão dos freios mecânicos e fluidez de movimentação de todos os eixos",
+                "Equipamento aprovado nos ensaios de segurança e liberado para uso médico",
+            ]
+
+    # 4. Padrão Geral / Preventiva
+    return [
+        "Inspeção visual externa e interna do chassi, conectores e fiações",
+        "Limpeza técnica interna especializada para eliminação de impurezas e poeira",
+        "Reaperto de bornes elétricos, barramentos de alimentação e conexões de aterramento",
+        "Teste de segurança elétrica: resistência de condutor de proteção e corrente de fuga",
+        "Lubrificação técnica dos pontos mecânicos móveis, eixos e articulações",
+        "Aferição dos parâmetros nominais e calibração de sensores operacionais",
+        "Teste de todos os comandos nos painéis de controle e paradas de emergência",
+        "Realização de ensaios funcionais simulados de rotina com liberação clínica",
+    ]

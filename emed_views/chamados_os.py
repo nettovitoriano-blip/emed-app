@@ -26,6 +26,7 @@ from emed_core import (
     obter_configuracao,
     salvar_configuracao,
     gerar_sugestao_relatorio_clinico,
+    obter_checklist_acoes_sugeridas,
     TEMPLATES_RELATORIO_TECNICO,
 )
 from emed_services import (
@@ -33,6 +34,9 @@ from emed_services import (
     carregar_clientes_internos,
     calcular_duracao_os,
     salvar_dados_seguro,
+    vincular_it_ao_equipamento,
+    converter_html_para_pdf_bytes,
+    gerar_link_whatsapp,
 )
 from emed_ui import (
     gerar_html_coletor_offline,
@@ -852,7 +856,13 @@ def _render_historico_concluidas(ctx: AppContext):
 
                 html_ficha_os = _gerar_html_os_formatada(str(id_os_c), row_c, equipa_tecnica)
 
-                c_bt1, c_bt2, c_bt3 = st.columns(3)
+                pdf_laudo_bytes = None
+                try:
+                    pdf_laudo_bytes = converter_html_para_pdf_bytes(html_ficha_os)
+                except Exception:
+                    pdf_laudo_bytes = None
+
+                c_bt1, c_bt2, c_bt3, c_bt4 = st.columns(4)
                 with c_bt1:
                     if st.button("📧 Enviar OS por E-mail", key=f"btn_send_em_{idx_c}", type="primary", use_container_width=True):
                         if not email_dest_in.strip():
@@ -866,7 +876,7 @@ def _render_historico_concluidas(ctx: AppContext):
                                 unsafe_allow_html=True,
                             )
                 with c_bt2:
-                    if st.button("💬 Enviar OS por WhatsApp", key=f"btn_send_wa_{idx_c}", type="primary", use_container_width=True):
+                    if st.button("💬 Enviar no WhatsApp", key=f"btn_send_wa_{idx_c}", type="primary", use_container_width=True):
                         if whats_dest_in.strip():
                             df.at[idx_c, 'whatsapp'] = whats_dest_in.strip()
                             salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel)
@@ -875,8 +885,20 @@ def _render_historico_concluidas(ctx: AppContext):
                             unsafe_allow_html=True,
                         )
                 with c_bt3:
+                    if pdf_laudo_bytes:
+                        st.download_button(
+                            label="📄 Baixar Laudo Oficial (PDF)",
+                            data=pdf_laudo_bytes,
+                            file_name=f"Laudo_Tecnico_OS_{id_os_c}_{limpar_texto(cli_nome_c, 'EMED').replace(' ', '_')}.pdf",
+                            mime="application/pdf",
+                            key=f"dl_pdf_laudo_{idx_c}",
+                            use_container_width=True,
+                        )
+                    else:
+                        st.button("📄 PDF Indisponível", disabled=True, key=f"dl_pdf_dis_{idx_c}", use_container_width=True)
+                with c_bt4:
                     st.download_button(
-                        label="🖨️ Baixar Ficha da OS (A4/PDF)",
+                        label="🌐 Baixar Ficha Web (HTML)",
                         data=html_ficha_os.encode("utf-8"),
                         file_name=f"OS_{id_os_c}_{limpar_texto(cli_nome_c, 'EMED').replace(' ', '_')}.html",
                         mime="text/html",
@@ -1098,6 +1120,43 @@ def _render_execucao_os_ativas(ctx: AppContext):
 </div>
 </div>"""
                 st.markdown(card_os_ativa_html, unsafe_allow_html=True)
+
+                # -------------------------------------------------------------
+                # PROCEDIMENTO TÉCNICO VINCULADO (IT & VÍDEO DO EQUIPAMENTO)
+                # -------------------------------------------------------------
+                try:
+                    info_it = vincular_it_ao_equipamento(eq_os_atual, srv_os_atual, os.path.join(ctx.base_dir, "Manuais"))
+                except Exception:
+                    info_it = {"encontrado": False}
+
+                if info_it.get("encontrado"):
+                    with st.expander(f"📘 Procedimento Operacional Vinculado: {info_it['codigo_it']}", expanded=True):
+                        c_it_left, c_it_right = st.columns([1.6, 1.4])
+                        with c_it_left:
+                            st.markdown(f"**Manual Técnico / IT Homologada:** `{info_it['nome_arquivo']}`")
+                            st.caption("Parâmetros de fábrica, rotinas de ajuste, calibração e segurança aplicáveis a este equipamento.")
+                            c_it_b1, c_it_b2 = st.columns(2)
+                            with c_it_b1:
+                                if info_it.get("caminho_pdf") and os.path.exists(info_it["caminho_pdf"]):
+                                    with open(info_it["caminho_pdf"], "rb") as f_it_p:
+                                        st.download_button(
+                                            "📄 Baixar IT em PDF",
+                                            data=f_it_p.read(),
+                                            file_name=os.path.basename(info_it["caminho_pdf"]),
+                                            mime="application/pdf",
+                                            key=f"dl_it_pdf_exec_{idx_os}_{id_os_ativa}",
+                                            use_container_width=True
+                                        )
+                            with c_it_b2:
+                                if info_it.get("caminho_pdf") and os.path.exists(info_it["caminho_pdf"]):
+                                    if st.button("🖥️ Abrir no Windows", key=f"btn_open_it_win_{idx_os}_{id_os_ativa}", use_container_width=True):
+                                        import webbrowser
+                                        webbrowser.open(info_it["caminho_pdf"])
+                                        st.toast("IT aberta no leitor nativo do sistema!", icon="📄")
+                        with c_it_right:
+                            if info_it.get("caminho_video") and os.path.exists(info_it["caminho_video"]):
+                                st.markdown("**🎬 Vídeo de Treinamento Técnico Co-localizado:**")
+                                st.video(info_it["caminho_video"])
 
                 c_top1, c_top2, c_top3 = st.columns([2.4, 1.3, 1.3])
                 with c_top1:
@@ -1345,21 +1404,51 @@ def _render_execucao_os_ativas(ctx: AppContext):
                                 with c_obs2:
                                     criterio_obs_in = st.text_input("Critério de Teste / Sintoma a Monitorar:", value="Validar ausência de falha sob carga", key=f"crit_obs_{idx_os}")
 
-                    # Assistente Clínico Inteligente (Sugestão IA / POP da EMED)
-                    st.markdown("###### 🤖 Assistente Clínico Inteligente & Modelos Prontos:")
-                    col_ia1, col_ia2 = st.columns([1.5, 2.5])
-                    with col_ia1:
-                        if st.button("⚡ Sugerir Relatório do Protocolo / IA", key=f"btn_sug_ia_{idx_os}_{id_os_ativa}", use_container_width=True, help="Analisa o equipamento e defeito para sugerir a redação técnica do POP"):
-                            sugestao_texto = gerar_sugestao_relatorio_clinico(
-                                equipamento=eq_os_atual,
-                                defeito=st.session_state.get(f"def_rel_{idx_os}", def_rel_atual),
-                                tipo_servico=srv_os_atual,
-                                causa_raiz=st.session_state.get(f"cr_os_{idx_os}", "")
-                            )
-                            st.session_state[f"obs_f_{idx_os}"] = sugestao_texto
-                            st.rerun()
+                    # Assistente Clínico com Checklist de Ações (Decisão 100% do Técnico)
+                    st.markdown("###### 📋 Checklist de Ações Executadas & Assistente de Redação:")
+                    with st.expander("✅ Abrir Checklist de Ações Técnicas (Marque o que foi feito na máquina)", expanded=False):
+                        st.caption("O sistema sugere as ações técnicas recomendadas para este equipamento e defeito. Você seleciona exatamente o que realizou e insere no relatório:")
+                        acoes_sugeridas_lista = obter_checklist_acoes_sugeridas(
+                            eq_os_atual,
+                            st.session_state.get(f"def_rel_{idx_os}", def_rel_atual)
+                        )
+                        col_ck1, col_ck2 = st.columns(2)
+                        acoes_marcadas_usuario = []
+                        for i_ac, ac_txt in enumerate(acoes_sugeridas_lista):
+                            alvo_col = col_ck1 if i_ac % 2 == 0 else col_ck2
+                            if alvo_col.checkbox(ac_txt, key=f"ck_it_{idx_os}_{id_os_ativa}_{i_ac}"):
+                                acoes_marcadas_usuario.append(ac_txt)
 
-                    with col_ia2:
+                        col_act_ck1, col_act_ck2 = st.columns([2, 2])
+                        with col_act_ck1:
+                            if st.button("📝 Inserir Ações Marcadas no Relatório", key=f"btn_add_chk_{idx_os}_{id_os_ativa}", use_container_width=True):
+                                if acoes_marcadas_usuario:
+                                    txt_montado = "SERVIÇOS EXECUTADOS CONFORME PROTOCOLO TÉCNICO EMED:\n" + "\n".join([f"• {ac}" for ac in acoes_marcadas_usuario])
+                                    atual_prev = st.session_state.get(f"obs_f_{idx_os}", srv_exec_atual)
+                                    if atual_prev and atual_prev.strip():
+                                        st.session_state[f"obs_f_{idx_os}"] = f"{atual_prev.strip()}\n\n{txt_montado}"
+                                    else:
+                                        st.session_state[f"obs_f_{idx_os}"] = txt_montado
+                                    st.success(f"✅ {len(acoes_marcadas_usuario)} ações adicionadas ao relatório!")
+                                    st.rerun()
+                                else:
+                                    st.warning("⚠️ Marque pelo menos uma ação no checklist acima.")
+                        with col_act_ck2:
+                            if st.button("⚡ Sugerir Texto Completo do Protocolo", key=f"btn_sug_ia_{idx_os}_{id_os_ativa}", use_container_width=True):
+                                sugestao_texto = gerar_sugestao_relatorio_clinico(
+                                    equipamento=eq_os_atual,
+                                    defeito=st.session_state.get(f"def_rel_{idx_os}", def_rel_atual),
+                                    tipo_servico=srv_os_atual,
+                                    causa_raiz=st.session_state.get(f"cr_os_{idx_os}", "")
+                                )
+                                st.session_state[f"obs_f_{idx_os}"] = sugestao_texto
+                                st.rerun()
+
+                    # Modelos Rápidos Padronizados
+                    col_tpl1, col_tpl2 = st.columns([1.5, 2.5])
+                    with col_tpl1:
+                        st.caption("Ou escolha um modelo pronto:")
+                    with col_tpl2:
                         opcoes_templates_lista = ["📑 Selecione um Modelo Pronto (1-Toque)..."] + list(TEMPLATES_RELATORIO_TECNICO.keys())
                         tpl_sel = st.selectbox(
                             "Modelos Padronizados EMED:",
