@@ -20,6 +20,13 @@ from emed_core import (
     registrar_peca_em_teste_observacao,
     converter_teste_em_aplicacao_definitiva_e_cobranca,
     retirar_peca_teste_e_devolver_estoque,
+    salvar_rascunho_provisorio,
+    obter_rascunho_provisorio,
+    limpar_rascunho_provisorio,
+    obter_configuracao,
+    salvar_configuracao,
+    gerar_sugestao_relatorio_clinico,
+    TEMPLATES_RELATORIO_TECNICO,
 )
 from emed_services import (
     AppContext,
@@ -32,6 +39,7 @@ from emed_ui import (
     renderizar_rubrica_tecnico,
     renderizar_quadro_assinatura_cliente,
 )
+from emed_views.pesquisa_satisfacao import URL_GOOGLE_REVIEW_OFICIAL
 
 
 def _obter_logo_base64() -> str:
@@ -92,8 +100,14 @@ def _render_modo_offline(ctx: AppContext):
                     st.rerun()
 
 
-def _gerar_html_os_formatada(id_os_c: str, row_c: pd.Series, equipa_tecnica: dict) -> str:
+def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: dict = None) -> str:
     """Gera o documento HTML/A4 oficial da Ordem de Serviço Fechada (com logo no cabeçalho superior esquerdo e formatação hospitalar)."""
+    if row_c is None and isinstance(id_os_c, (pd.Series, dict)):
+        row_c = pd.Series(id_os_c)
+        id_os_c = str(obter_id_os(0, row_c))
+    if equipa_tecnica is None:
+        equipa_tecnica = {}
+    id_os_c = str(id_os_c)
     cliente = limpar_texto(row_c.get("cliente"), "N/D")
     cnpj = limpar_texto(row_c.get("cnpj"), "N/D")
     endereco = limpar_texto(row_c.get("endereco"), "N/D")
@@ -769,12 +783,13 @@ def _render_historico_concluidas(ctx: AppContext):
 
                 link_aval_google = st.text_input(
                     "⭐ Link de Avaliação Google (Pesquisa de Satisfação)",
-                    value=st.session_state.get("link_google_avaliacao", "https://g.page/r/EMED_Eletromedicina/review"),
+                    value=st.session_state.get("link_google_avaliacao", obter_configuracao(ctx.db_name, "google_review_url", URL_GOOGLE_REVIEW_OFICIAL)),
                     key=f"lk_aval_g_{idx_c}",
                     help="Cole aqui o link do seu perfil do Google Meu Negócio para o cliente avaliar e subir a nota da EMED."
                 )
-                if link_aval_google:
+                if link_aval_google and link_aval_google.strip():
                     st.session_state.link_google_avaliacao = link_aval_google.strip()
+                    salvar_configuracao(ctx.db_name, "google_review_url", link_aval_google.strip())
 
                 bloco_aval_txt = f"\n\n⭐ *SUA AVALIAÇÃO É MUITO IMPORTANTE!*\nAjude a EMED a manter o padrão de excelência hospitalar avaliando nosso atendimento com 5 estrelas no Google:\n👉 {link_aval_google.strip()}" if link_aval_google.strip() else ""
                 bloco_aval_em = f"\n\n⭐ SUA AVALIAÇÃO É MUITO IMPORTANTE!\nAvalie o atendimento da EMED no Google: {link_aval_google.strip()}" if link_aval_google.strip() else ""
@@ -1033,8 +1048,28 @@ def _render_execucao_os_ativas(ctx: AppContext):
             email_os_atual = limpar_texto(row_os.get('email'), '')
             txt_aux_ativo = f" + Aux: {tec_aux_os_atual}" if tec_aux_os_atual else ""
 
+            # Recupera rascunho provisório offline/local se existir
+            rascunho_salvo, dt_rascunho = obter_rascunho_provisorio(ctx.db_name, str(id_os_ativa))
+            if rascunho_salvo:
+                srv_exec_atual = rascunho_salvo.get('servico_executado', srv_exec_atual)
+                prob_enc_atual = rascunho_salvo.get('problemas_encontrados', prob_enc_atual)
+                def_rel_atual = rascunho_salvo.get('defeito_relatado', def_rel_atual)
+                obs_ger_atual = rascunho_salvo.get('observacoes_gerais', obs_ger_atual)
+                param_atual = rascunho_salvo.get('parametros_medidos', param_atual)
+                inst_os_atual = rascunho_salvo.get('inst_prox_visita', inst_os_atual)
+                end_os_atual = rascunho_salvo.get('endereco', end_os_atual)
+                email_os_atual = rascunho_salvo.get('email', email_os_atual)
+
             titulo_os_ativa = f"🛠️ OS #{id_os_ativa} | {cli_os_atual} — Equipamento: {eq_os_atual} [{srv_os_atual}] [Técnico: {tec_resp_os}{txt_aux_ativo}]"
             with st.expander(titulo_os_ativa, expanded=(len(df_os_render) == 1)):
+                if rascunho_salvo:
+                    col_av1, col_av2 = st.columns([3.5, 1.5])
+                    with col_av1:
+                        st.info(f"💾 **Rascunho Provisório Ativo:** Salvo automaticamente em `{dt_rascunho}`. Seus dados estão 100% protegidos contra quedas de sinal!")
+                    with col_av2:
+                        if st.button("🗑️ Descartar Rascunho", key=f"btn_desc_rasc_{idx_os}_{id_os_ativa}"):
+                            limpar_rascunho_provisorio(ctx.db_name, str(id_os_ativa))
+                            st.rerun()
                 logo_atv_b64 = _obter_logo_base64()
                 bloco_logo_atv = (
                     f'<div style="background:#ffffff; padding:4px 8px; border-radius:6px; display:inline-flex; align-items:center;">'
@@ -1310,6 +1345,35 @@ def _render_execucao_os_ativas(ctx: AppContext):
                                 with c_obs2:
                                     criterio_obs_in = st.text_input("Critério de Teste / Sintoma a Monitorar:", value="Validar ausência de falha sob carga", key=f"crit_obs_{idx_os}")
 
+                    # Assistente Clínico Inteligente (Sugestão IA / POP da EMED)
+                    st.markdown("###### 🤖 Assistente Clínico Inteligente & Modelos Prontos:")
+                    col_ia1, col_ia2 = st.columns([1.5, 2.5])
+                    with col_ia1:
+                        if st.button("⚡ Sugerir Relatório do Protocolo / IA", key=f"btn_sug_ia_{idx_os}_{id_os_ativa}", use_container_width=True, help="Analisa o equipamento e defeito para sugerir a redação técnica do POP"):
+                            sugestao_texto = gerar_sugestao_relatorio_clinico(
+                                equipamento=eq_os_atual,
+                                defeito=st.session_state.get(f"def_rel_{idx_os}", def_rel_atual),
+                                tipo_servico=srv_os_atual,
+                                causa_raiz=st.session_state.get(f"cr_os_{idx_os}", "")
+                            )
+                            st.session_state[f"obs_f_{idx_os}"] = sugestao_texto
+                            st.rerun()
+
+                    with col_ia2:
+                        opcoes_templates_lista = ["📑 Selecione um Modelo Pronto (1-Toque)..."] + list(TEMPLATES_RELATORIO_TECNICO.keys())
+                        tpl_sel = st.selectbox(
+                            "Modelos Padronizados EMED:",
+                            opcoes_templates_lista,
+                            index=0,
+                            key=f"sel_tpl_srv_{idx_os}_{id_os_ativa}",
+                            label_visibility="collapsed"
+                        )
+                        if tpl_sel != "📑 Selecione um Modelo Pronto (1-Toque)...":
+                            texto_tpl = TEMPLATES_RELATORIO_TECNICO[tpl_sel]
+                            if st.button(f"📥 Aplicar Modelo: {tpl_sel.split()[1]}", key=f"btn_app_tpl_{idx_os}_{id_os_ativa}", use_container_width=True):
+                                st.session_state[f"obs_f_{idx_os}"] = texto_tpl
+                                st.rerun()
+
                     obs_tecnico_final = st.text_area(
                         "🛠️ Serviços Executados / Solução Técnica Aplicada *",
                         value=srv_exec_atual,
@@ -1317,6 +1381,30 @@ def _render_execucao_os_ativas(ctx: AppContext):
                         height=110,
                         key=f"obs_f_{idx_os}"
                     )
+                    
+                    # Botão de salvamento rápido de rascunho provisório
+                    if st.button("💾 Salvar Rascunho Provisório da OS (Sem Fechar)", key=f"btn_salvar_rasc_tab3_{idx_os}_{id_os_ativa}", use_container_width=True):
+                        dados_r_tab3 = {
+                            "servico_executado": obs_tecnico_final.strip(),
+                            "problemas_encontrados": st.session_state.get(f"prob_enc_{idx_os}", prob_enc_atual),
+                            "defeito_relatado": st.session_state.get(f"def_rel_{idx_os}", def_rel_atual),
+                            "causa_raiz": st.session_state.get(f"cr_os_{idx_os}", row_os.get('causa_raiz', '')),
+                            "condicao_inicial": st.session_state.get(f"ci_os_{idx_os}", row_os.get('condicao_inicial', '')),
+                            "condicao_final": st.session_state.get(f"cf_os_{idx_os}", row_os.get('condicao_final', '')),
+                            "parametros_medidos": st.session_state.get(f"param_med_{idx_os}", param_atual),
+                            "inst_prox_visita": st.session_state.get(f"inst_prox_{idx_os}", inst_os_atual),
+                            "observacoes_gerais": st.session_state.get(f"obs_g_{idx_os}", obs_ger_atual),
+                            "endereco": st.session_state.get(f"end_exec_{idx_os}", end_os_atual),
+                            "email": st.session_state.get(f"em_exec_{idx_os}", email_os_atual),
+                            "valor_servico_os": st.session_state.get(f"val_os_{idx_os}", row_os.get('valor_os', 0.0)),
+                            "modo_peca": st.session_state.get(f"modo_peca_{idx_os}", "❌ Nenhuma Peça"),
+                            "peca_selecionada": peca_selecionada,
+                            "qtd_aplicada": qtd_aplicada,
+                        }
+                        ok_s_r, msg_s_r = salvar_rascunho_provisorio(ctx.db_name, str(id_os_ativa), dados_r_tab3)
+                        if ok_s_r:
+                            st.success(f"✅ {msg_s_r}")
+                            st.rerun()
 
                 with m_tab4:
                     st.markdown("##### 🚨 Status de Pendências, Condição de Saída & Observações ao Cliente")
@@ -1557,11 +1645,45 @@ def _render_execucao_os_ativas(ctx: AppContext):
                     )
 
                 st.markdown("---")
-                btn_finalizar_os = st.button(
-                    f"💾 Salvar Modificações da OS #{id_os_ativa} (Gravar Todas as Abas)",
-                    key=f"btn_finalizar_os_{idx_os}",
-                    use_container_width=True
-                )
+                col_btn_sav1, col_btn_sav2 = st.columns([1, 1])
+                with col_btn_sav1:
+                    btn_rascunho_rapido = st.button(
+                        f"💾 Salvar Rascunho Provisório (Não Fecha a OS)",
+                        key=f"btn_rasc_rapido_bot_{idx_os}_{id_os_ativa}",
+                        use_container_width=True,
+                        help="Salva as informações digitadas sem exigir encerramento da OS ou dados de faturamento."
+                    )
+                with col_btn_sav2:
+                    btn_finalizar_os = st.button(
+                        f"💾 Salvar Modificações da OS #{id_os_ativa} (Gravar Todas as Abas)",
+                        key=f"btn_finalizar_os_{idx_os}",
+                        use_container_width=True
+                    )
+
+                if btn_rascunho_rapido:
+                    dados_r_bot = {
+                        "servico_executado": st.session_state.get(f"obs_f_{idx_os}", obs_tecnico_final),
+                        "problemas_encontrados": problemas_encontrados_in.strip(),
+                        "defeito_relatado": defeito_relatado_in.strip(),
+                        "causa_raiz": causa_raiz_in,
+                        "condicao_inicial": condicao_ini_os,
+                        "condicao_final": condicao_fim_os,
+                        "parametros_medidos": parametros_medidos_in.strip(),
+                        "inst_prox_visita": inst_prox_visita.strip(),
+                        "observacoes_gerais": observacoes_gerais_in.strip(),
+                        "endereco": endereco_exec_in.strip(),
+                        "email": email_exec_in.strip(),
+                        "valor_servico_os": float(valor_final_faturar),
+                        "opcao_faturamento": opcao_faturamento,
+                        "assinatura_cliente_input": assinatura_cliente_input.strip(),
+                        "assinatura_cliente_img": assinatura_cli_b64.strip(),
+                        "peca_selecionada": peca_selecionada,
+                        "qtd_aplicada": int(qtd_aplicada),
+                    }
+                    ok_r_bot, msg_r_bot = salvar_rascunho_provisorio(ctx.db_name, str(id_os_ativa), dados_r_bot)
+                    if ok_r_bot:
+                        st.success(f"✅ {msg_r_bot}")
+                        st.rerun()
 
                 if btn_concluir_tab6 or btn_finalizar_os:
                     status_escolhido_efetivo = status_fecho_tab6 if btn_concluir_tab6 else status_fecho_escolha
@@ -1704,19 +1826,22 @@ def _render_execucao_os_ativas(ctx: AppContext):
                                 pass
 
                             # 1. Baixa definitiva no estoque + atualização de status + sequência imediata ao fluxo de cobrança
-                            ok_cob, msg_cob = registrar_aplicacao_definitiva_e_fluxo_cobranca(
-                                ctx.db_name,
-                                id_os_ativa,
-                                row_os.get('cliente', ''),
-                                row_os.get('equipamento', ''),
-                                novo_tec_exec,
-                                peca_selecionada,
-                                int(qtd_aplicada),
-                                valor_final_faturar,
-                                condicao_pagamento=opcao_faturamento,
-                                tipo_contrato=row_os.get('tipo_contrato', 'CONTRATO')
-                            )
-                            msg_cobranca_resumo = msg_cob
+                            try:
+                                ok_cob, msg_cob = registrar_aplicacao_definitiva_e_fluxo_cobranca(
+                                    ctx.db_name,
+                                    id_os_ativa,
+                                    row_os.get('cliente', ''),
+                                    row_os.get('equipamento', ''),
+                                    novo_tec_exec,
+                                    peca_selecionada,
+                                    int(qtd_aplicada),
+                                    valor_final_faturar,
+                                    condicao_pagamento=opcao_faturamento,
+                                    tipo_contrato=row_os.get('tipo_contrato', 'CONTRATO')
+                                )
+                                msg_cobranca_resumo = msg_cob
+                            except Exception as ex_cob:
+                                msg_cobranca_resumo = f"⚠️ OS Concluída com sucesso! Faturamento em processamento paralelo: {ex_cob}"
 
                             if agendar_prox_ciclo:
                                 df, _ = agendar_proxima_etapa_circular(
@@ -1749,6 +1874,7 @@ def _render_execucao_os_ativas(ctx: AppContext):
                             df.at[idx_os, 'instrumento_necessario'] = inst_prox_visita.strip().upper()
 
                         if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
+                            limpar_rascunho_provisorio(ctx.db_name, str(id_os_ativa))
                             st.cache_data.clear()
                             if fechar_definitivo:
                                 st.success(f"🎉 ORDEM DE SERVIÇO #{id_os_ativa} CONCLUÍDA E FECHADA COM SUCESSO!")

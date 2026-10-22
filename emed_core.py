@@ -1335,3 +1335,239 @@ def atualizar_calibracao_equipamento_cliente(db_path: str, os_id: int, data_ulti
         return False, f"Erro ao atualizar calibração do cliente: {ex}"
 
 
+
+
+# =============================================================================
+# MÓDULO DE RESILIÊNCIA OFFLINE, RASCUNHOS PROVISÓRIOS & SUGESTÃO INTELIGENTE IA
+# =============================================================================
+
+def inicializar_tabela_rascunhos(db_name: str):
+    """Garante a existência das tabelas de rascunhos e configurações do sistema."""
+    try:
+        with get_db_connection(db_name) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS os_rascunhos (
+                    os_id TEXT PRIMARY KEY,
+                    dados_json TEXT,
+                    data_atualizacao TEXT
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS configuracoes_sistema (
+                    chave TEXT PRIMARY KEY,
+                    valor TEXT,
+                    data_atualizacao TEXT
+                )
+            """)
+            conn.commit()
+    except Exception:
+        pass
+
+
+def salvar_rascunho_provisorio(db_name: str, os_id: str, dados: dict) -> tuple:
+    """Salva um snapshot provisório do preenchimento da OS no SQLite (proteção contra quedas de sinal)."""
+    try:
+        inicializar_tabela_rascunhos(db_name)
+        data_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        dados_json = json.dumps(dados, ensure_ascii=False)
+        with get_db_connection(db_name) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO os_rascunhos (os_id, dados_json, data_atualizacao)
+                VALUES (?, ?, ?)
+                ON CONFLICT(os_id) DO UPDATE SET
+                    dados_json = excluded.dados_json,
+                    data_atualizacao = excluded.data_atualizacao
+            """, (str(os_id), dados_json, data_str))
+            conn.commit()
+        return True, f"Rascunho provisório da OS #{os_id} salvo com sucesso às {data_str.split()[1]}!"
+    except Exception as e:
+        return False, f"Erro ao salvar rascunho: {str(e)}"
+
+
+def obter_rascunho_provisorio(db_name: str, os_id: str) -> tuple:
+    """Recupera o rascunho provisório salvo para uma OS se existir."""
+    try:
+        inicializar_tabela_rascunhos(db_name)
+        with get_db_connection(db_name) as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT dados_json, data_atualizacao FROM os_rascunhos WHERE os_id = ?", (str(os_id),))
+            row = cur.fetchone()
+            if row and row[0]:
+                return json.loads(row[0]), str(row[1])
+    except Exception:
+        pass
+    return {}, ""
+
+
+def limpar_rascunho_provisorio(db_name: str, os_id: str) -> bool:
+    """Remove o rascunho provisório após o fechamento bem-sucedido da OS."""
+    try:
+        with get_db_connection(db_name) as conn:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM os_rascunhos WHERE os_id = ?", (str(os_id),))
+            conn.commit()
+        return True
+    except Exception:
+        return False
+
+
+def obter_configuracao(db_name: str, chave: str, padrao: str = "") -> str:
+    """Obtém parâmetro de configuração do sistema persistido no SQLite."""
+    try:
+        inicializar_tabela_rascunhos(db_name)
+        with get_db_connection(db_name) as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT valor FROM configuracoes_sistema WHERE chave = ?", (chave,))
+            row = cur.fetchone()
+            if row and row[0] is not None:
+                return str(row[0]).strip()
+    except Exception:
+        pass
+    return padrao
+
+
+def salvar_configuracao(db_name: str, chave: str, valor: str) -> bool:
+    """Persiste parâmetro de configuração do sistema no SQLite."""
+    try:
+        inicializar_tabela_rascunhos(db_name)
+        dt = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        with get_db_connection(db_name) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO configuracoes_sistema (chave, valor, data_atualizacao)
+                VALUES (?, ?, ?)
+                ON CONFLICT(chave) DO UPDATE SET
+                    valor = excluded.valor,
+                    data_atualizacao = excluded.data_atualizacao
+            """, (chave, str(valor).strip(), dt))
+            conn.commit()
+        return True
+    except Exception:
+        return False
+
+
+TEMPLATES_RELATORIO_TECNICO = {
+    "🔬 Manutenção Preventiva Completa (Padrão POP-EMED)": (
+        "MANUTENÇÃO PREVENTIVA PERIÓDICA EXECUTADA CONFORME PROTOCOLO EMED. "
+        "INSPEÇÃO VISUAL E MECÂNICA GERAL, LIMPEZA TÉCNICA INTERNA COM ASPIRAÇÃO E AR COMPRIMIDO SECO. "
+        "LUBRIFICAÇÃO DAS GUIAS LINEARES, TRILHOS E SISTEMAS DE ROLAMENTO COM GRAXA SINTÉTICA DE ALTA PERFORMANCE. "
+        "REAPERTO E VERIFICAÇÃO DE TORQUE NOS CABOS DE FORÇA, ELETROFREIOS E CONECTORES DE CONTROLE. "
+        "TESTES DE SEGURANÇA ELÉTRICA: AFERIÇÃO DE TENSÃO REDE (F-N), RESISTÊNCIA DE ATERRAMENTO (T-N < 1.0V) E CORRENTE DE FUGA DENTRO DA NORMA NBR IEC 60601-1. "
+        "TESTES FUNCIONAIS EM CARGA REAL EXECUTADOS COM ÊXITO. EQUIPAMENTO 100% OPERACIONAL E LIBERADO PARA USO CLÍNICO."
+    ),
+    "⚡ Manutenção Corretiva & Troca de Peça": (
+        "MANUTENÇÃO CORRETIVA EXECUTADA PARA RESOLUÇÃO DE FALHA OPERACIONAL. "
+        "DESMONTAGEM DO MÓDULO AFETADO, ISOLAMENTO DO CIRCUITO E ANÁLISE DE DIAGNÓSTICO. "
+        "SUBSTITUIÇÃO DA PEÇA DANIFICADA POR COMPONENTE NOVO COMPATÍVEL HOMOLOGADO. "
+        "AJUSTES DE TENSÃO, SINCRONISMO E CALIBRAÇÃO DOS SENSORES DE FIM DE CURSO. "
+        "TESTES DE DISPARO, CARGA E REPRODUTIBILIDADE CONCLUÍDOS SEM APRESENTAÇÃO DE CÓDIGOS DE ERRO. "
+        "EQUIPAMENTO TESTADO, HOMOLOGADO E LIBERADO PARA A EQUIPE MÉDICA."
+    ),
+    "🎯 Calibração Radiométrica & Dosimetria (Phantom / Anvisa)": (
+        "AFERIÇÃO RADIOMÉTRICA E CALIBRAÇÃO DE FEIXE DE RAIOS-X EXECUTADA CONFORME RDC 611 DA ANVISA. "
+        "AFERIÇÃO DE TENSÃO DE PICO (KVp), CORRENTE DO TUBO (mA) E TEMPO DE EXPOSIÇÃO (ms) UTILIZANDO MULTÍMETRO RADIOMÉTRICO CALIBRADO. "
+        "TESTE DE COINCIDÊNCIA DO CAMPO LUMINOSO COM O CAMPO DE RADIAÇÃO (COLIMADOR). "
+        "AVALIAÇÃO DA CAMADA SEMIREDUTORA (HVL), RENDIMENTO DO TUBO E QUALIDADE DE IMAGEM COM FANTOMA RADIOGRÁFICO PADRÃO. "
+        "PARÂMETROS EM CONFORMIDADE COM AS ESPECIFICAÇÕES DO FABRICANTE."
+    ),
+    "🎛️ Reparo Eletrônico em Bancada / Placa de Potência": (
+        "DIAGNÓSTICO E MANUTENÇÃO EM PLACA ELETRÔNICA NO LABORATÓRIO TÉCNICO EMED. "
+        "IDENTIFICADOS COMPONENTES EM CURTO-CIRCUITO / DEGRADADOS NA ETAPA DE ALIMENTAÇÃO E CONTROLE. "
+        "SUBSTITUIÇÃO DE SEMICONDUTORES, CAPACITORES E DIODOS DE POTÊNCIA. "
+        "RESSOLDA COM ESTAÇÃO DE SOLDA PROFISSIONAL, BANHO TÉCNICO DE LIMPEZA E APLICAÇÃO DE VERNIZ PROTETOR. "
+        "TESTES DE FONTE SOB CARGA EM BANCADA DURANTE 4 HORAS COM SUCESSO. REINSTALAÇÃO E VALIDAÇÃO NO EQUIPAMENTO."
+    ),
+    "🛡️ Segurança Elétrica, Cabos & Freios Mecânicos": (
+        "INSPEÇÃO DE SEGURANÇA MECÂNICA E ELÉTRICA. "
+        "REVISÃO DE CABOS DE AÇO DE SUSTENTAÇÃO DO CONTRAPESO E SISTEMA DE POLIAS. "
+        "AFERIÇÃO DA FORÇA DE RETENÇÃO DOS ELETROFREIOS LONGITUDINAL, VERTICAL E TRANSVERSAL. "
+        "CHECAGEM DOS INTERTRAVAMENTOS DE PORTA E BOTÕES DE PARADA DE EMERGÊNCIA (E-STOP). "
+        "TESTES SATISFATÓRIOS CONFORME PADRÕES INTERNACIONAIS DE ENGENHARIA BIOMÉDICA."
+    )
+}
+
+
+def gerar_sugestao_relatorio_clinico(equipamento: str, defeito: str = "", tipo_servico: str = "", causa_raiz: str = "") -> str:
+    """Gera sugestão inteligente de relatório técnico da EMED baseado na modalidade e no sintoma relatado."""
+    eq_norm = str(equipamento).upper().replace("Ó", "O").replace("Ã", "A").replace("Õ", "O").replace("É", "E")
+    def_norm = str(defeito).upper().replace("Ó", "O").replace("Ã", "A").replace("Õ", "O").replace("É", "E")
+    
+    # 1. Tomografia
+    if any(k in eq_norm for k in ["TOMO", "TC", "BRIGHTSPEED", "BRIVO", "OPTIMA"]):
+        if any(w in def_norm for w in ["MESA", "UP", "DOWN", "SUBIDA", "DESCIDA", "ELEVACAO", "TRAV"]):
+            return (
+                "INTERVENÇÃO TÉCNICA NO SISTEMA DE MOVIMENTAÇÃO DA MESA DO PACIENTE (TOMOGRAFIA). "
+                "REALIZADA ABERTURA DOS PAINÉIS LATERAIS E INSPEÇÃO DAS GUIAS LINEARES VERTICAIS E CABOS DE TRAÇÃO. "
+                "IDENTIFICADO RESÍDUO E FALTA DE LUBRIFICAÇÃO NOS TRILHOS. EXECUTADA LIMPEZA QUÍMICA E APLICAÇÃO DE GRAXA SINTÉTICA DE ALTA VISCOSIDADE. "
+                "EFETUADA A RECALIBRAÇÃO DOS POTENCIÔMETROS DE ELEVAÇÃO (ENCODERS UP/DOWN) E ALINHAMENTO DO SENSOR DE FIM DE CURSO. "
+                "REALIZADOS 10 CICLOS DE TESTES COM CARGA (150 KG) COM RESPOSTA SUAVE E REPRODUTÍVEL. "
+                "EQUIPAMENTO APROVADO E LIBERADO CONFORME PROTOCOLO POP-EMED-TC-004."
+            )
+        elif any(w in def_norm for w in ["TUBO", "KV", "MA", "DISPARO", "ALTA TENSAO", "ARCING", "GERADOR", "JEDI"]):
+            return (
+                "INSPEÇÃO E DIAGNÓSTICO DO SISTEMA GERADOR DE ALTA TENSÃO E TUBO DE RAIOS-X DE TC. "
+                "AFERIÇÃO DAS CONEXÕES DE ALTA TENSÃO, VERIFICAÇÃO DO NÍVEL E FLUXO DO ÓLEO DE REFRIGERAÇÃO DO MONOBLOCO. "
+                "EXECUTADA LEITURA DO HISTÓRICO DE ERROS DE ARCING E CALIBRAÇÃO DE CORRENTE DE FILAMENTO. "
+                "PROCEDIMENTO DE WARM-UP (AQUECIMENTO GRADUAL DO ÂNODO) EXECUTADO COM SUCESSO. "
+                "CALIBRAÇÃO DE AR (AIR CALIBRATION) REALIZADA NOS DETECTORES COM NÍVEIS DE RUÍDO DENTRO DO TOLERADO PELO FABRICANTE."
+            )
+        else:
+            return (
+                "MANUTENÇÃO PREVENTIVA E CALIBRAÇÃO GERAL EM SISTEMA DE TOMOGRAFIA COMPUTADORIZADA. "
+                "LIMPEZA DO GANTRY, CHECAGEM DAS ESCOVAS DO SLIP-RING E VERIFICAÇÃO DE DESGASTE. "
+                "INSPEÇÃO DOS SISTEMAS DE REFRIGERAÇÃO, TESTE DE SENSORES DE PARADA DE EMERGÊNCIA E LASERS DE POSICIONAMENTO. "
+                "AFERIÇÃO DE SEGURANÇA ELÉTRICA E QUALIDADE DE IMAGEM COM FANTOMA DE CALIBRAÇÃO. EQUIPAMENTO 100% OPERACIONAL."
+            )
+            
+    # 2. Mamografia
+    elif any(k in eq_norm for k in ["MAMO", "SENOGRAPHE", "LILLY", "SELENIA"]):
+        if any(w in def_norm for w in ["COMPRESS", "PEDAL", "FORCA", "DANO"]):
+            return (
+                "MANUTENÇÃO CORRETIVA NO SISTEMA DE COMPRESSÃO E PEDAIS DO MAMÓGRAFO. "
+                "DESMONTAGEM DA CAIXA DE REDUÇÃO E ENGRENAGENS DO SISTEMA MOTORIZADO DE COMPRESSÃO. "
+                "AJUSTE DA TENSÃO MECÂNICA, LUBRIFICAÇÃO DOS EIXOS E TESTE DE CONTINUIDADE NOS MICRO-SWITCHES DOS PEDAIS. "
+                "CALIBRAÇÃO DA CÉLULA DE CARGA: AJUSTE DO LIMITE MÁXIMO DE COMPRESSÃO PARA 18 daN CONFORME REQUISITOS DA RDC 611/ANVISA. "
+                "TESTES DE DESCOMPRESSÃO AUTOMÁTICA DE EMERGÊNCIA VALIDADOS COM SUCESSO."
+            )
+        else:
+            return (
+                "MANUTENÇÃO PREVENTIVA E AFERIÇÃO RADIOMÉTRICA EM MAMÓGRAFO. "
+                "INSPEÇÃO MECÂNICA DO BRAÇO C, VERIFICAÇÃO DOS ELETROFREIOS DE ROTAÇÃO E ALINHAMENTO DA BANDEJA DE COMPRESSÃO. "
+                "AFERIÇÃO DA FOTOCÉLULA (AEC) E CONTROLE DE QUALIDADE COM FANTOMA ACRÍLICO PADRÃO. "
+                "NENHUMA ANOMALIA DETECTADA. EQUIPAMENTO LIBERADO PARA EXAMES CLÍNICOS."
+            )
+
+    # 3. Raio-X
+    elif any(k in eq_norm for k in ["RAIO", "RX", "LOTUS", "SHIMADZU", "MOBILEDART", "NEUVISION"]):
+        if any(w in def_norm for w in ["FREIO", "ESTATIVA", "MESA", "CABO", "PESO"]):
+            return (
+                "MANUTENÇÃO MECÂNICA E ELÉTRICA NA ESTATIVA E MESA DE EXAMES DE RAIOS-X. "
+                "AJUSTE E TENSIONAMENTO DOS CABOS DE AÇO DO CONTRAPESO COM INSPEÇÃO DE DESGASTE. "
+                "REGULAGEM DA FOLGA DOS ELETROFREIOS LONGITUDINAL E VERTICAL COM TESTE DE RETENÇÃO EM CARGA. "
+                "LUBRIFICAÇÃO DOS TRILHOS E SISTEMA DE ROLAMENTOS. "
+                "MOVIMENTAÇÃO SUAVE RESTABELECIDA EM TODA A EXTENSÃO DO CURSO."
+            )
+        elif any(w in def_norm for w in ["COLIMADOR", "LUZ", "CAMPO", "LAMPADA"]):
+            return (
+                "ALINHAMENTO E CALIBRAÇÃO DO COLIMADOR DE RAIOS-X. "
+                "SUBSTITUIÇÃO DA LÂMPADA HALÓGENA DE PROJEÇÃO E AJUSTE DO ESPELHO REFLETOR. "
+                "CALIBRAÇÃO DE CONGRUÊNCIA ENTRE O CAMPO DE LUZ E O CAMPO EFETIVO DE RADIAÇÃO CONFORME PORTARIA ANVISA. "
+                "VERIFICAÇÃO DAS LÂMINAS DE CHUMBO E TEMPORIZADOR AUTOMÁTICO DE ILUMINAÇÃO. APROVADO."
+            )
+        else:
+            return (
+                "MANUTENÇÃO PREVENTIVA E AFERIÇÃO RADIOMÉTRICA EM EQUIPAMENTO DE RAIOS-X. "
+                "AFERIÇÃO DE KVP, MA E TEMPO DE DISPARO COM MULTÍMETRO RADIOMÉTRICO HOMOLOGADO. "
+                "TESTE DE REPETIBILIDADE, LINEARIDADE E RENDIMENTO DO TUBO. "
+                "INSPEÇÃO DA ISOLAÇÃO DOS CABOS DE ALTA TENSÃO E NÍVEL DE ÓLEO DO TANQUE GERADOR. EQUIPAMENTO LIBERADO."
+            )
+
+    # 4. Padrão Geral
+    return (
+        "MANUTENÇÃO TÉCNICA ESPECIALIZADA REALIZADA PELA EQUIPE DA EMED ELETROMEDICINA. "
+        "INSPEÇÃO COMPLETA DOS SISTEMAS MECÂNICOS, ELETRÔNICOS E DE CONTROLE. "
+        "TESTES DE FUNCIONALIDADE, CALIBRAÇÃO DE PARÂMETROS OPERACIONAIS E VERIFICAÇÃO DE SEGURANÇA. "
+        "EQUIPAMENTO AVALIADO E LIBERADO PARA USO NORMAL CONFORME PADRÕES DA ENGENHARIA BIOMÉDICA."
+    )

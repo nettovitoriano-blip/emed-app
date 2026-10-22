@@ -428,7 +428,7 @@ def render_portal_cliente(ctx: AppContext):
                     st.success("Obrigado pelo seu feedback!")
                     st.balloons()
         with col_fb2:
-            url_g_client = obter_url_google_review()
+            url_g_client = obter_url_google_review(ctx.db_name)
             if nota_cli >= 4:
                 st.markdown(f"""
                     <div style="background: #172554; border: 1.5px solid #3b82f6; border-radius: 10px; padding: 18px; text-align: center;">

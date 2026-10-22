@@ -9,17 +9,24 @@ import sqlite3
 import datetime
 import pandas as pd
 import streamlit as st
-from emed_core import limpar_texto, obter_id_os
+from emed_core import limpar_texto, obter_id_os, obter_configuracao, salvar_configuracao
 from emed_services import AppContext
 
 URL_GOOGLE_REVIEW_OFICIAL = "https://www.google.com/maps/search/?api=1&query=EMED+Eletromedicina+Ltda+Eusebio+Ceara"
 
-def obter_url_google_review() -> str:
-    """Retorna o link oficial para avaliação Google, priorizando link customizado da empresa."""
+def obter_url_google_review(db_name: str = "emed.db") -> str:
+    """Retorna o link oficial para avaliação Google, priorizando link configurado da empresa."""
     try:
         import streamlit as st
         if "link_google_avaliacao" in st.session_state and st.session_state.link_google_avaliacao:
             return st.session_state.link_google_avaliacao.strip()
+    except Exception:
+        pass
+    try:
+        if db_name:
+            cfg = obter_configuracao(db_name, "google_review_url")
+            if cfg and "http" in cfg:
+                return cfg
     except Exception:
         pass
     return URL_GOOGLE_REVIEW_OFICIAL
@@ -241,15 +248,35 @@ def render_pesquisa_satisfacao(ctx: AppContext):
                     </div>
                 """, unsafe_allow_html=True)
 
-        with st.expander("⚙️ Configurar Link Oficial do Google Meu Negócio"):
-            custom_g = st.text_input(
-                "URL Perfil Google:",
-                value=st.session_state.get("link_google_avaliacao", URL_GOOGLE_REVIEW_OFICIAL),
-                key="cfg_url_g_input",
-                help="Cole o link curto gerado pelo Google Meu Negócio da EMED"
+        with st.expander("⚙️ Configurar Link Direto de Avaliação (Google Meu Negócio)"):
+            url_atual_cfg = obter_url_google_review(db_name)
+            st.markdown(
+                """
+                <div style="background: rgba(59, 130, 246, 0.1); border-left: 3px solid #3b82f6; padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 10px;">
+                    <b>📍 Como obter o link direto com as 5 estrelas abertas:</b><br/>
+                    1. No celular ou PC, acesse o <b>Google Meu Negócio</b> ou pesquise pela <b>EMED Eletromedicina</b> no Google.<br/>
+                    2. No painel da empresa, clique em <b>"Solicitar avaliações"</b> (ou "Receber mais avaliações").<br/>
+                    3. O Google exibirá um link curto direto como: <code>https://g.page/r/CODIGO/review</code>.<br/>
+                    4. Cole o link no campo abaixo e clique em <b>Salvar Link Oficial</b>.
+                </div>
+                """,
+                unsafe_allow_html=True
             )
-            if custom_g and custom_g.strip():
-                st.session_state.link_google_avaliacao = custom_g.strip()
+            c_g1, c_g2 = st.columns([3, 1])
+            with c_g1:
+                custom_g = st.text_input(
+                    "Link Direto de Avaliação:",
+                    value=url_atual_cfg,
+                    key="cfg_url_g_input",
+                    help="Cole o link curto gerado pelo Google Meu Negócio da EMED (ex: https://g.page/r/.../review)"
+                )
+            with c_g2:
+                if st.button("💾 Salvar Link", key="btn_salvar_link_g_cfg", use_container_width=True):
+                    if custom_g and custom_g.strip():
+                        st.session_state.link_google_avaliacao = custom_g.strip()
+                        salvar_configuracao(db_name, "google_review_url", custom_g.strip())
+                        st.success("Link atualizado e salvo permanentemente!")
+                        st.rerun()
 
         if btn_salvar_pesquisa:
             clicou_g = 1 if nota_escolhida >= 4 else 0

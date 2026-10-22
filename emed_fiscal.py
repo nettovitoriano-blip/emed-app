@@ -14,6 +14,7 @@ import json
 import uuid
 import hashlib
 import sqlite3
+import pandas as pd
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
