@@ -63,6 +63,25 @@ def _obter_logo_base64() -> str:
     return ""
 
 
+def _carregar_foto_base64(caminho: str) -> str:
+    """Converte arquivo de imagem local para base64 data URI segura para renderização em HTML/PDF."""
+    if not caminho or not isinstance(caminho, str):
+        return ""
+    if caminho.startswith("data:image"):
+        return caminho
+    if os.path.exists(caminho):
+        try:
+            ext = os.path.splitext(caminho)[1].lower().replace('.', '')
+            if ext == 'jpg': ext = 'jpeg'
+            if ext not in ['jpeg', 'png', 'webp', 'gif']: ext = 'jpeg'
+            with open(caminho, 'rb') as f:
+                b64 = base64.b64encode(f.read()).decode('utf-8')
+            return f"data:image/{ext};base64,{b64}"
+        except Exception:
+            return ""
+    return ""
+
+
 def _render_modo_offline(ctx: AppContext):
     df = ctx.df
     col_off1, col_off2 = st.columns(2)
@@ -105,7 +124,7 @@ def _render_modo_offline(ctx: AppContext):
 
 
 def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: dict = None) -> str:
-    """Gera o documento HTML/A4 oficial da Ordem de Serviço Fechada (com logo no cabeçalho superior esquerdo e formatação hospitalar)."""
+    """Gera o documento HTML/A4 oficial da Ordem de Serviço Fechada com cabeçalho equilibrado, fotos e sem sobreposição de textos."""
     if row_c is None and isinstance(id_os_c, (pd.Series, dict)):
         row_c = pd.Series(id_os_c)
         id_os_c = str(obter_id_os(0, row_c))
@@ -156,18 +175,49 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
 
     logo_b64 = _obter_logo_base64()
     bloco_logo = (
-        f'<img src="{logo_b64}" style="height:62px; max-width:180px; object-fit:contain;" alt="Logo EMED"/>'
+        f'<img src="{logo_b64}" style="height:42px; max-width:125px; object-fit:contain; vertical-align:middle;" alt="Logo EMED"/>'
         if logo_b64
-        else '<div style="font-size:24px; font-weight:900; color:#0b132b;">🏥 EMED</div>'
+        else '<span style="font-size:16px; font-weight:900; color:#0b132b;">🏥 EMED</span>'
     )
 
     bloco_img_cli = (
-        f'<img src="{img_sig}" style="max-height:65px; max-width:220px;" alt="Assinatura Cliente"/>'
+        f'<img src="{img_sig}" style="max-height:45px; max-width:190px;" alt="Assinatura Cliente"/>'
         if img_sig.startswith("data:image")
-        else f'<div style="height:50px; line-height:50px; font-weight:bold; color:#0b132b;">{ass_cli}</div>'
+        else f'<div style="height:35px; line-height:35px; font-weight:bold; color:#0b132b; font-size:11px;">{ass_cli}</div>'
     )
 
     horario_atend_txt = f"{cin} às {cout} ({dur})" if cin != "-" and cin else "Horário comercial"
+
+    # Evidências Fotográficas Antes & Depois
+    f_ant_c = limpar_texto(row_c.get('foto_evidencia'), '')
+    f_dep_c = limpar_texto(row_c.get('foto_depois'), '')
+    f_ant_b64 = _carregar_foto_base64(f_ant_c)
+    f_dep_b64 = _carregar_foto_base64(f_dep_c)
+
+    if f_ant_b64 or f_dep_b64:
+        bloco_fotos = f"""
+  <div class="sec-title">5. Evidências Fotográficas do Atendimento (Antes & Depois)</div>
+  <table class="grid-table" style="margin-top:2px;">
+    <colgroup><col style="width:50%;"/><col style="width:50%;"/></colgroup>
+    <tr>
+      <td style="text-align:center; padding:5px; background:#f8fafc;">
+        <div style="font-size:9.5px; font-weight:bold; color:#0f766e; margin-bottom:3px;">📸 EVIDÊNCIA INICIAL / DEFEITO (ANTES)</div>
+        {f'<img src="{f_ant_b64}" style="max-height:100px; max-width:92%; border-radius:3px; border:1px solid #cbd5e1;" alt="Foto Antes"/>' if f_ant_b64 else '<div style="color:#94a3b8; font-size:9.5px; padding:20px 0;">(Nenhuma foto inicial anexada)</div>'}
+      </td>
+      <td style="text-align:center; padding:5px; background:#f8fafc;">
+        <div style="font-size:9.5px; font-weight:bold; color:#059669; margin-bottom:3px;">✅ CONCLUSÃO DO REPARO / TESTE (DEPOIS)</div>
+        {f'<img src="{f_dep_b64}" style="max-height:100px; max-width:92%; border-radius:3px; border:1px solid #cbd5e1;" alt="Foto Depois"/>' if f_dep_b64 else '<div style="color:#94a3b8; font-size:9.5px; padding:20px 0;">(Nenhuma foto final anexada)</div>'}
+      </td>
+    </tr>
+  </table>
+        """
+    else:
+        bloco_fotos = """
+  <div class="sec-title">5. Evidências Fotográficas do Atendimento (Antes & Depois)</div>
+  <div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:4px; padding:5px 8px; font-size:9px; color:#64748b; text-align:center; margin-bottom:3px;">
+    📷 Nenhuma evidência fotográfica anexada no fechamento desta Ordem de Serviço.
+  </div>
+        """
 
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -175,109 +225,176 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
 <meta charset="utf-8"/>
 <title>Ordem de Serviço #{id_os_c} - EMED Eletromedicina</title>
 <style>
-  body {{ font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 20px; background: #ffffff; line-height: 1.4; }}
-  .os-box {{ border: 2px solid #0b132b; border-radius: 8px; padding: 22px; max-width: 880px; margin: auto; }}
-  .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0b132b; padding-bottom: 14px; margin-bottom: 14px; }}
-  .title {{ font-size: 19px; font-weight: 800; color: #0b132b; }}
-  .sec-title {{ background: #1c2541; color: #64dfdf; padding: 6px 10px; font-weight: bold; font-size: 12px; border-radius: 4px; margin-top: 12px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }}
-  table {{ width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 4px; }}
-  td, th {{ border: 1px solid #cbd5e1; padding: 6px 9px; text-align: left; vertical-align: top; }}
-  .label {{ font-weight: bold; color: #1e293b; width: 22%; background: #f8fafc; }}
-  .destaque-exec {{ background: #f8fafc; border: 1.5px solid #0f766e; border-left: 5px solid #0f766e; border-radius: 4px; padding: 10px 12px; font-size: 13px; line-height: 1.5; color: #0b132b; font-weight: 500; margin: 4px 0 8px 0; }}
-  .sigs {{ display: flex; gap: 20px; margin-top: 18px; }}
-  .sig-card {{ flex: 1; border: 1.5px solid #94a3b8; border-radius: 6px; padding: 12px; text-align: center; font-size: 12px; background: #fafafa; }}
+  body {{ font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 0; padding: 0; background: #ffffff; line-height: 1.25; font-size: 10px; }}
+  .os-box {{ border: 1.5px solid #0b132b; border-radius: 5px; padding: 10px; max-width: 860px; margin: auto; }}
+  
+  /* CABEÇALHO EM TABELA DE 4 COLUNAS: EQUILÍBRIO PERFEITO */
+  .head-tbl {{ width: 100%; border-collapse: collapse; border-bottom: 1.8px solid #0b132b; margin-bottom: 6px; }}
+  .head-tbl td {{ border: none; vertical-align: middle; padding: 2px 4px; }}
+  
+  .sec-title {{ background: #1c2541; color: #64dfdf; padding: 2.5px 6px; font-weight: bold; font-size: 10px; border-radius: 3px; margin-top: 5px; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; }}
+  
+  /* TABELAS DE DADOS COM COLGROUP EXPLÍCITO - ELIMINA TOTALMENTE SOBREPOSIÇÃO */
+  .grid-table {{ width: 100%; border-collapse: collapse; font-size: 9.8px; margin-bottom: 2px; table-layout: fixed; }}
+  .grid-table td {{ border: 1px solid #cbd5e1; padding: 2.5px 5px; text-align: left; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }}
+  .lbl {{ font-weight: bold; color: #1e293b; background: #f8fafc; }}
+  
+  .destaque-exec {{ background: #f8fafc; border: 1.2px solid #0f766e; border-left: 3.5px solid #0f766e; border-radius: 3px; padding: 4px 6px; font-size: 9.8px; line-height: 1.3; color: #0b132b; font-weight: 500; margin: 2px 0 3px 0; word-wrap: break-word; }}
+  
+  .sigs-table {{ width: 100%; border-collapse: collapse; margin-top: 5px; table-layout: fixed; page-break-inside: avoid; }}
+  .sigs-table td {{ border: 1px solid #94a3b8; border-radius: 4px; padding: 4px; text-align: center; font-size: 9.5px; background: #fafafa; vertical-align: bottom; }}
+  
   @media print {{ .no-print {{ display: none; }} body {{ margin: 0; }} .os-box {{ border: 1px solid #000; }} }}
 </style>
 </head>
 <body>
 <div class="os-box">
-  <div class="header">
-    <div style="display:flex; align-items:center; gap:16px;">
-      <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:4px 8px; display:inline-flex; align-items:center;">
+
+  <!-- CABEÇALHO REORGANIZADO -->
+  <table class="head-tbl">
+    <colgroup>
+      <col style="width: 18%;"/>
+      <col style="width: 32%;"/>
+      <col style="width: 32%;"/>
+      <col style="width: 18%;"/>
+    </colgroup>
+    <tr>
+      <!-- COL 1: LOGO -->
+      <td style="text-align: left; vertical-align: middle;">
         {bloco_logo}
-      </div>
-      <div>
-        <div class="title">EMED ELETROMEDICINA LTDA.</div>
-        <div style="font-size:12px; color:#334155; font-weight:600;">Eletromedicina, Manutenção em Equipamentos de Diagnóstico por Imagem</div>
-        <div style="font-size:11px; color:#64748b;">CNPJ: 03.611.974/0001-08 • Fone: (85) 3254-2929 • Site: https://emed.med.br/ • Fortaleza - CE</div>
-      </div>
-    </div>
-    <div style="text-align:right;">
-      <div style="font-size:22px; font-weight:900; color:#0b132b; letter-spacing:0.5px;">ORDEM DE SERVIÇO Nº #{id_os_c}</div>
-      <div style="font-size:13px; color:#334155; margin-top:4px;"><b>Data:</b> {dt_agend}</div>
-    </div>
-  </div>
+      </td>
+      <!-- COL 2: NOME E DETALHES AO LADO DO LOGO -->
+      <td style="text-align: left; vertical-align: middle;">
+        <div style="font-size: 11.5px; font-weight: 900; color: #0b132b; line-height: 1.15;">EMED ELETROMEDICINA</div>
+        <div style="font-size: 8px; color: #334155; font-weight: 600; line-height: 1.15;">Engenharia Clínica & Imagem</div>
+        <div style="font-size: 7.5px; color: #64748b; line-height: 1.15;">CNPJ: 03.611.974/0001-08 • (85) 3254-2929</div>
+        <div style="font-size: 7.5px; color: #64748b; line-height: 1.15;">emed.med.br • Fortaleza - CE</div>
+      </td>
+      <!-- COL 3: ORDEM DE SERVIÇO Nº CENTRALIZADO -->
+      <td style="text-align: center; vertical-align: middle;">
+        <div style="font-size: 10px; font-weight: 800; color: #475569; letter-spacing: 0.8px;">ORDEM DE SERVIÇO</div>
+        <div style="font-size: 18px; font-weight: 900; color: #0b132b; letter-spacing: 0.5px;">Nº #{id_os_c}</div>
+        <div style="font-size: 8px; color: #059669; font-weight: bold;">VIA OFICIAL DO CLIENTE</div>
+      </td>
+      <!-- COL 4: DATA NO CANTO SUPERIOR DIREITO -->
+      <td style="text-align: right; vertical-align: middle;">
+        <div style="font-size: 8.5px; color: #64748b; font-weight: bold; text-transform: uppercase;">Data de Emissão</div>
+        <div style="font-size: 11.5px; font-weight: bold; color: #0b132b; margin-top: 1px;">📅 {dt_agend}</div>
+      </td>
+    </tr>
+  </table>
 
+  <!-- SEÇÃO 1: DADOS DO CLIENTE (DIMENSIONAMENTO COMPACTO E ELEGANTE) -->
   <div class="sec-title">1. Dados do Cliente & Localização do Atendimento</div>
-  <table>
+  <table class="grid-table">
+    <colgroup>
+      <col style="width: 20%;"/>
+      <col style="width: 32%;"/>
+      <col style="width: 18%;"/>
+      <col style="width: 30%;"/>
+    </colgroup>
     <tr>
-      <td class="label">Nome do Cliente:</td><td><b>{cliente}</b></td>
-      <td class="label">CNPJ:</td><td><b>{cnpj}</b></td>
+      <td class="lbl">Nome do Cliente:</td><td><b>{cliente}</b></td>
+      <td class="lbl">CNPJ:</td><td><b>{cnpj}</b></td>
     </tr>
     <tr>
-      <td class="label">Endereço Completo:</td><td colspan="3">{endereco} — {cidade}/{estado}</td>
+      <td class="lbl">Endereço Completo:</td><td colspan="3">{endereco} — {cidade}/{estado}</td>
     </tr>
     <tr>
-      <td class="label">Responsável Local:</td><td>{resp_hosp}</td>
-      <td class="label">Contatos (E-mail / Whats):</td><td>{email_cli} &nbsp;|&nbsp; {whats_cli}</td>
+      <td class="lbl">Responsável Local:</td><td>{resp_hosp}</td>
+      <td class="lbl">Contatos (E-mail/Whats):</td><td>{email_cli} &nbsp;|&nbsp; {whats_cli}</td>
     </tr>
   </table>
 
+  <!-- SEÇÃO 2: DADOS DO EQUIPAMENTO & EQUIPE TÉCNICA -->
   <div class="sec-title">2. Dados do Equipamento, Tipo de Serviço & Equipe Técnica</div>
-  <table>
+  <table class="grid-table">
+    <colgroup>
+      <col style="width: 20%;"/>
+      <col style="width: 32%;"/>
+      <col style="width: 18%;"/>
+      <col style="width: 30%;"/>
+    </colgroup>
     <tr>
-      <td class="label">Equipamento / Ativo:</td><td><b>{equipamento}</b></td>
-      <td class="label">Tipo de Serviço:</td><td><b>{tipo_srv}</b> ({etapa_prev})</td>
+      <td class="lbl">Equipamento / Ativo:</td><td><b>{equipamento}</b></td>
+      <td class="lbl">Tipo de Serviço:</td><td><b>{tipo_srv}</b> ({etapa_prev})</td>
     </tr>
     <tr>
-      <td class="label">Técnico Principal:</td><td><b>{tec_princ}</b> (CFT/CREA)</td>
-      <td class="label">Técnico Auxiliar:</td><td><b>{tec_aux}</b></td>
+      <td class="lbl">Técnico Principal:</td><td><b>{tec_princ}</b> (CFT/CREA)</td>
+      <td class="lbl">Técnico Auxiliar:</td><td><b>{tec_aux}</b></td>
     </tr>
     <tr>
-      <td class="label">Horário de Atendimento:</td><td>{horario_atend_txt}</td>
-      <td class="label">Condição na Saída:</td><td><b style="color:#059669;">✅ {cond_fin}</b></td>
+      <td class="lbl">Horário Atendimento:</td><td>{horario_atend_txt}</td>
+      <td class="lbl">Condição na Saída:</td><td><b style="color:#059669;">✅ {cond_fin}</b></td>
     </tr>
   </table>
 
+  <!-- SEÇÃO 3: SERVIÇOS EXECUTADOS & DIAGNÓSTICO -->
   <div class="sec-title">3. Serviços Executados & Diagnóstico Técnico (Intervenção Realizada)</div>
-  <table>
-    <tr><td class="label">Defeito Relatado / Causa:</td><td colspan="3">{def_rel} (Causa Raiz: {causa_r})</td></tr>
-    <tr><td class="label">Problemas Encontrados:</td><td colspan="3">{prob_enc}</td></tr>
+  <table class="grid-table">
+    <colgroup>
+      <col style="width: 20%;"/>
+      <col style="width: 80%;"/>
+    </colgroup>
+    <tr><td class="lbl">Defeito Relatado / Causa:</td><td>{def_rel} (Causa Raiz: {causa_r})</td></tr>
+    <tr><td class="lbl">Problemas Encontrados:</td><td>{prob_enc}</td></tr>
   </table>
-  <div style="margin-top:6px; font-size:12px; font-weight:bold; color:#0f766e;">🛠️ DESCRIÇÃO DETALHADA DOS SERVIÇOS EXECUTADOS:</div>
+  <div style="margin-top:3px; font-size:9.5px; font-weight:bold; color:#0f766e;">🛠️ DESCRIÇÃO DETALHADA DOS SERVIÇOS EXECUTADOS:</div>
   <div class="destaque-exec">{srv_exec}</div>
-  <table>
+  <table class="grid-table">
+    <colgroup>
+      <col style="width: 20%;"/>
+      <col style="width: 32%;"/>
+      <col style="width: 18%;"/>
+      <col style="width: 30%;"/>
+    </colgroup>
     <tr>
-      <td class="label">Checklist POP / Protocolo:</td><td>{chk_pop} (Etapa: {etapa_prev})</td>
-      <td class="label">Parâmetros / Testes:</td><td>{param_m}</td>
+      <td class="lbl">Checklist / Protocolo:</td><td>{chk_pop} (Etapa: {etapa_prev})</td>
+      <td class="lbl">Parâmetros / Testes:</td><td>{param_m}</td>
     </tr>
   </table>
 
-  <div class="sec-title">4. Observações Técnicas, Pendências & Condição Final</div>
-  <table>
-    <tr><td class="label">Observações Gerais:</td><td colspan="3">{obs_ger}</td></tr>
-    <tr><td class="label">Pendências / Recomendações:</td><td colspan="3">{pend_txt}</td></tr>
-    <tr>
-      <td class="label">Condição de Pagamento:</td><td colspan="3">{cond_pag}</td>
-    </tr>
+  <!-- SEÇÃO 4: OBSERVAÇÕES & PENDÊNCIAS -->
+  <div class="sec-title">4. Observações Técnicas, Pendências & Faturamento</div>
+  <table class="grid-table">
+    <colgroup>
+      <col style="width: 20%;"/>
+      <col style="width: 80%;"/>
+    </colgroup>
+    <tr><td class="lbl">Observações Gerais:</td><td>{obs_ger}</td></tr>
+    <tr><td class="lbl">Pendências / Recomendações:</td><td>{pend_txt}</td></tr>
+    <tr><td class="lbl">Condição de Pagamento:</td><td>{cond_pag}</td></tr>
   </table>
 
-  <div class="sec-title">5. Termo de Aceite & Validação Técnica</div>
-  <div class="sigs">
-    <div class="sig-card">
-      <div style="font-family:'Brush Script MT',cursive; font-size:24px; color:#0f766e;">{tec_princ.title()}</div>
-      <hr style="border:0; border-top:1px solid #94a3b8; margin:6px 0;"/>
-      <b>{ass_tec}</b><br/>
-      {f'<span style="font-size:11px; color:#475569;">Auxiliar: {tec_aux}</span><br/>' if tec_aux and tec_aux.upper() != 'NENHUM (INDIVIDUAL)' else ''}
-      <span style="color:#64748b;">Responsável Técnico EMED Eletromedicina</span>
-    </div>
-    <div class="sig-card">
-      {bloco_img_cli}
-      <hr style="border:0; border-top:1px solid #94a3b8; margin:6px 0;"/>
-      <b>{ass_cli}</b><br/>
-      <span style="color:#64748b;">Assinatura do Cliente / Responsável Local</span>
-    </div>
+  <!-- SEÇÃO 5: EVIDÊNCIAS FOTOGRÁFICAS (ANTES & DEPOIS) -->
+  {bloco_fotos}
+
+  <!-- SEÇÃO 6: TERMO DE ACEITE & VALIDAÇÃO TÉCNICA -->
+  <div style="page-break-inside: avoid;">
+    <div class="sec-title">6. Termo de Aceite & Validação Técnica</div>
+    <table class="sigs-table">
+      <colgroup>
+        <col style="width: 50%;"/>
+        <col style="width: 50%;"/>
+      </colgroup>
+      <tr>
+        <td>
+          <div style="font-family:'Brush Script MT',cursive; font-size:18px; color:#0f766e; height:24px;">{tec_princ.title()}</div>
+          <hr style="border:0; border-top:1px solid #94a3b8; margin:3px 15px;"/>
+          <b>{ass_tec}</b><br/>
+          {f'<span style="font-size:8.5px; color:#475569;">Auxiliar: {tec_aux}</span><br/>' if tec_aux and tec_aux.upper() != 'NENHUM (INDIVIDUAL)' else ''}
+          <span style="color:#64748b; font-size:9px;">Responsável Técnico EMED Eletromedicina</span>
+        </td>
+        <td>
+          {bloco_img_cli}
+          <hr style="border:0; border-top:1px solid #94a3b8; margin:3px 15px;"/>
+          <b>{ass_cli}</b><br/>
+          <span style="color:#64748b; font-size:9px;">Assinatura do Cliente / Responsável Local</span>
+        </td>
+      </tr>
+    </table>
   </div>
+
 </div>
 </body>
 </html>"""
@@ -638,22 +755,93 @@ def _render_historico_concluidas(ctx: AppContext):
                     else f'<div style="height:45px; line-height:45px; font-weight:bold; color:#cbd5e1;">(Assinatura Coletada: {ass_cli_hist})</div>'
                 )
 
-                card_os_fechada_html = f"""<div style="background:#101935; border:1.8px solid #64dfdf; border-radius:12px; padding:20px; margin-bottom:16px; box-shadow:0 4px 16px rgba(0,0,0,0.35);">
-<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #3a506b; padding-bottom:14px; margin-bottom:14px; flex-wrap:wrap; gap:12px;">
-<div style="display:flex; align-items:center; gap:14px;">
+                card_os_fechada_html = f"""<style>
+.os-resp-card {{
+    background: #101935;
+    border: 1.8px solid #64dfdf;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+}}
+.os-resp-header {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #3a506b;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 12px;
+}}
+.os-resp-header-left {{
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}}
+.os-resp-header-center {{
+    text-align: center;
+}}
+.os-resp-header-right {{
+    text-align: right;
+}}
+.os-resp-grid-2 {{
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+    font-size: 13px;
+}}
+.os-resp-grid-equal {{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}}
+@media (max-width: 768px) {{
+    .os-resp-card {{
+        padding: 10px !important;
+    }}
+    .os-resp-header {{
+        flex-direction: column !important;
+        align-items: flex-start !important;
+    }}
+    .os-resp-header-left, .os-resp-header-center, .os-resp-header-right {{
+        width: 100% !important;
+        text-align: left !important;
+    }}
+    .os-resp-header-center {{
+        border-top: 1px solid #233554;
+        border-bottom: 1px solid #233554;
+        padding: 6px 0;
+        margin: 4px 0;
+    }}
+    .os-resp-grid-2,
+    .os-resp-grid-equal {{
+        grid-template-columns: 1fr !important;
+    }}
+}}
+</style>
+<div class="os-resp-card">
+<div class="os-resp-header">
+<div class="os-resp-header-left">
 {bloco_logo_tela}
 <div>
-<div style="font-size:18px; font-weight:900; color:#ffffff; letter-spacing:0.5px;">EMED ELETROMEDICINA LTDA.</div>
-<div style="font-size:12px; color:#64dfdf; font-weight:600;">Eletromedicina, Manutenção em Equipamentos de Diagnóstico por Imagem</div>
-<div style="font-size:11px; color:#94a3b8;">CNPJ: 03.611.974/0001-08 • Fone: (85) 3254-2929 • Site: <a href="https://emed.med.br/" target="_blank" style="color:#64dfdf; text-decoration:none;">emed.med.br</a> • Fortaleza - CE</div>
+<div style="font-size:16px; font-weight:900; color:#ffffff; letter-spacing:0.5px;">EMED ELETROMEDICINA LTDA.</div>
+<div style="font-size:11.5px; color:#64dfdf; font-weight:600;">Engenharia Clínica & Diagnóstico por Imagem</div>
+<div style="font-size:10px; color:#94a3b8;">CNPJ: 03.611.974/0001-08 • Fone: (85) 3254-2929 • Fortaleza - CE</div>
 </div>
 </div>
-<div style="text-align:right;">
-<div style="font-size:22px; font-weight:900; color:#64dfdf; letter-spacing:0.5px; text-shadow:0 2px 4px rgba(0,0,0,0.4);"><b>ORDEM DE SERVIÇO Nº #{id_os_c}</b></div>
-<div style="font-size:13px; color:#cbd5e1; margin-top:4px;">📅 <b>Data:</b> {dt_ag_h}</div>
+<div class="os-resp-header-center">
+<div style="font-size:11px; font-weight:bold; color:#94a3b8; text-transform:uppercase; letter-spacing:0.8px;">ORDEM DE SERVIÇO</div>
+<div style="font-size:22px; font-weight:900; color:#64dfdf; letter-spacing:0.5px; text-shadow:0 2px 4px rgba(0,0,0,0.4);"><b>Nº #{id_os_c}</b></div>
+<div style="font-size:9.5px; color:#34d399; font-weight:bold;">VIA CONCLUÍDA</div>
+</div>
+<div class="os-resp-header-right">
+<div style="font-size:10px; color:#94a3b8; font-weight:bold; text-transform:uppercase;">Data do Atendimento</div>
+<div style="font-size:13px; color:#cbd5e1; margin-top:2px;">📅 <b>{dt_ag_h}</b></div>
 </div>
 </div>
-<div style="display:grid; grid-template-columns: 1.15fr 1fr; gap:12px; margin-bottom:12px; font-size:13px;">
+<div class="os-resp-grid-2">
 <div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b; border-left:4px solid #64dfdf;">
 <div style="font-size:11px; font-weight:bold; color:#64dfdf; text-transform:uppercase; margin-bottom:6px; letter-spacing:0.5px;">🏥 DADOS DO CLIENTE & LOCALIZAÇÃO</div>
 <div style="font-size:14px; font-weight:bold; color:#ffffff;">{cli_nome_c} <span style="font-size:11px; color:#94a3b8; font-weight:normal;">(CNPJ: {cli_cnpj_c})</span></div>
@@ -675,7 +863,7 @@ def _render_historico_concluidas(ctx: AppContext):
 <div style="background:#0b132b; border:1px solid #3a506b; border-radius:6px; padding:12px 14px; margin-bottom:10px;">
 <div style="font-size:13.5px; color:#f8fafc; line-height:1.5; font-weight:500;">{srv_exec_h}</div>
 </div>
-<div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:12px;">
+<div class="os-resp-grid-equal" style="gap:10px; font-size:12px;">
 <div style="background:#0b132b; padding:8px 10px; border-radius:6px; border:1px solid #233554;">
 <b style="color:#f59e0b;">📢 Defeito Relatado:</b> {def_rel_h}<br/>
 <b style="color:#ef4444;">🔍 Causa Raiz / Problema:</b> {prob_enc_h}
@@ -686,7 +874,7 @@ def _render_historico_concluidas(ctx: AppContext):
 </div>
 </div>
 </div>
-<div style="display:grid; grid-template-columns: 1.15fr 1fr; gap:12px; margin-bottom:12px; font-size:13px;">
+<div class="os-resp-grid-2">
 <div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b;">
 <div style="font-size:11px; font-weight:bold; color:#cbd5e1; text-transform:uppercase; margin-bottom:4px;">📝 Observações Gerais & Recomendações</div>
 <div style="font-size:12.5px; color:#f8fafc;">{obs_ger_h}</div>
@@ -700,7 +888,7 @@ def _render_historico_concluidas(ctx: AppContext):
 <div style="font-size:11.5px; color:#94a3b8; margin-top:6px;">Faturamento / Contrato: <b>{row_c.get('condicao_pagamento') or 'Contrato Padrão'}</b></div>
 </div>
 </div>
-<div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+<div class="os-resp-grid-equal">
 <div style="background:#1c2541; padding:12px 14px; border-radius:8px; border:1px solid #3a506b; text-align:center;">
 <div style="font-size:11px; font-weight:bold; color:#64dfdf; text-transform:uppercase; margin-bottom:6px;">✍️ Responsável Técnico EMED</div>
 <div style="font-family:'Brush Script MT',cursive; font-size:24px; color:#34d399; height:40px; line-height:40px;">{tec_hist_c.title()}</div>
@@ -749,20 +937,23 @@ def _render_historico_concluidas(ctx: AppContext):
                 f_ant_c = limpar_texto(row_c.get('foto_evidencia'), '')
                 f_dep_c = limpar_texto(row_c.get('foto_depois'), '')
                 vid_c = limpar_texto(row_c.get('video_evidencia'), '')
-                if (f_ant_c and os.path.exists(f_ant_c)) or (f_dep_c and os.path.exists(f_dep_c)) or (vid_c and os.path.exists(vid_c)):
+                tem_midia = (f_ant_c and os.path.exists(f_ant_c)) or (f_dep_c and os.path.exists(f_dep_c)) or (vid_c and os.path.exists(vid_c))
+                if tem_midia:
                     st.markdown("---")
                     st.markdown("##### 📸 Anexo de Fotos & 🎥 Vídeo da Intervenção")
                     cf1, cf2, cf3 = st.columns(3)
                     with cf1:
                         if f_ant_c and os.path.exists(f_ant_c):
-                            st.image(f_ant_c, caption="Foto Antes / Evidência Inicial", width=240)
+                            st.image(f_ant_c, caption="📸 Foto Antes / Evidência Inicial", use_container_width=True)
                     with cf2:
                         if f_dep_c and os.path.exists(f_dep_c):
-                            st.image(f_dep_c, caption="Foto Depois / Serviço Concluído", width=240)
+                            st.image(f_dep_c, caption="✅ Foto Depois / Serviço Concluído", use_container_width=True)
                     with cf3:
                         if vid_c and os.path.exists(vid_c):
                             st.video(vid_c)
                             st.caption(f"🎥 Vídeo: {os.path.basename(vid_c)}")
+                else:
+                    st.caption("ℹ️ Nenhuma fotografia ou vídeo anexado nesta Ordem de Serviço.")
 
                 # OPÇÃO DE ENVIO POR E-MAIL, WHATSAPP & FICHA OFICIAL A4
                 st.markdown("---")

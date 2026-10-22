@@ -35,7 +35,23 @@ DICIONARIO_VIDEOS_ITS = {
     "01_Manual_Pre_Instalacao_Oficial_Lotus_HF500M.pdf": "Video_IT_RX_LOT001_Vistoria_Pre_Instalacao_HF500M.mp4",
     "02_Formulario_Vistoria_Pre_Instalacao_Lotus_HF500M_eMED.pdf": "Video_IT_RX_LOT001_Vistoria_Pre_Instalacao_HF500M.mp4",
     "IT_RXM_SHIM_004_Roteiro_Mestre_Instalacao_Comissionamento_31_Passos_MX8_MX9.md": "Video_IT_RXM_SHIM003_Instalacao_Montagem_MobileDaRt_MX8.mp4",
-    "IT_RXM_SHIM_004_Roteiro_Mestre_Instalacao_Comissionamento_31_Passos_MX8_MX9.pdf": "Video_IT_RXM_SHIM003_Instalacao_Montagem_MobileDaRt_MX8.mp4"
+    "IT_RXM_SHIM_004_Roteiro_Mestre_Instalacao_Comissionamento_31_Passos_MX8_MX9.pdf": "Video_IT_RXM_SHIM003_Instalacao_Montagem_MobileDaRt_MX8.mp4",
+    "IT_RXM_SHIM_006_Protocolo_Geral_Calibracao_FVR_Baterias_Colimador_FPD_MX8_MX9.md": "Video_IT_RXM_SHIM002_Calibracao_Manopla_Sensor_Braco_MX8.mp4",
+    "IT_RXM_SHIM_006_Protocolo_Geral_Calibracao_FVR_Baterias_Colimador_FPD_MX8_MX9.pdf": "Video_IT_RXM_SHIM002_Calibracao_Manopla_Sensor_Braco_MX8.mp4",
+    "IT_MM_SIEM_001_Calibracao_Qualidade_Imagem_Compressao_Mamomat.md": "Video_Apresentacao_Sistema_Emed_PRO.mp4",
+    "IT_MM_SIEM_001_Calibracao_Qualidade_Imagem_Compressao_Mamomat.pdf": "Video_Apresentacao_Sistema_Emed_PRO.mp4",
+    "IT_HEMO_PHIL_001_Manutencao_Arco_C_Refrigeracao_Chiller.md": "Video_Apresentacao_Sistema_Emed_Real.mp4",
+    "IT_HEMO_PHIL_001_Manutencao_Arco_C_Refrigeracao_Chiller.pdf": "Video_Apresentacao_Sistema_Emed_Real.mp4",
+    "IT_RM_GE_001_Monitoramento_Nivel_Helio_Criogenia_RF.md": "Video_Tutorial_Solicitacao_Pecas_Baseada_na_IT.mp4",
+    "IT_RM_GE_001_Monitoramento_Nivel_Helio_Criogenia_RF.pdf": "Video_Tutorial_Solicitacao_Pecas_Baseada_na_IT.mp4",
+    "IT_US_GE_001_Inspecao_Cristais_Transdutores_Phantom.md": "Video_Tutorial_Abertura_OS_Manual.mp4",
+    "IT_US_GE_001_Inspecao_Cristais_Transdutores_Phantom.pdf": "Video_Tutorial_Abertura_OS_Manual.mp4",
+    "IT_ARC_ZIE_001_Calibracao_Laser_Mira_Intensificador_Imagem.md": "Video_Tutorial_Fluxo_Kits_Separacao_Entrega_Devolucao.mp4",
+    "IT_ARC_ZIE_001_Calibracao_Laser_Mira_Intensificador_Imagem.pdf": "Video_Tutorial_Fluxo_Kits_Separacao_Entrega_Devolucao.mp4",
+    "IT_RX_LOT_002_Calibracao_kV_mA_Tempo_Manutencao_Familia_HF.md": "Video_IT_RX_LOT001_Vistoria_Pre_Instalacao_HF500M.mp4",
+    "IT_RX_LOT_002_Calibracao_kV_mA_Tempo_Manutencao_Familia_HF.pdf": "Video_IT_RX_LOT001_Vistoria_Pre_Instalacao_HF500M.mp4",
+    "IT_RXD_NEU_002_Calibracao_Flat_Field_Ganho_Offset_Canon_CXDI.md": "Video_IT_RXD_NEU001_Instalacao_Software_DR_NeuVision550M.mp4",
+    "IT_RXD_NEU_002_Calibracao_Flat_Field_Ganho_Offset_Canon_CXDI.pdf": "Video_IT_RXD_NEU001_Instalacao_Software_DR_NeuVision550M.mp4"
 }
 
 
@@ -152,7 +168,7 @@ def _gerar_link_whatsapp(texto: str, telefone: str = "") -> str:
 DICIONARIO_NOMES_AMIGAVEIS = {
     # Raio-X Lotus HF500M
     "01_Manual_Pre_Instalacao_Oficial_Lotus_HF500M.pdf": "📖 Manual Oficial de Pré-Instalação Lotus HF500M (Fábrica)",
-    "02_Formulario_Vistoria_Pre_Instalacao_Lotus_HF500M_eMED.pdf": "📋 Formulário de Vistoria de Pré-Instalação HF500M (eMED Gatekeeper)",
+    "02_Formulario_Vistoria_Pre_Instalacao_Lotus_HF500M_eMED.pdf": "⭐ FICHA OFICIAL DE PRÉ-INSTALAÇÃO & PRONTIDÃO DE SALA eMED (4 Páginas c/ Fotos do Quadro, Planta Baixa e Checklist - Versão de Ontem)",
     
     # ITs Principais
     "IT_01_Troca_de_Tubo_GE_Brivo385.md": "⚡ IT-01: Troca de Tubo & Pipeline Completo de Calibração (Brivo CT385)",
@@ -210,6 +226,8 @@ DICIONARIO_NOMES_AMIGAVEIS = {
     "IT_RXM_SHIM_003_Instalacao_Montagem_Comissionamento_MobileDaRt_MX8.md": "🚀 IT-03: Roteiro Completo de Instalação, Montagem Mecânica & Comissionamento (Shimadzu MX8)",
     "IT_RXM_SHIM_004_Troca_Baterias_Calibracao_Tensao_MobileDaRt_MX8.md": "🔋 IT-04: Procedimento de Substituição do Banco de Baterias & Calibração de Tensão Mode 7 (Shimadzu MX8)",
     "IT_RXM_SHIM_005_Troca_Monobloco_Tubo_Centracao_Colimador_MX8.md": "🎯 IT-05: Substituição do Monobloco do Tubo de Raio-X & Centração Óptica do Colimador (Shimadzu MX8)",
+    "IT_RXM_SHIM_006_Protocolo_Geral_Calibracao_FVR_Baterias_Colimador_FPD_MX8_MX9.md": "🎯 IT-06: Protocolo Geral de Calibração, Ajustes Eletrônicos (FVR), Baterias e FPD (Shimadzu MX8 / MX9)",
+    "IT_RXM_SHIM_006_Protocolo_Geral_Calibracao_FVR_Baterias_Colimador_FPD_MX8_MX9.pdf": "🎯 IT-06: Protocolo Geral de Calibração, Ajustes Eletrônicos (FVR), Baterias e FPD (Shimadzu MX8 / MX9 - PDF Oficial)",
     "IT_RXM_SHIM_004_Roteiro_Mestre_Instalacao_Comissionamento_31_Passos_MX8_MX9.md": "🚀 IT-04: Roteiro Mestre de Instalação, Montagem Mecânica & Comissionamento Digital em 31 Passos (MobileDaRt MX8 / MX9)",
     "IT_RXM_SHIM_004_Roteiro_Mestre_Instalacao_Comissionamento_31_Passos_MX8_MX9.pdf": "🚀 IT-04: Roteiro Mestre de Instalação em 31 Passos (MobileDaRt MX8 / MX9 - PDF Oficial)",
     "1. MX8_Installation_Common_Section_M503-E404K.pdf": "📘 Manual de Instalação Geral MX8/MX9 (M503-E404K - Common Section 716p)",
@@ -1471,29 +1489,33 @@ def _render_central_pre_instalacao(ctx: AppContext):
     col_pdf_actions, col_wa_cliente = st.columns([1.1, 1.3])
 
     with col_pdf_actions:
-        st.markdown("#### 📄 Documentos para Download & Leitura")
+        st.markdown("#### ⭐ Documento Oficial Homologado (Versão de Ontem)")
         
-        # 1. Formulário de Vistoria eMED (4 Páginas)
+        # 1. Formulário de Vistoria eMED (4 Páginas com Fotos, Gráficos e Planta)
         if os.path.exists(arq_formulario_pdf):
             tamanho_mb = os.path.getsize(arq_formulario_pdf) / (1024 * 1024)
             with open(arq_formulario_pdf, "rb") as f_form:
                 bytes_form = f_form.read()
             st.download_button(
-                label=f"📥 Baixar Ficha de Vistoria eMED ({tamanho_mb:.2f} MB)",
+                label=f"📥 Baixar Ficha Oficial de Vistoria eMED ({tamanho_mb:.2f} MB)",
                 data=bytes_form,
                 file_name="02_Formulario_Vistoria_Pre_Instalacao_Lotus_HF500M_eMED.pdf",
                 mime="application/pdf",
                 key="btn_dl_ficha_pre_inst",
                 use_container_width=True
             )
-        
-        # 2. Manual de Fábrica Lotus
+            
+            if st.button("🖥️ Abrir Ficha no Leitor do Windows", key="btn_open_win_ficha_top", use_container_width=True):
+                _abrir_no_sistema_operacional(arq_formulario_pdf)
+                st.toast("Ficha Oficial aberta no leitor do Windows!", icon="📄")
+
+        # 2. Manual Oficial de Fábrica da Lotus
         if os.path.exists(arq_manual_fabrica_pdf):
             tam_fab_mb = os.path.getsize(arq_manual_fabrica_pdf) / (1024 * 1024)
             with open(arq_manual_fabrica_pdf, "rb") as f_man:
                 bytes_man = f_man.read()
             st.download_button(
-                label=f"📖 Baixar Manual Oficial de Fábrica ({tam_fab_mb:.2f} MB)",
+                label=f"📖 Baixar Manual de Fábrica Lotus ({tam_fab_mb:.2f} MB)",
                 data=bytes_man,
                 file_name="01_Manual_Pre_Instalacao_Oficial_Lotus_HF500M.pdf",
                 mime="application/pdf",
@@ -1501,23 +1523,10 @@ def _render_central_pre_instalacao(ctx: AppContext):
                 use_container_width=True
             )
 
-        # 3. IT-01 Vistoria (PDF)
-        if os.path.exists(arq_it_vistoria_pdf):
-            with open(arq_it_vistoria_pdf, "rb") as f_it:
-                bytes_it = f_it.read()
-            st.download_button(
-                label=f"🔬 Baixar IT-01 de Vistoria em PDF",
-                data=bytes_it,
-                file_name="IT_RX_LOT_001_Vistoria_Pre_Instalacao_Adequacao_Sala_HF500M.pdf",
-                mime="application/pdf",
-                key="btn_dl_it01_pre",
-                use_container_width=True
-            )
-
-        # Botão para alternar visualização do PDF da Ficha
+        # Alternar visualização da Ficha (inicia aberto)
         if "view_ficha_pre" not in st.session_state:
-            st.session_state["view_ficha_pre"] = False
-        lbl_view_ficha = "Fechar Leitor de PDF" if st.session_state["view_ficha_pre"] else "👁️ Visualizar Ficha de Vistoria Inline"
+            st.session_state["view_ficha_pre"] = True
+        lbl_view_ficha = "Ocultar Visualizador Abaixo" if st.session_state["view_ficha_pre"] else "👁️ Exibir Ficha Completa na Tela"
         if st.button(lbl_view_ficha, key="btn_toggle_ficha_view", use_container_width=True):
             st.session_state["view_ficha_pre"] = not st.session_state["view_ficha_pre"]
             st.rerun()
@@ -1839,6 +1848,16 @@ def _render_lista_cards(docs: list, ocorrencias_busca: dict = None):
                         * **Torque dos Terminais:** **$4,0\text{ a }4,5\text{ N}\cdot\text{m}$** (aperto uniforme com chave dinamométrica isolada).
                         * **Calibração de Tensão Mode 7.6:** Entrar no modo de serviço do MX8, medir tensão real com multímetro calibrado e inserir valor exato no painel.
                         * **Registro do Novo Banco Mode 7.11:** Resetar contador de vida útil e inserir código da nova data de fabricação das baterias.
+                        """)
+                elif "shim_006" in doc["nome_arquivo"].lower() or "calibracao_fvr" in doc["nome_arquivo"].lower():
+                    with st.expander("🎯 Parâmetros Críticos de Calibração (Shimadzu MobileDaRt MX8 / MX9)"):
+                        st.markdown(r"""
+                        * **Acesso ao Modo de Ajuste:** Ligar na chave mantendo pressionados [Collimator Lamp] + [APR Program] -> Display exibe `Adj`.
+                        * **Calibração de FVR (Corrente do Tubo):** Tecla <7> para 2 pontos a 80 kV (mA mín/máx) e Tecla <8> para 40 a 133 kV. Salvar com tecla [Registration] (`record`).
+                        * **Calibração de Tensão das Baterias (Modo <5>):** Aferir 240V DC no multímetro nos bornes e igualar valor no display com teclas mAs [+]/[-].
+                        * **Calibração da Manopla FSR (Modo <6>):** Dinamômetro de tração escalonado em 20 N (baixo), 45 N (médio) e 70 N (máximo) para avanço e recuo.
+                        * **Coincidência Óptica do Colimador:** Erro entre feixe luminoso e feixe de raios-X $\le 10	ext{ mm}$ a 1 metro DFF. Iluminância $\ge 160	ext{ lux}$.
+                        * **FPD Digital (VXvue/VSS):** Dark Calibration (sem radiação), Flat Field Gain (70 kV / 100 mA / 100 ms com filtro 1,5 mm Cu) e Defect Map.
                         """)
                 elif "31_passos" in doc["nome_arquivo"].lower() or "shim_004_roteiro" in doc["nome_arquivo"].lower():
                     with st.expander("🚀 Parâmetros Críticos da Instalação em 31 Passos (Shimadzu MX8 / MX9)"):

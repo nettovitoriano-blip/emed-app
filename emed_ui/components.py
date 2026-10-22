@@ -6,6 +6,9 @@ from emed_core import limpar_texto
 
 ATALHOS_DESKTOP_META = {
     "🤖 EmedOnline (Triagem & Rota)": ("🤖", "EmedOnline"),
+    "🏥 Portal do Cliente (Autoatendimento)": ("🏥", "Portal Cliente"),
+    "💳 Conciliação Bancária & Pagamentos PIX": ("💳", "Conciliação PIX"),
+    "⭐ Pesquisa de Satisfação & Google Reviews": ("⭐", "Pesquisa & Reviews"),
     "⏰ Alarmes de Calibração & Créditos": ("⏰", "Alarmes Calibração"),
     "📊 Mural & Despacho WhatsApp": ("📊", "Mural & WhatsApp"),
     "📋 Minhas Pendências (Técnico)": ("📋", "Minhas Pendências"),

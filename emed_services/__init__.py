@@ -25,6 +25,14 @@ from emed_services.domain_utils import (
     classificar_pendencia,
     calcular_duracao_os,
 )
+from emed_services.pdf_engine import (
+    clean_latex,
+    markdown_to_html,
+    render_markdown_to_pdf,
+    converter_html_para_pdf_bytes,
+    vincular_it_ao_equipamento,
+    gerar_link_whatsapp,
+)
 
 __all__ = [
     "AppContext",
@@ -50,4 +58,10 @@ __all__ = [
     "obter_icone_equipamento",
     "classificar_pendencia",
     "calcular_duracao_os",
+    "clean_latex",
+    "markdown_to_html",
+    "render_markdown_to_pdf",
+    "converter_html_para_pdf_bytes",
+    "vincular_it_ao_equipamento",
+    "gerar_link_whatsapp",
 ]

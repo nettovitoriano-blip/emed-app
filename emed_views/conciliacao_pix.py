@@ -7,6 +7,8 @@ acompanhamento de liquidações, simulação de webhooks de pagamento e concilia
 
 import os
 import io
+import re
+import unicodedata
 import base64
 import sqlite3
 import datetime
@@ -15,6 +17,16 @@ import streamlit as st
 import qrcode
 from emed_core import limpar_texto, obter_id_os
 from emed_services import AppContext
+
+
+def _sanitizar_texto_emv(texto: str, max_chars: int) -> str:
+    """Sanitiza texto removendo acentos para conformidade estrita com o padrão EMV/Pix."""
+    if not texto:
+        return ""
+    texto_norm = unicodedata.normalize('NFKD', str(texto))
+    texto_ascii = "".join(c for c in texto_norm if not unicodedata.combining(c))
+    texto_limpo = "".join(c for c in texto_ascii if c.isalnum() or c in " .-_")
+    return texto_limpo.strip()[:max_chars].upper()
 
 
 def _calcular_crc16(payload: str) -> str:
@@ -35,27 +47,27 @@ def _calcular_crc16(payload: str) -> str:
 def gerar_payload_pix(chave: str, nome_recebedor: str, cidade: str, valor: float, txid: str = "***") -> str:
     """Gera a string 'Copia e Cola' oficial no padrão BR Code do Banco Central do Brasil."""
     chave = chave.strip()
-    nome = nome_recebedor.strip()[:25].upper()
-    cidade = cidade.strip()[:15].upper()
+    nome = _sanitizar_texto_emv(nome_recebedor, 25)
+    cidade = _sanitizar_texto_emv(cidade, 15)
     txid = (txid or "***").strip()[:25]
 
     gui = "0014br.gov.bcb.pix"
-    campo_chave = f"01{len(chave):02d}{chave}"
+    campo_chave = f"01{len(chave.encode('utf-8')):02d}{chave}"
     campo_26 = f"{gui}{campo_chave}"
-    bloco_26 = f"26{len(campo_26):02d}{campo_26}"
+    bloco_26 = f"26{len(campo_26.encode('utf-8')):02d}{campo_26}"
 
     bloco_mcc = "52040000"
     bloco_moeda = "5303986"
 
     str_val = f"{valor:.2f}"
-    bloco_valor = f"54{len(str_val):02d}{str_val}"
+    bloco_valor = f"54{len(str_val.encode('utf-8')):02d}{str_val}"
 
     bloco_pais = "5802BR"
-    bloco_nome = f"59{len(nome):02d}{nome}"
-    bloco_cidade = f"60{len(cidade):02d}{cidade}"
+    bloco_nome = f"59{len(nome.encode('utf-8')):02d}{nome}"
+    bloco_cidade = f"60{len(cidade.encode('utf-8')):02d}{cidade}"
 
-    campo_txid = f"05{len(txid):02d}{txid}"
-    bloco_62 = f"62{len(campo_txid):02d}{campo_txid}"
+    campo_txid = f"05{len(txid.encode('utf-8')):02d}{txid}"
+    bloco_62 = f"62{len(campo_txid.encode('utf-8')):02d}{campo_txid}"
 
     payload_sem_crc = f"000201{bloco_26}{bloco_mcc}{bloco_moeda}{bloco_valor}{bloco_pais}{bloco_nome}{bloco_cidade}{bloco_62}"
     crc = _calcular_crc16(payload_sem_crc)
@@ -108,10 +120,13 @@ def liquidar_pagamento_pix(db_name: str, os_id: str, txid: str = "", metodo: str
     agora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     e2e_id = f"E2E{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{os.urandom(3).hex().upper()}"
     try:
+        os_id_num = re.sub(r'\D', '', str(os_id))
+        target_os_id = int(os_id_num) if os_id_num else os_id
+
         with sqlite3.connect(db_name) as conn:
             cursor = conn.cursor()
             # Atualiza ou insere na tabela pagamentos_pix
-            cursor.execute("SELECT id FROM pagamentos_pix WHERE os_id = ?", (str(os_id),))
+            cursor.execute("SELECT id FROM pagamentos_pix WHERE os_id = ? OR os_id = ?", (str(os_id), str(target_os_id)))
             row = cursor.fetchone()
             if row:
                 cursor.execute("""
@@ -120,8 +135,8 @@ def liquidar_pagamento_pix(db_name: str, os_id: str, txid: str = "", metodo: str
                         data_pagamento = ?,
                         e2e_id = ?,
                         metodo = ?
-                    WHERE os_id = ?
-                """, (agora, e2e_id, metodo, str(os_id)))
+                    WHERE id = ?
+                """, (agora, e2e_id, metodo, row[0]))
             else:
                 cursor.execute("""
                     INSERT INTO pagamentos_pix (os_id, cliente, cnpj, valor, chave_pix, status_pagamento, txid, e2e_id, data_geracao, data_pagamento, metodo)
@@ -133,8 +148,8 @@ def liquidar_pagamento_pix(db_name: str, os_id: str, txid: str = "", metodo: str
                 UPDATE notas_fiscais
                 SET status_fiscal = 'LIQUIDADO / PAGO VIA PIX',
                     atualizado_em = ?
-                WHERE os_id = ?
-            """, (agora, str(os_id)))
+                WHERE os_id = ? OR os_id = ?
+            """, (agora, target_os_id, str(os_id)))
             conn.commit()
         return True, f"Pagamento da OS #{os_id} confirmado com sucesso via {metodo}! E2E ID: {e2e_id}"
     except Exception as e:
