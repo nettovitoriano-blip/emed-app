@@ -12,7 +12,7 @@ import streamlit as st
 from emed_core import limpar_texto, obter_id_os
 from emed_services import AppContext
 
-URL_GOOGLE_REVIEW_OFICIAL = "https://www.google.com/search?q=EMED+Eletromedicina+Hospitalar+Fortaleza#lrd=0x0:0x0,3,,,"
+URL_GOOGLE_REVIEW_OFICIAL = "https://www.google.com/maps/search/?api=1&query=EMED+Eletromedicina+Ltda+Eusebio+Ceara"
 
 def obter_url_google_review() -> str:
     """Retorna o link oficial para avaliação Google, priorizando link customizado da empresa."""
