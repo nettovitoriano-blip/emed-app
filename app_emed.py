@@ -33,6 +33,7 @@ for _mod_name in [
     "emed_views.logistica_estoque",
     "emed_views.chamados_os",
     "emed_views.manuais_tecnicos",
+    "emed_views.emedonline",
     "emed_views",
 ]:
     if _mod_name in sys.modules:

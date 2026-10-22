@@ -229,13 +229,125 @@ def _organizar_rotas_inteligentes(df_ativos: pd.DataFrame, equipa_tecnica: dict)
 
 
 
+def _contem_termo_triagem(texto: str, termos: list) -> bool:
+    """Verifica com precisão cirúrgica se algum termo ou expressão está presente no relato."""
+    txt_up = (texto or "").upper()
+    palavras = set(re.findall(r'[A-Z0-9À-Ý]+', txt_up))
+    for t in termos:
+        t_up = t.upper()
+        if " " in t_up or "/" in t_up:
+            if t_up in txt_up:
+                return True
+        else:
+            if t_up in palavras:
+                return True
+    return False
+
+
 def _obter_perguntas_triagem_dinamica(modalidade: str, defeito: str, equip: str):
     """Analisa o relato do cliente e gera perguntas cirúrgicas e específicas para o defeito relatado."""
     txt = (defeito or "").upper()
     eq_up = (equip or "").upper()
 
-    # 1. Mamografia - Compressão e Pedais
-    if re.search(r'\b(COMPRESSOR|COMPRESSAO|COMPRESSÃO|PEDAL|PRATO|DESCOMPRESSAO|DESCOMPRESSÃO|DAN|ESPESSURA)\b', txt) and ("MAMO" in modalidade or "MAMO" in eq_up):
+    # 1. Movimentos de Mesa UP / DOWN & Elevação Vertical (PRIORIDADE MÁXIMA)
+    termos_mesa_up_down = [
+        "UP", "DOWN", "SUBIDA", "DESCIDA", "SUBIR", "DESCER", "ELEVAÇÃO", "ELEVACAO", "ALTURA",
+        "NAO SOBE", "NÃO SOBE", "NAO DESCE", "NÃO DESCE", "UP E DOWN", "UP/DOWN"
+    ]
+    if _contem_termo_triagem(txt, termos_mesa_up_down) or (
+        _contem_termo_triagem(txt, ["MESA"]) and _contem_termo_triagem(txt, ["TRAVA", "TRAVANDO", "TRAVOU", "TRAVADA", "EMPERRADA", "EMPERRADO", "PARADA", "MOVIMENTO", "VERTICAL", "GANTRY"])
+    ):
+        return {
+            "categoria": "MESA DO PACIENTE - ELEVAÇÃO & MOVIMENTOS UP / DOWN",
+            "icone": "🛏️",
+            "focada": True,
+            "desc": "Perguntas cirúrgicas direcionadas especificamente para os movimentos verticais e elevação da mesa:",
+            "p1": {
+                "nome": "Acionamento pelo Gantry",
+                "pergunta": "🕹️ 1. Já tentou realizar os movimentos de UP e DOWN pelo painel de acionamento do Gantry?",
+                "opcoes": [
+                    "⚠️ Sim, e também não responde pelo painel do Gantry (travamento total)",
+                    "🟢 Pelo painel do Gantry funciona normal (falha ocorre apenas na mesa/pedal)",
+                    "🔘 Tentamos acionar apenas pelos botões da mesa ou pedal (não testado no Gantry)",
+                    "⚪ Não / Nenhuma das opções",
+                ],
+                "help": "Identifica se a falha é na botoeira local da mesa ou no acionamento do Gantry."
+            },
+            "p2": {
+                "nome": "Sentido do Travamento",
+                "pergunta": "↕️ 2. Normalmente acontece na subida ou na descida?",
+                "opcoes": [
+                    "⬆️ Acontece na subida (UP)",
+                    "⬇️ Acontece na descida (DOWN)",
+                    "↕️ Em ambos os sentidos (totalmente travada na elevação)",
+                    "⚪ Não / Nenhuma das opções",
+                ],
+                "help": "Ajuda o técnico a diagnosticar se é sensor de fim de curso, correia ou drive do motor."
+            },
+            "p3": {
+                "nome": "Intermitência do Defeito",
+                "pergunta": "🔄 3. O defeito é intermitente ou permanente?",
+                "opcoes": [
+                    "🔴 Permanente (travou de vez e não se move)",
+                    "🟡 Intermitente (às vezes falha, outras vezes sobe/desce normal)",
+                    "⚖️ Acontece apenas com paciente / peso sobre a mesa",
+                    "⚪ Não / Nenhuma das opções",
+                ],
+                "help": "Diferencia falha mecânica/sobrecarga de mau contato elétrico ou cabeamento."
+            }
+        }
+
+    # 2. Movimento Longitudinal / Avanço e Recuo da Mesa (IN / OUT)
+    termos_mesa_in_out = [
+        "IN", "OUT", "LONGITUDINAL", "AVANÇO", "AVANCO", "HORIZONTAL", "TRILHO DA MESA", "DESLIZAMENTO",
+        "ENTRADA NO GANTRY", "IN E OUT", "IN/OUT"
+    ]
+    if _contem_termo_triagem(txt, termos_mesa_in_out):
+        return {
+            "categoria": "MESA DO PACIENTE - AVANÇO HORIZONTAL & IN / OUT",
+            "icone": "↔️",
+            "focada": True,
+            "desc": "Perguntas adaptadas para avanço, recuo no gantry e engrenagens de tração longitudinal:",
+            "p1": {
+                "nome": "Movimento Manual da Mesa",
+                "pergunta": "🔓 1. Já tentou avançar/recuar a mesa manualmente destravando a alavanca?",
+                "opcoes": [
+                    "🟢 Sim, manualmente corre livre (motor elétrico de tração não responde)",
+                    "⚠️ Manualmente está totalmente pesada ou trancada no trilho",
+                    "🔘 Não tentamos movimentar manualmente",
+                    "⚪ Não / Nenhuma das opções",
+                ],
+                "help": "Determina se a falha é no motor de passo/encoder ou trava mecânica nos trilhos."
+            },
+            "p2": {
+                "nome": "Sentido do Avanço",
+                "pergunta": "↔️ 2. O travamento ocorre na entrada (IN) ou na saída (OUT) do Gantry?",
+                "opcoes": [
+                    "➡️ Apenas na entrada para dentro do Gantry (IN)",
+                    "⬅️ Apenas no recuo para fora do Gantry (OUT)",
+                    "↔️ Em ambos os sentidos de avanço longitudinal",
+                    "⚪ Não / Nenhuma das opções",
+                ],
+                "help": "Verifica chave de fim de curso longitudinal ou sensor óptico de posição."
+            },
+            "p3": {
+                "nome": "Intermitência do Defeito",
+                "pergunta": "🔄 3. O defeito é intermitente ou permanente?",
+                "opcoes": [
+                    "🔴 Permanente (travou e não se move)",
+                    "🟡 Intermitente (engasga durante o trajeto)",
+                    "⚪ Não / Nenhuma das opções",
+                ],
+                "help": "Ajuda a prever necessidade de troca de correia dentada ou lubrificação de guias."
+            }
+        }
+
+    # 3. Mamografia - Compressão e Pedais
+    termos_compressor = [
+        "COMPRESSOR", "COMPRESSÃO", "COMPRESSAO", "PEDAL", "PEDAIS", "PRATO", "DESCOMPRESSÃO",
+        "DESCOMPRESSAO", "DAN", "ESPESSURA", "ACRILICO", "ACRÍLICO"
+    ]
+    if _contem_termo_triagem(txt, termos_compressor) and ("MAMO" in modalidade or "MAMO" in eq_up):
         return {
             "categoria": "SISTEMA DE COMPRESSÃO & PEDAIS (MAMOGRAFIA)",
             "icone": "🗜️",
@@ -243,24 +355,23 @@ def _obter_perguntas_triagem_dinamica(modalidade: str, defeito: str, equip: str)
             "desc": "Perguntas adaptadas especificamente para acionamento por pedais, descompressão rápida e célula de carga:",
             "p1": {
                 "nome": "Acionamento dos Pedais",
-                "pergunta": "🦶 1. Resposta aos Pedais de Elevação/Descida:",
+                "pergunta": "🦶 1. O acionamento falha nos pedais ou também nos botões manuais do gantry?",
                 "opcoes": [
-                    "⚠️ Falha apenas no pedal esquerdo (o pedal direito e botões manuais do gantry operam)",
-                    "⚠️ Falha apenas no pedal direito (o pedal esquerdo e botões manuais do gantry operam)",
-                    "🚨 Ambos os pedais falham (apenas botões manuais do gantry respondem)",
-                    "❌ Nem pedais nem botões manuais respondem (sistema de compressão inerte)",
+                    "⚠️ Falha apenas no pedal (botões manuais do gantry operam normalmente)",
+                    "🚨 Nem pedais nem botões manuais respondem (sistema de compressão inerte)",
                     "🟢 Movimento normal por pedais e botoeira",
+                    "⚪ Não / Nenhuma das opções",
                 ],
                 "help": "Identifica se o problema é microswitch/cabo do pedal ou circuito de potência da compressão."
             },
             "p2": {
                 "nome": "Descompressão de Emergência",
-                "pergunta": "🛑 2. Descompressão Rápida de Emergência:",
+                "pergunta": "🛑 2. O botão de emergência / descompressão rápida destrava o acrílico?",
                 "opcoes": [
-                    "🟢 Botão vermelho de liberação destrava o acrílico imediatamente",
+                    "🟢 Sim, botão de liberação destrava o acrílico imediatamente",
                     "⚠️ Descompressão mecânica pesada, emperrando ou lenta",
                     "🚨 Botão de emergência travado (risco de prender paciente)",
-                    "⚪ Não testado / Não se aplica",
+                    "⚪ Não / Nenhuma das opções",
                 ],
                 "help": "Verifica item crítico de segurança biológica da paciente."
             },
@@ -271,55 +382,65 @@ def _obter_perguntas_triagem_dinamica(modalidade: str, defeito: str, equip: str)
                     "🟢 Display marca valores coerentes com a compressão aplicada",
                     "⚠️ Valores oscilam sem parar ou congelam durante o avanço",
                     "❌ Display zerado ou mensagem de erro de célula de carga / fotocélula",
-                    "⚪ Não se aplica",
+                    "⚪ Não / Nenhuma das opções",
                 ],
                 "help": "Avalia o sensor de calibração radiométrica da mama."
             }
         }
 
-    # 2. Qualidade de Imagem, Artefatos e Detectores
-    if re.search(r'\b(ARTEFATO|ARTEFATOS|MANCHA|MANCHAS|RISCO|RISCOS|LISTRA|LISTRAS|LINHA|LINHAS|ANEL|ANEIS|ANÉIS|FANTOMA|PHANTOM|AIR CAL|CALIBRACAO|CALIBRAÇÃO|PIXEL|PIXELS)\b', txt):
+    # 4. Qualidade de Imagem, Artefatos e Detectores
+    termos_imagem = [
+        "ARTEFATO", "ARTEFATOS", "MANCHA", "MANCHAS", "RISCO", "RISCOS", "LISTRA", "LISTRAS",
+        "LINHA", "LINHAS", "ANEL", "ANEIS", "ANÉIS", "FANTOMA", "PHANTOM", "AIR CAL",
+        "CALIBRAÇÃO", "CALIBRACAO", "PIXEL", "PIXELS", "RUÍDO", "RUIDO"
+    ]
+    if _contem_termo_triagem(txt, termos_imagem):
         return {
             "categoria": "QUALIDADE DE IMAGEM & DETECTORES",
             "icone": "🔬",
             "focada": True,
-            "desc": "Perguntas focadas em artefatos visuais, aquecimento diário e calibração de detectores:",
+            "desc": "Perguntas focadas em artefatos visuais, calibração com Phantom e detectores:",
             "p1": {
                 "nome": "Padrão Visual do Defeito",
-                "pergunta": "🔬 1. Formato e Padrão Visual do Defeito:",
+                "pergunta": "🔬 1. O artefato se repete nas imagens de teste com o Phantom oficial?",
                 "opcoes": [
-                    "⚠️ Artefato em anel concêntrico circular (típico de canal de detector DAS / TC)",
-                    "⚠️ Linhas retas pretas ou brancas verticais (típico de pixel defeituoso / Flat Panel)",
-                    "⚠️ Mancha difusa, sombreamento ou perda homogênea de contraste",
-                    "⚪ Outro padrão não listado / Não se aplica",
+                    "🚨 Sim, o artefato aparece claramente nas imagens do Phantom oficial",
+                    "🟢 Não, aparece apenas em exames de pacientes específicos",
+                    "🔘 Phantom indisponível no momento para teste",
+                    "⚪ Não / Nenhuma das opções",
                 ],
-                "help": "Ajuda a distinguir falha de DAS/detector de desgaste de tubo."
+                "help": "Comprova a necessidade de calibração física pelo engenheiro com Phantom."
             },
             "p2": {
                 "nome": "Calibração Diária (Warm-up / Air Cal)",
-                "pergunta": "🌀 2. Rotina de Calibração Diária (Warm-up / Air Calibration):",
+                "pergunta": "🌀 2. A rotina diária de aquecimento (Warm-up) e calibração de ar (Air Cal) foi concluída hoje?",
                 "opcoes": [
-                    "🟢 Aquecimento de tubo e calibração de ar executados com sucesso hoje",
+                    "🟢 Sim, aquecimento de tubo e calibração de ar executados com sucesso",
                     "⚠️ Erro interrompeu a calibração de ar no meio do processo",
                     "❌ Não foi possível realizar o Warm-up (tubo frio ou bloqueado)",
-                    "⚪ Procedimento não realizado hoje",
+                    "⚪ Não / Nenhuma das opções",
                 ],
-                "help": "Verifica se a tabela de ganho e offset foi atualizada."
+                "help": "Verifica se a tabela de ganho e offset do detector foi atualizada."
             },
             "p3": {
-                "nome": "Comportamento com Phantom",
-                "pergunta": "🎯 3. Comportamento no Phantom de Calibração Oficial:",
+                "nome": "Intermitência do Defeito",
+                "pergunta": "🔄 3. O defeito é intermitente ou permanente?",
                 "opcoes": [
-                    "🚨 O defeito se reproduz claramente nas imagens do Phantom oficial",
-                    "🟢 Artefato só aparece em pacientes específicos ou técnicas de alta dose",
-                    "⚪ Phantom indisponível no momento para teste",
+                    "🔴 Permanente (aparece em 100% das imagens geradas)",
+                    "🟡 Intermitente (aparece apenas em determinados protocolos / kV)",
+                    "⚪ Não / Nenhuma das opções",
                 ],
-                "help": "Comprova a necessidade de calibração física pelo engenheiro."
+                "help": "Ajuda a distinguir falha de DAS/detector de desgaste de tubo."
             }
         }
 
-    # 3. Disparo, Alta Tensão, Tubo e Gerador
-    if re.search(r'\b(DISPARO|DISPARAR|DISPARANDO|NAO DISPARA|NÃO DISPARA|KV|KVP|MA|MAS|FILAMENTO|SOBRECORRENTE|OVERCURRENT|GERADOR|ALTA TENSAO|ALTA TENSÃO|TUBO|FAISCA|FAÍSCA|402|INTERLOCK)\b', txt):
+    # 5. Disparo, Alta Tensão, Tubo e Gerador
+    termos_disparo = [
+        "DISPARO", "DISPARAR", "DISPARANDO", "NAO DISPARA", "NÃO DISPARA", "KV", "KVP", "MA", "MAS",
+        "FILAMENTO", "SOBRECORRENTE", "OVERCURRENT", "GERADOR", "ALTA TENSÃO", "ALTA TENSAO", "TUBO",
+        "FAISCA", "FAÍSCA", "402", "INTERLOCK", "FEIXE", "SEM FEIXE"
+    ]
+    if _contem_termo_triagem(txt, termos_disparo):
         return {
             "categoria": "DISPARO, GERADOR & ALTA TENSÃO",
             "icone": "💥",
@@ -327,82 +448,44 @@ def _obter_perguntas_triagem_dinamica(modalidade: str, defeito: str, equip: str)
             "desc": "Perguntas cirúrgicas sobre aceleração de rotor, disparo de alta tensão e intertravamentos:",
             "p1": {
                 "nome": "1º Estágio (Prep / Rotor)",
-                "pergunta": "⚡ 1. Resposta ao 1º Estágio (Prep / Ready):",
+                "pergunta": "⚡ 1. O rotor do tubo gira suavemente no 1º estágio (Prep / Ready)?",
                 "opcoes": [
                     "🟢 Rotor acelera suavemente e luz de Pronto (Ready) acende no console",
                     "⚠️ Rotor acelera mas a luz de Ready não acende (bloqueio de interlock)",
                     "🔇 Não escuta o rotor acelerar ao pressionar o 1º estágio",
-                    "⚪ Nenhuma das opções / Não se aplica",
+                    "⚪ Não / Nenhuma das opções",
                 ],
                 "help": "Distingue falha de partida de anodo de erro de disparo."
             },
             "p2": {
                 "nome": "2º Estágio (Disparo / Emissão)",
-                "pergunta": "💥 2. Resposta ao 2º Estágio (Disparo de Raios-X):",
+                "pergunta": "💥 2. O erro ou bloqueio ocorre no momento exato do disparo (2º estágio)?",
                 "opcoes": [
                     "⚠️ Acusa código de erro / alarme sonoro exatamente no momento do disparo",
                     "🔴 Queda imediata de disjuntor / Faíscamento perceptível no gerador ou cabos HV",
                     "🔇 Sem nenhum disparo, aviso de interlock persistente no painel",
-                    "🟢 Disparo ocorre mas imagem sai totalmente branca/escura",
+                    "⚪ Não / Nenhuma das opções",
                 ],
                 "help": "Determina sobrecorrente, falha no inversor JEDI ou disparo em vazio."
             },
             "p3": {
-                "nome": "Intertravamento de Segurança",
-                "pergunta": "🛡️ 3. Sensores de Porta & Intertravamento de Segurança:",
+                "nome": "Intermitência do Defeito",
+                "pergunta": "🔄 3. O defeito é intermitente ou permanente?",
                 "opcoes": [
-                    "🟢 Sensor da porta da sala fecha e comuta o circuito normalmente",
-                    "⚠️ Alerta de 'Porta Aberta' ou 'Interlock Aberto' não apaga no console",
-                    "⚪ Não se aplica / Não verificado",
+                    "🔴 Permanente (não realiza nenhum disparo)",
+                    "🟡 Intermitente (às vezes dispara com técnicas de kV baixo)",
+                    "⚪ Não / Nenhuma das opções",
                 ],
-                "help": "Impede deslocamento desnecessário por simples chave de porta solta."
+                "help": "Diferencia tubo desgastado / arco elétrico de falha em placa de filamento."
             }
         }
 
-    # 4. Movimentação, Mesa, Estativa e Freios
-    if re.search(r'\b(FREIO|FREIOS|TRAVA|TRAVAS|TRAVOU|TRAVADO|TRAVADA|EMPERRADO|EMPERRADA|ESTATIVA|MESA|NAO SOBE|NÃO SOBE|NAO DESCE|NÃO DESCE|HORIZONTAL|VERTICAL|TILT|SOLTO|SOLTA|CURSO|TRILHO)\b', txt):
-        return {
-            "categoria": "MECÂNICA, MOVIMENTAÇÃO & FREIOS",
-            "icone": "⚙️",
-            "focada": True,
-            "desc": "Perguntas adaptadas para acionamento de motores, eletrofreios e curso dos trilhos:",
-            "p1": {
-                "nome": "Comando de Movimento",
-                "pergunta": "⚙️ 1. Resposta Elétrica ao Comando de Movimento (Botoeira / Pedal):",
-                "opcoes": [
-                    "🟢 Escuta o clique do relé/contator e o motor tenta girar",
-                    "🔇 Silêncio total ao apertar o botão (sem resposta elétrica)",
-                    "⚠️ Escuta zumbido contínuo ou o motor patina sem movimentar o conjunto",
-                    "⚪ Nenhuma das opções / Não se aplica",
-                ],
-                "help": "Avalia botão, fonte de alimentação ou motor elétrico."
-            },
-            "p2": {
-                "nome": "Eletrofreios e Travas",
-                "pergunta": "🧲 2. Atuação dos Eletrofreios ou Travas Mecânicas:",
-                "opcoes": [
-                    "🟢 Freios liberam e seguram com firmeza",
-                    "⚠️ Freio solto / livre (não segura o movimento, conjunto desliza sozinho)",
-                    "🚨 Freio permanentemente bloqueado (não destrava nem com botão manual)",
-                    "⚪ Nenhuma das opções / Outro comportamento",
-                ],
-                "help": "Diferencia bobina de freio queimada de desgaste de sapata."
-            },
-            "p3": {
-                "nome": "Curso e Fim de Curso",
-                "pergunta": "📏 3. Posição de Travamento no Curso / Trilhos:",
-                "opcoes": [
-                    "🟢 Curso livre em toda a extensão",
-                    "⚠️ Travou exatamente no batente / fim de curso (chave fim-de-curso acionada)",
-                    "🚨 Travamento no meio do percurso mecânico (possível obstáculo mecânico ou rolamento)",
-                    "⚪ Não se aplica",
-                ],
-                "help": "Determina se a falha é mecânica ou microswitch fim-de-curso."
-            }
-        }
-
-    # 5. Software, Console e Comunicação
-    if re.search(r'\b(CONSOLE|SOFTWARE|MONITOR|TELA PRETA|BOOT|WINDOWS|LINUX|COMMUNICATION|REDE|WORKSTATION|HOST|DICOM)\b', txt) or ("TRAV" in txt and any(k in txt for k in ["CONSOLE", "TELA", "SOFTWARE"])):
+    # 6. Software, Console e Comunicação
+    termos_console = [
+        "CONSOLE", "SOFTWARE", "MONITOR", "TELA PRETA", "BOOT", "WINDOWS", "LINUX",
+        "COMMUNICATION", "COMUNICAÇÃO", "COMUNICACAO", "REDE", "WORKSTATION", "HOST", "DICOM", "PACS"
+    ]
+    if _contem_termo_triagem(txt, termos_console):
         return {
             "categoria": "CONSOLE, SOFTWARE & COMUNICAÇÃO",
             "icone": "🖥️",
@@ -410,40 +493,44 @@ def _obter_perguntas_triagem_dinamica(modalidade: str, defeito: str, equip: str)
             "desc": "Perguntas específicas sobre inicialização do SO, mensagens de erro e barramento de rede:",
             "p1": {
                 "nome": "Inicialização do Sistema",
-                "pergunta": "💻 1. Inicialização do Sistema Operacional & Software:",
+                "pergunta": "💻 1. O computador do console liga e carrega o sistema operacional normalmente?",
                 "opcoes": [
                     "🟢 Computador liga e carrega o Windows/Linux normalmente",
                     "🔄 Computador liga, mas o software de aquisição médica não abre ou congela no boot",
                     "❌ Computador não dá vídeo / Tela preta / Bips contínuos na placa-mãe",
-                    "⚪ Nenhuma das opções / Outro comportamento",
+                    "⚪ Não / Nenhuma das opções",
                 ],
                 "help": "Distingue problema de PC/hardware de falha na aplicação médica."
             },
             "p2": {
                 "nome": "Código de Erro no Painel",
-                "pergunta": "💬 2. Mensagem Exata de Erro no Painel / Console:",
+                "pergunta": "💬 2. Apresenta mensagem explícita de erro de comunicação com o Gantry/Gerador?",
                 "opcoes": [
                     "⚠️ Erro de comunicação ('Communication Error' / 'Host unreachable' / 'Link Down')",
                     "⚠️ Erro de banco de dados DICOM ou disco cheio (Disk Full / Archive Error)",
                     "❌ Erro fatal de hardware de aquisição (Board Failure / Gantry Error)",
-                    "⚪ Nenhuma mensagem de erro visível, apenas travamento silencioso",
+                    "⚪ Não / Nenhuma das opções",
                 ],
                 "help": "Direciona a IT correta para o técnico levar cabos ou placas."
             },
             "p3": {
-                "nome": "Links de Fibra e Rede",
-                "pergunta": "🔌 3. Cabos de Comunicação & Rede / Fibra Óptica:",
+                "nome": "Intermitência do Defeito",
+                "pergunta": "🔄 3. O defeito é intermitente ou permanente?",
                 "opcoes": [
-                    "🟢 LEDs de rede/fibra óptica piscando normalmente entre console e gantry/gerador",
-                    "🔴 LED de link apagado no cabo de fibra / placa de rede sem sinal",
-                    "⚪ Não verificado / Não se aplica",
+                    "🔴 Permanente (não abre nem após reiniciar o PC)",
+                    "🟡 Intermitente (reiniciando às vezes volta a funcionar)",
+                    "⚪ Não / Nenhuma das opções",
                 ],
-                "help": "Verifica integridade do barramento de dados."
+                "help": "Verifica se a falha é corrupção de arquivos ou defeito em placa física."
             }
         }
 
-    # 6. Temperatura, Chiller e Óleo
-    if re.search(r'\b(AQUECENDO|QUENTE|TEMPERATURA|CHILLER|OLEO|ÓLEO|VAZAMENTO|FUMACA|FUMAÇA|CHEIRO|COOLER|OVERHEAT)\b', txt):
+    # 7. Temperatura, Chiller e Óleo
+    termos_termico = [
+        "AQUECENDO", "QUENTE", "TEMPERATURA", "CHILLER", "ÓLEO", "OLEO", "VAZAMENTO",
+        "FUMAÇA", "FUMACA", "CHEIRO", "COOLER", "OVERHEAT", "FLUXO"
+    ]
+    if _contem_termo_triagem(txt, termos_termico):
         return {
             "categoria": "ARREFECIMENTO, TEMPERATURA & FLUIDOS",
             "icone": "🌡️",
@@ -451,40 +538,43 @@ def _obter_perguntas_triagem_dinamica(modalidade: str, defeito: str, equip: str)
             "desc": "Perguntas adaptadas para monitoramento térmico, chiller e estanqueidade de óleo:",
             "p1": {
                 "nome": "Alerta Térmico",
-                "pergunta": "🌡️ 1. Alerta de Temperatura & Disparo do Sensor Térmico:",
+                "pergunta": "🌡️ 1. O alarme de temperatura surge logo ao ligar ou após realizar exames em sequência?",
                 "opcoes": [
                     "⚠️ Alerta de temperatura alta surge após poucos exames consecutivos",
                     "🔴 Mensagem de superaquecimento (Overheat) surge logo ao ligar a frio",
                     "🟢 Alerta térmico não apareceu (sistema acusa erro diferente)",
-                    "⚪ Não se aplica",
+                    "⚪ Não / Nenhuma das opções",
                 ],
                 "help": "Distingue superaquecimento real de termostato defeituoso."
             },
             "p2": {
                 "nome": "Óleo e Vazamento",
-                "pergunta": "💧 2. Nível de Fluido, Óleo Dielétrico & Vazamentos:",
+                "pergunta": "💧 2. Há algum vestígio de vazamento de óleo ou cheiro de queimado?",
                 "opcoes": [
                     "🟢 Sem nenhum vestígio de vazamento no chão ou na carcaça",
                     "⚠️ Mancha de óleo dielétrico perceptível ou cheiro característico de queimado",
                     "🔴 Vazamento ativo visível com gotejamento pelo fole de dilatação do tubo",
-                    "⚪ Não se aplica",
+                    "⚪ Não / Nenhuma das opções",
                 ],
                 "help": "Evita dano catastrófico ao monobloco por perda de isolamento."
             },
             "p3": {
-                "nome": "Chiller e Ventilação",
-                "pergunta": "❄️ 3. Chiller Externo & Circulação de Arrefecimento:",
+                "nome": "Intermitência do Defeito",
+                "pergunta": "🔄 3. O defeito é intermitente ou permanente?",
                 "opcoes": [
-                    "🟢 Bomba do chiller e ventoinhas funcionando com fluxo normal",
-                    "⚠️ Bomba do chiller não liga ou indicador de fluxo (flow switch) em alarme",
-                    "⚪ Equipamento com arrefecimento passivo / sem chiller dedicado",
+                    "🔴 Permanente (bloqueado sem permitir novos exames)",
+                    "🟡 Intermitente (resfria e volta a liberar exames temporariamente)",
+                    "⚪ Não / Nenhuma das opções",
                 ],
-                "help": "Avalia o circuito externo de refrigeração líquida."
+                "help": "Avalia o circuito de refrigeração e fluxo de ar."
             }
         }
 
-    # 7. Preventiva Programada
-    if re.search(r'\b(PREVENTIVA|REVISAO|REVISÃO|ROTINA|ANUAL|PERIODICA|PERIÓDICA)\b', txt):
+    # 8. Preventiva Programada
+    termos_preventiva = [
+        "PREVENTIVA", "REVISÃO", "REVISAO", "ROTINA", "ANUAL", "PERIÓDICA", "PERIODICA", "SEMESTRAL"
+    ]
+    if _contem_termo_triagem(txt, termos_preventiva):
         return {
             "categoria": "REVISÃO PREVENTIVA PROGRAMADA",
             "icone": "📋",
@@ -497,6 +587,7 @@ def _obter_perguntas_triagem_dinamica(modalidade: str, defeito: str, equip: str)
                     "🟢 100% Operacional (Realizando exames normalmente, sem falhas)",
                     "🟡 Operando com pequenas restrições ou ruídos que podem aguardar a revisão",
                     "🔴 Equipamento parado / inoperante precisando de manutenção corretiva urgente",
+                    "⚪ Não / Nenhuma das opções",
                 ],
                 "help": "Define se o técnico deve ir com kit de preventiva ou de emergência."
             },
@@ -506,19 +597,65 @@ def _obter_perguntas_triagem_dinamica(modalidade: str, defeito: str, equip: str)
                 "opcoes": [
                     "🟢 Sala estará totalmente liberada no horário agendado (sem pacientes)",
                     "🟡 Sala precisará ser compartilhada com plantão de urgência se houver",
-                    "⚪ A definir com a coordenação médica do hospital",
+                    "⚪ Não / Nenhuma das opções",
                 ],
                 "help": "Garante aproveitamento máximo das horas técnicas."
             },
             "p3": {
                 "nome": "Itens Secundários a Revisar",
-                "pergunta": "📐 3. Itens Secundários a Revisar nesta Preventiva:",
+                "pergunta": "📐 3. Há alguma pendência ou ruído específico para incluir na revisão?",
                 "opcoes": [
                     "🟢 Preventiva de rotina completa conforme POP padrão",
                     "⚠️ Incluir ajuste mecânico específico ou reaperto estrutural",
                     "⚠️ Incluir calibração radiométrica com Phantom e laudo de conformidade",
+                    "⚪ Não / Nenhuma das opções",
                 ],
                 "help": "Direciona ferramentas e Phantoms necessários para a rota."
+            }
+        }
+
+    # 9. Mecânica Geral, Estativa e Freios
+    termos_mecanica = [
+        "FREIO", "FREIOS", "TRAVA", "TRAVAS", "TRAVOU", "TRAVADO", "TRAVADA", "EMPERRADO", "EMPERRADA",
+        "ESTATIVA", "COLUNA", "BRAÇO", "BRACO", "ORBITAL", "TILT", "SOLTO", "SOLTA", "CURSO", "TRILHO"
+    ]
+    if _contem_termo_triagem(txt, termos_mecanica):
+        return {
+            "categoria": "MECÂNICA GERAL, MOVIMENTAÇÃO & FREIOS",
+            "icone": "⚙️",
+            "focada": True,
+            "desc": "Perguntas adaptadas para acionamento de motores, eletrofreios e curso dos trilhos:",
+            "p1": {
+                "nome": "Comando de Movimento",
+                "pergunta": "⚙️ 1. Os freios eletromagnéticos liberam ao acionar a botoeira/pedal?",
+                "opcoes": [
+                    "🟢 Freios liberam e o motor tenta movimentar o conjunto normalmente",
+                    "🔇 Silêncio total ao apertar o botão (sem resposta elétrica)",
+                    "⚠️ Freios travados permanentemente ou motor patina",
+                    "⚪ Não / Nenhuma das opções",
+                ],
+                "help": "Avalia botão, fonte de alimentação ou bobina do eletrofreio."
+            },
+            "p2": {
+                "nome": "Ruído e Atrito Mecânico",
+                "pergunta": "🔊 2. O movimento mecânico apresenta barulho anormal ou atrito nos trilhos?",
+                "opcoes": [
+                    "🟢 Movimento suave e silencioso",
+                    "⚠️ Ruído áspero de rolamento ou correia desgastada",
+                    "🚨 Travamento seco no meio do percurso mecânico",
+                    "⚪ Não / Nenhuma das opções",
+                ],
+                "help": "Diferencia desgaste mecânico de problema elétrico de comando."
+            },
+            "p3": {
+                "nome": "Intermitência do Defeito",
+                "pergunta": "🔄 3. O defeito é intermitente ou permanente?",
+                "opcoes": [
+                    "🔴 Permanente (bloqueado sem movimentar)",
+                    "🟡 Intermitente (às vezes desliza fácil, outras vezes emperra)",
+                    "⚪ Não / Nenhuma das opções",
+                ],
+                "help": "Determina se a falha é mecânica contínua ou fiação móvel rompida."
             }
         }
 
@@ -555,7 +692,7 @@ def _obter_perguntas_triagem_dinamica(modalidade: str, defeito: str, equip: str)
                 "🟢 Não foi observada oscilação (Fornecimento elétrico normal)",
                 "🟡 Houve oscilações na rede elétrica, mas o quadro já estabilizou",
                 "🔴 Sim, houve desarme de disjuntor no quadro de força ou PDU",
-                "⚪ Nenhuma das opções / Não se aplica",
+                "⚪ Não / Nenhuma das opções",
             ],
             "help": "Houve oscilação na rede elétrica? Se sim, algum disjuntor desarmou?"
         },
@@ -566,7 +703,7 @@ def _obter_perguntas_triagem_dinamica(modalidade: str, defeito: str, equip: str)
                 "🟢 Movimentação mecânica normal",
                 "⚠️ Travamento ou folga em movimento específico",
                 "🚨 Equipamento totalmente imobilizado",
-                "⚪ Nenhuma das opções / Outro comportamento",
+                "⚪ Não / Nenhuma das opções",
             ],
             "help": "Avalia integridade do trilho, colunas e gantry."
         },
@@ -577,12 +714,11 @@ def _obter_perguntas_triagem_dinamica(modalidade: str, defeito: str, equip: str)
                 "🟢 Comandos e botões respondendo normalmente",
                 "🔄 Reiniciamos o equipamento e o erro persistiu",
                 "❌ Painel inoperante ou travado na inicialização",
-                "⚪ Nenhuma das opções / Não se aplica",
+                "⚪ Não / Nenhuma das opções",
             ],
             "help": "Determina se a falha é de software ou botoeira física."
         }
     }
-
 
 def render_emedonline(ctx: AppContext):
     """Módulo EmedOnline: Triagem Técnica Humanizada, Pré-Atendimento e Roteamento Inteligente."""
@@ -762,11 +898,48 @@ def render_emedonline(ctx: AppContext):
             }
             ph_texto = placeholders_por_mod.get(mod_sugerida, "Ex: Descreva o problema observado no equipamento...")
 
+            if "emedonline_txt_defeito" not in st.session_state:
+                st.session_state["emedonline_txt_defeito"] = ""
+
+            st.markdown("<div style='font-size: 13px; color: #94a3b8; margin-bottom: 6px;'>💡 <b>Atalhos rápidos para sintomas comuns</b> (clique para carregar a triagem cirúrgica instantaneamente):</div>", unsafe_allow_html=True)
+            col_chip1, col_chip2, col_chip3, col_chip4, col_chip5 = st.columns(5)
+            with col_chip1:
+                if st.button("🛏️ Mesa UP/DOWN", use_container_width=True, help="Mesa travando movimento UP e DOWN"):
+                    st.session_state["emedonline_txt_defeito"] = "MESA TRAVANDO O MOVIMENTO DE UP E DOWN."
+                    st.rerun()
+            with col_chip2:
+                if st.button("💥 Tubo / Disparo", use_container_width=True, help="Tubo não dispara ou erro no gerador"):
+                    st.session_state["emedonline_txt_defeito"] = "TUBO NÃO DISPARA / ERRO DE ALTA TENSÃO NO GERADOR"
+                    st.rerun()
+            with col_chip3:
+                if st.button("🗜️ Compressor", use_container_width=True, help="Pedal ou compressão travada"):
+                    st.session_state["emedonline_txt_defeito"] = "COMPRESSOR TRAVADO / FALHA NO PEDAL DE ELEVAÇÃO"
+                    st.rerun()
+            with col_chip4:
+                if st.button("🔬 Artefato Imagem", use_container_width=True, help="Linhas, manchas ou falha com Phantom"):
+                    st.session_state["emedonline_txt_defeito"] = "ARTEFATO DE LINHAS NA IMAGEM / FALHA NO PHANTOM"
+                    st.rerun()
+            with col_chip5:
+                if st.button("💻 Console / Boot", use_container_width=True, help="Console ou software travando"):
+                    st.session_state["emedonline_txt_defeito"] = "CONSOLE TRAVANDO NO BOOT / ERRO DE COMUNICAÇÃO"
+                    st.rerun()
+
             defeito_digitado = st.text_area(
                 "Descreva com suas palavras o defeito apresentado ou código de erro na tela: *",
+                value=st.session_state["emedonline_txt_defeito"],
                 placeholder=ph_texto,
-                height=100,
+                height=90,
+                help="Dica: Pressione Ctrl+Enter ou clique fora do campo após digitar para atualizar automaticamente as perguntas da triagem."
             )
+            st.session_state["emedonline_txt_defeito"] = defeito_digitado
+
+            c_att1, c_att2 = st.columns([1.6, 3.4])
+            with c_att1:
+                if st.button("🔄 Atualizar Perguntas da Triagem", help="Clique após digitar para carregar as perguntas cirúrgicas imediatamente"):
+                    st.rerun()
+            with c_att2:
+                if defeito_digitado.strip():
+                    st.caption(f"🔍 Triagem cirúrgica ativa para: *'{defeito_digitado.strip()}'*")
 
             # Dica Técnica Inteligente (baseada nas ITs e POPs da EMED)
             if defeito_digitado and equip_escolhido:
@@ -844,6 +1017,34 @@ def render_emedonline(ctx: AppContext):
                     index=0,
                     help=p3_dados.get("help", "")
                 )
+
+            def _is_resposta_negativa(resp: str) -> bool:
+                r = (resp or "").strip().upper()
+                return (
+                    "NENHUMA DAS OPÇÕES" in r or
+                    "NENHUMA DAS OPCOES" in r or
+                    "NÃO / NENHUMA" in r or
+                    "NAO / NENHUMA" in r or
+                    "NÃO SE APLICA" in r or
+                    "NAO SE APLICA" in r or
+                    r.startswith("⚪ NÃO") or
+                    r.startswith("⚪ NAO") or
+                    r == "NÃO" or
+                    r == "NAO"
+                )
+
+            todas_respostas_nao = _is_resposta_negativa(chk_1) and _is_resposta_negativa(chk_2) and _is_resposta_negativa(chk_3)
+
+            if todas_respostas_nao:
+                st.markdown("""
+                <div style="background: rgba(30, 58, 138, 0.25); border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 8px; margin-top: 10px;">
+                    <div style="color: #93c5fd; font-weight: 700; font-size: 13.5px;">ℹ️ Triagem Técnica EMED:</div>
+                    <div style="color: #e2e8f0; font-size: 13px; margin-top: 2px;">
+                        Nenhuma das alternativas selecionadas? Fique tranquilo! Ao confirmar a abertura, <b>o chamado foi aberto com sucesso e a equipe técnica entrará em contato para mais informações sobre o problema.</b>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
             st.markdown("---")
             st.markdown("#### 📸 3.2 Foto do Painel & Dados do Solicitante")
             col_foto1, col_foto2 = st.columns(2)
@@ -881,7 +1082,10 @@ def render_emedonline(ctx: AppContext):
                 msg_sep = info_chamado.get("msg_sep", "")
                 ok_sep = info_chamado.get("ok_sep", False)
 
-                st.success(f"🎉 **Chamado Aberto com Sucesso! Ordem de Serviço Nº #{num_os_gerada} emitida.**")
+                if info_chamado.get("todas_nao", False):
+                    st.success(f"✅ **O chamado foi aberto com sucesso e a equipe técnica entrará em contato para mais informações sobre o problema.** (OS Nº #{num_os_gerada})")
+                else:
+                    st.success(f"🎉 **Chamado Aberto com Sucesso! Ordem de Serviço Nº #{num_os_gerada} emitida.**")
                 if ok_sep and msg_sep:
                     st.info(f"📦 {msg_sep}")
 
@@ -1094,6 +1298,7 @@ def render_emedonline(ctx: AppContext):
                                     "link_wpp": link_wpp,
                                     "ok_sep": ok_sep,
                                     "msg_sep": msg_sep,
+                                    "todas_nao": todas_respostas_nao,
                                 }
                                 st.balloons()
                                 st.rerun()

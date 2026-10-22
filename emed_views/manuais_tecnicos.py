@@ -7,6 +7,9 @@ import webbrowser
 import streamlit as st
 from emed_services import AppContext
 
+_SERVER_PORT = 8585
+_SERVER_THREAD = None
+
 
 DICIONARIO_VIDEOS_ITS = {
     "IT_01_Troca_de_Tubo_GE_Brivo385.md": "Video_IT01_Troca_Tubo_GE_Brivo385.mp4",
@@ -517,7 +520,12 @@ def _renderizar_leitor_markdown(caminho_md: str, doc_key: str = "it"):
         with open(caminho_md, "r", encoding="utf-8") as f:
             conteudo = f.read()
 
-        col_it_dl, col_it_wa, col_it_busca = st.columns([1.4, 1.1, 1.9])
+        col_it_dl, col_it_win, col_it_wa, col_it_busca = st.columns([1.3, 1.1, 1.0, 1.8])
+        with col_it_win:
+            if caminho_pdf_it and os.path.exists(caminho_pdf_it):
+                if st.button("🖥️ App Windows", key=f"btn_win_md_{doc_key}", use_container_width=True):
+                    _abrir_no_sistema_operacional(caminho_pdf_it)
+                    st.toast("Documento aberto no leitor do Windows!", icon="📄")
         with col_it_dl:
             caminho_pdf_it = os.path.splitext(caminho_md)[0] + ".pdf"
             if os.path.exists(caminho_pdf_it):
@@ -1912,6 +1920,12 @@ def _render_lista_cards(docs: list, ocorrencias_busca: dict = None):
                         )
                     except Exception as e:
                         st.error(f"Erro: {e}")
+
+                # Botão para abrir direto no aplicativo do Windows (Edge / Acrobat)
+                if caminho_pdf_oficial and os.path.exists(caminho_pdf_oficial):
+                    if st.button("🖥️ Abrir no Windows", key=f"btn_win_card_{doc['rel_path']}_{idx}", use_container_width=True):
+                        _abrir_no_sistema_operacional(caminho_pdf_oficial)
+                        st.toast("PDF aberto no visualizador do Windows!", icon="📄")
 
                 # Botão de Compartilhamento WhatsApp
                 with st.popover("📲 WhatsApp", use_container_width=True):
