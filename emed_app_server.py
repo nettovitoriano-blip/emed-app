@@ -742,13 +742,24 @@ async def api_salvar_os(request: web.Request) -> web.Response:
         srv_exec = "MANUTENÇÃO E REVISÃO TÉCNICA EXECUTADA CONFORME PROTOCOLO EMED."
 
     chk_pop = limpar_texto(body.get("checklist_pop"), limpar_texto(row_os.get("checklist_pop"), "POP PADRÃO CONCLUÍDO")).upper()
-    param_med = limpar_texto(body.get("parametros_medidos"), limpar_texto(row_os.get("parametros_medidos"), "-")).upper()
+    param_med = limpar_texto(body.get("parametros_medidos"), "DENTRO DAS NORMAS / HOMOLOGADO").upper()
     obs_gerais = limpar_texto(body.get("observacoes_gerais"), limpar_texto(row_os.get("observacoes_gerais"), "")).upper()
     cond_final = limpar_texto(body.get("condicao_final"), "LIBERADO PARA USO NORMAL").upper()
     inst_prox = limpar_texto(body.get("instrumento_necessario"), "").upper()
     prioridade_pend = limpar_texto(body.get("prioridade_pendencia"), "NENHUMA").upper()
 
-    peca_sel = limpar_texto(body.get("peca_selecionada"), "NENHUMA PEÇA")
+    peca_raw = limpar_texto(body.get("peca_selecionada"), "NENHUMA PEÇA").upper()
+    peca_manual = limpar_texto(body.get("peca_manual"), "").upper()
+    if peca_manual:
+        peca_sel = f"[DIGITADA MANUALMENTE] {peca_manual}"
+    elif peca_raw and peca_raw != "MANUAL":
+        peca_sel = peca_raw
+    else:
+        peca_sel = "NENHUMA PEÇA"
+
+    status_prop = limpar_texto(body.get("status_proposta"), "SEM_PROPOSTA").upper()
+    dias_obs = int(limpar_float(body.get("dias_observacao"), 7))
+
     qtd_peca = int(limpar_float(body.get("qtd_peca"), 1))
     valor_os = limpar_float(body.get("valor_os"), limpar_float(row_os.get("valor_os"), 0.0))
     opcao_fat = limpar_texto(body.get("condicao_pagamento"), "FATURAMENTO BOLETO BANCÁRIO (VALOR INTEGRAL)")
@@ -767,16 +778,34 @@ async def api_salvar_os(request: web.Request) -> web.Response:
     if ok_p and tag_peca and tag_peca not in srv_exec:
         srv_exec = f"{srv_exec} | {tag_peca}"
 
-    foto_ant_b64 = body.get("foto_antes_b64", "")
-    foto_dep_b64 = body.get("foto_depois_b64", "")
-    if foto_ant_b64:
-        cam_ant = _salvar_base64_em_arquivo(foto_ant_b64, "ANTES", os_id)
-        if cam_ant:
-            df.at[idx_alvo, "foto_evidencia"] = cam_ant
-    if foto_dep_b64:
-        cam_dep = _salvar_base64_em_arquivo(foto_dep_b64, "DEPOIS", os_id)
-        if cam_dep:
-            df.at[idx_alvo, "foto_depois"] = cam_dep
+    # Múltiplas fotos de evidência
+    fotos_recebidas = body.get("fotos_multiplas_b64") or []
+    if not isinstance(fotos_recebidas, list):
+        fotos_recebidas = [fotos_recebidas] if fotos_recebidas else []
+    if body.get("foto_antes_b64"):
+        fotos_recebidas.insert(0, body["foto_antes_b64"])
+    if body.get("foto_depois_b64"):
+        fotos_recebidas.append(body["foto_depois_b64"])
+
+    caminhos_fotos_salvas = []
+    for idx_f, f_b64 in enumerate(fotos_recebidas):
+        if f_b64 and len(str(f_b64)) > 50:
+            c_salvo = _salvar_base64_em_arquivo(f_b64, f"EVIDENCIA_{idx_f+1}", os_id)
+            if c_salvo:
+                caminhos_fotos_salvas.append(c_salvo)
+
+    if caminhos_fotos_salvas:
+        df.at[idx_alvo, "foto_evidencia"] = caminhos_fotos_salvas[0]
+        if len(caminhos_fotos_salvas) > 1:
+            df.at[idx_alvo, "foto_depois"] = caminhos_fotos_salvas[1]
+        df.at[idx_alvo, "fotos_adicionais"] = ";".join(caminhos_fotos_salvas)
+
+    # Vídeo curto da operação
+    video_b64 = body.get("video_b64", "")
+    if video_b64 and len(str(video_b64)) > 100:
+        cam_vid = _salvar_base64_em_arquivo(video_b64, "VIDEO_OPERACAO", os_id)
+        if cam_vid:
+            df.at[idx_alvo, "video_evidencia"] = cam_vid
 
     if body.get("endereco"):
         df.at[idx_alvo, "endereco"] = limpar_texto(body.get("endereco")).upper()
@@ -835,17 +864,23 @@ async def api_salvar_os(request: web.Request) -> web.Response:
         df.at[idx_alvo, "instrumento_necessario"] = ""
         df.at[idx_alvo, "pendencias"] = f"[CONCLUÍDO - {etapa_prev}] Sem pendências restantes."
 
-    if acao == "OBSERVACAO":
+    if acao == "OBSERVACAO" or "OBSERVA" in status_prop:
         df.at[idx_alvo, "status"] = "EM OBSERVAÇÃO"
+        desc_pend = f"[EM OBSERVAÇÃO - {dias_obs} DIAS] Peça: {peca_sel} | Follow-up técnico e posterior emissão de NF"
+        df.at[idx_alvo, "pendencias"] = desc_pend
         if peca_sel and peca_sel != "NENHUMA PEÇA":
             try:
                 registrar_peca_em_teste_observacao(
                     DB_NAME, int(os_id), limpar_texto(row_os.get("cliente"), ""),
-                    limpar_texto(row_os.get("equipamento"), ""), tec_resp, peca_sel, qtd_peca, 3, "Validar estabilidade operacional"
+                    limpar_texto(row_os.get("equipamento"), ""), tec_resp, peca_sel, qtd_peca, dias_obs, "Follow-up de estabilidade para faturamento NF"
                 )
             except Exception:
                 pass
-        msg_final = f"🔬 OS #{os_id} colocada EM OBSERVAÇÃO com sucesso!"
+        msg_final = f"🔬 OS #{os_id} colocada EM OBSERVAÇÃO ({dias_obs} dias para Follow-up e NF)!"
+    elif "FINANCEIRO" in status_prop or "AGUARDANDO" in status_prop:
+        df.at[idx_alvo, "status"] = "ATIVO"
+        df.at[idx_alvo, "pendencias"] = f"[FINANCEIRO: GERAR PROPOSTA COMERCIAL] Peça: {peca_sel} aplicada no cliente"
+        msg_final = f"📋 OS #{os_id} salva! Notificação enviada ao Financeiro para envio da Proposta Comercial!"
     elif acao == "SALVAR_ABERTA":
         df.at[idx_alvo, "status"] = "ATIVO"
         msg_final = f"💾 Dados da OS #{os_id} salvos no servidor (OS mantida ATIVA)!"
@@ -1180,7 +1215,7 @@ async def api_pdf_os(request: web.Request) -> web.Response:
             return web.Response(
                 body=pdf_bytes,
                 content_type="application/pdf",
-                headers={"Content-Disposition": f'attachment; filename="{nome_arq}"'},
+                headers={"Content-Disposition": f'inline; filename="{nome_arq}"', "Content-Type": "application/pdf"},
             )
     return web.Response(text=f"OS #{os_id} não encontrada", status=404)
 

@@ -2659,6 +2659,10 @@
       if (!os) return;
       STATE.osAberta = os;
 
+      // Resetar buffers de anexos da OS atual
+      window._fotosEvidenciaB64 = [];
+      window._videoEvidenciaB64 = "";
+
       // Mesclar com rascunho salvo no celular (localStorage) se existir
       const rascLocal = JSON.parse(localStorage.getItem(`emed_draft_${os.id}`) || "{}");
       const val = (campo, padrao = "") => (rascLocal[campo] !== undefined && rascLocal[campo] !== "") ? rascLocal[campo] : (os[campo] || padrao);
@@ -2666,18 +2670,32 @@
       document.getElementById("modalOSTitulo").innerText = `ORDEM DE SERVIÇO Nº #${os.id} — ${os.cliente}`;
       const body = document.getElementById("modalOSBody");
       const tecnicos = (STATE.data.tecnicos || []).map(t => t.nome);
-      const estoque = STATE.data.estoque || [];
+      
+      // Filtrar APENAS peças reais do estoque (não deve constar kits nem instrumentos)
+      const estoquePecas = (STATE.data.estoque || []).filter(p => {
+        const cat = (p.categoria || "").toUpperCase();
+        const cod = (p.codigo || "").toUpperCase();
+        return (cat.includes("PEÇA") || cat.includes("PEC") || cod.startsWith("PEC-")) && !cod.startsWith("FER-") && !cod.startsWith("KIT-");
+      });
+
+      const tipoSrvAtual = (val('tipo_servico', os.tipo_servico) || "PREVENTIVA").toUpperCase();
+      const pecaAtual = val('peca_selecionada', os.peca_selecionada || 'NENHUMA PEÇA');
+      const pecaManualAtual = val('peca_manual', '');
+      const statusPropAtual = val('status_proposta', 'SEM_PROPOSTA');
+      const diasObsAtual = val('dias_observacao', 7);
 
       body.innerHTML = `
         <div class="section-box" style="background:#eff6ff;border-color:#93c5fd;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
             <div>
-              <div style="font-weight:900;color:#002b54;">🔬 ${esc(os.equipamento)} • N/S: ${esc(os.numero_serie)}</div>
-              <div style="font-size:12px;color:#1e3a8a;">📍 ${esc(os.endereco)} (${esc(os.cidade)}) • Check-in: <b id="lblCheckinHora">${esc(os.checkin_hora || 'Não iniciado')}</b></div>
+              <div style="font-weight:900;color:#002b54;font-size:14px;">🔬 ${esc(os.equipamento)} • N/S: ${esc(os.numero_serie)}</div>
+              <div style="font-size:12px;color:#1e3a8a;margin-top:2px;">
+                📍 ${esc(os.endereco)} (${esc(os.cidade)}) • Check-in: <b id="lblCheckinHora">${esc(os.checkin_hora || 'Pendente')}</b>
+              </div>
             </div>
-            <div style="display:flex;gap:6px;">
-              <button class="btn btn-primary btn-sm" onclick="registrarCheckinOS('${esc(os.id)}')">📍 Fazer Check-in Agora</button>
-              <a class="btn btn-outline btn-sm" href="/api/pdf/${encodeURIComponent(os.id)}" target="_blank">📄 Ver PDF 1 Página</a>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn btn-primary btn-sm" onclick="registrarCheckinOS('${esc(os.id)}')">📍 Check-in Manual</button>
+              <button class="btn btn-outline btn-sm" onclick="abrirVisualizadorLaudo('${esc(os.id)}')">📄 Ver PDF da OS</button>
             </div>
           </div>
         </div>
@@ -2690,9 +2708,9 @@
             </select>
           </div>
           <div>
-            <label class="field-label">Modalidade do Serviço</label>
+            <label class="field-label">Modalidade do Serviço (Preenchido no Ato)</label>
             <select id="osTipoSrv" class="select" onchange="carregarChecklistModal();autoSalvarRascunho();">
-              ${["CORRETIVA","PREVENTIVA","CALIBRAÇÃO","INSTALAÇÃO"].map(tp => `<option value="${tp}" ${val('tipo_servico').includes(tp)?'selected':''}>${tp}</option>`).join("")}
+              ${["PREVENTIVA","CORRETIVA","CALIBRAÇÃO","INSTALAÇÃO","TREINAMENTO"].map(tp => `<option value="${tp}" ${tipoSrvAtual.includes(tp)?'selected':''}>${tp}</option>`).join("")}
             </select>
           </div>
           <div>
@@ -2705,10 +2723,10 @@
           </div>
         </div>
 
-        <!-- CHECKLIST DE SUGESTÕES DE POP/IT (O TÉCNICO ESCOLHE O QUE USAR!) -->
+        <!-- CHECKLIST DE SUGESTÕES TÉCNICAS -->
         <div class="section-box">
           <div class="section-title">
-            <span>✅ Checklist de Sugestões Técnicas (Marque o que você deseja incluir no relatório)</span>
+            <span>✅ Checklist de Sugestões Técnicas (Marque o que deseja incluir)</span>
             <button class="btn btn-primary btn-sm" onclick="aplicarItensChecklistSelecionados()">➕ Inserir Selecionados no Relatório</button>
           </div>
           <div id="boxChecklistSugestoes" class="chk-list">Carregando sugestões do POP...</div>
@@ -2717,59 +2735,83 @@
         <div class="form-grid">
           <div>
             <label class="field-label">Defeito Relatado / Solicitação</label>
-            <textarea id="osDefeito" class="textarea" rows="2" oninput="autoSalvarRascunho()">${esc(val('defeito_relatado', os.pendencia_limpa))}</textarea>
+            <textarea id="osDefeito" class="textarea" rows="2" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('defeito_relatado', os.pendencia_limpa))}</textarea>
           </div>
           <div>
             <label class="field-label">Diagnóstico / Problemas Encontrados</label>
-            <textarea id="osProb" class="textarea" rows="2" oninput="autoSalvarRascunho()">${esc(val('problemas_encontrados'))}</textarea>
+            <textarea id="osProb" class="textarea" rows="2" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('problemas_encontrados'))}</textarea>
           </div>
         </div>
 
-        <div style="margin-bottom:10px;">
-          <label class="field-label">Serviço Técnico Executado (Você pode editar livremente)</label>
-          <textarea id="osSrvExec" class="textarea" rows="4" oninput="autoSalvarRascunho()">${esc(val('servico_executado'))}</textarea>
+        <!-- SERVIÇOS EXECUTADOS EM LETRAS MAIÚSCULAS -->
+        <div style="margin-bottom:12px;">
+          <label class="field-label" style="font-weight:bold;color:#002b54;font-size:13px;">SERVIÇOS EXECUTADOS</label>
+          <textarea id="osSrvExec" class="textarea" rows="4" style="text-transform:uppercase;" placeholder="DESCREVA AQUI OS SERVIÇOS TÉCNICOS EXECUTADOS..." oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('servico_executado'))}</textarea>
         </div>
 
-        <div class="form-grid">
-          <div>
-            <label class="field-label">Parâmetros Medidos / Calibração</label>
-            <input id="osParam" class="input" value="${esc(val('parametros_medidos','Dentro das tolerâncias normativas'))}" oninput="autoSalvarRascunho()" />
-          </div>
-          <div>
-            <label class="field-label">Peça Aplicada do Estoque (Opcional)</label>
-            <select id="osPecaSel" class="select" onchange="autoSalvarRascunho()">
-              <option value="NENHUMA PEÇA">-- Nenhuma Peça Baixada --</option>
-              ${estoque.map(p => `<option value="${esc(p.codigo)} - ${esc(p.nome_peca)}">${esc(p.codigo)} - ${esc(p.nome_peca)} (Saldo: ${p.quantidade})</option>`).join("")}
-            </select>
-          </div>
-          <div>
-            <label class="field-label">Valor Total da OS (R$)</label>
-            <input id="osValor" type="number" step="0.01" class="input" value="${esc(val('valor_os', 0))}" oninput="autoSalvarRascunho()" />
-          </div>
-        </div>
-
-        <!-- FOTOS ANTES E DEPOIS -->
+        <!-- PEÇAS DO ESTOQUE / DIGITAÇÃO MANUAL & FOLLOW-UP FINANCEIRO -->
         <div class="section-box">
-          <div class="section-title">📷 Fotos de Evidência Técnica (Saem automaticamente no PDF de 1 Página)</div>
+          <div class="section-title">📦 Peça Aplicada &amp; Follow-up Comercial / Financeiro</div>
+          <div class="form-grid">
+            <div style="flex:2;">
+              <label class="field-label">Peça Aplicada do Estoque (Apenas Peças)</label>
+              <select id="osPecaSel" class="select" onchange="alternarPecaManual();autoSalvarRascunho();">
+                <option value="NENHUMA PEÇA">-- Nenhuma Peça Baixada --</option>
+                ${estoquePecas.map(p => `<option value="${esc(p.codigo)} - ${esc(p.nome_peca)}" ${pecaAtual.includes(p.codigo)?'selected':''}>${esc(p.codigo)} - ${esc(p.nome_peca)} (Saldo: ${p.quantidade})</option>`).join("")}
+                <option value="MANUAL" ${pecaManualAtual || pecaAtual.includes('DIGITADA') ? 'selected':''}>✍️ OUTRA PEÇA (DIGITAR MANUALMENTE)</option>
+              </select>
+              <div id="boxPecaManual" style="${(pecaManualAtual || pecaAtual.includes('DIGITADA')) ? 'display:block;' : 'display:none;'}margin-top:6px;">
+                <input id="osPecaManual" class="input" placeholder="DIGITE O NOME / CÓDIGO DA PEÇA APLICADA..." value="${esc(pecaManualAtual)}" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();" />
+              </div>
+            </div>
+            <div style="flex:2;">
+              <label class="field-label">Status da Proposta / Financeiro da Peça</label>
+              <select id="osStatusProposta" class="select" onchange="alternarBoxObservacao();autoSalvarRascunho();">
+                <option value="SEM_PROPOSTA" ${statusPropAtual==='SEM_PROPOSTA'?'selected':''}>SEM PEÇA A COBRAR / REVISÃO PADRÃO</option>
+                <option value="PROPOSTA_ENVIADA" ${statusPropAtual==='PROPOSTA_ENVIADA'?'selected':''}>PROPOSTA DA PEÇA JÁ ENVIADA E APROVADA PELO CLIENTE</option>
+                <option value="AGUARDANDO_FINANCEIRO" ${statusPropAtual==='AGUARDANDO_FINANCEIRO'?'selected':''}>AGUARDANDO FINANCEIRO GERAR PROPOSTA AO CLIENTE</option>
+                <option value="EM_OBSERVACAO" ${statusPropAtual==='EM_OBSERVACAO'?'selected':''}>DEIXAR EM OBSERVAÇÃO (PEÇA EM TESTE)</option>
+              </select>
+            </div>
+            <div id="boxDiasObs" style="${statusPropAtual==='EM_OBSERVACAO' ? 'display:block;' : 'display:none;'}flex:1;">
+              <label class="field-label">Prazo em Observação</label>
+              <select id="osDiasObs" class="select" onchange="autoSalvarRascunho()">
+                <option value="3" ${diasObsAtual==3?'selected':''}>3 DIAS</option>
+                <option value="7" ${diasObsAtual==7?'selected':''}>7 DIAS (RECOMENDADO)</option>
+                <option value="15" ${diasObsAtual==15?'selected':''}>15 DIAS</option>
+                <option value="30" ${diasObsAtual==30?'selected':''}>30 DIAS</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- FOTOS MÚLTIPLAS E VÍDEO CURTO -->
+        <div class="section-box">
+          <div class="section-title">📷 Fotos &amp; Vídeo da Evidência Técnica</div>
           <div class="form-grid">
             <div>
-              <label class="field-label">Foto 1 — Antes / Plaqueta de Série</label>
-              <input type="file" accept="image/*" class="input" onchange="lerFotoInput(this, 'foto_antes_b64')" />
+              <label class="field-label">Fotos da Evidência (Pode selecionar várias fotos)</label>
+              <input type="file" accept="image/*" multiple id="osFotosInput" class="input" onchange="lerFotosMultiplasInput(this)" />
+              <div id="previewFotosGrid" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
             </div>
             <div>
-              <label class="field-label">Foto 2 — Depois / Equipamento Operando</label>
-              <input type="file" accept="image/*" class="input" onchange="lerFotoInput(this, 'foto_depois_b64')" />
+              <label class="field-label">Vídeo da Operação (Máx. 1 vídeo curto)</label>
+              <input type="file" accept="video/*" id="osVideoInput" class="input" onchange="lerVideoOperacaoInput(this)" />
+              <div id="previewVideoInfo" style="font-size:12px;color:#0f766e;font-weight:bold;margin-top:8px;"></div>
             </div>
           </div>
         </div>
 
-        <!-- ASSINATURA TOUCH DO CLIENTE -->
+        <!-- ASSINATURA TOUCH COM OPÇÃO EM TELA CHEIA -->
         <div class="section-box">
           <div class="section-title">
-            <span>✍️ Assinatura na Tela (Responsável do Hospital)</span>
-            <button class="btn btn-outline btn-sm" onclick="limparCanvasAssinatura()">🧹 Limpar Rubrica</button>
+            <span>✍️ Assinatura do Cliente (Responsável do Hospital)</span>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-primary btn-sm" onclick="abrirAssinaturaTelaCheia()">🔍 Assinar em Tela Cheia</button>
+              <button class="btn btn-outline btn-sm" onclick="limparCanvasAssinatura()">🧹 Limpar</button>
+            </div>
           </div>
-          <input id="osAssNome" class="input" placeholder="Nome legível e Cargo do recebedor no hospital" value="${esc(val('assinatura_cliente', os.responsavel_hospital))}" style="margin-bottom:8px;" oninput="autoSalvarRascunho()" />
+          <input id="osAssNome" class="input" placeholder="Nome legível e Cargo do recebedor no hospital" value="${esc(val('assinatura_cliente', os.responsavel_hospital))}" style="margin-bottom:8px;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();" />
           <canvas id="canvasAssinatura" class="sig-canvas" width="600" height="140"></canvas>
         </div>
 
@@ -2789,15 +2831,32 @@
       document.getElementById("modalOS").classList.add("open");
       inicializarCanvasAssinatura();
       carregarChecklistModal();
+      verificarCheckinAutomaticoProximidade(os);
     }
 
     function fecharModalOS() {
       document.getElementById("modalOS").classList.remove("open");
     }
 
+    function alternarPecaManual() {
+      const sel = document.getElementById("osPecaSel");
+      const box = document.getElementById("boxPecaManual");
+      if (sel && box) {
+        box.style.display = (sel.value === "MANUAL") ? "block" : "none";
+      }
+    }
+
+    function alternarBoxObservacao() {
+      const sel = document.getElementById("osStatusProposta");
+      const box = document.getElementById("boxDiasObs");
+      if (sel && box) {
+        box.style.display = (sel.value === "EM_OBSERVACAO") ? "block" : "none";
+      }
+    }
+
     async function carregarChecklistModal() {
       if (!STATE.osAberta) return;
-      const tipo = document.getElementById("osTipoSrv")?.value || "CORRETIVA";
+      const tipo = document.getElementById("osTipoSrv")?.value || "PREVENTIVA";
       const eq = STATE.osAberta.equipamento || "";
       try {
         const r = await fetch(`/api/checklist?equipamento=${encodeURIComponent(eq)}&tipo_servico=${encodeURIComponent(tipo)}`);
@@ -2818,31 +2877,128 @@
       const marcados = [...document.querySelectorAll(".chk-pop-sug:checked")].map(el => el.value);
       if (!marcados.length) return mostrarToast("Marque pelo menos 1 item da lista para inserir.");
       const campo = document.getElementById("osSrvExec");
-      const textoNovo = marcados.map(x => `• ${x}`).join("\n");
-      campo.value = campo.value ? (campo.value.trim() + "\n" + textoNovo) : textoNovo;
+      const textoNovo = marcados.map(x => `• ${x.toUpperCase()}`).join("\n");
+      campo.value = (campo.value ? (campo.value.trim() + "\n" + textoNovo) : textoNovo).toUpperCase();
       autoSalvarRascunho();
-      mostrarToast(`✅ ${marcados.length} item(ns) inseridos! Você pode editar o texto como preferir.`);
+      mostrarToast(`✅ ${marcados.length} item(ns) inseridos em MAIÚSCULAS!`);
+    }
+
+    function lerFotosMultiplasInput(input) {
+      const files = input.files;
+      if (!files || !files.length) return;
+      window._fotosEvidenciaB64 = window._fotosEvidenciaB64 || [];
+      const grid = document.getElementById("previewFotosGrid");
+      
+      Array.from(files).forEach((f, idx) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const b64 = e.target.result;
+          window._fotosEvidenciaB64.push(b64);
+          if (grid) {
+            const thumb = document.createElement("img");
+            thumb.src = b64;
+            thumb.style.width = "64px";
+            thumb.style.height = "64px";
+            thumb.style.objectFit = "cover";
+            thumb.style.borderRadius = "6px";
+            thumb.style.border = "1px solid #0077b6";
+            grid.appendChild(thumb);
+          }
+          autoSalvarRascunho();
+        };
+        reader.readAsDataURL(f);
+      });
+      mostrarToast(`📷 ${files.length} foto(s) anexada(s) à Ordem de Serviço!`);
+    }
+
+    function lerVideoOperacaoInput(input) {
+      const file = input.files?.[0];
+      if (!file) return;
+      const preview = document.getElementById("previewVideoInfo");
+      const tamMb = (file.size / (1024 * 1024)).toFixed(1);
+      if (tamMb > 25) {
+        mostrarToast("⚠️ Vídeo muito grande (máx. 25 MB). Grave um vídeo curto.");
+        input.value = "";
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        window._videoEvidenciaB64 = e.target.result;
+        if (preview) preview.innerText = `🎬 Vídeo anexado: ${file.name} (${tamMb} MB)`;
+        autoSalvarRascunho();
+        mostrarToast("🎬 Vídeo da operação anexado com sucesso!");
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Check-in Automático por Proximidade GPS
+    function verificarCheckinAutomaticoProximidade(os) {
+      if (os.checkin_hora && !os.checkin_hora.includes("Pendente") && !os.checkin_hora.includes("Não")) return;
+      if (!("geolocation" in navigator)) return;
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          registrarCheckinOS(os.id, lat, lon, true);
+        },
+        (err) => {
+          console.log("GPS não autorizado para auto check-in:", err.message);
+        },
+        { timeout: 7000, enableHighAccuracy: false }
+      );
+    }
+
+    // Modal de Visualização Direta da OS (Sem tela branca)
+    function abrirVisualizadorLaudo(osId) {
+      const modal = document.getElementById("modalVisualizadorOS");
+      const iframe = document.getElementById("iframeLaudoOS");
+      const btnBaixar = document.getElementById("btnBaixarPDFVisualizador");
+      const titulo = document.getElementById("tituloVisualizadorOS");
+      
+      titulo.innerText = `📄 Laudo Técnico Oficial — OS #${osId}`;
+      iframe.src = `/api/pdf/${encodeURIComponent(osId)}#toolbar=1`;
+      btnBaixar.href = `/api/pdf/${encodeURIComponent(osId)}`;
+      modal.classList.add("open");
+    }
+
+    function fecharVisualizadorOS() {
+      document.getElementById("modalVisualizadorOS").classList.remove("open");
+      document.getElementById("iframeLaudoOS").src = "about:blank";
+    }
+
+    function imprimirIframeOS() {
+      const iframe = document.getElementById("iframeLaudoOS");
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      }
     }
 
     function coletarPayloadModalOS() {
       if (!STATE.osAberta) return {};
       const checks = [...document.querySelectorAll(".chk-pop-sug:checked")].map(el => `[OK] ${el.value}`).join(" | ");
+      const pecaSel = document.getElementById("osPecaSel")?.value || "NENHUMA PEÇA";
+      const pecaManual = document.getElementById("osPecaManual")?.value || "";
+
       return {
         os_id: String(STATE.osAberta.id),
         tecnico_responsavel: document.getElementById("osTecResp")?.value || "",
         tipo_servico: document.getElementById("osTipoSrv")?.value || "",
         condicao_final: document.getElementById("osCondFinal")?.value || "",
-        defeito_relatado: document.getElementById("osDefeito")?.value || "",
-        problemas_encontrados: document.getElementById("osProb")?.value || "",
-        servico_executado: document.getElementById("osSrvExec")?.value || "",
+        defeito_relatado: (document.getElementById("osDefeito")?.value || "").toUpperCase(),
+        problemas_encontrados: (document.getElementById("osProb")?.value || "").toUpperCase(),
+        servico_executado: (document.getElementById("osSrvExec")?.value || "").toUpperCase(),
         checklist_pop: checks,
-        parametros_medidos: document.getElementById("osParam")?.value || "",
-        peca_selecionada: document.getElementById("osPecaSel")?.value || "NENHUMA PEÇA",
-        valor_os: document.getElementById("osValor")?.value || 0,
-        assinatura_cliente: document.getElementById("osAssNome")?.value || "",
+        peca_selecionada: pecaSel,
+        peca_manual: pecaManual.toUpperCase(),
+        status_proposta: document.getElementById("osStatusProposta")?.value || "SEM_PROPOSTA",
+        dias_observacao: document.getElementById("osDiasObs")?.value || 7,
+        valor_os: 0.0,
+        assinatura_cliente: (document.getElementById("osAssNome")?.value || "").toUpperCase(),
         assinatura_cliente_img: obterAssinaturaBase64(),
-        foto_antes_b64: window._fotoAntesB64 || "",
-        foto_depois_b64: window._fotoDepoisB64 || ""
+        fotos_multiplas_b64: window._fotosEvidenciaB64 || [],
+        video_b64: window._videoEvidenciaB64 || ""
       };
     }
 
@@ -2979,6 +3135,102 @@
         selecionarMenu("GES_FROTA");
       }
     });
-  </script>
+  
+    /********************************************************************
+     * ASSINATURA EM TELA CHEIA (TOUCH RESPONSIVO PARA O CLIENTE)
+     ********************************************************************/
+    let _ctxCheia = null;
+    let _desenhandoCheia = false;
+    let _assinouCheia = false;
+
+    function abrirAssinaturaTelaCheia() {
+      const modal = document.getElementById("modalAssinaturaCheia");
+      const c = document.getElementById("canvasCheia");
+      modal.style.display = "flex";
+      
+      // Ajustar resolução interna do canvas ao tamanho real da tela
+      const r = c.getBoundingClientRect();
+      c.width = r.width || window.innerWidth;
+      c.height = r.height || (window.innerHeight - 80);
+      _ctxCheia = c.getContext("2d");
+      _ctxCheia.strokeStyle = "#002b54";
+      _ctxCheia.lineWidth = 3.2;
+      _ctxCheia.lineCap = "round";
+      _ctxCheia.lineJoin = "round";
+      _assinouCheia = false;
+
+      const pos = (e) => {
+        const rect = c.getBoundingClientRect();
+        const t = e.touches ? e.touches[0] : e;
+        return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+      };
+      const ini = (e) => { _desenhandoCheia = true; _assinouCheia = true; const p = pos(e); _ctxCheia.beginPath(); _ctxCheia.moveTo(p.x, p.y); e.preventDefault(); };
+      const mov = (e) => { if (!_desenhandoCheia) return; const p = pos(e); _ctxCheia.lineTo(p.x, p.y); _ctxCheia.stroke(); e.preventDefault(); };
+      const fim = () => { _desenhandoCheia = false; };
+
+      c.onmousedown = ini; c.onmousemove = mov; window.addEventListener("mouseup", fim);
+      c.ontouchstart = ini; c.ontouchmove = mov; c.ontouchend = fim;
+    }
+
+    function limparCanvasCheia() {
+      const c = document.getElementById("canvasCheia");
+      if (c && _ctxCheia) {
+        _ctxCheia.clearRect(0, 0, c.width, c.height);
+        _assinouCheia = false;
+      }
+    }
+
+    function fecharAssinaturaCheia() {
+      document.getElementById("modalAssinaturaCheia").style.display = "none";
+    }
+
+    function confirmarAssinaturaCheia() {
+      const cCheia = document.getElementById("canvasCheia");
+      const cModal = document.getElementById("canvasAssinatura");
+      if (cCheia && cModal && _assinouCheia) {
+        const ctxModal = cModal.getContext("2d");
+        ctxModal.clearRect(0, 0, cModal.width, cModal.height);
+        ctxModal.drawImage(cCheia, 0, 0, cModal.width, cModal.height);
+        window._temAssinaturaDesenhada = true;
+        autoSalvarRascunho();
+        mostrarToast("✍️ Assinatura do cliente confirmada!");
+      }
+      fecharAssinaturaCheia();
+    }
+</script>
+  <!-- MODAL DE ASSINATURA EM TELA CHEIA PARA O CLIENTE -->
+  <div id="modalAssinaturaCheia" style="display:none; position:fixed; inset:0; z-index:99999; background:#ffffff; flex-direction:column;">
+    <div style="background:#002b54; color:#ffffff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-weight:bold; font-size:15px;">✍️ Assinatura do Responsável (Hospital / Clínica)</div>
+        <div style="font-size:11.5px; opacity:0.85;">Assine na tela com o dedo ou caneta touch</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline btn-sm" style="color:#ffffff; border-color:rgba(255,255,255,0.4);" onclick="limparCanvasCheia()">🧹 Limpar</button>
+        <button class="btn btn-danger btn-sm" onclick="fecharAssinaturaCheia()">✕ Cancelar</button>
+        <button class="btn btn-success btn-sm" onclick="confirmarAssinaturaCheia()">✅ Confirmar</button>
+      </div>
+    </div>
+    <div style="flex:1; position:relative; background:#f8fafc; padding:8px;">
+      <canvas id="canvasCheia" style="width:100%; height:100%; border:2px dashed #94a3b8; border-radius:8px; background:#ffffff; touch-action:none;"></canvas>
+    </div>
+  </div>
+
+  <!-- MODAL DE VISUALIZAÇÃO DIRETA DA OS EM PDF / LAUDO -->
+  <div id="modalVisualizadorOS" class="modal-overlay">
+    <div class="modal" style="max-width:920px; width:95%; height:92vh; display:flex; flex-direction:column; padding:0;">
+      <div class="modal-head" style="padding:12px 16px; border-bottom:1px solid #cbd5e1;">
+        <div class="modal-title" id="tituloVisualizadorOS">📄 Laudo Técnico Oficial da Ordem de Serviço</div>
+        <div style="display:flex; gap:6px;">
+          <a id="btnBaixarPDFVisualizador" class="btn btn-primary btn-sm" href="#" target="_blank">📥 Baixar PDF</a>
+          <button class="btn btn-outline btn-sm" onclick="imprimirIframeOS()">🖨️ Imprimir</button>
+          <button class="modal-close" onclick="fecharVisualizadorOS()">✕</button>
+        </div>
+      </div>
+      <div style="flex:1; background:#f1f5f9; position:relative;">
+        <iframe id="iframeLaudoOS" style="width:100%; height:100%; border:none;" src="about:blank"></iframe>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

@@ -234,33 +234,34 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
 
     horario_atend_txt = f"{cin} às {cout} ({dur})" if cin != "-" and cin else "Horário comercial"
 
-    # Evidências Fotográficas (Antes e Depois)
-    foto_ant_b64 = _carregar_imagem_base64(row_c.get("foto_evidencia"))
-    foto_dep_b64 = _carregar_imagem_base64(row_c.get("foto_depois"))
+    # Evidências Fotográficas da Intervenção Técnica
+    lista_fotos_b64 = []
+    for c_foto in [row_c.get("foto_evidencia"), row_c.get("foto_depois"), row_c.get("fotos_adicionais")]:
+        if c_foto:
+            for item in str(c_foto).split(";"):
+                b64_f = _carregar_imagem_base64(item.strip())
+                if b64_f and b64_f not in lista_fotos_b64:
+                    lista_fotos_b64.append(b64_f)
+
     bloco_fotos_html = ""
-    if foto_ant_b64 or foto_dep_b64:
-        cel_ant = (
-            f'<div style="font-size:7pt; font-weight:bold; color:#334155; margin-bottom:2px;">FOTO ANTES / EVIDÊNCIA INICIAL</div>'
-            f'<img src="{foto_ant_b64}" width="165" height="86" style="width:165px; height:86px; object-fit:contain; border:1px solid #cbd5e1;" alt="Foto Antes"/>'
-            if foto_ant_b64
-            else '<div style="font-size:7.5pt; color:#64748b; padding:18px 0;">Sem foto inicial anexada</div>'
-        )
-        cel_dep = (
-            f'<div style="font-size:7pt; font-weight:bold; color:#0f766e; margin-bottom:2px;">FOTO DEPOIS / SERVIÇO CONCLUÍDO</div>'
-            f'<img src="{foto_dep_b64}" width="165" height="86" style="width:165px; height:86px; object-fit:contain; border:1px solid #cbd5e1;" alt="Foto Depois"/>'
-            if foto_dep_b64
-            else '<div style="font-size:7.5pt; color:#64748b; padding:18px 0;">Sem foto final anexada</div>'
-        )
+    if lista_fotos_b64:
+        qtd_fotos = len(lista_fotos_b64)
+        largura_td = f"{100 // min(qtd_fotos, 3)}%"
+        celulas = []
+        for idx_f, f_b64 in enumerate(lista_fotos_b64[:3]):
+            celulas.append(
+                f'<td width="{largura_td}" align="center" style="text-align:center; padding:4px;">'
+                f'<div style="font-size:7pt; font-weight:bold; color:#0f766e; margin-bottom:2px;">EVIDÊNCIA TÉCNICA #{idx_f+1}</div>'
+                f'<img src="{f_b64}" width="165" height="88" style="width:165px; height:88px; object-fit:contain; border:1px solid #cbd5e1; border-radius:3px;" alt="Evidência #{idx_f+1}"/>'
+                f'</td>'
+            )
         bloco_fotos_html = f"""
-  <div class="sec-title">5. Evidências Fotográficas da Intervenção (Antes &amp; Depois)</div>
+  <div class="sec-title">5. Evidências Fotográficas da Intervenção Técnica</div>
   <table class="data-tbl" width="100%">
-    <tr>
-      <td width="50%" align="center" style="text-align:center; padding:4px;">{cel_ant}</td>
-      <td width="50%" align="center" style="text-align:center; padding:4px;">{cel_dep}</td>
-    </tr>
+    <tr>{''.join(celulas)}</tr>
   </table>"""
 
-    num_sec_aceite = "6" if (foto_ant_b64 or foto_dep_b64) else "5"
+    num_sec_aceite = "6" if lista_fotos_b64 else "5"
 
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
