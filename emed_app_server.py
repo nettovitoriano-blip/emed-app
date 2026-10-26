@@ -1459,6 +1459,6 @@ def criar_app() -> web.Application:
 
 
 if __name__ == "__main__":
-    porta = int(os.environ.get("EMED_APP_PORT", 8502))
+    porta = int(os.environ.get("PORT", os.environ.get("EMED_APP_PORT", 8502)))
     print(f"🚀 Iniciando Servidor Completo do Aplicativo Oficial EMED na porta {porta}...")
     web.run_app(criar_app(), host="0.0.0.0", port=porta)
