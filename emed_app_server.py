@@ -154,17 +154,25 @@ def _listar_manuais_homologados() -> list:
             vid_nome = os.path.basename(vid_path) if vid_path else ""
 
             titulo_limpo = base_sem_ext.replace("_", " ")
+            if titulo_limpo == "01":
+                titulo_limpo = "Manual Técnico Oficial — Raio-X Lotus Família HF (Parte 1)"
+            elif titulo_limpo == "02":
+                titulo_limpo = "Manual Técnico Oficial — Raio-X Lotus Família HF (Parte 2)"
+            formato_str = ext.replace(".", "").upper()
             catalogo.append({
                 "arquivo": f,
                 "titulo": titulo_limpo,
                 "modalidade": modalidade,
-                "fabricante": fabricante,
+                "fabricante": fabricante or "HOMOLOGADO EMED",
                 "modelo": modelo,
                 "rel_path": rel_path,
+                "caminho_rel": rel_path,
                 "ext": ext,
+                "formato": formato_str,
                 "tamanho_kb": round(os.path.getsize(caminho_abs) / 1024, 1),
                 "video": vid_nome,
             })
+    catalogo.sort(key=lambda x: (0 if x["modalidade"] != "GERAL" else 1, x["modalidade"], x["titulo"]))
     return catalogo
 
 
@@ -266,9 +274,9 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
         # Categoria TV do Laboratório
         if any(k in raw_pend for k in ["URGENTE", "CRÍTICO", "CRITICO", "EMERGÊNCIA"]) or "PARADO" in cond_ini or "PARADO" in cond_fim:
-            cat_tv = "CRÍTICA"
-        elif any(k in raw_pend for k in ["PEÇA", "PECA", "ALMOXARIFADO", "SEPARAÇÃO"]) or any(k in inst_nec for k in ["PEC-", "PLACA", "TUBO", "FONTE", "BOTAO"]):
-            cat_tv = "ALMOXARIFADO"
+            cat_tv = "CRITICA"
+        elif any(k in raw_pend for k in ["PEÇA", "PECA", "ALMOXARIFADO", "SEPARAÇÃO", "ORÇAMENTO", "ORCAMENTO"]) or any(k in inst_nec for k in ["PEC-", "PLACA", "TUBO", "FONTE", "BOTAO"]):
+            cat_tv = "PECA_ORCAMENTO"
         elif "PREVENTIVA" in tp_srv or "PROGRAMADA" in raw_pend:
             cat_tv = "PROGRAMADA"
         else:
@@ -304,6 +312,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
         f_ant = limpar_texto(row.get("foto_evidencia"), "")
         f_dep = limpar_texto(row.get("foto_depois"), "")
         rascunho_salvo, dt_rasc = obter_rascunho_provisorio(DB_NAME, os_id)
+        num_serie = limpar_texto(row.get("numero_serie") or row.get("patrimonio"), "S/N")
 
         ordens.append({
             "id": os_id,
@@ -315,8 +324,10 @@ async def api_bootstrap(request: web.Request) -> web.Response:
             "estado": limpar_texto(row.get("estado"), "CE"),
             "email": limpar_texto(row.get("email"), ""),
             "whatsapp": _limpar_telefone_exibicao(row.get("whatsapp") or row.get("contato_responsavel")),
+            "contato_responsavel": _limpar_telefone_exibicao(row.get("contato_responsavel") or row.get("whatsapp")),
             "responsavel_hospital": limpar_texto(row.get("responsavel_hospital"), ""),
             "equipamento": eq,
+            "numero_serie": num_serie,
             "tipo_servico": tp_srv,
             "etapa_preventiva": limpar_texto(row.get("etapa_preventiva"), "GERAL"),
             "tecnico_responsavel": tec,
@@ -337,6 +348,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
             "observacoes_gerais": limpar_texto(row.get("observacoes_gerais"), ""),
             "pendencias_raw": limpar_texto(row.get("pendencias"), ""),
             "pendencias_limpa": pend_limpa,
+            "pendencia_limpa": pend_limpa,
             "tem_pendencia_real": tem_pend_real,
             "prioridade_pendencia": prioridade_pend,
             "categoria_tv": cat_tv,
@@ -358,6 +370,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
             "tem_foto_antes": bool(f_ant and os.path.exists(f_ant)),
             "tem_foto_depois": bool(f_dep and os.path.exists(f_dep)),
             "rascunho_servidor": rascunho_salvo,
+            "tem_rascunho_servidor": bool(rascunho_salvo),
             "data_rascunho_servidor": dt_rasc,
         })
 
@@ -367,6 +380,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
         qtd_ch = len(gr["os_ids"])
         if qtd_ch > 1:
             viagens_economizadas += (qtd_ch - 1)
+        tecs_list = list(gr["tecnicos"])
         rotas_lista.append({
             "cliente": gr["cliente"],
             "cidade": gr["cidade"],
@@ -374,7 +388,8 @@ async def api_bootstrap(request: web.Request) -> web.Response:
             "qtd_chamados": qtd_ch,
             "os_ids": gr["os_ids"],
             "equipamentos": gr["equipamentos"],
-            "tecnicos": list(gr["tecnicos"]),
+            "tecnicos": tecs_list,
+            "tecnicos_atuais": tecs_list,
         })
     rotas_lista.sort(key=lambda x: x["qtd_chamados"], reverse=True)
 
@@ -391,13 +406,15 @@ async def api_bootstrap(request: web.Request) -> web.Response:
         try:
             df_tec = pd.read_sql_query("SELECT * FROM tecnicos", conn)
             for _, r in df_tec.iterrows():
+                ass_p = limpar_texto(r.get("assinatura_padrao"), "CFT")
                 tecnicos.append({
                     "nome": limpar_texto(r.get("nome"), "").upper(),
                     "telefone": _limpar_telefone_exibicao(r.get("telefone")),
                     "partida": limpar_texto(r.get("partida"), "FORTALEZA"),
                     "sede": limpar_texto(r.get("sede"), "FORTALEZA"),
                     "perfil": limpar_texto(r.get("perfil"), "Técnico"),
-                    "assinatura_padrao": limpar_texto(r.get("assinatura_padrao"), "CFT"),
+                    "assinatura_padrao": ass_p,
+                    "assinatura": ass_p,
                 })
         except Exception:
             pass
@@ -420,6 +437,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
                     "saldo_creditos": limpar_texto(r.get("saldo_creditos"), ""),
                     "badge_calibracao": st_cal["badge_txt"],
                     "cor_calibracao": st_cal["badge_cor"],
+                    "status_cal": st_cal["status"],
                 })
         except Exception:
             pass
@@ -456,14 +474,18 @@ async def api_bootstrap(request: web.Request) -> web.Response:
         try:
             df_nf = pd.read_sql_query("SELECT * FROM notas_fiscais ORDER BY id DESC LIMIT 50", conn)
             for _, r in df_nf.iterrows():
+                nid = int(r.get("id", 0))
+                st_f = limpar_texto(r.get("status_fiscal"), "PENDENTE")
                 notas.append({
-                    "id": int(r.get("id", 0)),
+                    "id": nid,
+                    "numero_nf": f"NFS-{nid:04d}",
                     "os_id": limpar_texto(r.get("os_id"), ""),
                     "cliente": limpar_texto(r.get("cliente"), ""),
                     "tipo_nota": limpar_texto(r.get("tipo_nota"), "NFS-e"),
                     "descricao": limpar_texto(r.get("descricao"), ""),
                     "valor_total": limpar_float(r.get("valor_total"), 0.0),
-                    "status_fiscal": limpar_texto(r.get("status_fiscal"), ""),
+                    "status_fiscal": st_f,
+                    "status_pagamento": st_f,
                     "data_emissao": limpar_texto(r.get("data_emissao"), ""),
                 })
         except Exception:
@@ -512,6 +534,33 @@ async def api_bootstrap(request: web.Request) -> web.Response:
             pass
 
     alarmes_cal = obter_resumo_alarmes_calibracao(DB_NAME)
+    inst_emed_list = []
+    for e in estoque:
+        if e.get("validade_calibracao") or "INSTRUMENTO" in str(e.get("categoria", "")).upper() or str(e.get("codigo", "")).startswith("FER-"):
+            inst_emed_list.append({
+                "codigo": e["codigo"],
+                "nome_peca": e["nome_peca"],
+                "certificado": e.get("certificado_calibracao") or "RBC-EMED",
+                "validade": e.get("validade_calibracao") or "EM DIA",
+                "status_cal": str(e.get("status_cal", "EM DIA")).replace(" ", "_"),
+                "badge": e.get("badge_calibracao") or "🟢 EM DIA",
+            })
+    eq_cli_list = []
+    for o in ordens:
+        if o.get("data_validade_calibracao") or o.get("certificado_calibracao"):
+            st_c = calcular_status_calibracao(o.get("data_validade_calibracao", ""))
+            eq_cli_list.append({
+                "os_id": o["id"],
+                "cliente": o["cliente"],
+                "equipamento": o["equipamento"],
+                "certificado": o.get("certificado_calibracao") or "RBC",
+                "validade": o.get("data_validade_calibracao") or "N/D",
+                "status_cal": str(st_c.get("status", "EM DIA")).replace(" ", "_"),
+                "badge": o.get("cal_badge_txt") or "🟢 EM DIA",
+            })
+    alarmes_cal["instrumentos_emed"] = inst_emed_list
+    alarmes_cal["equipamentos_clientes"] = eq_cli_list
+
     google_url = obter_url_google_review(DB_NAME)
     manuais_lista = _listar_manuais_homologados()
     frota_gps_multas = carregar_painel_frota_gps_multas(DB_NAME)
@@ -1133,12 +1182,31 @@ async def api_html_os(request: web.Request) -> web.Response:
 
 async def api_manual_download(request: web.Request) -> web.Response:
     """Serve o PDF de um manual técnico ou compila um .md em PDF na hora."""
-    rel_path = request.query.get("path", "")
-    if not rel_path or ".." in rel_path:
+    rel_path = request.query.get("path", "").strip()
+    if ".." in rel_path:
         return web.Response(text="Caminho inválido", status=400)
-    abs_path = os.path.join(BASE_DIR, rel_path.replace("/", os.sep))
-    if not os.path.exists(abs_path):
-        return web.Response(text="Manual não encontrado", status=404)
+
+    abs_path = os.path.join(BASE_DIR, rel_path.replace("/", os.sep)) if rel_path and rel_path != "undefined" else ""
+
+    # Fallback: se o caminho relativo não bater direto, procura pelo nome do arquivo na pasta Manuais/
+    if not abs_path or not os.path.exists(abs_path):
+        nome_busca = os.path.basename(rel_path) if rel_path and rel_path != "undefined" else request.query.get("file", "")
+        encontrado = None
+        pasta_manuais = os.path.join(BASE_DIR, "Manuais")
+        if os.path.exists(pasta_manuais):
+            for root, _, files in os.walk(pasta_manuais):
+                for f in files:
+                    if nome_busca and f.lower() == nome_busca.lower():
+                        encontrado = os.path.join(root, f)
+                        break
+                    elif not encontrado and f.lower().endswith(".pdf"):
+                        encontrado = os.path.join(root, f)
+                if encontrado and nome_busca:
+                    break
+        if encontrado and os.path.exists(encontrado):
+            abs_path = encontrado
+        else:
+            return web.Response(text="Manual não encontrado", status=404)
 
     nome_base = os.path.basename(abs_path)
     if abs_path.lower().endswith(".pdf"):
