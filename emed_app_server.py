@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Servidor Nativo & API REST do Aplicativo Oficial EMED (PWA Técnico & Gestor)
-=============================================================================
-Conecta-se diretamente ao banco SQLite (emed.db) e Excel (base_clientes.xlsx),
-oferecendo duas interfaces dedicadas de altíssima velocidade (Zero Rerun):
-1. App do Técnico de Campo (100% Offline-First, Checklist, Fotos, Assinatura Touch e PDF 1 Página)
-2. App do Gestor Completo (Central de Comando, Despacho, TV do Laboratório, Almoxarifado, PIX e Triagem)
+Servidor Nativo & API REST Completa do Aplicativo Oficial EMED (PWA Técnico, Gestor & Cliente)
+==============================================================================================
+Integra todos os 18 módulos do ecossistema EMED em uma arquitetura SPA/PWA de resposta imediata (0ms),
+conectada em tempo real ao banco SQLite (emed.db) e à planilha Excel (base_clientes.xlsx).
 """
 
 import os
@@ -13,6 +11,7 @@ import sys
 import json
 import base64
 import sqlite3
+import tempfile
 import datetime
 import pandas as pd
 from aiohttp import web
@@ -24,6 +23,7 @@ if BASE_DIR not in sys.path:
 from emed_core import (
     limpar_texto,
     limpar_float,
+    limpar_int,
     obter_id_os,
     get_db_connection,
     aplicar_peca_os_idempotente,
@@ -32,9 +32,14 @@ from emed_core import (
     acionar_separacao_automatica_almoxarifado,
     registrar_aplicacao_definitiva_e_fluxo_cobranca,
     registrar_peca_em_teste_observacao,
+    converter_teste_em_aplicacao_definitiva_e_cobranca,
+    retirar_peca_teste_e_devolver_estoque,
     atualizar_status_solicitacao_peca,
     obter_resumo_alarmes_calibracao,
     calcular_status_calibracao,
+    calcular_dias_aguardando_orcamento,
+    atualizar_calibracao_instrumento,
+    atualizar_calibracao_equipamento_cliente,
     salvar_rascunho_provisorio,
     obter_rascunho_provisorio,
     limpar_rascunho_provisorio,
@@ -50,6 +55,7 @@ from emed_services import (
     CAMINHO_EXCEL,
     init_db,
     converter_html_para_pdf_bytes,
+    render_markdown_to_pdf,
     calcular_duracao_os,
 )
 from emed_views.chamados_os import (
@@ -67,15 +73,16 @@ from emed_views.conciliacao_pix import (
 )
 from emed_views.pesquisa_satisfacao import (
     inicializar_tabela_satisfacao,
+    registrar_pesquisa,
     obter_url_google_review,
     URL_GOOGLE_REVIEW_OFICIAL,
 )
+from emed_views.manuais_tecnicos import DICIONARIO_VIDEOS_ITS, _localizar_video_do_documento
 
 STATIC_DIR = os.path.join(BASE_DIR, "emed_pwa_static")
 
 
 def _carregar_df_direto() -> pd.DataFrame:
-    """Lê a tabela clientes_equipamentos diretamente do SQLite sem depender do contexto do Streamlit."""
     init_db(DB_NAME, CAMINHO_EXCEL)
     with get_db_connection(DB_NAME) as conn:
         df = pd.read_sql_query("SELECT * FROM clientes_equipamentos", conn)
@@ -83,7 +90,6 @@ def _carregar_df_direto() -> pd.DataFrame:
 
 
 def _salvar_df_direto(df: pd.DataFrame) -> bool:
-    """Persiste o DataFrame de forma transacional no SQLite e na planilha Excel."""
     backup_excel = os.path.join(BASE_DIR, "base_clientes_backup.xlsx")
     return salvar_dataframe_transacional(df, DB_NAME, CAMINHO_EXCEL, backup_excel)
 
@@ -99,11 +105,59 @@ def _montar_equipa_direto() -> dict:
                 equipa[nome] = {
                     "tel": limpar_texto(r.get("telefone"), ""),
                     "esp": limpar_texto(r.get("especialidade"), "GERAL"),
-                    "assinatura": f"{nome} - {limpar_texto(r.get('registro_cft'), 'TÉCNICO CFT')}",
+                    "assinatura": limpar_texto(r.get("assinatura_padrao"), f"{nome} - CFT"),
                 }
     except Exception:
         pass
     return equipa
+
+
+def _listar_manuais_homologados() -> list:
+    """Varre a pasta Manuais/ para listar todas as ITs, POPs e Manuais de Serviço (.pdf e .md)."""
+    pasta_manuais = os.path.join(BASE_DIR, "Manuais")
+    catalogo = []
+    if not os.path.exists(pasta_manuais):
+        return catalogo
+
+    vistos = set()
+    for root, _, files in os.walk(pasta_manuais):
+        for f in sorted(files):
+            ext = os.path.splitext(f)[1].lower()
+            if ext not in (".pdf", ".md"):
+                continue
+            # Se existir tanto .pdf quanto .md do mesmo documento, prioriza o .pdf já compilado
+            base_sem_ext = os.path.splitext(f)[0]
+            rel_dir = os.path.relpath(root, pasta_manuais).replace("\\", "/")
+            chave_unica = f"{rel_dir}/{base_sem_ext}"
+            if ext == ".md" and os.path.exists(os.path.join(root, base_sem_ext + ".pdf")):
+                continue
+            if chave_unica in vistos:
+                continue
+            vistos.add(chave_unica)
+
+            caminho_abs = os.path.join(root, f)
+            rel_path = os.path.relpath(caminho_abs, BASE_DIR).replace("\\", "/")
+            partes = rel_dir.split("/")
+            modalidade = partes[0] if partes and partes[0] != "." else "GERAL"
+            fabricante = partes[1] if len(partes) > 1 else ""
+            modelo = partes[2] if len(partes) > 2 else ""
+
+            vid_path = _localizar_video_do_documento(caminho_abs)
+            vid_nome = os.path.basename(vid_path) if vid_path else ""
+
+            titulo_limpo = base_sem_ext.replace("_", " ")
+            catalogo.append({
+                "arquivo": f,
+                "titulo": titulo_limpo,
+                "modalidade": modalidade,
+                "fabricante": fabricante,
+                "modelo": modelo,
+                "rel_path": rel_path,
+                "ext": ext,
+                "tamanho_kb": round(os.path.getsize(caminho_abs) / 1024, 1),
+                "video": vid_nome,
+            })
+    return catalogo
 
 
 async def handle_index(request: web.Request) -> web.Response:
@@ -136,10 +190,11 @@ async def handle_logo(request: web.Request) -> web.Response:
 
 
 async def api_bootstrap(request: web.Request) -> web.Response:
-    """Retorna todo o estado atualizado do servidor EMED para o App do Técnico e App do Gestor."""
+    """Retorna o estado completo de todos os 18 menus do Sistema EMED."""
     inicializar_tabela_pix(DB_NAME)
     inicializar_tabela_satisfacao(DB_NAME)
     df = _carregar_df_direto()
+    hoje_ts = pd.Timestamp.today().normalize()
 
     ordens = []
     qtd_ativas = 0
@@ -149,9 +204,27 @@ async def api_bootstrap(request: web.Request) -> web.Response:
     qtd_pend_prog = 0
     fat_total = 0.0
 
+    # Contadores de BI
+    bi_status = {}
+    bi_tecnico = {}
+    bi_cidade = {}
+    bi_servico = {}
+    grupos_rotas = {}
+
     for idx, row in df.iterrows():
         os_id = str(obter_id_os(idx, row))
         st_os = limpar_texto(row.get("status"), "ATIVO").upper()
+        cli = limpar_texto(row.get("cliente"), "N/D")
+        cid = limpar_texto(row.get("cidade"), "FORTALEZA").upper()
+        tec = limpar_texto(row.get("tecnico_responsavel"), "A DEFINIR").upper()
+        tp_srv = limpar_texto(row.get("tipo_servico"), "MANUTENÇÃO").upper()
+        eq = limpar_texto(row.get("equipamento"), "N/D")
+
+        bi_status[st_os] = bi_status.get(st_os, 0) + 1
+        bi_tecnico[tec] = bi_tecnico.get(tec, 0) + 1
+        bi_cidade[cid] = bi_cidade.get(cid, 0) + 1
+        bi_servico[tp_srv] = bi_servico.get(tp_srv, 0) + 1
+
         if st_os == "CONCLUÍDO":
             qtd_concluidas += 1
         elif "OBSERVA" in st_os:
@@ -166,6 +239,9 @@ async def api_bootstrap(request: web.Request) -> web.Response:
         pend_limpa = _extrair_pendencia_limpa(row)
         raw_pend = limpar_texto(row.get("pendencias"), "").upper()
         inst_nec = limpar_texto(row.get("instrumento_necessario"), "").upper()
+        cond_ini = limpar_texto(row.get("condicao_inicial"), "OPERACIONAL").upper()
+        cond_fim = limpar_texto(row.get("condicao_final"), "LIBERADO PARA USO NORMAL").upper()
+
         tem_pend_real = (
             "NENHUMA PENDÊNCIA" not in pend_limpa.upper()
             and pend_limpa.strip() != ""
@@ -173,12 +249,49 @@ async def api_bootstrap(request: web.Request) -> web.Response:
         )
         prioridade_pend = "NORMAL"
         if tem_pend_real:
-            if "URGENTE" in inst_nec or "URGÊNCIA" in raw_pend or "PARADO" in limpar_texto(row.get("condicao_final"), "").upper():
+            if "URGENTE" in inst_nec or "URGÊNCIA" in raw_pend or "PARADO" in cond_fim or "PARADO" in cond_ini:
                 prioridade_pend = "URGENTE"
                 qtd_pend_urg += 1
             else:
                 prioridade_pend = "PROGRAMADA"
                 qtd_pend_prog += 1
+
+        # Categoria TV do Laboratório
+        if any(k in raw_pend for k in ["URGENTE", "CRÍTICO", "CRITICO", "EMERGÊNCIA"]) or "PARADO" in cond_ini or "PARADO" in cond_fim:
+            cat_tv = "CRÍTICA"
+        elif any(k in raw_pend for k in ["PEÇA", "PECA", "ALMOXARIFADO", "SEPARAÇÃO"]) or any(k in inst_nec for k in ["PEC-", "PLACA", "TUBO", "FONTE", "BOTAO"]):
+            cat_tv = "ALMOXARIFADO"
+        elif "PREVENTIVA" in tp_srv or "PROGRAMADA" in raw_pend:
+            cat_tv = "PROGRAMADA"
+        else:
+            cat_tv = "NORMAL"
+
+        # Orçamento pendente (>15 dias ou aguardando aprovação)
+        eh_orcamento_pendente = (
+            st_os == "ATIVO"
+            and any(k in raw_pend for k in ["ORÇAMENTO", "ORCAMENTO", "APROVA", "PROPOSTA"])
+            and "ORÇAMENTO APROVADO" not in raw_pend
+        )
+        dias_orc = calcular_dias_aguardando_orcamento(row.get("data_agendamento"), hoje_ts)
+
+        # Calibração do equipamento do cliente
+        cal_eq = calcular_status_calibracao(limpar_texto(row.get("data_validade_calibracao"), ""))
+
+        # Agrupamento de rotas para chamados ativos
+        if st_os != "CONCLUÍDO":
+            ch_rota = f"{cli} ({cid})"
+            if ch_rota not in grupos_rotas:
+                grupos_rotas[ch_rota] = {
+                    "cliente": cli,
+                    "cidade": cid,
+                    "endereco": limpar_texto(row.get("endereco"), ""),
+                    "os_ids": [],
+                    "equipamentos": [],
+                    "tecnicos": set(),
+                }
+            grupos_rotas[ch_rota]["os_ids"].append(os_id)
+            grupos_rotas[ch_rota]["equipamentos"].append(eq)
+            grupos_rotas[ch_rota]["tecnicos"].add(tec)
 
         f_ant = limpar_texto(row.get("foto_evidencia"), "")
         f_dep = limpar_texto(row.get("foto_depois"), "")
@@ -187,19 +300,20 @@ async def api_bootstrap(request: web.Request) -> web.Response:
         ordens.append({
             "id": os_id,
             "idx": int(idx),
-            "cliente": limpar_texto(row.get("cliente"), "N/D"),
+            "cliente": cli,
             "cnpj": limpar_texto(row.get("cnpj"), "N/D"),
             "endereco": limpar_texto(row.get("endereco"), ""),
-            "cidade": limpar_texto(row.get("cidade"), "FORTALEZA"),
+            "cidade": cid,
             "estado": limpar_texto(row.get("estado"), "CE"),
             "email": limpar_texto(row.get("email"), ""),
             "whatsapp": _limpar_telefone_exibicao(row.get("whatsapp") or row.get("contato_responsavel")),
             "responsavel_hospital": limpar_texto(row.get("responsavel_hospital"), ""),
-            "equipamento": limpar_texto(row.get("equipamento"), "N/D"),
-            "tipo_servico": limpar_texto(row.get("tipo_servico"), "MANUTENÇÃO"),
+            "equipamento": eq,
+            "tipo_servico": tp_srv,
             "etapa_preventiva": limpar_texto(row.get("etapa_preventiva"), "GERAL"),
-            "tecnico_responsavel": limpar_texto(row.get("tecnico_responsavel"), "A DEFINIR"),
+            "tecnico_responsavel": tec,
             "tecnico_auxiliar": limpar_texto(row.get("tecnico_auxiliar"), ""),
+            "telefone_tecnico": limpar_texto(row.get("telefone_tecnico"), ""),
             "data_agendamento": limpar_texto(row.get("data_agendamento"), ""),
             "data_br": _formatar_data_br(row.get("data_agendamento")),
             "status": st_os,
@@ -213,28 +327,56 @@ async def api_bootstrap(request: web.Request) -> web.Response:
             "checklist_pop": limpar_texto(row.get("checklist_pop"), ""),
             "parametros_medidos": limpar_texto(row.get("parametros_medidos"), ""),
             "observacoes_gerais": limpar_texto(row.get("observacoes_gerais"), ""),
+            "pendencias_raw": limpar_texto(row.get("pendencias"), ""),
             "pendencias_limpa": pend_limpa,
             "tem_pendencia_real": tem_pend_real,
             "prioridade_pendencia": prioridade_pend,
+            "categoria_tv": cat_tv,
+            "eh_orcamento_pendente": eh_orcamento_pendente,
+            "dias_orcamento": dias_orc,
             "instrumento_necessario": limpar_texto(row.get("instrumento_necessario"), ""),
-            "condicao_inicial": limpar_texto(row.get("condicao_inicial"), "OPERACIONAL"),
-            "condicao_final": limpar_texto(row.get("condicao_final"), "LIBERADO PARA USO NORMAL"),
+            "condicao_inicial": cond_ini,
+            "condicao_final": cond_fim,
             "condicao_pagamento": limpar_texto(row.get("condicao_pagamento"), "FATURAMENTO BOLETO BANCÁRIO (VALOR INTEGRAL)"),
             "valor_os": val_os,
             "assinatura_cliente": limpar_texto(row.get("assinatura_cliente"), ""),
             "assinatura_tecnico": limpar_texto(row.get("assinatura_tecnico"), ""),
             "peca_baixada_ref": limpar_texto(row.get("peca_baixada_ref"), ""),
+            "data_ultima_calibracao": limpar_texto(row.get("data_ultima_calibracao"), ""),
+            "data_validade_calibracao": limpar_texto(row.get("data_validade_calibracao"), ""),
+            "certificado_calibracao": limpar_texto(row.get("certificado_calibracao"), ""),
+            "cal_badge_txt": cal_eq["badge_txt"],
+            "cal_badge_cor": cal_eq["badge_cor"],
             "tem_foto_antes": bool(f_ant and os.path.exists(f_ant)),
             "tem_foto_depois": bool(f_dep and os.path.exists(f_dep)),
             "rascunho_servidor": rascunho_salvo,
             "data_rascunho_servidor": dt_rasc,
         })
 
-    # Técnicos, Estoque, Solicitações, Notas Fiscais
+    rotas_lista = []
+    viagens_economizadas = 0
+    for _, gr in grupos_rotas.items():
+        qtd_ch = len(gr["os_ids"])
+        if qtd_ch > 1:
+            viagens_economizadas += (qtd_ch - 1)
+        rotas_lista.append({
+            "cliente": gr["cliente"],
+            "cidade": gr["cidade"],
+            "endereco": gr["endereco"],
+            "qtd_chamados": qtd_ch,
+            "os_ids": gr["os_ids"],
+            "equipamentos": gr["equipamentos"],
+            "tecnicos": list(gr["tecnicos"]),
+        })
+    rotas_lista.sort(key=lambda x: x["qtd_chamados"], reverse=True)
+
     tecnicos = []
     estoque = []
     solicitacoes = []
+    baixas_cons = []
     notas = []
+    veiculos = []
+    pesquisas = []
     clientes_unicos = sorted(list(set(o["cliente"] for o in ordens if o["cliente"] and o["cliente"] != "N/D")))
 
     with get_db_connection(DB_NAME) as conn:
@@ -243,9 +385,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
             for _, r in df_tec.iterrows():
                 tecnicos.append({
                     "nome": limpar_texto(r.get("nome"), "").upper(),
-                    "especialidade": limpar_texto(r.get("especialidade"), "GERAL"),
-                    "telefone": limpar_texto(r.get("telefone"), ""),
-                    "registro_cft": limpar_texto(r.get("registro_cft"), "CFT"),
+                    "telefone": _limpar_telefone_exibicao(r.get("telefone")),
+                    "partida": limpar_texto(r.get("partida"), "FORTALEZA"),
+                    "sede": limpar_texto(r.get("sede"), "FORTALEZA"),
+                    "perfil": limpar_texto(r.get("perfil"), "Técnico"),
+                    "assinatura_padrao": limpar_texto(r.get("assinatura_padrao"), "CFT"),
                 })
         except Exception:
             pass
@@ -261,8 +405,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
                     "quantidade": int(limpar_float(r.get("quantidade"), 0)),
                     "estoque_minimo": int(limpar_float(r.get("estoque_minimo"), 1)),
                     "preco_unitario": limpar_float(r.get("preco_unitario"), 0.0),
-                    "localizacao": limpar_texto(r.get("localizacao"), ""),
+                    "localizacao": limpar_texto(r.get("localizacao"), "ALMOXARIFADO CENTRAL"),
+                    "ultima_calibracao": limpar_texto(r.get("data_ultima_calibracao"), ""),
                     "validade_calibracao": limpar_texto(r.get("data_validade_calibracao"), ""),
+                    "certificado_calibracao": limpar_texto(r.get("certificado_calibracao"), ""),
+                    "saldo_creditos": limpar_texto(r.get("saldo_creditos"), ""),
                     "badge_calibracao": st_cal["badge_txt"],
                     "cor_calibracao": st_cal["badge_cor"],
                 })
@@ -270,7 +417,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
             pass
 
         try:
-            df_sol = pd.read_sql_query("SELECT * FROM solicitacoes_pecas ORDER BY id DESC LIMIT 50", conn)
+            df_sol = pd.read_sql_query("SELECT * FROM solicitacoes_pecas ORDER BY id DESC LIMIT 60", conn)
             for _, r in df_sol.iterrows():
                 solicitacoes.append({
                     "id": int(r.get("id", 0)),
@@ -285,7 +432,21 @@ async def api_bootstrap(request: web.Request) -> web.Response:
             pass
 
         try:
-            df_nf = pd.read_sql_query("SELECT * FROM notas_fiscais ORDER BY id DESC LIMIT 40", conn)
+            df_bx = pd.read_sql_query("SELECT * FROM baixas_consumiveis ORDER BY id DESC LIMIT 30", conn)
+            for _, r in df_bx.iterrows():
+                baixas_cons.append({
+                    "id": int(r.get("id", 0)),
+                    "tecnico": limpar_texto(r.get("tecnico"), ""),
+                    "item": limpar_texto(r.get("item"), ""),
+                    "quantidade": int(limpar_float(r.get("quantidade"), 1)),
+                    "cliente_os": limpar_texto(r.get("cliente_os"), ""),
+                    "data_baixa": limpar_texto(r.get("data_baixa"), ""),
+                })
+        except Exception:
+            pass
+
+        try:
+            df_nf = pd.read_sql_query("SELECT * FROM notas_fiscais ORDER BY id DESC LIMIT 50", conn)
             for _, r in df_nf.iterrows():
                 notas.append({
                     "id": int(r.get("id", 0)),
@@ -300,8 +461,44 @@ async def api_bootstrap(request: web.Request) -> web.Response:
         except Exception:
             pass
 
+        try:
+            df_v = pd.read_sql_query("SELECT * FROM veiculos", conn)
+            for _, r in df_v.iterrows():
+                km_at = limpar_int(r.get("km_atual"), 0)
+                km_pr = limpar_int(r.get("km_proxima_revisao"), 50000)
+                veiculos.append({
+                    "id": int(r.get("id", 1)),
+                    "modelo": limpar_texto(r.get("modelo"), "Veículo EMED"),
+                    "placa": limpar_texto(r.get("placa"), ""),
+                    "km_atual": km_at,
+                    "km_ultima_revisao": limpar_int(r.get("km_ultima_revisao"), 0),
+                    "km_proxima_revisao": km_pr,
+                    "km_restante": km_pr - km_at,
+                    "status_manutencao": limpar_texto(r.get("status_manutencao"), "Em Dia"),
+                    "historico_manutencao": limpar_texto(r.get("historico_manutencao"), ""),
+                    "proximas_manutencoes": limpar_texto(r.get("proximas_manutencoes"), ""),
+                })
+        except Exception:
+            pass
+
+        try:
+            df_ps = pd.read_sql_query("SELECT * FROM pesquisas_satisfacao ORDER BY id DESC LIMIT 40", conn)
+            for _, r in df_ps.iterrows():
+                pesquisas.append({
+                    "id": int(r.get("id", 0)),
+                    "os_id": limpar_texto(r.get("os_id"), ""),
+                    "cliente": limpar_texto(r.get("cliente"), ""),
+                    "tecnico": limpar_texto(r.get("tecnico"), ""),
+                    "nota": int(limpar_float(r.get("nota"), 5)),
+                    "comentario": limpar_texto(r.get("comentario"), ""),
+                    "data_avaliacao": limpar_texto(r.get("data_avaliacao"), ""),
+                })
+        except Exception:
+            pass
+
     alarmes_cal = obter_resumo_alarmes_calibracao(DB_NAME)
     google_url = obter_url_google_review(DB_NAME)
+    manuais_lista = _listar_manuais_homologados()
 
     payload = {
         "ok": True,
@@ -314,14 +511,26 @@ async def api_bootstrap(request: web.Request) -> web.Response:
             "pendencias_programadas": qtd_pend_prog,
             "faturamento_total": fat_total,
             "alarmes_calibracao": alarmes_cal.get("total_alarmes_urgentes", 0),
+            "viagens_economizadas": viagens_economizadas,
+        },
+        "bi": {
+            "por_status": bi_status,
+            "por_tecnico": bi_tecnico,
+            "por_cidade": bi_cidade,
+            "por_servico": bi_servico,
         },
         "ordens": ordens,
+        "rotas_agrupadas": rotas_lista,
         "clientes_unicos": clientes_unicos,
         "tecnicos": tecnicos,
+        "veiculos": veiculos,
         "estoque": estoque,
         "solicitacoes_almox": solicitacoes,
+        "baixas_consumiveis": baixas_cons,
         "notas_fiscais": notas,
+        "pesquisas_satisfacao": pesquisas,
         "alarmes_calibracao": alarmes_cal,
+        "manuais": manuais_lista,
         "templates_relatorio": TEMPLATES_RELATORIO_TECNICO,
         "kits_servico": SUGESTOES_SEPARACAO_POR_ATIVIDADE,
         "google_review_url": google_url,
@@ -334,11 +543,7 @@ async def api_checklist(request: web.Request) -> web.Response:
     defeito = request.query.get("defeito", "")
     acoes = obter_checklist_acoes_sugeridas(equip, defeito)
     sugestao_ia = gerar_sugestao_relatorio_clinico(equip, defeito)
-    return web.json_response({
-        "ok": True,
-        "acoes": acoes,
-        "sugestao_ia": sugestao_ia,
-    })
+    return web.json_response({"ok": True, "acoes": acoes, "sugestao_ia": sugestao_ia})
 
 
 async def api_triagem(request: web.Request) -> web.Response:
@@ -346,11 +551,7 @@ async def api_triagem(request: web.Request) -> web.Response:
     defeito = request.query.get("defeito", "")
     modalidade = _detectar_modalidade(equip, defeito)
     triagem = _obter_perguntas_triagem_dinamica(modalidade, defeito, equip)
-    return web.json_response({
-        "ok": True,
-        "modalidade": modalidade,
-        "triagem": triagem,
-    })
+    return web.json_response({"ok": True, "modalidade": modalidade, "triagem": triagem})
 
 
 async def api_salvar_rascunho(request: web.Request) -> web.Response:
@@ -369,23 +570,17 @@ async def api_checkin(request: web.Request) -> web.Response:
     df = _carregar_df_direto()
     agora_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
 
-    encontrou = False
     for idx, row in df.iterrows():
         if str(obter_id_os(idx, row)) == os_id:
             df.at[idx, "checkin_hora"] = agora_str
             df.at[idx, "confirmado"] = "SIM"
-            encontrou = True
-            break
+            _salvar_df_direto(df)
+            return web.json_response({"ok": True, "checkin_hora": agora_str, "msg": f"📍 Check-in registrado na OS #{os_id} às {agora_str}!"})
 
-    if not encontrou:
-        return web.json_response({"ok": False, "msg": f"OS #{os_id} não encontrada."}, status=404)
-
-    _salvar_df_direto(df)
-    return web.json_response({"ok": True, "checkin_hora": agora_str, "msg": f"📍 Check-in registrado na OS #{os_id} às {agora_str}!"})
+    return web.json_response({"ok": False, "msg": f"OS #{os_id} não encontrada."}, status=404)
 
 
 def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
-    """Decodifica uma imagem data:image/...;base64 e salva em uploads_os/."""
     if not b64_str or not str(b64_str).startswith("data:image"):
         return ""
     try:
@@ -403,10 +598,9 @@ def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
 
 
 async def api_salvar_os(request: web.Request) -> web.Response:
-    """Grava ou conclui uma Ordem de Serviço a partir do App do Técnico ou App do Gestor."""
     body = await request.json()
     os_id = str(body.get("os_id", "")).strip()
-    acao = str(body.get("acao", "CONCLUIR")).upper()  # CONCLUIR, OBSERVACAO, SALVAR_ABERTA
+    acao = str(body.get("acao", "CONCLUIR")).upper()
 
     df = _carregar_df_direto()
     equipa = _montar_equipa_direto()
@@ -458,13 +652,11 @@ async def api_salvar_os(request: web.Request) -> web.Response:
     ass_cli_img = limpar_texto(body.get("assinatura_cliente_img"), limpar_texto(row_os.get("assinatura_cliente_img"), ""))
     ass_tec = equipa.get(tec_resp, {}).get("assinatura", f"{tec_resp} - CFT")
 
-    # Aplicação de peça no estoque (se selecionada)
     ref_ant = limpar_texto(row_os.get("peca_baixada_ref"), "")
     ok_p, tag_peca, nova_ref_peca = aplicar_peca_os_idempotente(DB_NAME, peca_sel, qtd_peca, ref_ant)
     if ok_p and tag_peca and tag_peca not in srv_exec:
         srv_exec = f"{srv_exec} | {tag_peca}"
 
-    # Fotos Antes e Depois (se enviadas em Base64)
     foto_ant_b64 = body.get("foto_antes_b64", "")
     foto_dep_b64 = body.get("foto_depois_b64", "")
     if foto_ant_b64:
@@ -476,7 +668,6 @@ async def api_salvar_os(request: web.Request) -> web.Response:
         if cam_dep:
             df.at[idx_alvo, "foto_depois"] = cam_dep
 
-    # Atualiza campos na linha da OS
     if body.get("endereco"):
         df.at[idx_alvo, "endereco"] = limpar_texto(body.get("endereco")).upper()
     if body.get("email"):
@@ -567,11 +758,10 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 async def api_nova_os(request: web.Request) -> web.Response:
-    """Cria uma nova Ordem de Serviço (via Gestor ou Portal de Triagem) e aciona separação no Almoxarifado."""
     body = await request.json()
     cliente = limpar_texto(body.get("cliente"), "").upper()
     equipamento = limpar_texto(body.get("equipamento"), "").upper()
-    defeito = limpar_texto(body.get("defeito_relatado"), "").upper()
+    defeito = limpar_texto(body.get("defeito_relatado"), "MANUTENÇÃO PREVENTIVA / CADASTRO PARQUE").upper()
     if not cliente or not equipamento:
         return web.json_response({"ok": False, "msg": "Informe o Cliente e o Equipamento."}, status=400)
 
@@ -583,6 +773,7 @@ async def api_nova_os(request: web.Request) -> web.Response:
     contato = _limpar_telefone_exibicao(body.get("contato_responsavel") or body.get("whatsapp"))
     endereco = limpar_texto(body.get("endereco"), "UNIDADE HOSPITALAR").upper()
     cidade = limpar_texto(body.get("cidade"), "FORTALEZA").upper()
+    cnpj = limpar_texto(body.get("cnpj"), "")
     respostas_triagem = limpar_texto(body.get("respostas_triagem"), "")
 
     kit_sug = obter_kit_por_servico(tipo_srv, defeito)
@@ -592,6 +783,7 @@ async def api_nova_os(request: web.Request) -> web.Response:
     nova_linha = {
         "id": novo_id,
         "cliente": cliente,
+        "cnpj": cnpj,
         "cidade": cidade,
         "estado": "CE",
         "equipamento": equipamento,
@@ -641,6 +833,185 @@ async def api_reabrir_os(request: web.Request) -> web.Response:
             _salvar_df_direto(df)
             return web.json_response({"ok": True, "msg": f"🔓 OS #{os_id} reaberta e devolvida para a fila de OS Ativas!"})
     return web.json_response({"ok": False, "msg": "OS não encontrada."}, status=404)
+
+
+async def api_despachar_rota(request: web.Request) -> web.Response:
+    """Despacha em bloco todos os chamados ativos de um hospital/rota para um técnico."""
+    body = await request.json()
+    os_ids = [str(x) for x in body.get("os_ids", [])]
+    tecnico = limpar_texto(body.get("tecnico"), "").upper()
+    auxiliar = limpar_texto(body.get("auxiliar"), "").upper()
+    if not os_ids or not tecnico:
+        return web.json_response({"ok": False, "msg": "Selecione os chamados e o técnico."}, status=400)
+
+    df = _carregar_df_direto()
+    equipa = _montar_equipa_direto()
+    tel_t = equipa.get(tecnico, {}).get("tel", "")
+    qtd = 0
+    for idx, row in df.iterrows():
+        if str(obter_id_os(idx, row)) in os_ids:
+            df.at[idx, "tecnico_responsavel"] = tecnico
+            df.at[idx, "tecnico_auxiliar"] = auxiliar
+            df.at[idx, "telefone_tecnico"] = tel_t
+            df.at[idx, "confirmado"] = "SIM"
+            qtd += 1
+    _salvar_df_direto(df)
+    return web.json_response({"ok": True, "msg": f"🚚 Rota despachada! {qtd} chamado(s) atribuído(s) para {tecnico}."})
+
+
+async def api_orcamento_acao(request: web.Request) -> web.Response:
+    """Aprova orçamento, converte peça em teste em definitiva ou retira peça em teste."""
+    body = await request.json()
+    os_id = str(body.get("os_id", "")).strip()
+    acao = limpar_texto(body.get("acao"), "APROVAR").upper()
+    valor = limpar_float(body.get("valor"), 0.0)
+
+    if acao == "CONVERTER_TESTE":
+        ok, msg = converter_teste_em_aplicacao_definitiva_e_cobranca(DB_NAME, int(os_id), valor if valor > 0 else None)
+        df = _carregar_df_direto()
+        _salvar_df_direto(df)
+        return web.json_response({"ok": ok, "msg": msg})
+    elif acao == "RETIRAR_TESTE":
+        ok, msg = retirar_peca_teste_e_devolver_estoque(DB_NAME, int(os_id))
+        df = _carregar_df_direto()
+        _salvar_df_direto(df)
+        return web.json_response({"ok": ok, "msg": msg})
+    else:
+        df = _carregar_df_direto()
+        for idx, row in df.iterrows():
+            if str(obter_id_os(idx, row)) == os_id:
+                desc_ant = limpar_texto(row.get("pendencias"), "")
+                df.at[idx, "pendencias"] = f"[ORÇAMENTO APROVADO - LIBERADO PARA EXECUÇÃO] {desc_ant}"
+                df.at[idx, "confirmado"] = "SIM"
+                _salvar_df_direto(df)
+                return web.json_response({"ok": True, "msg": f"✅ Orçamento da OS #{os_id} aprovado e liberado para execução!"})
+        return web.json_response({"ok": False, "msg": "OS não localizada."}, status=404)
+
+
+async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
+    """Registra pedido de peças/ferramentas/kit ao Almoxarifado ou baixa de consumível pelo técnico."""
+    body = await request.json()
+    tipo = limpar_texto(body.get("tipo"), "PEDIDO_PECA").upper()
+    tecnico = limpar_texto(body.get("tecnico"), "ANTONIO").upper()
+    cliente = limpar_texto(body.get("cliente"), "DEMANDA DE CAMPO").upper()
+    itens = limpar_texto(body.get("itens"), "").upper()
+    instrumentos = limpar_texto(body.get("instrumentos"), "KIT PADRÃO").upper()
+    agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    if not itens:
+        return web.json_response({"ok": False, "msg": "Informe a peça, consumível ou kit desejado."}, status=400)
+
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        if tipo == "BAIXA_CONSUMIVEL":
+            qtd_c = int(limpar_float(body.get("quantidade"), 1))
+            cur.execute("""
+                INSERT INTO baixas_consumiveis (tecnico, item, quantidade, cliente_os, data_baixa)
+                VALUES (?, ?, ?, ?, ?)
+            """, (tecnico, itens, qtd_c, cliente, agora))
+            conn.commit()
+            return web.json_response({"ok": True, "msg": f"🧴 Baixa de consumível ({qtd_c}x {itens}) registrada!"})
+        else:
+            cur.execute("""
+                INSERT INTO solicitacoes_pecas
+                (tecnico, destino_cliente, itens_solicitados, instrumentos_solicitados, status_pedido, data_pedido)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (tecnico, cliente, itens, instrumentos, "A SEPARAR (SOLICITADO PELO APP)", agora))
+            conn.commit()
+            return web.json_response({"ok": True, "msg": f"📦 Pedido enviado para o Almoxarifado EMED com sucesso!"})
+
+
+async def api_estoque_salvar(request: web.Request) -> web.Response:
+    """Adiciona ou atualiza item no estoque + validade de calibração."""
+    body = await request.json()
+    codigo = limpar_texto(body.get("codigo"), "").upper()
+    nome_peca = limpar_texto(body.get("nome_peca"), "").upper()
+    categoria = limpar_texto(body.get("categoria"), "PEÇA").upper()
+    quantidade = int(limpar_float(body.get("quantidade"), 1))
+    preco = limpar_float(body.get("preco_unitario"), 0.0)
+    validade_cal = limpar_texto(body.get("validade_calibracao"), "")
+    cert_cal = limpar_texto(body.get("certificado_calibracao"), "").upper()
+
+    if not codigo or not nome_peca:
+        return web.json_response({"ok": False, "msg": "Informe o código e o nome da peça/instrumento."}, status=400)
+
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT codigo FROM estoque_pecas WHERE UPPER(codigo) = ?", (codigo,))
+        existe = cur.fetchone()
+        if existe:
+            cur.execute("""
+                UPDATE estoque_pecas
+                SET nome_peca = ?, categoria = ?, quantidade = ?, preco_unitario = ?,
+                    data_validade_calibracao = ?, certificado_calibracao = ?
+                WHERE UPPER(codigo) = ?
+            """, (nome_peca, categoria, quantidade, preco, validade_cal, cert_cal, codigo))
+        else:
+            cur.execute("""
+                INSERT INTO estoque_pecas
+                (codigo, nome_peca, categoria, quantidade, estoque_minimo, preco_unitario, localizacao, data_validade_calibracao, certificado_calibracao)
+                VALUES (?, ?, ?, ?, 1, ?, 'ALMOXARIFADO CENTRAL', ?, ?)
+            """, (codigo, nome_peca, categoria, quantidade, preco, validade_cal, cert_cal))
+        conn.commit()
+
+    return web.json_response({"ok": True, "msg": f"✅ Item '{codigo} — {nome_peca}' salvo no estoque!"})
+
+
+async def api_calibracao_equipamento(request: web.Request) -> web.Response:
+    body = await request.json()
+    os_id = int(limpar_float(body.get("os_id"), 0))
+    dt_ult = limpar_texto(body.get("data_ultima"), datetime.date.today().strftime("%d/%m/%Y"))
+    dt_val = limpar_texto(body.get("data_validade"), "")
+    cert = limpar_texto(body.get("certificado"), "")
+    ok, msg = atualizar_calibracao_equipamento_cliente(DB_NAME, os_id, dt_ult, dt_val, cert)
+    return web.json_response({"ok": ok, "msg": msg})
+
+
+async def api_veiculo_km(request: web.Request) -> web.Response:
+    body = await request.json()
+    vid = int(limpar_float(body.get("id"), 1))
+    km_atual = int(limpar_float(body.get("km_atual"), 0))
+    km_prox = int(limpar_float(body.get("km_proxima_revisao"), 50000))
+    obs = limpar_texto(body.get("historico_manutencao"), "")
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE veiculos
+            SET km_atual = ?, km_proxima_revisao = ?, historico_manutencao = ?
+            WHERE id = ?
+        """, (km_atual, km_prox, obs, vid))
+        conn.commit()
+    return web.json_response({"ok": True, "msg": f"🚗 Quilometragem atualizada para {km_atual:,} KM!"})
+
+
+async def api_tecnico_salvar(request: web.Request) -> web.Response:
+    body = await request.json()
+    nome = limpar_texto(body.get("nome"), "").upper()
+    tel = limpar_texto(body.get("telefone"), "")
+    sede = limpar_texto(body.get("sede"), "FORTALEZA").upper()
+    perfil = limpar_texto(body.get("perfil"), "Técnico")
+    ass = limpar_texto(body.get("assinatura_padrao"), f"{nome} - CFT").upper()
+    if not nome:
+        return web.json_response({"ok": False, "msg": "Informe o nome do técnico."}, status=400)
+    with get_db_connection(DB_NAME) as conn:
+        conn.execute("""
+            INSERT OR REPLACE INTO tecnicos
+            (nome, telefone, partida, sede, senha, perfil, assinatura_padrao, rubrica_img)
+            VALUES (?, ?, ?, ?, '1234', ?, ?, '')
+        """, (nome, tel, sede, sede, perfil, ass))
+        conn.commit()
+    return web.json_response({"ok": True, "msg": f"👷 Técnico '{nome}' salvo na equipe EMED!"})
+
+
+async def api_satisfacao_registrar(request: web.Request) -> web.Response:
+    body = await request.json()
+    os_id = limpar_texto(body.get("os_id"), "AVULSO")
+    cliente = limpar_texto(body.get("cliente"), "HOSPITAL CREDENCIADO")
+    tecnico = limpar_texto(body.get("tecnico"), "EQUIPE EMED")
+    nota = int(limpar_float(body.get("nota"), 5))
+    comentario = limpar_texto(body.get("comentario"), "Excelente atendimento!")
+    ok, msg = registrar_pesquisa(DB_NAME, os_id, cliente, tecnico, nota, comentario)
+    return web.json_response({"ok": ok, "msg": msg, "google_url": obter_url_google_review(DB_NAME)})
 
 
 async def api_almox_status(request: web.Request) -> web.Response:
@@ -715,8 +1086,68 @@ async def api_html_os(request: web.Request) -> web.Response:
     return web.Response(text=f"OS #{os_id} não encontrada", status=404)
 
 
+async def api_manual_download(request: web.Request) -> web.Response:
+    """Serve o PDF de um manual técnico ou compila um .md em PDF na hora."""
+    rel_path = request.query.get("path", "")
+    if not rel_path or ".." in rel_path:
+        return web.Response(text="Caminho inválido", status=400)
+    abs_path = os.path.join(BASE_DIR, rel_path.replace("/", os.sep))
+    if not os.path.exists(abs_path):
+        return web.Response(text="Manual não encontrado", status=404)
+
+    nome_base = os.path.basename(abs_path)
+    if abs_path.lower().endswith(".pdf"):
+        with open(abs_path, "rb") as f:
+            return web.Response(
+                body=f.read(),
+                content_type="application/pdf",
+                headers={"Content-Disposition": f'inline; filename="{nome_base}"'},
+            )
+    else:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            out_pdf = tmp.name
+        try:
+            render_markdown_to_pdf(abs_path, out_pdf)
+            with open(out_pdf, "rb") as f:
+                pdf_b = f.read()
+            return web.Response(
+                body=pdf_b,
+                content_type="application/pdf",
+                headers={"Content-Disposition": f'inline; filename="{os.path.splitext(nome_base)[0]}.pdf"'},
+            )
+        finally:
+            if os.path.exists(out_pdf):
+                try:
+                    os.remove(out_pdf)
+                except Exception:
+                    pass
+
+
+async def api_video_stream(request: web.Request) -> web.Response:
+    nome_vid = os.path.basename(request.query.get("name", ""))
+    if not nome_vid:
+        return web.Response(status=404)
+    cand1 = os.path.join(BASE_DIR, "Videos_Treinamento_ITs", nome_vid)
+    cand2 = os.path.join(BASE_DIR, nome_vid)
+    alvo = cand1 if os.path.exists(cand1) else (cand2 if os.path.exists(cand2) else None)
+    if not alvo:
+        return web.Response(status=404)
+    return web.FileResponse(alvo)
+
+
+async def api_exportar_excel(request: web.Request) -> web.Response:
+    if os.path.exists(CAMINHO_EXCEL):
+        with open(CAMINHO_EXCEL, "rb") as f:
+            return web.Response(
+                body=f.read(),
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": 'attachment; filename="base_clientes_EMED.xlsx"'},
+            )
+    return web.Response(status=404)
+
+
 def criar_app() -> web.Application:
-    app = web.Application(client_max_size=25 * 1024 * 1024)  # Suporta upload de fotos de alta resolução (até 25MB)
+    app = web.Application(client_max_size=25 * 1024 * 1024)
     app.router.add_get("/", handle_index)
     app.router.add_get("/manifest.json", handle_manifest)
     app.router.add_get("/sw.js", handle_sw)
@@ -729,16 +1160,27 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/salvar-os", api_salvar_os)
     app.router.add_post("/api/nova-os", api_nova_os)
     app.router.add_post("/api/reabrir-os", api_reabrir_os)
+    app.router.add_post("/api/rotas/despachar", api_despachar_rota)
+    app.router.add_post("/api/orcamento/acao", api_orcamento_acao)
+    app.router.add_post("/api/solicitar-peca", api_solicitar_peca_kit)
+    app.router.add_post("/api/estoque/salvar", api_estoque_salvar)
+    app.router.add_post("/api/calibracao/equipamento", api_calibracao_equipamento)
+    app.router.add_post("/api/veiculo/km", api_veiculo_km)
+    app.router.add_post("/api/tecnico/salvar", api_tecnico_salvar)
+    app.router.add_post("/api/satisfacao/registrar", api_satisfacao_registrar)
     app.router.add_post("/api/almoxarifado/status", api_almox_status)
     app.router.add_post("/api/pix/gerar", api_pix_gerar)
     app.router.add_post("/api/pix/liquidar", api_pix_liquidar)
     app.router.add_post("/api/config", api_config)
     app.router.add_get("/api/pdf/{os_id}", api_pdf_os)
     app.router.add_get("/api/html/{os_id}", api_html_os)
+    app.router.add_get("/api/manual", api_manual_download)
+    app.router.add_get("/api/video", api_video_stream)
+    app.router.add_get("/api/exportar-excel", api_exportar_excel)
     return app
 
 
 if __name__ == "__main__":
     porta = int(os.environ.get("EMED_APP_PORT", 8502))
-    print(f"🚀 Iniciando Servidor do Aplicativo Oficial EMED (Técnico & Gestor) na porta {porta}...")
+    print(f"🚀 Iniciando Servidor Completo do Aplicativo Oficial EMED na porta {porta}...")
     web.run_app(criar_app(), host="0.0.0.0", port=porta)

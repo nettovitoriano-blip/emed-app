@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v1';
+const CACHE_NAME = 'emed-pwa-v3-18menus';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
