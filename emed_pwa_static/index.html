@@ -865,20 +865,49 @@
       }
     }
 
+    let _tentativasBootstrap = 0;
     async function sincronizarTudo(exibirFeedback = false) {
       atualizarStatusRede();
       try {
         const resp = await fetch("/api/bootstrap");
-        if (resp.ok) {
-          STATE.data = await resp.json();
-          localStorage.setItem("emed_bootstrap_cache", JSON.stringify(STATE.data));
-          if (exibirFeedback) mostrarToast("✅ Dados sincronizados ao vivo com o servidor EMED!");
+        if (resp && resp.ok) {
+          const dados = await resp.json();
+          if (dados && (dados.ok || dados.ordens)) {
+            STATE.data = dados;
+            localStorage.setItem("emed_bootstrap_cache", JSON.stringify(STATE.data));
+            if (exibirFeedback) mostrarToast("✅ Dados sincronizados ao vivo com o servidor EMED!");
+          }
         }
       } catch (e) {
-        const cache = localStorage.getItem("emed_bootstrap_cache");
-        if (cache) STATE.data = JSON.parse(cache);
-        if (exibirFeedback) mostrarToast("📴 Operando com banco em cache no celular (Modo Offline).");
+        console.warn("Aviso fetch /api/bootstrap:", e);
       }
+
+      if (!STATE.data) {
+        const cache = localStorage.getItem("emed_bootstrap_cache");
+        if (cache) {
+          try { STATE.data = JSON.parse(cache); } catch(err) {}
+        }
+      }
+
+      if (!STATE.data) {
+        const box = document.getElementById("mainContainer");
+        _tentativasBootstrap++;
+        if (box) {
+          box.innerHTML = `
+            <div class="section-box" style="text-align:center;padding:36px 16px;">
+              <div style="font-size:28px;margin-bottom:12px;">⏳</div>
+              <div style="font-weight:bold;color:#0077b6;font-size:15px;margin-bottom:6px;">Conectando ao Servidor EMED na Nuvem...</div>
+              <div style="color:#64748b;font-size:12.5px;margin-bottom:16px;">Carregando ordens de serviço, clientes e manuais.</div>
+              <button class="btn btn-primary btn-sm" onclick="sincronizarTudo(true)">🔄 Conectar Agora</button>
+            </div>
+          `;
+        }
+        if (_tentativasBootstrap <= 5) {
+          setTimeout(() => sincronizarTudo(false), 1500);
+        }
+        return;
+      }
+
       renderizarNavegacao();
       renderizarTelaPrincipal();
     }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v4-gps-detran';
+const CACHE_NAME = 'emed-pwa-v5-cloud';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
@@ -25,16 +25,25 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  // Para chamadas de API GET (/api/bootstrap), tenta rede primeiro e salva cache para uso offline
+
+  // Para chamadas de API GET (/api/bootstrap), tenta rede primeiro com timeout e salva cache para uso offline
   if (url.pathname.startsWith('/api/bootstrap')) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
           return response;
         })
-        .catch(() => caches.match(event.request))
+        .catch(async () => {
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+          return new Response(JSON.stringify({ ok: false, error: 'offline' }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        })
     );
     return;
   }
