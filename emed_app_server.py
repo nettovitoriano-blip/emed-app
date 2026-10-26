@@ -1351,6 +1351,38 @@ async def api_gps_lote(request: web.Request) -> web.Response:
     })
 
 
+async def api_v1_odometro_doc(request: web.Request) -> web.Response:
+    """Documentação amigável quando alguém acessa o endpoint de odômetro via GET no navegador."""
+    identificador = request.match_info.get("identificador", "").strip()
+    return web.json_response({
+        "ok": True,
+        "endpoint": f"/api/v1/veiculos/{identificador}/odometro" if identificador else "/api/v1/veiculos/odometro",
+        "servico": "EMED Telemetria de Frota & Sincronização Automática de Odômetro (J16 4G LTE + NFC)",
+        "status": "ONLINE E PRONTO PARA RECEBER DADOS",
+        "metodos_aceitos": ["POST", "PUT"],
+        "autenticacao_suportada": "Authorization: Bearer EMED-GPS-2026-TOKEN-OFICIAL",
+        "exemplo_payload_esperado": {
+            "placa": "EMD-2026",
+            "renavam": "01234567890",
+            "tecnico": {
+                "cpf": "123.456.789-00",
+                "nome": "ANTONIO"
+            },
+            "viagem": {
+                "data_inicio": "2026-10-26T07:30:00Z",
+                "data_fim": "2026-10-26T17:45:00Z",
+                "odometro_inicial_km": 45000.0,
+                "odometro_final_km": 45118.5,
+                "km_percorrido": 118.5,
+                "ignicao_tempo_ligada_min": 185
+            },
+            "status_odometro_atual": 45118.5
+        },
+        "aplicativo_visual": "Para abrir o aplicativo EMED com telas, menus e ordens de serviço, acesse a página inicial sem /api",
+        "url_aplicativo": "https://emed-app-6ofv.onrender.com"
+    })
+
+
 async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
     """GET /api/v1/veiculos — Consulta de status, placa, RENAVAM e odômetro atual da frota EMED."""
     garantir_tabelas_frota_gps_multas(DB_NAME)
@@ -1435,6 +1467,8 @@ def criar_app() -> web.Application:
     app.router.add_put("/api/gps/telemetria", api_gps_telemetria)
     # Endpoints Oficiais da Especificação de Integração v1 (Rastreadores J16 4G + NFC + PostGIS + Scraper DETRAN)
     app.router.add_get("/api/v1/veiculos", api_v1_listar_veiculos)
+    app.router.add_get("/api/v1/veiculos/odometro", api_v1_odometro_doc)
+    app.router.add_get("/api/v1/veiculos/{identificador}/odometro", api_v1_odometro_doc)
     app.router.add_post("/api/v1/veiculos/odometro", api_gps_telemetria)
     app.router.add_put("/api/v1/veiculos/odometro", api_gps_telemetria)
     app.router.add_post("/api/v1/veiculos/{identificador}/odometro", api_gps_telemetria)
