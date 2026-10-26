@@ -78,6 +78,14 @@ from emed_views.pesquisa_satisfacao import (
     URL_GOOGLE_REVIEW_OFICIAL,
 )
 from emed_views.manuais_tecnicos import DICIONARIO_VIDEOS_ITS, _localizar_video_do_documento
+from emed_frota_gps import (
+    garantir_tabelas_frota_gps_multas,
+    registrar_telemetria_ou_viagem_gps,
+    registrar_multa_ou_taxa_com_cruzamento,
+    executar_varredura_robo_detran,
+    atualizar_status_multa_taxa,
+    carregar_painel_frota_gps_multas,
+)
 
 STATIC_DIR = os.path.join(BASE_DIR, "emed_pwa_static")
 
@@ -462,6 +470,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
             pass
 
         try:
+            garantir_tabelas_frota_gps_multas(DB_NAME)
             df_v = pd.read_sql_query("SELECT * FROM veiculos", conn)
             for _, r in df_v.iterrows():
                 km_at = limpar_int(r.get("km_atual"), 0)
@@ -470,6 +479,12 @@ async def api_bootstrap(request: web.Request) -> web.Response:
                     "id": int(r.get("id", 1)),
                     "modelo": limpar_texto(r.get("modelo"), "Veículo EMED"),
                     "placa": limpar_texto(r.get("placa"), ""),
+                    "renavam": limpar_texto(r.get("renavam"), "01234567890"),
+                    "condutor_atual": limpar_texto(r.get("condutor_atual"), "DISPONÍVEL NA BASE"),
+                    "tag_rfid_atual": limpar_texto(r.get("tag_rfid_atual"), ""),
+                    "ultima_lat": limpar_float(r.get("ultima_lat"), -3.7319),
+                    "ultima_lon": limpar_float(r.get("ultima_lon"), -38.5267),
+                    "ultima_atualizacao_gps": limpar_texto(r.get("ultima_atualizacao_gps"), ""),
                     "km_atual": km_at,
                     "km_ultima_revisao": limpar_int(r.get("km_ultima_revisao"), 0),
                     "km_proxima_revisao": km_pr,
@@ -499,20 +514,38 @@ async def api_bootstrap(request: web.Request) -> web.Response:
     alarmes_cal = obter_resumo_alarmes_calibracao(DB_NAME)
     google_url = obter_url_google_review(DB_NAME)
     manuais_lista = _listar_manuais_homologados()
+    frota_gps_multas = carregar_painel_frota_gps_multas(DB_NAME)
+
+    tv_criticas = sum(1 for o in ordens if o.get("categoria_tv") == "CRITICA")
+    tv_peca = sum(1 for o in ordens if o.get("categoria_tv") == "PECA_ORCAMENTO")
+    tv_programadas = sum(1 for o in ordens if o.get("categoria_tv") == "PROGRAMADA")
+    orc_pendentes = sum(1 for o in ordens if o.get("eh_orcamento_pendente"))
+    media_sat = round(sum(p["nota"] for p in pesquisas) / len(pesquisas), 1) if pesquisas else 5.0
+
+    resumo_obj = {
+        "total_os": len(ordens),
+        "ativas": qtd_ativas,
+        "concluidas": qtd_concluidas,
+        "observacao": qtd_obs,
+        "em_observacao": qtd_obs,
+        "orcamentos_pendentes": orc_pendentes,
+        "tv_criticas": tv_criticas,
+        "tv_peca": tv_peca,
+        "tv_programadas": tv_programadas,
+        "pendencias_urgentes": qtd_pend_urg,
+        "pendencias_programadas": qtd_pend_prog,
+        "faturamento_total": fat_total,
+        "receita_total": fat_total,
+        "alarmes_calibracao": alarmes_cal.get("total_alarmes_urgentes", 0),
+        "viagens_economizadas": viagens_economizadas,
+        "media_satisfacao": media_sat,
+    }
 
     payload = {
         "ok": True,
         "timestamp": datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-        "kpis": {
-            "ativas": qtd_ativas,
-            "concluidas": qtd_concluidas,
-            "observacao": qtd_obs,
-            "pendencias_urgentes": qtd_pend_urg,
-            "pendencias_programadas": qtd_pend_prog,
-            "faturamento_total": fat_total,
-            "alarmes_calibracao": alarmes_cal.get("total_alarmes_urgentes", 0),
-            "viagens_economizadas": viagens_economizadas,
-        },
+        "kpis": resumo_obj,
+        "resumo": resumo_obj,
         "bi": {
             "por_status": bi_status,
             "por_tecnico": bi_tecnico,
@@ -524,6 +557,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
         "clientes_unicos": clientes_unicos,
         "tecnicos": tecnicos,
         "veiculos": veiculos,
+        "frota_gps_multas": frota_gps_multas,
         "estoque": estoque,
         "solicitacoes_almox": solicitacoes,
         "baixas_consumiveis": baixas_cons,
@@ -540,10 +574,16 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 async def api_checklist(request: web.Request) -> web.Response:
     equip = request.query.get("equipamento", "")
-    defeito = request.query.get("defeito", "")
+    defeito = request.query.get("defeito", "") or request.query.get("tipo_servico", "")
     acoes = obter_checklist_acoes_sugeridas(equip, defeito)
     sugestao_ia = gerar_sugestao_relatorio_clinico(equip, defeito)
-    return web.json_response({"ok": True, "acoes": acoes, "sugestao_ia": sugestao_ia})
+    return web.json_response({
+        "ok": True,
+        "acoes": acoes,
+        "itens_checklist": acoes,
+        "frases_relatorio": [sugestao_ia] if sugestao_ia else [],
+        "sugestao_ia": sugestao_ia,
+    })
 
 
 async def api_triagem(request: web.Request) -> web.Response:
@@ -551,7 +591,12 @@ async def api_triagem(request: web.Request) -> web.Response:
     defeito = request.query.get("defeito", "")
     modalidade = _detectar_modalidade(equip, defeito)
     triagem = _obter_perguntas_triagem_dinamica(modalidade, defeito, equip)
-    return web.json_response({"ok": True, "modalidade": modalidade, "triagem": triagem})
+    return web.json_response({
+        "ok": True,
+        "modalidade": modalidade,
+        "triagem": triagem,
+        "perguntas": triagem,
+    })
 
 
 async def api_salvar_rascunho(request: web.Request) -> web.Response:
@@ -1146,6 +1191,42 @@ async def api_exportar_excel(request: web.Request) -> web.Response:
     return web.Response(status=404)
 
 
+async def api_gps_telemetria(request: web.Request) -> web.Response:
+    """
+    Endpoint para o App GPS e Rastreadores OBD2/RFID:
+    Atualiza odômetro automaticamente, registra posse do condutor por horário e coordenadas.
+    """
+    body = await request.json()
+    res = registrar_telemetria_ou_viagem_gps(DB_NAME, body)
+    return web.json_response(res)
+
+
+async def api_frota_webhook_detran(request: web.Request) -> web.Response:
+    """
+    Endpoint para o Robô Diário DETRAN / Autarquia (AMC, PRF, SEFAZ):
+    Recebe multa ou taxa e executa o Cruzamento Automático de Condutor por Data/Hora e GPS.
+    """
+    body = await request.json()
+    res = registrar_multa_ou_taxa_com_cruzamento(DB_NAME, body)
+    return web.json_response(res)
+
+
+async def api_frota_executar_robo(request: web.Request) -> web.Response:
+    """Dispara a varredura e cruzamento diário do Robô DETRAN/Autarquia."""
+    res = executar_varredura_robo_detran(DB_NAME)
+    return web.json_response(res)
+
+
+async def api_frota_multa_status(request: web.Request) -> web.Response:
+    """Atualiza status de pagamento/indicação de condutor de uma multa ou taxa."""
+    body = await request.json()
+    id_m = int(limpar_float(body.get("id"), 0))
+    st_novo = limpar_texto(body.get("status_pagamento"), "PAGO")
+    cond_man = limpar_texto(body.get("condutor_identificado"), "")
+    res = atualizar_status_multa_taxa(DB_NAME, id_m, st_novo, cond_man)
+    return web.json_response(res)
+
+
 def criar_app() -> web.Application:
     app = web.Application(client_max_size=25 * 1024 * 1024)
     app.router.add_get("/", handle_index)
@@ -1166,6 +1247,10 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/estoque/salvar", api_estoque_salvar)
     app.router.add_post("/api/calibracao/equipamento", api_calibracao_equipamento)
     app.router.add_post("/api/veiculo/km", api_veiculo_km)
+    app.router.add_post("/api/gps/telemetria", api_gps_telemetria)
+    app.router.add_post("/api/frota/webhook-detran", api_frota_webhook_detran)
+    app.router.add_post("/api/frota/executar-robo-detran", api_frota_executar_robo)
+    app.router.add_post("/api/frota/multa-status", api_frota_multa_status)
     app.router.add_post("/api/tecnico/salvar", api_tecnico_salvar)
     app.router.add_post("/api/satisfacao/registrar", api_satisfacao_registrar)
     app.router.add_post("/api/almoxarifado/status", api_almox_status)

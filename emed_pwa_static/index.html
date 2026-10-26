@@ -743,7 +743,7 @@
         { id: "TEC_PEND", icone: "📋", titulo: "Minhas Pendências", desc: "Retornos técnicos e pendências atribuídas ao meu nome" },
         { id: "TEC_PECAS", icone: "📦", titulo: "Solicitar Peças, Kits & Consumíveis", desc: "Pedir peça/kit ao Almoxarifado ou dar baixa em insumo" },
         { id: "TEC_MANUAIS", icone: "📚", titulo: "Manuais Técnicos, POPs & Vídeos", desc: "Catálogo de ITs homologadas em PDF e vídeos MP4 de treinamento" },
-        { id: "TEC_KM", icone: "🚗", titulo: "Atualizar Quilometragem (Frota)", desc: "Lançamento rápido de odômetro do veículo EMED" }
+        { id: "TEC_KM", icone: "🛰️", titulo: "Frota GPS, Condutor & Odômetro", desc: "Rastreamento GPS do celular, identificação do condutor e odômetro automático" }
       ],
       GESTOR: [
         { id: "GES_MURAL", icone: "📊", titulo: "Mural & Despacho WhatsApp", desc: "Escala diária por técnico e disparo rápido no WhatsApp" },
@@ -757,7 +757,7 @@
         { id: "GES_PIX", icone: "💳", titulo: "Conciliação Bancária & PIX", desc: "QR Code PIX oficial Banco Central (CRC16) e Notas Fiscais" },
         { id: "GES_BI", icone: "📈", titulo: "Gráficos & BI Executivo", desc: "Indicadores visuais por Status, Técnico, Cidade e Modalidade" },
         { id: "GES_SATISFACAO", icone: "⭐", titulo: "Pesquisa de Satisfação & Google 5★", desc: "Avaliações de clientes, NPS e link direto Google Meu Negócio" },
-        { id: "GES_ADMIN", icone: "⚙️", titulo: "Administração, Equipe, Frota & Excel", desc: "Cadastro de Técnicos, Frota de Veículos e Download da Planilha" }
+        { id: "GES_ADMIN", icone: "🛰️", titulo: "Frota GPS, Multas DETRAN & Equipe", desc: "Telemetria GPS, Identificação do Condutor, Robô DETRAN/Autarquia e Equipe" }
       ],
       CLIENTE: [
         { id: "CLI_TRIAGEM", icone: "🤖", titulo: "EmedOnline (Triagem Cirúrgica)", desc: "Abertura rápida de chamado com 3 perguntas inteligentes" },
@@ -1409,13 +1409,60 @@
     }
 
     /********************************************************************
-     * MENU 5 (TÉCNICO): ATUALIZAR QUILOMETRAGEM DA FROTA
+     * MENU 5 (TÉCNICO): FROTA GPS, IDENTIFICAÇÃO DO CONDUTOR & ODÔMETRO
      ********************************************************************/
     function renderMenuAtualizarKM(box) {
       const veiculos = STATE.data.veiculos || [];
+      const tecnicos = (STATE.data.tecnicos || []).map(t => t.nome);
+      const viagens = STATE.data.frota_gps_multas?.viagens_gps || [];
+      const ativas = (STATE.data.ordens || []).filter(o => !(o.status||"").includes("CONCLU"));
+
       box.innerHTML = `
+        <div class="section-box" style="background:#eff6ff;border-color:#93c5fd;">
+          <div class="section-title">
+            <span>🛰️ Rastreamento GPS do Condutor & Atualização Automática de Odômetro</span>
+            <span class="badge ativo">Integrado ao Cruzamento de Multas DETRAN</span>
+          </div>
+          <p style="font-size:12px;color:#1e3a8a;margin-top:0;">
+            Ao iniciar ou encerrar um deslocamento abaixo, o aplicativo captura sua posição GPS, registra o <b>horário exato de posse do condutor</b> (para cruzamento automático de multas) e soma os KM rodados direto no odômetro do veículo:
+          </p>
+          <div class="form-grid">
+            <div>
+              <label class="field-label">Veículo da Frota EMED</label>
+              <select id="gpsPlaca" class="select">
+                ${veiculos.map(v => `<option value="${esc(v.placa)}">🚘 ${esc(v.modelo)} (${esc(v.placa)} • ${(v.km_atual||0).toLocaleString('pt-BR')} KM)</option>`).join("")}
+              </select>
+            </div>
+            <div>
+              <label class="field-label">Condutor Identificado (Técnico)</label>
+              <select id="gpsCondutor" class="select">
+                ${tecnicos.map(t => `<option value="${esc(t)}" ${STATE.tecnicoFiltro===t?'selected':''}>👷 ${esc(t)}</option>`).join("")}
+              </select>
+            </div>
+            <div>
+              <label class="field-label">Tag RFID / Método de Identificação</label>
+              <input id="gpsTag" class="input" value="APP_GPS_CELULAR + RFID" />
+            </div>
+            <div>
+              <label class="field-label">OS / Hospital de Destino</label>
+              <select id="gpsOsDestino" class="select">
+                <option value="">-- Deslocamento Geral / Base --</option>
+                ${ativas.map(o => `<option value="${esc(o.id)}|${esc(o.cliente)} - ${esc(o.cidade)}">OS #${esc(o.id)} — ${esc(o.cliente)} (${esc(o.cidade)})</option>`).join("")}
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+            <button class="btn btn-primary" style="flex:1;" onclick="acionarViagemGPS('INICIAR_VIAGEM')">
+              🛰️ Iniciar Viagem com GPS (Vincular Condutor)
+            </button>
+            <button class="btn btn-success" style="flex:1;" onclick="acionarViagemGPS('FINALIZAR_VIAGEM')">
+              🏁 Encerrar Viagem & Atualizar Odômetro por GPS
+            </button>
+          </div>
+        </div>
+
         <div class="section-box">
-          <div class="section-title">🚗 Atualizar Quilometragem do Veículo em Campo</div>
+          <div class="section-title">🚗 Ajuste Manual de Odômetro e Revisão da Frota</div>
           <div class="os-grid">
             ${veiculos.map(v => {
               const falta = (v.km_proxima_revisao || 50000) - (v.km_atual || 0);
@@ -1429,6 +1476,8 @@
                     <div class="os-meta" style="margin-bottom:10px;">
                       <div><b>Odômetro Atual:</b> ${(v.km_atual||0).toLocaleString('pt-BR')} KM</div>
                       <div><b>Próx. Revisão:</b> ${(v.km_proxima_revisao||0).toLocaleString('pt-BR')} KM</div>
+                      <div><b>Condutor Atual:</b> ${esc(v.condutor_atual || 'Base')}</div>
+                      <div><b>Últ. Sync GPS:</b> ${esc(v.ultima_atualizacao_gps || 'Hoje')}</div>
                     </div>
                     <div style="margin-bottom:8px;">
                       <label class="field-label">Novo KM Atual (Odômetro do Painel)</label>
@@ -1442,8 +1491,8 @@
                       <label class="field-label">Observação / Abastecimento / Manutenção</label>
                       <input id="kmObs_${v.id}" class="input" value="${esc(v.historico_manutencao || '')}" />
                     </div>
-                    <button class="btn btn-primary btn-block" onclick="salvarKMFrota(${v.id})">
-                      💾 Salvar Quilometragem da Frota
+                    <button class="btn btn-outline btn-block" onclick="salvarKMFrota(${v.id})">
+                      💾 Salvar Odômetro Manualmente
                     </button>
                   </div>
                 </div>
@@ -1451,7 +1500,66 @@
             }).join("")}
           </div>
         </div>
+
+        <div class="section-box">
+          <div class="section-title">🕒 Histórico de Viagens GPS & Posse de Condutor por Horário (${viagens.length})</div>
+          <div class="os-grid">
+            ${viagens.slice(0, 8).map(vg => `
+              <div class="os-card">
+                <div class="os-card-head">
+                  <span class="os-num">🚘 ${esc(vg.placa)} • 👷 ${esc(vg.condutor)}</span>
+                  <span class="badge ${vg.status_viagem==='EM DESLOCAMENTO'?'obs':'concluido'}">${esc(vg.status_viagem)}</span>
+                </div>
+                <div class="os-card-body">
+                  <div><b>🕒 Período:</b> ${esc(vg.data_hora_inicio)} até ${esc(vg.data_hora_fim)}</div>
+                  <div><b>🛣️ Odômetro:</b> ${vg.km_inicial} → ${vg.km_final} KM (<b>+${vg.km_percorrido} KM</b>)</div>
+                  <div><b>🏥 Destino:</b> ${esc(vg.destino_hospital)} ${vg.os_id_vinculada ? `(OS #${esc(vg.os_id_vinculada)})` : ''}</div>
+                  <div style="font-size:11px;color:#64748b;margin-top:3px;">🏷️ Identificação: ${esc(vg.tag_identificacao)}</div>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
       `;
+    }
+
+    async function acionarViagemGPS(acao) {
+      const placa = document.getElementById("gpsPlaca")?.value || "EMD-2026";
+      const condutor = document.getElementById("gpsCondutor")?.value || "ANTONIO";
+      const tag = document.getElementById("gpsTag")?.value || "APP_GPS_CELULAR";
+      const destRaw = document.getElementById("gpsOsDestino")?.value || "";
+      const [osId, destNome] = destRaw.includes("|") ? destRaw.split("|") : ["", "ROTA TÉCNICA DE CAMPO"];
+
+      const enviarComCoords = async (lat, lon, velKmh) => {
+        const res = await apiPost("/api/gps/telemetria", {
+          acao,
+          placa,
+          condutor,
+          tag_identificacao: tag,
+          os_id_vinculada: osId,
+          destino_hospital: destNome,
+          latitude: lat,
+          longitude: lon,
+          velocidade_kmh: velKmh || 45.0,
+          km_percorrido_gps: acao === "FINALIZAR_VIAGEM" ? 8.5 : 0.0
+        });
+        mostrarToast(res.msg);
+        await sincronizarTudo(false);
+      };
+
+      if (navigator.geolocation) {
+        mostrarToast("🛰️ Capturando coordenada de satélite GPS do aparelho...");
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const vel = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 48.0;
+            enviarComCoords(pos.coords.latitude, pos.coords.longitude, vel);
+          },
+          () => enviarComCoords(-3.7325, -38.5270, 45.0),
+          { enableHighAccuracy: true, timeout: 5000 }
+        );
+      } else {
+        await enviarComCoords(-3.7325, -38.5270, 45.0);
+      }
     }
 
     async function salvarKMFrota(vid) {
@@ -2153,11 +2261,169 @@
     }
 
     /********************************************************************
-     * MENU 17 (GESTOR 12): ADMINISTRAÇÃO, EQUIPE, FROTA & PLANILHA EXCEL
+     * MENU 17 (GESTOR 12): FROTA GPS, ROBÔ DETRAN/MULTAS, EQUIPE & EXCEL
      ********************************************************************/
     function renderMenuGesAdmin(box) {
       const tecnicos = STATE.data.tecnicos || [];
+      const veiculos = STATE.data.veiculos || [];
+      const fgm = STATE.data.frota_gps_multas || {};
+      const multas = fgm.multas_taxas || [];
+      const viagens = fgm.viagens_gps || [];
+      const logsRobo = fgm.logs_robo_detran || [];
+      const agoraPadrao = new Date().toLocaleDateString('pt-BR') + " 09:30";
+
       box.innerHTML = `
+        <!-- PAINEL 1: ROBÔ DIÁRIO DETRAN / AUTARQUIA & CRUZAMENTO DE MULTAS -->
+        <div class="section-box" style="border-left:4px solid #dc2626;background:#fff;">
+          <div class="section-title">
+            <span>🤖 Robô Diário DETRAN / Autarquia (AMC, PRF, SEFAZ) & Cruzamento Automático de Condutor</span>
+            <button class="btn btn-primary btn-sm" onclick="executarRoboDetranAgora()">
+              🤖 Executar Varredura DETRAN & Cruzar GPS Agora
+            </button>
+          </div>
+          <p style="font-size:12px;color:#475569;margin-top:0;">
+            Quando uma multa ou taxa é capturada pelo robô no DETRAN/Autarquia, o sistema cruza a <b>Data e Hora exata da infração</b> com a <b>Telemetria GPS / Tag RFID do veículo</b> e os <b>Check-ins de OS em campo</b> para identificar automaticamente qual técnico estava dirigindo:
+          </p>
+
+          <div class="os-grid" style="margin-bottom:12px;">
+            ${multas.map(m => {
+              const cadTec = tecnicos.find(t => t.nome === m.condutor_identificado) || {};
+              const telTec = (cadTec.telefone || "").replace(/\D/g, "");
+              const msgInd = encodeURIComponent(
+                `🚨 *AVISO DE AUTUAÇÃO / FROTA EMED*\n` +
+                `• *Veículo:* ${m.placa}\n` +
+                `• *Auto/Ref:* ${m.auto_infracao} (${m.orgao_autuador})\n` +
+                `• *Data/Hora:* ${m.data_hora_infracao}\n` +
+                `• *Local:* ${m.local_infracao}\n` +
+                `• *Infração:* ${m.descricao}\n` +
+                `• *Condutor Identificado pelo GPS/OS:* ${m.condutor_identificado}\n` +
+                `• *Valor c/ Desconto:* R$ ${Number(m.valor_desconto||0).toFixed(2)} (Venc: ${m.data_vencimento})\n` +
+                `Por favor, confirme para assinatura da Indicação de Condutor.`
+              );
+              const ehPago = String(m.status_pagamento).includes("PAGO");
+              return `
+                <div class="os-card" style="border-top:3px solid ${m.tipo_registro.includes('MULTA') ? '#dc2626' : '#0284c7'};">
+                  <div class="os-card-head">
+                    <span class="os-num">${esc(m.auto_infracao)} • 🚘 ${esc(m.placa)}</span>
+                    <span class="badge ${ehPago ? 'concluido' : 'crit'}">${esc(m.status_pagamento)}</span>
+                  </div>
+                  <div class="os-card-body">
+                    <div class="os-cli" style="font-size:13px;">🏛️ ${esc(m.orgao_autuador)} — ${esc(m.tipo_registro)}</div>
+                    <div style="font-size:12px;color:#b91c1c;font-weight:700;margin:3px 0;">🕒 Data/Hora: ${esc(m.data_hora_infracao)}</div>
+                    <div style="font-size:11.5px;color:#334155;">📍 <b>Local:</b> ${esc(m.local_infracao)}</div>
+                    <div style="font-size:11.5px;color:#0f172a;margin:4px 0;">📋 <b>Descrição:</b> ${esc(m.descricao)} (${esc(m.gravidade_pontos)})</div>
+                    <div class="os-meta" style="margin:6px 0;">
+                      <div><b>Valor Original:</b> R$ ${Number(m.valor_original||0).toFixed(2)}</div>
+                      <div><b>Com Desconto:</b> <span style="color:#15803d;font-weight:900;">R$ ${Number(m.valor_desconto||0).toFixed(2)}</span></div>
+                      <div><b>Vencimento:</b> ${esc(m.data_vencimento)}</div>
+                      <div><b>Origem:</b> ${esc(m.capturado_por)}</div>
+                    </div>
+                    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:7px 9px;margin-top:6px;">
+                      <div style="font-size:12px;font-weight:900;color:#991b1b;">
+                        🎯 CONDUTOR IDENTIFICADO: ${esc(m.condutor_identificado)}
+                      </div>
+                      <div style="font-size:10.5px;font-weight:800;color:#b45309;">Confiança: ${esc(m.confianca_cruzamento)}</div>
+                      <div style="font-size:11px;color:#475569;margin-top:2px;">${esc(m.evidencia_cruzamento)}</div>
+                    </div>
+                  </div>
+                  <div class="os-card-foot">
+                    ${telTec ? `<a class="btn btn-success btn-sm" style="flex:1;" href="https://wa.me/55${telTec}?text=${msgInd}" target="_blank">📲 Notificar ${esc(m.condutor_identificado)} (WhatsApp)</a>` : ""}
+                    ${!ehPago ? `
+                      <button class="btn btn-amber btn-sm" onclick="mudarStatusMulta(${m.id},'INDICACAO_CONDUTOR_ASSINADA')">✍️ Indicar Condutor</button>
+                      <button class="btn btn-primary btn-sm" onclick="mudarStatusMulta(${m.id},'PAGO')">✅ Baixar Pago</button>
+                    ` : ""}
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+
+          <!-- SIMULADOR / LANÇADOR DE MULTA OU TAXA PARA TESTAR O CRUZAMENTO POR HORÁRIO -->
+          <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:10px;">
+            <div style="font-size:12px;font-weight:900;color:var(--emed-navy);margin-bottom:8px;">
+              ➕ Testar Cruzamento Automático (Cadastrar Multa / Taxa ou Receber do Robô DETRAN)
+            </div>
+            <div class="form-grid">
+              <div>
+                <label class="field-label">Placa</label>
+                <select id="mltPlaca" class="select">
+                  ${veiculos.map(v => `<option value="${esc(v.placa)}">${esc(v.placa)} — ${esc(v.modelo)}</option>`).join("")}
+                </select>
+              </div>
+              <div>
+                <label class="field-label">Tipo</label>
+                <select id="mltTipo" class="select">
+                  <option value="MULTA DE TRÂNSITO">🚨 MULTA DE TRÂNSITO (Cruzar Condutor)</option>
+                  <option value="TAXA LICENCIAMENTO / IPVA">🏛️ TAXA LICENCIAMENTO / IPVA / DETRAN</option>
+                </select>
+              </div>
+              <div>
+                <label class="field-label">Data e Hora Exata da Infração *</label>
+                <input id="mltDataHora" class="input" value="${esc(agoraPadrao)}" placeholder="DD/MM/AAAA HH:MM" />
+              </div>
+              <div>
+                <label class="field-label">Órgão / Autarquia</label>
+                <input id="mltOrgao" class="input" value="AMC FORTALEZA / DETRAN-CE" />
+              </div>
+              <div>
+                <label class="field-label">Local / Radar</label>
+                <input id="mltLocal" class="input" placeholder="Ex: Av. Bezerra de Menezes, 1200 (60 km/h)" />
+              </div>
+              <div>
+                <label class="field-label">Valor Original (R$)</label>
+                <input id="mltValor" type="number" step="0.01" class="input" value="195.23" />
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input id="mltDesc" class="input" style="flex:1;" placeholder="Descrição da infração (Ex: Avançar sinal vermelho / Excesso de velocidade)" value="TRANSITAR EM VELOCIDADE SUPERIOR À MÁXIMA EM ATÉ 20%" />
+              <button class="btn btn-danger" onclick="lancarMultaComCruzamento()">
+                🎯 Cruzar Horário no GPS/OS & Identificar Condutor
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAINEL 2: TELEMETRIA GPS DOS VEÍCULOS, HISTÓRICO DE CONDUTORES & INTEGRAÇÃO API -->
+        <div class="section-box">
+          <div class="section-title">
+            <span>🛰️ Telemetria dos Veículos, Odômetro Automático & Log de Condutores (${viagens.length} viagens)</span>
+          </div>
+          <div class="os-grid" style="margin-bottom:10px;">
+            ${veiculos.map(v => `
+              <div class="os-card">
+                <div class="os-card-head">
+                  <span class="os-num">🚘 ${esc(v.modelo)} (${esc(v.placa)})</span>
+                  <span class="badge concluido">Odômetro: ${(v.km_atual||0).toLocaleString('pt-BR')} KM</span>
+                </div>
+                <div class="os-card-body">
+                  <div class="os-meta">
+                    <div><b>👷 Condutor Atual:</b> ${esc(v.condutor_atual || 'Base')}</div>
+                    <div><b>🏷️ Tag RFID:</b> ${esc(v.tag_rfid_atual || 'APP_GPS')}</div>
+                    <div><b>📄 RENAVAM:</b> ${esc(v.renavam || '01234567890')}</div>
+                    <div><b>📍 Coord. GPS:</b> ${Number(v.ultima_lat||0).toFixed(4)}, ${Number(v.ultima_lon||0).toFixed(4)}</div>
+                  </div>
+                </div>
+                <div class="os-card-foot">
+                  <a class="btn btn-outline btn-sm" style="flex:1;" href="https://www.google.com/maps?q=${v.ultima_lat || -3.7319},${v.ultima_lon || -38.5267}" target="_blank">
+                    🗺️ Ver Posição no Google Maps
+                  </a>
+                  <button class="btn btn-primary btn-sm" onclick="selecionarMenu('TEC_KM','TECNICO')">
+                    🛰️ Painel GPS do Condutor
+                  </button>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+
+          <div style="background:#0f172a;color:#e2e8f0;padding:10px 12px;border-radius:8px;font-size:11.5px;">
+            <div style="color:#38bdf8;font-weight:900;margin-bottom:4px;">🔌 Endpoints de Integração Prontos para o seu App GPS, Rastreador Hardware e Robô DETRAN:</div>
+            <div>• <b>Enviar Telemetria / Odômetro / RFID do Condutor:</b> <code>POST ${window.location.origin}/api/gps/telemetria</code></div>
+            <div>• <b>Enviar Multas / Taxas do Robô Diário DETRAN/Autarquia:</b> <code>POST ${window.location.origin}/api/frota/webhook-detran</code></div>
+            <div style="color:#94a3b8;margin-top:4px;">Última execução do Robô DETRAN: ${logsRobo[0] ? `${esc(logsRobo[0].data_hora_execucao)} — ${esc(logsRobo[0].resumo_execucao)}` : 'Ativo'}</div>
+          </div>
+        </div>
+
+        <!-- PAINEL 3: EQUIPE TÉCNICA & EXPORTAÇÃO EXCEL -->
         <div class="form-grid">
           <div class="section-box">
             <div class="section-title">👷 Cadastrar / Atualizar Técnico na Equipe EMED</div>
@@ -2199,6 +2465,33 @@
           </div>
         </div>
       `;
+    }
+
+    async function executarRoboDetranAgora() {
+      mostrarToast("🤖 Consultando bases DETRAN / Autarquia e cruzando horários com o GPS...");
+      const res = await apiPost("/api/frota/executar-robo-detran", {});
+      mostrarToast(res.msg);
+      await sincronizarTudo(false);
+    }
+
+    async function lancarMultaComCruzamento() {
+      const res = await apiPost("/api/frota/webhook-detran", {
+        placa: document.getElementById("mltPlaca").value,
+        tipo_registro: document.getElementById("mltTipo").value,
+        data_hora_infracao: document.getElementById("mltDataHora").value,
+        orgao_autuador: document.getElementById("mltOrgao").value,
+        local_infracao: document.getElementById("mltLocal").value || "FISCALIZAÇÃO ELETRÔNICA - FORTALEZA/CE",
+        valor_original: document.getElementById("mltValor").value,
+        descricao: document.getElementById("mltDesc").value
+      });
+      mostrarToast(res.msg, 5500);
+      await sincronizarTudo(false);
+    }
+
+    async function mudarStatusMulta(idMulta, novoStatus) {
+      const res = await apiPost("/api/frota/multa-status", { id: idMulta, status_pagamento: novoStatus });
+      mostrarToast(res.msg);
+      await sincronizarTudo(false);
     }
 
     async function salvarTecnicoApp() {

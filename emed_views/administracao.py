@@ -1,4 +1,5 @@
 import os
+import datetime
 import streamlit as st
 from emed_core import limpar_texto, limpar_int, get_db_connection
 from emed_services import (
@@ -6,6 +7,13 @@ from emed_services import (
     carregar_tecnicos,
     carregar_veiculos,
     salvar_dados_seguro,
+)
+from emed_frota_gps import (
+    carregar_painel_frota_gps_multas,
+    registrar_telemetria_ou_viagem_gps,
+    registrar_multa_ou_taxa_com_cruzamento,
+    executar_varredura_robo_detran,
+    atualizar_status_multa_taxa,
 )
 
 
@@ -17,7 +25,11 @@ def render_gestao_administracao(ctx: AppContext):
     st.markdown("### ⚙️ Painel de Gestão & Administração")
     sub_gestao = st.radio(
         "Selecione o módulo:",
-        ["👷 Gestão de Técnicos", "🚗 Gestão de Veículos & Quilometragem"],
+        [
+            "👷 Gestão de Técnicos",
+            "🚗 Gestão de Veículos & Quilometragem",
+            "🛰️ Telemetria GPS, Condutor & Multas DETRAN (Robô)",
+        ],
         horizontal=True
     )
     st.markdown("---")
@@ -281,6 +293,77 @@ def render_gestao_administracao(ctx: AppContext):
                 if btn_fechar_v:
                     st.session_state.abrir_painel_veiculo = False
                     st.rerun()
+
+    elif sub_gestao == "🛰️ Telemetria GPS, Condutor & Multas DETRAN (Robô)":
+        st.markdown("#### 🛰️ Central de Rastreamento GPS, Identificação de Condutor & Robô Diário DETRAN/Autarquia")
+        painel_gps = carregar_painel_frota_gps_multas(ctx.db_name)
+        multas_list = painel_gps.get("multas_taxas", [])
+        viagens_list = painel_gps.get("viagens_gps", [])
+        logs_robo = painel_gps.get("logs_robo_detran", [])
+
+        c_r1, c_r2 = st.columns([3, 1])
+        with c_r1:
+            st.info(
+                "🤖 **Robô Diário DETRAN / Autarquia (AMC, PRF, SEFAZ) Ativo:** Todos os dias o sistema consulta as placas da frota "
+                "e cruza automaticamente a **Data e Hora da Infração** com a **Telemetria GPS / Tag RFID do Condutor** e os **Check-ins de OS**."
+            )
+        with c_r2:
+            if st.button("🤖 Executar Varredura DETRAN Agora", type="primary", use_container_width=True):
+                res_r = executar_varredura_robo_detran(ctx.db_name)
+                st.success(res_r["msg"])
+                st.rerun()
+
+        st.markdown("##### 🚨 Multas de Trânsito & Taxas com Cruzamento Automático de Condutor")
+        for m in multas_list:
+            cor_borda = "#dc2626" if "MULTA" in str(m.get("tipo_registro", "")) else "#0284c7"
+            st.markdown(f"""
+                <div style="background:#fff;border:1px solid #cbd5e1;border-left:5px solid {cor_borda};border-radius:10px;padding:12px;margin-bottom:10px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <b>{m['auto_infracao']} • 🚘 Placa: {m['placa']} ({m['orgao_autuador']})</b>
+                        <span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:800;">{m['status_pagamento']}</span>
+                    </div>
+                    <div style="font-size:13px;margin:4px 0;"><b>🕒 Data/Hora da Infração:</b> {m['data_hora_infracao']} | <b>📍 Local:</b> {m['local_infracao']}</div>
+                    <div style="font-size:13px;"><b>📋 Infração/Taxa:</b> {m['descricao']} ({m['gravidade_pontos']})</div>
+                    <div style="font-size:13px;margin:4px 0;"><b>💰 Valor Original:</b> R$ {m['valor_original']:.2f} | <b style="color:#15803d;">Valor c/ Desconto (SNE): R$ {m['valor_desconto']:.2f}</b> | <b>Vencimento:</b> {m['data_vencimento']}</div>
+                    <div style="background:#fef2f2;border:1px solid #fecaca;padding:8px;border-radius:8px;margin-top:6px;">
+                        <b style="color:#991b1b;">🎯 CONDUTOR IDENTIFICADO PELO SISTEMA: {m['condutor_identificado']}</b> ({m['confianca_cruzamento']})<br/>
+                        <span style="font-size:12px;color:#475569;">{m['evidencia_cruzamento']}</span>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+        with st.expander("➕ Lançar / Simular Nova Multa ou Taxa para Testar o Cruzamento Automático por Horário"):
+            with st.form("form_nova_multa_cruzamento"):
+                cm1, cm2, cm3 = st.columns(3)
+                with cm1:
+                    m_placa = st.text_input("Placa", value="EMD-2026")
+                    m_tipo = st.selectbox("Tipo", ["MULTA DE TRÂNSITO", "TAXA LICENCIAMENTO / IPVA"])
+                with cm2:
+                    m_dt = st.text_input("Data e Hora da Infração (DD/MM/AAAA HH:MM)", value=datetime.datetime.now().strftime("%d/%m/%Y 09:30"))
+                    m_org = st.text_input("Órgão Autuador", value="AMC FORTALEZA / DETRAN-CE")
+                with cm3:
+                    m_val = st.number_input("Valor Original (R$)", min_value=0.0, value=195.23, step=10.0)
+                    m_loc = st.text_input("Local / Radar", value="AV. AGUANAMBI KM 2 - FORTALEZA/CE")
+                m_desc = st.text_input("Descrição da Infração", value="TRANSITAR EM VELOCIDADE SUPERIOR À MÁXIMA EM ATÉ 20%")
+                if st.form_submit_button("🎯 Cruzar Horário com GPS/OS e Registrar", type="primary"):
+                    res_m = registrar_multa_ou_taxa_com_cruzamento(ctx.db_name, {
+                        "placa": m_placa,
+                        "tipo_registro": m_tipo,
+                        "data_hora_infracao": m_dt,
+                        "orgao_autuador": m_org,
+                        "valor_original": m_val,
+                        "local_infracao": m_loc,
+                        "descricao": m_desc,
+                    })
+                    st.success(res_m["msg"])
+                    st.rerun()
+
+        st.markdown("##### 🕒 Histórico de Viagens GPS & Posse de Condutor por Horário")
+        if viagens_list:
+            st.dataframe(viagens_list, use_container_width=True, hide_index=True)
+        if logs_robo:
+            st.markdown("##### 🤖 Histórico de Execuções do Robô Diário DETRAN / Autarquia")
+            st.dataframe(logs_robo, use_container_width=True, hide_index=True)
 
 
 def render_atualizar_km(ctx: AppContext):
