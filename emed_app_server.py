@@ -121,19 +121,29 @@ def _montar_equipa_direto() -> dict:
 
 
 def _listar_manuais_homologados() -> list:
-    """Varre a pasta Manuais/ para listar todas as ITs, POPs e Manuais de Serviço (.pdf e .md)."""
+    """Varre a pasta Manuais/ para listar todas as ITs, POPs e Manuais de Serviço Oficiais (.pdf e .md)."""
+    from emed_views.manuais_tecnicos import DICIONARIO_NOMES_AMIGAVEIS
+
     pasta_manuais = os.path.join(BASE_DIR, "Manuais")
     catalogo = []
     if not os.path.exists(pasta_manuais):
         return catalogo
 
+    pastas_ignorar = {"media", "content", "css", "scripts", "icons", "search", "toc", "forms", "images", "system utiliies"}
     vistos = set()
-    for root, _, files in os.walk(pasta_manuais):
+
+    for root, dirs, files in os.walk(pasta_manuais):
+        dirs[:] = [d for d in dirs if d.lower() not in pastas_ignorar]
         for f in sorted(files):
             ext = os.path.splitext(f)[1].lower()
             if ext not in (".pdf", ".md"):
                 continue
-            # Se existir tanto .pdf quanto .md do mesmo documento, prioriza o .pdf já compilado
+            if f.upper().startswith("LEIA_ME"):
+                continue
+            # Ignora fragmentos numéricos internos do CD da GE (ex: 377318-16.pdf)
+            if f[0].isdigit() and not f.startswith(("00_", "01", "02", "03", "04", "05")):
+                continue
+
             base_sem_ext = os.path.splitext(f)[0]
             rel_dir = os.path.relpath(root, pasta_manuais).replace("\\", "/")
             chave_unica = f"{rel_dir}/{base_sem_ext}"
@@ -153,12 +163,17 @@ def _listar_manuais_homologados() -> list:
             vid_path = _localizar_video_do_documento(caminho_abs)
             vid_nome = os.path.basename(vid_path) if vid_path else ""
 
-            titulo_limpo = base_sem_ext.replace("_", " ")
-            if titulo_limpo == "01":
-                titulo_limpo = "Manual Técnico Oficial — Raio-X Lotus Família HF (Parte 1)"
-            elif titulo_limpo == "02":
-                titulo_limpo = "Manual Técnico Oficial — Raio-X Lotus Família HF (Parte 2)"
+            titulo_limpo = (
+                DICIONARIO_NOMES_AMIGAVEIS.get(f)
+                or DICIONARIO_NOMES_AMIGAVEIS.get(base_sem_ext + ".pdf")
+                or DICIONARIO_NOMES_AMIGAVEIS.get(base_sem_ext + ".md")
+                or base_sem_ext.replace("_", " ")
+            )
+            if "IT_RX_LOT_001" in f.upper() or "02_FORMULARIO_VISTORIA_PRE_INSTALACAO" in f.upper():
+                titulo_limpo = "⭐ RELATÓRIO OFICIAL DE PRÉ-INSTALAÇÃO — RAIO-X LOTUS HF500M (FT-INS-HF500M-REV05 c/ Logo EMED)"
+
             formato_str = ext.replace(".", "").upper()
+            eh_destaque = 0 if ("PRÉ-INSTALAÇÃO" in titulo_limpo.upper() or "⭐" in titulo_limpo) else 1
             catalogo.append({
                 "arquivo": f,
                 "titulo": titulo_limpo,
@@ -171,8 +186,9 @@ def _listar_manuais_homologados() -> list:
                 "formato": formato_str,
                 "tamanho_kb": round(os.path.getsize(caminho_abs) / 1024, 1),
                 "video": vid_nome,
+                "_ordem": eh_destaque,
             })
-    catalogo.sort(key=lambda x: (0 if x["modalidade"] != "GERAL" else 1, x["modalidade"], x["titulo"]))
+    catalogo.sort(key=lambda x: (x.get("_ordem", 1), 0 if x["modalidade"] != "GERAL" else 1, x["modalidade"], x["titulo"]))
     return catalogo
 
 
@@ -1208,13 +1224,22 @@ async def api_manual_download(request: web.Request) -> web.Response:
         else:
             return web.Response(text="Manual não encontrado", status=404)
 
+    # Se apontar para .md mas já existir o .pdf oficial homologado na mesma pasta, serve o .pdf oficial
+    if abs_path.lower().endswith(".md"):
+        pdf_irmao = os.path.splitext(abs_path)[0] + ".pdf"
+        if os.path.exists(pdf_irmao):
+            abs_path = pdf_irmao
+
     nome_base = os.path.basename(abs_path)
     if abs_path.lower().endswith(".pdf"):
         with open(abs_path, "rb") as f:
             return web.Response(
                 body=f.read(),
                 content_type="application/pdf",
-                headers={"Content-Disposition": f'inline; filename="{nome_base}"'},
+                headers={
+                    "Content-Disposition": f'inline; filename="{nome_base}"',
+                    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                },
             )
     else:
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:

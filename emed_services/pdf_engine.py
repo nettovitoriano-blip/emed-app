@@ -167,11 +167,49 @@ def markdown_to_html(md_text: str, doc_title: str = "Instrução de Trabalho eME
     </style>
     """
 
+    import base64
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    logo_html = ""
+    for nome_logo, mime in [("emed_svg-1.png", "image/png"), ("emed1.jpg", "image/jpeg"), ("logo_emed.png", "image/png")]:
+        p_logo = os.path.join(base_dir, nome_logo)
+        if os.path.exists(p_logo):
+            try:
+                with open(p_logo, "rb") as fl:
+                    b64_logo = base64.b64encode(fl.read()).decode("utf-8")
+                logo_html = f"<img src='data:{mime};base64,{b64_logo}' style='height:46px; max-width:135px; object-fit:contain;' />"
+                break
+            except Exception:
+                pass
+
+    if not logo_html:
+        logo_html = "<div style='font-size:16pt; font-weight:900; color:#0077b6;'>🏥 eMED</div>"
+
+    # Extrai o código da IT se presente no doc_title
+    m_cod = re.search(r'(IT[_-][A-Z0-9_-]+)', doc_title, re.IGNORECASE)
+    cod_doc = m_cod.group(1).replace("_", "-").upper() if m_cod else "POP/IT-EMED"
+    if cod_doc.startswith("IT-") and len(cod_doc.split("-")) == 2 and cod_doc.split("-")[1].isdigit():
+        cod_doc = f"IT-TOMO-GE-{int(cod_doc.split('-')[1]):03d}"
+
     body_html = [
-        f"<div class='header-box'>",
-        f"<div class='header-title'>{clean_latex(doc_title)}</div>",
-        f"<div class='header-sub'>eMED Engenharia Clínica & Manutenção Hospitalar • Procedimento Homologado</div>",
-        f"</div>"
+        "<div class='header-box' style='border-bottom: 2.5px solid #0077b6; padding-bottom: 8px; margin-bottom: 14px;'>",
+        "<table style='width:100%; border:none; margin:0; border-collapse:collapse;'>",
+        "<tr style='background:transparent;'>",
+        f"<td style='border:none; width:140px; vertical-align:middle; padding:0 8px 0 0;'>{logo_html}</td>",
+        "<td style='border:none; vertical-align:middle; padding:0 8px;'>",
+        "<div style='font-size:11pt; font-weight:800; color:#0b132b; letter-spacing:0.3px;'>EMED ELETROMEDICINA LTDA.</div>",
+        "<div style='font-size:7.5pt; color:#64748b; font-weight:600;'>ENGENHARIA CLÍNICA • DIAGNÓSTICO POR IMAGEM • CNPJ: 03.611.974/0001-08</div>",
+        f"<div class='header-title' style='color:#0077b6; font-size:12.5pt; font-weight:bold; margin-top:3px;'>{clean_latex(doc_title)}</div>",
+        "</td>",
+        "<td style='border:none; width:175px; vertical-align:middle; text-align:right; padding:0;'>",
+        "<div style='background:#f8fafc; border:1.2px solid #0077b6; border-radius:4px; padding:4px 7px; text-align:left; font-size:7.5pt; line-height:1.3;'>",
+        f"<b>CÓDIGO:</b> <span style='color:#0077b6;'>{cod_doc}</span><br/>",
+        "<b>VERSÃO:</b> <span style='color:#0284c7; font-weight:bold;'>2.4 Homologada</span><br/>",
+        "<b>REVISÃO:</b> Rev. 02 | 26/10/2026<br/>",
+        "<b>NORMA:</b> ANVISA RDC 611",
+        "</div>",
+        "</td>",
+        "</tr></table>",
+        "</div>"
     ]
 
     lines = md_text.splitlines()
@@ -331,7 +369,7 @@ def converter_html_para_pdf_bytes(html_content: str) -> bytes:
         story = pymupdf.Story(html=html_content)
         writer = pymupdf.DocumentWriter(tmp_path)
         mediabox = pymupdf.Rect(0, 0, 595, 842)
-        content_rect = pymupdf.Rect(20, 20, 595 - 20, 842 - 20)
+        content_rect = pymupdf.Rect(28, 28, 595 - 28, 842 - 28)
         more = 1
         while more:
             dev = writer.begin_page(mediabox)
@@ -385,8 +423,8 @@ def vincular_it_ao_equipamento(equipamento_nome: str, tipo_servico: str = "", ba
         # GE BRIGHTSPEED
         (
             ["BRIGHTSPEED", "BRIGTHSPEED", "GE CT"],
-            "IT_02_Manutencao_Preventiva_GE_BrightSpeed.md" if "PREVENTIVA" in srv_upper else "IT_03_Troca_de_Tubo_GE_BrightSpeed.md",
-            "Video_IT02_Manutencao_Preventiva_BrightSpeed.mp4"
+            "IT_21_Instalacao_e_Recarga_de_Software_LFC_GE_BrightSpeed.md" if ("SOFTWARE" in srv_upper or "INSTAL" in srv_upper or "LFC" in srv_upper) else ("IT_02_Manutencao_Preventiva_GE_BrightSpeed.md" if "PREVENTIVA" in srv_upper else "IT_03_Troca_de_Tubo_GE_BrightSpeed.md"),
+            "Video_IT21_Instalacao_Software_LFC_BrightSpeed.mp4" if ("SOFTWARE" in srv_upper or "INSTAL" in srv_upper or "LFC" in srv_upper) else "Video_IT02_Manutencao_Preventiva_BrightSpeed.mp4"
         ),
         # GE BRIVO 385
         (

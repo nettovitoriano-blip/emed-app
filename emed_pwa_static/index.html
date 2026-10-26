@@ -1379,8 +1379,8 @@
                   <div style="font-size:11.5px;color:#64748b;margin-top:4px;">Arquivo: ${esc(m.arquivo)} (${m.tamanho_kb || 120} KB)</div>
                 </div>
                 <div class="os-card-foot">
-                  <a class="btn btn-primary btn-sm" style="flex:1;" href="/api/manual?path=${encodeURIComponent(cam)}&file=${encodeURIComponent(m.arquivo || '')}" target="_blank">
-                    📄 Abrir Manual / IT (PDF)
+                  <a class="btn btn-primary btn-sm" style="flex:1;" href="/api/manual?path=${encodeURIComponent(cam)}&file=${encodeURIComponent(m.arquivo || '')}&v=rev05" target="_blank">
+                    📄 Abrir Manual Oficial (PDF c/ Logo EMED)
                   </a>
                   ${m.video ? `
                     <button class="btn btn-amber btn-sm" onclick="tocarVideoManual('${esc(m.video)}','${esc(m.titulo)}')">
