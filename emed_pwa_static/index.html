@@ -1,0 +1,1713 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="theme-color" content="#0b132b"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title>EMED App Oficial — Técnico &amp; Gestor</title>
+  <link rel="manifest" href="/manifest.json"/>
+  <style>
+    :root {
+      --bg-dark: #070d1f;
+      --bg-card: #101935;
+      --bg-panel: #1c2541;
+      --border: #2e4068;
+      --cyan: #64dfdf;
+      --blue: #38bdf8;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text);
+      line-height: 1.45;
+      padding-bottom: 80px;
+    }
+    /* TOP HEADER */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: linear-gradient(90deg, #0b132b 0%, #162247 100%);
+      border-bottom: 2px solid var(--cyan);
+      padding: 10px 14px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
+    .topbar-inner {
+      max-width: 1320px;
+      margin: auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-logo {
+      background: #fff;
+      padding: 3px 7px;
+      border-radius: 6px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+    }
+    .brand-logo img { height: 34px; max-width: 95px; object-fit: contain; }
+    .brand-title { font-size: 16px; font-weight: 900; color: #fff; letter-spacing: 0.4px; }
+    .brand-sub { font-size: 11px; color: var(--cyan); font-weight: 600; }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .net-badge {
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .net-online { background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid #059669; }
+    .net-offline { background: rgba(245,158,11,0.22); color: #fbbf24; border: 1px solid #d97706; }
+
+    /* MODE SWITCHER */
+    .mode-switcher {
+      max-width: 1320px;
+      margin: 12px auto 0 auto;
+      padding: 0 12px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .mode-btn {
+      background: var(--bg-card);
+      color: var(--muted);
+      border: 1.5px solid var(--border);
+      padding: 10px 8px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+    .mode-btn.active {
+      background: linear-gradient(135deg, #0f766e 0%, #0284c7 100%);
+      color: #fff;
+      border-color: var(--cyan);
+      box-shadow: 0 3px 12px rgba(100,223,223,0.3);
+    }
+
+    .container {
+      max-width: 1320px;
+      margin: 14px auto;
+      padding: 0 12px;
+    }
+
+    /* CARDS & GRIDS */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--cyan);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .kpi-lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 700; }
+    .kpi-val { font-size: 22px; font-weight: 900; color: #fff; margin-top: 3px; }
+
+    .toolbar {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    input, select, textarea {
+      background: #0b132b;
+      color: #fff;
+      border: 1px solid #3a506b;
+      border-radius: 8px;
+      padding: 9px 11px;
+      font-size: 13.5px;
+      width: 100%;
+      font-family: inherit;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--cyan);
+    }
+    label.field-lbl {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--cyan);
+      margin-bottom: 4px;
+      margin-top: 10px;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 8px;
+      padding: 9px 14px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.92; }
+    .btn-primary { background: linear-gradient(90deg, #0d9488, #0284c7); color: #fff; }
+    .btn-success { background: #10b981; color: #052e16; }
+    .btn-warning { background: #f59e0b; color: #1e1b4b; }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .btn-outline { background: var(--bg-panel); color: #e2e8f0; border: 1px solid #475569; }
+    .btn-wa { background: #25D366; color: #052e16; }
+    .btn-block { width: 100%; }
+
+    .os-list { display: flex; flex-direction: column; gap: 12px; }
+    .os-card {
+      background: var(--bg-card);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.28);
+    }
+    .os-card-hdr {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid #233554;
+      padding-bottom: 8px;
+      margin-bottom: 8px;
+    }
+    .badge {
+      padding: 3px 9px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 800;
+      display: inline-block;
+    }
+    .st-ativo { background: rgba(239,68,68,0.2); color: #fca5a5; border: 1px solid #ef4444; }
+    .st-concluido { background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid #10b981; }
+    .st-obs { background: rgba(139,92,246,0.22); color: #c4b5fd; border: 1px solid #8b5cf6; }
+
+    .os-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    /* SUBTABS GESTOR */
+    .subtabs {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      margin-bottom: 14px;
+    }
+    .subtab-btn {
+      background: var(--bg-panel);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 13px;
+      font-size: 12.5px;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .subtab-btn.active {
+      background: var(--cyan);
+      color: #0b132b;
+      border-color: var(--cyan);
+    }
+
+    /* MODAL / DRAWER DE FECHAMENTO DE OS */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 7, 18, 0.85);
+      z-index: 200;
+      display: none;
+      overflow-y: auto;
+      padding: 12px;
+    }
+    .modal-backdrop.open { display: block; }
+    .modal-box {
+      max-width: 900px;
+      margin: 10px auto 40px auto;
+      background: var(--bg-card);
+      border: 2px solid var(--cyan);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 10px 35px rgba(0,0,0,0.7);
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .chk-list {
+      background: #0b132b;
+      border: 1px solid #3a506b;
+      border-radius: 8px;
+      padding: 10px;
+      max-height: 230px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      margin-top: 6px;
+    }
+    .chk-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 12.5px;
+      color: #e2e8f0;
+      cursor: pointer;
+    }
+    .chk-item input { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; }
+
+    /* TV DO LABORATORIO */
+    .tv-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .tv-col-urg {
+      background: rgba(127, 29, 29, 0.22);
+      border: 2px solid #ef4444;
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .tv-col-prog {
+      background: rgba(120, 53, 15, 0.22);
+      border: 2px solid #f59e0b;
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    /* TOAST */
+    #toast-box {
+      position: fixed;
+      bottom: 18px;
+      right: 18px;
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 340px;
+    }
+    .toast-msg {
+      background: #0f172a;
+      border-left: 4px solid var(--cyan);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+    }
+
+    @media (max-width: 720px) {
+      .grid-2, .tv-grid { grid-template-columns: 1fr !important; }
+      .mode-btn { font-size: 11.5px; padding: 8px 4px; }
+      .brand-title { font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand-row">
+        <div class="brand-logo">
+          <img src="/api/logo" alt="EMED" onerror="this.style.display='none'"/>
+        </div>
+        <div>
+          <div class="brand-title">EMED ELETROMEDICINA LTDA.</div>
+          <div class="brand-sub" id="lbl-modo-ativo">📱 App Oficial • Engenharia Clínica &amp; Diagnóstico por Imagem</div>
+        </div>
+      </div>
+      <div class="status-row">
+        <span id="net-status" class="net-badge net-online">🟢 Conectado ao Servidor EMED</span>
+        <button id="btn-sync-fila" class="btn btn-warning" style="display:none; padding:5px 10px; font-size:11.5px;" onclick="sincronizarFilaOffline()">
+          🔄 Sincronizar Fila (<span id="qtd-fila">0</span>)
+        </button>
+        <button id="btn-install-pwa" class="btn btn-outline" style="display:none; padding:5px 10px; font-size:11.5px;" onclick="instalarPWA()">
+          📲 Instalar App
+        </button>
+        <button class="btn btn-outline" style="padding:5px 10px; font-size:11.5px;" onclick="carregarDadosServidor(true)">
+          🔄 Atualizar
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- SELETOR DE VERSÃO DEDICADA (TÉCNICO vs GESTOR vs TRIAGEM CLIENTE) -->
+  <div class="mode-switcher">
+    <button id="tab-modo-tecnico" class="mode-btn active" onclick="alternarModoApp('tecnico')">
+      👷 APP DO TÉCNICO<br/><span style="font-size:10px; font-weight:normal;">Campo • Offline • Fechamento</span>
+    </button>
+    <button id="tab-modo-gestor" class="mode-btn" onclick="alternarModoApp('gestor')">
+      🏢 APP DO GESTOR<br/><span style="font-size:10px; font-weight:normal;">Comando • TV • Estoque • PIX</span>
+    </button>
+    <button id="tab-modo-cliente" class="mode-btn" onclick="alternarModoApp('cliente')">
+      🎫 TRIAGEM &amp; CLIENTE<br/><span style="font-size:10px; font-weight:normal;">Abertura Inteligente • QR Code</span>
+    </button>
+  </div>
+
+  <!-- CONTEÚDO PRINCIPAL -->
+  <main class="container">
+
+    <!-- ================================================================== -->
+    <!-- VISÃO 1: APLICATIVO DEDICADO AO TÉCNICO DE CAMPO                   -->
+    <!-- ================================================================== -->
+    <section id="view-tecnico">
+      <div class="toolbar">
+        <div style="flex: 1; min-width: 170px;">
+          <label class="field-lbl" style="margin-top:0;">👷 Meu Perfil Técnico:</label>
+          <select id="sel-tec-filtro" onchange="renderizarListaTecnico()">
+            <option value="TODOS">TODOS OS TÉCNICOS (EQUIPE COMPLETA)</option>
+          </select>
+        </div>
+        <div style="flex: 1; min-width: 150px;">
+          <label class="field-lbl" style="margin-top:0;">📌 Status das OS:</label>
+          <select id="sel-st-tec" onchange="renderizarListaTecnico()">
+            <option value="ABERTAS">🚨 OS Ativas / Em Atendimento</option>
+            <option value="OBSERVACAO">🔬 Em Observação (Peça em Teste)</option>
+            <option value="CONCLUIDO">✅ Concluídas (Laudo PDF &amp; WhatsApp)</option>
+            <option value="TODAS">📋 Todas as OS</option>
+          </select>
+        </div>
+        <div style="flex: 1.4; min-width: 200px;">
+          <label class="field-lbl" style="margin-top:0;">🔍 Buscar Cliente, OS ou Equipamento:</label>
+          <input type="text" id="inp-busca-tec" placeholder="Digite nome do hospital, máquina ou nº da OS..." oninput="renderizarListaTecnico()"/>
+        </div>
+      </div>
+
+      <div id="lista-os-tecnico" class="os-list"></div>
+    </section>
+
+    <!-- ================================================================== -->
+    <!-- VISÃO 2: APLICATIVO COMPLETO DO GESTOR (CENTRAL DE COMANDO)        -->
+    <!-- ================================================================== -->
+    <section id="view-gestor" style="display:none;">
+      <div class="kpi-grid" id="gestor-kpis"></div>
+
+      <div class="subtabs">
+        <button class="subtab-btn active" id="gtab-btn-os" onclick="abrirAbaGestor('os')">📋 Gestão de OS &amp; Despacho</button>
+        <button class="subtab-btn" id="gtab-btn-tv" onclick="abrirAbaGestor('tv')">📺 TV do Laboratório (Pendências)</button>
+        <button class="subtab-btn" id="gtab-btn-almox" onclick="abrirAbaGestor('almox')">📦 Almoxarifado, Kits &amp; Calibração</button>
+        <button class="subtab-btn" id="gtab-btn-pix" onclick="abrirAbaGestor('pix')">💳 Financeiro &amp; PIX Banco Central</button>
+        <button class="subtab-btn" id="gtab-btn-cfg" onclick="abrirAbaGestor('cfg')">⭐ Google 5 Estrelas &amp; Servidor</button>
+      </div>
+
+      <!-- SUB-ABA GESTOR 1: TODAS AS OS + NOVA OS -->
+      <div id="gtab-os">
+        <div class="toolbar" style="justify-content: space-between;">
+          <div style="display:flex; gap:10px; flex-wrap:wrap; flex:1;">
+            <input type="text" id="inp-busca-gestor" style="max-width:320px;" placeholder="🔍 Filtrar OS por hospital, técnico, equipamento..." oninput="renderizarListaGestor()"/>
+            <select id="sel-st-gestor" style="max-width:220px;" onchange="renderizarListaGestor()">
+              <option value="TODAS">📋 Todos os Status</option>
+              <option value="ATIVO">🚨 Somente Ativas</option>
+              <option value="OBSERVACAO">🔬 Em Observação</option>
+              <option value="CONCLUÍDO">✅ Somente Concluídas</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="abrirModalNovaOS()">➕ Emitir Nova Ordem de Serviço</button>
+        </div>
+        <div id="lista-os-gestor" class="os-list"></div>
+      </div>
+
+      <!-- SUB-ABA GESTOR 2: PAINEL TV DO LABORATÓRIO -->
+      <div id="gtab-tv" style="display:none;">
+        <div class="toolbar" style="justify-content: space-between;">
+          <div>
+            <h3 style="color:#fff; font-size:17px;">📺 MONITORAMENTO DE PENDÊNCIAS TÉCNICAS — TV DO LABORATÓRIO EMED</h3>
+            <p style="font-size:12px; color:var(--muted);">Triagem automática em tempo real das pendências reportadas pelos técnicos no fechamento das OS.</p>
+          </div>
+          <button class="btn btn-outline" onclick="alternarTelaCheiaTV()">🖥️ Modo Tela Cheia (TV)</button>
+        </div>
+        <div class="tv-grid">
+          <div class="tv-col-urg">
+            <h4 style="color:#fca5a5; font-size:15px; margin-bottom:10px;">🔴 URGÊNCIA / CRÍTICA (MÁQUINA PARADA OU RISCO IMINENTE)</h4>
+            <div id="tv-lista-urgente" class="os-list"></div>
+          </div>
+          <div class="tv-col-prog">
+            <h4 style="color:#fde68a; font-size:15px; margin-bottom:10px;">🟡 PROGRAMADAS (SUPRIR ATÉ A PRÓXIMA PREVENTIVA)</h4>
+            <div id="tv-lista-programada" class="os-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB-ABA GESTOR 3: ALMOXARIFADO, ESTOQUE & CALIBRAÇÃO -->
+      <div id="gtab-almox" style="display:none;">
+        <div class="grid-2">
+          <div class="os-card">
+            <h4 style="color:var(--cyan); margin-bottom:10px;">📥 Demandas de Peças &amp; Kits Acionados (Campo / Abertura)</h4>
+            <div id="lista-demandas-almox" class="os-list"></div>
+          </div>
+          <div class="os-card">
+            <h4 style="color:var(--blue); margin-bottom:10px;">📦 Inventário de Peças, Instrumentos &amp; Validade Calibração</h4>
+            <input type="text" id="inp-busca-estoque" placeholder="🔍 Buscar peça ou instrumento..." oninput="renderizarEstoqueGestor()" style="margin-bottom:10px;"/>
+            <div id="lista-estoque-gestor" class="os-list" style="max-height:540px; overflow-y:auto;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB-ABA GESTOR 4: FINANCEIRO & PIX -->
+      <div id="gtab-pix" style="display:none;">
+        <div class="grid-2">
+          <div class="os-card">
+            <h4 style="color:var(--green); margin-bottom:8px;">⚡ Gerador Instantâneo de QR Code PIX (Padrão Banco Central)</h4>
+            <label class="field-lbl">Vincular à Ordem de Serviço:</label>
+            <select id="sel-pix-os" onchange="preencherValorPixOS()"></select>
+            <div class="grid-2">
+              <div>
+                <label class="field-lbl">Valor a Receber (R$):</label>
+                <input type="number" id="inp-pix-valor" step="10" value="450.00"/>
+              </div>
+              <div>
+                <label class="field-lbl">Chave PIX EMED:</label>
+                <input type="text" id="inp-pix-chave" value="03611974000108"/>
+              </div>
+            </div>
+            <button class="btn btn-success btn-block" style="margin-top:12px;" onclick="gerarPixApp()">📲 Gerar QR Code PIX &amp; Copia e Cola</button>
+            <div id="box-resultado-pix" style="display:none; margin-top:14px; text-align:center; background:#0b132b; padding:14px; border-radius:10px; border:1px solid var(--green);">
+              <img id="img-qr-pix" src="" alt="QR PIX" style="width:200px; height:200px; background:#fff; padding:8px; border-radius:8px;"/>
+              <label class="field-lbl">Código PIX Copia e Cola (EMV CRC16):</label>
+              <textarea id="txt-pix-emv" rows="3" readonly></textarea>
+              <button class="btn btn-outline btn-block" style="margin-top:8px;" onclick="copiarPixEmv()">📋 Copiar Código PIX</button>
+            </div>
+          </div>
+          <div class="os-card">
+            <h4 style="color:var(--cyan); margin-bottom:10px;">🧾 Faturamentos &amp; Notas Fiscais Emitidas</h4>
+            <div id="lista-notas-fiscais" class="os-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB-ABA GESTOR 5: GOOGLE REVIEW & CONFIGURAÇÃO -->
+      <div id="gtab-cfg" style="display:none;">
+        <div class="os-card" style="max-width:720px;">
+          <h4 style="color:var(--amber); margin-bottom:8px;">⭐ Impulsionador de Avaliação 5 Estrelas no Google Meu Negócio</h4>
+          <p style="font-size:13px; color:var(--muted); margin-bottom:10px;">
+            Cole abaixo o link curto oficial de avaliação da EMED no Google. Ele será enviado automaticamente no WhatsApp do cliente ao concluir cada Ordem de Serviço.
+          </p>
+          <label class="field-lbl">URL Direta de Avaliação no Google:</label>
+          <input type="text" id="inp-cfg-google-url" placeholder="https://g.page/r/.../review"/>
+          <button class="btn btn-primary" style="margin-top:12px;" onclick="salvarConfigGoogle()">💾 Salvar Link Oficial no Servidor</button>
+          <div style="margin-top:16px; background:#0b132b; padding:12px; border-radius:8px; border-left:4px solid var(--cyan); font-size:12.5px; color:#cbd5e1;">
+            <b>💡 Como pegar o link sem precisar de programador do site:</b><br/>
+            1. Faça login no Google com a conta da EMED e pesquise <b>EMED Eletromedicina</b>.<br/>
+            2. No painel do Perfil da Empresa, clique em <b>"Ler avaliações"</b> ou <b>"Receber mais avaliações"</b>.<br/>
+            3. Copie o link curto (<code>https://g.page/r/.../review</code>) e cole no campo acima!
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================== -->
+    <!-- VISÃO 3: TRIAGEM CIRÚRGICA & PORTAL DO CLIENTE (EMED ONLINE)       -->
+    <!-- ================================================================== -->
+    <section id="view-cliente" style="display:none;">
+      <div class="os-card" style="max-width:820px; margin:auto;">
+        <h3 style="color:var(--cyan); margin-bottom:4px;">🎫 Abertura Inteligente de Chamado Técnico (EMED Online)</h3>
+        <p style="font-size:12.5px; color:var(--muted); margin-bottom:12px;">
+          Identificamos o equipamento e filtramos o defeito relatado para fazer apenas 3 perguntas cirúrgicas sobre o problema específico.
+        </p>
+        <div class="grid-2">
+          <div>
+            <label class="field-lbl">🏥 Hospital / Clínica Solicitante: *</label>
+            <input type="text" id="tri-cliente" list="dl-clientes" placeholder="Ex: HOSPITAL SAO CARLOS"/>
+            <datalist id="dl-clientes"></datalist>
+          </div>
+          <div>
+            <label class="field-lbl">🔬 Equipamento / Modalidade: *</label>
+            <input type="text" id="tri-equip" value="TOMOGRAFO - GE - BRIGHTSPEED" oninput="atualizarPerguntasTriagem()" placeholder="Ex: TOMOGRAFO GE, RAIO-X LOTUS, MAMOGRAFO..."/>
+          </div>
+        </div>
+
+        <label class="field-lbl">⚡ Atalhos Rápidos de Sintoma (Toque para preencher):</label>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+          <button class="btn btn-outline" style="font-size:11.5px; padding:6px 10px;" onclick="setSintomaTriagem('MESA TRAVANDO O MOVIMENTO DE UP E DOWN')">🛏️ Movimento UP e DOWN</button>
+          <button class="btn btn-outline" style="font-size:11.5px; padding:6px 10px;" onclick="setSintomaTriagem('TUBO NÃO DISPARA / ERRO DE ALTA TENSÃO')">💥 Tubo / Alta Tensão</button>
+          <button class="btn btn-outline" style="font-size:11.5px; padding:6px 10px;" onclick="setSintomaTriagem('COMPRESSOR TRAVADO / FALHA NO PEDAL')">🗜️ Compressor Mamógrafo</button>
+          <button class="btn btn-outline" style="font-size:11.5px; padding:6px 10px;" onclick="setSintomaTriagem('ARTEFATO DE IMAGEM / FALHA NO DETECTOR')">🔬 Artefato na Imagem</button>
+        </div>
+
+        <label class="field-lbl">📢 Descreva o Problema ou Código de Erro Apresentado: *</label>
+        <textarea id="tri-defeito" rows="2" placeholder="Ex: A mesa não realiza o movimento de subida (UP) e descida (DOWN)..." oninput="atualizarPerguntasTriagem()"></textarea>
+
+        <div id="box-perguntas-triagem" style="background:#0b132b; border:1px solid var(--cyan); border-radius:10px; padding:12px; margin-top:12px;">
+          <div id="tri-cat-titulo" style="font-weight:800; color:var(--cyan); font-size:13.5px; margin-bottom:8px;">🎯 Triagem Técnica Direcionada</div>
+          <div id="tri-perguntas-container"></div>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <label class="field-lbl">👤 Seu Nome / Setor: *</label>
+            <input type="text" id="tri-resp" placeholder="Ex: Sra. Damares / Engenharia Clínica"/>
+          </div>
+          <div>
+            <label class="field-lbl">💬 Seu WhatsApp (com DDD):</label>
+            <input type="text" id="tri-whats" placeholder="Ex: 85999999999"/>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-block" style="margin-top:16px; padding:12px;" onclick="confirmarAberturaTriagem()">
+          🚀 Confirmar Abertura de Chamado Técnico na EMED
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================================================================== -->
+  <!-- MODAL DE PREENCHIMENTO / FECHAMENTO DA OS (100% OFFLINE + SERVIDOR)  -->
+  <!-- ==================================================================== -->
+  <div id="modal-os" class="modal-backdrop">
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:10px;">
+        <div>
+          <h3 id="mod-titulo-os" style="color:var(--cyan); font-size:17px;">🛠️ Ordem de Serviço #1</h3>
+          <div id="mod-sub-os" style="font-size:12px; color:var(--muted);">Auto-salvamento ativo no celular e no servidor</div>
+        </div>
+        <button class="btn btn-outline" onclick="fecharModalOS()">✖ Fechar</button>
+      </div>
+
+      <input type="hidden" id="mod-os-id"/>
+
+      <div class="grid-2">
+        <div>
+          <label class="field-lbl">👷 Técnico Principal:</label>
+          <select id="mod-tec-resp" onchange="autoSalvarRascunhoLocal()"></select>
+        </div>
+        <div>
+          <label class="field-lbl">🤝 Técnico Auxiliar:</label>
+          <input type="text" id="mod-tec-aux" placeholder="NENHUM (INDIVIDUAL)" oninput="autoSalvarRascunhoLocal()"/>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div>
+          <label class="field-lbl">📢 Defeito Relatado pelo Cliente:</label>
+          <input type="text" id="mod-defeito" oninput="autoSalvarRascunhoLocal()"/>
+        </div>
+        <div>
+          <label class="field-lbl">🔍 Diagnóstico / Problema Encontrado:</label>
+          <input type="text" id="mod-problema" placeholder="Causa técnica identificada..." oninput="autoSalvarRascunhoLocal()"/>
+        </div>
+      </div>
+
+      <!-- CHECKLIST INTERATIVO DE AÇÕES (O TÉCNICO DECIDE O QUE MARCAR) -->
+      <div style="background:#162247; border:1px solid var(--cyan); border-radius:10px; padding:10px 12px; margin-top:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+          <span style="font-size:12.5px; font-weight:800; color:var(--cyan);">✅ Checklist de Ações Sugeridas (Marque o que você realizou):</span>
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="btn btn-primary" style="padding:5px 10px; font-size:11.5px;" onclick="inserirChecklistMarcado()">📝 Inserir Marcados no Relatório</button>
+            <button type="button" class="btn btn-outline" style="padding:5px 10px; font-size:11.5px;" onclick="aplicarSugestaoCompletaIA()">⚡ Sugerir Texto Completo</button>
+          </div>
+        </div>
+        <div id="mod-checklist-box" class="chk-list"></div>
+      </div>
+
+      <label class="field-lbl">🛠️ Descrição Detalhada dos Serviços Executados: *</label>
+      <textarea id="mod-servico-exec" rows="4" placeholder="Descreva os serviços executados ou insira pelo checklist acima..." oninput="autoSalvarRascunhoLocal()"></textarea>
+
+      <div class="grid-2">
+        <div>
+          <label class="field-lbl">📋 Checklist POP / Protocolo Executado:</label>
+          <input type="text" id="mod-chk-pop" value="LIMPEZA TÉCNICA, TESTE FUNCIONAL COM OPERADOR, INSPEÇÃO DE CABOS E SEGURANÇA" oninput="autoSalvarRascunhoLocal()"/>
+        </div>
+        <div>
+          <label class="field-lbl">⚡ Parâmetros Medidos / Testes:</label>
+          <input type="text" id="mod-parametros" placeholder="Ex: Tensão F-N 220V, T-N < 1.0V, Carga OK" oninput="autoSalvarRascunhoLocal()"/>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div>
+          <label class="field-lbl">📦 Peça Aplicada (Estoque ou Manual):</label>
+          <input type="text" id="mod-peca" list="dl-estoque-pecas" placeholder="NENHUMA PEÇA (ou digite/selecione)" oninput="autoSalvarRascunhoLocal()"/>
+          <datalist id="dl-estoque-pecas"></datalist>
+        </div>
+        <div>
+          <label class="field-lbl">🏁 Condição Final do Equipamento na Saída:</label>
+          <select id="mod-cond-final" onchange="autoSalvarRascunhoLocal()">
+            <option value="LIBERADO PARA USO NORMAL">✅ LIBERADO PARA USO NORMAL</option>
+            <option value="LIBERADO COM RESTRIÇÃO OPERACIONAL">⚠️ LIBERADO COM RESTRIÇÃO OPERACIONAL</option>
+            <option value="PARADO AGUARDANDO PEÇA / APROVAÇÃO DE ORÇAMENTO">🛑 PARADO AGUARDANDO PEÇA / ORÇAMENTO</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div>
+          <label class="field-lbl">🚨 Triagem de Pendência para o Almoxarifado:</label>
+          <select id="mod-prio-pend" onchange="autoSalvarRascunhoLocal()">
+            <option value="NENHUMA">🟢 Nenhuma pendência restante (100% resolvido)</option>
+            <option value="PROGRAMADA">🟡 PROGRAMADA (Aguarda até a próxima preventiva)</option>
+            <option value="URGENTE">🔴 URGÊNCIA / CRÍTICA (Acionar Almoxarifado imediato)</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-lbl">🔩 Peça / Ferramenta Pendente p/ Próxima Visita:</label>
+          <input type="text" id="mod-inst-prox" placeholder="Ex: BOTAO ANTIVANDALISMO 22MM" oninput="autoSalvarRascunhoLocal()"/>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div>
+          <label class="field-lbl">📝 Observações Gerais ao Hospital:</label>
+          <input type="text" id="mod-obs-gerais" placeholder="SEM OBSERVAÇÕES ADICIONAIS" oninput="autoSalvarRascunhoLocal()"/>
+        </div>
+        <div>
+          <label class="field-lbl">💰 Valor do Serviço / Orçamento (R$):</label>
+          <input type="number" id="mod-valor-os" step="50" value="0" oninput="autoSalvarRascunhoLocal()"/>
+        </div>
+      </div>
+
+      <!-- FOTOS ANTES E DEPOIS (SAEM NO PDF DE 1 PÁGINA) -->
+      <div style="background:#0b132b; border:1px solid #3a506b; border-radius:10px; padding:10px 12px; margin-top:12px;">
+        <div style="font-size:12.5px; font-weight:800; color:var(--cyan); margin-bottom:6px;">📸 Fotos da Intervenção (Saem automaticamente no Laudo PDF de 1 Página):</div>
+        <div class="grid-2">
+          <div>
+            <label class="field-lbl" style="margin-top:0;">📸 Foto Antes / Evidência Inicial:</label>
+            <input type="file" id="inp-foto-antes" accept="image/*" onchange="processarFotoUpload(this, 'antes')"/>
+            <img id="prev-foto-antes" src="" style="display:none; max-height:110px; margin-top:6px; border-radius:6px; border:1px solid var(--cyan);"/>
+          </div>
+          <div>
+            <label class="field-lbl" style="margin-top:0;">📸 Foto Depois / Serviço Concluído:</label>
+            <input type="file" id="inp-foto-depois" accept="image/*" onchange="processarFotoUpload(this, 'depois')"/>
+            <img id="prev-foto-depois" src="" style="display:none; max-height:110px; margin-top:6px; border-radius:6px; border:1px solid var(--green);"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- ASSINATURA DO CLIENTE TOUCH -->
+      <div style="background:#0b132b; border:1px solid #3a506b; border-radius:10px; padding:10px 12px; margin-top:12px;">
+        <div class="grid-2" style="align-items:center;">
+          <div>
+            <label class="field-lbl" style="margin-top:0;">🏥 Nome do Responsável que Recebeu a OS: *</label>
+            <input type="text" id="mod-ass-nome" placeholder="Ex: SRA. DAMARES / DR. CARLOS" oninput="autoSalvarRascunhoLocal()"/>
+            <div style="font-size:11px; color:var(--muted); margin-top:6px;">
+              Assine com o dedo no quadro ao lado (ou abaixo no celular).
+            </div>
+            <button type="button" class="btn btn-outline" style="margin-top:6px; padding:5px 10px; font-size:11.5px;" onclick="limparCanvasAssinatura()">🗑️ Limpar Assinatura</button>
+          </div>
+          <div style="text-align:center;">
+            <canvas id="canvas-assinatura" width="320" height="110" style="background:#ffffff; border:2px solid var(--cyan); border-radius:8px; touch-action:none; cursor:crosshair; max-width:100%;"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTÕES DE SALVAMENTO E FECHAMENTO -->
+      <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:16px;">
+        <button type="button" class="btn btn-outline" style="flex:1;" onclick="submeterOS('SALVAR_ABERTA')">
+          💾 Salvar Provisório (Manter OS Aberta)
+        </button>
+        <button type="button" class="btn btn-warning" style="flex:1;" onclick="submeterOS('OBSERVACAO')">
+          🔬 Deixar em Observação (Peça em Teste)
+        </button>
+        <button type="button" class="btn btn-success" style="flex:1.4;" onclick="submeterOS('CONCLUIR')">
+          🏁 Concluir e Fechar OS Agora
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CRIAR NOVA OS (GESTOR) -->
+  <div id="modal-nova-os" class="modal-backdrop">
+    <div class="modal-box" style="max-width:650px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:10px;">
+        <h3 style="color:var(--cyan);">➕ Emitir Nova Ordem de Serviço &amp; Acionar Almoxarifado</h3>
+        <button class="btn btn-outline" onclick="document.getElementById('modal-nova-os').classList.remove('open')">✖</button>
+      </div>
+      <div class="grid-2">
+        <div>
+          <label class="field-lbl">🏥 Cliente / Hospital: *</label>
+          <input type="text" id="nova-cli" list="dl-clientes" placeholder="Ex: HOSPITAL SAO CARLOS"/>
+        </div>
+        <div>
+          <label class="field-lbl">🔬 Equipamento / Ativo: *</label>
+          <input type="text" id="nova-eq" placeholder="Ex: COMPACTO PLUS 300"/>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div>
+          <label class="field-lbl">🔧 Tipo de Serviço:</label>
+          <select id="nova-tipo">
+            <option value="CORRETIVA">CORRETIVA (EMERGÊNCIA / REPARO)</option>
+            <option value="PREVENTIVA">PREVENTIVA (POP / CHECKLIST)</option>
+            <option value="CALIBRAÇÃO RADIOMÉTRICA">CALIBRAÇÃO RADIOMÉTRICA &amp; QA</option>
+            <option value="INSTALAÇÃO">INSTALAÇÃO DE EQUIPAMENTO</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-lbl">👷 Técnico Designado:</label>
+          <select id="nova-tec"></select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div>
+          <label class="field-lbl">👤 Responsável no Hospital:</label>
+          <input type="text" id="nova-resp" placeholder="Ex: SRA. DAMARES"/>
+        </div>
+        <div>
+          <label class="field-lbl">💬 WhatsApp do Cliente:</label>
+          <input type="text" id="nova-whats" placeholder="Ex: 5585999999999"/>
+        </div>
+      </div>
+      <label class="field-lbl">📢 Defeito Relatado / Solicitação: *</label>
+      <textarea id="nova-defeito" rows="3" placeholder="Descreva o defeito ou serviço a realizar..."></textarea>
+      <button class="btn btn-primary btn-block" style="margin-top:14px;" onclick="criarNovaOSGestor()">
+        🚀 Emitir OS e Acionar Kit no Almoxarifado
+      </button>
+    </div>
+  </div>
+
+  <div id="toast-box"></div>
+
+  <script>
+    let STATE = {
+      modo: 'tecnico',
+      abaGestor: 'os',
+      ordens: [],
+      tecnicos: [],
+      estoque: [],
+      solicitacoes_almox: [],
+      notas_fiscais: [],
+      clientes_unicos: [],
+      kpis: {},
+      google_review_url: '',
+      online: navigator.onLine,
+      osAbertaModal: null,
+      fotoAntesB64: '',
+      fotoDepoisB64: '',
+      assinaturaDesenhada: false,
+      sugestaoIaAtual: ''
+    };
+
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      document.getElementById('btn-install-pwa').style.display = 'inline-flex';
+    });
+
+    function instalarPWA() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+      } else {
+        mostrarToast('No celular, toque no menu do navegador (⋮ ou Compartilhar) e escolha "Adicionar à Tela Inicial"!');
+      }
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+
+    function mostrarToast(msg) {
+      const box = document.getElementById('toast-box');
+      const el = document.createElement('div');
+      el.className = 'toast-msg';
+      el.innerText = msg;
+      box.appendChild(el);
+      setTimeout(() => el.remove(), 3800);
+    }
+
+    function atualizarStatusRede() {
+      STATE.online = navigator.onLine;
+      const badge = document.getElementById('net-status');
+      if (STATE.online) {
+        badge.className = 'net-badge net-online';
+        badge.innerText = '🟢 Conectado ao Servidor EMED';
+        sincronizarFilaOffline();
+      } else {
+        badge.className = 'net-badge net-offline';
+        badge.innerText = '🟠 Modo Offline (Salvando no Celular)';
+      }
+      atualizarBotaoFila();
+    }
+    window.addEventListener('online', atualizarStatusRede);
+    window.addEventListener('offline', atualizarStatusRede);
+
+    function obterFilaOffline() {
+      try {
+        return JSON.parse(localStorage.getItem('emed_fila_offline_os') || '[]');
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function salvarFilaOffline(fila) {
+      localStorage.setItem('emed_fila_offline_os', JSON.stringify(fila));
+      atualizarBotaoFila();
+    }
+
+    function atualizarBotaoFila() {
+      const fila = obterFilaOffline();
+      const btn = document.getElementById('btn-sync-fila');
+      document.getElementById('qtd-fila').innerText = fila.length;
+      btn.style.display = fila.length > 0 ? 'inline-flex' : 'none';
+    }
+
+    async function sincronizarFilaOffline() {
+      const fila = obterFilaOffline();
+      if (!fila.length || !navigator.onLine) return;
+      let restantes = [];
+      let sinc = 0;
+      for (const item of fila) {
+        try {
+          const r = await fetch('/api/salvar-os', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item)
+          });
+          if (r.ok) sinc++;
+          else restantes.push(item);
+        } catch (e) {
+          restantes.push(item);
+        }
+      }
+      salvarFilaOffline(restantes);
+      if (sinc > 0) {
+        mostrarToast(`✅ ${sinc} OS(s) feitas offline foram sincronizadas com o servidor EMED!`);
+        carregarDadosServidor();
+      }
+    }
+
+    async function carregarDadosServidor(exibirFeedback = false) {
+      try {
+        const res = await fetch('/api/bootstrap');
+        const data = await res.json();
+        if (data.ok) {
+          STATE.ordens = data.ordens || [];
+          STATE.tecnicos = data.tecnicos || [];
+          STATE.estoque = data.estoque || [];
+          STATE.solicitacoes_almox = data.solicitacoes_almox || [];
+          STATE.notas_fiscais = data.notas_fiscais || [];
+          STATE.clientes_unicos = data.clientes_unicos || [];
+          STATE.kpis = data.kpis || {};
+          STATE.google_review_url = data.google_review_url || '';
+          localStorage.setItem('emed_cache_bootstrap', JSON.stringify(data));
+          popularSelectsGlobais();
+          renderizarTudo();
+          if (exibirFeedback) mostrarToast('🔄 Dados sincronizados em tempo real com o servidor EMED!');
+        }
+      } catch (e) {
+        // Fallback para o cache local se estiver sem rede no celular
+        const cache = localStorage.getItem('emed_cache_bootstrap');
+        if (cache) {
+          const data = JSON.parse(cache);
+          STATE.ordens = data.ordens || [];
+          STATE.tecnicos = data.tecnicos || [];
+          STATE.estoque = data.estoque || [];
+          STATE.solicitacoes_almox = data.solicitacoes_almox || [];
+          STATE.notas_fiscais = data.notas_fiscais || [];
+          STATE.clientes_unicos = data.clientes_unicos || [];
+          STATE.kpis = data.kpis || {};
+          STATE.google_review_url = data.google_review_url || '';
+          popularSelectsGlobais();
+          renderizarTudo();
+        }
+        atualizarStatusRede();
+      }
+    }
+
+    function popularSelectsGlobais() {
+      const selTec = document.getElementById('sel-tec-filtro');
+      const valorAtual = selTec.value || localStorage.getItem('emed_tec_preferido') || 'TODOS';
+      const nomesTecs = STATE.tecnicos.map(t => t.nome);
+      selTec.innerHTML = `<option value="TODOS">👷 TODOS OS TÉCNICOS (EQUIPE)</option>` +
+        nomesTecs.map(n => `<option value="${n}">👷 Técnico: ${n}</option>`).join('');
+      if ([...selTec.options].some(o => o.value === valorAtual)) selTec.value = valorAtual;
+
+      const modTec = document.getElementById('mod-tec-resp');
+      const novaTec = document.getElementById('nova-tec');
+      const opcoesTec = nomesTecs.map(n => `<option value="${n}">${n}</option>`).join('');
+      modTec.innerHTML = opcoesTec;
+      novaTec.innerHTML = opcoesTec;
+
+      const dlCli = document.getElementById('dl-clientes');
+      dlCli.innerHTML = STATE.clientes_unicos.map(c => `<option value="${c}"/>`).join('');
+
+      const dlEst = document.getElementById('dl-estoque-pecas');
+      dlEst.innerHTML = `<option value="NENHUMA PEÇA"/>` +
+        STATE.estoque.map(p => `<option value="${p.nome_peca}">${p.codigo} (Saldo: ${p.quantidade})</option>`).join('');
+
+      const selPixOs = document.getElementById('sel-pix-os');
+      selPixOs.innerHTML = `<option value="AVULSO">Cobrança Avulsa / Sem OS</option>` +
+        STATE.ordens.map(o => `<option value="${o.id}" data-val="${o.valor_os}">OS #${o.id} — ${o.cliente} (R$ ${o.valor_os.toFixed(2)})</option>`).join('');
+
+      document.getElementById('inp-cfg-google-url').value = STATE.google_review_url;
+    }
+
+    function alternarModoApp(modo) {
+      STATE.modo = modo;
+      document.getElementById('view-tecnico').style.display = modo === 'tecnico' ? 'block' : 'none';
+      document.getElementById('view-gestor').style.display = modo === 'gestor' ? 'block' : 'none';
+      document.getElementById('view-cliente').style.display = modo === 'cliente' ? 'block' : 'none';
+
+      document.getElementById('tab-modo-tecnico').classList.toggle('active', modo === 'tecnico');
+      document.getElementById('tab-modo-gestor').classList.toggle('active', modo === 'gestor');
+      document.getElementById('tab-modo-cliente').classList.toggle('active', modo === 'cliente');
+
+      const titulos = {
+        tecnico: '👷 Versão Dedicada ao Técnico de Campo (Offline-First)',
+        gestor: '🏢 Versão Completa do Gestor (Central de Comando & Servidor)',
+        cliente: '🎫 Portal de Abertura & Triagem Cirúrgica (EMED Online)'
+      };
+      document.getElementById('lbl-modo-ativo').innerText = titulos[modo] || '';
+      if (modo === 'cliente') atualizarPerguntasTriagem();
+      renderizarTudo();
+    }
+
+    function renderizarTudo() {
+      renderizarListaTecnico();
+      renderizarKPIsGestor();
+      renderizarListaGestor();
+      renderizarTVLaboratorio();
+      renderizarEstoqueGestor();
+      renderizarFinanceiroGestor();
+      atualizarBotaoFila();
+    }
+
+    function badgeStatusHTML(st) {
+      const s = (st || '').toUpperCase();
+      if (s === 'CONCLUÍDO') return `<span class="badge st-concluido">✅ CONCLUÍDA</span>`;
+      if (s.includes('OBSERVA')) return `<span class="badge st-obs">🔬 EM OBSERVAÇÃO</span>`;
+      return `<span class="badge st-ativo">🚨 ATIVA EM CAMPO</span>`;
+    }
+
+    function gerarLinkWhatsAppOS(os) {
+      const aval = STATE.google_review_url
+        ? `\n\n⭐ *SUA AVALIAÇÃO É MUITO IMPORTANTE!*\nAvalie o atendimento da EMED com 5 estrelas no Google:\n👉 ${STATE.google_review_url}`
+        : '';
+      const txt =
+        `🏥 *EMED ELETROMEDICINA LTDA.*\n` +
+        `📋 *ORDEM DE SERVIÇO Nº #${os.id}*\n\n` +
+        `🏢 *Cliente:* ${os.cliente}\n` +
+        `🔬 *Equipamento:* ${os.equipamento}\n` +
+        `👷 *Técnico:* ${os.tecnico_responsavel}\n` +
+        `🛠️ *Serviços Executados:* ${os.servico_executado || 'Manutenção realizada conforme protocolo EMED.'}\n` +
+        `🏁 *Condição Final:* ${os.condicao_final}\n` +
+        `✍️ *Recebido por:* ${os.assinatura_cliente || os.responsavel_hospital || 'Responsável Local'}` +
+        aval;
+      let num = (os.whatsapp || '').replace(/\D/g, '');
+      if (num && !num.startsWith('55') && (num.length === 10 || num.length === 11)) num = '55' + num;
+      return `https://wa.me/${num}?text=${encodeURIComponent(txt)}`;
+    }
+
+    function renderizarCardOS(os, modoGestor = false) {
+      const rascLocal = localStorage.getItem(`emed_rascunho_os_${os.id}`);
+      const temRasc = Boolean(rascLocal || (os.rascunho_servidor && Object.keys(os.rascunho_servidor).length > 0));
+      const tagRasc = (temRasc && os.status !== 'CONCLUÍDO')
+        ? `<span class="badge" style="background:rgba(56,189,248,0.2); color:#38bdf8; border:1px solid #0284c7;">💾 Rascunho Salvo</span>`
+        : '';
+
+      const tagPend = os.tem_pendencia_real
+        ? `<div style="margin-top:6px; font-size:12px; color:#fbbf24; background:rgba(245,158,11,0.12); padding:5px 8px; border-radius:6px; border-left:3px solid #f59e0b;">
+             <b>⚠️ Pendência Técnica:</b> ${os.pendencias_limpa}
+           </div>`
+        : '';
+
+      const botoesAbertas = os.status !== 'CONCLUÍDO'
+        ? `<button class="btn btn-outline" onclick="registrarCheckin('${os.id}')">📍 Check-in ${os.checkin_hora ? '(' + os.checkin_hora.split(' ').pop() + ')' : ''}</button>
+           <button class="btn btn-primary" onclick="abrirModalOS('${os.id}')">🛠️ Preencher / Fechar OS</button>`
+        : `<button class="btn btn-outline" onclick="abrirModalOS('${os.id}')">✏️ Editar / Anexar Fotos</button>
+           ${modoGestor ? `<button class="btn btn-warning" onclick="reabrirOS('${os.id}')">🔓 Reabrir OS</button>` : ''}`;
+
+      return `
+        <div class="os-card">
+          <div class="os-card-hdr">
+            <div>
+              <span style="font-size:16px; font-weight:900; color:var(--cyan);">OS #${os.id}</span>
+              <span style="font-size:15px; font-weight:800; color:#fff; margin-left:6px;">${os.cliente}</span>
+              <div style="font-size:12.5px; color:#38bdf8; font-weight:700; margin-top:2px;">
+                🔬 ${os.equipamento} <span style="color:var(--muted); font-weight:normal;">• [${os.tipo_servico}] • 📅 ${os.data_br}</span>
+              </div>
+            </div>
+            <div style="display:flex; gap:6px; align-items:center;">
+              ${tagRasc}
+              ${badgeStatusHTML(os.status)}
+            </div>
+          </div>
+          <div style="font-size:12.5px; color:#cbd5e1;">
+            <b>👷 Técnico:</b> ${os.tecnico_responsavel} ${os.tecnico_auxiliar ? ' + Aux: ' + os.tecnico_auxiliar : ''}
+            &nbsp;|&nbsp; <b>📍 Local:</b> ${os.endereco || os.cidade}
+            ${os.responsavel_hospital ? ` &nbsp;|&nbsp; <b>👤 Resp.:</b> ${os.responsavel_hospital}` : ''}
+          </div>
+          <div style="font-size:12.5px; color:#f8fafc; background:#0b132b; padding:7px 10px; border-radius:6px; margin-top:6px; border:1px solid #1e293b;">
+            ${os.status === 'CONCLUÍDO'
+              ? `<b style="color:#34d399;">🛠️ Serviço Executado:</b> ${os.servico_executado || 'Manutenção concluída.'}`
+              : `<b style="color:#f59e0b;">📢 Defeito / Solicitação:</b> ${os.defeito_relatado || os.pendencias_limpa || 'Manutenção programada'}`}
+          </div>
+          ${tagPend}
+          <div class="os-actions">
+            ${botoesAbertas}
+            <a class="btn btn-success" href="/api/pdf/${os.id}" target="_blank">📄 Baixar PDF (1 Pág)</a>
+            <a class="btn btn-outline" href="/api/html/${os.id}" target="_blank">🌐 Ver Folha A4</a>
+            <a class="btn btn-wa" href="${gerarLinkWhatsAppOS(os)}" target="_blank">💬 WhatsApp + Google 5★</a>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderizarListaTecnico() {
+      const tecSel = document.getElementById('sel-tec-filtro').value;
+      localStorage.setItem('emed_tec_preferido', tecSel);
+      const stFiltro = document.getElementById('sel-st-tec').value;
+      const busca = (document.getElementById('inp-busca-tec').value || '').toUpperCase().trim();
+
+      const filtradas = STATE.ordens.filter(o => {
+        if (tecSel !== 'TODOS' && o.tecnico_responsavel.toUpperCase() !== tecSel && !o.tecnico_auxiliar.toUpperCase().includes(tecSel)) {
+          return false;
+        }
+        if (stFiltro === 'ABERTAS' && (o.status === 'CONCLUÍDO' || o.status.includes('OBSERVA'))) return false;
+        if (stFiltro === 'OBSERVACAO' && !o.status.includes('OBSERVA')) return false;
+        if (stFiltro === 'CONCLUIDO' && o.status !== 'CONCLUÍDO') return false;
+        if (busca) {
+          const alvo = `${o.id} ${o.cliente} ${o.equipamento} ${o.defeito_relatado} ${o.cidade}`.toUpperCase();
+          if (!alvo.includes(busca)) return false;
+        }
+        return true;
+      });
+
+      const box = document.getElementById('lista-os-tecnico');
+      if (!filtradas.length) {
+        box.innerHTML = `<div class="os-card" style="text-align:center; color:var(--muted);">Nenhuma Ordem de Serviço encontrada para este filtro.</div>`;
+        return;
+      }
+      box.innerHTML = filtradas.map(o => renderizarCardOS(o, false)).join('');
+    }
+
+    /* GESTOR */
+    function renderizarKPIsGestor() {
+      const k = STATE.kpis;
+      document.getElementById('gestor-kpis').innerHTML = `
+        <div class="kpi-card" style="border-left-color:#ef4444;">
+          <div class="kpi-lbl">🚨 OS Ativas em Campo</div>
+          <div class="kpi-val">${k.ativas || 0}</div>
+        </div>
+        <div class="kpi-card" style="border-left-color:#10b981;">
+          <div class="kpi-lbl">✅ OS Concluídas</div>
+          <div class="kpi-val">${k.concluidas || 0}</div>
+        </div>
+        <div class="kpi-card" style="border-left-color:#8b5cf6;">
+          <div class="kpi-lbl">🔬 Em Observação / Teste</div>
+          <div class="kpi-val">${k.observacao || 0}</div>
+        </div>
+        <div class="kpi-card" style="border-left-color:#f59e0b;">
+          <div class="kpi-lbl">⚠️ Pendências Técnicas</div>
+          <div class="kpi-val">${(k.pendencias_urgentes || 0) + (k.pendencias_programadas || 0)}</div>
+        </div>
+        <div class="kpi-card" style="border-left-color:#38bdf8;">
+          <div class="kpi-lbl">💰 Faturamento OS</div>
+          <div class="kpi-val">R$ ${(k.faturamento_total || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}</div>
+        </div>
+      `;
+    }
+
+    function abrirAbaGestor(aba) {
+      STATE.abaGestor = aba;
+      ['os', 'tv', 'almox', 'pix', 'cfg'].forEach(a => {
+        document.getElementById(`gtab-${a}`).style.display = a === aba ? 'block' : 'none';
+        document.getElementById(`gtab-btn-${a}`).classList.toggle('active', a === aba);
+      });
+    }
+
+    function renderizarListaGestor() {
+      const st = document.getElementById('sel-st-gestor').value;
+      const busca = (document.getElementById('inp-busca-gestor').value || '').toUpperCase().trim();
+      const filtradas = STATE.ordens.filter(o => {
+        if (st === 'ATIVO' && (o.status === 'CONCLUÍDO' || o.status.includes('OBSERVA'))) return false;
+        if (st === 'OBSERVACAO' && !o.status.includes('OBSERVA')) return false;
+        if (st === 'CONCLUÍDO' && o.status !== 'CONCLUÍDO') return false;
+        if (busca) {
+          const txt = `${o.id} ${o.cliente} ${o.equipamento} ${o.tecnico_responsavel} ${o.defeito_relatado}`.toUpperCase();
+          if (!txt.includes(busca)) return false;
+        }
+        return true;
+      });
+      document.getElementById('lista-os-gestor').innerHTML = filtradas.map(o => renderizarCardOS(o, true)).join('');
+    }
+
+    function renderizarTVLaboratorio() {
+      const comPend = STATE.ordens.filter(o => o.tem_pendencia_real);
+      const urg = comPend.filter(o => o.prioridade_pendencia === 'URGENTE');
+      const prog = comPend.filter(o => o.prioridade_pendencia !== 'URGENTE');
+
+      const cardTV = (o, cor) => `
+        <div style="background:#0b132b; border-left:5px solid ${cor}; border-radius:8px; padding:12px; border:1px solid #334155;">
+          <div style="display:flex; justify-content:space-between; font-weight:900; font-size:15px; color:#fff;">
+            <span>OS #${o.id} — ${o.cliente}</span>
+            <span style="color:${cor};">${o.prioridade_pendencia}</span>
+          </div>
+          <div style="font-size:13px; color:#38bdf8; font-weight:700; margin-top:2px;">🔬 ${o.equipamento} • 👷 Técnico: ${o.tecnico_responsavel}</div>
+          <div style="font-size:13.5px; color:#fde68a; margin-top:6px; font-weight:700;">🔩 Pendência: ${o.pendencias_limpa}</div>
+        </div>
+      `;
+
+      document.getElementById('tv-lista-urgente').innerHTML = urg.length
+        ? urg.map(o => cardTV(o, '#ef4444')).join('')
+        : `<div style="color:var(--muted); padding:14px;">✅ Nenhuma máquina parada com pendência crítica no momento.</div>`;
+
+      document.getElementById('tv-lista-programada').innerHTML = prog.length
+        ? prog.map(o => cardTV(o, '#f59e0b')).join('')
+        : `<div style="color:var(--muted); padding:14px;">✅ Nenhuma pendência programada acumulada.</div>`;
+    }
+
+    function alternarTelaCheiaTV() {
+      const el = document.getElementById('gtab-tv');
+      if (!document.fullscreenElement) el.requestFullscreen().catch(() => {});
+      else document.exitFullscreen().catch(() => {});
+    }
+
+    function renderizarEstoqueGestor() {
+      const boxDem = document.getElementById('lista-demandas-almox');
+      boxDem.innerHTML = STATE.solicitacoes_almox.length
+        ? STATE.solicitacoes_almox.map(s => `
+            <div style="background:#0b132b; padding:10px; border-radius:8px; border:1px solid #334155; font-size:12.5px;">
+              <div style="display:flex; justify-content:space-between; font-weight:800; color:var(--cyan);">
+                <span>Pedido #${s.id} • 👷 ${s.tecnico}</span>
+                <span style="color:#fbbf24;">${s.status_pedido}</span>
+              </div>
+              <div style="color:#fff; font-weight:700; margin-top:3px;">🏥 ${s.destino_cliente}</div>
+              <div style="color:#cbd5e1; margin-top:3px;">📦 ${s.itens_solicitados}</div>
+              <div style="display:flex; gap:6px; margin-top:8px;">
+                <button class="btn btn-success" style="padding:4px 8px; font-size:11px;" onclick="atualizarPedidoAlmox(${s.id}, 'SEPARADO / ENTREGUE AO TÉCNICO')">✅ Marcar Separado</button>
+                <button class="btn btn-outline" style="padding:4px 8px; font-size:11px;" onclick="atualizarPedidoAlmox(${s.id}, 'ESTORNADO AO ESTOQUE')">🔄 Estornar</button>
+              </div>
+            </div>
+          `).join('')
+        : `<div style="color:var(--muted);">Nenhuma solicitação pendente.</div>`;
+
+      const busca = (document.getElementById('inp-busca-estoque').value || '').toUpperCase().trim();
+      const itens = STATE.estoque.filter(e => !busca || `${e.codigo} ${e.nome_peca} ${e.categoria}`.toUpperCase().includes(busca));
+      document.getElementById('lista-estoque-gestor').innerHTML = itens.map(e => `
+        <div style="background:#0b132b; padding:9px 11px; border-radius:8px; border:1px solid #233554; display:flex; justify-content:space-between; align-items:center; font-size:12.5px;">
+          <div>
+            <b style="color:#fff;">${e.codigo} — ${e.nome_peca}</b>
+            <div style="font-size:11px; color:var(--muted);">Categoria: ${e.categoria} • R$ ${e.preco_unitario.toFixed(2)} ${e.validade_calibracao ? ' • ' + e.badge_calibracao : ''}</div>
+          </div>
+          <span class="badge" style="background:${e.quantidade > 0 ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}; color:${e.quantidade > 0 ? '#34d399' : '#fca5a5'};">
+            Saldo: ${e.quantidade}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    async function atualizarPedidoAlmox(id, novoStatus) {
+      const r = await fetch('/api/almoxarifado/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, novo_status: novoStatus })
+      });
+      const d = await r.json();
+      mostrarToast(d.msg || 'Status atualizado!');
+      carregarDadosServidor();
+    }
+
+    function renderizarFinanceiroGestor() {
+      const box = document.getElementById('lista-notas-fiscais');
+      box.innerHTML = STATE.notas_fiscais.length
+        ? STATE.notas_fiscais.map(n => `
+            <div style="background:#0b132b; padding:10px; border-radius:8px; border:1px solid #334155; font-size:12.5px;">
+              <div style="display:flex; justify-content:space-between; font-weight:800;">
+                <span style="color:var(--cyan);">OS #${n.os_id} — ${n.cliente}</span>
+                <span style="color:#34d399;">R$ ${n.valor_total.toFixed(2)}</span>
+              </div>
+              <div style="color:#cbd5e1; margin-top:3px;">${n.descricao}</div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                <span style="font-size:11px; color:#fbbf24;">${n.status_fiscal}</span>
+                <button class="btn btn-success" style="padding:4px 8px; font-size:11px;" onclick="liquidarPixOS('${n.os_id}')">✅ Liquidar Recebimento</button>
+              </div>
+            </div>
+          `).join('')
+        : `<div style="color:var(--muted);">Nenhum faturamento registrado.</div>`;
+    }
+
+    function preencherValorPixOS() {
+      const sel = document.getElementById('sel-pix-os');
+      const opt = sel.options[sel.selectedIndex];
+      const v = parseFloat(opt.getAttribute('data-val') || '0');
+      if (v > 0) document.getElementById('inp-pix-valor').value = v.toFixed(2);
+    }
+
+    async function gerarPixApp() {
+      const os_id = document.getElementById('sel-pix-os').value;
+      const valor = parseFloat(document.getElementById('inp-pix-valor').value || '0');
+      const chave_pix = document.getElementById('inp-pix-chave').value;
+      const r = await fetch('/api/pix/gerar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ os_id, valor, chave_pix })
+      });
+      const d = await r.json();
+      if (d.ok) {
+        document.getElementById('box-resultado-pix').style.display = 'block';
+        document.getElementById('img-qr-pix').src = d.qr_base64;
+        document.getElementById('txt-pix-emv').value = d.payload_emv;
+        mostrarToast('✅ QR Code PIX Oficial gerado com sucesso!');
+      } else {
+        mostrarToast('⚠️ ' + d.msg);
+      }
+    }
+
+    function copiarPixEmv() {
+      const txt = document.getElementById('txt-pix-emv');
+      txt.select();
+      navigator.clipboard.writeText(txt.value);
+      mostrarToast('📋 Código PIX Copia e Cola copiado!');
+    }
+
+    async function liquidarPixOS(os_id) {
+      const r = await fetch('/api/pix/liquidar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ os_id })
+      });
+      const d = await r.json();
+      mostrarToast(d.msg || 'Liquidado!');
+      carregarDadosServidor();
+    }
+
+    async function salvarConfigGoogle() {
+      const url = document.getElementById('inp-cfg-google-url').value.trim();
+      const r = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ google_review_url: url })
+      });
+      const d = await r.json();
+      if (d.ok) {
+        STATE.google_review_url = d.google_review_url;
+        mostrarToast(d.msg);
+      }
+    }
+
+    /* CHECKIN & MODAL DE FECHAMENTO DE OS */
+    async function registrarCheckin(os_id) {
+      if (!navigator.onLine) {
+        mostrarToast('📍 Check-in salvo localmente no celular!');
+        return;
+      }
+      const r = await fetch('/api/checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ os_id })
+      });
+      const d = await r.json();
+      mostrarToast(d.msg || 'Check-in registrado!');
+      carregarDadosServidor();
+    }
+
+    async function reabrirOS(os_id) {
+      const r = await fetch('/api/reabrir-os', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ os_id })
+      });
+      const d = await r.json();
+      mostrarToast(d.msg);
+      carregarDadosServidor();
+    }
+
+    async function abrirModalOS(os_id) {
+      const os = STATE.ordens.find(o => o.id === String(os_id));
+      if (!os) return;
+      STATE.osAbertaModal = os;
+      STATE.fotoAntesB64 = '';
+      STATE.fotoDepoisB64 = '';
+      document.getElementById('prev-foto-antes').style.display = 'none';
+      document.getElementById('prev-foto-depois').style.display = 'none';
+      document.getElementById('inp-foto-antes').value = '';
+      document.getElementById('inp-foto-depois').value = '';
+
+      // Verifica se há rascunho salvo no celular ou no servidor
+      let rasc = {};
+      try {
+        const localStr = localStorage.getItem(`emed_rascunho_os_${os.id}`);
+        if (localStr) rasc = JSON.parse(localStr);
+        else if (os.rascunho_servidor) rasc = os.rascunho_servidor;
+      } catch (e) {}
+
+      document.getElementById('mod-os-id').value = os.id;
+      document.getElementById('mod-titulo-os').innerText = `🛠️ OS #${os.id} — ${os.cliente} (${os.equipamento})`;
+      document.getElementById('mod-tec-resp').value = rasc.tecnico_responsavel || os.tecnico_responsavel || 'ANTONIO';
+      document.getElementById('mod-tec-aux').value = rasc.tecnico_auxiliar !== undefined ? rasc.tecnico_auxiliar : os.tecnico_auxiliar;
+      document.getElementById('mod-defeito').value = rasc.defeito_relatado !== undefined ? rasc.defeito_relatado : os.defeito_relatado;
+      document.getElementById('mod-problema').value = rasc.problemas_encontrados !== undefined ? rasc.problemas_encontrados : os.problemas_encontrados;
+      document.getElementById('mod-servico-exec').value = rasc.servico_executado !== undefined ? rasc.servico_executado : os.servico_executado;
+      document.getElementById('mod-chk-pop').value = rasc.checklist_pop || os.checklist_pop || 'LIMPEZA TÉCNICA, TESTE FUNCIONAL COM OPERADOR, INSPEÇÃO DE CABOS E SEGURANÇA';
+      document.getElementById('mod-parametros').value = rasc.parametros_medidos || os.parametros_medidos || '-';
+      document.getElementById('mod-peca').value = rasc.peca_selecionada || '';
+      document.getElementById('mod-cond-final').value = rasc.condicao_final || os.condicao_final || 'LIBERADO PARA USO NORMAL';
+      document.getElementById('mod-prio-pend').value = rasc.prioridade_pendencia || (os.tem_pendencia_real ? os.prioridade_pendencia : 'NENHUMA');
+      document.getElementById('mod-inst-prox').value = rasc.instrumento_necessario !== undefined ? rasc.instrumento_necessario : os.instrumento_necessario.replace(/^\[.*?\]\s*/, '');
+      document.getElementById('mod-obs-gerais').value = rasc.observacoes_gerais || os.observacoes_gerais || '';
+      document.getElementById('mod-valor-os').value = rasc.valor_os !== undefined ? rasc.valor_os : os.valor_os;
+      document.getElementById('mod-ass-nome').value = rasc.assinatura_cliente || os.assinatura_cliente || os.responsavel_hospital || '';
+
+      limparCanvasAssinatura();
+      document.getElementById('modal-os').classList.add('open');
+
+      // Carrega checklist sugerido da API
+      try {
+        const res = await fetch(`/api/checklist?equipamento=${encodeURIComponent(os.equipamento)}&defeito=${encodeURIComponent(os.defeito_relatado)}`);
+        const d = await res.json();
+        if (d.ok) {
+          STATE.sugestaoIaAtual = d.sugestao_ia || '';
+          document.getElementById('mod-checklist-box').innerHTML = (d.acoes || []).map((ac, i) => `
+            <label class="chk-item">
+              <input type="checkbox" class="chk-acao-it" value="${ac.replace(/"/g, '&quot;')}"/>
+              <span>${ac}</span>
+            </label>
+          `).join('');
+        }
+      } catch (e) {}
+    }
+
+    function fecharModalOS() {
+      document.getElementById('modal-os').classList.remove('open');
+    }
+
+    function coletarDadosModalOS() {
+      return {
+        os_id: document.getElementById('mod-os-id').value,
+        tecnico_responsavel: document.getElementById('mod-tec-resp').value,
+        tecnico_auxiliar: document.getElementById('mod-tec-aux').value,
+        defeito_relatado: document.getElementById('mod-defeito').value,
+        problemas_encontrados: document.getElementById('mod-problema').value,
+        servico_executado: document.getElementById('mod-servico-exec').value,
+        checklist_pop: document.getElementById('mod-chk-pop').value,
+        parametros_medidos: document.getElementById('mod-parametros').value,
+        peca_selecionada: document.getElementById('mod-peca').value || 'NENHUMA PEÇA',
+        condicao_final: document.getElementById('mod-cond-final').value,
+        prioridade_pendencia: document.getElementById('mod-prio-pend').value,
+        instrumento_necessario: document.getElementById('mod-inst-prox').value,
+        observacoes_gerais: document.getElementById('mod-obs-gerais').value,
+        valor_os: parseFloat(document.getElementById('mod-valor-os').value || '0'),
+        assinatura_cliente: document.getElementById('mod-ass-nome').value
+      };
+    }
+
+    let timerRascunho = null;
+    function autoSalvarRascunhoLocal() {
+      const dados = coletarDadosModalOS();
+      if (!dados.os_id) return;
+      // 1. Salva imediatamente no celular (0ms)
+      localStorage.setItem(`emed_rascunho_os_${dados.os_id}`, JSON.stringify(dados));
+      document.getElementById('mod-sub-os').innerText = `💾 Salvo automaticamente no celular às ${new Date().toLocaleTimeString()}`;
+
+      // 2. Sincroniza em background com o servidor SQLite
+      clearTimeout(timerRascunho);
+      timerRascunho = setTimeout(async () => {
+        if (!navigator.onLine) return;
+        try {
+          await fetch('/api/rascunho', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ os_id: dados.os_id, dados })
+          });
+        } catch (e) {}
+      }, 600);
+    }
+
+    function inserirChecklistMarcado() {
+      const marcados = [...document.querySelectorAll('.chk-acao-it:checked')].map(el => el.value);
+      if (!marcados.length) {
+        mostrarToast('⚠️ Marque pelo menos um item no checklist acima!');
+        return;
+      }
+      const bloco = 'SERVIÇOS EXECUTADOS CONFORME PROTOCOLO TÉCNICO EMED:\n' + marcados.map(m => `• ${m}`).join('\n');
+      const area = document.getElementById('mod-servico-exec');
+      area.value = area.value.trim() ? `${area.value.trim()}\n\n${bloco}` : bloco;
+      autoSalvarRascunhoLocal();
+      mostrarToast(`✅ ${marcados.length} ações inseridas no relatório!`);
+    }
+
+    function aplicarSugestaoCompletaIA() {
+      if (STATE.sugestaoIaAtual) {
+        document.getElementById('mod-servico-exec').value = STATE.sugestaoIaAtual;
+        autoSalvarRascunhoLocal();
+        mostrarToast('⚡ Sugestão do protocolo clínico inserida!');
+      }
+    }
+
+    function processarFotoUpload(input, tipo) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxW = 900;
+          const scale = img.width > maxW ? maxW / img.width : 1;
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const b64 = canvas.toDataURL('image/jpeg', 0.82);
+          if (tipo === 'antes') {
+            STATE.fotoAntesB64 = b64;
+            const p = document.getElementById('prev-foto-antes');
+            p.src = b64;
+            p.style.display = 'block';
+          } else {
+            STATE.fotoDepoisB64 = b64;
+            const p = document.getElementById('prev-foto-depois');
+            p.src = b64;
+            p.style.display = 'block';
+          }
+          mostrarToast(`📸 Foto (${tipo.toUpperCase()}) pronta para o PDF da OS!`);
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    /* CANVAS ASSINATURA TOUCH */
+    const canvasSig = document.getElementById('canvas-assinatura');
+    const ctxSig = canvasSig.getContext('2d');
+    let desenhandoSig = false;
+
+    function posCanvas(e) {
+      const r = canvasSig.getBoundingClientRect();
+      const t = e.touches ? e.touches[0] : e;
+      return {
+        x: (t.clientX - r.left) * (canvasSig.width / r.width),
+        y: (t.clientY - r.top) * (canvasSig.height / r.height)
+      };
+    }
+    function iniSig(e) {
+      e.preventDefault();
+      desenhandoSig = true;
+      STATE.assinaturaDesenhada = true;
+      const p = posCanvas(e);
+      ctxSig.beginPath();
+      ctxSig.moveTo(p.x, p.y);
+    }
+    function movSig(e) {
+      if (!desenhandoSig) return;
+      e.preventDefault();
+      const p = posCanvas(e);
+      ctxSig.lineWidth = 2.4;
+      ctxSig.lineCap = 'round';
+      ctxSig.strokeStyle = '#0b132b';
+      ctxSig.lineTo(p.x, p.y);
+      ctxSig.stroke();
+    }
+    function fimSig() { desenhandoSig = false; }
+
+    canvasSig.addEventListener('mousedown', iniSig);
+    canvasSig.addEventListener('mousemove', movSig);
+    window.addEventListener('mouseup', fimSig);
+    canvasSig.addEventListener('touchstart', iniSig, { passive: false });
+    canvasSig.addEventListener('touchmove', movSig, { passive: false });
+    window.addEventListener('touchend', fimSig);
+
+    function limparCanvasAssinatura() {
+      ctxSig.clearRect(0, 0, canvasSig.width, canvasSig.height);
+      STATE.assinaturaDesenhada = false;
+    }
+
+    async function submeterOS(acao) {
+      const payload = coletarDadosModalOS();
+      payload.acao = acao;
+      if (STATE.fotoAntesB64) payload.foto_antes_b64 = STATE.fotoAntesB64;
+      if (STATE.fotoDepoisB64) payload.foto_depois_b64 = STATE.fotoDepoisB64;
+      if (STATE.assinaturaDesenhada) {
+        payload.assinatura_cliente_img = canvasSig.toDataURL('image/png');
+      }
+
+      if (!navigator.onLine) {
+        const fila = obterFilaOffline();
+        fila.push(payload);
+        salvarFilaOffline(fila);
+        fecharModalOS();
+        mostrarToast('🟠 Sem sinal no momento: OS salva na Fila Offline do celular! Sincronizará automaticamente assim que a rede voltar.');
+        return;
+      }
+
+      try {
+        const r = await fetch('/api/salvar-os', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const d = await r.json();
+        if (d.ok) {
+          if (acao === 'CONCLUIR') {
+            localStorage.removeItem(`emed_rascunho_os_${payload.os_id}`);
+          }
+          fecharModalOS();
+          mostrarToast(d.msg);
+          carregarDadosServidor();
+        } else {
+          mostrarToast('⚠️ ' + (d.msg || 'Erro ao salvar OS'));
+        }
+      } catch (e) {
+        const fila = obterFilaOffline();
+        fila.push(payload);
+        salvarFilaOffline(fila);
+        fecharModalOS();
+        mostrarToast('🟠 Oscilação de rede: OS guardada no cofre offline do celular para sincronização automática!');
+      }
+    }
+
+    /* NOVA OS GESTOR */
+    function abrirModalNovaOS() {
+      document.getElementById('modal-nova-os').classList.add('open');
+    }
+
+    async function criarNovaOSGestor() {
+      const payload = {
+        cliente: document.getElementById('nova-cli').value,
+        equipamento: document.getElementById('nova-eq').value,
+        tipo_servico: document.getElementById('nova-tipo').value,
+        tecnico_responsavel: document.getElementById('nova-tec').value,
+        responsavel_hospital: document.getElementById('nova-resp').value,
+        whatsapp: document.getElementById('nova-whats').value,
+        defeito_relatado: document.getElementById('nova-defeito').value
+      };
+      const r = await fetch('/api/nova-os', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const d = await r.json();
+      if (d.ok) {
+        document.getElementById('modal-nova-os').classList.remove('open');
+        mostrarToast(d.msg);
+        carregarDadosServidor();
+      } else {
+        mostrarToast('⚠️ ' + d.msg);
+      }
+    }
+
+    /* TRIAGEM DINÂMICA (EMED ONLINE) */
+    function setSintomaTriagem(txt) {
+      document.getElementById('tri-defeito').value = txt;
+      atualizarPerguntasTriagem();
+    }
+
+    let timerTriagem = null;
+    function atualizarPerguntasTriagem() {
+      clearTimeout(timerTriagem);
+      timerTriagem = setTimeout(async () => {
+        const eq = document.getElementById('tri-equip').value;
+        const def = document.getElementById('tri-defeito').value;
+        try {
+          const r = await fetch(`/api/triagem?equipamento=${encodeURIComponent(eq)}&defeito=${encodeURIComponent(def)}`);
+          const d = await r.json();
+          if (d.ok && d.triagem) {
+            const t = d.triagem;
+            document.getElementById('tri-cat-titulo').innerText = `${t.icone || '🎯'} ${t.categoria}`;
+            const pList = [t.p1, t.p2, t.p3].filter(Boolean);
+            document.getElementById('tri-perguntas-container').innerHTML = pList.map((p, idx) => `
+              <div style="margin-bottom:10px;">
+                <div style="font-size:12.5px; font-weight:700; color:#e2e8f0; margin-bottom:4px;">${p.pergunta}</div>
+                <select class="tri-resp-sel" id="tri-sel-p${idx}">
+                  ${(p.opcoes || []).map(op => `<option value="${op}">${op}</option>`).join('')}
+                </select>
+              </div>
+            `).join('');
+          }
+        } catch (e) {}
+      }, 250);
+    }
+
+    async function confirmarAberturaTriagem() {
+      const cliente = document.getElementById('tri-cliente').value.trim();
+      const equipamento = document.getElementById('tri-equip').value.trim();
+      const defeito_relatado = document.getElementById('tri-defeito').value.trim();
+      const responsavel_hospital = document.getElementById('tri-resp').value.trim();
+      const whatsapp = document.getElementById('tri-whats').value.trim();
+      if (!cliente || !defeito_relatado || !responsavel_hospital) {
+        mostrarToast('⚠️ Preencha a Instituição, a descrição do problema e seu Nome.');
+        return;
+      }
+      const resps = [...document.querySelectorAll('.tri-resp-sel')].map(s => s.value);
+      const todasNao = resps.length === 3 && resps.every(v => v.toUpperCase().includes('NÃO') || v.toUpperCase().includes('NENHUMA'));
+
+      const r = await fetch('/api/nova-os', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cliente,
+          equipamento,
+          defeito_relatado,
+          responsavel_hospital,
+          whatsapp,
+          respostas_triagem: resps.join(' | ')
+        })
+      });
+      const d = await r.json();
+      if (d.ok) {
+        if (todasNao) {
+          alert(`✅ Chamado #${d.os_id} aberto com sucesso! Nossa equipe técnica entrará em contato para mais informações sobre o problema.`);
+        } else {
+          mostrarToast(d.msg);
+        }
+        document.getElementById('tri-defeito').value = '';
+        carregarDadosServidor();
+      }
+    }
+
+    // Inicialização automática
+    (function init() {
+      const params = new URLSearchParams(window.location.search);
+      const m = params.get('modo');
+      if (m === 'gestor' || m === 'cliente' || m === 'tecnico') {
+        alternarModoApp(m);
+      }
+      atualizarStatusRede();
+      carregarDadosServidor();
+      // Auto-refresh para a TV do Laboratório e sincronismo a cada 20s
+      setInterval(() => {
+        if (navigator.onLine && !document.getElementById('modal-os').classList.contains('open')) {
+          carregarDadosServidor();
+        }
+      }, 20000);
+    })();
+  </script>
+</body>
+</html>

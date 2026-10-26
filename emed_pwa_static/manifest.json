@@ -1,0 +1,22 @@
+{
+  "name": "EMED Eletromedicina — App Oficial (Técnico & Gestor)",
+  "short_name": "EMED App",
+  "description": "Aplicativo Oficial de Engenharia Clínica, Ordens de Serviço Offline, Almoxarifado e Gestão Hospitalar da EMED Eletromedicina.",
+  "start_url": "/?modo=tecnico",
+  "display": "standalone",
+  "background_color": "#0b132b",
+  "theme_color": "#0b132b",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/api/logo",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/api/logo",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
