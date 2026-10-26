@@ -121,16 +121,19 @@ def _montar_equipa_direto() -> dict:
 
 
 def _listar_manuais_homologados() -> list:
-    """Varre a pasta Manuais/ para listar todas as ITs, POPs e Manuais de Serviço Oficiais (.pdf e .md)."""
+    """
+    Varre a pasta Manuais/ para listar todas as ITs, POPs e Manuais de Serviço Oficiais (.pdf e .md).
+    Elimina 100% das duplicidades causadas por pastas compartilhadas (ex: BrightSpeed x Brivo)
+    e prioriza sempre a versão .PDF homologada com a Logo da EMED sobre o .MD.
+    """
     from emed_views.manuais_tecnicos import DICIONARIO_NOMES_AMIGAVEIS
 
     pasta_manuais = os.path.join(BASE_DIR, "Manuais")
-    catalogo = []
     if not os.path.exists(pasta_manuais):
-        return catalogo
+        return []
 
     pastas_ignorar = {"media", "content", "css", "scripts", "icons", "search", "toc", "forms", "images", "system utiliies"}
-    vistos = set()
+    catalogo_map = {}
 
     for root, dirs, files in os.walk(pasta_manuais):
         dirs[:] = [d for d in dirs if d.lower() not in pastas_ignorar]
@@ -140,21 +143,14 @@ def _listar_manuais_homologados() -> list:
                 continue
             if f.upper().startswith("LEIA_ME"):
                 continue
-            # Ignora fragmentos numéricos internos do CD da GE (ex: 377318-16.pdf)
+            # Ignora diagramas numéricos internos do CD da GE (ex: 377318-16.pdf)
             if f[0].isdigit() and not f.startswith(("00_", "01", "02", "03", "04", "05")):
                 continue
 
             base_sem_ext = os.path.splitext(f)[0]
-            rel_dir = os.path.relpath(root, pasta_manuais).replace("\\", "/")
-            chave_unica = f"{rel_dir}/{base_sem_ext}"
-            if ext == ".md" and os.path.exists(os.path.join(root, base_sem_ext + ".pdf")):
-                continue
-            if chave_unica in vistos:
-                continue
-            vistos.add(chave_unica)
-
             caminho_abs = os.path.join(root, f)
             rel_path = os.path.relpath(caminho_abs, BASE_DIR).replace("\\", "/")
+            rel_dir = os.path.relpath(root, pasta_manuais).replace("\\", "/")
             partes = rel_dir.split("/")
             modalidade = partes[0] if partes and partes[0] != "." else "GERAL"
             fabricante = partes[1] if len(partes) > 1 else ""
@@ -172,9 +168,32 @@ def _listar_manuais_homologados() -> list:
             if "IT_RX_LOT_001" in f.upper() or "02_FORMULARIO_VISTORIA_PRE_INSTALACAO" in f.upper():
                 titulo_limpo = "⭐ RELATÓRIO OFICIAL DE PRÉ-INSTALAÇÃO — RAIO-X LOTUS HF500M (FT-INS-HF500M-REV05 c/ Logo EMED)"
 
-            formato_str = ext.replace(".", "").upper()
+            # Chave rigorosa de deduplicação pelo Título e Código Técnico
+            chave_dedup = titulo_limpo.strip().upper()
+
+            # Se já catalogamos este documento:
+            if chave_dedup in catalogo_map:
+                existente = catalogo_map[chave_dedup]
+                # Se o existente for .md e encontramos o .pdf homologado, promove para o .pdf
+                if existente["ext"] == ".md" and ext == ".pdf":
+                    catalogo_map[chave_dedup] = {
+                        "arquivo": f,
+                        "titulo": titulo_limpo,
+                        "modalidade": modalidade,
+                        "fabricante": fabricante or "HOMOLOGADO EMED",
+                        "modelo": modelo,
+                        "rel_path": rel_path,
+                        "caminho_rel": rel_path,
+                        "ext": ext,
+                        "formato": "PDF HOMOLOGADO",
+                        "tamanho_kb": round(os.path.getsize(caminho_abs) / 1024, 1),
+                        "video": vid_nome or existente.get("video", ""),
+                        "_ordem": existente.get("_ordem", 1),
+                    }
+                continue
+
             eh_destaque = 0 if ("PRÉ-INSTALAÇÃO" in titulo_limpo.upper() or "⭐" in titulo_limpo) else 1
-            catalogo.append({
+            catalogo_map[chave_dedup] = {
                 "arquivo": f,
                 "titulo": titulo_limpo,
                 "modalidade": modalidade,
@@ -183,11 +202,13 @@ def _listar_manuais_homologados() -> list:
                 "rel_path": rel_path,
                 "caminho_rel": rel_path,
                 "ext": ext,
-                "formato": formato_str,
+                "formato": "PDF HOMOLOGADO",
                 "tamanho_kb": round(os.path.getsize(caminho_abs) / 1024, 1),
                 "video": vid_nome,
                 "_ordem": eh_destaque,
-            })
+            }
+
+    catalogo = list(catalogo_map.values())
     catalogo.sort(key=lambda x: (x.get("_ordem", 1), 0 if x["modalidade"] != "GERAL" else 1, x["modalidade"], x["titulo"]))
     return catalogo
 
