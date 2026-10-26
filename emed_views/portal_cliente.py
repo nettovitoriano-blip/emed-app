@@ -12,7 +12,7 @@ import datetime
 import pandas as pd
 import streamlit as st
 from emed_core import limpar_texto, obter_id_os
-from emed_services import AppContext, salvar_dados_seguro
+from emed_services import AppContext, salvar_dados_seguro, converter_html_para_pdf_bytes
 from emed_views.emedonline import _obter_perguntas_triagem_dinamica, _detectar_modalidade
 from emed_views.chamados_os import _gerar_html_os_formatada
 from emed_views.conciliacao_pix import gerar_payload_pix, gerar_qr_code_pix_base64
@@ -182,14 +182,31 @@ def render_portal_cliente(ctx: AppContext):
 
                 if "CONCLU" in st_os:
                     html_os = _gerar_html_os_formatada(str(num_os), r_os, getattr(ctx, "equipa_tecnica", {}))
-                    st.download_button(
-                        label="📄 Baixar Folha de OS Assinada (PDF/HTML)",
-                        data=html_os,
-                        file_name=f"OS_{num_os}.html",
-                        mime="text/html",
-                        key=f"dl_os_cliente_{idx_os}_{num_os}",
-                        use_container_width=True,
-                    )
+                    pdf_os_cli = None
+                    try:
+                        pdf_os_cli = converter_html_para_pdf_bytes(html_os)
+                    except Exception:
+                        pdf_os_cli = None
+                    c_dl1, c_dl2 = st.columns(2)
+                    with c_dl1:
+                        if pdf_os_cli:
+                            st.download_button(
+                                label="📄 Baixar Laudo Oficial da OS (PDF)",
+                                data=pdf_os_cli,
+                                file_name=f"Laudo_OS_{num_os}_EMED.pdf",
+                                mime="application/pdf",
+                                key=f"dl_pdf_os_cli_{idx_os}_{num_os}",
+                                use_container_width=True,
+                            )
+                    with c_dl2:
+                        st.download_button(
+                            label="🌐 Baixar Folha de OS Assinada (HTML)",
+                            data=html_os,
+                            file_name=f"OS_{num_os}.html",
+                            mime="text/html",
+                            key=f"dl_os_cliente_{idx_os}_{num_os}",
+                            use_container_width=True,
+                        )
 
     # =========================================================================
     # TAB 2: ABRIR NOVO CHAMADO
