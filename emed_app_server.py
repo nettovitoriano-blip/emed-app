@@ -849,6 +849,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
     df.at[idx_alvo, "checklist_pop"] = chk_pop
     df.at[idx_alvo, "parametros_medidos"] = param_med
     df.at[idx_alvo, "observacoes_gerais"] = obs_gerais
+    df.at[idx_alvo, "imprimir_observacoes"] = limpar_texto(body.get("imprimir_observacoes"), "SIM").upper()
     df.at[idx_alvo, "condicao_final"] = cond_final
     df.at[idx_alvo, "condicao_pagamento"] = resumo_pag
     df.at[idx_alvo, "valor_os"] = float(val_calc)

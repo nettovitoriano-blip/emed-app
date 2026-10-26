@@ -2659,11 +2659,9 @@
       if (!os) return;
       STATE.osAberta = os;
 
-      // Resetar buffers de anexos da OS atual
       window._fotosEvidenciaB64 = [];
       window._videoEvidenciaB64 = "";
 
-      // Mesclar com rascunho salvo no celular (localStorage) se existir
       const rascLocal = JSON.parse(localStorage.getItem(`emed_draft_${os.id}`) || "{}");
       const val = (campo, padrao = "") => (rascLocal[campo] !== undefined && rascLocal[campo] !== "") ? rascLocal[campo] : (os[campo] || padrao);
 
@@ -2671,7 +2669,7 @@
       const body = document.getElementById("modalOSBody");
       const tecnicos = (STATE.data.tecnicos || []).map(t => t.nome);
       
-      // Filtrar APENAS peças reais do estoque (não deve constar kits nem instrumentos)
+      // Filtrar APENAS peças reais (sem kits e sem ferramentas FER-)
       const estoquePecas = (STATE.data.estoque || []).filter(p => {
         const cat = (p.categoria || "").toUpperCase();
         const cod = (p.codigo || "").toUpperCase();
@@ -2683,6 +2681,7 @@
       const pecaManualAtual = val('peca_manual', '');
       const statusPropAtual = val('status_proposta', 'SEM_PROPOSTA');
       const diasObsAtual = val('dias_observacao', 7);
+      const impObsAtual = val('imprimir_observacoes', 'SIM');
 
       body.innerHTML = `
         <div class="section-box" style="background:#eff6ff;border-color:#93c5fd;">
@@ -2723,13 +2722,13 @@
           </div>
         </div>
 
-        <!-- CHECKLIST DE SUGESTÕES TÉCNICAS -->
+        <!-- CHECKLIST DE SUGESTÕES TÉCNICAS (CARREGAMENTO INSTANTÂNEO 0MS) -->
         <div class="section-box">
           <div class="section-title">
             <span>✅ Checklist de Sugestões Técnicas (Marque o que deseja incluir)</span>
             <button class="btn btn-primary btn-sm" onclick="aplicarItensChecklistSelecionados()">➕ Inserir Selecionados no Relatório</button>
           </div>
-          <div id="boxChecklistSugestoes" class="chk-list">Carregando sugestões do POP...</div>
+          <div id="boxChecklistSugestoes" class="chk-list"></div>
         </div>
 
         <div class="form-grid">
@@ -2743,7 +2742,7 @@
           </div>
         </div>
 
-        <!-- SERVIÇOS EXECUTADOS EM LETRAS MAIÚSCULAS -->
+        <!-- SERVIÇOS EXECUTADOS EM MAIÚSCULAS -->
         <div style="margin-bottom:12px;">
           <label class="field-label" style="font-weight:bold;color:#002b54;font-size:13px;">SERVIÇOS EXECUTADOS</label>
           <textarea id="osSrvExec" class="textarea" rows="4" style="text-transform:uppercase;" placeholder="DESCREVA AQUI OS SERVIÇOS TÉCNICOS EXECUTADOS..." oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('servico_executado'))}</textarea>
@@ -2785,6 +2784,18 @@
           </div>
         </div>
 
+        <!-- OBSERVAÇÕES GERAIS COM OPÇÃO DE SAIR OU NÃO NO LAUDO IMPRESSO -->
+        <div class="section-box">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:6px;">
+            <div class="section-title" style="margin:0;">📝 Observações Gerais da Ordem de Serviço</div>
+            <label style="font-size:12px;color:#0369a1;display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:bold;background:#e0f2fe;padding:4px 10px;border-radius:6px;">
+              <input type="checkbox" id="osImprimirObs" ${impObsAtual==='SIM'?'checked':''} onchange="autoSalvarRascunho()" />
+              <span>🖨️ Sair impresso no Laudo / PDF da OS</span>
+            </label>
+          </div>
+          <textarea id="osObsGerais" class="textarea" rows="2" style="text-transform:uppercase;" placeholder="OBSERVAÇÕES ADICIONAIS OU RECOMENDAÇÕES AO CLIENTE..." oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('observacoes_gerais'))}</textarea>
+        </div>
+
         <!-- FOTOS MÚLTIPLAS E VÍDEO CURTO -->
         <div class="section-box">
           <div class="section-title">📷 Fotos &amp; Vídeo da Evidência Técnica</div>
@@ -2802,17 +2813,25 @@
           </div>
         </div>
 
-        <!-- ASSINATURA TOUCH COM OPÇÃO EM TELA CHEIA -->
+        <!-- ASSINATURA TOUCH COM BOTÃO 'ASSINATURA RESPONSÁVEL' ABAIXO DO NOME -->
         <div class="section-box">
           <div class="section-title">
-            <span>✍️ Assinatura do Cliente (Responsável do Hospital)</span>
-            <div style="display:flex;gap:6px;">
-              <button class="btn btn-primary btn-sm" onclick="abrirAssinaturaTelaCheia()">🔍 Assinar em Tela Cheia</button>
-              <button class="btn btn-outline btn-sm" onclick="limparCanvasAssinatura()">🧹 Limpar</button>
-            </div>
+            <span>✍️ Validação do Cliente / Responsável do Hospital</span>
+            <button type="button" class="btn btn-outline btn-sm" onclick="limparCanvasAssinatura()">🧹 Limpar</button>
           </div>
-          <input id="osAssNome" class="input" placeholder="Nome legível e Cargo do recebedor no hospital" value="${esc(val('assinatura_cliente', os.responsavel_hospital))}" style="margin-bottom:8px;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();" />
-          <canvas id="canvasAssinatura" class="sig-canvas" width="600" height="140"></canvas>
+          <label class="field-label">Nome do Responsável Local</label>
+          <input id="osAssNome" class="input" placeholder="NOME LEGÍVEL E CARGO DO RECEBEDOR NO HOSPITAL" value="${esc(val('assinatura_cliente', os.responsavel_hospital))}" style="margin-bottom:8px;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();" />
+          
+          <div style="margin-bottom:10px;">
+            <button type="button" class="btn btn-primary" style="width:100%;padding:12px;font-size:14px;font-weight:bold;" onclick="abrirModalAssinaturaDedicada()">
+              ✍️ Assinatura Responsável
+            </button>
+          </div>
+
+          <div style="position:relative;background:#fff;border-radius:8px;text-align:center;">
+            <canvas id="canvasAssinatura" class="sig-canvas" width="600" height="150" style="touch-action:none;user-select:none;-webkit-user-select:none;width:100%;height:150px;border:2px dashed #0077b6;border-radius:8px;background:#ffffff;"></canvas>
+            <div style="font-size:11.5px;color:#64748b;margin-top:4px;">Rubrica registrada acima (toque no botão para assinar com mais conforto).</div>
+          </div>
         </div>
 
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;">
@@ -2854,23 +2873,75 @@
       }
     }
 
-    async function carregarChecklistModal() {
+    // CHECKLIST POP COM RESPOSTA INSTANTÂNEA OFFLINE (ZERO ESPERA)
+    const BANCO_CHECKLIST_IMEDIATO = {
+      RX: [
+        "Inspeção geral da estativa, mesa de exames e cabeçote monobloco",
+        "Aferição radiométrica de kVp, mA e tempo com multímetro calibrado",
+        "Teste de repetibilidade e linearidade da taxa de kerma no ar (RDC 611)",
+        "Checagem do estado dos cabos de alta tensão e aterramento de carcaça",
+        "Revisão dos freios mecânicos e fluidez de movimentação de todos os eixos",
+        "Equipamento aprovado nos ensaios de segurança e liberado para uso médico"
+      ],
+      TOMO: [
+        "Verificação de alinhamento óptico dos lasers e centralização de isocentro",
+        "Checagem do Slip Ring, escovas de contato e balanceamento de Gantry",
+        "Inspeção do sistema de refrigeração do tubo de raios-X e óleo dielétrico",
+        "Teste de ruído, número de CT (Hounsfield) e uniformidade com phantom",
+        "Varredura de calibração detailed cal e testes de segurança de rotação",
+        "Tomógrafo homologado e liberado para rotina diagnóstica"
+      ],
+      MAMO: [
+        "Inspeção da pá de compressão, força limite (15 a 20 daN) e alinhamento",
+        "Aferição de kVp, filtração Mo/Rh e camada semi-redutora (CSR)",
+        "Teste de qualidade de imagem com phantom de mamografia (microcalcificações e massas)",
+        "Checagem do sistema AEC (controle automático de exposição)",
+        "Mamógrafo validado conforme protocolo RDC 611 e liberado"
+      ],
+      PADRAO: [
+        "Revisão preventiva e verificação de aterramento de segurança elétrica",
+        "Limpeza técnica interna, lubrificação mecânica e inspeção de conectores",
+        "Testes de funcionamento com validação de todos os modos operacionais",
+        "Equipamento inspecionado, testado e aprovado para uso normal"
+      ]
+    };
+
+    function carregarChecklistModal() {
       if (!STATE.osAberta) return;
+      const box = document.getElementById("boxChecklistSugestoes");
+      if (!box) return;
+
+      const eq = (STATE.osAberta.equipamento || "").toUpperCase();
+      let chave = "PADRAO";
+      if (eq.includes("RX") || eq.includes("RAIO") || eq.includes("LOTUS") || eq.includes("ALTUS") || eq.includes("VMI")) chave = "RX";
+      else if (eq.includes("TOMO") || eq.includes("BRIGHT") || eq.includes("BRIVO") || eq.includes("CT")) chave = "TOMO";
+      else if (eq.includes("MAMO") || eq.includes("MM")) chave = "MAMO";
+
+      const itens = BANCO_CHECKLIST_IMEDIATO[chave] || BANCO_CHECKLIST_IMEDIATO.PADRAO;
+      box.innerHTML = itens.map((item, idx) => `
+        <label class="chk-item">
+          <input type="checkbox" class="chk-pop-sug" value="${esc(item)}" ${idx < 3 ? 'checked' : ''} />
+          <span>${esc(item)}</span>
+        </label>
+      `).join("");
+
+      // Tenta enriquecer com frases adicionais da API em segundo plano sem travar a tela
       const tipo = document.getElementById("osTipoSrv")?.value || "PREVENTIVA";
-      const eq = STATE.osAberta.equipamento || "";
-      try {
-        const r = await fetch(`/api/checklist?equipamento=${encodeURIComponent(eq)}&tipo_servico=${encodeURIComponent(tipo)}`);
-        const j = await r.json();
-        const box = document.getElementById("boxChecklistSugestoes");
-        if (!box) return;
-        const todosItens = [...(j.itens_checklist || []), ...(j.frases_relatorio || [])];
-        box.innerHTML = todosItens.map((item, idx) => `
-          <label class="chk-item">
-            <input type="checkbox" class="chk-pop-sug" value="${esc(item)}" ${idx < 3 ? 'checked' : ''} />
-            <span>${esc(item)}</span>
-          </label>
-        `).join("");
-      } catch (e) {}
+      fetch(`/api/checklist?equipamento=${encodeURIComponent(eq)}&tipo_servico=${encodeURIComponent(tipo)}`)
+        .then(r => r.json())
+        .then(j => {
+          if (j && j.frases_relatorio && j.frases_relatorio.length) {
+            j.frases_relatorio.forEach(f => {
+              if (!itens.includes(f)) {
+                const label = document.createElement("label");
+                label.className = "chk-item";
+                label.innerHTML = `<input type="checkbox" class="chk-pop-sug" value="${esc(f)}" /><span>${esc(f)}</span>`;
+                box.appendChild(label);
+              }
+            });
+          }
+        })
+        .catch(() => {});
     }
 
     function aplicarItensChecklistSelecionados() {
@@ -2889,7 +2960,7 @@
       window._fotosEvidenciaB64 = window._fotosEvidenciaB64 || [];
       const grid = document.getElementById("previewFotosGrid");
       
-      Array.from(files).forEach((f, idx) => {
+      Array.from(files).forEach((f) => {
         const reader = new FileReader();
         reader.onload = (e) => {
           const b64 = e.target.result;
@@ -2931,25 +3002,20 @@
       reader.readAsDataURL(file);
     }
 
-    // Check-in Automático por Proximidade GPS
     function verificarCheckinAutomaticoProximidade(os) {
       if (os.checkin_hora && !os.checkin_hora.includes("Pendente") && !os.checkin_hora.includes("Não")) return;
       if (!("geolocation" in navigator)) return;
 
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          const lat = pos.coords.latitude;
-          const lon = pos.coords.longitude;
-          registrarCheckinOS(os.id, lat, lon, true);
+          registrarCheckinOS(os.id);
+          mostrarToast("📍 Check-in Automático por Proximidade Ativado!");
         },
-        (err) => {
-          console.log("GPS não autorizado para auto check-in:", err.message);
-        },
-        { timeout: 7000, enableHighAccuracy: false }
+        () => {},
+        { timeout: 6000, enableHighAccuracy: false }
       );
     }
 
-    // Modal de Visualização Direta da OS (Sem tela branca)
     function abrirVisualizadorLaudo(osId) {
       const modal = document.getElementById("modalVisualizadorOS");
       const iframe = document.getElementById("iframeLaudoOS");
@@ -2994,6 +3060,8 @@
         peca_manual: pecaManual.toUpperCase(),
         status_proposta: document.getElementById("osStatusProposta")?.value || "SEM_PROPOSTA",
         dias_observacao: document.getElementById("osDiasObs")?.value || 7,
+        observacoes_gerais: (document.getElementById("osObsGerais")?.value || "").toUpperCase(),
+        imprimir_observacoes: document.getElementById("osImprimirObs")?.checked ? "SIM" : "NAO",
         valor_os: 0.0,
         assinatura_cliente: (document.getElementById("osAssNome")?.value || "").toUpperCase(),
         assinatura_cliente_img: obterAssinaturaBase64(),
@@ -3198,24 +3266,6 @@
       fecharAssinaturaCheia();
     }
 </script>
-  <!-- MODAL DE ASSINATURA EM TELA CHEIA PARA O CLIENTE -->
-  <div id="modalAssinaturaCheia" style="display:none; position:fixed; inset:0; z-index:99999; background:#ffffff; flex-direction:column;">
-    <div style="background:#002b54; color:#ffffff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center;">
-      <div>
-        <div style="font-weight:bold; font-size:15px;">✍️ Assinatura do Responsável (Hospital / Clínica)</div>
-        <div style="font-size:11.5px; opacity:0.85;">Assine na tela com o dedo ou caneta touch</div>
-      </div>
-      <div style="display:flex; gap:8px;">
-        <button class="btn btn-outline btn-sm" style="color:#ffffff; border-color:rgba(255,255,255,0.4);" onclick="limparCanvasCheia()">🧹 Limpar</button>
-        <button class="btn btn-danger btn-sm" onclick="fecharAssinaturaCheia()">✕ Cancelar</button>
-        <button class="btn btn-success btn-sm" onclick="confirmarAssinaturaCheia()">✅ Confirmar</button>
-      </div>
-    </div>
-    <div style="flex:1; position:relative; background:#f8fafc; padding:8px;">
-      <canvas id="canvasCheia" style="width:100%; height:100%; border:2px dashed #94a3b8; border-radius:8px; background:#ffffff; touch-action:none;"></canvas>
-    </div>
-  </div>
-
   <!-- MODAL DE VISUALIZAÇÃO DIRETA DA OS EM PDF / LAUDO -->
   <div id="modalVisualizadorOS" class="modal-overlay">
     <div class="modal" style="max-width:920px; width:95%; height:92vh; display:flex; flex-direction:column; padding:0;">
@@ -3229,6 +3279,27 @@
       </div>
       <div style="flex:1; background:#f1f5f9; position:relative;">
         <iframe id="iframeLaudoOS" style="width:100%; height:100%; border:none;" src="about:blank"></iframe>
+      </div>
+    </div>
+  </div>
+  <!-- MODAL DE ASSINATURA DEDICADA DO RESPONSÁVEL (SEM ZOOM / TOQUE PERFEITO) -->
+  <div id="modalAssinaturaResponsavel" class="modal-overlay" style="z-index:999999;">
+    <div class="modal" style="max-width:560px; width:95%; padding:14px; background:#ffffff; border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1.5px solid #e2e8f0; padding-bottom:8px;">
+        <div>
+          <div style="font-weight:bold; font-size:15px; color:#002b54;" id="tituloModalAssinatura">✍️ Assinatura do Responsável</div>
+          <div style="font-size:11.5px; color:#64748b;">Faça a assinatura abaixo com o dedo ou caneta touch</div>
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="limparCanvasDedicada()">🧹 Limpar</button>
+      </div>
+
+      <div style="background:#f8fafc; border:2px dashed #0284c7; border-radius:8px; padding:4px; margin-bottom:12px; touch-action:none;">
+        <canvas id="canvasDedicada" width="520" height="220" style="width:100%; height:220px; background:#ffffff; border-radius:6px; touch-action:none; display:block;"></canvas>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" class="btn btn-outline" onclick="fecharAssinaturaDedicada()">✕ Cancelar</button>
+        <button type="button" class="btn btn-success" style="padding:10px 18px; font-weight:bold;" onclick="confirmarAssinaturaDedicada()">✅ Confirmar Assinatura</button>
       </div>
     </div>
   </div>

@@ -211,6 +211,12 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     chk_pop = limpar_texto(row_c.get("checklist_pop"), "N/A")
     param_m = limpar_texto(row_c.get("parametros_medidos"), "-")
     obs_ger = limpar_texto(row_c.get("observacoes_gerais"), "SEM OBSERVAÇÕES ADICIONAIS")
+    imp_obs = str(row_c.get("imprimir_observacoes", "SIM")).upper()
+    if imp_obs in ("NAO", "NÃO", "FALSE", "0"):
+        bloco_observacoes_html = ""
+    else:
+        bloco_observacoes_html = f'''
+  {bloco_observacoes_html}'''
     pend_txt = _extrair_pendencia_limpa(row_c)
 
     cond_fin = limpar_texto(row_c.get("condicao_final"), "LIBERADO PARA USO NORMAL")
@@ -356,17 +362,7 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     </tr>
   </table>
 
-  <div class="sec-title">4. Observações, Pendências &amp; Condição Comercial</div>
-  <table class="data-tbl" width="100%">
-    <tr>
-      <td width="58%"><span class="lbl">Pendências / Recomendações:</span> {pend_txt}</td>
-      <td width="42%"><span class="lbl">Observações Gerais:</span> {obs_ger}</td>
-    </tr>
-    <tr>
-      <td width="58%"><span class="lbl">Condição Final do Equipamento:</span> <b style="color:#047857;">{cond_fin}</b></td>
-      <td width="42%"><span class="lbl">Condição de Pagamento:</span> {cond_pag}</td>
-    </tr>
-  </table>
+  {bloco_observacoes_html}
 {bloco_fotos_html}
   <div class="sec-title">{num_sec_aceite}. Termo de Aceite &amp; Validação Técnica</div>
   <table class="data-tbl" width="100%">

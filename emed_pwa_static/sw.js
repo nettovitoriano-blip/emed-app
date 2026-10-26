@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v5-cloud';
+const CACHE_NAME = 'emed-pwa-v8-obs-sig';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
