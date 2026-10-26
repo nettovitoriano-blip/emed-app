@@ -178,23 +178,34 @@ def calcular_distancia_haversine_km(lat1: float, lon1: float, lat2: float, lon2:
         return 0.0
 
 
+def _normalizar_placa(placa_raw: str) -> str:
+    """Padroniza placas antigas (ABC-1234) ou Mercosul (ABC1D23) para busca sem falha."""
+    s = limpar_texto(placa_raw, "").upper().strip()
+    return s
+
+
 def _parse_data_hora_flex(dt_str: str) -> Optional[datetime.datetime]:
-    """Converte strings DD/MM/YYYY HH:MM ou YYYY-MM-DD HH:MM em datetime."""
+    """Converte strings DD/MM/YYYY HH:MM, YYYY-MM-DD HH:MM ou ISO-8601 (2026-10-26T07:30:00Z) em datetime."""
     s = limpar_texto(dt_str, "").strip()
     if not s:
         return None
+    s_clean = s.replace("Z", "")
+    if "+" in s_clean and "T" in s_clean:
+        s_clean = s_clean.split("+")[0]
     formatos = [
+        "%Y-%m-%dT%H:%M:%S.%f",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%dT%H:%M",
         "%d/%m/%Y %H:%M:%S",
         "%d/%m/%Y %H:%M",
         "%Y-%m-%d %H:%M:%S",
         "%Y-%m-%d %H:%M",
-        "%Y-%m-%dT%H:%M",
         "%d/%m/%Y",
         "%Y-%m-%d",
     ]
     for fmt in formatos:
         try:
-            return datetime.datetime.strptime(s, fmt)
+            return datetime.datetime.strptime(s_clean, fmt)
         except Exception:
             continue
     return None
@@ -306,64 +317,174 @@ def cruzar_condutor_por_data_hora(
 
 def registrar_telemetria_ou_viagem_gps(db_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Recebe pacote de telemetria GPS (do App de Celular ou do Rastreador OBD2/Hardware),
-    atualiza o odômetro automaticamente na tabela `veiculos` e grava o log de condutor em `frota_viagens_gps`.
+    Recebe pacote de telemetria GPS tanto no formato direto do App EMED quanto no formato
+    estruturado da Proposta de Integração (J16 4G LTE + NFC NTAG213 + PostGIS):
+      {
+        "placa": "ABC1D23",
+        "renavam": "01234567890",
+        "tecnico": { "cpf": "123.456.789-00", "nome": "Técnico Responsável" },
+        "viagem": {
+          "data_inicio": "2026-10-26T07:30:00Z",
+          "data_fim": "2026-10-26T17:45:00Z",
+          "odometro_inicial_km": 124500.2,
+          "odometro_final_km": 124618.5,
+          "km_percorrido": 118.3,
+          "ignicao_tempo_ligada_min": 185
+        },
+        "status_odometro_atual": 124618.5
+      }
+    Atualiza o odômetro na tabela `veiculos` (cadastrando automaticamente novos veículos da frota
+    se a placa ainda não existir) e grava o histórico auditável em `frota_viagens_gps`.
     """
     garantir_tabelas_frota_gps_multas(db_name)
-    placa = limpar_texto(payload.get("placa"), "EMD-2026").upper()
-    condutor = limpar_texto(payload.get("condutor"), "ANTONIO").upper()
-    tag = limpar_texto(payload.get("tag_identificacao"), "APP_GPS_CELULAR").upper()
-    os_id = limpar_texto(payload.get("os_id_vinculada"), "")
-    destino = limpar_texto(payload.get("destino_hospital"), "ROTA TÉCNICA EMED").upper()
+    placa = _normalizar_placa(payload.get("placa") or "EMD-2026")
+    renavam = limpar_texto(payload.get("renavam"), "")
+
+    # Suporte ao objeto aninhado `tecnico: {"cpf": ..., "nome": ...}` ou campo plano `condutor`
+    tec_obj = payload.get("tecnico")
+    cpf_tec = ""
+    if isinstance(tec_obj, dict):
+        condutor = limpar_texto(tec_obj.get("nome"), "TÉCNICO EMED").upper()
+        cpf_tec = limpar_texto(tec_obj.get("cpf"), "")
+    elif isinstance(tec_obj, str) and tec_obj.strip():
+        condutor = limpar_texto(tec_obj, "TÉCNICO EMED").upper()
+    else:
+        condutor = limpar_texto(payload.get("condutor"), "ANTONIO").upper()
+        cpf_tec = limpar_texto(payload.get("cpf"), "")
+
+    tag_default = f"NFC-NTAG213 | CPF: {cpf_tec}" if cpf_tec else "J16_4G_NFC_PWA"
+    tag = limpar_texto(payload.get("tag_identificacao"), tag_default).upper()
+
+    # Suporte ao objeto aninhado `viagem: {...}`
+    viagem_obj = payload.get("viagem") if isinstance(payload.get("viagem"), dict) else {}
+    dt_ini_raw = viagem_obj.get("data_inicio") or payload.get("data_inicio") or ""
+    dt_fim_raw = viagem_obj.get("data_fim") or payload.get("data_fim") or ""
+    dt_ini_parsed = _parse_data_hora_flex(str(dt_ini_raw))
+    dt_fim_parsed = _parse_data_hora_flex(str(dt_fim_raw))
+
+    agora_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    dt_ini_str = dt_ini_parsed.strftime("%d/%m/%Y %H:%M") if dt_ini_parsed else agora_str
+    dt_fim_str = dt_fim_parsed.strftime("%d/%m/%Y %H:%M") if dt_fim_parsed else agora_str
+
+    odo_ini_v = limpar_float(viagem_obj.get("odometro_inicial_km") or payload.get("odometro_inicial_km"), 0.0)
+    odo_fim_v = limpar_float(
+         payload.get("status_odometro_atual")
+         or viagem_obj.get("odometro_final_km")
+         or payload.get("odometro_km")
+         or payload.get("odometro_final_km"),
+         0.0,
+    )
+    km_perc_v = limpar_float(
+        viagem_obj.get("km_percorrido") or payload.get("km_percorrido_gps") or payload.get("km_percorrido"),
+        0.0,
+    )
+    ignicao_min = limpar_int(viagem_obj.get("ignicao_tempo_ligada_min"), 0)
+
+    os_id = limpar_texto(payload.get("os_id_vinculada") or payload.get("os_id") or viagem_obj.get("os_id"), "")
+    destino = limpar_texto(payload.get("destino_hospital") or viagem_obj.get("destino"), "ROTA TÉCNICA EMED").upper()
     acao = limpar_texto(payload.get("acao"), "ATUALIZAR_TELEMETRIA").upper()
 
-    lat = limpar_float(payload.get("latitude"), -3.7319)
-    lon = limpar_float(payload.get("longitude"), -38.5267)
-    vel = limpar_float(payload.get("velocidade_kmh"), 0.0)
-    km_informado = limpar_int(payload.get("odometro_km"), 0)
-    km_adicional_gps = limpar_float(payload.get("km_percorrido_gps"), 0.0)
-    agora_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    lat = limpar_float(payload.get("latitude") or viagem_obj.get("lat_fim"), -3.7319)
+    lon = limpar_float(payload.get("longitude") or viagem_obj.get("lon_fim"), -38.5267)
+    vel = limpar_float(payload.get("velocidade_kmh") or viagem_obj.get("velocidade_max_kmh"), 0.0)
 
     with get_db_connection(db_name) as conn:
         cur = conn.cursor()
-        cur.execute("SELECT id, modelo, km_atual, ultima_lat, ultima_lon FROM veiculos WHERE UPPER(placa) = ?", (placa,))
+
+        # Se não veio os_id explícito, tenta vincular automaticamente à OS ativa do técnico
+        if not os_id and condutor:
+            try:
+                primeiro_nome = condutor.split()[0]
+                cur.execute("""
+                    SELECT id, cliente, cidade FROM clientes_equipamentos
+                    WHERE UPPER(tecnico_responsavel) LIKE ? AND UPPER(status) != 'CONCLUÍDO'
+                    ORDER BY id DESC LIMIT 1
+                """, (f"%{primeiro_nome}%",))
+                r_os = cur.fetchone()
+                if r_os:
+                    os_id = str(r_os[0])
+                    if destino == "ROTA TÉCNICA EMED":
+                        destino = f"{r_os[1]} - {r_os[2]}".upper()
+            except Exception:
+                pass
+
+        # Busca veículo por Placa (com ou sem hífen) ou RENAVAM
+        placa_sem_hifen = placa.replace("-", "")
+        cur.execute("""
+            SELECT id, modelo, km_atual, ultima_lat, ultima_lon, placa, km_proxima_revisao
+            FROM veiculos
+            WHERE REPLACE(UPPER(placa), '-', '') = ?
+               OR (renavam != '' AND renavam = ?)
+            LIMIT 1
+        """, (placa_sem_hifen, renavam or "__NONE__"))
         row_v = cur.fetchone()
-        if not row_v:
-            cur.execute("SELECT id, modelo, km_atual, ultima_lat, ultima_lon, placa FROM veiculos LIMIT 1")
-            row_v = cur.fetchone()
-            if row_v:
-                placa = row_v[5]
 
-        vid = row_v[0] if row_v else 1
-        modelo = row_v[1] if row_v else "RENAULT CAPTUR 1.6 16V SCE"
-        km_banco = int(row_v[2] or 45000) if row_v else 45000
-        lat_ant = float(row_v[3] or -3.7319) if row_v else -3.7319
-        lon_ant = float(row_v[4] or -38.5267) if row_v else -38.5267
+        # Escalabilidade 20 veículos: se a placa enviada pelo rastreador J16 ainda não existir, cadastra na frota
+        if not row_v and placa:
+            modelo_novo = limpar_texto(payload.get("modelo"), f"FROTA EMED 4G ({placa})").upper()
+            km_ini_cad = int(round(odo_fim_v or odo_ini_v or 0))
+            prox_rev = ((km_ini_cad // 10000) + 1) * 10000 if km_ini_cad > 0 else 50000
+            cur.execute("""
+                INSERT INTO veiculos
+                (modelo, placa, km_atual, km_proxima_revisao, status_manutencao, historico_manutencao,
+                 renavam, condutor_atual, tag_rfid_atual, ultima_lat, ultima_lon, ultima_atualizacao_gps, ignicao_ligada)
+                VALUES (?, ?, ?, ?, 'Disponível', 'Integrado via Telemetria J16 4G + NFC', ?, ?, ?, ?, ?, ?, 0)
+            """, (modelo_novo, placa, km_ini_cad, prox_rev, renavam or "01234567890", condutor, tag, lat, lon, agora_str))
+            vid = cur.lastrowid
+            modelo = modelo_novo
+            km_banco = km_ini_cad
+            lat_ant = lat
+            lon_ant = lon
+            km_prox_rev = prox_rev
+        else:
+            vid = row_v[0]
+            modelo = row_v[1]
+            km_banco = int(row_v[2] or 45000)
+            lat_ant = float(row_v[3] or -3.7319)
+            lon_ant = float(row_v[4] or -38.5267)
+            placa = row_v[5]
+            km_prox_rev = int(row_v[6] or 50000)
 
-        # Se o GPS mandou coordenadas diferentes e não informou km_percorrido_gps, calcula via Haversine urbano
-        if km_adicional_gps <= 0 and (abs(lat - lat_ant) > 0.0002 or abs(lon - lon_ant) > 0.0002):
-            km_adicional_gps = calcular_distancia_haversine_km(lat_ant, lon_ant, lat, lon)
+        # Calcula distância via Haversine se necessário
+        if km_perc_v <= 0 and odo_fim_v > 0 and odo_ini_v > 0 and odo_fim_v >= odo_ini_v:
+            km_perc_v = round(odo_fim_v - odo_ini_v, 2)
+        elif km_perc_v <= 0 and (abs(lat - lat_ant) > 0.0002 or abs(lon - lon_ant) > 0.0002):
+            km_perc_v = calcular_distancia_haversine_km(lat_ant, lon_ant, lat, lon)
 
-        if km_informado > km_banco:
-            novo_km = km_informado
-            km_rodado = float(novo_km - km_banco)
-        elif km_adicional_gps > 0:
-            novo_km = int(round(km_banco + max(1.0, km_adicional_gps)))
-            km_rodado = round(km_adicional_gps, 2)
+        if odo_fim_v > 0:
+            novo_km = int(round(odo_fim_v))
+            km_rodado = round(km_perc_v if km_perc_v > 0 else max(0.0, odo_fim_v - (odo_ini_v or km_banco)), 2)
+        elif km_perc_v > 0:
+            novo_km = int(round(km_banco + max(1.0, km_perc_v)))
+            km_rodado = round(km_perc_v, 2)
         else:
             novo_km = km_banco
             km_rodado = 0.0
 
-        status_manut = "Em Viagem / Campo" if acao == "INICIAR_VIAGEM" else "Disponível"
-        ignicao = 1 if acao == "INICIAR_VIAGEM" else 0
+        alerta_revisao = novo_km >= (km_prox_rev - 1000)
+        if acao == "INICIAR_VIAGEM":
+            status_manut = "Em Viagem / Campo"
+            ignicao = 1
+        else:
+            status_manut = "REVISÃO PREVENTIVA NECESSÁRIA" if novo_km >= km_prox_rev else ("Alerta de Revisão Próxima" if alerta_revisao else "Disponível")
+            ignicao = 0
 
-        cur.execute("""
-            UPDATE veiculos
-            SET km_atual = ?, condutor_atual = ?, tag_rfid_atual = ?,
-                ultima_lat = ?, ultima_lon = ?, ultima_atualizacao_gps = ?,
-                ignicao_ligada = ?, status_manutencao = ?
-            WHERE id = ?
-        """, (novo_km, condutor, tag, lat, lon, agora_str, ignicao, status_manut, vid))
+        if renavam:
+            cur.execute("""
+                UPDATE veiculos
+                SET km_atual = ?, renavam = ?, condutor_atual = ?, tag_rfid_atual = ?,
+                    ultima_lat = ?, ultima_lon = ?, ultima_atualizacao_gps = ?,
+                    ignicao_ligada = ?, status_manutencao = ?
+                WHERE id = ?
+            """, (novo_km, renavam, condutor, tag, lat, lon, agora_str, ignicao, status_manut, vid))
+        else:
+            cur.execute("""
+                UPDATE veiculos
+                SET km_atual = ?, condutor_atual = ?, tag_rfid_atual = ?,
+                    ultima_lat = ?, ultima_lon = ?, ultima_atualizacao_gps = ?,
+                    ignicao_ligada = ?, status_manutencao = ?
+                WHERE id = ?
+            """, (novo_km, condutor, tag, lat, lon, agora_str, ignicao, status_manut, vid))
 
         if acao == "INICIAR_VIAGEM":
             cur.execute("""
@@ -372,18 +493,18 @@ def registrar_telemetria_ou_viagem_gps(db_name: str, payload: Dict[str, Any]) ->
                  data_hora_inicio, data_hora_fim, km_inicial, km_final, km_percorrido,
                  lat_inicio, lon_inicio, lat_fim, lon_fim, velocidade_max_kmh, status_viagem)
                 VALUES (?, ?, ?, ?, ?, ?, ?, 'EM TRÂNSITO', ?, ?, 0.0, ?, ?, ?, ?, ?, 'EM DESLOCAMENTO')
-            """, (placa, modelo, condutor, tag, os_id, destino, agora_str, novo_km, novo_km, lat, lon, lat, lon, vel))
-            msg = f"🛰️ Viagem iniciada! Condutor {condutor} vinculado ao veículo {placa} (Odômetro: {novo_km:,} KM)."
+            """, (placa, modelo, condutor, tag, os_id, destino, dt_ini_str, novo_km, novo_km, lat, lon, lat, lon, vel))
+            viagem_id = cur.lastrowid
+            msg = f"🛰️ Viagem #{viagem_id} iniciada! Condutor {condutor} vinculado ao veículo {placa} (Odômetro: {novo_km:,} KM)."
         else:
-            # Verifica se há viagem EM DESLOCAMENTO para fechar, senão cria registro completo
             cur.execute("""
                 SELECT id, km_inicial, lat_inicio, lon_inicio
                 FROM frota_viagens_gps
-                WHERE UPPER(placa) = ? AND status_viagem = 'EM DESLOCAMENTO'
+                WHERE REPLACE(UPPER(placa), '-', '') = ? AND status_viagem = 'EM DESLOCAMENTO'
                 ORDER BY id DESC LIMIT 1
-            """, (placa,))
+            """, (placa_sem_hifen,))
             aberta = cur.fetchone()
-            if aberta:
+            if aberta and not viagem_obj:
                 id_ab, kmi_ab, lati_ab, loni_ab = aberta
                 if km_rodado <= 0 and novo_km == kmi_ab:
                     dist_calc = calcular_distancia_haversine_km(lati_ab, loni_ab, lat, lon)
@@ -399,16 +520,19 @@ def registrar_telemetria_ou_viagem_gps(db_name: str, payload: Dict[str, Any]) ->
                         lat_fim = ?, lon_fim = ?, velocidade_max_kmh = MAX(velocidade_max_kmh, ?),
                         status_viagem = 'FINALIZADA'
                     WHERE id = ?
-                """, (agora_str, novo_km, km_rodado, lat, lon, vel, id_ab))
+                """, (dt_fim_str, novo_km, km_rodado, lat, lon, vel, id_ab))
+                viagem_id = id_ab
             else:
-                kmi_reg = max(0, int(novo_km - round(km_rodado)))
+                kmi_reg = int(round(odo_ini_v)) if odo_ini_v > 0 else max(0, int(novo_km - round(km_rodado)))
+                dest_final = f"{destino} ({ignicao_min} min ignição)" if ignicao_min > 0 else destino
                 cur.execute("""
                     INSERT INTO frota_viagens_gps
                     (placa, modelo, condutor, tag_identificacao, os_id_vinculada, destino_hospital,
                      data_hora_inicio, data_hora_fim, km_inicial, km_final, km_percorrido,
                      lat_inicio, lon_inicio, lat_fim, lon_fim, velocidade_max_kmh, status_viagem)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'FINALIZADA')
-                """, (placa, modelo, condutor, tag, os_id, destino, agora_str, agora_str, kmi_reg, novo_km, km_rodado, lat_ant, lon_ant, lat, lon, vel))
+                """, (placa, modelo, condutor, tag, os_id, dest_final, dt_ini_str, dt_fim_str, kmi_reg, novo_km, km_rodado, lat_ant, lon_ant, lat, lon, vel))
+                viagem_id = cur.lastrowid
 
             msg = f"🏁 Telemetria GPS sincronizada! Odômetro do veículo {placa} atualizado para {novo_km:,} KM (+{km_rodado} KM) • Condutor: {condutor}."
 
@@ -416,10 +540,21 @@ def registrar_telemetria_ou_viagem_gps(db_name: str, payload: Dict[str, Any]) ->
 
     return {
         "ok": True,
+        "status": "sincronizado",
+        "viagem_id": viagem_id,
+        "veiculo_id": vid,
         "placa": placa,
+        "renavam": renavam or "01234567890",
         "condutor": condutor,
+        "cpf": cpf_tec,
+        "os_id_vinculada": os_id,
+        "odometro_anterior_km": km_banco,
         "km_atual": novo_km,
+        "status_odometro_atual": round(odo_fim_v if odo_fim_v > 0 else float(novo_km), 1),
         "km_percorrido": km_rodado,
+        "km_proxima_revisao": km_prox_rev,
+        "alerta_revisao_preventiva": alerta_revisao,
+        "timestamp_servidor": agora_str,
         "msg": msg,
     }
 

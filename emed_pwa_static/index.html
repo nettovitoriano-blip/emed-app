@@ -2922,9 +2922,32 @@
         STATE.menuAtivo = "CLI_PORTAL";
       }
       await sincronizarTudo(false);
-      const osParam = params.get("os");
+
+      // Suporte ao Deep Link 1-Toque do Sistema de Telemetria GPS / Check-in NFC (?placa=ABC1D23&km=124618.5&tecnico=ANTONIO&cpf=123.456.789-00)
+      const kmDeepLink = params.get("km") || params.get("odometro") || params.get("status_odometro_atual");
+      const placaDeepLink = params.get("placa");
+      if (kmDeepLink) {
+        const resGps = await postJSON("/api/v1/veiculos/odometro", {
+          placa: placaDeepLink || "EMD-2026",
+          renavam: params.get("renavam") || "",
+          tecnico: {
+            nome: params.get("tecnico") || params.get("condutor") || "ANTONIO",
+            cpf: params.get("cpf") || ""
+          },
+          status_odometro_atual: parseFloat(kmDeepLink),
+          os_id_vinculada: params.get("os_id") || params.get("os") || ""
+        });
+        if (resGps.ok) {
+          mostrarToast("🛰️ Deep Link GPS/NFC: " + resGps.msg);
+          await sincronizarTudo(false);
+        }
+      }
+
+      const osParam = params.get("os") || params.get("os_id");
       if (osParam) {
         abrirModalOS(osParam);
+      } else if (kmDeepLink) {
+        selecionarMenu("GES_FROTA");
       }
     });
   </script>

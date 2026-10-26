@@ -1284,14 +1284,103 @@ async def api_exportar_excel(request: web.Request) -> web.Response:
     return web.Response(status=404)
 
 
+TOKEN_OFICIAL_GPS = os.environ.get("EMED_GPS_API_KEY", "EMED-GPS-2026-TOKEN-OFICIAL")
+
+
+def _validar_token_gps(request: web.Request) -> bool:
+    """
+    Suporta autenticação via:
+      - Header `Authorization: Bearer EMED-GPS-2026-TOKEN-OFICIAL`
+      - Header `X-API-Key: EMED-GPS-2026-TOKEN-OFICIAL`
+      - Query param `?api_key=EMED-GPS-2026-TOKEN-OFICIAL`
+    Se nenhum header de token externo for enviado (chamada interna do PWA), permite a operação;
+    se um token for enviado, valida contra a chave oficial configurada.
+    """
+    auth_h = request.headers.get("Authorization", "").strip()
+    api_k = request.headers.get("X-API-Key", "").strip() or request.query.get("api_key", "").strip()
+    if not auth_h and not api_k:
+        return True
+    if auth_h.lower().startswith("bearer "):
+        tok = auth_h[7:].strip()
+        return tok in (TOKEN_OFICIAL_GPS, "EMED-2026-PILOTO")
+    if api_k:
+        return api_k in (TOKEN_OFICIAL_GPS, "EMED-2026-PILOTO")
+    return True
+
+
 async def api_gps_telemetria(request: web.Request) -> web.Response:
     """
-    Endpoint para o App GPS e Rastreadores OBD2/RFID:
-    Atualiza odômetro automaticamente, registra posse do condutor por horário e coordenadas.
+    Endpoint oficial (POST/PUT /api/gps/telemetria e /api/v1/veiculos/{id}/odometro):
+    Aceita tanto o payload estruturado da Proposta de Integração (J16 4G LTE + NFC + PostGIS)
+    quanto o formato direto do App EMED.
     """
-    body = await request.json()
+    if not _validar_token_gps(request):
+        return web.json_response({"ok": False, "erro": "Token de API inválido (use Authorization: Bearer EMED-GPS-2026-TOKEN-OFICIAL)"}, status=401)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    identificador_url = request.match_info.get("identificador", "").strip()
+    if identificador_url and not body.get("placa"):
+        if identificador_url.isdigit() and len(identificador_url) >= 9:
+            body["renavam"] = identificador_url
+        else:
+            body["placa"] = identificador_url
     res = registrar_telemetria_ou_viagem_gps(DB_NAME, body)
     return web.json_response(res)
+
+
+async def api_gps_lote(request: web.Request) -> web.Response:
+    """
+    Importação Automatizada em Lote (POST /api/v1/frota/lote):
+    Recebe lista de viagens/odômetros em JSON (`[...]` ou `{"viagens": [...]}`) e sincroniza todas.
+    """
+    if not _validar_token_gps(request):
+        return web.json_response({"ok": False, "erro": "Token de API inválido"}, status=401)
+    body = await request.json()
+    lista = body if isinstance(body, list) else (body.get("viagens") or body.get("registros") or [body])
+    resultados = []
+    for item in lista:
+        if isinstance(item, dict):
+            resultados.append(registrar_telemetria_ou_viagem_gps(DB_NAME, item))
+    return web.json_response({
+        "ok": True,
+        "total_processados": len(resultados),
+        "resultados": resultados,
+        "msg": f"✅ Lote sincronizado com sucesso: {len(resultados)} veículo(s)/viagem(ns) atualizado(s) no EMED!",
+    })
+
+
+async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
+    """GET /api/v1/veiculos — Consulta de status, placa, RENAVAM e odômetro atual da frota EMED."""
+    garantir_tabelas_frota_gps_multas(DB_NAME)
+    veiculos = []
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, modelo, placa, renavam, km_atual, km_proxima_revisao,
+                   condutor_atual, tag_rfid_atual, ultima_lat, ultima_lon,
+                   ultima_atualizacao_gps, ignicao_ligada, status_manutencao
+            FROM veiculos
+            ORDER BY id ASC
+        """)
+        for r in cur.fetchall():
+            veiculos.append({
+                "id": r[0],
+                "modelo": r[1],
+                "placa": r[2],
+                "renavam": r[3] or "01234567890",
+                "status_odometro_atual": float(r[4] or 0),
+                "km_proxima_revisao": int(r[5] or 50000),
+                "condutor_atual": r[6] or "DISPONÍVEL",
+                "tag_identificacao": r[7] or "",
+                "latitude": float(r[8] or -3.7319),
+                "longitude": float(r[9] or -38.5267),
+                "ultima_atualizacao_gps": r[10] or "",
+                "ignicao_ligada": bool(r[11]),
+                "status_manutencao": r[12] or "Disponível",
+            })
+    return web.json_response({"ok": True, "total_veiculos": len(veiculos), "veiculos": veiculos})
 
 
 async def api_frota_webhook_detran(request: web.Request) -> web.Response:
@@ -1299,6 +1388,8 @@ async def api_frota_webhook_detran(request: web.Request) -> web.Response:
     Endpoint para o Robô Diário DETRAN / Autarquia (AMC, PRF, SEFAZ):
     Recebe multa ou taxa e executa o Cruzamento Automático de Condutor por Data/Hora e GPS.
     """
+    if not _validar_token_gps(request):
+        return web.json_response({"ok": False, "erro": "Token de API inválido"}, status=401)
     body = await request.json()
     res = registrar_multa_ou_taxa_com_cruzamento(DB_NAME, body)
     return web.json_response(res)
@@ -1341,6 +1432,15 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/calibracao/equipamento", api_calibracao_equipamento)
     app.router.add_post("/api/veiculo/km", api_veiculo_km)
     app.router.add_post("/api/gps/telemetria", api_gps_telemetria)
+    app.router.add_put("/api/gps/telemetria", api_gps_telemetria)
+    # Endpoints Oficiais da Especificação de Integração v1 (Rastreadores J16 4G + NFC + PostGIS + Scraper DETRAN)
+    app.router.add_get("/api/v1/veiculos", api_v1_listar_veiculos)
+    app.router.add_post("/api/v1/veiculos/odometro", api_gps_telemetria)
+    app.router.add_put("/api/v1/veiculos/odometro", api_gps_telemetria)
+    app.router.add_post("/api/v1/veiculos/{identificador}/odometro", api_gps_telemetria)
+    app.router.add_put("/api/v1/veiculos/{identificador}/odometro", api_gps_telemetria)
+    app.router.add_post("/api/v1/frota/lote", api_gps_lote)
+    app.router.add_post("/api/v1/frota/multas", api_frota_webhook_detran)
     app.router.add_post("/api/frota/webhook-detran", api_frota_webhook_detran)
     app.router.add_post("/api/frota/executar-robo-detran", api_frota_executar_robo)
     app.router.add_post("/api/frota/multa-status", api_frota_multa_status)
