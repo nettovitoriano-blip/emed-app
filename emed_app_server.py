@@ -3248,6 +3248,58 @@ async def api_video_stream(request: web.Request) -> web.Response:
 
 
 
+
+
+async def api_importar_excel(request: web.Request) -> web.Response:
+    """Importa planilha atualizada de clientes/equipamentos ou de estoque."""
+    try:
+        reader = await request.multipart()
+        field = await reader.next()
+        if not field:
+            return web.json_response({"ok": False, "msg": "Nenhum arquivo enviado."}, status=400)
+        filename = field.filename or "upload.xlsx"
+        conteudo = await field.read()
+        
+        temp_path = os.path.join(tempfile.gettempdir(), f"emed_upload_{filename}")
+        with open(temp_path, "wb") as f_tmp:
+            f_tmp.write(conteudo)
+            
+        df_uploaded = pd.read_excel(temp_path)
+        colunas = [str(c).lower().strip() for c in df_uploaded.columns]
+        
+        # Caso seja planilha de estoque
+        if any(c in colunas for c in ["codigo", "nome_peca", "quantidade", "preco_custo", "saldo"]):
+            with get_db_connection(DB_NAME) as conn:
+                for _, row in df_uploaded.iterrows():
+                    cod = limpar_texto(row.get("codigo") or row.get("código"), "").upper()
+                    nome = limpar_texto(row.get("nome_peca") or row.get("peça") or row.get("descricao"), "").upper()
+                    qtd = int(limpar_float(row.get("quantidade") or row.get("saldo") or row.get("estoque"), 0))
+                    preco = limpar_float(row.get("preco_custo") or row.get("preco_unitario") or row.get("valor"), 0.0)
+                    if cod:
+                        conn.execute("""
+                            INSERT INTO estoque_pecas (codigo, nome_peca, quantidade, preco_custo)
+                            VALUES (?, ?, ?, ?)
+                            ON CONFLICT(codigo) DO UPDATE SET
+                                nome_peca = excluded.nome_peca,
+                                quantidade = excluded.quantidade,
+                                preco_custo = excluded.preco_custo
+                        """, (cod, nome, qtd, preco))
+                conn.commit()
+            return web.json_response({"ok": True, "msg": f"✅ Estoque atualizado! {len(df_uploaded)} itens sincronizados com sucesso."})
+        
+        # Caso seja planilha de clientes/equipamentos
+        else:
+            if os.path.exists(CAMINHO_EXCEL):
+                import shutil
+                shutil.copyfile(CAMINHO_EXCEL, CAMINHO_EXCEL.replace(".xlsx", "_backup.xlsx"))
+            df_uploaded.to_excel(CAMINHO_EXCEL, index=False)
+            with get_db_connection(DB_NAME) as conn:
+                df_uploaded.to_sql("clientes_equipamentos", conn, if_exists="replace", index=False)
+            return web.json_response({"ok": True, "msg": f"✅ Base de clientes e equipamentos atualizada! {len(df_uploaded)} registros sincronizados."})
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": f"Erro na importação da planilha: {str(e)}"}, status=500)
+
+
 async def api_exportar_excel(request: web.Request) -> web.Response:
 
     if os.path.exists(CAMINHO_EXCEL):
@@ -3699,6 +3751,7 @@ def criar_app() -> web.Application:
     app.router.add_get("/api/video", api_video_stream)
 
     app.router.add_get("/api/exportar-excel", api_exportar_excel)
+    app.router.add_post("/api/importar-excel", api_importar_excel)
 
     return app
 

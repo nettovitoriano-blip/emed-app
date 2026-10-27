@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v19-respostas-alertas-proposta';
+const CACHE_NAME = 'emed-pwa-v20-geofencing-alinhamento-estoque';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
