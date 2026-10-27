@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v13-oficial-phantom';
+const CACHE_NAME = 'emed-pwa-v14-clean-svg';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
