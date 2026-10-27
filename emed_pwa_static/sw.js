@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v15-true-emed-symbol';
+const CACHE_NAME = 'emed-pwa-v16-layout-mobile-clean';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
