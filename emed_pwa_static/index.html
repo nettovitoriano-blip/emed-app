@@ -643,6 +643,25 @@
       }
     }
 
+  
+    /* ROTAÇÃO PAISAGEM AUTOMÁTICA EM TELA CHEIA PARA A PRANCHETA */
+    .modal-paisagem-ativa {
+      display: flex !important;
+      position: fixed !important;
+      inset: 0 !important;
+      z-index: 99999999 !important;
+      background: #002b54 !important;
+      flex-direction: column !important;
+    }
+    .modal-paisagem-ativa.rotacionado-vertical {
+      width: 100vh !important;
+      height: 100vw !important;
+      top: 0 !important;
+      left: 0 !important;
+      transform: rotate(90deg) translateY(-100vw) !important;
+      transform-origin: top left !important;
+    }
+
   </style>
 </head>
 <body>
@@ -3242,48 +3261,86 @@
     }
 
     /********************************************************************
-     * MOTOR DE ASSINATURA FIEL (PIXEL REAL + AUTO-CROP + ANTI-INVERSÃO)
-     * 1. A prancheta é sempre horizontal (retangular), forçando a pessoa a assinar no sentido correto.
-     * 2. Grava os pontos em pixels reais da tela.
-     * 3. Ao salvar, faz auto-crop da assinatura com margem limpa e exporta em PNG horizontal (800x260).
-     * 4. Zero zoom, zero distorção, zero inversão.
+     * MOTOR DE ASSINATURA COM GIRO AUTOMÁTICO EM PAISAGEM (LANDSCAPE)
+     * 1. Ao clicar em assinar, a tela GIRA AUTOMATICAMENTE para modo Paisagem.
+     * 2. Se a rotação do aparelho estiver travada no Android/iOS, a interface
+     *    se auto-rotaciona 90° cobrindo 100% da tela do aparelho!
+     * 3. As coordenadas do touch são calculadas com precisão milimétrica.
+     * 4. Ao salvar, exporta a assinatura nítida na horizontal oficial (800x260).
      ********************************************************************/
     let _ctxPaisagem = null;
     let _desenhandoPaisagem = false;
     let _assinouPaisagem = false;
     let _linhasReais = [];
     let _linhaAtual = null;
+    let _modalRotacionado90 = false;
 
-    function abrirModalAssinaturaPaisagem() {
+    async function abrirModalAssinaturaPaisagem() {
       const modal = document.getElementById("modalAssinaturaPaisagem");
       const c = document.getElementById("canvasPaisagem");
       const nomeResp = document.getElementById("osAssNome")?.value || "Responsável do Hospital";
       const lblTitulo = document.getElementById("lblTituloAssinaturaPaisagem");
       if (lblTitulo) lblTitulo.innerText = `Assinatura: ${nomeResp.toUpperCase()}`;
 
-      modal.style.display = "flex";
+      // 1. Tentar forçar rotação de tela nativa no navegador móvel (Landscape Fullscreen)
+      try {
+        const docEl = document.documentElement;
+        if (docEl.requestFullscreen) {
+          await docEl.requestFullscreen().catch(() => {});
+        } else if (docEl.webkitRequestFullscreen) {
+          await docEl.webkitRequestFullscreen().catch(() => {});
+        }
+        if (screen.orientation && screen.orientation.lock) {
+          await screen.orientation.lock("landscape").catch(() => {});
+        }
+      } catch (err) {}
+
+      // 2. Verifica se a tela física está em pé (retrato). Se estiver, aplica a rotação visual automática de 90°!
+      modal.className = "modal-paisagem-ativa";
+      if (window.innerHeight > window.innerWidth) {
+        modal.classList.add("rotacionado-vertical");
+        _modalRotacionado90 = true;
+      } else {
+        modal.classList.remove("rotacionado-vertical");
+        _modalRotacionado90 = false;
+      }
 
       setTimeout(() => {
         ajustarTamanhoCanvasAssinatura();
-      }, 60);
+      }, 70);
 
       configurarEventosTouchCanvas(c);
     }
 
     function ajustarTamanhoCanvasAssinatura() {
+      const modal = document.getElementById("modalAssinaturaPaisagem");
       const c = document.getElementById("canvasPaisagem");
-      if (!c) return;
+      if (!c || !modal) return;
+
+      // Reavalia orientação
+      if (window.innerHeight > window.innerWidth) {
+        modal.classList.add("rotacionado-vertical");
+        _modalRotacionado90 = true;
+      } else {
+        modal.classList.remove("rotacionado-vertical");
+        _modalRotacionado90 = false;
+      }
+
       const rect = c.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
 
       const ratio = window.devicePixelRatio || 1;
-      c.width = rect.width * ratio;
-      c.height = rect.height * ratio;
+      // Se rotacionado 90°, a largura do canvas interno é a altura física do rect e vice-versa
+      const wReal = _modalRotacionado90 ? rect.height : rect.width;
+      const hReal = _modalRotacionado90 ? rect.width : rect.height;
+
+      c.width = wReal * ratio;
+      c.height = hReal * ratio;
 
       _ctxPaisagem = c.getContext("2d");
       _ctxPaisagem.scale(ratio, ratio);
       _ctxPaisagem.strokeStyle = "#002b54";
-      _ctxPaisagem.lineWidth = 3.2;
+      _ctxPaisagem.lineWidth = 3.4;
       _ctxPaisagem.lineCap = "round";
       _ctxPaisagem.lineJoin = "round";
 
@@ -3292,24 +3349,27 @@
 
     window.addEventListener("resize", () => {
       const modal = document.getElementById("modalAssinaturaPaisagem");
-      if (modal && modal.style.display === "flex") {
+      if (modal && modal.style.display !== "none") {
         ajustarTamanhoCanvasAssinatura();
       }
     });
 
     window.addEventListener("orientationchange", () => {
       const modal = document.getElementById("modalAssinaturaPaisagem");
-      if (modal && modal.style.display === "flex") {
-        setTimeout(ajustarTamanhoCanvasAssinatura, 160);
+      if (modal && modal.style.display !== "none") {
+        setTimeout(ajustarTamanhoCanvasAssinatura, 180);
       }
     });
 
     function redesenharCanvasLimpo() {
       if (!_ctxPaisagem) return;
       const c = document.getElementById("canvasPaisagem");
-      _ctxPaisagem.clearRect(0, 0, c.clientWidth, c.clientHeight);
+      const wReal = _modalRotacionado90 ? c.clientHeight : c.clientWidth;
+      const hReal = _modalRotacionado90 ? c.clientWidth : c.clientHeight;
+
+      _ctxPaisagem.clearRect(0, 0, wReal, hReal);
       _ctxPaisagem.strokeStyle = "#002b54";
-      _ctxPaisagem.lineWidth = 3.2;
+      _ctxPaisagem.lineWidth = 3.4;
       _ctxPaisagem.lineCap = "round";
       _ctxPaisagem.lineJoin = "round";
 
@@ -3331,10 +3391,19 @@
       const obterPonto = (e) => {
         const r = c.getBoundingClientRect();
         const t = e.touches ? e.touches[0] : e;
-        return {
-          x: t.clientX - r.left,
-          y: t.clientY - r.top
-        };
+
+        if (_modalRotacionado90) {
+          // Transposição perfeita com o modal rotacionado 90 graus no sentido horário:
+          return {
+            x: (t.clientY - r.top),
+            y: (r.right - t.clientX)
+          };
+        } else {
+          return {
+            x: (t.clientX - r.left),
+            y: (t.clientY - r.top)
+          };
+        }
       };
 
       const iniciar = (e) => {
@@ -3380,13 +3449,22 @@
       _assinouPaisagem = false;
       const c = document.getElementById("canvasPaisagem");
       if (c && _ctxPaisagem) {
-        _ctxPaisagem.clearRect(0, 0, c.clientWidth, c.clientHeight);
+        _ctxPaisagem.clearRect(0, 0, c.width, c.height);
       }
       mostrarToast("Prancheta limpa.");
     }
 
     function fecharModalAssinaturaPaisagem() {
-      document.getElementById("modalAssinaturaPaisagem").style.display = "none";
+      const modal = document.getElementById("modalAssinaturaPaisagem");
+      modal.style.display = "none";
+      modal.className = "";
+      _modalRotacionado90 = false;
+
+      // Restaura orientação nativa da tela ao sair
+      try {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+        if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+      } catch (e) {}
     }
 
     function salvarAssinaturaPaisagem() {
@@ -3395,7 +3473,7 @@
         return;
       }
 
-      // Calcula os limites reais (bounding box) da assinatura
+      // Calcula limites da assinatura (bounding box)
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       _linhasReais.forEach(linha => {
         linha.forEach(p => {
@@ -3558,24 +3636,12 @@
   </div>
   <!-- OVERLAY DE ANIMAÇÃO OFICIAL EMED DE FECHAMENTO DE OS -->
   <div id="overlayFechamentoEMED" style="display:none; position:fixed; inset:0; z-index:99999999; background:rgba(0, 26, 51, 0.90); backdrop-filter:blur(8px); flex-direction:column; align-items:center; justify-content:center; color:#ffffff; text-align:center; padding:20px;">
-    <!-- SÍMBOLO OFICIAL EMED: O 'É' EM FORMATO DE ARROBA COM PULSO E GIRO -->
+        <!-- SÍMBOLO OFICIAL EMED COM O 'e' ITÁLICO E ESPIRAL DO ARROBA -->
     <div style="position:relative; width:130px; height:130px; display:flex; align-items:center; justify-content:center; margin-bottom:20px;">
-      <div style="position:absolute; width:115px; height:115px; border-radius:50%; border:3px solid #38bdf8; opacity:0.6; animation:emedPulse 2s infinite;"></div>
-      <div style="position:absolute; width:130px; height:130px; border-radius:50%; border:3px solid transparent; border-top-color:#38bdf8; border-right-color:#0284c7; animation:emedSpin 1.4s linear infinite;"></div>
-      <div style="width:88px; height:88px; border-radius:50%; background:linear-gradient(135deg, #002b54 0%, #0077b6 100%); display:flex; align-items:center; justify-content:center; box-shadow:0 0 25px rgba(2, 132, 199, 0.7); border:2.5px solid #38bdf8;">
-        <svg viewBox="0 0 100 100" width="76" height="76" style="display:block;">
-          <defs>
-            <linearGradient id="emedArobaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#38bdf8"/>
-              <stop offset="100%" stop-color="#ffffff"/>
-            </linearGradient>
-          </defs>
-          <!-- Espiral contínua estilo arroba da eMED envolvendo o 'é' minúsculo -->
-          <path d="M 50,14 A 36,36 0 1,1 18,64 C 16,46 24,28 44,18 C 62,9 82,18 88,38 C 94,58 82,78 62,82 C 44,86 26,74 24,54" 
-                fill="none" stroke="url(#emedArobaGrad)" stroke-width="4.5" stroke-linecap="round"/>
-          <!-- Letra 'é' minúscula oficial com acento agudo no formato da marca eMED -->
-          <text x="49" y="67" font-family="'Segoe UI', Arial, sans-serif" font-weight="900" font-size="52" fill="#ffffff" text-anchor="middle">é</text>
-        </svg>
+      <div style="position:absolute; width:116px; height:116px; border-radius:50%; border:3px solid #38bdf8; opacity:0.6; animation:emedPulse 2s infinite;"></div>
+      <div style="position:absolute; width:132px; height:132px; border-radius:50%; border:3px solid transparent; border-top-color:#38bdf8; border-right-color:#0284c7; animation:emedSpin 1.4s linear infinite;"></div>
+      <div style="width:90px; height:90px; border-radius:50%; background:#ffffff; display:flex; align-items:center; justify-content:center; box-shadow:0 0 30px rgba(56, 189, 248, 0.7); border:3px solid #38bdf8; overflow:hidden; padding:8px;">
+        <img src="data:image/png;base64,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" style="width:100%; height:100%; object-fit:contain; display:block;" alt="eMED" />
       </div>
     </div>
     
@@ -3584,39 +3650,34 @@
     <div style="font-size:12px; color:#cbd5e1; margin-top:8px;">Aguarde alguns instantes enquanto consolidamos os dados na nuvem</div>
   </div>
 
-  <!-- MODAL DE ASSINATURA OFICIAL EMED - PRANCHETA HORIZONTAL DEFINITIVA -->
-  <div id="modalAssinaturaPaisagem" style="display:none; position:fixed; inset:0; z-index:9999999; background:rgba(0, 31, 63, 0.94); backdrop-filter:blur(6px); flex-direction:column; justify-content:space-between; padding:12px;">
-    <div style="background:#002b54; color:#ffffff; padding:12px 16px; border-radius:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; box-shadow:0 4px 15px rgba(0,0,0,0.35);">
-      <div style="display:flex; align-items:center; gap:10px;">
+  <!-- MODAL DE ASSINATURA OFICIAL EMED - GIRO AUTOMÁTICO PARA PAISAGEM -->
+  <div id="modalAssinaturaPaisagem" style="display:none;">
+    <div style="background:#002b54; color:#ffffff; padding:10px 16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:10;">
+      <div style="display:flex; align-items:center; gap:8px;">
         <span style="font-size:22px;">✍️</span>
         <div>
           <div style="font-weight:900; font-size:15px; color:#ffffff;" id="lblTituloAssinaturaPaisagem">Assinatura do Responsável</div>
-          <div style="font-size:11.5px; color:#93c5fd;">Assine na horizontal (se preferir mais espaço, deite o celular)</div>
+          <div style="font-size:11px; color:#93c5fd;">Prancheta Paisagem Oficial • Assine com o dedo ou caneta touch</div>
         </div>
       </div>
       <div style="display:flex; align-items:center; gap:8px;">
         <button type="button" class="btn btn-outline btn-sm" style="background:#ffffff; color:#002b54; border-color:#ffffff; font-weight:bold; padding:8px 14px;" onclick="limparCanvasPaisagem()">
           🧹 Limpar
         </button>
-        <button type="button" class="btn btn-success btn-sm" style="font-weight:900; padding:8px 20px; font-size:14px; box-shadow:0 3px 10px rgba(22,101,52,0.5);" onclick="salvarAssinaturaPaisagem()">
+        <button type="button" class="btn btn-success btn-sm" style="font-weight:900; padding:8px 22px; font-size:14px; box-shadow:0 3px 10px rgba(22,101,52,0.5);" onclick="salvarAssinaturaPaisagem()">
           💾 Salvar
         </button>
         <button type="button" class="btn btn-sm" style="background:transparent; color:#fff; border:1px solid rgba(255,255,255,0.4); font-size:16px; padding:6px 12px;" onclick="fecharModalAssinaturaPaisagem()">✕</button>
       </div>
     </div>
     
-    <!-- PRANCHETA HORIZONTAL AUTO-RESPONSIVA (NUNCA INVERTIDA) -->
-    <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:12px 0;">
-      <div style="width:100%; max-width:850px; height:min(68vh, 320px); min-height:210px; position:relative; background:#ffffff; border-radius:14px; border:2.5px solid #0284c7; box-shadow:0 8px 30px rgba(0,0,0,0.35); overflow:hidden;">
+    <div style="flex:1; position:relative; background:#0f172a; padding:10px; display:flex; flex-direction:column; justify-content:center; align-items:center; overflow:hidden;">
+      <div style="width:100%; height:100%; position:relative; background:#ffffff; border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,0.4); overflow:hidden;">
         <canvas id="canvasPaisagem" style="width:100%; height:100%; touch-action:none; display:block; cursor:crosshair;"></canvas>
-        <div style="position:absolute; bottom:22%; left:6%; right:6%; border-bottom:1.5px dashed #94a3b8; pointer-events:none; text-align:center;">
-          <span style="background:#ffffff; color:#64748b; font-size:11px; padding:0 12px; position:relative; top:8px; font-weight:bold; letter-spacing:0.5px;">LINHA DE ASSINATURA</span>
+        <div style="position:absolute; bottom:20%; left:6%; right:6%; border-bottom:1.5px dashed #94a3b8; pointer-events:none; text-align:center;">
+          <span style="background:#ffffff; color:#64748b; font-size:11px; padding:0 14px; position:relative; top:8px; font-weight:bold; letter-spacing:0.5px;">LINHA DE ASSINATURA</span>
         </div>
       </div>
-    </div>
-
-    <div style="text-align:center; color:#93c5fd; font-size:12px; padding-bottom:6px;">
-      💡 Dica: Ao deitar o smartphone na horizontal, a prancheta se expande automaticamente para tela cheia!
     </div>
   </div>
 </body>

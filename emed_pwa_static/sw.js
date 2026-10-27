@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v11-antiinversao-live';
+const CACHE_NAME = 'emed-pwa-v12-autorotate';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
