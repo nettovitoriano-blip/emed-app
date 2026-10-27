@@ -934,7 +934,7 @@
      * REDE, SERVICE WORKER E COFRE OFFLINE
      ********************************************************************/
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js?v=v17").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=v18").then(reg => { if(reg) reg.update(); }).catch(() => {});
     }
     window.addEventListener("beforeinstallprompt", (e) => {
       e.preventDefault();
@@ -972,6 +972,20 @@
       if (isOnline && fila.length > 0) processarFilaOffline();
     }
     window.addEventListener("online", atualizarStatusRede);
+
+    /********************************************************************
+     * HEARTBEAT ANTI-STANDBY (MANTÉM O SERVIDOR NUVEM 100% ONLINE E QUENTE)
+     ********************************************************************/
+    setInterval(() => {
+      if (navigator.onLine) {
+        fetch("/api/ping", { cache: "no-store" })
+          .then(r => r.json())
+          .then(data => {
+            console.debug("⏱️ [Heartbeat eMED] Servidor mantido online:", data.timestamp);
+          })
+          .catch(() => {});
+      }
+    }, 240000); // Dispara a cada 4 minutos (Render dorme com 15 min de inatividade)
     window.addEventListener("offline", atualizarStatusRede);
 
     async function processarFilaOffline() {

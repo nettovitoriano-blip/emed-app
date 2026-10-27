@@ -13,6 +13,8 @@ import base64
 import sqlite3
 import tempfile
 import datetime
+from datetime import datetime
+import asyncio
 import pandas as pd
 from aiohttp import web
 
@@ -248,6 +250,17 @@ async def handle_logo_circle(request: web.Request) -> web.Response:
         with open(caminho_circ, "rb") as f:
             return web.Response(body=f.read(), content_type="image/png")
     return web.Response(status=404)
+
+
+async def api_ping(request: web.Request) -> web.Response:
+    """Endpoint ultraleve de Keep-Alive / Heartbeat Anti-Standby para Render e Uptime Monitors."""
+    return web.json_response({
+        "status": "ok",
+        "app": "EMED Eletromedicina",
+        "timestamp": datetime.now().isoformat(),
+        "keep_alive": True,
+        "anti_standby": "100% Ativo"
+    })
 
 
 async def api_bootstrap(request: web.Request) -> web.Response:
@@ -1563,6 +1576,8 @@ def criar_app() -> web.Application:
     app.router.add_get("/sw.js", handle_sw)
     app.router.add_get("/api/logo", handle_logo)
     app.router.add_get("/api/logo-circle", handle_logo_circle)
+    app.router.add_get("/api/ping", api_ping)
+    app.router.add_get("/healthz", api_ping)
     app.router.add_get("/api/bootstrap", api_bootstrap)
     app.router.add_get("/api/checklist", api_checklist)
     app.router.add_get("/api/triagem", api_triagem)
@@ -1607,7 +1622,32 @@ def criar_app() -> web.Application:
     return app
 
 
+async def _background_keep_alive_task():
+    """Tarefa em background que envia ping HTTP a cada 9 minutos para manter a instância Render aquecida."""
+    render_url = os.environ.get("RENDER_EXTERNAL_URL", "https://emed-app-6ofv.onrender.com")
+    ping_url = f"{render_url.rstrip('/')}/api/ping"
+    await asyncio.sleep(60) # aguarda 1 minuto após startup
+    while True:
+        try:
+            import urllib.request
+            req = urllib.request.Request(ping_url, headers={"User-Agent": "EMED-Internal-KeepAlive/1.0"})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                if resp.getcode() == 200:
+                    print(f"⏱️ [Anti-Standby] Auto-ping enviado com sucesso para {ping_url}")
+        except Exception as e:
+            # Em ambiente local sem internet pública, ignora silenciosamente
+            pass
+        await asyncio.sleep(540) # a cada 9 minutos (Render dorme em 15 minutos)
+
+
+async def iniciar_app_com_keepalive():
+    app = criar_app()
+    # Inicia a tarefa de auto-ping se estiver rodando no Render ou configurado
+    asyncio.create_task(_background_keep_alive_task())
+    return app
+
+
 if __name__ == "__main__":
     porta = int(os.environ.get("PORT", os.environ.get("EMED_APP_PORT", 8502)))
-    print(f"🚀 Iniciando Servidor Completo do Aplicativo Oficial EMED na porta {porta}...")
-    web.run_app(criar_app(), host="0.0.0.0", port=porta)
+    print(f"🚀 Iniciando Servidor Completo do Aplicativo Oficial EMED na porta {porta} (com Anti-Standby 24/7)...")
+    web.run_app(iniciar_app_com_keepalive(), host="0.0.0.0", port=porta)
