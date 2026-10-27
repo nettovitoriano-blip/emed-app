@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v18-anti-standby';
+const CACHE_NAME = 'emed-pwa-v19-respostas-alertas-proposta';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
