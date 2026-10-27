@@ -1,4 +1,11 @@
 # INSTRUÇÃO DE TRABALHO (IT-RXM-SHIM-002)
+
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-RXM-SHIM-002`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+|:---:|:---|:---|
+
+---
+
+
 ## Calibração da Manopla com Balança / Dinamômetro (FSR) & Ajuste do Sensor do Braço no Catcher
 ### Raio-X Móvel Digital Shimadzu MobileDaRt Evolution (Versão MX8 & MX9)
 *Baseado nos Manuais Oficiais Shimadzu M503-E404H (Seção 7.5 e 7.1) e M503-E411F (Seções 4.3 e 4.4)*

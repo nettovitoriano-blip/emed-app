@@ -1,4 +1,11 @@
 # INSTRUÇÃO DE TRABALHO TÉCNICA - eMED BIOMEDICAL
+
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-RXD-NEU-002`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+|:---:|:---|:---|
+
+---
+
+
 ## IT-RXD-NEU-002: Calibração de Campo Plano (Flat Field), Ganho, Offset e Mapa de Defeitos (Canon CXDI / NeuVision 550M)
 **Equipamento:** Neusoft NeuVision 550M / NeuVision 550M Plus (DR Móvel)  
 **Subsistema:** Flat Panel Detector (FPD) sem fio Canon CXDI & Canon Service Tool  

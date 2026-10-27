@@ -9,8 +9,16 @@ __pycache__/
 scratch/
 screenshots_fluxo_kit/
 temp_video_fluxo_kit/
+temp_it21_video/
+temp_preinstall_video/
+uploads_os/
 qrcode_*.png
 qrcode_*.html
 test_*.py
 build_fluxo_kit_ferramentas_video.py
 capture_fluxo_kit_screenshots.py
+
+# Manuais brutos pesados de fabrica (>30MB)
+Manuais/1. MX8_Installation_Common_Section_M503-E404K.pdf
+Manuais/2. MX8_Installation_DR_Part_M503-E410L.pdf
+Manuais/**/02_MANUAIS_DE_SERVICO_E_INSTALACAO/

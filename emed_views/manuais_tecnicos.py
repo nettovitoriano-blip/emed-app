@@ -51,7 +51,9 @@ DICIONARIO_VIDEOS_ITS = {
     "IT_RX_LOT_002_Calibracao_kV_mA_Tempo_Manutencao_Familia_HF.md": "Video_IT_RX_LOT001_Vistoria_Pre_Instalacao_HF500M.mp4",
     "IT_RX_LOT_002_Calibracao_kV_mA_Tempo_Manutencao_Familia_HF.pdf": "Video_IT_RX_LOT001_Vistoria_Pre_Instalacao_HF500M.mp4",
     "IT_RXD_NEU_002_Calibracao_Flat_Field_Ganho_Offset_Canon_CXDI.md": "Video_IT_RXD_NEU001_Instalacao_Software_DR_NeuVision550M.mp4",
-    "IT_RXD_NEU_002_Calibracao_Flat_Field_Ganho_Offset_Canon_CXDI.pdf": "Video_IT_RXD_NEU001_Instalacao_Software_DR_NeuVision550M.mp4"
+    "IT_RXD_NEU_002_Calibracao_Flat_Field_Ganho_Offset_Canon_CXDI.pdf": "Video_IT_RXD_NEU001_Instalacao_Software_DR_NeuVision550M.mp4",
+    "IT_21_Instalacao_e_Recarga_de_Software_LFC_GE_BrightSpeed.md": "Video_IT21_Instalacao_Software_LFC_BrightSpeed.mp4",
+    "IT_21_Instalacao_e_Recarga_de_Software_LFC_GE_BrightSpeed.pdf": "Video_IT21_Instalacao_Software_LFC_BrightSpeed.mp4"
 }
 
 
@@ -607,11 +609,17 @@ def _renderizar_leitor_markdown(caminho_md: str, doc_key: str = "it"):
             _renderizar_bloco_video_vinculado(caminho_video, doc_key=f"md_top_{doc_key}")
 
         # Resolução e Embutimento Automático de Imagens Locais (assets) em Base64
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         pasta_doc = os.path.dirname(caminho_md)
+
         def _sub_img(match):
             alt_txt = match.group(1)
             img_rel = match.group(2)
             caminho_img = os.path.normpath(os.path.join(pasta_doc, img_rel))
+            if not os.path.exists(caminho_img):
+                p_root = os.path.normpath(os.path.join(base_dir, img_rel))
+                if os.path.exists(p_root):
+                    caminho_img = p_root
             if os.path.exists(caminho_img):
                 ext = os.path.splitext(caminho_img)[1].lower().replace(".", "")
                 if ext == "jpg":
@@ -625,7 +633,31 @@ def _renderizar_leitor_markdown(caminho_md: str, doc_key: str = "it"):
                     pass
             return match.group(0)
 
+        def _sub_img_tag(match):
+            full_tag = match.group(0)
+            src = match.group(1)
+            if src.startswith("data:") or src.startswith("http"):
+                return full_tag
+            p_local = os.path.normpath(os.path.join(pasta_doc, src))
+            if not os.path.exists(p_local):
+                p_root = os.path.normpath(os.path.join(base_dir, src))
+                if os.path.exists(p_root):
+                    p_local = p_root
+            if os.path.exists(p_local):
+                ext = os.path.splitext(p_local)[1].lower().replace(".", "")
+                if ext == "jpg":
+                    ext = "jpeg"
+                mime = f"image/{ext}"
+                try:
+                    with open(p_local, "rb") as fl:
+                        b64 = base64.b64encode(fl.read()).decode("utf-8")
+                    return full_tag.replace(src, f"data:{mime};base64,{b64}")
+                except Exception:
+                    pass
+            return full_tag
+
         conteudo_render = re.sub(r'!\[(.*?)\]\((.*?)\)', _sub_img, conteudo)
+        conteudo_render = re.sub(r"""<img[^>]+src=['"]([^'"]+)['"]""", _sub_img_tag, conteudo_render)
 
         st.markdown(
             f"""
@@ -660,7 +692,7 @@ def _obter_catalogo_videos(base_dir: str) -> list:
             "equipamento": "Tomógrafo GE Brivo CT385 / BrightSpeed",
             "it_arquivo": "IT_01_Troca_de_Tubo_GE_Brivo385.md",
             "duracao_aprox": "03:45",
-            "descricao": "Roteiro prático passo a passo para içamento com guincho, fixação dos parafusos M10 e M12 com torquímetro calibrado, conexão dos receptáculos de alta tensão com óleo dielétrico e calibração completa no Service Desktop (mA, Filamento, POR, BOW, ISO e QA Fantom).",
+            "descricao": "Roteiro prático passo a passo para içamento com guincho, fixação dos parafusos M10 e M12 com torquímetro calibrado, conexão dos receptáculos de alta tensão com óleo dielétrico e calibração completa no Service Desktop (mA, Filamento, POR, BOW, ISO e QA Phantom).",
             "tags": ["tubo", "ge", "brivo", "brightspeed", "calibração", "alinhamento", "loto", "gantry"]
         },
         {
@@ -1752,7 +1784,7 @@ def _render_lista_cards(docs: list, ocorrencias_busca: dict = None):
                         * **Desenergização LOTO:** Desligar PDU + 3 chaves do Service Switch Panel (Axial Drive, HVDC, 120VAC).
                         * **Firmware:** Executar *Flash Download* após religar para gravar firmware na NVRAM da nova placa.
                         * **Restauração de Parâmetros:** *Restore Runtime Parameters* (ou *Initialize Database* se sem backup).
-                        * **Calibrações Mandatórias:** Rotation Safety Check, Meter Verification, Filament Calibration, HHS Scans e QA Fantom H2O ($0 \pm 4\text{ HU}$).
+                        * **Calibrações Mandatórias:** Rotation Safety Check, Meter Verification, Filament Calibration, HHS Scans e QA Phantom H2O ($0 \pm 4\text{ HU}$).
                         """)
                 elif "axial_drive" in doc["nome_arquivo"].lower() or "it_14" in doc["nome_arquivo"].lower():
                     with st.expander("⚡ Parâmetros Críticos do Axial Drive / Rotação (GE BrightSpeed)"):

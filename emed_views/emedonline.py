@@ -392,7 +392,7 @@ def _obter_perguntas_triagem_dinamica(modalidade: str, defeito: str, equip: str)
     # 4. Qualidade de Imagem, Artefatos e Detectores
     termos_imagem = [
         "ARTEFATO", "ARTEFATOS", "MANCHA", "MANCHAS", "RISCO", "RISCOS", "LISTRA", "LISTRAS",
-        "LINHA", "LINHAS", "ANEL", "ANEIS", "ANÉIS", "FANTOMA", "PHANTOM", "AIR CAL",
+        "LINHA", "LINHAS", "ANEL", "ANEIS", "ANÉIS", "PHANTOM", "PHANTOM", "AIR CAL",
         "CALIBRAÇÃO", "CALIBRACAO", "PIXEL", "PIXELS", "RUÍDO", "RUIDO"
     ]
     if _contem_termo_triagem(txt, termos_imagem):

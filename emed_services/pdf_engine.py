@@ -184,25 +184,31 @@ def markdown_to_html(md_text: str, doc_title: str = "Instrução de Trabalho eME
     if not logo_html:
         logo_html = "<div style='font-size:16pt; font-weight:900; color:#0077b6;'>🏥 eMED</div>"
 
-    # Extrai o código da IT se presente no doc_title
+    # Extrai o código da IT se presente no doc_title ou no markdown
     m_cod = re.search(r'(IT[_-][A-Z0-9_-]+)', doc_title, re.IGNORECASE)
     cod_doc = m_cod.group(1).replace("_", "-").upper() if m_cod else "POP/IT-EMED"
     if cod_doc.startswith("IT-") and len(cod_doc.split("-")) == 2 and cod_doc.split("-")[1].isdigit():
         cod_doc = f"IT-TOMO-GE-{int(cod_doc.split('-')[1]):03d}"
 
+    doc_title_display = doc_title.replace("_", " ").strip()
+    for l in md_text.splitlines()[:5]:
+        if l.strip().startswith("# "):
+            doc_title_display = l.strip().lstrip("#").strip()
+            break
+
     body_html = [
         "<div class='header-box' style='border-bottom: 2.5px solid #0077b6; padding-bottom: 8px; margin-bottom: 14px;'>",
-        "<table style='width:100%; border:none; margin:0; border-collapse:collapse;'>",
+        "<table style='width:100%; border:none; margin:0; border-collapse:collapse; table-layout:fixed;'>",
         "<tr style='background:transparent;'>",
-        f"<td style='border:none; width:140px; vertical-align:middle; padding:0 8px 0 0;'>{logo_html}</td>",
-        "<td style='border:none; vertical-align:middle; padding:0 8px;'>",
-        "<div style='font-size:11pt; font-weight:800; color:#0b132b; letter-spacing:0.3px;'>EMED ELETROMEDICINA LTDA.</div>",
-        "<div style='font-size:7.5pt; color:#64748b; font-weight:600;'>ENGENHARIA CLÍNICA • DIAGNÓSTICO POR IMAGEM • CNPJ: 03.611.974/0001-08</div>",
-        f"<div class='header-title' style='color:#0077b6; font-size:12.5pt; font-weight:bold; margin-top:3px;'>{clean_latex(doc_title)}</div>",
+        f"<td style='border:none; width:120px; vertical-align:middle; padding:0 6px 0 0;'>{logo_html}</td>",
+        "<td style='border:none; vertical-align:middle; padding:0 8px; overflow:hidden;'>",
+        "<div style='font-size:10pt; font-weight:800; color:#0b132b; letter-spacing:0.3px;'>EMED ELETROMEDICINA LTDA.</div>",
+        "<div style='font-size:7pt; color:#64748b; font-weight:600;'>ENGENHARIA CLÍNICA • DIAGNÓSTICO POR IMAGEM • CNPJ: 03.611.974/0001-08</div>",
+        f"<div class='header-title' style='color:#0077b6; font-size:10pt; font-weight:bold; margin-top:2px; line-height:1.25;'>{clean_latex(doc_title_display)}</div>",
         "</td>",
-        "<td style='border:none; width:175px; vertical-align:middle; text-align:right; padding:0;'>",
-        "<div style='background:#f8fafc; border:1.2px solid #0077b6; border-radius:4px; padding:4px 7px; text-align:left; font-size:7.5pt; line-height:1.3;'>",
-        f"<b>CÓDIGO:</b> <span style='color:#0077b6;'>{cod_doc}</span><br/>",
+        "<td style='border:none; width:155px; vertical-align:middle; text-align:right; padding:0;'>",
+        "<div style='background:#f8fafc; border:1.2px solid #0077b6; border-radius:4px; padding:3px 6px; text-align:left; font-size:7pt; line-height:1.25;'>",
+        f"<b>CÓDIGO:</b> <span style='color:#0077b6; font-weight:bold;'>{cod_doc}</span><br/>",
         "<b>VERSÃO:</b> <span style='color:#0284c7; font-weight:bold;'>2.4 Homologada</span><br/>",
         "<b>REVISÃO:</b> Rev. 02 | 26/10/2026<br/>",
         "<b>NORMA:</b> ANVISA RDC 611",
@@ -212,12 +218,27 @@ def markdown_to_html(md_text: str, doc_title: str = "Instrução de Trabalho eME
         "</div>"
     ]
 
-    lines = md_text.splitlines()
+    raw_lines = md_text.splitlines()
     in_table = False
     table_html = []
     in_alert = False
     alert_type = "info"
     alert_lines = []
+
+    # Ignora metadados iniciais (H1, tabela de versão, réguas) pois o cabeçalho PDF oficial já os renderiza
+    idx_content_start = 0
+    ignoring_top_meta = True
+    for idx_line, line in enumerate(raw_lines):
+        s_test = line.strip()
+        if ignoring_top_meta:
+            if s_test.startswith("# ") or s_test.startswith("|") or s_test.startswith("---") or s_test == "":
+                continue
+            else:
+                idx_content_start = idx_line
+                ignoring_top_meta = False
+                break
+
+    lines = raw_lines[idx_content_start:]
 
     for line in lines:
         s = line.strip()

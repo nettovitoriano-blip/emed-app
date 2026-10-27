@@ -1,4 +1,11 @@
 # INSTRUÇÃO DE TRABALHO TÉCNICA - eMED BIOMEDICAL
+
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-TOMO-GE-016`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+|:---:|:---|:---|
+
+---
+
+
 ## IT-TOMO-GE-016: Diagnóstico e Substituição dos Módulos de Potência IGBT no Inversor de Alta Tensão (JEDI Generator)
 **Sistema:** Tomógrafo Computadorizado GE BrightSpeed (Lite, Select, 16, Ultra, Plus) & Brivo CT385  
 **Subsistema:** Power Unit / Gantry High Voltage Generation / Inversor Ressonante JEDI  
@@ -207,7 +214,7 @@ Ordem de Aperto Cruzado dos Parafusos da Base:
 6. **Pipeline Final de Calibração com Emissão de Raio-X:**
    * Executar **`[Filament Cal]`** (Calibração de corrente de filamento fino e grosso).
    * Executar **`[HHS Scans]`** (Varreduras em alta rotação sob carga contínua).
-   * Executar teste de calibração no **Fantom de Água de QA** ($120\text{ kV} / 200\text{ mA}$, tolerância de $0 \pm 4\text{ HU}$, desvio padrão do ruído $< 3,5\text{ HU}$).
+   * Executar teste de calibração no **Phantom de Água de QA** ($120\text{ kV} / 200\text{ mA}$, tolerância de $0 \pm 4\text{ HU}$, desvio padrão do ruído $< 3,5\text{ HU}$).
 
 ---
 
@@ -222,5 +229,5 @@ Ordem de Aperto Cruzado dos Parafusos da Base:
 - [ ] Tampa frontal da Power Unit fechada com os 12 parafusos sextavados de blindagem.
 - [ ] Teste progressivo sem carga (*No Load kV Test*) executado de $60\text{ kV}$ até $140\text{ kV}$ sem erros de inversor.
 - [ ] Calibração de filamentos (Small e Large) e varreduras HHS executadas com sucesso.
-- [ ] Exame de QA com fantom de água aprovado dentro dos padrões ($0 \pm 4\text{ HU}$).
+- [ ] Exame de QA com phantom de água aprovado dentro dos padrões ($0 \pm 4\text{ HU}$).
 - [ ] Equipamento lacrado, tampas instaladas e sistema liberado para exames com pacientes.

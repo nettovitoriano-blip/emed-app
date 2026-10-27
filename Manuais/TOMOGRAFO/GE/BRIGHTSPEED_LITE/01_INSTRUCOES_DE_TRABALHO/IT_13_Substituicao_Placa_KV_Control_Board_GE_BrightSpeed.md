@@ -1,4 +1,11 @@
 # INSTRUÇÃO DE TRABALHO TÉCNICA - eMED BIOMEDICAL
+
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-TOMO-GE-013`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+|:---:|:---|:---|
+
+---
+
+
 ## IT-TOMO-GE-013: Substituição da Placa Controladora de Alta Tensão (Programmed KV Control Board)
 **Sistema:** Tomógrafo Computadorizado GE BrightSpeed (Lite, Select, 16, Ultra, Plus)  
 **Subsistema:** Gantry / Geração de Alta Tensão / Power Unit (Gerador JEDI)  
@@ -29,7 +36,7 @@ Padronizar a rotina técnica de substituição física da **Placa Controladora d
 | **4** | Chave Sextavada para parafusos da Power Unit | Remoção dos **12 parafusos** da tampa frontal da Power Unit |
 | **5** | Multímetro Digital True-RMS CAT III 1000V calibrado | Confirmação de ausência de tensão no barramento HVDC |
 | **6** | Kit LOTO (Cadeado, garra de travamento e cartão de bloqueio) | Bloqueio de segurança no disjuntor geral da PDU |
-| **7** | Fantom de Calibração de Água (QA Phantom GE) | Teste final de aceite e qualidade de imagem ($0 \pm 4\text{ HU}$) |
+| **7** | Phantom de Calibração de Água (QA Phantom GE) | Teste final de aceite e qualidade de imagem ($0 \pm 4\text{ HU}$) |
 
 ---
 
@@ -48,7 +55,7 @@ flowchart TD
     D --> E["5. Instalação da Nova Placa & Tampa<br>(Reconectar fiação e fechar Power Unit)"]
     E --> F["6. Carga de Firmware e Banco<br>(Flash Download + Restore Runtime)"]
     F --> G["7. Pipeline de Calibrações<br>(Filament Cal, Meter Verif., HHS Scans)"]
-    G --> H["8. Teste de Aceite QA Final<br>(Fantom H2O: 0 ± 4 HU / Ruído < 3.5)"]
+    G --> H["8. Teste de Aceite QA Final<br>(Phantom H2O: 0 ± 4 HU / Ruído < 3.5)"]
 ```
 
 ---
@@ -147,8 +154,8 @@ flowchart TD
    - Selecione **`[HHS Scans]`** para executar uma bateria de varreduras em alta potência e alta rotação, condicionando a malha de controle térmico e atestando a estabilidade da nova placa sob carga pesada.
 7. **System Scanning Test:**
    - Execute uma rotina completa de varredura helicoidal e axial no modo clínico para certificar que nenhum erro de timeout, comunicação ou arco elétrico ocorre.
-8. **Quality Assurance Test (QA Test com Fantom de Água):**
-   - Posicione o fantom oficial de calibração da GE no suporte da mesa e alinhe o plano de corte no centro da seção de água.
+8. **Quality Assurance Test (QA Test com Phantom de Água):**
+   - Posicione o phantom oficial de calibração da GE no suporte da mesa e alinhe o plano de corte no centro da seção de água.
    - Execute o protocolo padrão de QA ($120\text{ kV}$, $200\text{ mA}$, corte de $5\text{ mm}$):
      - **Número de CT Médio da Água ($H_2O$):** Deve situar-se estritamente entre **$-4\text{ HU}$ e $+4\text{ HU}$** ($0 \pm 4\text{ HU}$).
      - **Desvio Padrão do Ruído (Noise SD):** Deve ser **$< 3,5\text{ HU}$**.
@@ -169,5 +176,5 @@ flowchart TD
 | **7** | Gantry Rotation Safety Check executado | [ ] Concluído | Sem atritos na blindagem |
 | **8** | Calibração de filamentos (Small e Large Focus) aprovada (PASSED) | [ ] Concluído | Ambos os focos calibrados |
 | **9** | Varreduras HHS em alta rotação executadas sem erros de arco ou sobretensão | [ ] Concluído | Estabilidade térmica atestada |
-| **10** | Fantom de água de QA executado dentro das tolerâncias ($0 \pm 4\text{ HU}$) | [ ] Concluído | Valor obtido: ______ HU (SD: ______) |
+| **10** | Phantom de água de QA executado dentro das tolerâncias ($0 \pm 4\text{ HU}$) | [ ] Concluído | Valor obtido: ______ HU (SD: ______) |
 | **11** | Tampas do Gantry instaladas e equipamento liberado para uso médico | [ ] Concluído | Engenheiro Responsável: ____________ |

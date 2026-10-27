@@ -1,9 +1,10 @@
 # INSTRUÇÃO DE TRABALHO: TROCA DE TUBO DE RAIO-X
-### Tomógrafo Computadorizado GE BrightSpeed Lite / Select Series
-**DOCUMENTO:** `IT-TOMO-GE-003` | **REVISÃO:** 01 | **REF. FABRICANTE:** Direction 5181178-800 Rev 16  
-**EMED ELETROMEDICINA LTDA. | ENGENHARIA CLÍNICA & SUPORTE ESPECIALIZADO EM CAMPO**
+
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-TOMO-GE-003`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+|:---:|:---|:---|
 
 ---
+
 
 ## 1. Objetivo e Escopo
 

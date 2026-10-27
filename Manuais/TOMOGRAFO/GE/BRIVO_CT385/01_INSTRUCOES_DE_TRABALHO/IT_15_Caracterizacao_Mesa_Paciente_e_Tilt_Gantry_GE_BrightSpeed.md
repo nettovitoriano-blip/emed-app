@@ -1,4 +1,11 @@
 # INSTRUÇÃO DE TRABALHO TÉCNICA - eMED BIOMEDICAL
+
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-TOMO-GE-015`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+|:---:|:---|:---|
+
+---
+
+
 ## IT-TOMO-GE-015: Caracterização Completa da Mesa do Paciente (IN / OUT e UP / DOWN) e Calibração do Tilt do Gantry
 **Sistema:** Tomógrafo Computadorizado GE BrightSpeed (Lite, Select, 16, Ultra, Plus) & Brivo CT385  
 **Subsistemas:** Mesa do Paciente (Patient Table / Cradle) & Inclinação Mecânica do Gantry (Tilt $\pm 30^\circ$)  

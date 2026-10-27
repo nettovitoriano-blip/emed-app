@@ -1469,7 +1469,7 @@ TEMPLATES_RELATORIO_TECNICO = {
         "AFERIÇÃO RADIOMÉTRICA E CALIBRAÇÃO DE FEIXE DE RAIOS-X EXECUTADA CONFORME RDC 611 DA ANVISA. "
         "AFERIÇÃO DE TENSÃO DE PICO (KVp), CORRENTE DO TUBO (mA) E TEMPO DE EXPOSIÇÃO (ms) UTILIZANDO MULTÍMETRO RADIOMÉTRICO CALIBRADO. "
         "TESTE DE COINCIDÊNCIA DO CAMPO LUMINOSO COM O CAMPO DE RADIAÇÃO (COLIMADOR). "
-        "AVALIAÇÃO DA CAMADA SEMIREDUTORA (HVL), RENDIMENTO DO TUBO E QUALIDADE DE IMAGEM COM FANTOMA RADIOGRÁFICO PADRÃO. "
+        "AVALIAÇÃO DA CAMADA SEMIREDUTORA (HVL), RENDIMENTO DO TUBO E QUALIDADE DE IMAGEM COM PHANTOM RADIOGRÁFICO PADRÃO. "
         "PARÂMETROS EM CONFORMIDADE COM AS ESPECIFICAÇÕES DO FABRICANTE."
     ),
     "🎛️ Reparo Eletrônico em Bancada / Placa de Potência": (
@@ -1518,7 +1518,7 @@ def gerar_sugestao_relatorio_clinico(equipamento: str, defeito: str = "", tipo_s
                 "MANUTENÇÃO PREVENTIVA E CALIBRAÇÃO GERAL EM SISTEMA DE TOMOGRAFIA COMPUTADORIZADA. "
                 "LIMPEZA DO GANTRY, CHECAGEM DAS ESCOVAS DO SLIP-RING E VERIFICAÇÃO DE DESGASTE. "
                 "INSPEÇÃO DOS SISTEMAS DE REFRIGERAÇÃO, TESTE DE SENSORES DE PARADA DE EMERGÊNCIA E LASERS DE POSICIONAMENTO. "
-                "AFERIÇÃO DE SEGURANÇA ELÉTRICA E QUALIDADE DE IMAGEM COM FANTOMA DE CALIBRAÇÃO. EQUIPAMENTO 100% OPERACIONAL."
+                "AFERIÇÃO DE SEGURANÇA ELÉTRICA E QUALIDADE DE IMAGEM COM PHANTOM DE CALIBRAÇÃO. EQUIPAMENTO 100% OPERACIONAL."
             )
             
     # 2. Mamografia
@@ -1535,7 +1535,7 @@ def gerar_sugestao_relatorio_clinico(equipamento: str, defeito: str = "", tipo_s
             return (
                 "MANUTENÇÃO PREVENTIVA E AFERIÇÃO RADIOMÉTRICA EM MAMÓGRAFO. "
                 "INSPEÇÃO MECÂNICA DO BRAÇO C, VERIFICAÇÃO DOS ELETROFREIOS DE ROTAÇÃO E ALINHAMENTO DA BANDEJA DE COMPRESSÃO. "
-                "AFERIÇÃO DA FOTOCÉLULA (AEC) E CONTROLE DE QUALIDADE COM FANTOMA ACRÍLICO PADRÃO. "
+                "AFERIÇÃO DA FOTOCÉLULA (AEC) E CONTROLE DE QUALIDADE COM PHANTOM ACRÍLICO PADRÃO. "
                 "NENHUMA ANOMALIA DETECTADA. EQUIPAMENTO LIBERADO PARA EXAMES CLÍNICOS."
             )
 
@@ -1626,7 +1626,7 @@ def obter_checklist_acoes_sugeridas(equipamento: str, defeito: str = "") -> list
                 "Calibração da célula de carga e ajuste da força máxima de compressão (limite 18 daN)",
                 "Teste funcional do sistema de descompressão automática de emergência",
                 "Alinhamento da bandeja de compressão e teste de paralelismo com o receptor de imagem",
-                "Aferição da fotocélula (AEC) em fantoma acrílico padrão",
+                "Aferição da fotocélula (AEC) em phantom acrílico padrão",
                 "Certificação dos parâmetros de compressão conforme requisitos da RDC 611/ANVISA",
             ]
         else:
@@ -1635,7 +1635,7 @@ def obter_checklist_acoes_sugeridas(equipamento: str, defeito: str = "") -> list
                 "Aferição dos eletrofreios de rotação e verificação de folgas mecânicas",
                 "Limpeza e higienização técnica da mesa de exame e bandejas de compressão",
                 "Teste dos pedais de controle e comandos no painel da workstation",
-                "Controle de qualidade de imagem radiográfica com fantoma de mamografia padrão",
+                "Controle de qualidade de imagem radiográfica com phantom de mamografia padrão",
                 "Verificação de reprodutibilidade e linearidade de dose do feixe",
                 "Equipamento liberado e em conformidade técnica para exames clínicos",
             ]

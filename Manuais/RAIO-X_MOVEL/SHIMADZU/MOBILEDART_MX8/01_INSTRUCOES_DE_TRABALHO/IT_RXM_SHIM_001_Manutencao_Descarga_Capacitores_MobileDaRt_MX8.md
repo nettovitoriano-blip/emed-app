@@ -1,4 +1,11 @@
 # INSTRUÇÃO DE TRABALHO (IT-RXM-SHIM-001)
+
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-RXM-SHIM-001`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+|:---:|:---|:---|
+
+---
+
+
 ## Manutenção Preventiva, Diagnóstico de Falhas & Descarga Segura de Capacitores
 ### Raio-X Móvel Digital Shimadzu MobileDaRt Evolution (Versões MX8 & MX9)
 *Baseado no manual oficial de serviço Shimadzu M503-E411F / M503-E404H*

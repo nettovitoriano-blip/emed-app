@@ -1,4 +1,11 @@
 # INSTRUÇÃO DE TRABALHO TÉCNICA - eMED BIOMEDICAL
+
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-RX-LOT-002`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+|:---:|:---|:---|
+
+---
+
+
 ## IT-RX-LOT-002: Calibração de Parâmetros Radiológicos (kV, mA, Tempo) e Manutenção Preventiva (Família HF Lotus)
 **Equipamento:** Aparelhos de Raios-X Fixos e Telecomandados Lotus Família HF  
 **Documento Base:** Manual do Usuário e Operação Família HF & Rotina Preventiva eMED  
@@ -16,7 +23,7 @@ Estabelecer o protocolo de calibração metrológica de tensão de pico ($kV_p$)
 * Medidor Multiparâmetro não invasivo de Raios-X (ex: Radcal, RaySafe ou Piranha) calibrado pela RBC.
 * Multímetro digital True-RMS e osciloscópio digital de memória com ponta de prova $100:1$.
 * Dispositivo de teste de alinhamento de feixe luminoso e radiológico (placa de chumbo com orifícios calibrados).
-* Fantom de alumínio para filtração equivalente ($2,5\text{ mm Al}$).
+* Phantom de alumínio para filtração equivalente ($2,5\text{ mm Al}$).
 
 ---
 

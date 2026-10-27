@@ -1,6 +1,10 @@
 # IT-GE-CT-019: Substituição, Montagem Mecânica e Calibração do Colimador Motorizado - GE BrightSpeed / Brivo CT
 
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-TOMO-GE-019`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+|:---:|:---|:---|
+
 ---
+
 
 ## 1. OBJETIVO E ESCOPO
 Esta Instrução de Trabalho (IT) padroniza o procedimento de manutenção de campo para a remoção segura com guincho, substituição da unidade mecânica, conexões eletrônicas da placa CCB, conferência de torques estruturais e execução das rotinas de alinhamento óptico e calibração de software do **Colimador Motorizado (P/N 5140001-6)** nos tomógrafos **GE BrightSpeed (4, 8 e 16 canais)** e **GE Brivo CT385**.

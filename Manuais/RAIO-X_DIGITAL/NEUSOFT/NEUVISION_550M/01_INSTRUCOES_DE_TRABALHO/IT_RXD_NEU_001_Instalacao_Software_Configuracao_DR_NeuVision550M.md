@@ -1,4 +1,11 @@
 # INSTRUÇÃO DE TRABALHO TÉCNICA - eMED BIOMEDICAL
+
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-RXD-NEU-001`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+|:---:|:---|:---|
+
+---
+
+
 ## IT-RXD-NEU-001: Instalação de Software, Configuração do Gerador e Rede DR Sem Fio - NeuVision 550M / 550M Plus
 **Sistema:** Neusoft NeuVision 550M / NeuVision 550M Plus (Mobile DR)  
 **Subsistemas:** Estação de Aquisição DR, Gerador Sedecal de Alta Tensão, Flat Panel Canon CXDI & AP Wi-Fi  
