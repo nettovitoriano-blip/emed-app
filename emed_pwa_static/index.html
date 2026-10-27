@@ -609,6 +609,40 @@
       box-shadow: 0 8px 20px rgba(0,0,0,0.3);
       display: none;
     }
+  
+    /* ANIMAÇÃO OFICIAL EMED COM SÍMBOLO @ */
+    @keyframes emedSpin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes emedPulse {
+      0% { transform: scale(0.92); opacity: 0.85; }
+      50% { transform: scale(1.12); opacity: 0.25; }
+      100% { transform: scale(0.92); opacity: 0.85; }
+    }
+    @media (max-width: 640px) {
+      .form-grid {
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+        margin-bottom: 8px !important;
+      }
+      .modal-box {
+        margin: 0 auto !important;
+        border-radius: 8px !important;
+        width: 100% !important;
+      }
+      .modal-body {
+        padding: 10px 12px !important;
+      }
+      .section-box {
+        padding: 10px 12px !important;
+        margin-bottom: 10px !important;
+      }
+      .section-title {
+        font-size: 11.5px !important;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -1116,8 +1150,11 @@
             <button class="btn btn-primary btn-sm" style="flex:1;" onclick="abrirModalOS('${esc(os.id)}')">
               ${st.includes("CONCLU") ? "✏️ Ver / Editar OS" : "⚡ Executar / Preencher OS"}
             </button>
+            <a class="btn btn-outline btn-sm" href="/api/imprimir/${encodeURIComponent(os.id)}" target="_blank" title="Imprimir em A4 direto sem folha branca">
+              🖨️ Imprimir A4
+            </a>
             <a class="btn btn-outline btn-sm" href="/api/pdf/${encodeURIComponent(os.id)}" target="_blank">
-              📄 PDF 1 Pág
+              📄 PDF
             </a>
             ${telLimpo ? `<a class="btn btn-success btn-sm" href="https://wa.me/55${telLimpo}?text=${msgWpp}" target="_blank">📲 WhatsApp</a>` : ""}
             ${mostrarBotoesGestor && st.includes("CONCLU") ? `<button class="btn btn-amber btn-sm" onclick="reabrirOS('${esc(os.id)}')">🔓 Reabrir</button>` : ""}
@@ -2659,11 +2696,12 @@
       if (!os) return;
       STATE.osAberta = os;
 
-      window._fotosEvidenciaB64 = [];
-      window._videoEvidenciaB64 = "";
-
       const rascLocal = JSON.parse(localStorage.getItem(`emed_draft_${os.id}`) || "{}");
       const val = (campo, padrao = "") => (rascLocal[campo] !== undefined && rascLocal[campo] !== "") ? rascLocal[campo] : (os[campo] || padrao);
+
+      window._fotosEvidenciaB64 = val('fotos_multiplas_b64', []) || [];
+      window._videoEvidenciaB64 = val('video_b64', "");
+      window._assinaturaDataUrl = val('assinatura_cliente_img', os.assinatura_cliente_img || "");
 
       document.getElementById("modalOSTitulo").innerText = `ORDEM DE SERVIÇO Nº #${os.id} — ${os.cliente}`;
       const body = document.getElementById("modalOSBody");
@@ -2694,7 +2732,8 @@
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
               <button class="btn btn-primary btn-sm" onclick="registrarCheckinOS('${esc(os.id)}')">📍 Check-in Manual</button>
-              <button class="btn btn-outline btn-sm" onclick="abrirVisualizadorLaudo('${esc(os.id)}')">📄 Ver PDF da OS</button>
+              <button class="btn btn-outline btn-sm" onclick="abrirVisualizadorLaudo('${esc(os.id)}')">📄 Ver PDF</button>
+              <a class="btn btn-primary btn-sm" href="/api/imprimir/${encodeURIComponent(os.id)}" target="_blank" style="background:#0f766e;border-color:#0f766e;">🖨️ Imprimir A4</a>
             </div>
           </div>
         </div>
@@ -2813,24 +2852,35 @@
           </div>
         </div>
 
-        <!-- ASSINATURA TOUCH COM BOTÃO 'ASSINATURA RESPONSÁVEL' ABAIXO DO NOME -->
+        <!-- ASSINATURA DO RESPONSÁVEL EM TELA CHEIA NA ORIENTAÇÃO PAISAGEM -->
         <div class="section-box">
           <div class="section-title">
             <span>✍️ Validação do Cliente / Responsável do Hospital</span>
-            <button type="button" class="btn btn-outline btn-sm" onclick="limparCanvasAssinatura()">🧹 Limpar</button>
           </div>
           <label class="field-label">Nome do Responsável Local</label>
-          <input id="osAssNome" class="input" placeholder="NOME LEGÍVEL E CARGO DO RECEBEDOR NO HOSPITAL" value="${esc(val('assinatura_cliente', os.responsavel_hospital))}" style="margin-bottom:8px;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();" />
+          <input id="osAssNome" class="input" placeholder="NOME LEGÍVEL E CARGO DO RECEBEDOR NO HOSPITAL" value="${esc(val('assinatura_cliente', os.responsavel_hospital))}" style="margin-bottom:10px;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();" />
           
-          <div style="margin-bottom:10px;">
-            <button type="button" class="btn btn-primary" style="width:100%;padding:12px;font-size:14px;font-weight:bold;" onclick="abrirModalAssinaturaDedicada()">
-              ✍️ Assinatura Responsável
-            </button>
-          </div>
+          <button type="button" class="btn btn-primary" style="width:100%;padding:12px 16px;font-size:14.5px;font-weight:bold;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 3px 8px rgba(0,43,84,0.25);" onclick="abrirModalAssinaturaPaisagem()">
+            <span>✍️</span> Assinatura Responsável (Toque para Assinar)
+          </button>
 
-          <div style="position:relative;background:#fff;border-radius:8px;text-align:center;">
-            <canvas id="canvasAssinatura" class="sig-canvas" width="600" height="150" style="touch-action:none;user-select:none;-webkit-user-select:none;width:100%;height:150px;border:2px dashed #0077b6;border-radius:8px;background:#ffffff;"></canvas>
-            <div style="font-size:11.5px;color:#64748b;margin-top:4px;">Rubrica registrada acima (toque no botão para assinar com mais conforto).</div>
+          <div id="boxStatusAssinatura" style="margin-top:10px;">
+            ${(window._assinaturaDataUrl || val('assinatura_cliente_img')) ? `
+              <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <img src="${window._assinaturaDataUrl || val('assinatura_cliente_img')}" style="height:44px;max-width:140px;object-fit:contain;background:#fff;border-radius:4px;border:1px solid #bbf7d0;padding:2px;" alt="Rubrica"/>
+                  <div>
+                    <div style="font-size:12px;font-weight:bold;color:#15803d;">✅ Assinatura Registrada</div>
+                    <div style="font-size:11px;color:#166534;">Pronta para o laudo oficial</div>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-outline btn-sm" onclick="limparAssinaturaColetada()" style="color:#b91c1c;border-color:#fca5a5;padding:4px 8px;">🗑️ Refazer</button>
+              </div>
+            ` : `
+              <div style="font-size:12px;color:#64748b;text-align:center;padding:10px;background:#f8fafc;border-radius:8px;border:1.5px dashed #cbd5e1;">
+                Nenhuma assinatura coletada ainda. Toque no botão acima para abrir a tela de assinatura em tela cheia.
+              </div>
+            `}
           </div>
         </div>
 
@@ -2848,7 +2898,6 @@
       `;
 
       document.getElementById("modalOS").classList.add("open");
-      inicializarCanvasAssinatura();
       carregarChecklistModal();
       verificarCheckinAutomaticoProximidade(os);
     }
@@ -2954,32 +3003,74 @@
       mostrarToast(`✅ ${marcados.length} item(ns) inseridos em MAIÚSCULAS!`);
     }
 
-    function lerFotosMultiplasInput(input) {
+    // COMPRESSÃO INTELIGENTE DE FOTOS NO FRONTEND (MÁX 1280PX / QUALIDADE 0.72)
+    // Reduz fotos de celulares modernos de 8MB para ~120KB evitando lentidão e estouro de memória
+    function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            let w = img.width;
+            let h = img.height;
+            if (w > maxLargura) {
+              h = Math.round((h * maxLargura) / w);
+              w = maxLargura;
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL("image/jpeg", qualidade));
+          };
+          img.onerror = () => resolve(e.target.result);
+          img.src = e.target.result;
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function lerFotosMultiplasInput(input) {
       const files = input.files;
       if (!files || !files.length) return;
       window._fotosEvidenciaB64 = window._fotosEvidenciaB64 || [];
       const grid = document.getElementById("previewFotosGrid");
-      
-      Array.from(files).forEach((f) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const b64 = e.target.result;
-          window._fotosEvidenciaB64.push(b64);
-          if (grid) {
-            const thumb = document.createElement("img");
-            thumb.src = b64;
-            thumb.style.width = "64px";
-            thumb.style.height = "64px";
-            thumb.style.objectFit = "cover";
-            thumb.style.borderRadius = "6px";
-            thumb.style.border = "1px solid #0077b6";
-            grid.appendChild(thumb);
+
+      mostrarToast(`⏳ Comprimindo ${files.length} foto(s) para upload ultra-rápido...`);
+
+      for (let i = 0; i < files.length; i++) {
+        try {
+          const b64 = await comprimirImagemBase64(files[i], 1280, 0.72);
+          if (b64) {
+            window._fotosEvidenciaB64.push(b64);
+            if (grid) {
+              const div = document.createElement("div");
+              div.style = "position:relative;display:inline-block;";
+              div.innerHTML = `
+                <img src="${b64}" style="width:68px;height:68px;object-fit:cover;border-radius:6px;border:1.5px solid #0284c7;display:block;" />
+                <button type="button" onclick="removerFotoEvidencia(this, ${window._fotosEvidenciaB64.length - 1})" style="position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+              `;
+              grid.appendChild(div);
+            }
           }
-          autoSalvarRascunho();
-        };
-        reader.readAsDataURL(f);
-      });
-      mostrarToast(`📷 ${files.length} foto(s) anexada(s) à Ordem de Serviço!`);
+        } catch (err) {
+          console.error("Erro ao comprimir imagem:", err);
+        }
+      }
+      autoSalvarRascunho();
+      mostrarToast(`📷 ${files.length} foto(s) anexada(s) e otimizada(s) com sucesso!`);
+    }
+
+    function removerFotoEvidencia(btn, idx) {
+      if (window._fotosEvidenciaB64) {
+        window._fotosEvidenciaB64.splice(idx, 1);
+      }
+      const divPai = btn.closest("div");
+      if (divPai) divPai.remove();
+      autoSalvarRascunho();
+      mostrarToast("Foto removida do rascunho.");
     }
 
     function lerVideoOperacaoInput(input) {
@@ -3020,11 +3111,13 @@
       const modal = document.getElementById("modalVisualizadorOS");
       const iframe = document.getElementById("iframeLaudoOS");
       const btnBaixar = document.getElementById("btnBaixarPDFVisualizador");
+      const btnImprimir = document.getElementById("btnImprimirA4Visualizador");
       const titulo = document.getElementById("tituloVisualizadorOS");
       
       titulo.innerText = `📄 Laudo Técnico Oficial — OS #${osId}`;
       iframe.src = `/api/pdf/${encodeURIComponent(osId)}#toolbar=1`;
       btnBaixar.href = `/api/pdf/${encodeURIComponent(osId)}`;
+      if (btnImprimir) btnImprimir.href = `/api/imprimir/${encodeURIComponent(osId)}`;
       modal.classList.add("open");
     }
 
@@ -3106,58 +3199,175 @@
       await sincronizarTudo(false);
     }
 
+    function mostrarOverlayFechamento(msg = "Finalizando Ordem de Serviço...") {
+      const el = document.getElementById("overlayFechamentoEMED");
+      const txt = document.getElementById("txtStatusFechamentoEMED");
+      if (txt) txt.innerText = msg;
+      if (el) el.style.display = "flex";
+    }
+
+    function esconderOverlayFechamento() {
+      const el = document.getElementById("overlayFechamentoEMED");
+      if (el) el.style.display = "none";
+    }
+
     async function finalizarOS(acao) {
       const payload = coletarPayloadModalOS();
       payload.acao = acao;
-      const res = await apiPost("/api/salvar-os", payload, true);
-      if (res.ok && acao === "CONCLUIR") {
-        localStorage.removeItem(`emed_draft_${payload.os_id}`);
+
+      const txtAcao = acao === "CONCLUIR" ? "Concluindo e Gerando Laudo Oficial..." : (acao === "OBSERVACAO" ? "Configurando Equipamento em Observação..." : "Salvando Progresso da Ordem de Serviço...");
+      mostrarOverlayFechamento(txtAcao);
+
+      try {
+        const res = await apiPost("/api/salvar-os", payload, true);
+        if (res.ok) {
+          document.getElementById("txtStatusFechamentoEMED").innerText = "✅ Laudo e Ordens Atualizados com Sucesso!";
+          if (acao === "CONCLUIR") {
+            localStorage.removeItem(`emed_draft_${payload.os_id}`);
+            window._assinaturaDataUrl = "";
+          }
+          await new Promise(r => setTimeout(r, 650));
+          esconderOverlayFechamento();
+          fecharModalOS();
+          mostrarToast(res.msg);
+          await sincronizarTudo(false);
+        } else {
+          esconderOverlayFechamento();
+          mostrarToast("⚠️ Erro ao salvar: " + (res.msg || "Verifique a conexão"));
+        }
+      } catch (err) {
+        esconderOverlayFechamento();
+        mostrarToast("⚠️ Erro de rede ou servidor ao finalizar OS.");
       }
-      mostrarToast(res.msg);
-      fecharModalOS();
-      await sincronizarTudo(false);
     }
 
     /********************************************************************
-     * CANVAS DE ASSINATURA TOUCH / MOUSE
+     * ASSINATURA DO RESPONSÁVEL EM TELA CHEIA NA ORIENTAÇÃO PAISAGEM
      ********************************************************************/
-    function inicializarCanvasAssinatura() {
-      const c = document.getElementById("canvasAssinatura");
-      if (!c) return;
-      const ctx = c.getContext("2d");
-      ctx.strokeStyle = "#002b54";
-      ctx.lineWidth = 2.4;
-      ctx.lineCap = "round";
-      let desenhando = false;
-      window._temAssinaturaDesenhada = false;
+    let _ctxPaisagem = null;
+    let _desenhandoPaisagem = false;
+    let _assinouPaisagem = false;
+
+    function abrirModalAssinaturaPaisagem() {
+      const modal = document.getElementById("modalAssinaturaPaisagem");
+      const c = document.getElementById("canvasPaisagem");
+      const nomeResp = document.getElementById("osAssNome")?.value || "Responsável do Hospital";
+      const lblTitulo = document.getElementById("lblTituloAssinaturaPaisagem");
+      if (lblTitulo) lblTitulo.innerText = `Assinatura: ${nomeResp.toUpperCase()}`;
+
+      modal.style.display = "flex";
+
+      // Configurar resolução interna nítida para o canvas (evita borrão em retina/telas HD)
+      const rect = c.getBoundingClientRect();
+      const ratio = window.devicePixelRatio || 1;
+      c.width = rect.width * ratio;
+      c.height = rect.height * ratio;
+
+      _ctxPaisagem = c.getContext("2d");
+      _ctxPaisagem.scale(ratio, ratio);
+      _ctxPaisagem.strokeStyle = "#002b54";
+      _ctxPaisagem.lineWidth = 3.0;
+      _ctxPaisagem.lineCap = "round";
+      _ctxPaisagem.lineJoin = "round";
+      _assinouPaisagem = false;
 
       const pos = (e) => {
         const r = c.getBoundingClientRect();
         const t = e.touches ? e.touches[0] : e;
         return {
-          x: (t.clientX - r.left) * (c.width / r.width),
-          y: (t.clientY - r.top) * (c.height / r.height)
+          x: t.clientX - r.left,
+          y: t.clientY - r.top
         };
       };
-      const ini = (e) => { desenhando = true; window._temAssinaturaDesenhada = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); e.preventDefault(); };
-      const mov = (e) => { if (!desenhando) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); e.preventDefault(); };
-      const fim = () => { if (desenhando) { desenhando = false; autoSalvarRascunho(); } };
 
-      c.onmousedown = ini; c.onmousemove = mov; window.addEventListener("mouseup", fim);
-      c.ontouchstart = ini; c.ontouchmove = mov; c.ontouchend = fim;
+      const ini = (e) => {
+        _desenhandoPaisagem = true;
+        _assinouPaisagem = true;
+        const p = pos(e);
+        _ctxPaisagem.beginPath();
+        _ctxPaisagem.moveTo(p.x, p.y);
+        e.preventDefault();
+      };
+
+      const mov = (e) => {
+        if (!_desenhandoPaisagem) return;
+        const p = pos(e);
+        _ctxPaisagem.lineTo(p.x, p.y);
+        _ctxPaisagem.stroke();
+        e.preventDefault();
+      };
+
+      const fim = () => {
+        _desenhandoPaisagem = false;
+      };
+
+      c.onmousedown = ini;
+      c.onmousemove = mov;
+      window.addEventListener("mouseup", fim);
+
+      c.ontouchstart = ini;
+      c.ontouchmove = mov;
+      c.ontouchend = fim;
     }
 
-    function limparCanvasAssinatura() {
-      const c = document.getElementById("canvasAssinatura");
-      if (!c) return;
-      c.getContext("2d").clearRect(0, 0, c.width, c.height);
-      window._temAssinaturaDesenhada = false;
+    function limparCanvasPaisagem() {
+      const c = document.getElementById("canvasPaisagem");
+      if (c && _ctxPaisagem) {
+        _ctxPaisagem.clearRect(0, 0, c.width, c.height);
+        _assinouPaisagem = false;
+      }
+    }
+
+    function fecharModalAssinaturaPaisagem() {
+      document.getElementById("modalAssinaturaPaisagem").style.display = "none";
+    }
+
+    function salvarAssinaturaPaisagem() {
+      const c = document.getElementById("canvasPaisagem");
+      if (!c || !_assinouPaisagem) {
+        mostrarToast("⚠️ Por favor, faça a assinatura antes de salvar.");
+        return;
+      }
+      const dataUrl = c.toDataURL("image/png");
+      window._assinaturaDataUrl = dataUrl;
+
+      // Atualiza o status visual no formulário da OS
+      const boxStatus = document.getElementById("boxStatusAssinatura");
+      if (boxStatus) {
+        boxStatus.innerHTML = `
+          <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <img src="${dataUrl}" style="height:44px;max-width:140px;object-fit:contain;background:#fff;border-radius:4px;border:1px solid #bbf7d0;padding:2px;" alt="Rubrica"/>
+              <div>
+                <div style="font-size:12px;font-weight:bold;color:#15803d;">✅ Assinatura Registrada</div>
+                <div style="font-size:11px;color:#166534;">Pronta para o laudo oficial</div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" onclick="limparAssinaturaColetada()" style="color:#b91c1c;border-color:#fca5a5;padding:4px 8px;">🗑️ Refazer</button>
+          </div>
+        `;
+      }
+      fecharModalAssinaturaPaisagem();
+      autoSalvarRascunho();
+      mostrarToast("✍️ Assinatura do responsável salva com sucesso!");
+    }
+
+    function limparAssinaturaColetada() {
+      window._assinaturaDataUrl = "";
+      const boxStatus = document.getElementById("boxStatusAssinatura");
+      if (boxStatus) {
+        boxStatus.innerHTML = `
+          <div style="font-size:12px;color:#64748b;text-align:center;padding:10px;background:#f8fafc;border-radius:8px;border:1.5px dashed #cbd5e1;">
+            Nenhuma assinatura coletada ainda. Toque no botão acima para abrir a tela de assinatura em tela cheia.
+          </div>
+        `;
+      }
+      autoSalvarRascunho();
+      mostrarToast("Assinatura apagada. Toque no botão para assinar novamente.");
     }
 
     function obterAssinaturaBase64() {
-      const c = document.getElementById("canvasAssinatura");
-      if (!c || !window._temAssinaturaDesenhada) return "";
-      return c.toDataURL("image/png");
+      return window._assinaturaDataUrl || "";
     }
 
     // Inicializar App ao carregar (com suporte a ?modo=gestor, ?modo=tecnico, ?os=ID)
@@ -3204,76 +3414,16 @@
       }
     });
   
-    /********************************************************************
-     * ASSINATURA EM TELA CHEIA (TOUCH RESPONSIVO PARA O CLIENTE)
-     ********************************************************************/
-    let _ctxCheia = null;
-    let _desenhandoCheia = false;
-    let _assinouCheia = false;
 
-    function abrirAssinaturaTelaCheia() {
-      const modal = document.getElementById("modalAssinaturaCheia");
-      const c = document.getElementById("canvasCheia");
-      modal.style.display = "flex";
-      
-      // Ajustar resolução interna do canvas ao tamanho real da tela
-      const r = c.getBoundingClientRect();
-      c.width = r.width || window.innerWidth;
-      c.height = r.height || (window.innerHeight - 80);
-      _ctxCheia = c.getContext("2d");
-      _ctxCheia.strokeStyle = "#002b54";
-      _ctxCheia.lineWidth = 3.2;
-      _ctxCheia.lineCap = "round";
-      _ctxCheia.lineJoin = "round";
-      _assinouCheia = false;
-
-      const pos = (e) => {
-        const rect = c.getBoundingClientRect();
-        const t = e.touches ? e.touches[0] : e;
-        return { x: t.clientX - rect.left, y: t.clientY - rect.top };
-      };
-      const ini = (e) => { _desenhandoCheia = true; _assinouCheia = true; const p = pos(e); _ctxCheia.beginPath(); _ctxCheia.moveTo(p.x, p.y); e.preventDefault(); };
-      const mov = (e) => { if (!_desenhandoCheia) return; const p = pos(e); _ctxCheia.lineTo(p.x, p.y); _ctxCheia.stroke(); e.preventDefault(); };
-      const fim = () => { _desenhandoCheia = false; };
-
-      c.onmousedown = ini; c.onmousemove = mov; window.addEventListener("mouseup", fim);
-      c.ontouchstart = ini; c.ontouchmove = mov; c.ontouchend = fim;
-    }
-
-    function limparCanvasCheia() {
-      const c = document.getElementById("canvasCheia");
-      if (c && _ctxCheia) {
-        _ctxCheia.clearRect(0, 0, c.width, c.height);
-        _assinouCheia = false;
-      }
-    }
-
-    function fecharAssinaturaCheia() {
-      document.getElementById("modalAssinaturaCheia").style.display = "none";
-    }
-
-    function confirmarAssinaturaCheia() {
-      const cCheia = document.getElementById("canvasCheia");
-      const cModal = document.getElementById("canvasAssinatura");
-      if (cCheia && cModal && _assinouCheia) {
-        const ctxModal = cModal.getContext("2d");
-        ctxModal.clearRect(0, 0, cModal.width, cModal.height);
-        ctxModal.drawImage(cCheia, 0, 0, cModal.width, cModal.height);
-        window._temAssinaturaDesenhada = true;
-        autoSalvarRascunho();
-        mostrarToast("✍️ Assinatura do cliente confirmada!");
-      }
-      fecharAssinaturaCheia();
-    }
 </script>
   <!-- MODAL DE VISUALIZAÇÃO DIRETA DA OS EM PDF / LAUDO -->
   <div id="modalVisualizadorOS" class="modal-overlay">
     <div class="modal" style="max-width:920px; width:95%; height:92vh; display:flex; flex-direction:column; padding:0;">
       <div class="modal-head" style="padding:12px 16px; border-bottom:1px solid #cbd5e1;">
         <div class="modal-title" id="tituloVisualizadorOS">📄 Laudo Técnico Oficial da Ordem de Serviço</div>
-        <div style="display:flex; gap:6px;">
-          <a id="btnBaixarPDFVisualizador" class="btn btn-primary btn-sm" href="#" target="_blank">📥 Baixar PDF</a>
-          <button class="btn btn-outline btn-sm" onclick="imprimirIframeOS()">🖨️ Imprimir</button>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <a id="btnImprimirA4Visualizador" class="btn btn-primary btn-sm" href="#" target="_blank" style="background:#0f766e;border-color:#0f766e;">🖨️ Imprimir A4 Direto</a>
+          <a id="btnBaixarPDFVisualizador" class="btn btn-outline btn-sm" href="#" target="_blank">📥 Baixar PDF</a>
           <button class="modal-close" onclick="fecharVisualizadorOS()">✕</button>
         </div>
       </div>
@@ -3282,24 +3432,45 @@
       </div>
     </div>
   </div>
-  <!-- MODAL DE ASSINATURA DEDICADA DO RESPONSÁVEL (SEM ZOOM / TOQUE PERFEITO) -->
-  <div id="modalAssinaturaResponsavel" class="modal-overlay" style="z-index:999999;">
-    <div class="modal" style="max-width:560px; width:95%; padding:14px; background:#ffffff; border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1.5px solid #e2e8f0; padding-bottom:8px;">
+  <!-- OVERLAY DE ANIMAÇÃO OFICIAL EMED DE FECHAMENTO DE OS -->
+  <div id="overlayFechamentoEMED" style="display:none; position:fixed; inset:0; z-index:99999999; background:rgba(0, 26, 51, 0.90); backdrop-filter:blur(8px); flex-direction:column; align-items:center; justify-content:center; color:#ffffff; text-align:center; padding:20px;">
+    <!-- SÍMBOLO ESTILIZADO '@' DA EMED COM PULSO E GIRO SUTIL -->
+    <div style="position:relative; width:130px; height:130px; display:flex; align-items:center; justify-content:center; margin-bottom:22px;">
+      <div style="position:absolute; width:114px; height:114px; border-radius:50%; border:3px solid #0ea5e9; opacity:0.6; animation:emedPulse 2s infinite;"></div>
+      <div style="position:absolute; width:130px; height:130px; border-radius:50%; border:3px solid transparent; border-top-color:#38bdf8; border-right-color:#0284c7; animation:emedSpin 1.4s linear infinite;"></div>
+      <div style="width:86px; height:86px; border-radius:50%; background:linear-gradient(135deg, #002b54 0%, #0077b6 100%); display:flex; align-items:center; justify-content:center; box-shadow:0 0 25px rgba(2, 132, 199, 0.6); border:2.5px solid #38bdf8;">
+        <!-- Ícone do '@' estilizado da marca eMED -->
+        <span style="font-size:48px; font-weight:900; font-family:'Segoe UI', sans-serif; color:#ffffff; text-shadow:0 2px 10px rgba(0,0,0,0.5); line-height:1; user-select:none;">@</span>
+      </div>
+    </div>
+    
+    <div style="font-size:19px; font-weight:900; letter-spacing:0.5px; color:#ffffff; margin-bottom:6px;">EMED ELETROMEDICINA</div>
+    <div id="txtStatusFechamentoEMED" style="font-size:14.5px; color:#93c5fd; font-weight:600; min-height:22px;">Otimizando evidências e gerando laudo técnico oficial...</div>
+    <div style="font-size:12px; color:#cbd5e1; margin-top:8px;">Aguarde alguns instantes enquanto consolidamos os dados na nuvem</div>
+  </div>
+
+  <!-- MODAL DE ASSINATURA EM TELA CHEIA NA ORIENTAÇÃO PAISAGEM (WIDESCREEN) -->
+  <div id="modalAssinaturaPaisagem" style="display:none; position:fixed; inset:0; z-index:9999999; background:#ffffff; flex-direction:column;">
+    <div style="background:#002b54; color:#ffffff; padding:10px 16px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:18px;">✍️</span>
         <div>
-          <div style="font-weight:bold; font-size:15px; color:#002b54;" id="tituloModalAssinatura">✍️ Assinatura do Responsável</div>
-          <div style="font-size:11.5px; color:#64748b;">Faça a assinatura abaixo com o dedo ou caneta touch</div>
+          <div style="font-weight:bold; font-size:14.5px;" id="lblTituloAssinaturaPaisagem">Assinatura do Responsável</div>
+          <div style="font-size:11px; color:#93c5fd;">Assine com o dedo ou caneta touch na área branca abaixo</div>
         </div>
-        <button type="button" class="btn btn-outline btn-sm" onclick="limparCanvasDedicada()">🧹 Limpar</button>
       </div>
-
-      <div style="background:#f8fafc; border:2px dashed #0284c7; border-radius:8px; padding:4px; margin-bottom:12px; touch-action:none;">
-        <canvas id="canvasDedicada" width="520" height="220" style="width:100%; height:220px; background:#ffffff; border-radius:6px; touch-action:none; display:block;"></canvas>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:11px; background:rgba(255,255,255,0.15); padding:4px 8px; border-radius:6px; color:#e0f2fe; display:inline-block;">🔄 Gire o celular se preferir</span>
+        <button type="button" class="btn btn-outline btn-sm" style="background:#ffffff; color:#002b54; border-color:#ffffff; font-weight:bold;" onclick="limparCanvasPaisagem()">🧹 Limpar</button>
+        <button type="button" class="btn btn-success btn-sm" style="font-weight:bold; padding:8px 18px; font-size:13.5px;" onclick="salvarAssinaturaPaisagem()">💾 Salvar</button>
+        <button type="button" class="btn btn-sm" style="background:transparent; color:#fff; border:1px solid rgba(255,255,255,0.3); font-size:14px; padding:6px 10px;" onclick="fecharModalAssinaturaPaisagem()">✕</button>
       </div>
-
-      <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button type="button" class="btn btn-outline" onclick="fecharAssinaturaDedicada()">✕ Cancelar</button>
-        <button type="button" class="btn btn-success" style="padding:10px 18px; font-weight:bold;" onclick="confirmarAssinaturaDedicada()">✅ Confirmar Assinatura</button>
+    </div>
+    
+    <div style="flex:1; position:relative; background:#f8fafc; padding:8px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+      <canvas id="canvasPaisagem" style="width:100%; height:100%; background:#ffffff; border-radius:10px; border:2px dashed #0284c7; box-shadow:0 4px 15px rgba(0,0,0,0.06); touch-action:none; display:block; cursor:crosshair;"></canvas>
+      <div style="position:absolute; bottom:25%; left:6%; right:6%; border-bottom:1.5px dashed #cbd5e1; pointer-events:none; text-align:center;">
+        <span style="background:#fff; color:#94a3b8; font-size:11px; padding:0 12px; position:relative; top:8px; font-weight:bold; letter-spacing:0.5px;">LINHA DE ASSINATURA</span>
       </div>
     </div>
   </div>

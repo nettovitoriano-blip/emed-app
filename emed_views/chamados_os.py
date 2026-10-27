@@ -212,11 +212,20 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     param_m = limpar_texto(row_c.get("parametros_medidos"), "-")
     obs_ger = limpar_texto(row_c.get("observacoes_gerais"), "SEM OBSERVAÇÕES ADICIONAIS")
     imp_obs = str(row_c.get("imprimir_observacoes", "SIM")).upper()
-    if imp_obs in ("NAO", "NÃO", "FALSE", "0"):
-        bloco_observacoes_html = ""
-    else:
-        bloco_observacoes_html = f'''
-  {bloco_observacoes_html}'''
+
+    sec_num = 4
+    bloco_observacoes_html = ""
+    if imp_obs not in ("NAO", "NÃO", "FALSE", "0") and obs_ger and obs_ger != "SEM OBSERVAÇÕES ADICIONAIS":
+        bloco_observacoes_html = f"""
+  <div class="sec-title">{sec_num}. Observações Gerais &amp; Recomendações Técnicas</div>
+  <table class="data-tbl" width="100%">
+    <tr>
+      <td width="100%" style="padding:4px 6px; background-color:#ffffff; font-size:7.5pt; color:#1e293b; line-height:1.3;">
+        {obs_ger}
+      </td>
+    </tr>
+  </table>"""
+        sec_num += 1
     pend_txt = _extrair_pendencia_limpa(row_c)
 
     cond_fin = limpar_texto(row_c.get("condicao_final"), "LIBERADO PARA USO NORMAL")
@@ -262,12 +271,13 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
                 f'</td>'
             )
         bloco_fotos_html = f"""
-  <div class="sec-title">5. Evidências Fotográficas da Intervenção Técnica</div>
+  <div class="sec-title">{sec_num}. Evidências Fotográficas da Intervenção Técnica</div>
   <table class="data-tbl" width="100%">
     <tr>{''.join(celulas)}</tr>
   </table>"""
+        sec_num += 1
 
-    num_sec_aceite = "6" if lista_fotos_b64 else "5"
+    num_sec_aceite = str(sec_num)
 
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
