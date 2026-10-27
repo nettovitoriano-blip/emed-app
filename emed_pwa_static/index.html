@@ -3242,11 +3242,16 @@
     }
 
     /********************************************************************
-     * ASSINATURA DO RESPONSÁVEL EM TELA CHEIA NA ORIENTAÇÃO PAISAGEM
+     * MOTOR VETORIAL DE ASSINATURA PAISAGEM COM PROTEÇÃO ANTIDISTORÇÃO & ANTI-ZOOM
+     * Armazena os traços em coordenadas normalizadas (0.0 a 1.0) para que
+     * rotação da tela ou redimensionamento NUNCA dê zoom ou corte o desenho!
      ********************************************************************/
     let _ctxPaisagem = null;
     let _desenhandoPaisagem = false;
     let _assinouPaisagem = false;
+    let _linhasVetoriais = []; // Lista de linhas: [ [ {x:0.1, y:0.2}, ... ], ... ]
+    let _linhaAtual = null;
+    let _girado90Manual = false;
 
     function abrirModalAssinaturaPaisagem() {
       const modal = document.getElementById("modalAssinaturaPaisagem");
@@ -3256,9 +3261,49 @@
       if (lblTitulo) lblTitulo.innerText = `Assinatura: ${nomeResp.toUpperCase()}`;
 
       modal.style.display = "flex";
+      _girado90Manual = false;
 
-      // Configurar resolução interna nítida para o canvas (evita borrão em retina/telas HD)
+      // Tenta travar rotação nativa do smartphone em paisagem caso suporte
+      try {
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock("landscape").catch(() => {});
+        }
+      } catch (e) {}
+
+      // Configurar dimensões corretas e ouvintes
+      setTimeout(() => {
+        reajustarResolucaoCanvasPaisagem();
+      }, 60);
+
+      // Vincular eventos de toque e mouse
+      configurarEventosTouchCanvas(c);
+    }
+
+    function alternarGiroPranchetaManual() {
+      _girado90Manual = !_girado90Manual;
+      const container = document.getElementById("containerPrancheta");
+      if (_girado90Manual) {
+        container.style.transform = "rotate(90deg)";
+        container.style.transformOrigin = "center center";
+        container.style.width = "100vh";
+        container.style.height = "100vw";
+      } else {
+        container.style.transform = "none";
+        container.style.width = "auto";
+        container.style.height = "auto";
+      }
+      setTimeout(() => {
+        reajustarResolucaoCanvasPaisagem();
+      }, 100);
+      mostrarToast(_girado90Manual ? "🔄 Prancheta virada 90° (Modo Paisagem)" : "🔄 Prancheta normal");
+    }
+
+    function reajustarResolucaoCanvasPaisagem() {
+      const c = document.getElementById("canvasPaisagem");
+      if (!c) return;
       const rect = c.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+
       const ratio = window.devicePixelRatio || 1;
       c.width = rect.width * ratio;
       c.height = rect.height * ratio;
@@ -3266,94 +3311,178 @@
       _ctxPaisagem = c.getContext("2d");
       _ctxPaisagem.scale(ratio, ratio);
       _ctxPaisagem.strokeStyle = "#002b54";
-      _ctxPaisagem.lineWidth = 3.0;
+      _ctxPaisagem.lineWidth = 3.2;
       _ctxPaisagem.lineCap = "round";
       _ctxPaisagem.lineJoin = "round";
-      _assinouPaisagem = false;
 
-      const pos = (e) => {
+      // Redesenha todos os traços vetoriais gravados SEM DISTORÇÃO E SEM ZOOM
+      redesenharLinhasVetoriais(rect.width, rect.height);
+    }
+
+    // Ouvinte para reajustar imediatamente ao virar o celular sem deformar
+    window.addEventListener("resize", () => {
+      const modal = document.getElementById("modalAssinaturaPaisagem");
+      if (modal && modal.style.display === "flex") {
+        reajustarResolucaoCanvasPaisagem();
+      }
+    });
+    window.addEventListener("orientationchange", () => {
+      const modal = document.getElementById("modalAssinaturaPaisagem");
+      if (modal && modal.style.display === "flex") {
+        setTimeout(reajustarResolucaoCanvasPaisagem, 150);
+      }
+    });
+
+    function redesenharLinhasVetoriais(largura, altura) {
+      if (!_ctxPaisagem) return;
+      _ctxPaisagem.clearRect(0, 0, largura, altura);
+      _ctxPaisagem.strokeStyle = "#002b54";
+      _ctxPaisagem.lineWidth = 3.2;
+      _ctxPaisagem.lineCap = "round";
+      _ctxPaisagem.lineJoin = "round";
+
+      _linhasVetoriais.forEach(linha => {
+        if (!linha || !linha.length) return;
+        _ctxPaisagem.beginPath();
+        _ctxPaisagem.moveTo(linha[0].x * largura, linha[0].y * altura);
+        for (let i = 1; i < linha.length; i++) {
+          _ctxPaisagem.lineTo(linha[i].x * largura, linha[i].y * altura);
+        }
+        _ctxPaisagem.stroke();
+      });
+    }
+
+    function configurarEventosTouchCanvas(c) {
+      if (c._eventosConfigurados) return;
+      c._eventosConfigurados = true;
+
+      const obterPonto = (e) => {
         const r = c.getBoundingClientRect();
         const t = e.touches ? e.touches[0] : e;
         return {
-          x: t.clientX - r.left,
-          y: t.clientY - r.top
+          px: t.clientX - r.left,
+          py: t.clientY - r.top,
+          rx: Math.max(0, Math.min(1, (t.clientX - r.left) / r.width)),
+          ry: Math.max(0, Math.min(1, (t.clientY - r.top) / r.height))
         };
       };
 
-      const ini = (e) => {
+      const iniciar = (e) => {
+        e.preventDefault();
         _desenhandoPaisagem = true;
         _assinouPaisagem = true;
-        const p = pos(e);
+        const p = obterPonto(e);
+        _linhaAtual = [{ x: p.rx, y: p.ry }];
+        _linhasVetoriais.push(_linhaAtual);
+
         _ctxPaisagem.beginPath();
-        _ctxPaisagem.moveTo(p.x, p.y);
-        e.preventDefault();
+        _ctxPaisagem.moveTo(p.px, p.py);
       };
 
-      const mov = (e) => {
-        if (!_desenhandoPaisagem) return;
-        const p = pos(e);
-        _ctxPaisagem.lineTo(p.x, p.y);
+      const mover = (e) => {
+        if (!_desenhandoPaisagem || !_linhaAtual) return;
+        e.preventDefault();
+        const p = obterPonto(e);
+        _linhaAtual.push({ x: p.rx, y: p.ry });
+
+        _ctxPaisagem.lineTo(p.px, p.py);
         _ctxPaisagem.stroke();
-        e.preventDefault();
       };
 
-      const fim = () => {
+      const finalizar = () => {
         _desenhandoPaisagem = false;
+        _linhaAtual = null;
       };
 
-      c.onmousedown = ini;
-      c.onmousemove = mov;
-      window.addEventListener("mouseup", fim);
+      c.addEventListener("mousedown", iniciar);
+      c.addEventListener("mousemove", mover);
+      window.addEventListener("mouseup", finalizar);
 
-      c.ontouchstart = ini;
-      c.ontouchmove = mov;
-      c.ontouchend = fim;
+      c.addEventListener("touchstart", iniciar, { passive: false });
+      c.addEventListener("touchmove", mover, { passive: false });
+      c.addEventListener("touchend", finalizar);
+      c.addEventListener("touchcancel", finalizar);
     }
 
     function limparCanvasPaisagem() {
+      _linhasVetoriais = [];
+      _linhaAtual = null;
+      _assinouPaisagem = false;
       const c = document.getElementById("canvasPaisagem");
       if (c && _ctxPaisagem) {
-        _ctxPaisagem.clearRect(0, 0, c.width, c.height);
-        _assinouPaisagem = false;
+        _ctxPaisagem.clearRect(0, 0, c.clientWidth, c.clientHeight);
       }
+      mostrarToast("Prancheta limpa.");
     }
 
     function fecharModalAssinaturaPaisagem() {
       document.getElementById("modalAssinaturaPaisagem").style.display = "none";
+      const container = document.getElementById("containerPrancheta");
+      if (container) {
+        container.style.transform = "none";
+        container.style.width = "auto";
+        container.style.height = "auto";
+      }
+      _girado90Manual = false;
     }
 
     function salvarAssinaturaPaisagem() {
-      const c = document.getElementById("canvasPaisagem");
-      if (!c || !_assinouPaisagem) {
+      if (!_assinouPaisagem || !_linhasVetoriais.length) {
         mostrarToast("⚠️ Por favor, faça a assinatura antes de salvar.");
         return;
       }
-      const dataUrl = c.toDataURL("image/png");
+
+      // Renderiza em um canvas virtual com proporção horizontal padrão (800x260px)
+      // Garantindo que a assinatura fique SEMPRE nítida, horizontal e uniforme no laudo!
+      const vCanvas = document.createElement("canvas");
+      vCanvas.width = 800;
+      vCanvas.height = 260;
+      const vCtx = vCanvas.getContext("2d");
+
+      vCtx.strokeStyle = "#002b54";
+      vCtx.lineWidth = 3.6;
+      vCtx.lineCap = "round";
+      vCtx.lineJoin = "round";
+
+      _linhasVetoriais.forEach(linha => {
+        if (!linha || !linha.length) return;
+        vCtx.beginPath();
+        vCtx.moveTo(linha[0].x * 800, linha[0].y * 260);
+        for (let i = 1; i < linha.length; i++) {
+          vCtx.lineTo(linha[i].x * 800, linha[i].y * 260);
+        }
+        vCtx.stroke();
+      });
+
+      const dataUrl = vCanvas.toDataURL("image/png");
       window._assinaturaDataUrl = dataUrl;
 
-      // Atualiza o status visual no formulário da OS
+      // Atualiza o status visual no formulário da OS com visualização horizontal perfeita
       const boxStatus = document.getElementById("boxStatusAssinatura");
       if (boxStatus) {
         boxStatus.innerHTML = `
           <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
             <div style="display:flex;align-items:center;gap:10px;">
-              <img src="${dataUrl}" style="height:44px;max-width:140px;object-fit:contain;background:#fff;border-radius:4px;border:1px solid #bbf7d0;padding:2px;" alt="Rubrica"/>
+              <img src="${dataUrl}" style="height:44px;width:130px;object-fit:contain;background:#fff;border-radius:4px;border:1px solid #bbf7d0;padding:2px;" alt="Rubrica"/>
               <div>
-                <div style="font-size:12px;font-weight:bold;color:#15803d;">✅ Assinatura Registrada</div>
-                <div style="font-size:11px;color:#166534;">Pronta para o laudo oficial</div>
+                <div style="font-size:12px;font-weight:bold;color:#15803d;">✅ Assinatura Registrada (Horizontal)</div>
+                <div style="font-size:11px;color:#166534;">Pronta para o laudo e PDF</div>
               </div>
             </div>
             <button type="button" class="btn btn-outline btn-sm" onclick="limparAssinaturaColetada()" style="color:#b91c1c;border-color:#fca5a5;padding:4px 8px;">🗑️ Refazer</button>
           </div>
         `;
       }
+
       fecharModalAssinaturaPaisagem();
       autoSalvarRascunho();
-      mostrarToast("✍️ Assinatura do responsável salva com sucesso!");
+      mostrarToast("✍️ Assinatura do responsável salva com perfeição!");
     }
 
     function limparAssinaturaColetada() {
       window._assinaturaDataUrl = "";
+      _linhasVetoriais = [];
+      _assinouPaisagem = false;
       const boxStatus = document.getElementById("boxStatusAssinatura");
       if (boxStatus) {
         boxStatus.innerHTML = `
@@ -3363,7 +3492,7 @@
         `;
       }
       autoSalvarRascunho();
-      mostrarToast("Assinatura apagada. Toque no botão para assinar novamente.");
+      mostrarToast("Assinatura removida. Toque no botão para assinar novamente.");
     }
 
     function obterAssinaturaBase64() {
@@ -3434,13 +3563,24 @@
   </div>
   <!-- OVERLAY DE ANIMAÇÃO OFICIAL EMED DE FECHAMENTO DE OS -->
   <div id="overlayFechamentoEMED" style="display:none; position:fixed; inset:0; z-index:99999999; background:rgba(0, 26, 51, 0.90); backdrop-filter:blur(8px); flex-direction:column; align-items:center; justify-content:center; color:#ffffff; text-align:center; padding:20px;">
-    <!-- SÍMBOLO ESTILIZADO '@' DA EMED COM PULSO E GIRO SUTIL -->
-    <div style="position:relative; width:130px; height:130px; display:flex; align-items:center; justify-content:center; margin-bottom:22px;">
-      <div style="position:absolute; width:114px; height:114px; border-radius:50%; border:3px solid #0ea5e9; opacity:0.6; animation:emedPulse 2s infinite;"></div>
+    <!-- SÍMBOLO OFICIAL EMED: O 'É' EM FORMATO DE ARROBA COM PULSO E GIRO -->
+    <div style="position:relative; width:130px; height:130px; display:flex; align-items:center; justify-content:center; margin-bottom:20px;">
+      <div style="position:absolute; width:115px; height:115px; border-radius:50%; border:3px solid #38bdf8; opacity:0.6; animation:emedPulse 2s infinite;"></div>
       <div style="position:absolute; width:130px; height:130px; border-radius:50%; border:3px solid transparent; border-top-color:#38bdf8; border-right-color:#0284c7; animation:emedSpin 1.4s linear infinite;"></div>
-      <div style="width:86px; height:86px; border-radius:50%; background:linear-gradient(135deg, #002b54 0%, #0077b6 100%); display:flex; align-items:center; justify-content:center; box-shadow:0 0 25px rgba(2, 132, 199, 0.6); border:2.5px solid #38bdf8;">
-        <!-- Ícone do '@' estilizado da marca eMED -->
-        <span style="font-size:48px; font-weight:900; font-family:'Segoe UI', sans-serif; color:#ffffff; text-shadow:0 2px 10px rgba(0,0,0,0.5); line-height:1; user-select:none;">@</span>
+      <div style="width:88px; height:88px; border-radius:50%; background:linear-gradient(135deg, #002b54 0%, #0077b6 100%); display:flex; align-items:center; justify-content:center; box-shadow:0 0 25px rgba(2, 132, 199, 0.7); border:2.5px solid #38bdf8;">
+        <svg viewBox="0 0 100 100" width="76" height="76" style="display:block;">
+          <defs>
+            <linearGradient id="emedArobaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#38bdf8"/>
+              <stop offset="100%" stop-color="#ffffff"/>
+            </linearGradient>
+          </defs>
+          <!-- Espiral / anel orbital estilo arroba da eMED envolvendo o É -->
+          <path d="M 50,14 A 36,36 0 1,1 18,65 C 16,48 24,30 42,20 C 58,12 78,20 84,38 C 90,56 78,76 60,80 C 44,84 28,74 26,56" 
+                fill="none" stroke="url(#emedArobaGrad)" stroke-width="4.5" stroke-linecap="round"/>
+          <!-- Letra É maiúscula oficial com acento -->
+          <text x="50" y="63" font-family="'Segoe UI', Arial, Helvetica, sans-serif" font-weight="900" font-size="44" fill="#ffffff" text-anchor="middle">É</text>
+        </svg>
       </div>
     </div>
     
@@ -3449,28 +3589,34 @@
     <div style="font-size:12px; color:#cbd5e1; margin-top:8px;">Aguarde alguns instantes enquanto consolidamos os dados na nuvem</div>
   </div>
 
-  <!-- MODAL DE ASSINATURA EM TELA CHEIA NA ORIENTAÇÃO PAISAGEM (WIDESCREEN) -->
-  <div id="modalAssinaturaPaisagem" style="display:none; position:fixed; inset:0; z-index:9999999; background:#ffffff; flex-direction:column;">
-    <div style="background:#002b54; color:#ffffff; padding:10px 16px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 2px 8px rgba(0,0,0,0.2);">
-      <div style="display:flex; align-items:center; gap:10px;">
-        <span style="font-size:18px;">✍️</span>
+  <!-- MODAL DE ASSINATURA EM TELA CHEIA NA ORIENTAÇÃO PAISAGEM (WIDESCREEN ANTIDISTORÇÃO) -->
+  <div id="modalAssinaturaPaisagem" style="display:none; position:fixed; inset:0; z-index:9999999; background:#002b54; flex-direction:column;">
+    <div style="background:#002b54; color:#ffffff; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; box-shadow:0 2px 8px rgba(0,0,0,0.3); z-index:10;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:20px;">✍️</span>
         <div>
-          <div style="font-weight:bold; font-size:14.5px;" id="lblTituloAssinaturaPaisagem">Assinatura do Responsável</div>
-          <div style="font-size:11px; color:#93c5fd;">Assine com o dedo ou caneta touch na área branca abaixo</div>
+          <div style="font-weight:900; font-size:14px; color:#ffffff;" id="lblTituloAssinaturaPaisagem">Assinatura do Responsável</div>
+          <div style="font-size:11px; color:#93c5fd;">Assine com o dedo ou caneta touch na prancheta horizontal</div>
         </div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px;">
-        <span style="font-size:11px; background:rgba(255,255,255,0.15); padding:4px 8px; border-radius:6px; color:#e0f2fe; display:inline-block;">🔄 Gire o celular se preferir</span>
-        <button type="button" class="btn btn-outline btn-sm" style="background:#ffffff; color:#002b54; border-color:#ffffff; font-weight:bold;" onclick="limparCanvasPaisagem()">🧹 Limpar</button>
-        <button type="button" class="btn btn-success btn-sm" style="font-weight:bold; padding:8px 18px; font-size:13.5px;" onclick="salvarAssinaturaPaisagem()">💾 Salvar</button>
+      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+        <button type="button" class="btn btn-outline btn-sm" style="background:#ffffff; color:#002b54; border-color:#ffffff; font-weight:bold; padding:7px 12px;" onclick="alternarGiroPranchetaManual()" title="Girar prancheta 90 graus">
+          🔄 Girar Tela
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" style="background:rgba(255,255,255,0.15); color:#ffffff; border-color:rgba(255,255,255,0.4); font-weight:bold; padding:7px 12px;" onclick="limparCanvasPaisagem()">
+          🧹 Limpar
+        </button>
+        <button type="button" class="btn btn-success btn-sm" style="font-weight:900; padding:8px 18px; font-size:13.5px; box-shadow:0 2px 8px rgba(22,101,52,0.4);" onclick="salvarAssinaturaPaisagem()">
+          💾 Salvar
+        </button>
         <button type="button" class="btn btn-sm" style="background:transparent; color:#fff; border:1px solid rgba(255,255,255,0.3); font-size:14px; padding:6px 10px;" onclick="fecharModalAssinaturaPaisagem()">✕</button>
       </div>
     </div>
     
-    <div style="flex:1; position:relative; background:#f8fafc; padding:8px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
-      <canvas id="canvasPaisagem" style="width:100%; height:100%; background:#ffffff; border-radius:10px; border:2px dashed #0284c7; box-shadow:0 4px 15px rgba(0,0,0,0.06); touch-action:none; display:block; cursor:crosshair;"></canvas>
-      <div style="position:absolute; bottom:25%; left:6%; right:6%; border-bottom:1.5px dashed #cbd5e1; pointer-events:none; text-align:center;">
-        <span style="background:#fff; color:#94a3b8; font-size:11px; padding:0 12px; position:relative; top:8px; font-weight:bold; letter-spacing:0.5px;">LINHA DE ASSINATURA</span>
+    <div id="containerPrancheta" style="flex:1; position:relative; background:#f1f5f9; padding:8px; display:flex; flex-direction:column; justify-content:center; align-items:center; overflow:hidden;">
+      <canvas id="canvasPaisagem" style="width:100%; height:100%; background:#ffffff; border-radius:10px; border:2px solid #0284c7; box-shadow:0 4px 20px rgba(0,0,0,0.12); touch-action:none; display:block; cursor:crosshair;"></canvas>
+      <div id="guiaLinhaAssinatura" style="position:absolute; bottom:25%; left:6%; right:6%; border-bottom:1.5px dashed #94a3b8; pointer-events:none; text-align:center;">
+        <span style="background:#fff; color:#64748b; font-size:11px; padding:0 12px; position:relative; top:8px; font-weight:bold; letter-spacing:0.5px;">LINHA DE ASSINATURA (HORIZONTAL)</span>
       </div>
     </div>
   </div>
