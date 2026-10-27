@@ -1,6 +1,6 @@
 # INSTRUÇÃO DE TRABALHO TÉCNICA - eMED BIOMEDICAL
 
-| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-TOMO-GE-016`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-TOMO-GE-016`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
 |:---:|:---|:---|
 
 ---
@@ -11,7 +11,7 @@
 **Subsistema:** Power Unit / Gantry High Voltage Generation / Inversor Ressonante JEDI  
 **Componentes:** Módulos de Potência IGBT ($1200\text{V} / 400\text{A}$), Placa de Disparo de Gate (*Gate Driver Board*), Barramentos de Cobre (*Busbars*)  
 **Documentos Base de Fábrica:** GE Direction 5181178-800 Rev. 16 (Seções 1012794, 1074627 e 254380)  
-**Nível Técnico:** Engenharia Clínica Especializada / Nível 3 (Eletrônica de Potência & Alta Tensão)  
+**Nível Técnico:** Diagnóstico por Imagem Especializada / Nível 3 (Eletrônica de Potência & Alta Tensão)  
 **Revisão:** 1.0 - Procedimento de Teste em Bancada, Substituição Mecânica, Pasta Térmica e No-Load Test  
 
 ---

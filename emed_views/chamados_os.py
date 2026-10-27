@@ -1475,7 +1475,7 @@ def _render_execucao_os_ativas(ctx: AppContext):
                     causa_at = limpar_texto(row_os.get('causa_raiz'), opcoes_causa[0])
                     idx_cr = opcoes_causa.index(causa_at) if causa_at in opcoes_causa else 0
                     causa_raiz_in = st.selectbox(
-                        "Causa Raiz Identificada (Engenharia Clínica)",
+                        "Causa Raiz Identificada (Diagnóstico por Imagem)",
                         opcoes_causa,
                         index=idx_cr,
                         key=f"cr_os_{idx_os}"

@@ -35,7 +35,7 @@ def clean_latex(text: str) -> str:
 
 
 def markdown_to_html(md_text: str, doc_title: str = "Instrução de Trabalho eMED") -> str:
-    """Converte Markdown estruturado de Engenharia Clínica para HTML A4 timbrado e estilizado."""
+    """Converte Markdown estruturado de Diagnóstico por Imagem para HTML A4 timbrado e estilizado."""
     css = """
     <style>
         @page {
@@ -203,7 +203,7 @@ def markdown_to_html(md_text: str, doc_title: str = "Instrução de Trabalho eME
         f"<td style='border:none; width:120px; vertical-align:middle; padding:0 6px 0 0;'>{logo_html}</td>",
         "<td style='border:none; vertical-align:middle; padding:0 8px; overflow:hidden;'>",
         "<div style='font-size:10pt; font-weight:800; color:#0b132b; letter-spacing:0.3px;'>EMED ELETROMEDICINA LTDA.</div>",
-        "<div style='font-size:7pt; color:#64748b; font-weight:600;'>ENGENHARIA CLÍNICA • DIAGNÓSTICO POR IMAGEM • CNPJ: 03.611.974/0001-08</div>",
+        "<div style='font-size:7pt; color:#64748b; font-weight:600;'>DIAGNÓSTICO POR IMAGEM • CNPJ: 03.611.974/0001-08</div>",
         f"<div class='header-title' style='color:#0077b6; font-size:10pt; font-weight:bold; margin-top:2px; line-height:1.25;'>{clean_latex(doc_title_display)}</div>",
         "</td>",
         "<td style='border:none; width:155px; vertical-align:middle; text-align:right; padding:0;'>",
@@ -350,7 +350,7 @@ def markdown_to_html(md_text: str, doc_title: str = "Instrução de Trabalho eME
     full_html = (
         f"<!DOCTYPE html><html><head><meta charset='utf-8'>{css}</head><body>"
         f"{''.join(body_html)}"
-        f"<div class='footer-note'>eMED Engenharia Clínica & Manutenção Hospitalar • Procedimento Técnico Homologado • Confidencial</div>"
+        f"<div class='footer-note'>eMED Eletromedicina • Diagnóstico por Imagem • CNPJ: 03.611.974/0001-08 • Procedimento Homologado</div>"
         f"</body></html>"
     )
     return full_html

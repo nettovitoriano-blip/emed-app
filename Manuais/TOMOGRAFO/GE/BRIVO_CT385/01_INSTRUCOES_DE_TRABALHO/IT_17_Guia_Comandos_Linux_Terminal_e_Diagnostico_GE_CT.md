@@ -1,6 +1,6 @@
 # INSTRUÇÃO DE TRABALHO TÉCNICA - eMED BIOMEDICAL
 
-| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-TOMO-GE-017`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-TOMO-GE-017`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
 |:---:|:---|:---|
 
 ---
@@ -10,7 +10,7 @@
 **Sistemas:** Tomógrafos GE BrightSpeed (Lite, Select, 16, Ultra, Plus) & Brivo CT385  
 **Ambiente:** Sistema Operacional Linux Red Hat / CentOS Embarcado no Console (Host Computer)  
 **Documento Base:** Manuais de Software GE 03_Comandos_Linux_GE & 04_Utilitarios_Diagnostico_Linux  
-**Nível de Acesso:** Engenharia Clínica / Especialista de Campo eMED  
+**Nível de Acesso:** Diagnóstico por Imagem / Especialista de Campo eMED  
 **Revisão:** 1.0 - Guia Prático de Comandos CLI de Serviço  
 
 ---

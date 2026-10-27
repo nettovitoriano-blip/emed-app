@@ -1,6 +1,6 @@
 # INSTRUÇÃO DE TRABALHO TÉCNICA - eMED BIOMEDICAL
 
-| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-RX-LOT-002`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-RX-LOT-002`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
 |:---:|:---|:---|
 
 ---
@@ -9,7 +9,7 @@
 ## IT-RX-LOT-002: Calibração de Parâmetros Radiológicos (kV, mA, Tempo) e Manutenção Preventiva (Família HF Lotus)
 **Equipamento:** Aparelhos de Raios-X Fixos e Telecomandados Lotus Família HF  
 **Documento Base:** Manual do Usuário e Operação Família HF & Rotina Preventiva eMED  
-**Nível de Acesso:** Engenharia Clínica / Técnico de Manutenção Especializado  
+**Nível de Acesso:** Diagnóstico por Imagem / Técnico de Manutenção Especializado  
 **Revisão:** 1.0 - Procedimento Anual de Calibração e Manutenção Preventiva  
 
 ---

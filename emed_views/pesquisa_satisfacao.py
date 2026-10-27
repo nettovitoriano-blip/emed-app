@@ -229,7 +229,7 @@ def render_pesquisa_satisfacao(ctx: AppContext):
                         <div style="font-size: 38px;">🎉</div>
                         <h3 style="color: #93c5fd; margin: 8px 0 4px 0;">Ficamos Muito Felizes!</h3>
                         <p style="color: #e2e8f0; font-size: 13.5px; line-height: 1.5;">
-                            Sua opinião positiva nos motiva a continuar entregando a melhor engenharia clínica do Ceará.
+                            Sua opinião positiva nos motiva a continuar entregando a melhor assistência técnica em diagnóstico por imagem do Ceará.
                             <b>Ajude-nos a subir nossa nota no Google</b> compartilhando este elogio em apenas 1 clique:
                         </p>
                         <a href="{url_g_atual}" target="_blank" style="display: inline-block; background: #f59e0b; color: #000; font-weight: 900; font-size: 15px; padding: 12px 22px; border-radius: 8px; text-decoration: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-top: 10px;">

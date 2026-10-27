@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v20-geofencing-alinhamento-estoque';
+const CACHE_NAME = 'emed-pwa-v21-diagnostico-imagem-preinstalacao-timbrada';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

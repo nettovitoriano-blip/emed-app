@@ -114,7 +114,7 @@ def _obter_dica_rapida_it(equipamento: str, relato: str) -> str:
     
     if any(w in txt for w in ["FREIO", "ESTATIVA", "PORTA TUBO", "PORTA-TUBO", "DESTRAV", "TRILHO", "HORIZONTAL", "VERTICAL", "SOLTO", "LIVRE"]):
         return (
-            "💡 **Orientação da Engenharia Clínica EMED (Estativa & Eletrofreios):** "
+            "💡 **Orientação Especializada em Diagnóstico por Imagem EMED (Estativa & Eletrofreios):** "
             "Se o freio não estiver segurando (movimento livre) ou travar no trilho, verifique se ao apertar o botão da manopla escuta-se o estalo da bobina solenoide. "
             "Se **todos** os freios da sala (mesa e estativa) estiverem inoperantes, a falha provável é na fonte de alimentação dos freios. "
             "Se for **apenas um movimento específico**, nossa equipe levará a bobina solenoide e o botão de acionamento para substituição imediata."
@@ -128,7 +128,7 @@ def _obter_dica_rapida_it(equipamento: str, relato: str) -> str:
     elif "BRIVO" in txt or "TOMO" in txt or "CT385" in txt or "BRIGHTSPEED" in txt or "SOMATOM" in txt or "OPTIMA" in txt:
         if any(w in txt for w in ["TRAV", "REINIC", "COMUNIC", "GANTRY", "ERRO", "CHILLER"]):
             return (
-                "💡 **Dica da Engenharia Clínica EMED (POP-03 / IT-05):** "
+                "💡 **Dica Técnica em Diagnóstico por Imagem EMED (POP-03 / IT-05):** "
                 "Para tomógrafos, verifique se o disjuntor de emergência do console ou a chave geral do Gantry "
                 "não foram acionados acidentalmente. Um ciclo de reinicialização de 60 segundos "
                 "no PDU costuma restaurar o barramento de comunicação."
@@ -136,7 +136,7 @@ def _obter_dica_rapida_it(equipamento: str, relato: str) -> str:
     elif "RAIO" in txt or "LOTUS" in txt or "HF500" in txt or "RX" in txt or "MULTIX" in txt:
         if any(w in txt for w in ["DISPAR", "COLIM", "EMISS", "GERADOR", "KV", "MAS", "FEIXE", "FOTOCEL"]):
             return (
-                "💡 **Dica da Engenharia Clínica EMED (POP-Lotus HF500 / IT-RX):** "
+                "💡 **Dica Técnica em Diagnóstico por Imagem EMED (POP-Lotus HF500 / IT-RX):** "
                 "Para sistemas de Raio-X, confirme se o botão de disparo de 2 estágios está com o cabo íntegro "
                 "e se o intertravamento das portas da sala de exame está fechado corretamente antes do chamado."
             )

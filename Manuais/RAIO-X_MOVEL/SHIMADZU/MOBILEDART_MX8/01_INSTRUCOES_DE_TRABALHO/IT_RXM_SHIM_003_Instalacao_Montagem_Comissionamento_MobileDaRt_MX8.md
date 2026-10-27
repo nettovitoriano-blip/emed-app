@@ -1,6 +1,6 @@
 # INSTRUÇÃO DE TRABALHO TÉCNICA - eMED BIOMEDICAL
 
-| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-RXM-SHIM-003`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-RXM-SHIM-003`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
 |:---:|:---|:---|
 
 ---
@@ -10,7 +10,7 @@
 **Equipamento:** Shimadzu MobileDaRt Evolution / MX8 Version (Raio-X Móvel Motorizado)  
 **Potência do Gerador:** 32 kW (Alta Potência com Banco de Capacitores) / 12.5 kW  
 **Documento Base de Fábrica:** Manual de Instalação Shimadzu M503-E410 (560 páginas)  
-**Público-Alvo:** Engenharia Clínica & Especialistas de Campo eMED  
+**Público-Alvo:** Diagnóstico por Imagem & Especialistas de Campo eMED  
 **Revisão:** 1.0 - Procedimento Oficial de Entrega Técnica e Comissionamento  
 
 ---
@@ -79,7 +79,7 @@ flowchart TD
    - Corte e descarte as duas cintas plásticas azuis/pretas (*PP-bands*) que amarram o monobloco do tubo de raios-X à estrutura.
 5. **Acomodação dos suportes de transporte:**
    > [!IMPORTANT]
-   > Guarde todos os suportes metálicos de fixação de transporte e entregue ao responsável da Engenharia Clínica do hospital ou acomode no compartimento de manutenção. Eles serão **obrigatórios** caso o equipamento precise ser embarcado em caminhão para transferência no futuro.
+   > Guarde todos os suportes metálicos de fixação de transporte e entregue ao responsável da Diagnóstico por Imagem do hospital ou acomode no compartimento de manutenção. Eles serão **obrigatórios** caso o equipamento precise ser embarcado em caminhão para transferência no futuro.
 6. **Inspeção das rodas de tração:**
    - Se o equipamento ficou armazenado em caixote por muito tempo, a borracha das rodas traseiras pode apresentar uma leve deformação plana (achatamento). Isso é normal e desaparece sozinho após os primeiros minutos de condução do equipamento.
 

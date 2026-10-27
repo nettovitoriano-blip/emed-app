@@ -1,6 +1,6 @@
 # INSTRUÇÃO DE TRABALHO TÉCNICA - eMED BIOMEDICAL
 
-| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-TOMO-GE-014`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-TOMO-GE-014`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
 |:---:|:---|:---|
 
 ---
@@ -12,7 +12,7 @@
 **Componente:** 2010 Axial Drive Controller (Driver Titan / Danaher Motion)  
 **Part Number Oficial GE:** `5344401`  
 **Documento Base de Fábrica:** GE Direction 5181178-800 Rev. 16 (Section 1093058)  
-**Nível Técnico:** Engenharia Clínica Especializada / Nível 3 (Gantry Drive & Motion Control)  
+**Nível Técnico:** Diagnóstico por Imagem Especializada / Nível 3 (Gantry Drive & Motion Control)  
 **Revisão:** 1.0 - Procedimento de Substituição, Cabeamento e Verificação de Display  
 
 ---

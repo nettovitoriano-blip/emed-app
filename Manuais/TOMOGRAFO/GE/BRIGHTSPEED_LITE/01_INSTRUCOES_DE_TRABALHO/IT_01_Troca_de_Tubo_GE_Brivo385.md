@@ -1,6 +1,6 @@
 # INSTRUÇÃO DE TRABALHO: TROCA DE TUBO DE RAIO-X & CALIBRAÇÃO INTEGRAL
 
-| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-TOMO-GE-001`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-TOMO-GE-001`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
 |:---:|:---|:---|
 
 ---
@@ -168,4 +168,4 @@ O tomógrafo GE Brivo CT385 somente será liberado para uso em pacientes quando:
 4. Termo de Conclusão de Serviço e Backup do Sistema assinados pelos técnicos responsáveis.
 
 ---
-*eMED Eletromedicina Ltda. • Engenharia Clínica • Suporte Técnico Autorizado*
+*eMED Eletromedicina Ltda. • Diagnóstico por Imagem • Suporte Técnico Autorizado*

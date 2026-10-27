@@ -1,6 +1,6 @@
 # INSTRUÇÃO DE TRABALHO TÉCNICA - eMED BIOMEDICAL
 
-| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-TOMO-GE-013`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-TOMO-GE-013`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
 |:---:|:---|:---|
 
 ---
@@ -11,7 +11,7 @@
 **Subsistema:** Gantry / Geração de Alta Tensão / Power Unit (Gerador JEDI)  
 **Componente:** Programmed KV Control Board (Placa de Controle de kV JEDI)  
 **Documento Base de Fábrica:** GE Direction 5181178-800 Rev. 16 (Section 1074628)  
-**Nível Técnico:** Engenharia Clínica Especializada / Nível 3 (Alta Tensão & Gantry)  
+**Nível Técnico:** Diagnóstico por Imagem Especializada / Nível 3 (Alta Tensão & Gantry)  
 **Revisão:** 1.0 - Procedimento de Substituição, Flash Firmware e Revalidação  
 
 ---

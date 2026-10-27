@@ -34,16 +34,24 @@ DICIONARIO_VIDEOS_ITS = {
     "IT_RX_LOT_001_Vistoria_Pre_Instalacao_Adequacao_Sala_HF500M.md": "Video_IT_RX_LOT001_Vistoria_Pre_Instalacao_HF500M.mp4",
     "01_Manual_Pre_Instalacao_Oficial_Lotus_HF500M.pdf": "Video_IT_RX_LOT001_Vistoria_Pre_Instalacao_HF500M.mp4",
     "02_Formulario_Vistoria_Pre_Instalacao_Lotus_HF500M_eMED.pdf": "Video_IT_RX_LOT001_Vistoria_Pre_Instalacao_HF500M.mp4",
-    "IT_RXM_SHIM_004_Roteiro_Mestre_Instalacao_Comissionamento_31_Passos_MX8_MX9.md": "Video_IT_RXM_SHIM003_Instalacao_Montagem_MobileDaRt_MX8.mp4",
-    "IT_RXM_SHIM_004_Roteiro_Mestre_Instalacao_Comissionamento_31_Passos_MX8_MX9.pdf": "Video_IT_RXM_SHIM003_Instalacao_Montagem_MobileDaRt_MX8.mp4",
+    "POP_RXM_SHIM_001_Roteiro_Mestre_Instalacao_Comissionamento_31_Passos_MX8_MX9.md": "Video_IT_RXM_SHIM003_Instalacao_Montagem_MobileDaRt_MX8.mp4",
+    "POP_RXM_SHIM_001_Roteiro_Mestre_Instalacao_Comissionamento_31_Passos_MX8_MX9.pdf": "Video_IT_RXM_SHIM003_Instalacao_Montagem_MobileDaRt_MX8.mp4",
+    "IT_MM_GE_001_Calibracao_Forca_e_Espessura_Compressao_Crystal_Nova.md": "Video_Apresentacao_Sistema_Emed_PRO.mp4",
+    "IT_MM_GE_001_Calibracao_Forca_e_Espessura_Compressao_Crystal_Nova.pdf": "Video_Apresentacao_Sistema_Emed_PRO.mp4",
+    "IT_MM_GE_002_Calibracao_kV_mA_Gerador_Alta_Tensao_Crystal_Nova.md": "Video_Apresentacao_Sistema_Emed_PRO.mp4",
+    "IT_MM_GE_002_Calibracao_kV_mA_Gerador_Alta_Tensao_Crystal_Nova.pdf": "Video_Apresentacao_Sistema_Emed_PRO.mp4",
+    "IT_MM_GE_003_Autocalibracao_Detector_Plano_FPD_BPM_Ganho_Crystal_Nova.md": "Video_Apresentacao_Sistema_Emed_PRO.mp4",
+    "IT_MM_GE_003_Autocalibracao_Detector_Plano_FPD_BPM_Ganho_Crystal_Nova.pdf": "Video_Apresentacao_Sistema_Emed_PRO.mp4",
+    "IT_MM_GE_004_Alinhamento_Geometrico_Isocentro_Rotacao_Braco_C_Crystal_Nova.md": "Video_Apresentacao_Sistema_Emed_PRO.mp4",
+    "IT_MM_GE_004_Alinhamento_Geometrico_Isocentro_Rotacao_Braco_C_Crystal_Nova.pdf": "Video_Apresentacao_Sistema_Emed_PRO.mp4",
+    "POP_MM_GE_001_Roteiro_Manutencao_Preventiva_Semestral_Anual_Crystal_Nova.md": "Video_Apresentacao_Sistema_Emed_PRO.mp4",
+    "POP_MM_GE_001_Roteiro_Manutencao_Preventiva_Semestral_Anual_Crystal_Nova.pdf": "Video_Apresentacao_Sistema_Emed_PRO.mp4",
     "IT_RXM_SHIM_006_Protocolo_Geral_Calibracao_FVR_Baterias_Colimador_FPD_MX8_MX9.md": "Video_IT_RXM_SHIM002_Calibracao_Manopla_Sensor_Braco_MX8.mp4",
     "IT_RXM_SHIM_006_Protocolo_Geral_Calibracao_FVR_Baterias_Colimador_FPD_MX8_MX9.pdf": "Video_IT_RXM_SHIM002_Calibracao_Manopla_Sensor_Braco_MX8.mp4",
     "IT_MM_SIEM_001_Calibracao_Qualidade_Imagem_Compressao_Mamomat.md": "Video_Apresentacao_Sistema_Emed_PRO.mp4",
     "IT_MM_SIEM_001_Calibracao_Qualidade_Imagem_Compressao_Mamomat.pdf": "Video_Apresentacao_Sistema_Emed_PRO.mp4",
     "IT_HEMO_PHIL_001_Manutencao_Arco_C_Refrigeracao_Chiller.md": "Video_Apresentacao_Sistema_Emed_Real.mp4",
     "IT_HEMO_PHIL_001_Manutencao_Arco_C_Refrigeracao_Chiller.pdf": "Video_Apresentacao_Sistema_Emed_Real.mp4",
-    "IT_RM_GE_001_Monitoramento_Nivel_Helio_Criogenia_RF.md": "Video_Tutorial_Solicitacao_Pecas_Baseada_na_IT.mp4",
-    "IT_RM_GE_001_Monitoramento_Nivel_Helio_Criogenia_RF.pdf": "Video_Tutorial_Solicitacao_Pecas_Baseada_na_IT.mp4",
     "IT_US_GE_001_Inspecao_Cristais_Transdutores_Phantom.md": "Video_Tutorial_Abertura_OS_Manual.mp4",
     "IT_US_GE_001_Inspecao_Cristais_Transdutores_Phantom.pdf": "Video_Tutorial_Abertura_OS_Manual.mp4",
     "IT_ARC_ZIE_001_Calibracao_Laser_Mira_Intensificador_Imagem.md": "Video_Tutorial_Fluxo_Kits_Separacao_Entrega_Devolucao.mp4",
@@ -255,6 +263,10 @@ DICIONARIO_SUBGRUPOS = {
     "03_SOFTWARE_E_UTILITARIOS_LINUX": "💻 SOFTWARE E UTILITÁRIOS LINUX",
     "03_SOFTWARE_E_UTILITARIOS": "💻 SOFTWARE & UTILITÁRIOS",
     "02_PORTAL_INTERATIVO_SERVICE_METHODS": "🌐 PORTAL INTERATIVO SERVICE METHODS",
+    "02_POPS_E_CHECKLISTS": "📝 POPS & CHECKLISTS OPERACIONAIS",
+    "03_MANUAIS_DE_SERVICO_OEM": "📘 MANUAIS DE SERVIÇO DE FÁBRICA (OEM)",
+    "04_FIRMWARES_E_UTILITARIOS": "💾 FIRMWARES & UTILITÁRIOS DE CALIBRAÇÃO",
+    "05_VIDEOS_TREINAMENTO": "🎬 VÍDEOS DE TREINAMENTO CO-LOCALIZADOS",
     "02_MANUAIS_DE_SERVICO_E_INSTALACAO": "📚 MANUAIS DE SERVIÇO & INSTALAÇÃO",
     "02_MANUAIS_DE_SERVICO": "📘 MANUAIS DE SERVIÇO TÉCNICO",
     "02_MANUAIS_OFICIAIS_PDF": "📚 MANUAIS DE FÁBRICA OFICIAIS (PDF)",
@@ -314,7 +326,7 @@ def _escanear_arvore_manuais(pasta_base: str):
     extensoes_permitidas = (".pdf", ".md", ".docx", ".doc")
     pastas_ignoradas = {
         "media", "content", "css", "scripts", "icons", "search", 
-        "toc", "forms", "images", "__pycache__", ".git", "system utiliies"
+        "toc", "forms", "images", "__pycache__", ".git", "system utiliies", "oxygen-webhelp"
     }
 
     for root, dirs, files in os.walk(pasta_base):
@@ -428,7 +440,7 @@ def _renderizar_leitor_pdf(caminho_pdf: str, doc_key: str):
             with st.popover("📲 WhatsApp", use_container_width=True):
                 nome_pdf = os.path.basename(caminho_pdf)
                 msg_wa = (
-                    f"🏥 *eMED Engenharia Clínica*\n"
+                    f"🏥 *eMED Eletromedicina • Diagnóstico por Imagem*\n"
                     f"📄 *Manual / Documento:* {nome_pdf}\n"
                     f"Consulte o documento oficial na Biblioteca Técnica eMED."
                 )
@@ -580,7 +592,7 @@ def _renderizar_leitor_markdown(caminho_md: str, doc_key: str = "it"):
             with st.popover("📲 WhatsApp", use_container_width=True):
                 nome_it = os.path.basename(caminho_md)
                 msg_it_wa = (
-                    f"🏥 *eMED Engenharia Clínica & Manutenção*\n"
+                    f"🏥 *eMED Eletromedicina • Diagnóstico por Imagem*\n"
                     f"📋 *Instrução de Trabalho:* {nome_it}\n"
                     f"Documento técnico homologado para suporte de campo eMED."
                 )
@@ -1480,7 +1492,7 @@ def _render_central_pre_instalacao(ctx: AppContext):
     st.markdown("### 🏗️ Central de Vistorias, Adequação de Sala & Pré-Instalação Hospitalar")
     st.markdown(
         "Acesso prioritário a **Formulários de Vistoria de Pré-Instalação homologados pela eMED**, "
-        "Dossiês de Engenharia Clínica para Adequação de Salas de Exames, Manuais de Fábrica e "
+        "Dossiês de Diagnóstico por Imagem para Adequação de Salas de Exames, Manuais de Fábrica e "
         "ferramenta de **compartilhamento direto de diretrizes com clientes via WhatsApp**."
     )
 
@@ -1567,7 +1579,7 @@ def _render_central_pre_instalacao(ctx: AppContext):
         st.markdown("#### 📲 Compartilhar Diretrizes com o Cliente (WhatsApp)")
         with st.container(border=True):
             cliente_nome = st.text_input("Nome do Cliente / Hospital / Clínica:", value="Hospital / Clínica Parceira", key="pre_cli_nome")
-            cliente_tel = st.text_input("WhatsApp do Responsável da Engenharia / Obra:", placeholder="Ex: 11988887777", key="pre_cli_tel")
+            cliente_tel = st.text_input("WhatsApp do Responsável da Infraestrutura / Obra:", placeholder="Ex: 11988887777", key="pre_cli_tel")
             
             st.markdown("**Parâmetros Críticos Inclusos na Mensagem:**")
             st.markdown(
@@ -1581,7 +1593,7 @@ def _render_central_pre_instalacao(ctx: AppContext):
             )
 
             msg_cliente_wa = (
-                f"🏥 *eMED ENGENHARIA CLÍNICA - DIRETRIZES OFICIAIS DE PRÉ-INSTALAÇÃO*\n\n"
+                f"🏥 *eMED DIAGNÓSTICO POR IMAGEM - DIRETRIZES OFICIAIS DE PRÉ-INSTALAÇÃO*\n\n"
                 f"Prezado(a) responsável de *{cliente_nome}*,\n\n"
                 f"Para viabilizar a entrega e instalação segura do sistema de Raio-X Fixo *Lotus HF500M*, "
                 f"encaminhamos os requisitos obrigatórios de adequação de sala homologados pela engenharia eMED:\n\n"
@@ -1982,7 +1994,7 @@ def _render_lista_cards(docs: list, ocorrencias_busca: dict = None):
                 with st.popover("📲 WhatsApp", use_container_width=True):
                     st.markdown(f"**Compartilhar Documento via WhatsApp**")
                     msg_wa = (
-                        f"🏥 *eMED Engenharia Clínica & Manutenção Hospitalar*\n"
+                        f"🏥 *eMED Eletromedicina • Diagnóstico por Imagem*\n"
                         f"📋 *Documento:* {doc['titulo_amigavel']}\n"
                         f"📁 *Categoria:* {doc['categoria']} | {doc['modelo']}\n"
                         f"💾 *Formato:* {'PDF Oficial eMED' if caminho_pdf_oficial else doc['tipo']}\n\n"

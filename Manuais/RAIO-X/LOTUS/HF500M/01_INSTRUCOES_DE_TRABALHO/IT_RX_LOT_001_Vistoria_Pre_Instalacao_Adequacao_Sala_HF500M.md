@@ -1,6 +1,6 @@
 # INSTRUÇÃO DE TRABALHO TÉCNICA - eMED BIOMEDICAL
 
-| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Engenharia Clínica & Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-RX-LOT-001`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
+| <img src="emed_svg-1.png" width="160" alt="eMED" /> | **EMED ELETROMEDICINA LTDA.**<br>**Diagnóstico por Imagem**<br>CNPJ: 03.611.974/0001-08 | **CÓDIGO:** `IT-RX-LOT-001`<br>**VERSÃO:** `2.4 Homologada`<br>**REVISÃO:** `Rev. 02 (26/10/2026)`<br>**NORMA:** `ANVISA RDC 611` |
 |:---:|:---|:---|
 
 ---
@@ -9,7 +9,7 @@
 ## IT-RX-LOT-001: Vistoria Técnica de Pré-Instalação, Adequação Elétrica e Blindagem Radiológica (Lotus HF500M)
 **Equipamento:** Gerador e Sistema de Raio-X Fixo Lotus HF500M (50 kW / 500 mA)  
 **Documento Base:** Manual Oficial de Pré-Instalação Lotus & Protocolo eMED Gatekeeper  
-**Nível de Acesso:** Engenharia Clínica / Especialista de Infraestrutura Hospitalar  
+**Nível de Acesso:** Diagnóstico por Imagem / Especialista de Infraestrutura Hospitalar  
 **Revisão:** 1.0 - Procedimento de Liberação Predial Pré-Entrega  
 
 ---
