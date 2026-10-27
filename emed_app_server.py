@@ -242,6 +242,14 @@ async def handle_logo(request: web.Request) -> web.Response:
     return web.Response(status=404)
 
 
+async def handle_logo_circle(request: web.Request) -> web.Response:
+    caminho_circ = os.path.join(BASE_DIR, "emed_pwa_static", "logo_emed_circle.png")
+    if os.path.exists(caminho_circ):
+        with open(caminho_circ, "rb") as f:
+            return web.Response(body=f.read(), content_type="image/png")
+    return web.Response(status=404)
+
+
 async def api_bootstrap(request: web.Request) -> web.Response:
     """Retorna o estado completo de todos os 18 menus do Sistema EMED."""
     inicializar_tabela_pix(DB_NAME)
@@ -1554,6 +1562,7 @@ def criar_app() -> web.Application:
     app.router.add_get("/manifest.json", handle_manifest)
     app.router.add_get("/sw.js", handle_sw)
     app.router.add_get("/api/logo", handle_logo)
+    app.router.add_get("/api/logo-circle", handle_logo_circle)
     app.router.add_get("/api/bootstrap", api_bootstrap)
     app.router.add_get("/api/checklist", api_checklist)
     app.router.add_get("/api/triagem", api_triagem)

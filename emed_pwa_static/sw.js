@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v16-layout-mobile-clean';
+const CACHE_NAME = 'emed-pwa-v17-topbar-extended-logo';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
