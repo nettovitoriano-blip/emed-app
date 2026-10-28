@@ -1506,27 +1506,21 @@
 
 
 
-
-
-
-
       display: flex;
 
 
 
+      width: 100%;
+
+      max-width: 100%;
 
 
 
+      margin: 6px 0 0 0;
 
-      max-width: 1360px;
+      padding: 4px 16px;
 
-
-
-
-
-
-
-      margin: 8px auto 0 auto;
+      box-sizing: border-box;
 
 
 
@@ -1786,23 +1780,13 @@
 
 
 
+      width: 100%;
+
+      max-width: 100%;
 
 
 
-
-      max-width: 1360px;
-
-
-
-
-
-
-
-      margin: 0 auto;
-
-
-
-
+      margin: 0;
 
 
 
@@ -1810,41 +1794,35 @@
 
 
 
+      flex-wrap: wrap;
 
 
 
-
-      gap: 6px;
-
+      gap: 6px 8px;
 
 
 
+      overflow-x: visible;
+
+      overflow-y: visible;
 
 
 
-      overflow-x: auto;
+      padding: 8px 16px;
 
 
 
+      scrollbar-width: none;
+
+      box-sizing: border-box;
 
 
 
+    }
 
-      padding: 8px 12px;
+    .submenu-strip::-webkit-scrollbar {
 
-
-
-
-
-
-
-      scrollbar-width: thin;
-
-
-
-
-
-
+      display: none;
 
     }
 
@@ -2663,37 +2641,11 @@
 
 
     .container {
-
-
-
-
-
-
-
-      max-width: 1360px;
-
-
-
-
-
-
-
-      margin: 0 auto;
-
-
-
-
-
-
-
-      padding: 14px 12px;
-
-
-
-
-
-
-
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      padding: 14px 18px 80px 18px;
+      box-sizing: border-box;
     }
 
 
@@ -6498,6 +6450,8 @@
         max-width: 100% !important;
         box-sizing: border-box !important;
         padding: 8px 12px !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
         overflow-x: auto !important;
         scroll-snap-type: x mandatory !important;
         scroll-behavior: smooth !important;
@@ -7539,6 +7493,33 @@
 
 
 
+    
+    function focarParaEditarCampo(idCampo) {
+      const el = document.getElementById(idCampo);
+      if (el) {
+        el.focus();
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.border = '2px solid #0284c7';
+        el.style.boxShadow = '0 0 0 3px rgba(2, 132, 199, 0.2)';
+        setTimeout(() => {
+          el.style.border = '';
+          el.style.boxShadow = '';
+        }, 2200);
+        mostrarToast("✏️ Campo pronto para digitação e edição!");
+      }
+    }
+
+    function limparCampoTexto(idCampo) {
+      const el = document.getElementById(idCampo);
+      if (!el) return;
+      if (confirm("Deseja apagar o texto deste campo para escrever outro do zero?")) {
+        el.value = "";
+        el.focus();
+        if (typeof autoSalvarRascunho === "function") autoSalvarRascunho();
+        mostrarToast("🧹 Campo limpo! Digite o novo texto.");
+      }
+    }
+
     function htmlToolbarCampo(idCampo, categoria, label) {
 
 
@@ -7600,6 +7581,30 @@
 
 
               <span>🔬</span> Parâmetros
+
+
+
+            </button>
+
+
+
+            <button type="button" class="toolbar-btn-mini" onclick="focarParaEditarCampo('${idCampo}')" title="Clique para editar ou complementar o texto">
+
+
+
+              <span>✏️</span> Editar
+
+
+
+            </button>
+
+
+
+            <button type="button" class="toolbar-btn-mini" onclick="limparCampoTexto('${idCampo}')" title="Limpar campo para digitar do zero">
+
+
+
+              <span>🧹</span> Limpar
 
 
 
@@ -25676,9 +25681,15 @@ function renderizarNavegacao() {
 
         <div style="margin-bottom:12px;">
 
-          ${htmlToolbarCampo('osSrvExec', 'SERVICOS_EXECUTADOS', 'SERVIÇOS TÉCNICOS EXECUTADOS (EVITE TEXTO ROBOTIZADO)')}
+          ${htmlToolbarCampo('osSrvExec', 'SERVICOS_EXECUTADOS', 'SERVIÇOS TÉCNICOS EXECUTADOS')}
 
-          <textarea id="osSrvExec" class="textarea" rows="5" style="text-transform:uppercase;" placeholder="DESCREVA AQUI OS PROCEDIMENTOS, MEDIÇÕES E AJUSTES REALIZADOS..." oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('servico_executado'))}</textarea>
+          <div style="font-size:11px;color:#0284c7;margin:-2px 0 6px 0;display:flex;align-items:center;gap:4px;">
+
+            <span>✏️</span> <b>Texto pré-preenchido e 100% editável:</b> Clique abaixo para alterar, apagar ou adicionar mais detalhes da intervenção.
+
+          </div>
+
+          <textarea id="osSrvExec" class="textarea" rows="5" style="text-transform:uppercase;" placeholder="DESCREVA AQUI OS PROCEDIMENTOS, MEDIÇÕES E AJUSTES REALIZADOS OU EDITE O TEXTO SUGERIDO..." oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('servico_executado'))}</textarea>
 
         </div>
 
@@ -28910,14 +28921,17 @@ function renderizarNavegacao() {
       const srv = document.getElementById("osSrvExec");
       if (srv) {
         srv.value = "VISITA TÉCNICA PRESENCIAL REALIZADA. NÃO FOI POSSÍVEL REALIZAR A INTERVENÇÃO NA PRESENTE DATA POIS O EQUIPAMENTO ENCONTRAVA-SE EM USO CLÍNICO ATIVO NO SETOR HOSPITALAR. VISITA CONFIRMADA JUNTO AO CLIENTE PARA REAGENDAMENTO CONFORME DISPONIBILIDADE.";
+        srv.focus();
+        srv.style.border = "2px solid #f59e0b";
+        srv.style.background = "#fffbeb";
+        srv.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => {
+          srv.style.background = "";
+          srv.style.border = "";
+        }, 3000);
       }
 
-      const secaoAss = document.getElementById("canvasAssinaturaCliente") || document.getElementById("osAssClienteNome");
-      if (secaoAss) {
-        secaoAss.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-
-      mostrarToast("🏥 Relatório pré-preenchido: Colete o nome e assinatura do responsável no hospital e clique em 'CONCLUIR E FECHAR OS'!");
+      mostrarToast("✍️ Texto padrão de 'Equipamento em Uso' inserido! Você pode editar o texto acima antes de colher a assinatura.");
       window._acaoEspecialFechamento = "EQUIPAMENTO_EM_USO";
     }
 

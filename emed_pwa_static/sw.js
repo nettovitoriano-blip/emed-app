@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v23-rota-whatsapp-equipamento-em-uso';
+const CACHE_NAME = 'emed-pwa-v24-fullwidth-menu-edicao-servicos';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
