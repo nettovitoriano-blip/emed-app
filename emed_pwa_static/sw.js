@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v27-fix-cursor-edicao-texto';
+const CACHE_NAME = 'emed-pwa-v28-fix-seletor-modulos-preventiva';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

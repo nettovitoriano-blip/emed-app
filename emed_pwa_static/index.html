@@ -10057,7 +10057,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-      navigator.serviceWorker.register("/sw.js?v=v27").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=v28").then(reg => { if(reg) reg.update(); }).catch(() => {});
 
 
 
@@ -11660,8 +11660,38 @@ function htmlToolbarCampo(idCampo, categoria, label) {
     let STATE_MODULO_PREV = "MODULO_1";
     let ITENS_PREV_EDITAVEIS = [];
 
+    function atualizarEstilosBotoesModulosPrev() {
+      const b1 = document.getElementById("btnModPrev1");
+      const b2 = document.getElementById("btnModPrev2");
+      const b3 = document.getElementById("btnModPrev3");
+      
+      const aplicar = (btn, ativo) => {
+        if (!btn) return;
+        if (ativo) {
+          btn.className = "btn btn-sm btn-primary";
+          btn.style.background = "#002b54";
+          btn.style.color = "#ffffff";
+          btn.style.borderColor = "#002b54";
+          btn.style.boxShadow = "0 2px 6px rgba(0, 43, 84, 0.35)";
+          btn.style.fontWeight = "700";
+        } else {
+          btn.className = "btn btn-sm btn-outline";
+          btn.style.background = "#ffffff";
+          btn.style.color = "#334155";
+          btn.style.borderColor = "#cbd5e1";
+          btn.style.boxShadow = "none";
+          btn.style.fontWeight = "600";
+        }
+      };
+
+      aplicar(b1, STATE_MODULO_PREV === "MODULO_1");
+      aplicar(b2, STATE_MODULO_PREV === "MODULO_2");
+      aplicar(b3, STATE_MODULO_PREV === "MODULO_3");
+    }
+
     function selecionarAbaModuloPreventiva(modId) {
       STATE_MODULO_PREV = modId;
+      atualizarEstilosBotoesModulosPrev();
       carregarChecklistModal();
     }
 
@@ -14034,47 +14064,19 @@ function renderizarNavegacao() {
 
 
 
-              <label class="field-label">Peças / Componentes Solicitados</label>
-
-
-
-
-
-
-
-              <input id="pedItens" class="input" placeholder="Ex: Cabo de ECG 5 vias, Sensor SpO2, Placa Fonte..." />
-
-
-
-
-
-
-
+              <label class="field-label">Peças / Insumos do Almoxarifado (Busca no Catálogo)</label>
+              <input id="pedItens" list="listaPecasAlmox" class="input" placeholder="Digite código ou nome da peça (Ex: 199, ampola, cabo, placa)..." />
+              <datalist id="listaPecasAlmox">
+                ${(d.estoque || []).slice(0, 400).map(e => `<option value="#${esc(e.codigo)} — ${esc(e.nome_peca)} (Saldo: ${e.quantidade} ${esc(e.unidade || 'UND')})">`).join('')}
+              </datalist>
             </div>
 
-
-
-
-
-
-
             <div style="margin-bottom:10px;">
-
-
-
-
-
-
-
               <label class="field-label">Instrumentos / Ferramentas Necessárias</label>
-
-
-
-
-
-
-
-              <input id="pedInst" class="input" placeholder="Ex: Analisador Fluke, Phantom ACR, Mala Padrão..." />
+              <input id="pedInst" list="listaInstAlmox" class="input" placeholder="Digite instrumento ou ferramenta (Ex: Cobia, multímetro, mala, fantoma)..." />
+              <datalist id="listaInstAlmox">
+                ${(d.estoque || []).filter(e => String(e.categoria).includes('INSTRUMENTO') || String(e.categoria).includes('IMOBILIZADO') || String(e.grupo_item).includes('IMOBILIZADO')).map(e => `<option value="#${esc(e.codigo)} — ${esc(e.nome_peca)} (Saldo: ${e.quantidade} ${esc(e.unidade || 'UND')})">`).join('')}
+              </datalist>
 
 
 
@@ -19897,620 +19899,301 @@ function renderizarNavegacao() {
 
 
 
+    
+    // =========================================================================
+    // GESTÃO AVANÇADA DE ESTOQUE, INVENTÁRIO (1010 ITENS) & KARDEX
+    // =========================================================================
+    if (!STATE.filtroCatEstoque) STATE.filtroCatEstoque = "TODOS";
+    if (!STATE.paginaEstoque) STATE.paginaEstoque = 1;
+    if (STATE.buscaEstoque === undefined) STATE.buscaEstoque = "";
+
+    function mudarFiltroEstoque(cat) {
+      STATE.filtroCatEstoque = cat;
+      STATE.paginaEstoque = 1;
+      renderMenuGesEstoque(document.getElementById("mainContent"));
+    }
+
+    function mudarPaginaEstoque(delta) {
+      STATE.paginaEstoque = Math.max(1, STATE.paginaEstoque + delta);
+      renderMenuGesEstoque(document.getElementById("mainContent"));
+    }
+
+    function filtrarEstoqueCompleto(estoque) {
+      let lista = estoque;
+      const q = (STATE.buscaEstoque || "").trim().toLowerCase();
+      if (q) {
+        lista = lista.filter(e => {
+          const cod = String(e.codigo || "").toLowerCase();
+          const nome = String(e.nome_peca || "").toLowerCase();
+          const grp = String(e.grupo_item || "").toLowerCase();
+          const cat = String(e.categoria || "").toLowerCase();
+          return cod.includes(q) || nome.includes(q) || grp.includes(q) || cat.includes(q);
+        });
+      }
+
+      const f = STATE.filtroCatEstoque;
+      if (f === "PECAS") {
+        lista = lista.filter(e => String(e.categoria || '').toUpperCase().includes('PEÇA') || String(e.grupo_item || '').toUpperCase().includes('REVENDA'));
+      } else if (f === "CONSUMO") {
+        lista = lista.filter(e => String(e.categoria || '').toUpperCase().includes('CONSUMÍVEL') || String(e.grupo_item || '').toUpperCase().includes('CONSUMO'));
+      } else if (f === "IMOBILIZADO") {
+        lista = lista.filter(e => String(e.categoria || '').toUpperCase().includes('IMOBILIZADO') || String(e.categoria || '').toUpperCase().includes('INSTRUMENTO') || String(e.grupo_item || '').toUpperCase().includes('IMOBILIZADO'));
+      } else if (f === "COM_SALDO") {
+        lista = lista.filter(e => (e.quantidade || 0) > 0);
+      } else if (f === "ZERADOS") {
+        lista = lista.filter(e => (e.quantidade || 0) <= 0);
+      }
+      return lista;
+    }
+
+    function preencherAjusteEstoque(codigo, nome, qtd, preco, cat) {
+      const elCod = document.getElementById("estCod");
+      const elNome = document.getElementById("estNome");
+      const elQtd = document.getElementById("estQtd");
+      const elPreco = document.getElementById("estPreco");
+      const elCat = document.getElementById("estCat");
+      if (elCod) elCod.value = codigo;
+      if (elNome) elNome.value = nome;
+      if (elQtd) elQtd.value = qtd;
+      if (elPreco) elPreco.value = preco;
+      if (elCat) elCat.value = cat;
+      const form = document.getElementById("formCadastroEstoque");
+      if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      mostrarToast(`✏️ Item #${codigo} carregado para edição.`);
+    }
+
+    async function abrirModalKardex(filtroItem = "") {
+      const modal = document.getElementById("modalKardex");
+      if (!modal) return;
+      modal.style.display = "flex";
+      carregarKardex(filtroItem);
+    }
+
+    function fecharModalKardex() {
+      const modal = document.getElementById("modalKardex");
+      if (modal) modal.style.display = "none";
+    }
+
+    async function carregarKardex(q = "") {
+      const box = document.getElementById("modalKardexBody");
+      if (!box) return;
+      box.innerHTML = `<div style="text-align:center;padding:20px;color:#64748b;">⏳ Carregando movimentações Kardex do Almoxarifado...</div>`;
+      try {
+        const res = await fetch(`/api/kardex?q=${encodeURIComponent(q)}&limite=80`).then(r => r.json());
+        const movs = res.movimentacoes || [];
+        if (!movs.length) {
+          box.innerHTML = `<div style="text-align:center;padding:30px;color:#94a3b8;">Nenhuma movimentação encontrada para o critério "${esc(q)}".</div>`;
+          return;
+        }
+        box.innerHTML = `
+          <div style="font-size:11.5px;color:#64748b;margin-bottom:8px;">Mostrando as últimas <b>${movs.length}</b> movimentações auditadas:</div>
+          <div style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto;">
+            ${movs.map(m => `
+              <div style="background:#ffffff;border:1px solid #e2e8f0;padding:8px 10px;border-radius:6px;font-size:11.5px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-weight:800;color:#0284c7;">#${esc(m.codigo_item)} — ${esc(m.descricao)}</span>
+                  <span class="badge ${m.qtd_entrada > 0 ? 'concluido' : 'obs'}">${m.qtd_entrada > 0 ? '🟢 Entrada: +' + m.qtd_entrada : '🔴 Saída: -' + m.qtd_saida}</span>
+                </div>
+                <div style="color:#64748b;font-size:11px;margin-top:2px;display:flex;justify-content:space-between;">
+                  <span><b>Data:</b> ${esc(m.data_mov)} ${esc(m.hora_mov)} • <b>Saldo Atual:</b> ${m.saldo}</span>
+                  <span><b>NF:</b> ${esc(m.numero_nf || 'S/N')} • <b>Custo Médio:</b> R$ ${m.custo_medio.toFixed(2)}</span>
+                </div>
+                ${m.observacao ? `<div style="font-size:10.5px;color:#475569;margin-top:2px;background:#f8fafc;padding:2px 6px;border-radius:4px;"><b>Obs:</b> ${esc(m.observacao)}</div>` : ''}
+              </div>
+            `).join("")}
+          </div>
+        `;
+      } catch (e) {
+        box.innerHTML = `<div style="color:#ef4444;text-align:center;padding:20px;">Erro ao carregar movimentações do Kardex.</div>`;
+      }
+    }
+
     function renderMenuGesEstoque(box) {
-
-
-
-
-
-
-
-      const d = STATE.data;
-
-
-
-
-
-
-
+      const d = STATE.data || {};
       const estoque = d.estoque || [];
-
-
-
-
-
-
-
       const pedidos = d.solicitacoes_almox || [];
 
+      // Estatísticas gerais
+      const totalItens = estoque.length;
+      const comSaldo = estoque.filter(e => (e.quantidade || 0) > 0).length;
+      const zerados = estoque.filter(e => (e.quantidade || 0) <= 0).length;
+      const valorTotal = estoque.reduce((acc, e) => acc + (Number(e.valor_total) || ((e.quantidade || 0) * (e.preco_unitario || 0))), 0);
+      const qtdRevenda = estoque.filter(e => String(e.categoria || '').toUpperCase().includes('PEÇA') || String(e.grupo_item || '').toUpperCase().includes('REVENDA')).length;
+      const qtdConsumo = estoque.filter(e => String(e.categoria || '').toUpperCase().includes('CONSUMÍVEL') || String(e.grupo_item || '').toUpperCase().includes('CONSUMO')).length;
+      const qtdImob = estoque.filter(e => String(e.categoria || '').toUpperCase().includes('IMOBILIZADO') || String(e.categoria || '').toUpperCase().includes('INSTRUMENTO') || String(e.grupo_item || '').toUpperCase().includes('IMOBILIZADO')).length;
 
-
-
-
-
-
-
-
-
-
-
-
-
+      // Filtragem e Paginação
+      const filtrados = filtrarEstoqueCompleto(estoque);
+      const ITENS_PAG = 25;
+      const totalPaginas = Math.ceil(filtrados.length / ITENS_PAG) || 1;
+      STATE.paginaEstoque = Math.min(Math.max(1, STATE.paginaEstoque), totalPaginas);
+      const inicio = (STATE.paginaEstoque - 1) * ITENS_PAG;
+      const itensExibidos = filtrados.slice(inicio, inicio + ITENS_PAG);
 
       box.innerHTML = `
-
-
-
-
-
-
-
-        <div class="section-box">
-
-
-
-
-
-
-
-          <div class="section-title">🚚 Pedidos de Separação do Almoxarifado (${pedidos.length})</div>
-
-
-
-
-
-
-
-          <div class="os-grid">
-
-
-
-
-
-
-
-            ${pedidos.map(p => `
-
-
-
-
-
-
-
-              <div class="os-card">
-
-
-
-
-
-
-
-                <div class="os-card-head">
-
-
-
-
-
-
-
-                  <span class="os-num">Pedido #${p.id} • 👷 ${esc(p.tecnico)}</span>
-
-
-
-
-
-
-
-                  <span class="badge ${String(p.status_pedido).includes('SEPARAR')?'obs':'concluido'}">${esc(p.status_pedido)}</span>
-
-
-
-
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div class="os-card-body">
-
-
-
-
-
-
-
-                  <div><b>🏥 Cliente:</b> ${esc(p.destino_cliente)}</div>
-
-
-
-
-
-
-
-                  <div><b>🔩 Peças:</b> ${esc(p.itens_solicitados)}</div>
-
-
-
-
-
-
-
-                  <div><b>🧰 Kits/Instrumentos:</b> ${esc(p.instrumentos_solicitados)}</div>
-
-
-
-
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div class="os-card-foot">
-
-
-
-
-
-
-
-                  <button class="btn btn-success btn-sm btn-block" onclick="aprovarAlmox(${p.id})">
-
-
-
-
-
-
-
-                    ✅ Marcar Separado / Entregue ao Técnico
-
-
-
-
-
-
-
-                  </button>
-
-
-
-
-
-
-
-                </div>
-
-
-
-
-
-
-
-              </div>
-
-
-
-
-
-
-
-            `).join("")}
-
-
-
-
-
-
-
+        <!-- CABEÇALHO COM KPIS REAIS DO ALMOXARIFADO (INVENTÁRIO OFICIAL) -->
+        <div class="kpi-grid" style="margin-bottom:12px;">
+          <div class="kpi-card">
+            <div class="kpi-label">📦 Itens Cadastrados</div>
+            <div class="kpi-val">${totalItens}</div>
           </div>
-
-
-
-
-
-
-
+          <div class="kpi-card green">
+            <div class="kpi-label">⚡ Prontos / Com Saldo</div>
+            <div class="kpi-val">${comSaldo}</div>
+          </div>
+          <div class="kpi-card amber">
+            <div class="kpi-label">⚠️ Itens Zerados</div>
+            <div class="kpi-val">${zerados}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">💰 Patrimônio Total</div>
+            <div class="kpi-val" style="font-size:16px;">R$ ${valorTotal.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
+          </div>
         </div>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        <div class="section-box">
-
-
-
-
-
-
-
-          <div class="section-title">➕ Cadastrar / Atualizar Peça ou Instrumento no Estoque</div>
-
-
-
-
-
-
-
-          <div class="form-grid">
-
-
-
-
-
-
-
-            <div><label class="field-label">Código</label><input id="estCod" class="input" placeholder="Ex: PEC-099" /></div>
-
-
-
-
-
-
-
-            <div><label class="field-label">Nome da Peça / Instrumento</label><input id="estNome" class="input" placeholder="Ex: CABO DE ECG 5 VIAS" /></div>
-
-
-
-
-
-
-
-            <div>
-
-
-
-
-
-
-
-              <label class="field-label">Categoria</label>
-
-
-
-
-
-
-
-              <select id="estCat" class="select">
-
-
-
-
-
-
-
-                <option value="PEÇA">PEÇA DE REPOSIÇÃO</option>
-
-
-
-
-
-
-
-                <option value="INSTRUMENTO CALIBRAÇÃO">INSTRUMENTO DE CALIBRAÇÃO (RBC)</option>
-
-
-
-
-
-
-
-                <option value="CONSUMÍVEL">CONSUMÍVEL</option>
-
-
-
-
-
-
-
-              </select>
-
-
-
-
-
-
-
+        <!-- PEDIDOS DE SEPARAÇÃO DO ALMOXARIFADO -->
+        <div class="section-box" style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+            <div class="section-title" style="margin:0;">🚚 Pedidos de Separação de Campo (${pedidos.length})</div>
+            <button class="btn btn-outline btn-sm" onclick="abrirModalKardex('')" style="border-color:#0284c7;color:#0284c7;font-weight:700;">
+              📑 Consultar Kardex (1.796 Movimentos)
+            </button>
+          </div>
+          ${pedidos.length ? `
+            <div class="os-grid">
+              ${pedidos.map(p => `
+                <div class="os-card">
+                  <div class="os-card-head">
+                    <span class="os-num">Pedido #${p.id} • 👷 ${esc(p.tecnico)}</span>
+                    <span class="badge ${String(p.status_pedido).includes('SEPARAR')?'obs':'concluido'}">${esc(p.status_pedido)}</span>
+                  </div>
+                  <div class="os-card-body">
+                    <div><b>🏥 Cliente / OS:</b> ${esc(p.destino_cliente)}</div>
+                    <div><b>🔩 Peças:</b> ${esc(p.itens_solicitados)}</div>
+                    <div><b>🧰 Kits / Ferramentas:</b> ${esc(p.instrumentos_solicitados || 'Padrão')}</div>
+                  </div>
+                  <div class="os-card-foot">
+                    <button class="btn btn-success btn-sm btn-block" onclick="aprovarAlmox(${p.id})">
+                      ✅ Marcar Separado / Entregue ao Técnico
+                    </button>
+                  </div>
+                </div>
+              `).join("")}
             </div>
+          ` : `
+            <div style="text-align:center;padding:12px;color:#64748b;font-size:12px;">Nenhum pedido de separação pendente no momento.</div>
+          `}
+        </div>
 
-
-
-
-
-
-
-            <div><label class="field-label">Quantidade</label><input id="estQtd" type="number" class="input" value="5" /></div>
-
-
-
-
-
-
-
+        <!-- FORMULÁRIO DE CADASTRO / AJUSTE RÁPIDO DE ITEM -->
+        <div class="section-box" id="formCadastroEstoque" style="margin-bottom:12px;">
+          <div class="section-title">➕ Cadastrar / Ajustar Item no Estoque</div>
+          <div class="form-grid">
+            <div><label class="field-label">Código Item (ERP)</label><input id="estCod" class="input" placeholder="Ex: 245 ou PEC-001" /></div>
+            <div><label class="field-label">Nome da Peça / Instrumento</label><input id="estNome" class="input" placeholder="Ex: AMPOLA DE RAIOS-X 20/40" /></div>
+            <div>
+              <label class="field-label">Categoria / Grupo</label>
+              <select id="estCat" class="select">
+                <option value="PEÇA DE REPOSIÇÃO">🔩 PEÇA DE REPOSIÇÃO (REVENDA)</option>
+                <option value="CONSUMÍVEL">🧴 CONSUMÍVEL &amp; OFICINA (INTERNO)</option>
+                <option value="INSTRUMENTO CALIBRAÇÃO">🧰 INSTRUMENTO DE CALIBRAÇÃO (RBC)</option>
+                <option value="FERRAMENTA / IMOBILIZADO">🔨 FERRAMENTA / IMOBILIZADO</option>
+              </select>
+            </div>
+            <div><label class="field-label">Quantidade</label><input id="estQtd" type="number" step="0.1" class="input" value="1.0" /></div>
             <div><label class="field-label">Preço Unitário (R$)</label><input id="estPreco" type="number" step="0.01" class="input" value="150.00" /></div>
-
-
-
-
-
-
-
-            <div><label class="field-label">Validade Calibração (DD/MM/AAAA)</label><input id="estVal" class="input" placeholder="Opcional" /></div>
-
-
-
-
-
-
-
+            <div><label class="field-label">Validade Calibração RBC</label><input id="estVal" class="input" placeholder="DD/MM/AAAA (Se aplicável)" /></div>
           </div>
-
-
-
-
-
-
-
-          <button class="btn btn-primary" onclick="salvarItemEstoque()">💾 Salvar no Estoque EMED</button>
-
-
-
-
-
-
-
+          <button class="btn btn-primary" onclick="salvarItemEstoque()" style="margin-top:6px;">💾 Salvar no Estoque EMED</button>
         </div>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        <!-- INVENTÁRIO COMPLETO COM BUSCA E PAGINAÇÃO LEVE -->
         <div class="section-box">
-
-
-
-
-
-
-
-          <div class="section-title">📦 Inventário Completo do Estoque (${estoque.length} itens)</div>
-
-
-
-
-
-
-
-          <div class="os-grid">
-
-
-
-
-
-
-
-            ${estoque.map(e => `
-
-
-
-
-
-
-
-              <div class="os-card">
-
-
-
-
-
-
-
-                <div class="os-card-head">
-
-
-
-
-
-
-
-                  <span class="os-num">${esc(e.codigo)}</span>
-
-
-
-
-
-
-
-                  <span class="badge ${e.quantidade > 0 ? 'concluido' : 'crit'}">Saldo: ${e.quantidade} un</span>
-
-
-
-
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div class="os-card-body">
-
-
-
-
-
-
-
-                  <div class="os-cli">${esc(e.nome_peca)}</div>
-
-
-
-
-
-
-
-                  <div style="font-size:12px;color:#475569;">Categoria: ${esc(e.categoria)} • R$ ${Number(e.preco_unitario||0).toFixed(2)}</div>
-
-
-
-
-
-
-
-                  ${e.validade_calibracao ? `<div style="font-size:11.5px;color:#0284c7;margin-top:4px;">📅 Calibração: ${esc(e.validade_calibracao)}</div>` : ""}
-
-
-
-
-
-
-
-                </div>
-
-
-
-
-
-
-
-              </div>
-
-
-
-
-
-
-
-            `).join("")}
-
-
-
-
-
-
-
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+            <div class="section-title" style="margin:0;">📦 Catálogo Oficial do Almoxarifado (${filtrados.length} de ${totalItens})</div>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-outline btn-xs" ${STATE.paginaEstoque <= 1 ? 'disabled' : ''} onclick="mudarPaginaEstoque(-1)">◀ Anterior</button>
+              <span style="font-size:11px;font-weight:700;display:flex;align-items:center;padding:0 6px;color:#0f172a;">
+                Pág ${STATE.paginaEstoque} de ${totalPaginas}
+              </span>
+              <button class="btn btn-outline btn-xs" ${STATE.paginaEstoque >= totalPaginas ? 'disabled' : ''} onclick="mudarPaginaEstoque(1)">Próximo ▶</button>
+            </div>
           </div>
 
+          <!-- BARRA DE BUSCA EM TEMPO REAL -->
+          <div style="margin-bottom:10px;">
+            <input type="text" class="input" style="width:100%;font-size:12.5px;padding:8px 12px;" placeholder="🔍 Buscar por código, nome da peça, ampola, cabo, placa, cobia, fusível..." value="${esc(STATE.buscaEstoque)}" oninput="STATE.buscaEstoque=this.value;STATE.paginaEstoque=1;renderMenuGesEstoque(document.getElementById('mainContent'));" />
+          </div>
 
+          <!-- FILTROS POR CATEGORIA -->
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;">
+            <button class="btn btn-xs ${STATE.filtroCatEstoque==='TODOS'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('TODOS')">Todos (${totalItens})</button>
+            <button class="btn btn-xs ${STATE.filtroCatEstoque==='PECAS'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('PECAS')">🔩 Peças (${qtdRevenda})</button>
+            <button class="btn btn-xs ${STATE.filtroCatEstoque==='CONSUMO'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('CONSUMO')">🧴 Consumíveis (${qtdConsumo})</button>
+            <button class="btn btn-xs ${STATE.filtroCatEstoque==='IMOBILIZADO'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('IMOBILIZADO')">🧰 Imobilizado/RBC (${qtdImob})</button>
+            <button class="btn btn-xs ${STATE.filtroCatEstoque==='COM_SALDO'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('COM_SALDO')">🟢 Com Saldo (${comSaldo})</button>
+            <button class="btn btn-xs ${STATE.filtroCatEstoque==='ZERADOS'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('ZERADOS')">🔴 Zerados (${zerados})</button>
+          </div>
 
+          <!-- LISTA DOS ITENS PAGINADOS -->
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${itensExibidos.map(e => `
+              <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+                  <div>
+                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                      <span style="font-weight:900;color:#0284c7;font-size:13px;">#${esc(e.codigo)}</span>
+                      <span class="badge ${String(e.categoria).includes('INSTRUMENTO') ? 'ativo' : 'concluido'}" style="font-size:10px;">${esc(e.categoria || e.grupo_item || 'ESTOQUE')}</span>
+                      ${e.grupo_item ? `<span style="font-size:10px;color:#64748b;background:#f1f5f9;padding:1px 5px;border-radius:3px;">${esc(e.grupo_item)}</span>` : ''}
+                    </div>
+                    <div style="font-weight:700;color:#1e293b;font-size:13px;margin-top:2px;">
+                      ${esc(e.nome_peca)}
+                    </div>
+                  </div>
+                  <div style="text-align:right;">
+                    ${(e.quantidade || 0) > 0 ? `
+                      <span class="badge concluido" style="font-size:12px;font-weight:800;padding:3px 8px;">
+                        🟢 ${e.quantidade} ${esc(e.unidade || 'UND')}
+                      </span>
+                    ` : `
+                      <span class="badge" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-size:11.5px;font-weight:800;padding:3px 8px;">
+                        🔴 0.0 ${esc(e.unidade || 'UND')} (Zerado)
+                      </span>
+                    `}
+                  </div>
+                </div>
 
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:6px;border-top:1px dashed #e2e8f0;flex-wrap:wrap;gap:6px;font-size:11.5px;">
+                  <div style="color:#475569;">
+                    <span><b>Unitário:</b> R$ ${(e.preco_unitario || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
+                    <span style="margin-left:8px;"><b>Total em Estoque:</b> R$ ${(Number(e.valor_total) || ((e.quantidade || 0) * (e.preco_unitario || 0))).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
+                  </div>
+                  <div style="display:flex;gap:4px;">
+                    <button class="btn btn-outline btn-xs" onclick="preencherAjusteEstoque('${esc(e.codigo)}', '${esc(e.nome_peca)}', ${e.quantidade||0}, ${e.preco_unitario||0}, '${esc(e.categoria||'PEÇA DE REPOSIÇÃO')}')" style="padding:2px 7px;">
+                      ✏️ Ajustar
+                    </button>
+                    <button class="btn btn-outline btn-xs" onclick="abrirModalKardex('${esc(e.codigo)}')" style="padding:2px 7px;border-color:#0284c7;color:#0284c7;" title="Ver movimentações desta peça">
+                      📑 Kardex
+                    </button>
+                  </div>
+                </div>
+              </div>
+            `).join("")}
+          </div>
 
-
-
+          <!-- PAGINAÇÃO INFERIOR -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:8px;border-top:1px solid #e2e8f0;">
+            <div style="font-size:11px;color:#64748b;">
+              Mostrando <b>${inicio + 1}</b> a <b>${Math.min(inicio + ITENS_PAG, filtrados.length)}</b> de <b>${filtrados.length}</b> itens
+            </div>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-outline btn-xs" ${STATE.paginaEstoque <= 1 ? 'disabled' : ''} onclick="mudarPaginaEstoque(-1)">◀ Anterior</button>
+              <button class="btn btn-outline btn-xs" ${STATE.paginaEstoque >= totalPaginas ? 'disabled' : ''} onclick="mudarPaginaEstoque(1)">Próximo ▶</button>
+            </div>
+          </div>
         </div>
-
-
-
-
-
-
-
       `;
-
-
-
-
-
-
-
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    async function aprovarAlmox(idPed) {
-
-
-
-
-
-
-
-      const res = await apiPost("/api/almoxarifado/status", { id: idPed, novo_status: "SEPARADO / ENTREGUE AO TÉCNICO" });
-
-
-
-
-
-
-
-      mostrarToast(res.msg);
-
-
-
-
-
-
-
-      await sincronizarTudo(false);
-
-
-
-
-
-
-
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     async function salvarItemEstoque() {
@@ -25920,9 +25603,9 @@ function renderizarNavegacao() {
 
           <!-- SELETOR DE MÓDULOS DA PREVENTIVA -->
           <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;background:#f1f5f9;padding:4px;border-radius:8px;">
-            <button type="button" class="btn btn-sm ${STATE_MODULO_PREV==='MODULO_1'?'btn-primary':'btn-outline'}" style="flex:1;min-width:110px;font-size:11px;padding:6px 4px;" onclick="selecionarAbaModuloPreventiva('MODULO_1')">📦 Módulo 1 (Gantry)</button>
-            <button type="button" class="btn btn-sm ${STATE_MODULO_PREV==='MODULO_2'?'btn-primary':'btn-outline'}" style="flex:1;min-width:110px;font-size:11px;padding:6px 4px;" onclick="selecionarAbaModuloPreventiva('MODULO_2')">🖥️ Módulo 2 (Console/PDU)</button>
-            <button type="button" class="btn btn-sm ${STATE_MODULO_PREV==='MODULO_3'?'btn-primary':'btn-outline'}" style="flex:1;min-width:110px;font-size:11px;padding:6px 4px;" onclick="selecionarAbaModuloPreventiva('MODULO_3')">⚡ Módulo 3 (QDF/Logs)</button>
+            <button id="btnModPrev1" type="button" class="btn btn-sm ${STATE_MODULO_PREV==='MODULO_1'?'btn-primary':'btn-outline'}" style="flex:1;min-width:110px;font-size:11px;padding:6px 4px;" onclick="selecionarAbaModuloPreventiva('MODULO_1')">📦 Módulo 1 (Gantry)</button>
+            <button id="btnModPrev2" type="button" class="btn btn-sm ${STATE_MODULO_PREV==='MODULO_2'?'btn-primary':'btn-outline'}" style="flex:1;min-width:110px;font-size:11px;padding:6px 4px;" onclick="selecionarAbaModuloPreventiva('MODULO_2')">🖥️ Módulo 2 (Console/PDU)</button>
+            <button id="btnModPrev3" type="button" class="btn btn-sm ${STATE_MODULO_PREV==='MODULO_3'?'btn-primary':'btn-outline'}" style="flex:1;min-width:110px;font-size:11px;padding:6px 4px;" onclick="selecionarAbaModuloPreventiva('MODULO_3')">⚡ Módulo 3 (QDF/Logs)</button>
           </div>
 
           <div style="font-size:11px;color:#64748b;margin-bottom:6px;">
@@ -27381,6 +27064,7 @@ function renderizarNavegacao() {
 
       // SE FOR PREVENTIVA: CARREGA ESTRUTURA MODULAR
       if (tipoSrv.includes("PREVENTIVA")) {
+        if (typeof atualizarEstilosBotoesModulosPrev === "function") atualizarEstilosBotoesModulosPrev();
         const modDef = BANCO_PREVENTIVA_MODULAR[STATE_MODULO_PREV] || BANCO_PREVENTIVA_MODULAR.MODULO_1;
         ITENS_PREV_EDITAVEIS = modDef.itens.map(txt => ({ texto: txt.toUpperCase(), checked: true }));
         renderizarItensChecklistEditaveis();
