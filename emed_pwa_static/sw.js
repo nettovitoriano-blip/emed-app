@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v22-checkin-fuso-brasil';
+const CACHE_NAME = 'emed-pwa-v23-rota-whatsapp-equipamento-em-uso';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

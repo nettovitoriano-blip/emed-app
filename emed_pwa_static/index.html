@@ -6486,16 +6486,55 @@
       .submenu-strip-wrap {
         width: 100% !important;
         max-width: 100vw !important;
-        overflow-x: hidden !important;
         box-sizing: border-box !important;
+        background: #ffffff !important;
+        position: sticky !important;
+        top: 94px !important;
+        z-index: 150 !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
       }
       .submenu-strip {
         width: 100% !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
-        padding: 8px 10px !important;
+        padding: 8px 12px !important;
         overflow-x: auto !important;
+        scroll-snap-type: x mandatory !important;
+        scroll-behavior: smooth !important;
         -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+      }
+      .submenu-strip::-webkit-scrollbar {
+        display: none !important;
+      }
+      .submenu-pill {
+        scroll-snap-align: center !important;
+        flex-shrink: 0 !important;
+        font-size: 12.5px !important;
+        padding: 8px 14px !important;
+        border-radius: 999px !important;
+      }
+      .kpi-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+        width: 100% !important;
+      }
+      .tv-kpi-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+        width: 100% !important;
+      }
+      .kpi-card, .tv-kpi {
+        min-width: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      .section-box {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        padding: 12px !important;
       }
     }
 
@@ -6827,7 +6866,7 @@
 
 
 
-        👷 Técnico (5)
+        👷 Técnico
 
 
 
@@ -6851,7 +6890,7 @@
 
 
 
-        🏢 Gestor (12)
+        🏢 Gestor
 
 
 
@@ -6875,7 +6914,7 @@
 
 
 
-        🏥 Triagem (2)
+        🏥 Triagem
 
 
 
@@ -7439,18 +7478,22 @@
             if (os.checkin_hora && !os.checkin_hora.includes("Pendente") && !os.checkin_hora.includes("Não")) continue;
             if (window._checkinDisparadoSet.has(os.id)) continue;
 
+            // Se o técnico estiver a caminho de uma OS alvo específica, prioriza essa OS!
+            if (window._osAlvoRota && String(os.id) !== String(window._osAlvoRota)) continue;
+
             const coords = obterCoordenadasCliente(os.cliente);
             if (!coords) continue;
 
             const distMetros = calcularDistanciaMetros(userLat, userLon, coords.lat, coords.lon);
 
-            // RAIO DE 500 METROS EXATO
-            if (distMetros <= 500) {
+            // RAIO CALIBRADO: 250 METROS (Perímetro da Portaria / Estacionamento do Hospital)
+            if (distMetros <= 250) {
               window._checkinDisparadoSet.add(os.id);
-              console.log(`🎯 [Geofencing 500m] Técnico a ${Math.round(distMetros)}m de ${os.cliente} (OS #${os.id}). Disparando Check-in Automático!`);
+              window._osAlvoRota = null; // Rota concluída com sucesso
+              console.log(`🎯 [Geofencing 250m] Técnico a ${Math.round(distMetros)}m de ${os.cliente} (OS #${os.id}). Disparando Check-in Automático!`);
               
-              if ("vibrate" in navigator) navigator.vibrate([120, 80, 120]);
-              mostrarToast(`📍 CHECK-IN AUTOMÁTICO (500M)!\nVocê chegou ao ${os.cliente} (${Math.round(distMetros)}m). Atendimento iniciado!`);
+              if ("vibrate" in navigator) navigator.vibrate([140, 70, 140]);
+              mostrarToast(`📍 CHECK-IN AUTOMÁTICO (250M)!\nVocê chegou ao ${os.cliente} (${Math.round(distMetros)}m da portaria). Atendimento iniciado!`);
               
               await registrarCheckinOS(os.id, true);
               break;
@@ -8176,6 +8219,17 @@
 
 
         await sincronizarTudo(false);
+
+      const acaoUrl = (params.get("acao") || "").toLowerCase();
+      const osUrl = params.get("os") || params.get("os_id");
+      if (acaoUrl === "atender" && osUrl) {
+        console.log(`🚗 [DeepLink] Ação 'atender' detectada na URL para OS #${osUrl}`);
+        setTimeout(() => {
+          if (typeof iniciarRotaTecnico === "function") {
+            iniciarRotaTecnico(osUrl);
+          }
+        }, 600);
+      }
 
 
 
@@ -11519,302 +11573,47 @@
 
 
     function obterContadorMenu(menuId) {
-
-
-
-
-
-
-
       if (!STATE.data) return "";
-
-
-
-
-
-
-
       const d = STATE.data;
-
-
-
-
-
-
-
       const ordens = d.ordens || [];
-
-
-
-
-
-
+      const ordensAbertas = ordens.filter(o => {
+        const s = (o.status || "").toUpperCase();
+        return !s.includes("CONCLU") && !s.includes("FINALIZ");
+      });
 
       switch (menuId) {
-
-
-
-
-
-
-
         case "TEC_OS":
-
-
-
-
-
-
-
-          return ordens.filter(o => o.status !== "CONCLUÍDO").length;
-
-
-
-
-
-
-
+          return ordensAbertas.length;
         case "TEC_PEND":
-
-
-
-
-
-
-
-          return ordens.filter(o => o.status !== "CONCLUÍDO" && (STATE.tecnicoFiltro === "TODOS" || o.tecnico_responsavel === STATE.tecnicoFiltro)).length;
-
-
-
-
-
-
-
+          return ordensAbertas.filter(o => STATE.tecnicoFiltro === "TODOS" || o.tecnico_responsavel === STATE.tecnicoFiltro).length;
         case "TEC_PECAS":
-
-
-
-
-
-
-
           return (d.solicitacoes_almox || []).length;
-
-
-
-
-
-
-
         case "TEC_MANUAIS":
-
-
-
-
-
-
-
           return (d.manuais || []).length;
-
-
-
-
-
-
-
         case "GES_MURAL":
-
-
-
-
-
-
-
         case "GES_CHAMADOS":
-
-
-
-
-
-
-
-          return ordens.length;
-
-
-
-
-
-
-
         case "GES_TV":
-
-
-
-
-
-
-
-          return (d.resumo?.ativas || 0) + (d.resumo?.em_observacao || 0);
-
-
-
-
-
-
-
+          return ordensAbertas.length;
         case "GES_ORCAMENTOS":
-
-
-
-
-
-
-
           return (d.resumo?.em_observacao || 0) + (d.resumo?.orcamentos_pendentes || 0);
-
-
-
-
-
-
-
         case "GES_ROTAS":
-
-
-
-
-
-
-
           return (d.rotas_agrupadas || []).length;
-
-
-
-
-
-
-
         case "GES_CLIENTES":
-
-
-
-
-
-
-
           return ordens.length;
-
-
-
-
-
-
-
         case "GES_ESTOQUE":
-
-
-
-
-
-
-
           return (d.estoque || []).length;
-
-
-
-
-
-
-
         case "GES_CALIBRACAO":
-
-
-
-
-
-
-
           return ((d.alarmes_calibracao?.instrumentos_emed || []).length + (d.alarmes_calibracao?.equipamentos_clientes || []).length);
-
-
-
-
-
-
-
         case "GES_PIX":
-
-
-
-
-
-
-
           return (d.notas_fiscais || []).length;
-
-
-
-
-
-
-
         case "GES_SATISFACAO":
-
-
-
-
-
-
-
           return (d.pesquisas_satisfacao || []).length;
-
-
-
-
-
-
-
         default:
-
-
-
-
-
-
-
           return "";
-
-
-
-
-
-
-
       }
-
-
-
-
-
-
-
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    function renderizarNavegacao() {
+function renderizarNavegacao() {
 
 
 
@@ -12142,6 +11941,7 @@
 
 
 
+      centralizarAbaAtiva();
     }
 
 
@@ -12791,7 +12591,8 @@
 
 
 
-            <button class="btn btn-primary btn-sm" style="flex:1;" onclick="abrirModalOS('${esc(os.id)}')">
+            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();iniciarRotaTecnico('${esc(os.id)}')" style="border-color:#2563eb;color:#2563eb;font-weight:600;" title="Iniciar rota GPS para este chamado">🚗 Rota</button>
+              <button class="btn btn-primary btn-sm" style="flex:1;" onclick="abrirModalOS('${esc(os.id)}')">
 
 
 
@@ -13103,6 +12904,12 @@
 
 
 
+            const ordensBase = ordens.filter(o => STATE.tecnicoFiltro === "TODOS" || o.tecnico_responsavel === STATE.tecnicoFiltro);
+      const ativasCount = ordensBase.filter(o => !(o.status || "").toUpperCase().includes("CONCLU")).length;
+      const obsCount = ordensBase.filter(o => (o.status || "").toUpperCase().includes("OBSERVA")).length;
+      const concCount = ordensBase.filter(o => (o.status || "").toUpperCase().includes("CONCLU")).length;
+      const todasCount = ordensBase.length;
+
       box.innerHTML = `
 
 
@@ -13127,15 +12934,7 @@
 
 
 
-            <div class="kpi-label" style="font-size:10px; font-weight:800; line-height:1.15;">🎫 OS Ativas</div>
-
-
-
-
-
-
-
-            <div class="kpi-val" style="font-size:20px; font-weight:900; margin-top:3px;">${d.resumo?.ativas || 0}</div>
+            <div class="kpi-label" style="font-size:10px; font-weight:800; line-height:1.15;">🎫 OS Ativas</div><div class="kpi-val" style="font-size:20px; font-weight:900; margin-top:3px;">${ativasCount}</div>
 
 
 
@@ -13145,7 +12944,7 @@
 
           </div>
 
-        ${htmlPainelAlertasInterativo()}
+        
 
 
 
@@ -13161,15 +12960,7 @@
 
 
 
-            <div class="kpi-label" style="font-size:10px; font-weight:800; line-height:1.15;">🔬 Observação</div>
-
-
-
-
-
-
-
-            <div class="kpi-val" style="font-size:20px; font-weight:900; margin-top:3px;">${d.resumo?.em_observacao || 0}</div>
+            <div class="kpi-label" style="font-size:10px; font-weight:800; line-height:1.15;">${"🔬 Observação (" + obsCount + ")"}</div><div class="kpi-val" style="font-size:20px; font-weight:900; margin-top:3px;">${obsCount}</div>
 
 
 
@@ -13193,15 +12984,7 @@
 
 
 
-            <div class="kpi-label" style="font-size:10px; font-weight:800; line-height:1.15;">✅ Concluídas</div>
-
-
-
-
-
-
-
-            <div class="kpi-val" style="font-size:20px; font-weight:900; margin-top:3px;">${d.resumo?.concluidas || 0}</div>
+            <div class="kpi-label" style="font-size:10px; font-weight:800; line-height:1.15;">${"✅ Concluídas (" + concCount + ")"}</div><div class="kpi-val" style="font-size:20px; font-weight:900; margin-top:3px;">${concCount}</div>
 
 
 
@@ -13218,6 +13001,10 @@
 
 
         </div>
+
+        ${htmlPainelAlertasInterativo()}
+
+
 
 
 
@@ -13337,7 +13124,7 @@
 
 
 
-            <button class="btn btn-sm ${STATE.abaStatusOS==='ATIVAS'?'btn-primary':'btn-outline'}" style="flex:1; min-width:65px; padding:6px 2px; font-size:11px;" onclick="STATE.abaStatusOS='ATIVAS';renderizarTelaPrincipal();">⚡ Ativas</button>
+            <button class="btn btn-sm ${STATE.abaStatusOS==='ATIVAS'?'btn-primary':'btn-outline'}" style="flex:1; min-width:65px; padding:6px 2px; font-size:11px;" onclick="STATE.abaStatusOS='ATIVAS';renderizarTelaPrincipal();">${"⚡ Ativas (" + ativasCount + ")"}</button>
 
 
 
@@ -13345,7 +13132,7 @@
 
 
 
-            <button class="btn btn-sm ${STATE.abaStatusOS==='OBSERVACAO'?'btn-primary':'btn-outline'}" style="flex:1; min-width:80px; padding:6px 2px; font-size:11px;" onclick="STATE.abaStatusOS='OBSERVACAO';renderizarTelaPrincipal();">🔬 Observação</button>
+            <button class="btn btn-sm ${STATE.abaStatusOS==='OBSERVACAO'?'btn-primary':'btn-outline'}" style="flex:1; min-width:80px; padding:6px 2px; font-size:11px;" onclick="STATE.abaStatusOS='OBSERVACAO';renderizarTelaPrincipal();">${"🔬 Observação (" + obsCount + ")"}</button>
 
 
 
@@ -13353,7 +13140,7 @@
 
 
 
-            <button class="btn btn-sm ${STATE.abaStatusOS==='CONCLUIDAS'?'btn-primary':'btn-outline'}" style="flex:1; min-width:80px; padding:6px 2px; font-size:11px;" onclick="STATE.abaStatusOS='CONCLUIDAS';renderizarTelaPrincipal();">✅ Concluídas</button>
+            <button class="btn btn-sm ${STATE.abaStatusOS==='CONCLUIDAS'?'btn-primary':'btn-outline'}" style="flex:1; min-width:80px; padding:6px 2px; font-size:11px;" onclick="STATE.abaStatusOS='CONCLUIDAS';renderizarTelaPrincipal();">${"✅ Concluídas (" + concCount + ")"}</button>
 
 
 
@@ -13361,7 +13148,7 @@
 
 
 
-            <button class="btn btn-sm ${STATE.abaStatusOS==='TODAS'?'btn-primary':'btn-outline'}" style="flex:1; min-width:60px; padding:6px 2px; font-size:11px;" onclick="STATE.abaStatusOS='TODAS';renderizarTelaPrincipal();">📋 Todas</button>
+            <button class="btn btn-sm ${STATE.abaStatusOS==='TODAS'?'btn-primary':'btn-outline'}" style="flex:1; min-width:60px; padding:6px 2px; font-size:11px;" onclick="STATE.abaStatusOS='TODAS';renderizarTelaPrincipal();">${"📋 Todas (" + todasCount + ")"}</button>
 
 
 
@@ -16883,7 +16670,7 @@
 
           <div class="kpi-card"><div class="kpi-label">📋 Total de OS</div><div class="kpi-val">${d.resumo?.total_os || 0}</div></div>
 
-        ${htmlPainelAlertasInterativo()}
+        
 
 
 
@@ -16916,6 +16703,10 @@
 
 
         </div>
+
+        ${htmlPainelAlertasInterativo()}
+
+
 
 
 
@@ -17867,29 +17658,21 @@
 
 
 
-      const pendentes = (d.ordens || []).filter(o => !(o.status || "").toUpperCase().includes("CONCLU"));
+      const pendentes = (d.ordens || []).filter(o => {
+        const st = (o.status || "").toUpperCase();
+        return !st.includes("CONCLU") && !st.includes("FINALIZ");
+      });
+      const qtdCriticas = pendentes.filter(o => o.categoria_tv === "CRITICA").length;
+      const qtdPeca = pendentes.filter(o => o.categoria_tv === "PECA_ORCAMENTO").length;
+      const qtdProgramadas = pendentes.length - qtdCriticas - qtdPeca;
 
-
-
-
-
-
-
-      const filtradas = pendentes.filter(o => STATE.filtroTV === "TODAS" || o.categoria_tv === STATE.filtroTV);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      const filtradas = pendentes.filter(o => {
+        if (STATE.filtroTV === "TODAS") return true;
+        if (STATE.filtroTV === "CRITICA") return o.categoria_tv === "CRITICA";
+        if (STATE.filtroTV === "PECA_ORCAMENTO") return o.categoria_tv === "PECA_ORCAMENTO";
+        if (STATE.filtroTV === "PROGRAMADA") return o.categoria_tv === "PROGRAMADA" || !["CRITICA", "PECA_ORCAMENTO"].includes(o.categoria_tv);
+        return true;
+      });
 
       box.innerHTML = `
 
@@ -18027,7 +17810,7 @@
 
 
 
-              <div class="num" style="color:#f87171;">${d.resumo?.tv_criticas || 0}</div>
+              <div class="num" style="color:#f87171;">${qtdCriticas}</div>
 
 
 
@@ -18059,7 +17842,7 @@
 
 
 
-              <div class="num" style="color:#fbbf24;">${d.resumo?.tv_peca || 0}</div>
+              <div class="num" style="color:#fbbf24;">${qtdPeca}</div>
 
 
 
@@ -18091,7 +17874,7 @@
 
 
 
-              <div class="num" style="color:#38bdf8;">${d.resumo?.tv_programadas || 0}</div>
+              <div class="num" style="color:#38bdf8;">${qtdProgramadas}</div>
 
 
 
@@ -25524,6 +25307,8 @@
 
 
               <button class="btn btn-primary btn-sm" onclick="registrarCheckinOS('${esc(os.id)}')">📍 Check-in Manual</button>
+              <button class="btn btn-outline btn-sm" onclick="iniciarRotaTecnico('${esc(os.id)}')" style="border-color:#2563eb;color:#2563eb;font-weight:600;" title="Iniciar rota para este equipamento">🚗 Iniciar Rota</button>
+              <button class="btn btn-outline btn-sm" onclick="acionarEncerramentoEquipamentoEmUso()" style="border-color:#d97706;color:#b45309;font-weight:600;" title="Encerrar visita: Equipamento em uso clínico">⏳ Equip. em Uso</button>
 
 
 
@@ -28368,9 +28153,9 @@
           const coords = obterCoordenadasCliente(os.cliente);
           const dist = coords ? calcularDistanciaMetros(userLat, userLon, coords.lat, coords.lon) : 200;
 
-          if (dist <= 500) {
+          if (dist <= 250) {
             registrarCheckinOS(os.id, true);
-            mostrarToast(`📍 Check-in Automático (500m)! Distância: ${Math.round(dist)} metros.`);
+            mostrarToast(`📍 Check-in Automático (250m)! Distância: ${Math.round(dist)} metros.`);
           }
         },
         () => {},
@@ -29088,6 +28873,54 @@
       return `${dia}/${mes}/${ano} ${hor}:${min}`;
     }
 
+    
+    window._osAlvoRota = null;
+    window._acaoEspecialFechamento = null;
+
+    async function iniciarRotaTecnico(osId) {
+      console.log(`🚗 [Rota] Iniciando rota para OS #${osId}...`);
+      const res = await apiPost("/api/iniciar-rota", { os_id: osId });
+      window._osAlvoRota = osId;
+      const cli = (res && res.cliente) ? res.cliente : "Cliente";
+      const eq = (res && res.equipamento) ? res.equipamento : "";
+      mostrarToast(`🚗 ROTA INICIADA!\nA caminho de: ${cli} (${eq}). O check-in ativará automaticamente ao chegar a 250m!`);
+      await sincronizarTudo(false);
+      if (typeof abrirModalOS === "function") {
+        abrirModalOS(osId);
+      }
+      if (typeof renderizarOrdensServico === "function") {
+        renderizarOrdensServico();
+      }
+    }
+
+    function acionarEncerramentoEquipamentoEmUso() {
+      if (!confirm("Confirmar visita presencial com equipamento em uso clínico?\n\nOs campos técnicos serão preenchidos automaticamente e você precisará apenas coletar a assinatura do cliente para certificar a visita.")) {
+        return;
+      }
+
+      const condFinal = document.getElementById("osCondFinal");
+      if (condFinal) condFinal.value = "EM USO CLÍNICO";
+
+      const def = document.getElementById("osDefeito");
+      if (def && !def.value) def.value = "MANUTENÇÃO PREVENTIVA PROGRAMADA";
+
+      const prob = document.getElementById("osProb");
+      if (prob) prob.value = "EQUIPAMENTO EM USO CLÍNICO INTENSIVO NO SETOR HOSPITALAR NO MOMENTO DO ATENDIMENTO";
+
+      const srv = document.getElementById("osSrvExec");
+      if (srv) {
+        srv.value = "VISITA TÉCNICA PRESENCIAL REALIZADA. NÃO FOI POSSÍVEL REALIZAR A INTERVENÇÃO NA PRESENTE DATA POIS O EQUIPAMENTO ENCONTRAVA-SE EM USO CLÍNICO ATIVO NO SETOR HOSPITALAR. VISITA CONFIRMADA JUNTO AO CLIENTE PARA REAGENDAMENTO CONFORME DISPONIBILIDADE.";
+      }
+
+      const secaoAss = document.getElementById("canvasAssinaturaCliente") || document.getElementById("osAssClienteNome");
+      if (secaoAss) {
+        secaoAss.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+
+      mostrarToast("🏥 Relatório pré-preenchido: Colete o nome e assinatura do responsável no hospital e clique em 'CONCLUIR E FECHAR OS'!");
+      window._acaoEspecialFechamento = "EQUIPAMENTO_EM_USO";
+    }
+
     async function registrarCheckinOS(osId, isAuto = false) {
       const horaDisp = obterHoraLocalDispositivo();
       console.log(`📍 [Check-in] Registrando OS #${osId} com hora local: ${horaDisp}`);
@@ -29252,6 +29085,9 @@
 
 
 
+      if (window._acaoEspecialFechamento === "EQUIPAMENTO_EM_USO" && (acao === "CONCLUIR" || acao === "EQUIPAMENTO_EM_USO")) {
+        acao = "EQUIPAMENTO_EM_USO";
+      }
       payload.acao = acao;
       payload.hora_local = typeof obterHoraLocalDispositivo === 'function' ? obterHoraLocalDispositivo() : '';
 

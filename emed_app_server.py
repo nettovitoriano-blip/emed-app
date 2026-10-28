@@ -1258,11 +1258,10 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-    tv_criticas = sum(1 for o in ordens if o.get("categoria_tv") == "CRITICA")
-
-    tv_peca = sum(1 for o in ordens if o.get("categoria_tv") == "PECA_ORCAMENTO")
-
-    tv_programadas = sum(1 for o in ordens if o.get("categoria_tv") == "PROGRAMADA")
+    ordens_abertas = [o for o in ordens if not (o.get("status") or "").upper().startswith("CONCLU") and not (o.get("status") or "").upper().startswith("FINAL")]
+    tv_criticas = sum(1 for o in ordens_abertas if o.get("categoria_tv") == "CRITICA")
+    tv_peca = sum(1 for o in ordens_abertas if o.get("categoria_tv") == "PECA_ORCAMENTO")
+    tv_programadas = len(ordens_abertas) - tv_criticas - tv_peca
 
     orc_pendentes = sum(1 for o in ordens if o.get("eh_orcamento_pendente"))
 
@@ -1516,6 +1515,30 @@ async def api_salvar_rascunho(request: web.Request) -> web.Response:
 
 
 
+
+
+async def api_iniciar_rota(request: web.Request) -> web.Response:
+    """Registra início de deslocamento do técnico para o cliente e ativa rota (fuso Brasil)."""
+    body = await request.json()
+    os_id = str(body.get("os_id", "")).strip()
+    df = _carregar_df_direto()
+    hora_atual = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+
+    for idx, row in df.iterrows():
+        if str(obter_id_os(idx, row)) == os_id:
+            df.at[idx, "status"] = "A CAMINHO"
+            df.at[idx, "deslocamento_inicio_hora"] = hora_atual
+            _salvar_df_direto(df)
+            return web.json_response({
+                "ok": True,
+                "os_id": os_id,
+                "cliente": limpar_texto(row.get("cliente")),
+                "equipamento": limpar_texto(row.get("equipamento")),
+                "deslocamento_inicio_hora": hora_atual,
+                "msg": f"🚗 Rota iniciada para {limpar_texto(row.get('cliente'))} às {hora_atual}!"
+            })
+
+    return web.json_response({"ok": False, "msg": f"OS #{os_id} não encontrada."}, status=404)
 
 
 async def api_checkin(request: web.Request) -> web.Response:
@@ -1943,6 +1966,16 @@ async def api_salvar_os(request: web.Request) -> web.Response:
         df.at[idx_alvo, "pendencias"] = f"[FINANCEIRO: GERAR PROPOSTA COMERCIAL] Peça: {peca_sel} aplicada no cliente"
 
         msg_final = f"📋 OS #{os_id} salva! Notificação enviada ao Financeiro para envio da Proposta Comercial!"
+
+    elif acao == "EQUIPAMENTO_EM_USO":
+
+        df.at[idx_alvo, "status"] = "VISITA REALIZADA (EQUIP. EM USO)"
+
+        df.at[idx_alvo, "condicao_final"] = "EM USO CLÍNICO"
+
+        df.at[idx_alvo, "pendencias"] = f"[REAGENDAMENTO NECESSÁRIO] Visita presencial confirmada às {agora_str}. Intervenção técnica suspensa pelo hospital pois o equipamento estava em uso clínico."
+
+        msg_final = f"🏥 Visita técnica registrada na OS #{os_id}! Equipamento registrado em uso clínico com assinatura coletada."
 
     elif acao == "SALVAR_ABERTA":
 
@@ -3686,6 +3719,7 @@ def criar_app() -> web.Application:
 
     app.router.add_post("/api/rascunho", api_salvar_rascunho)
 
+    app.router.add_post("/api/iniciar-rota", api_iniciar_rota)
     app.router.add_post("/api/checkin", api_checkin)
 
     app.router.add_post("/api/salvar-os", api_salvar_os)

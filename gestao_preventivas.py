@@ -87,7 +87,7 @@ def gerar_mural():
             if tecnico_resp not in tecnicos_agenda:
                 tecnicos_agenda[tecnico_resp] = []
             tecnicos_agenda[tecnico_resp].append({
-                'cliente': cliente, 'cidade': cidade, 'estado': estado, 
+                'id': str(row.get('id', idx)), 'cliente': cliente, 'cidade': cidade, 'estado': estado, 
                 'equipamento': equipamento, 'data': data_agend, 'pendencias': pendencias,
                 'endereco': endereco, 'resp': resp_cliente, 'tel': tel_cliente,
                 'maps': link_maps, 'waze': link_waze
@@ -136,6 +136,8 @@ def gerar_mural():
             texto_msg += f"📅 Data Agendada: {d_str}\n"
             texto_msg += f"🗺️ Google Maps: {i['maps']}\n"
             texto_msg += f"🚗 Waze: {i['waze']}\n"
+            os_id_link = i.get('id', '')
+            texto_msg += f"👉 🚗 *Atender / Iniciar Rota:* https://emed-app-6ofv.onrender.com/?acao=atender&os={os_id_link}\n"
             if i['pendencias'] and i['pendencias'].lower() != "nan":
                 texto_msg += f"⚠️ Pendências: {i['pendencias']}\n"
             texto_msg += f"-----------------------------------\n"

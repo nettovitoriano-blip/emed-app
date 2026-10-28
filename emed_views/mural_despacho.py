@@ -57,7 +57,9 @@ def render_mural_despacho(ctx: AppContext):
             if tecnico_resp != 'A DEFINIR':
                 if tecnico_resp not in tecnicos_agenda:
                     tecnicos_agenda[tecnico_resp] = []
+                os_id_item = str(row.get('id', idx))
                 tecnicos_agenda[tecnico_resp].append({
+                    'id': os_id_item,
                     'cliente': cliente, 'cidade': cidade, 'estado': estado,
                     'equipamento': equipamento, 'data': data_agend, 'pendencias': pendencias,
                     'instrumento': instrumento, 'etapa_preventiva': etapa_prev,
@@ -110,7 +112,9 @@ def render_mural_despacho(ctx: AppContext):
                 texto_msg += f"👤 Responsável: {i['resp']} ({i['tel']})\n"
                 texto_msg += f"📅 Data: {d_str}\n"
                 texto_msg += f"🗺️ Maps: {i['maps']}\n"
-                texto_msg += f"🚗 Waze: {i['waze']}\n-----------------------------------\n"
+                texto_msg += f"🚗 Waze: {i['waze']}\n"
+                os_id_link = i.get('id', '')
+                texto_msg += f"👉 🚗 *Atender / Iniciar Rota:* https://emed-app-6ofv.onrender.com/?acao=atender&os={os_id_link}\n-----------------------------------\n"
 
                 mensagem_grupo_geral += f"• {d_str} - {i['cliente']} ({i['cidade']}) | {i['equipamento']} [{i['tipo_servico']}]\n"
 
