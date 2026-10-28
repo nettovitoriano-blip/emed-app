@@ -28,9 +28,19 @@ import tempfile
 
 import datetime
 
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 import asyncio
+
+TZ_BRASIL = timezone(timedelta(hours=-3))
+
+def obter_agora_brasil() -> datetime:
+    """Retorna datetime no fuso oficial do Brasil (UTC-3 / Fortaleza / Brasília)."""
+    return datetime.now(TZ_BRASIL)
+
+def obter_agora_brasil_str(fmt: str = "%d/%m/%Y %H:%M") -> str:
+    """Retorna string formatada da data/hora oficial do Brasil (UTC-3)."""
+    return obter_agora_brasil().strftime(fmt)
 
 import pandas as pd
 
@@ -516,7 +526,7 @@ async def api_ping(request: web.Request) -> web.Response:
 
         "app": "EMED Eletromedicina",
 
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": obter_agora_brasil().isoformat(),
 
         "keep_alive": True,
 
@@ -1374,7 +1384,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
         "ok": True,
 
-        "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+        "timestamp": obter_agora_brasil_str("%d/%m/%Y %H:%M:%S"),
 
         "kpis": resumo_obj,
 
@@ -1516,7 +1526,12 @@ async def api_checkin(request: web.Request) -> web.Response:
 
     df = _carregar_df_direto()
 
-    agora_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+    # Prioriza o horário local do celular/dispositivo do técnico (UTC-3 Brasil)
+    hora_cliente = str(body.get("hora_local", "")).strip()
+    if hora_cliente and len(hora_cliente) >= 16 and "/" in hora_cliente and ":" in hora_cliente:
+        agora_str = hora_cliente
+    else:
+        agora_str = obter_agora_brasil_str("%d/%m/%Y %H:%M")
 
 
 
@@ -1556,7 +1571,7 @@ def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
 
         os.makedirs(pasta, exist_ok=True)
 
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        ts = obter_agora_brasil_str("%Y%m%d_%H%M%S")
 
         caminho = os.path.join(pasta, f"{prefixo}_OS{os_id}_{ts}.{ext}")
 
@@ -1612,9 +1627,14 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-    agora_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+    # Horário de checkout no fuso Brasil UTC-3
+    hora_cliente = str(body.get("hora_local", "")).strip()
+    if hora_cliente and len(hora_cliente) >= 16 and "/" in hora_cliente and ":" in hora_cliente:
+        agora_str = hora_cliente
+    else:
+        agora_str = obter_agora_brasil_str("%d/%m/%Y %H:%M")
 
-    cin_atual = limpar_texto(row_os.get("checkin_hora"), "") or agora_str
+    cin_atual = limpar_texto(body.get("checkin_hora"), "") or limpar_texto(row_os.get("checkin_hora"), "") or agora_str
 
     duracao_str = calcular_duracao_os(cin_atual, agora_str)
 
@@ -2244,7 +2264,7 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
     instrumentos = limpar_texto(body.get("instrumentos"), "KIT PADRÃO").upper()
 
-    agora = datetime.now().strftime("%d/%m/%Y %H:%M")
+    agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
 
 
 
@@ -2540,7 +2560,7 @@ async def api_pix_liquidar(request: web.Request) -> web.Response:
 
     os_id = str(body.get("os_id", "")).strip()
 
-    txid = f"PIX_APP_{os_id}_{datetime.now().strftime('%H%M%S')}"
+    txid = f"PIX_APP_{os_id}_{obter_agora_brasil_str('%H%M%S')}"
 
     ok, msg = liquidar_pagamento_pix(DB_NAME, os_id, txid, metodo="APP_GESTOR_EMED")
 
@@ -2754,7 +2774,7 @@ async def api_os_nf_salvar(request: web.Request) -> web.Response:
 
     valor_pecas = limpar_float(body.get("valor_pecas"), 0.0)
 
-    data_emissao = limpar_texto(body.get("data_emissao"), datetime.now().strftime("%d/%m/%Y"))
+    data_emissao = limpar_texto(body.get("data_emissao"), obter_agora_brasil_str("%d/%m/%Y"))
 
 
 
@@ -2878,7 +2898,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
         if solicitar_compra or saldo_disponivel <= 0:
 
-            agora_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+            agora_str = obter_agora_brasil_str("%d/%m/%Y %H:%M")
 
             cur.execute("""
 

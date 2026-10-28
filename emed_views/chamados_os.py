@@ -1362,7 +1362,7 @@ def _render_execucao_os_ativas(ctx: AppContext):
                         )
                 with c_top2:
                     if st.button("📍 Marcar Check-in (Chegada)", key=f"cin_{idx_os}", use_container_width=True):
-                        hora_atual = datetime.datetime.now().strftime('%d/%m/%Y %H:%M')
+                        hora_atual = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).strftime('%d/%m/%Y %H:%M')
                         df.at[idx_os, 'checkin_hora'] = hora_atual
                         salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel)
                         st.cache_data.clear()
@@ -1371,7 +1371,7 @@ def _render_execucao_os_ativas(ctx: AppContext):
                     st.caption(f"✅ **Chegada:** {cin_val if cin_val else 'Não registada'}")
                 with c_top3:
                     if st.button("🏁 Marcar Check-out (Saída)", key=f"cout_{idx_os}", use_container_width=True):
-                        hora_saida = datetime.datetime.now().strftime('%d/%m/%Y %H:%M')
+                        hora_saida = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).strftime('%d/%m/%Y %H:%M')
                         df.at[idx_os, 'checkout_hora'] = hora_saida
                         dur_calc = calcular_duracao_os(row_os.get('checkin_hora', ''), hora_saida)
                         if dur_calc:

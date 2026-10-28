@@ -1,5 +1,5 @@
 # emed_services/pdf_engine.py
-# Motor Biomédico de Geração de PDFs Homologados, Laudos Técnicos e Vinculação de ITs
+# Motor Técnico de Engenharia Clínica e Geração de PDFs Homologados, Laudos Técnicos e Vinculação de ITs
 import os
 import re
 import urllib.parse
@@ -8,7 +8,26 @@ import pandas as pd
 
 
 def clean_latex(text: str) -> str:
-    """Substitui sintaxes LaTeX brutas por caracteres Unicode limpos."""
+    """Substitui sintaxes LaTeX brutas por caracteres Unicode limpos e legíveis."""
+    # Remove invólucros \text{...}
+    text = re.sub(r'\\text\{([^}]*)\}', r'\1', text)
+    
+    # Simplifica índices e sobrescritos antes das frações
+    text = re.sub(r'([_^])\{([^}]+)\}', r'\1\2', text)
+    text = re.sub(r'\\bar\{([^{}]+)\}', r'\1̄', text)
+    
+    # Frações iterativas: \frac{A}{B} -> (A / B)
+    while re.search(r'\\frac\{([^{}]+)\}\{([^{}]+)\}', text):
+        def _frac_repl(m):
+            num = m.group(1).strip()
+            den = m.group(2).strip()
+            return f"({num} / {den})"
+        text = re.sub(r'\\frac\{([^{}]+)\}\{([^{}]+)\}', _frac_repl, text)
+        
+    # Delimitadores \left e \right
+    text = re.sub(r'\\left\s*([|()\[\]])', r'\1', text)
+    text = re.sub(r'\\right\s*([|()\[\]])', r'\1', text)
+    
     replacements = [
         (r'\\le\b', '≤'),
         (r'\\ge\b', '≥'),
@@ -18,19 +37,22 @@ def clean_latex(text: str) -> str:
         (r'\\Omega\b', 'Ω'),
         (r'\\mu\b', 'µ'),
         (r'\\sigma\b', 'σ'),
+        (r'\\Delta\b', 'Δ'),
         (r'\\circ\b', '°'),
         (r'\\approx\b', '≈'),
         (r'\\%', '%'),
+        (r'\\_', '_'),
         (r'\^2\b', '²'),
         (r'\^3\b', '³'),
-        (r'\\text\{([^}]*)\}', r'\1'),
         (r'\\\s+', ' '),
     ]
     for pattern, repl in replacements:
         text = re.sub(pattern, repl, text)
-    # Remove delimitadores de inline math $...$
-    text = re.sub(r'\$([^$]+)\$', r'\1', text)
+        
+    # Remove todos os delimitadores matemáticos de LaTeX ($ e $$)
+    text = text.replace('$$', '').replace('$', '')
     text = text.replace(r'\%', '%').replace(r'\_', '_').replace(r'\$', '$').replace(r'\ ', ' ')
+    text = re.sub(r'\s{2,}', ' ', text).strip()
     return text
 
 
@@ -88,6 +110,42 @@ def markdown_to_html(md_text: str, doc_title: str = "Instrução de Trabalho eME
             font-size: 9.5pt;
             margin-top: 10px;
             margin-bottom: 4px;
+        }
+        h4 {
+            color: #0369a1;
+            font-size: 9pt;
+            font-weight: bold;
+            margin-top: 10px;
+            margin-bottom: 4px;
+            border-bottom: 1px dashed #cbd5e1;
+            padding-bottom: 2px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        h5 {
+            color: #475569;
+            font-size: 8.5pt;
+            font-weight: bold;
+            margin-top: 8px;
+            margin-bottom: 3px;
+        }
+        h6 {
+            color: #64748b;
+            font-size: 8pt;
+            font-weight: 600;
+            margin-top: 6px;
+            margin-bottom: 2px;
+        }
+        .formula-box {
+            background-color: #f8fafc;
+            border-left: 3.5px solid #0284c7;
+            padding: 5px 12px;
+            margin: 6px 0 6px 12px;
+            font-family: Consolas, 'Courier New', monospace;
+            font-size: 9pt;
+            color: #0f172a;
+            font-weight: 600;
+            border-radius: 3px;
         }
         p {
             margin: 4px 0 5px 0;
@@ -195,6 +253,8 @@ def markdown_to_html(md_text: str, doc_title: str = "Instrução de Trabalho eME
         if l.strip().startswith("# "):
             doc_title_display = l.strip().lstrip("#").strip()
             break
+    doc_title_display = re.sub(r'\s*-\s*e?MED\s+BIOMEDICAL', '', doc_title_display, flags=re.IGNORECASE).strip()
+    doc_title_display = re.sub(r'BIOMEDICAL', '', doc_title_display, flags=re.IGNORECASE).strip()
 
     body_html = [
         "<div class='header-box' style='border-bottom: 2.5px solid #0077b6; padding-bottom: 8px; margin-bottom: 14px;'>",
@@ -258,7 +318,7 @@ def markdown_to_html(md_text: str, doc_title: str = "Instrução de Trabalho eME
                 body_html.append(f"<div class='{box_class}'>{''.join(alert_lines)}</div>")
             in_alert = True
             alert_type = "info"
-            alert_lines = ["<div class='info-title'>ℹ️ NOTA TÉCNICA BIOMÉDICA</div>"]
+            alert_lines = ["<div class='info-title'>ℹ️ NOTA TÉCNICA ESPECIALIZADA</div>"]
             continue
 
         if in_alert:
@@ -307,12 +367,24 @@ def markdown_to_html(md_text: str, doc_title: str = "Instrução de Trabalho eME
             continue
 
         s = clean_latex(s)
-        if s.startswith("### "):
-            body_html.append(f"<h3>{s[4:]}</h3>")
-        elif s.startswith("## "):
-            body_html.append(f"<h2>{s[3:]}</h2>")
-        elif s.startswith("# "):
-            body_html.append(f"<h1>{s[2:]}</h1>")
+        # Fórmulas matemáticas destacadas
+        if line.strip().startswith("$$") or (line.strip().startswith("$") and line.strip().endswith("$")) or ('\\frac' in line and '=' in line):
+            formula_clean = clean_latex(line)
+            if formula_clean:
+                body_html.append(f"<div class='formula-box'>📐 {formula_clean}</div>")
+                continue
+
+        # Suporte completo a Headings Markdown de qualquer nível (h1 a h6)
+        m_head = re.match(r'^(#{1,6})\s*(.*)$', s)
+        if m_head:
+            lvl = len(m_head.group(1))
+            htxt = m_head.group(2).strip()
+            htxt = clean_latex(htxt)
+            htxt = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', htxt)
+            htxt = re.sub(r'\*(.*?)\*', r'<i>\1</i>', htxt)
+            htxt = re.sub(r'`(.*?)`', r'<code>\1</code>', htxt)
+            body_html.append(f"<h{lvl}>{htxt}</h{lvl}>")
+            continue
         elif s.startswith("- [ ] "):
             txt = s[6:]
             txt = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', txt)

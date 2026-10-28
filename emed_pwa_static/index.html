@@ -29078,39 +29078,45 @@
 
 
 
-    async function registrarCheckinOS(osId) {
+        function obterHoraLocalDispositivo() {
+      const d = new Date();
+      const dia = String(d.getDate()).padStart(2, '0');
+      const mes = String(d.getMonth() + 1).padStart(2, '0');
+      const ano = d.getFullYear();
+      const hor = String(d.getHours()).padStart(2, '0');
+      const min = String(d.getMinutes()).padStart(2, '0');
+      return `${dia}/${mes}/${ano} ${hor}:${min}`;
+    }
 
+    async function registrarCheckinOS(osId, isAuto = false) {
+      const horaDisp = obterHoraLocalDispositivo();
+      console.log(`📍 [Check-in] Registrando OS #${osId} com hora local: ${horaDisp}`);
 
+      const res = await apiPost("/api/checkin", {
+        os_id: osId,
+        hora_local: horaDisp,
+        is_auto: isAuto
+      });
 
+      const horaSalva = (res && res.checkin_hora) ? res.checkin_hora : horaDisp;
+      const elHora = document.getElementById("lblCheckinHora");
+      if (elHora) elHora.innerText = horaSalva;
 
+      // Atualiza memória do estado local imediatamente
+      const ordens = STATE.data?.ordens || [];
+      const osObj = ordens.find(o => String(o.id) === String(osId));
+      if (osObj) {
+        osObj.checkin_hora = horaSalva;
+        osObj.confirmado = "SIM";
+      }
+      if (STATE.osAberta && String(STATE.osAberta.id) === String(osId)) {
+        STATE.osAberta.checkin_hora = horaSalva;
+        STATE.osAberta.confirmado = "SIM";
+      }
 
-
-
-      const res = await apiPost("/api/checkin", { os_id: osId });
-
-
-
-
-
-
-
-      if (res.checkin_hora) document.getElementById("lblCheckinHora").innerText = res.checkin_hora;
-
-
-
-
-
-
-
-      mostrarToast(res.msg || "📍 Check-in registrado!");
-
-
-
-
-
-
-
+      mostrarToast((res && res.msg) ? res.msg : `📍 Check-in registrado às ${horaSalva}!`);
       await sincronizarTudo(false);
+      if (typeof renderizarOrdensServico === "function") renderizarOrdensServico();
 
 
 
@@ -29247,6 +29253,7 @@
 
 
       payload.acao = acao;
+      payload.hora_local = typeof obterHoraLocalDispositivo === 'function' ? obterHoraLocalDispositivo() : '';
 
 
 

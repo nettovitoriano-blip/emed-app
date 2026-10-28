@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v21-diagnostico-imagem-preinstalacao-timbrada';
+const CACHE_NAME = 'emed-pwa-v22-checkin-fuso-brasil';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
