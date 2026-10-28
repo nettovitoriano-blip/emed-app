@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v28-fix-seletor-modulos-preventiva';
+const CACHE_NAME = 'emed-pwa-v29-fix-busca-estoque-e-limpeza-testes';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

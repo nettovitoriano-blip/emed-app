@@ -6492,7 +6492,38 @@
       }
     }
 
-</style>
+
+    /* ========================================================
+       MODAL OVERLAYS (ESTRUTURA GERAL DE DIÁLOGOS E LAUDOS)
+       ======================================================== */
+    .modal-overlay {
+      display: none !important;
+      position: fixed !important;
+      inset: 0 !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      background: rgba(15, 23, 42, 0.78) !important;
+      z-index: 9999 !important;
+      justify-content: center !important;
+      align-items: center !important;
+      padding: 16px !important;
+      box-sizing: border-box !important;
+      backdrop-filter: blur(5px) !important;
+    }
+    .modal-overlay.open,
+    .modal-overlay.active {
+      display: flex !important;
+    }
+    #tabModeFull.active {
+      background: #38bdf8 !important;
+      color: #0f172a !important;
+      font-weight: 900 !important;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.5) !important;
+    }
+
+  </style>
 
 
 
@@ -6812,6 +6843,9 @@
 
 
 
+            <button id="tabModeFull" class="mode-btn" onclick="mudarPerfil(\'FULL\')">
+        👑 Modo FULL (Master)
+      </button>
       <button id="tabModeTecnico" class="mode-btn active" onclick="mudarPerfil('TECNICO')">
 
 
@@ -9553,7 +9587,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-      perfil: localStorage.getItem("emed_perfil") || "TECNICO",
+      perfil: localStorage.getItem("emed_perfil") || "FULL",
 
 
 
@@ -9561,7 +9595,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-      menuAtivo: localStorage.getItem("emed_menu_ativo") || "TEC_OS",
+      menuAtivo: localStorage.getItem("emed_menu_ativo") || "GES_MURAL",
 
 
 
@@ -9666,6 +9700,25 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
     const MENUS_POR_PERFIL = {
+      FULL: [
+        { id: "GES_MURAL", icone: "📊", titulo: "Mural & Despacho", desc: "Escala diária por técnico e disparo rápido no WhatsApp" },
+        { id: "GES_CHAMADOS", icone: "🎫", titulo: "Chamados & OS", desc: "Emitir nova OS, gerenciar todas as OS e Laudo PDF 1 Página" },
+        { id: "TEC_OS", icone: "⚡", titulo: "Minhas OS de Campo", desc: "Execução em campo, Check-in, Checklist POP, Fotos, Assinatura" },
+        { id: "GES_TV", icone: "🚨", titulo: "Painel TV Pendências", desc: "Painel de Laboratório: Críticas, Peças e Programadas" },
+        { id: "GES_ESTOQUE", icone: "📦", titulo: "Almoxarifado & Estoque (945 Itens)", desc: "Estoque completo de R$ 3,44M, catálogo e Kardex" },
+        { id: "GES_ORCAMENTOS", icone: "⏳", titulo: "Orçamentos & Peças Teste", desc: "Orçamentos >15 dias e conversão/retirada de peças em teste" },
+        { id: "GES_ROTAS", icone: "🗺️", titulo: "Mapa & Rotas", desc: "Agrupamento inteligente por hospital/cidade e despacho" },
+        { id: "GES_CLIENTES", icone: "👥", titulo: "Clientes & Parque", desc: "Cadastro hospitalar, etiquetas QR Code e calibração" },
+        { id: "GES_CALIBRACAO", icone: "⏰", titulo: "Calibração & Instrumentos", desc: "Semáforo RBC/ANVISA de instrumentos EMED e máquinas" },
+        { id: "GES_PIX", icone: "💳", titulo: "Financeiro & PIX", desc: "QR Code PIX oficial Banco Central (CRC16) e Notas Fiscais" },
+        { id: "GES_BI", icone: "📈", titulo: "BI & Faturamento", desc: "Indicadores visuais por Status, Técnico, Cidade e Faturamento" },
+        { id: "TEC_MANUAIS", icone: "📚", titulo: "Manuais & ITs", desc: "Catálogo de ITs homologadas em PDF e vídeos MP4 de treinamento" },
+        { id: "GES_ADMIN", icone: "🛰️", titulo: "Frota GPS & DETRAN", desc: "Telemetria GPS, Condutor, Robô DETRAN e Equipe" },
+        { id: "GES_SATISFACAO", icone: "⭐", titulo: "Pesquisa Google 5★", desc: "Avaliações de clientes, NPS e link direto Google" },
+        { id: "CLI_TRIAGEM", icone: "🤖", titulo: "Triagem Cirúrgica", desc: "Abertura rápida de chamado com perguntas inteligentes" },
+        { id: "CLI_PORTAL", icone: "🏥", titulo: "Portal do Cliente", desc: "Consulta de parque, status ao vivo, Laudo PDF e PIX" }
+      ],
+
 
 
 
@@ -10057,7 +10110,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-      navigator.serviceWorker.register("/sw.js?v=v28").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=v29").then(reg => { if(reg) reg.update(); }).catch(() => {});
 
 
 
@@ -11927,6 +11980,8 @@ function renderizarNavegacao() {
 
 
 
+            const btnFull = document.getElementById("tabModeFull");
+      if (btnFull) btnFull.className = "mode-btn" + (STATE.perfil === "FULL" ? " active" : "");
       document.getElementById("tabModeTecnico").className = "mode-btn" + (STATE.perfil === "TECNICO" ? " active" : "");
 
 
@@ -19907,19 +19962,25 @@ function renderizarNavegacao() {
     if (!STATE.paginaEstoque) STATE.paginaEstoque = 1;
     if (STATE.buscaEstoque === undefined) STATE.buscaEstoque = "";
 
+    function onBuscaEstoqueInput(val) {
+      STATE.buscaEstoque = val;
+      STATE.paginaEstoque = 1;
+      atualizarTabelaCatalogoEstoque();
+    }
+
     function mudarFiltroEstoque(cat) {
       STATE.filtroCatEstoque = cat;
       STATE.paginaEstoque = 1;
-      renderMenuGesEstoque(document.getElementById("mainContent"));
+      atualizarTabelaCatalogoEstoque();
     }
 
     function mudarPaginaEstoque(delta) {
-      STATE.paginaEstoque = Math.max(1, STATE.paginaEstoque + delta);
-      renderMenuGesEstoque(document.getElementById("mainContent"));
+      STATE.paginaEstoque = Math.max(1, (STATE.paginaEstoque || 1) + delta);
+      atualizarTabelaCatalogoEstoque();
     }
 
     function filtrarEstoqueCompleto(estoque) {
-      let lista = estoque;
+      let lista = estoque || [];
       const q = (STATE.buscaEstoque || "").trim().toLowerCase();
       if (q) {
         lista = lista.filter(e => {
@@ -19931,7 +19992,7 @@ function renderizarNavegacao() {
         });
       }
 
-      const f = STATE.filtroCatEstoque;
+      const f = STATE.filtroCatEstoque || "TODOS";
       if (f === "PECAS") {
         lista = lista.filter(e => String(e.categoria || '').toUpperCase().includes('PEÇA') || String(e.grupo_item || '').toUpperCase().includes('REVENDA'));
       } else if (f === "CONSUMO") {
@@ -19996,7 +20057,7 @@ function renderizarNavegacao() {
                 </div>
                 <div style="color:#64748b;font-size:11px;margin-top:2px;display:flex;justify-content:space-between;">
                   <span><b>Data:</b> ${esc(m.data_mov)} ${esc(m.hora_mov)} • <b>Saldo Atual:</b> ${m.saldo}</span>
-                  <span><b>NF:</b> ${esc(m.numero_nf || 'S/N')} • <b>Custo Médio:</b> R$ ${m.custo_medio.toFixed(2)}</span>
+                  <span><b>NF:</b> ${esc(m.numero_nf || 'S/N')} • <b>Custo Médio:</b> R$ ${Number(m.custo_medio || 0).toFixed(2)}</span>
                 </div>
                 ${m.observacao ? `<div style="font-size:10.5px;color:#475569;margin-top:2px;background:#f8fafc;padding:2px 6px;border-radius:4px;"><b>Obs:</b> ${esc(m.observacao)}</div>` : ''}
               </div>
@@ -20008,7 +20069,120 @@ function renderizarNavegacao() {
       }
     }
 
+    function atualizarTabelaCatalogoEstoque() {
+      const boxTabela = document.getElementById("boxCatalogoEstoqueTabela");
+      if (!boxTabela) {
+        const mc = document.getElementById("mainContainer");
+        if (mc) renderMenuGesEstoque(mc);
+        return;
+      }
+
+      const d = STATE.data || {};
+      const estoque = d.estoque || [];
+      const totalItens = estoque.length;
+      const comSaldo = estoque.filter(e => (e.quantidade || 0) > 0).length;
+      const zerados = estoque.filter(e => (e.quantidade || 0) <= 0).length;
+      const qtdRevenda = estoque.filter(e => String(e.categoria || '').toUpperCase().includes('PEÇA') || String(e.grupo_item || '').toUpperCase().includes('REVENDA')).length;
+      const qtdConsumo = estoque.filter(e => String(e.categoria || '').toUpperCase().includes('CONSUMÍVEL') || String(e.grupo_item || '').toUpperCase().includes('CONSUMO')).length;
+      const qtdImob = estoque.filter(e => String(e.categoria || '').toUpperCase().includes('IMOBILIZADO') || String(e.categoria || '').toUpperCase().includes('INSTRUMENTO') || String(e.grupo_item || '').toUpperCase().includes('IMOBILIZADO')).length;
+
+      const filtrados = filtrarEstoqueCompleto(estoque);
+      const ITENS_PAG = 25;
+      const totalPaginas = Math.ceil(filtrados.length / ITENS_PAG) || 1;
+      STATE.paginaEstoque = Math.min(Math.max(1, STATE.paginaEstoque || 1), totalPaginas);
+      const inicio = (STATE.paginaEstoque - 1) * ITENS_PAG;
+      const itensExibidos = filtrados.slice(inicio, inicio + ITENS_PAG);
+
+      const elTitulo = document.getElementById("tituloContadorEstoque");
+      if (elTitulo) {
+        elTitulo.innerText = `📦 Catálogo Oficial do Almoxarifado (${filtrados.length} de ${totalItens})`;
+      }
+
+      const catAtiva = STATE.filtroCatEstoque || "TODOS";
+
+      boxTabela.innerHTML = `
+        <!-- FILTROS POR CATEGORIA COM CORES ATIVAS CLARAS -->
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px;">
+          <button type="button" class="btn btn-xs ${catAtiva==='TODOS'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('TODOS')">Todos (${totalItens})</button>
+          <button type="button" class="btn btn-xs ${catAtiva==='PECAS'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('PECAS')">🔩 Peças (${qtdRevenda})</button>
+          <button type="button" class="btn btn-xs ${catAtiva==='CONSUMO'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('CONSUMO')">🧴 Consumíveis (${qtdConsumo})</button>
+          <button type="button" class="btn btn-xs ${catAtiva==='IMOBILIZADO'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('IMOBILIZADO')">🧰 Imobilizado/RBC (${qtdImob})</button>
+          <button type="button" class="btn btn-xs ${catAtiva==='COM_SALDO'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('COM_SALDO')">🟢 Com Saldo (${comSaldo})</button>
+          <button type="button" class="btn btn-xs ${catAtiva==='ZERADOS'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('ZERADOS')">🔴 Zerados (${zerados})</button>
+        </div>
+
+        <!-- LISTA DOS ITENS PAGINADOS -->
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${itensExibidos.length ? itensExibidos.map(e => `
+            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+                <div>
+                  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                    <span style="font-weight:900;color:#0284c7;font-size:13px;">#${esc(e.codigo)}</span>
+                    <span class="badge ${String(e.categoria).includes('INSTRUMENTO') ? 'ativo' : 'concluido'}" style="font-size:10px;">${esc(e.categoria || e.grupo_item || 'ESTOQUE')}</span>
+                    ${e.grupo_item ? `<span style="font-size:10px;color:#64748b;background:#f1f5f9;padding:1px 5px;border-radius:3px;">${esc(e.grupo_item)}</span>` : ''}
+                  </div>
+                  <div style="font-weight:700;color:#1e293b;font-size:13px;margin-top:2px;">
+                    ${esc(e.nome_peca)}
+                  </div>
+                </div>
+                <div style="text-align:right;">
+                  ${(e.quantidade || 0) > 0 ? `
+                    <span class="badge concluido" style="font-size:12px;font-weight:800;padding:3px 8px;">
+                      🟢 ${e.quantidade} ${esc(e.unidade || 'UND')}
+                    </span>
+                  ` : `
+                    <span class="badge" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-size:11.5px;font-weight:800;padding:3px 8px;">
+                      🔴 0.0 ${esc(e.unidade || 'UND')} (Zerado)
+                    </span>
+                  `}
+                </div>
+              </div>
+
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:6px;border-top:1px dashed #e2e8f0;flex-wrap:wrap;gap:6px;font-size:11.5px;">
+                <div style="color:#475569;">
+                  <span><b>Unitário:</b> R$ ${(e.preco_unitario || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
+                  <span style="margin-left:8px;"><b>Total em Estoque:</b> R$ ${(Number(e.valor_total) || ((e.quantidade || 0) * (e.preco_unitario || 0))).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
+                </div>
+                <div style="display:flex;gap:4px;">
+                  <button type="button" class="btn btn-outline btn-xs" onclick="preencherAjusteEstoque('${esc(e.codigo)}', '${esc(e.nome_peca)}', ${e.quantidade||0}, ${e.preco_unitario||0}, '${esc(e.categoria||'PEÇA DE REPOSIÇÃO')}')" style="padding:2px 7px;">
+                    ✏️ Ajustar
+                  </button>
+                  <button type="button" class="btn btn-outline btn-xs" onclick="abrirModalKardex('${esc(e.codigo)}')" style="padding:2px 7px;border-color:#0284c7;color:#0284c7;" title="Ver movimentações desta peça">
+                    📑 Kardex
+                  </button>
+                </div>
+              </div>
+            </div>
+          `).join("") : `
+            <div style="text-align:center;padding:28px 16px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;">
+              <div style="font-size:26px;margin-bottom:6px;">🔍</div>
+              <div style="font-weight:700;color:#334155;font-size:13px;">Nenhum item encontrado no almoxarifado</div>
+              <div style="font-size:12px;margin-top:3px;color:#64748b;">Verifique a grafia do termo ou troque a categoria selecionada.</div>
+            </div>
+          `}
+        </div>
+
+        <!-- PAGINAÇÃO INFERIOR -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:8px;border-top:1px solid #e2e8f0;">
+          <div style="font-size:11px;color:#64748b;">
+            ${filtrados.length ? `Mostrando <b>${inicio + 1}</b> a <b>${Math.min(inicio + ITENS_PAG, filtrados.length)}</b> de <b>${filtrados.length}</b> itens` : `0 itens encontrados`}
+          </div>
+          <div style="display:flex;gap:4px;">
+            <button type="button" class="btn btn-outline btn-xs" ${STATE.paginaEstoque <= 1 ? 'disabled' : ''} onclick="mudarPaginaEstoque(-1)">◀ Anterior</button>
+            <span style="font-size:11px;font-weight:700;display:flex;align-items:center;padding:0 6px;color:#0f172a;">
+              Pág ${STATE.paginaEstoque} de ${totalPaginas}
+            </span>
+            <button type="button" class="btn btn-outline btn-xs" ${STATE.paginaEstoque >= totalPaginas ? 'disabled' : ''} onclick="mudarPaginaEstoque(1)">Próximo ▶</button>
+          </div>
+        </div>
+      `;
+    }
+
     function renderMenuGesEstoque(box) {
+      box = box || document.getElementById("mainContainer");
+      if (!box) return;
+
       const d = STATE.data || {};
       const estoque = d.estoque || [];
       const pedidos = d.solicitacoes_almox || [];
@@ -20018,17 +20192,6 @@ function renderizarNavegacao() {
       const comSaldo = estoque.filter(e => (e.quantidade || 0) > 0).length;
       const zerados = estoque.filter(e => (e.quantidade || 0) <= 0).length;
       const valorTotal = estoque.reduce((acc, e) => acc + (Number(e.valor_total) || ((e.quantidade || 0) * (e.preco_unitario || 0))), 0);
-      const qtdRevenda = estoque.filter(e => String(e.categoria || '').toUpperCase().includes('PEÇA') || String(e.grupo_item || '').toUpperCase().includes('REVENDA')).length;
-      const qtdConsumo = estoque.filter(e => String(e.categoria || '').toUpperCase().includes('CONSUMÍVEL') || String(e.grupo_item || '').toUpperCase().includes('CONSUMO')).length;
-      const qtdImob = estoque.filter(e => String(e.categoria || '').toUpperCase().includes('IMOBILIZADO') || String(e.categoria || '').toUpperCase().includes('INSTRUMENTO') || String(e.grupo_item || '').toUpperCase().includes('IMOBILIZADO')).length;
-
-      // Filtragem e Paginação
-      const filtrados = filtrarEstoqueCompleto(estoque);
-      const ITENS_PAG = 25;
-      const totalPaginas = Math.ceil(filtrados.length / ITENS_PAG) || 1;
-      STATE.paginaEstoque = Math.min(Math.max(1, STATE.paginaEstoque), totalPaginas);
-      const inicio = (STATE.paginaEstoque - 1) * ITENS_PAG;
-      const itensExibidos = filtrados.slice(inicio, inicio + ITENS_PAG);
 
       box.innerHTML = `
         <!-- CABEÇALHO COM KPIS REAIS DO ALMOXARIFADO (INVENTÁRIO OFICIAL) -->
@@ -20055,7 +20218,7 @@ function renderizarNavegacao() {
         <div class="section-box" style="margin-bottom:12px;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
             <div class="section-title" style="margin:0;">🚚 Pedidos de Separação de Campo (${pedidos.length})</div>
-            <button class="btn btn-outline btn-sm" onclick="abrirModalKardex('')" style="border-color:#0284c7;color:#0284c7;font-weight:700;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="abrirModalKardex('')" style="border-color:#0284c7;color:#0284c7;font-weight:700;">
               📑 Consultar Kardex (1.796 Movimentos)
             </button>
           </div>
@@ -20073,7 +20236,7 @@ function renderizarNavegacao() {
                     <div><b>🧰 Kits / Ferramentas:</b> ${esc(p.instrumentos_solicitados || 'Padrão')}</div>
                   </div>
                   <div class="os-card-foot">
-                    <button class="btn btn-success btn-sm btn-block" onclick="aprovarAlmox(${p.id})">
+                    <button type="button" class="btn btn-success btn-sm btn-block" onclick="aprovarAlmox(${p.id})">
                       ✅ Marcar Separado / Entregue ao Técnico
                     </button>
                   </div>
@@ -20104,95 +20267,26 @@ function renderizarNavegacao() {
             <div><label class="field-label">Preço Unitário (R$)</label><input id="estPreco" type="number" step="0.01" class="input" value="150.00" /></div>
             <div><label class="field-label">Validade Calibração RBC</label><input id="estVal" class="input" placeholder="DD/MM/AAAA (Se aplicável)" /></div>
           </div>
-          <button class="btn btn-primary" onclick="salvarItemEstoque()" style="margin-top:6px;">💾 Salvar no Estoque EMED</button>
+          <button type="button" class="btn btn-primary" onclick="salvarItemEstoque()" style="margin-top:6px;">💾 Salvar no Estoque EMED</button>
         </div>
 
         <!-- INVENTÁRIO COMPLETO COM BUSCA E PAGINAÇÃO LEVE -->
         <div class="section-box">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
-            <div class="section-title" style="margin:0;">📦 Catálogo Oficial do Almoxarifado (${filtrados.length} de ${totalItens})</div>
-            <div style="display:flex;gap:4px;">
-              <button class="btn btn-outline btn-xs" ${STATE.paginaEstoque <= 1 ? 'disabled' : ''} onclick="mudarPaginaEstoque(-1)">◀ Anterior</button>
-              <span style="font-size:11px;font-weight:700;display:flex;align-items:center;padding:0 6px;color:#0f172a;">
-                Pág ${STATE.paginaEstoque} de ${totalPaginas}
-              </span>
-              <button class="btn btn-outline btn-xs" ${STATE.paginaEstoque >= totalPaginas ? 'disabled' : ''} onclick="mudarPaginaEstoque(1)">Próximo ▶</button>
-            </div>
+            <div class="section-title" id="tituloContadorEstoque" style="margin:0;">📦 Catálogo Oficial do Almoxarifado (${totalItens} itens)</div>
           </div>
 
           <!-- BARRA DE BUSCA EM TEMPO REAL -->
           <div style="margin-bottom:10px;">
-            <input type="text" class="input" style="width:100%;font-size:12.5px;padding:8px 12px;" placeholder="🔍 Buscar por código, nome da peça, ampola, cabo, placa, cobia, fusível..." value="${esc(STATE.buscaEstoque)}" oninput="STATE.buscaEstoque=this.value;STATE.paginaEstoque=1;renderMenuGesEstoque(document.getElementById('mainContent'));" />
+            <input id="inputBuscaEstoque" type="text" class="input" style="width:100%;font-size:12.5px;padding:8px 12px;" placeholder="🔍 Buscar por código, nome da peça, ampola, cabo, placa, cobia, fusível..." value="${esc(STATE.buscaEstoque || '')}" oninput="onBuscaEstoqueInput(this.value)" />
           </div>
 
-          <!-- FILTROS POR CATEGORIA -->
-          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;">
-            <button class="btn btn-xs ${STATE.filtroCatEstoque==='TODOS'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('TODOS')">Todos (${totalItens})</button>
-            <button class="btn btn-xs ${STATE.filtroCatEstoque==='PECAS'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('PECAS')">🔩 Peças (${qtdRevenda})</button>
-            <button class="btn btn-xs ${STATE.filtroCatEstoque==='CONSUMO'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('CONSUMO')">🧴 Consumíveis (${qtdConsumo})</button>
-            <button class="btn btn-xs ${STATE.filtroCatEstoque==='IMOBILIZADO'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('IMOBILIZADO')">🧰 Imobilizado/RBC (${qtdImob})</button>
-            <button class="btn btn-xs ${STATE.filtroCatEstoque==='COM_SALDO'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('COM_SALDO')">🟢 Com Saldo (${comSaldo})</button>
-            <button class="btn btn-xs ${STATE.filtroCatEstoque==='ZERADOS'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('ZERADOS')">🔴 Zerados (${zerados})</button>
-          </div>
-
-          <!-- LISTA DOS ITENS PAGINADOS -->
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            ${itensExibidos.map(e => `
-              <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
-                  <div>
-                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                      <span style="font-weight:900;color:#0284c7;font-size:13px;">#${esc(e.codigo)}</span>
-                      <span class="badge ${String(e.categoria).includes('INSTRUMENTO') ? 'ativo' : 'concluido'}" style="font-size:10px;">${esc(e.categoria || e.grupo_item || 'ESTOQUE')}</span>
-                      ${e.grupo_item ? `<span style="font-size:10px;color:#64748b;background:#f1f5f9;padding:1px 5px;border-radius:3px;">${esc(e.grupo_item)}</span>` : ''}
-                    </div>
-                    <div style="font-weight:700;color:#1e293b;font-size:13px;margin-top:2px;">
-                      ${esc(e.nome_peca)}
-                    </div>
-                  </div>
-                  <div style="text-align:right;">
-                    ${(e.quantidade || 0) > 0 ? `
-                      <span class="badge concluido" style="font-size:12px;font-weight:800;padding:3px 8px;">
-                        🟢 ${e.quantidade} ${esc(e.unidade || 'UND')}
-                      </span>
-                    ` : `
-                      <span class="badge" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-size:11.5px;font-weight:800;padding:3px 8px;">
-                        🔴 0.0 ${esc(e.unidade || 'UND')} (Zerado)
-                      </span>
-                    `}
-                  </div>
-                </div>
-
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:6px;border-top:1px dashed #e2e8f0;flex-wrap:wrap;gap:6px;font-size:11.5px;">
-                  <div style="color:#475569;">
-                    <span><b>Unitário:</b> R$ ${(e.preco_unitario || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
-                    <span style="margin-left:8px;"><b>Total em Estoque:</b> R$ ${(Number(e.valor_total) || ((e.quantidade || 0) * (e.preco_unitario || 0))).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
-                  </div>
-                  <div style="display:flex;gap:4px;">
-                    <button class="btn btn-outline btn-xs" onclick="preencherAjusteEstoque('${esc(e.codigo)}', '${esc(e.nome_peca)}', ${e.quantidade||0}, ${e.preco_unitario||0}, '${esc(e.categoria||'PEÇA DE REPOSIÇÃO')}')" style="padding:2px 7px;">
-                      ✏️ Ajustar
-                    </button>
-                    <button class="btn btn-outline btn-xs" onclick="abrirModalKardex('${esc(e.codigo)}')" style="padding:2px 7px;border-color:#0284c7;color:#0284c7;" title="Ver movimentações desta peça">
-                      📑 Kardex
-                    </button>
-                  </div>
-                </div>
-              </div>
-            `).join("")}
-          </div>
-
-          <!-- PAGINAÇÃO INFERIOR -->
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:8px;border-top:1px solid #e2e8f0;">
-            <div style="font-size:11px;color:#64748b;">
-              Mostrando <b>${inicio + 1}</b> a <b>${Math.min(inicio + ITENS_PAG, filtrados.length)}</b> de <b>${filtrados.length}</b> itens
-            </div>
-            <div style="display:flex;gap:4px;">
-              <button class="btn btn-outline btn-xs" ${STATE.paginaEstoque <= 1 ? 'disabled' : ''} onclick="mudarPaginaEstoque(-1)">◀ Anterior</button>
-              <button class="btn btn-outline btn-xs" ${STATE.paginaEstoque >= totalPaginas ? 'disabled' : ''} onclick="mudarPaginaEstoque(1)">Próximo ▶</button>
-            </div>
-          </div>
+          <!-- CONTAINER DO CATÁLOGO QUE ATUALIZA DINAMICAMENTE SEM RESETAR O INPUT -->
+          <div id="boxCatalogoEstoqueTabela"></div>
         </div>
       `;
+
+      atualizarTabelaCatalogoEstoque();
     }
 
 
@@ -31519,7 +31613,10 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
-      if (modoUrl === "GESTOR") {
+      if (modoUrl === "FULL") {
+        STATE.perfil = "FULL";
+        STATE.menuAtivo = "GES_MURAL";
+      } else if (modoUrl === "GESTOR") {
 
 
 
@@ -31863,7 +31960,7 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
-  <div id="modalVisualizadorOS" class="modal-overlay">
+  <div id="modalVisualizadorOS" class="modal-overlay" style="display:none;">
 
 
 
@@ -32455,7 +32552,7 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
-  <div id="modalBancoRespostas" class="modal-overlay" style="z-index:99999;">
+  <div id="modalBancoRespostas" class="modal-overlay" style="display:none; z-index:99999;">
 
 
 
@@ -32831,7 +32928,7 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
-  <div id="modalNovoModeloBanco" class="modal-overlay" style="z-index:100000;">
+  <div id="modalNovoModeloBanco" class="modal-overlay" style="display:none; z-index:100000;">
 
 
 
@@ -33135,7 +33232,7 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
-  <div id="modalDadosNF" class="modal-overlay" style="z-index:99999;">
+  <div id="modalDadosNF" class="modal-overlay" style="display:none; z-index:99999;">
 
 
 
@@ -33526,6 +33623,49 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
+
+
+  <!-- MODAL KARDEX MOVIMENTAÇÕES -->
+  <div id="modalKardex" class="modal-overlay" style="display:none; z-index:99999;">
+    <div class="modal-box" style="max-width:750px;width:95%;">
+      <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;background:#0284c7;color:#fff;padding:12px 16px;border-radius:8px 8px 0 0;">
+        <div style="font-weight:900;font-size:14px;">📑 Kardex de Movimentações do Almoxarifado</div>
+        <button type="button" class="btn btn-xs" onclick="fecharModalKardex()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;cursor:pointer;">✕</button>
+      </div>
+      <div class="modal-body" id="modalKardexBody" style="padding:16px;"></div>
+      <div class="modal-foot" style="padding:10px 16px;text-align:right;border-top:1px solid #e2e8f0;">
+        <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalKardex()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL HISTÓRICO DE EQUIPAMENTO -->
+  <div id="modalEquipamento" class="modal-overlay" style="display:none; z-index:99999;">
+    <div class="modal-box" style="max-width:700px;width:95%;">
+      <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;background:#0f172a;color:#fff;padding:12px 16px;border-radius:8px 8px 0 0;">
+        <div id="modalEqTitulo" style="font-weight:900;font-size:14px;">Histórico do Equipamento</div>
+        <button type="button" class="btn btn-xs" onclick="fecharModalEquipamento()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;cursor:pointer;">✕</button>
+      </div>
+      <div class="modal-body" id="modalEqBody" style="padding:16px;"></div>
+      <div class="modal-foot" style="padding:10px 16px;text-align:right;border-top:1px solid #e2e8f0;">
+        <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalEquipamento()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL INSUMOS DE VIAGEM -->
+  <div id="modalInsumosViagem" class="modal-overlay" style="display:none; z-index:99999;">
+    <div class="modal-box" style="max-width:650px;width:95%;">
+      <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;background:#0284c7;color:#fff;padding:12px 16px;border-radius:8px 8px 0 0;">
+        <div id="modalInsumosTitulo" style="font-weight:900;font-size:14px;">🎒 Insumos Recomendados: Viagem Longa</div>
+        <button type="button" class="btn btn-xs" onclick="fecharModalInsumosViagem()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;cursor:pointer;">✕</button>
+      </div>
+      <div class="modal-body" id="modalInsumosBody" style="padding:16px;"></div>
+      <div class="modal-foot" style="padding:10px 16px;text-align:right;border-top:1px solid #e2e8f0;">
+        <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalInsumosViagem()">Fechar</button>
+      </div>
+    </div>
+  </div>
 
 </body>
 
