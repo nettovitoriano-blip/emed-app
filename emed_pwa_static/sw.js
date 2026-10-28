@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v32-etiquetas-vizinhas-ferramentas';
+const CACHE_NAME = 'emed-pwa-v36-rastreamento-automatico';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
