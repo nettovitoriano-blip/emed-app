@@ -2367,13 +2367,18 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 async def api_estoque_salvar(request: web.Request) -> web.Response:
-    """Adiciona ou atualiza item no estoque + local de armazenamento + validade de calibração."""
+    """Adiciona ou atualiza item no estoque + tabela de precificação dinâmica por consumidor + local."""
     body = await request.json()
     codigo = limpar_texto(body.get("codigo"), "").upper()
     nome_peca = limpar_texto(body.get("nome_peca"), "").upper()
     categoria = limpar_texto(body.get("categoria"), "PEÇA").upper()
     quantidade = int(limpar_float(body.get("quantidade"), 1))
     preco = limpar_float(body.get("preco_unitario"), 0.0)
+    preco_custo = limpar_float(body.get("preco_custo"), preco)
+    m_contrato = limpar_float(body.get("margem_contrato"), 30.0)
+    m_avulso = limpar_float(body.get("margem_avulso"), 60.0)
+    m_avista = limpar_float(body.get("margem_avista"), 20.0)
+    m_desestimulo = limpar_float(body.get("margem_desestimulo"), 180.0)
     localizacao = limpar_texto(body.get("localizacao"), "ALMOXARIFADO CENTRAL").upper()
     validade_cal = limpar_texto(body.get("validade_calibracao"), "")
     cert_cal = limpar_texto(body.get("certificado_calibracao"), "").upper()
@@ -2388,19 +2393,22 @@ async def api_estoque_salvar(request: web.Request) -> web.Response:
         if existe:
             cur.execute("""
                 UPDATE estoque_pecas
-                SET nome_peca = ?, categoria = ?, quantidade = ?, preco_unitario = ?,
+                SET nome_peca = ?, categoria = ?, quantidade = ?, preco_unitario = ?, preco_custo = ?,
+                    margem_contrato = ?, margem_avulso = ?, margem_avista = ?, margem_desestimulo = ?,
                     localizacao = ?, data_validade_calibracao = ?, certificado_calibracao = ?
                 WHERE UPPER(codigo) = ?
-            """, (nome_peca, categoria, quantidade, preco, localizacao, validade_cal, cert_cal, codigo))
+            """, (nome_peca, categoria, quantidade, preco, preco_custo, m_contrato, m_avulso, m_avista, m_desestimulo, localizacao, validade_cal, cert_cal, codigo))
         else:
             cur.execute("""
                 INSERT INTO estoque_pecas
-                (codigo, nome_peca, categoria, quantidade, estoque_minimo, preco_unitario, localizacao, data_validade_calibracao, certificado_calibracao)
-                VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)
-            """, (codigo, nome_peca, categoria, quantidade, preco, localizacao, validade_cal, cert_cal))
+                (codigo, nome_peca, categoria, quantidade, estoque_minimo, preco_unitario, preco_custo,
+                 margem_contrato, margem_avulso, margem_avista, margem_desestimulo,
+                 localizacao, data_validade_calibracao, certificado_calibracao)
+                VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (codigo, nome_peca, categoria, quantidade, preco, preco_custo, m_contrato, m_avulso, m_avista, m_desestimulo, localizacao, validade_cal, cert_cal))
         conn.commit()
 
-    return web.json_response({"ok": True, "msg": f"✅ Item '{codigo} — {nome_peca}' salvo no estoque com local '{localizacao}'!"})
+    return web.json_response({"ok": True, "msg": f"✅ Item '{codigo} — {nome_peca}' salvo com precificação por consumidor!"})
 
 
 async def api_calibracao_equipamento(request: web.Request) -> web.Response:
@@ -4073,5 +4081,5 @@ if __name__ == "__main__":
 
     print(f"🚀 Iniciando Servidor Completo do Aplicativo Oficial EMED na porta {porta} (com Anti-Standby 24/7)...")
 
-    web.run_app(iniciar_app_com_keepalive(), host="0.0.0.0", port=porta)
+    web.run_app(criar_app(), host="0.0.0.0", port=porta, handle_signals=False)
 

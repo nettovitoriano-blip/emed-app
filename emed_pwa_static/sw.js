@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v30-layout-estoque-e-mapeamento';
+const CACHE_NAME = 'emed-pwa-v28-bloco-financeiro';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

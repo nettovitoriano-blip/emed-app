@@ -10110,7 +10110,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-      navigator.serviceWorker.register("/sw.js?v=v30").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=v31").then(reg => { if(reg) reg.update(); }).catch(() => {});
 
 
 
@@ -19962,7 +19962,9 @@ function renderizarNavegacao() {
     if (!STATE.paginaEstoque) STATE.paginaEstoque = 1;
     if (STATE.buscaEstoque === undefined) STATE.buscaEstoque = "";
 
-        function formatarUnidadeLimpa(u) {
+        if (!STATE.tabelaPrecificacao) STATE.tabelaPrecificacao = "AVULSO";
+
+    function formatarUnidadeLimpa(u) {
       const s = String(u || '').trim().toUpperCase();
       if (!s || s.includes('PÃ') || s === 'PC' || s === 'PÇ' || s === 'PÇA' || s === 'PEÇA' || s === 'PÇS') return 'PÇS';
       if (s === 'UND' || s === 'UN' || s === 'UNI' || s === '1' || s === '0') return 'UN';
@@ -19974,6 +19976,76 @@ function renderizarNavegacao() {
       if (s === 'PCT' || s === 'PACOTE') return 'PCT';
       if (s === 'PAR' || s === 'PR') return 'PAR';
       return s || 'UN';
+    }
+
+    function calcularPrecosConsumidor(e) {
+      const custo = Number(e.preco_custo > 0 ? e.preco_custo : e.preco_unitario) || 0;
+      const mContrato = Number(e.margem_contrato !== undefined && e.margem_contrato !== null ? e.margem_contrato : 30);
+      const mAvulso = Number(e.margem_avulso !== undefined && e.margem_avulso !== null ? e.margem_avulso : 60);
+      const mAvista = Number(e.margem_avista !== undefined && e.margem_avista !== null ? e.margem_avista : 20);
+      const mDesestimulo = Number(e.margem_desestimulo !== undefined && e.margem_desestimulo !== null ? e.margem_desestimulo : 180);
+
+      const pContrato = Math.round((custo * (1 + mContrato / 100)) * 100) / 100;
+      const pAvulso = Math.round((custo * (1 + mAvulso / 100)) * 100) / 100;
+      const pAvista = Math.round((custo * (1 + mAvista / 100)) * 100) / 100;
+      const pDesestimulo = Math.round((custo * (1 + mDesestimulo / 100)) * 100) / 100;
+
+      return {
+        custo,
+        contrato: pContrato,
+        avulso: pAvulso,
+        avista: pAvista,
+        desestimulo: pDesestimulo,
+        mContrato,
+        mAvulso,
+        mAvista,
+        mDesestimulo
+      };
+    }
+
+    function mudarTabelaPreco(tab) {
+      STATE.tabelaPrecificacao = tab;
+      atualizarTabelaCatalogoEstoque();
+      const rotulos = {
+        'CONTRATO': 'Contrato (+30%)',
+        'AVULSO': 'Avulso (+60%)',
+        'AVISTA': 'À Vista / PIX (+20%)',
+        'DESESTIMULO': 'Não Quero Atender (+180%)',
+        'CUSTO': 'Custo Base'
+      };
+      mostrarToast(`🏷️ Tabela alterada para: ${rotulos[tab] || tab}`);
+    }
+
+    function togglePainelPrecosItem(cod) {
+      const el = document.getElementById("boxPrecos_" + cod);
+      if (!el) return;
+      el.style.display = (el.style.display === "none" || !el.style.display) ? "block" : "none";
+    }
+
+    function recalcularFormPreviaEstoque() {
+      const custo = parseFloat(document.getElementById("estCusto")?.value || 0) || 0;
+      const mCont = parseFloat(document.getElementById("estMargContrato")?.value || 30) || 30;
+      const mAvul = parseFloat(document.getElementById("estMargAvulso")?.value || 60) || 60;
+      const mAvis = parseFloat(document.getElementById("estMargAvista")?.value || 20) || 20;
+      const mDese = parseFloat(document.getElementById("estMargDesestimulo")?.value || 180) || 180;
+
+      const pCont = (custo * (1 + mCont / 100)).toFixed(2);
+      const pAvul = (custo * (1 + mAvul / 100)).toFixed(2);
+      const pAvis = (custo * (1 + mAvis / 100)).toFixed(2);
+      const pDese = (custo * (1 + mDese / 100)).toFixed(2);
+
+      const el = document.getElementById("boxPreviaCalculadaForm");
+      if (el) {
+        el.innerHTML = `
+          <div style="font-size:11px;font-weight:800;color:#334155;margin-bottom:4px;">📊 Prévia dos Preços de Venda Sugeridos por Consumidor:</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:11.5px;">
+            <span style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;padding:3px 8px;border-radius:4px;">🟢 Contrato: <b>R$ ${pCont}</b></span>
+            <span style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;padding:3px 8px;border-radius:4px;">🔵 Avulso: <b>R$ ${pAvul}</b></span>
+            <span style="background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;padding:3px 8px;border-radius:4px;">⚡ À Vista: <b>R$ ${pAvis}</b></span>
+            <span style="background:#fef2f2;color:#991b1b;border:1px solid #fecaca;padding:3px 8px;border-radius:4px;">⛔ Não Atender: <b>R$ ${pDese}</b></span>
+          </div>
+        `;
+      }
     }
 
     function onBuscaEstoqueInput(val) {
@@ -20022,22 +20094,35 @@ function renderizarNavegacao() {
       return lista;
     }
 
-    function preencherAjusteEstoque(codigo, nome, qtd, preco, cat, loc) {
+    function preencherAjusteEstoque(codigo, nome, qtd, preco, cat, loc, custo, mCont, mAvul, mAvis, mDese) {
       const elCod = document.getElementById("estCod");
       const elNome = document.getElementById("estNome");
       const elQtd = document.getElementById("estQtd");
       const elPreco = document.getElementById("estPreco");
       const elCat = document.getElementById("estCat");
       const elLoc = document.getElementById("estLoc");
+      const elCusto = document.getElementById("estCusto");
+      const elMCont = document.getElementById("estMargContrato");
+      const elMAvul = document.getElementById("estMargAvulso");
+      const elMAvis = document.getElementById("estMargAvista");
+      const elMDese = document.getElementById("estMargDesestimulo");
+
       if (elCod) elCod.value = codigo;
       if (elNome) elNome.value = nome;
       if (elQtd) elQtd.value = qtd;
       if (elPreco) elPreco.value = preco;
       if (elCat) elCat.value = cat;
       if (elLoc) elLoc.value = loc || "Almoxarifado Central";
+      if (elCusto) elCusto.value = custo || preco || 0;
+      if (elMCont) elMCont.value = (mCont !== undefined && mCont !== null && mCont !== '') ? mCont : 30;
+      if (elMAvul) elMAvul.value = (mAvul !== undefined && mAvul !== null && mAvul !== '') ? mAvul : 60;
+      if (elMAvis) elMAvis.value = (mAvis !== undefined && mAvis !== null && mAvis !== '') ? mAvis : 20;
+      if (elMDese) elMDese.value = (mDese !== undefined && mDese !== null && mDese !== '') ? mDese : 180;
+
+      recalcularFormPreviaEstoque();
       const form = document.getElementById("formCadastroEstoque");
       if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      mostrarToast(`✏️ Item #${codigo} carregado para ajuste e mapeamento.`);
+      mostrarToast(`✏️ Item #${codigo} carregado com tabela de precificação.`);
     }
 
     async function abrirModalKardex(filtroItem = "") {
@@ -20116,8 +20201,37 @@ function renderizarNavegacao() {
       }
 
       const catAtiva = STATE.filtroCatEstoque || "TODOS";
+      const tabAtiva = STATE.tabelaPrecificacao || "AVULSO";
 
       boxTabela.innerHTML = `
+        <!-- SIMULADOR DINÂMICO DE TABELA POR TIPO DE CONSUMIDOR -->
+        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+            <div style="font-size:12px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:6px;">
+              <span>🏷️ Tabela Vigente por Tipo de Consumidor:</span>
+              <span class="badge" style="background:#0284c7;color:#fff;font-size:10.5px;">${tabAtiva === 'CONTRATO' ? '🟢 CONTRATO (+30%)' : tabAtiva === 'AVISTA' ? '⚡ À VISTA (+20%)' : tabAtiva === 'DESESTIMULO' ? '⛔ NÃO QUERO ATENDER (+180%)' : tabAtiva === 'CUSTO' ? '⚙️ CUSTO BASE' : '🔵 AVULSO SPOT (+60%)'}</span>
+            </div>
+            <div style="font-size:11px;color:#64748b;">Simule instantaneamente o preço de venda para qualquer perfil de cliente</div>
+          </div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-xs ${tabAtiva==='CONTRATO'?'btn-success':'btn-outline'}" onclick="mudarTabelaPreco('CONTRATO')" style="${tabAtiva==='CONTRATO'?'background:#16a34a;color:#fff;border-color:#16a34a;font-weight:800;':''}">
+              🟢 Contrato (+30%)
+            </button>
+            <button type="button" class="btn btn-xs ${tabAtiva==='AVULSO'?'btn-primary':'btn-outline'}" onclick="mudarTabelaPreco('AVULSO')" style="${tabAtiva==='AVULSO'?'font-weight:800;':''}">
+              🔵 Avulso (+60%)
+            </button>
+            <button type="button" class="btn btn-xs ${tabAtiva==='AVISTA'?'btn-primary':'btn-outline'}" onclick="mudarTabelaPreco('AVISTA')" style="${tabAtiva==='AVISTA'?'background:#0284c7;color:#fff;border-color:#0284c7;font-weight:800;':''}">
+              ⚡ À Vista / PIX (+20%)
+            </button>
+            <button type="button" class="btn btn-xs ${tabAtiva==='DESESTIMULO'?'btn-danger':'btn-outline'}" onclick="mudarTabelaPreco('DESESTIMULO')" style="${tabAtiva==='DESESTIMULO'?'background:#dc2626;color:#fff;border-color:#dc2626;font-weight:800;':''}">
+              ⛔ Não Quero Atender (+180%)
+            </button>
+            <button type="button" class="btn btn-xs ${tabAtiva==='CUSTO'?'btn-neutral':'btn-outline'}" onclick="mudarTabelaPreco('CUSTO')" style="${tabAtiva==='CUSTO'?'background:#475569;color:#fff;border-color:#475569;font-weight:800;':''}">
+              ⚙️ Custo Base
+            </button>
+          </div>
+        </div>
+
         <!-- FILTROS POR CATEGORIA COM CORES ATIVAS CLARAS -->
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
           <button type="button" class="btn btn-xs ${catAtiva==='TODOS'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('TODOS')">Todos (${totalItens})</button>
@@ -20130,68 +20244,148 @@ function renderizarNavegacao() {
 
         <!-- LISTA DOS ITENS PAGINADOS FORMATADA COM ALTA LEGIBILIDADE -->
         <div style="display:flex;flex-direction:column;gap:8px;">
-          ${itensExibidos.length ? itensExibidos.map(e => `
-            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
-                
-                <!-- IDENTIFICAÇÃO E NOME DO ITEM -->
-                <div style="flex:1;min-width:260px;">
-                  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                    <span style="font-weight:900;color:#0284c7;font-size:13.5px;background:#f0f9ff;border:1px solid #bae6fd;padding:1px 6px;border-radius:4px;">#${esc(e.codigo)}</span>
-                    <span class="badge ${String(e.categoria).includes('INSTRUMENTO') ? 'ativo' : 'concluido'}" style="font-size:10.5px;">${esc(e.categoria || e.grupo_item || 'ESTOQUE')}</span>
-                    ${e.grupo_item ? `<span style="font-size:10px;color:#475569;background:#f1f5f9;padding:1px 6px;border-radius:4px;font-weight:600;">${esc(e.grupo_item)}</span>` : ''}
+          ${itensExibidos.length ? itensExibidos.map(e => {
+            const precos = calcularPrecosConsumidor(e);
+            
+            let precoAtivo = precos.avulso;
+            let rotuloTabela = `🔵 Avulso (+${precos.mAvulso}%)`;
+            let estiloBadgePreco = `background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;`;
+
+            if (tabAtiva === 'CONTRATO') {
+              precoAtivo = precos.contrato;
+              rotuloTabela = `🟢 Contrato (+${precos.mContrato}%)`;
+              estiloBadgePreco = `background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;`;
+            } else if (tabAtiva === 'AVISTA') {
+              precoAtivo = precos.avista;
+              rotuloTabela = `⚡ À Vista (+${precos.mAvista}%)`;
+              estiloBadgePreco = `background:#f0f9ff;border:1px solid #bae6fd;color:#0369a1;`;
+            } else if (tabAtiva === 'DESESTIMULO') {
+              precoAtivo = precos.desestimulo;
+              rotuloTabela = `⛔ Não Quero Atender (+${precos.mDesestimulo}%)`;
+              estiloBadgePreco = `background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-weight:800;`;
+            } else if (tabAtiva === 'CUSTO') {
+              precoAtivo = precos.custo;
+              rotuloTabela = `⚙️ Custo Base`;
+              estiloBadgePreco = `background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;`;
+            }
+
+            const subtotalAtivo = Math.round(((e.quantidade || 0) * precoAtivo) * 100) / 100;
+
+            return `
+              <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+                  
+                  <!-- IDENTIFICAÇÃO E NOME DO ITEM -->
+                  <div style="flex:1;min-width:260px;">
+                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                      <span style="font-weight:900;color:#0284c7;font-size:13.5px;background:#f0f9ff;border:1px solid #bae6fd;padding:1px 6px;border-radius:4px;">#${esc(e.codigo)}</span>
+                      <span class="badge ${String(e.categoria).includes('INSTRUMENTO') ? 'ativo' : 'concluido'}" style="font-size:10.5px;">${esc(e.categoria || e.grupo_item || 'ESTOQUE')}</span>
+                      ${e.grupo_item ? `<span style="font-size:10px;color:#475569;background:#f1f5f9;padding:1px 6px;border-radius:4px;font-weight:600;">${esc(e.grupo_item)}</span>` : ''}
+                    </div>
+
+                    <div style="font-weight:800;color:#0f172a;font-size:13.5px;margin-top:4px;line-height:1.35;">
+                      ${esc(e.nome_peca)}
+                    </div>
+
+                    <!-- LOCALIZAÇÃO / ARMAZENAMENTO MAPEAÇÃO -->
+                    <div style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                      <span style="font-size:11.5px;color:#334155;background:#f8fafc;border:1px solid #cbd5e1;padding:2px 8px;border-radius:4px;display:inline-flex;align-items:center;gap:4px;">
+                        📍 <b>Local de Armazenamento:</b> <span style="color:#0284c7;font-weight:700;">${esc(e.localizacao || 'Almoxarifado Central (Aguardando Mapeamento)')}</span>
+                      </span>
+                    </div>
                   </div>
 
-                  <div style="font-weight:800;color:#0f172a;font-size:13.5px;margin-top:4px;line-height:1.35;">
-                    ${esc(e.nome_peca)}
-                  </div>
-
-                  <!-- LOCALIZAÇÃO / ARMAZENAMENTO MAPEAÇÃO -->
-                  <div style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                    <span style="font-size:11.5px;color:#334155;background:#f8fafc;border:1px solid #cbd5e1;padding:2px 8px;border-radius:4px;display:inline-flex;align-items:center;gap:4px;">
-                      📍 <b>Local de Armazenamento:</b> <span style="color:#0284c7;font-weight:700;">${esc(e.localizacao || 'Almoxarifado Central (Aguardando Mapeamento)')}</span>
-                    </span>
+                  <!-- SALDO FÍSICO DISPONÍVEL (DIREITA) -->
+                  <div style="text-align:right;min-width:130px;">
+                    <div style="font-size:10px;text-transform:uppercase;font-weight:800;color:#64748b;letter-spacing:0.5px;margin-bottom:3px;">
+                      Saldo em Estoque
+                    </div>
+                    ${(e.quantidade || 0) > 0 ? `
+                      <span style="display:inline-flex;align-items:center;gap:5px;background:#dcfce7;color:#15803d;border:1px solid #86efac;font-size:13.5px;font-weight:900;padding:4px 10px;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                        🟢 ${e.quantidade} ${formatarUnidadeLimpa(e.unidade)}
+                      </span>
+                    ` : `
+                      <span style="display:inline-flex;align-items:center;gap:5px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-size:12px;font-weight:800;padding:4px 9px;border-radius:6px;">
+                        🔴 0.0 ${formatarUnidadeLimpa(e.unidade)} (Zerado)
+                      </span>
+                    `}
                   </div>
                 </div>
 
-                <!-- SALDO FÍSICO DISPONÍVEL (DIREITA) -->
-                <div style="text-align:right;min-width:130px;">
-                  <div style="font-size:10px;text-transform:uppercase;font-weight:800;color:#64748b;letter-spacing:0.5px;margin-bottom:3px;">
-                    Saldo em Estoque
+                <!-- VALORES FINANCEIROS DINÂMICOS CONFORME A TABELA DE CONSUMIDOR -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px dashed #e2e8f0;flex-wrap:wrap;gap:8px;font-size:11.5px;">
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:#334155;">
+                    <span style="padding:3px 8px;border-radius:4px;${estiloBadgePreco}">
+                      💵 <b>Preço (${rotuloTabela}):</b> R$ ${precoAtivo.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}
+                    </span>
+                    <span style="background:#f8fafc;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0;color:#475569;">
+                      🔍 Custo Base: R$ ${precos.custo.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}
+                    </span>
+                    <span style="background:#f0fdf4;padding:3px 8px;border-radius:4px;border:1px solid #bbf7d0;color:#166534;">
+                      💰 <b>Subtotal (${rotuloTabela}):</b> R$ ${subtotalAtivo.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}
+                    </span>
                   </div>
-                  ${(e.quantidade || 0) > 0 ? `
-                    <span style="display:inline-flex;align-items:center;gap:5px;background:#dcfce7;color:#15803d;border:1px solid #86efac;font-size:13.5px;font-weight:900;padding:4px 10px;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
-                      🟢 ${e.quantidade} ${formatarUnidadeLimpa(e.unidade)}
-                    </span>
-                  ` : `
-                    <span style="display:inline-flex;align-items:center;gap:5px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-size:12px;font-weight:800;padding:4px 9px;border-radius:6px;">
-                      🔴 0.0 ${formatarUnidadeLimpa(e.unidade)} (Zerado)
-                    </span>
-                  `}
+                  <div style="display:flex;gap:5px;">
+                    <button type="button" class="btn btn-outline btn-xs" onclick="togglePainelPrecosItem('${esc(e.codigo)}')" style="padding:4px 8px;border-color:#6366f1;color:#4f46e5;font-weight:700;" title="Ver cotação nas 4 tabelas de clientes">
+                      📊 4 Tabelas
+                    </button>
+                    <button type="button" class="btn btn-outline btn-xs" onclick="preencherAjusteEstoque('${esc(e.codigo)}', '${esc(e.nome_peca)}', ${e.quantidade||0}, ${e.preco_unitario||0}, '${esc(e.categoria||'PEÇA DE REPOSIÇÃO')}', '${esc(e.localizacao||'ALMOXARIFADO CENTRAL')}', ${precos.custo}, ${precos.mContrato}, ${precos.mAvulso}, ${precos.mAvista}, ${precos.mDesestimulo})" style="padding:4px 8px;font-weight:700;">
+                      ✏️ Ajustar / Mapear
+                    </button>
+                    <button type="button" class="btn btn-outline btn-xs" onclick="abrirModalKardex('${esc(e.codigo)}')" style="padding:4px 8px;border-color:#0284c7;color:#0284c7;font-weight:700;" title="Ver movimentações desta peça">
+                      📑 Kardex
+                    </button>
+                  </div>
+                </div>
+
+                <!-- GAVETA EXPANSÍVEL: MINI-TABELA DE PREÇOS POR PERFIL DE CONSUMIDOR -->
+                <div id="boxPrecos_${esc(e.codigo)}" style="display:none;margin-top:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:11.5px;">
+                  <div style="font-weight:800;color:#0f172a;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+                    <span>🏷️ Comparativo de Precificação por Tipo de Consumidor (#${esc(e.codigo)}):</span>
+                    <button type="button" class="btn btn-xs btn-outline" onclick="togglePainelPrecosItem('${esc(e.codigo)}')" style="padding:1px 6px;">✕ Fechar</button>
+                  </div>
+                  <div style="overflow-x:auto;">
+                    <table style="width:100%;border-collapse:collapse;text-align:left;">
+                      <thead>
+                        <tr style="background:#e2e8f0;color:#334155;font-size:11px;">
+                          <th style="padding:5px 8px;border-radius:4px 0 0 4px;">Tipo de Consumidor</th>
+                          <th style="padding:5px 8px;">Margem Aplicada</th>
+                          <th style="padding:5px 8px;">Preço Unitário</th>
+                          <th style="padding:5px 8px;border-radius:0 4px 4px 0;">Lucro Bruto Estimado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr style="border-bottom:1px solid #e2e8f0;background:#ffffff;">
+                          <td style="padding:6px 8px;font-weight:700;color:#166534;">🟢 Cliente Contrato (Mensalista)</td>
+                          <td style="padding:6px 8px;">+${precos.mContrato}%</td>
+                          <td style="padding:6px 8px;font-weight:800;color:#0f172a;">R$ ${precos.contrato.toFixed(2)}</td>
+                          <td style="padding:6px 8px;color:#16a34a;font-weight:700;">+ R$ ${(precos.contrato - precos.custo).toFixed(2)}</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+                          <td style="padding:6px 8px;font-weight:700;color:#1e40af;">🔵 Cliente Avulso (Spot / Sem Contrato)</td>
+                          <td style="padding:6px 8px;">+${precos.mAvulso}%</td>
+                          <td style="padding:6px 8px;font-weight:800;color:#0f172a;">R$ ${precos.avulso.toFixed(2)}</td>
+                          <td style="padding:6px 8px;color:#2563eb;font-weight:700;">+ R$ ${(precos.avulso - precos.custo).toFixed(2)}</td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #e2e8f0;background:#ffffff;">
+                          <td style="padding:6px 8px;font-weight:700;color:#0369a1;">⚡ À Vista / PIX (Liquidação Imediata)</td>
+                          <td style="padding:6px 8px;">+${precos.mAvista}%</td>
+                          <td style="padding:6px 8px;font-weight:800;color:#0f172a;">R$ ${precos.avista.toFixed(2)}</td>
+                          <td style="padding:6px 8px;color:#0284c7;font-weight:700;">+ R$ ${(precos.avista - precos.custo).toFixed(2)}</td>
+                        </tr>
+                        <tr style="background:#fef2f2;">
+                          <td style="padding:6px 8px;font-weight:800;color:#991b1b;">⛔ "Não Quero Atender" (Preço Desestímulo)</td>
+                          <td style="padding:6px 8px;font-weight:800;color:#991b1b;">+${precos.mDesestimulo}%</td>
+                          <td style="padding:6px 8px;font-weight:900;color:#991b1b;">R$ ${precos.desestimulo.toFixed(2)}</td>
+                          <td style="padding:6px 8px;color:#dc2626;font-weight:800;">+ R$ ${(precos.desestimulo - precos.custo).toFixed(2)} <span style="font-size:10px;font-weight:normal;">(Barreira)</span></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
-
-              <!-- VALORES FINANCEIROS CLAROS (SUBTOTAL EM R$ E UNITÁRIO) -->
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px dashed #e2e8f0;flex-wrap:wrap;gap:8px;font-size:11.5px;">
-                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#334155;">
-                  <span style="background:#f8fafc;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0;">
-                    💵 <b>Preço Unitário:</b> R$ ${(e.preco_unitario || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}
-                  </span>
-                  <span style="background:#f0fdf4;padding:3px 8px;border-radius:4px;border:1px solid #bbf7d0;color:#166534;">
-                    💰 <b>Subtotal em R$ (Valor Total):</b> R$ ${(Number(e.valor_total) || ((e.quantidade || 0) * (e.preco_unitario || 0))).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}
-                  </span>
-                </div>
-                <div style="display:flex;gap:5px;">
-                  <button type="button" class="btn btn-outline btn-xs" onclick="preencherAjusteEstoque('${esc(e.codigo)}', '${esc(e.nome_peca)}', ${e.quantidade||0}, ${e.preco_unitario||0}, '${esc(e.categoria||'PEÇA DE REPOSIÇÃO')}', '${esc(e.localizacao||'ALMOXARIFADO CENTRAL')}')" style="padding:4px 9px;font-weight:700;">
-                    ✏️ Ajustar / Mapear
-                  </button>
-                  <button type="button" class="btn btn-outline btn-xs" onclick="abrirModalKardex('${esc(e.codigo)}')" style="padding:4px 9px;border-color:#0284c7;color:#0284c7;font-weight:700;" title="Ver movimentações desta peça">
-                    📑 Kardex
-                  </button>
-                </div>
-              </div>
-            </div>
-          `).join("") : `
+            `;
+          }).join("") : `
             <div style="text-align:center;padding:28px 16px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;">
               <div style="font-size:26px;margin-bottom:6px;">🔍</div>
               <div style="font-weight:700;color:#334155;font-size:13px;">Nenhum item encontrado no almoxarifado</div>
@@ -20285,9 +20479,9 @@ function renderizarNavegacao() {
           `}
         </div>
 
-        <!-- FORMULÁRIO DE CADASTRO / AJUSTE RÁPIDO DE ITEM COM LOCAL DE ARMAZENAMENTO -->
+        <!-- FORMULÁRIO DE CADASTRO / AJUSTE COM PRECIFICAÇÃO DINÂMICA POR CONSUMIDOR -->
         <div class="section-box" id="formCadastroEstoque" style="margin-bottom:12px;">
-          <div class="section-title">➕ Cadastrar / Ajustar Item &amp; Local de Armazenamento</div>
+          <div class="section-title">➕ Cadastrar / Ajustar Item &amp; Tabela de Precificação</div>
           <div class="form-grid">
             <div><label class="field-label">Código Item (ERP)</label><input id="estCod" class="input" placeholder="Ex: 245 ou PEC-001" /></div>
             <div><label class="field-label">Nome da Peça / Instrumento</label><input id="estNome" class="input" placeholder="Ex: AMPOLA DE RAIOS-X 20/40" /></div>
@@ -20301,11 +20495,39 @@ function renderizarNavegacao() {
               </select>
             </div>
             <div><label class="field-label">Quantidade Físico</label><input id="estQtd" type="number" step="0.1" class="input" value="1.0" /></div>
-            <div><label class="field-label">Preço Unitário (R$)</label><input id="estPreco" type="number" step="0.01" class="input" value="150.00" /></div>
-            <div><label class="field-label">📍 Local de Armazenamento (Prateleira / Gaveta)</label><input id="estLoc" class="input" placeholder="Ex: Prateleira B3, Gaveta 12, Almox Central..." /></div>
+            <div><label class="field-label">💵 Preço de Custo (R$)</label><input id="estCusto" type="number" step="0.01" class="input" value="100.00" oninput="recalcularFormPreviaEstoque()" /></div>
+            <div><label class="field-label">Preço Base Unitário (R$)</label><input id="estPreco" type="number" step="0.01" class="input" value="160.00" /></div>
+            <div><label class="field-label">📍 Local de Armazenamento</label><input id="estLoc" class="input" placeholder="Ex: Prateleira B3, Gaveta 12, Almox Central..." /></div>
             <div><label class="field-label">Validade Calibração RBC</label><input id="estVal" class="input" placeholder="DD/MM/AAAA (Se aplicável)" /></div>
           </div>
-          <button type="button" class="btn btn-primary" onclick="salvarItemEstoque()" style="margin-top:6px;">💾 Salvar no Estoque &amp; Mapeamento</button>
+
+          <!-- REGRAS DE MARGEM POR CONSUMIDOR -->
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-top:10px;">
+            <div style="font-size:12px;font-weight:800;color:#0f172a;margin-bottom:6px;">📈 Margens de Lucro (%) por Perfil de Consumidor:</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));gap:8px;">
+              <div>
+                <label style="font-size:11px;font-weight:700;color:#166534;">🟢 Margem Contrato (%)</label>
+                <input id="estMargContrato" type="number" step="1" class="input" value="30" oninput="recalcularFormPreviaEstoque()" style="padding:4px 8px;font-size:12px;" />
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:#1e40af;">🔵 Margem Avulso (%)</label>
+                <input id="estMargAvulso" type="number" step="1" class="input" value="60" oninput="recalcularFormPreviaEstoque()" style="padding:4px 8px;font-size:12px;" />
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:700;color:#0369a1;">⚡ Margem À Vista (%)</label>
+                <input id="estMargAvista" type="number" step="1" class="input" value="20" oninput="recalcularFormPreviaEstoque()" style="padding:4px 8px;font-size:12px;" />
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:800;color:#991b1b;">⛔ "Não Quero Atender" (%)</label>
+                <input id="estMargDesestimulo" type="number" step="5" class="input" value="180" oninput="recalcularFormPreviaEstoque()" style="padding:4px 8px;font-size:12px;border-color:#fca5a5;" />
+              </div>
+            </div>
+
+            <!-- PRÉVIA DOS 4 PREÇOS CALCULADOS -->
+            <div id="boxPreviaCalculadaForm" style="margin-top:8px;padding-top:6px;border-top:1px dashed #cbd5e1;"></div>
+          </div>
+
+          <button type="button" class="btn btn-primary" onclick="salvarItemEstoque()" style="margin-top:8px;">💾 Salvar no Estoque &amp; Mapeamento com 4 Tabelas</button>
         </div>
 
         <!-- INVENTÁRIO COMPLETO COM BUSCA E PAGINAÇÃO LEVE -->
@@ -20324,6 +20546,7 @@ function renderizarNavegacao() {
         </div>
       `;
 
+      recalcularFormPreviaEstoque();
       atualizarTabelaCatalogoEstoque();
     }
 
@@ -20333,6 +20556,11 @@ function renderizarNavegacao() {
       const elCat = document.getElementById("estCat");
       const elQtd = document.getElementById("estQtd");
       const elPreco = document.getElementById("estPreco");
+      const elCusto = document.getElementById("estCusto");
+      const elMCont = document.getElementById("estMargContrato");
+      const elMAvul = document.getElementById("estMargAvulso");
+      const elMAvis = document.getElementById("estMargAvista");
+      const elMDese = document.getElementById("estMargDesestimulo");
       const elLoc = document.getElementById("estLoc");
       const elVal = document.getElementById("estVal");
 
@@ -20344,6 +20572,11 @@ function renderizarNavegacao() {
         categoria: elCat ? elCat.value : "PEÇA DE REPOSIÇÃO",
         quantidade: elQtd ? elQtd.value : "1",
         preco_unitario: elPreco ? elPreco.value : "0",
+        preco_custo: elCusto ? elCusto.value : "0",
+        margem_contrato: elMCont ? elMCont.value : "30",
+        margem_avulso: elMAvul ? elMAvul.value : "60",
+        margem_avista: elMAvis ? elMAvis.value : "20",
+        margem_desestimulo: elMDese ? elMDese.value : "180",
         localizacao: elLoc ? elLoc.value : "Almoxarifado Central",
         validade_calibracao: elVal ? elVal.value : ""
       });
@@ -20351,30 +20584,6 @@ function renderizarNavegacao() {
       mostrarToast(res.msg || "Item salvo com sucesso!");
       await sincronizarTudo(false);
     }
-
-
-    /********************************************************************
-
-
-
-
-
-
-
-     * MENU 13 (GESTOR 8): ALARMES DE CALIBRAÇÃO & CRÉDITOS
-
-
-
-
-
-
-
-     ********************************************************************/
-
-
-
-
-
 
 
     function renderMenuGesCalibracao(box) {
@@ -33843,6 +34052,23 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
       <div class="modal-body" id="modalInsumosBody" style="padding:16px;"></div>
       <div class="modal-foot" style="padding:10px 16px;text-align:right;border-top:1px solid #e2e8f0;">
         <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalInsumosViagem()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL DE CAUTELA, MOVIMENTAÇÃO & LEITOR DE CÓDIGO DE BARRAS DE FERRAMENTAS (PAULO) -->
+  <div id="modalCautelaFerramenta" class="modal-overlay" style="display:none;z-index:99999;">
+    <div style="background:#fff;border-radius:14px;max-width:550px;width:100%;box-shadow:0 20px 25px -5px rgba(0,0,0,0.3);overflow:hidden;border:1px solid #cbd5e1;">
+      <div style="background:#0f172a;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:18px;">🧰</span>
+          <span style="font-weight:900;font-size:15px;color:#38bdf8;">Movimentação de Ferramenta &bull; Cautela</span>
+        </div>
+        <button type="button" onclick="fecharModalCautela()" style="background:transparent;border:none;color:#94a3b8;font-size:20px;cursor:pointer;font-weight:bold;">&times;</button>
+      </div>
+      <div id="modalCautelaBody" style="padding:16px;">
+        <!-- Preenchido dinamicamente via abrirModalCautela() -->
       </div>
     </div>
   </div>
