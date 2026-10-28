@@ -971,54 +971,44 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
         try:
-
-            df_est = pd.read_sql_query("SELECT * FROM estoque_pecas", conn)
-
+            df_est = pd.read_sql_query("SELECT * FROM estoque_pecas ORDER BY quantidade DESC, nome_peca ASC", conn)
             for _, r in df_est.iterrows():
-
                 st_cal = calcular_status_calibracao(limpar_texto(r.get("data_validade_calibracao"), ""))
-
+                qtd_val = round(limpar_float(r.get("quantidade"), 0.0), 2)
+                p_unit = limpar_float(r.get("preco_unitario") or r.get("preco_custo"), 0.0)
+                v_tot = limpar_float(r.get("valor_total"), qtd_val * p_unit)
                 estoque.append({
-
                     "codigo": limpar_texto(r.get("codigo"), ""),
-
                     "nome_peca": limpar_texto(r.get("nome_peca"), ""),
-
-                    "categoria": limpar_texto(r.get("categoria"), "PEÇA"),
-
-                    "quantidade": int(limpar_float(r.get("quantidade"), 0)),
-
-                    "estoque_minimo": int(limpar_float(r.get("estoque_minimo"), 1)),
-
-                    "preco_unitario": limpar_float(r.get("preco_unitario"), 0.0),
-
-                    "localizacao": limpar_texto(r.get("localizacao"), "ALMOXARIFADO CENTRAL"),
-
+                    "categoria": limpar_texto(r.get("categoria"), "PEÇA DE REPOSIÇÃO"),
+                    "tipo_item": limpar_texto(r.get("tipo_item"), "GERAL"),
+                    "grupo_item": limpar_texto(r.get("grupo_item"), ""),
+                    "unidade": limpar_texto(r.get("unidade"), "UND"),
+                    "quantidade": qtd_val,
+                    "estoque_minimo": round(limpar_float(r.get("estoque_minimo"), 1.0), 1),
+                    "preco_unitario": p_unit,
+                    "preco_custo": p_unit,
+                    "valor_total": v_tot,
+                    "localizacao": limpar_texto(r.get("localizacao"), "ALMOXARIFADO CENTRAL - FORTALEZA"),
                     "ultima_calibracao": limpar_texto(r.get("data_ultima_calibracao"), ""),
-
                     "validade_calibracao": limpar_texto(r.get("data_validade_calibracao"), ""),
-
                     "certificado_calibracao": limpar_texto(r.get("certificado_calibracao"), ""),
-
                     "saldo_creditos": limpar_texto(r.get("saldo_creditos"), ""),
-
                     "badge_calibracao": st_cal["badge_txt"],
-
                     "cor_calibracao": st_cal["badge_cor"],
-
                     "status_cal": st_cal["status"],
-
                 })
-
-        except Exception:
-
-            pass
+        except Exception as e:
+            print("Erro ao carregar estoque_pecas:", e)
 
 
 
         try:
 
             df_sol = pd.read_sql_query("SELECT * FROM solicitacoes_pecas ORDER BY id DESC LIMIT 60", conn)
+
+
+
 
             for _, r in df_sol.iterrows():
 
@@ -1043,6 +1033,28 @@ async def api_bootstrap(request: web.Request) -> web.Response:
         except Exception:
 
             pass
+
+        ferramentas = []
+        try:
+            df_fer = pd.read_sql_query("SELECT * FROM ferramentas_cautela ORDER BY id ASC", conn)
+            for _, r in df_fer.iterrows():
+                ferramentas.append({
+                    "id": int(r.get("id", 0)),
+                    "codigo": limpar_texto(r.get("codigo_ferramenta"), ""),
+                    "nome": limpar_texto(r.get("nome_ferramenta"), ""),
+                    "status": limpar_texto(r.get("status"), "DISPONIVEL").upper(),
+                    "tecnico": limpar_texto(r.get("tecnico_responsavel"), "").upper(),
+                    "cliente": limpar_texto(r.get("destino_cliente"), "").upper(),
+                    "os_id": limpar_texto(r.get("os_id"), ""),
+                    "data_saida": limpar_texto(r.get("data_saida"), ""),
+                    "numero_serie": limpar_texto(r.get("numero_serie"), ""),
+                    "localizacao": limpar_texto(r.get("localizacao"), "ALMOXARIFADO CENTRAL"),
+                    "validade_calibracao": limpar_texto(r.get("data_validade_calibracao"), ""),
+                    "certificado": limpar_texto(r.get("certificado_calibracao"), ""),
+                    "observacao": limpar_texto(r.get("observacao"), "")
+                })
+        except Exception as e_fer:
+            print("Aviso ao carregar ferramentas_cautela:", e_fer)
 
 
 
@@ -1373,9 +1385,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
         "media_satisfacao": media_sat,
 
-        "pecas_zeradas": pecas_zeradas,
-
-        "pecas_abaixo_minimo": pecas_abaixo_minimo,
+        "pecas_zeradas": sum(1 for p in estoque if p["quantidade"] <= 0),
+        "pecas_abaixo_minimo": sum(1 for p in estoque if p["quantidade"] <= p.get("estoque_minimo", 1)),
+        "total_itens_estoque": len(estoque),
+        "itens_com_saldo": sum(1 for p in estoque if p["quantidade"] > 0),
+        "valor_total_estoque": sum(p.get("valor_total", 0.0) for p in estoque),
 
         "pre_atendimentos_cont": pre_atendimentos_cont,
 
@@ -1420,6 +1434,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
         "estoque": estoque,
 
         "solicitacoes_almox": solicitacoes,
+        "ferramentas": ferramentas,
 
         "baixas_consumiveis": baixas_cons,
 
@@ -2352,75 +2367,40 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 async def api_estoque_salvar(request: web.Request) -> web.Response:
-
-    """Adiciona ou atualiza item no estoque + validade de calibração."""
-
+    """Adiciona ou atualiza item no estoque + local de armazenamento + validade de calibração."""
     body = await request.json()
-
     codigo = limpar_texto(body.get("codigo"), "").upper()
-
     nome_peca = limpar_texto(body.get("nome_peca"), "").upper()
-
     categoria = limpar_texto(body.get("categoria"), "PEÇA").upper()
-
     quantidade = int(limpar_float(body.get("quantidade"), 1))
-
     preco = limpar_float(body.get("preco_unitario"), 0.0)
-
+    localizacao = limpar_texto(body.get("localizacao"), "ALMOXARIFADO CENTRAL").upper()
     validade_cal = limpar_texto(body.get("validade_calibracao"), "")
-
     cert_cal = limpar_texto(body.get("certificado_calibracao"), "").upper()
 
-
-
     if not codigo or not nome_peca:
-
         return web.json_response({"ok": False, "msg": "Informe o código e o nome da peça/instrumento."}, status=400)
 
-
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         cur.execute("SELECT codigo FROM estoque_pecas WHERE UPPER(codigo) = ?", (codigo,))
-
         existe = cur.fetchone()
-
         if existe:
-
             cur.execute("""
-
                 UPDATE estoque_pecas
-
                 SET nome_peca = ?, categoria = ?, quantidade = ?, preco_unitario = ?,
-
-                    data_validade_calibracao = ?, certificado_calibracao = ?
-
+                    localizacao = ?, data_validade_calibracao = ?, certificado_calibracao = ?
                 WHERE UPPER(codigo) = ?
-
-            """, (nome_peca, categoria, quantidade, preco, validade_cal, cert_cal, codigo))
-
+            """, (nome_peca, categoria, quantidade, preco, localizacao, validade_cal, cert_cal, codigo))
         else:
-
             cur.execute("""
-
                 INSERT INTO estoque_pecas
-
                 (codigo, nome_peca, categoria, quantidade, estoque_minimo, preco_unitario, localizacao, data_validade_calibracao, certificado_calibracao)
-
-                VALUES (?, ?, ?, ?, 1, ?, 'ALMOXARIFADO CENTRAL', ?, ?)
-
-            """, (codigo, nome_peca, categoria, quantidade, preco, validade_cal, cert_cal))
-
+                VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)
+            """, (codigo, nome_peca, categoria, quantidade, preco, localizacao, validade_cal, cert_cal))
         conn.commit()
 
-
-
-    return web.json_response({"ok": True, "msg": f"✅ Item '{codigo} — {nome_peca}' salvo no estoque!"})
-
-
-
+    return web.json_response({"ok": True, "msg": f"✅ Item '{codigo} — {nome_peca}' salvo no estoque com local '{localizacao}'!"})
 
 
 async def api_calibracao_equipamento(request: web.Request) -> web.Response:
@@ -2535,6 +2515,158 @@ async def api_satisfacao_registrar(request: web.Request) -> web.Response:
 
 
 
+
+
+
+async def api_kardex(request: web.Request) -> web.Response:
+    """Consulta o histórico de movimentações (Kardex) do Almoxarifado."""
+    q = request.query.get("q", "").strip().upper()
+    limite = int(request.query.get("limite", 60))
+    movs = []
+    with get_db_connection(DB_NAME) as conn:
+        try:
+            if q:
+                df_k = pd.read_sql_query("""
+                    SELECT * FROM movimentacoes_estoque 
+                    WHERE UPPER(codigo_item) LIKE ? OR UPPER(descricao) LIKE ? OR UPPER(numero_nf) LIKE ?
+                    ORDER BY id DESC LIMIT ?
+                """, conn, params=(f"%{q}%", f"%{q}%", f"%{q}%", limite))
+            else:
+                df_k = pd.read_sql_query("SELECT * FROM movimentacoes_estoque ORDER BY id DESC LIMIT ?", conn, params=(limite,))
+            for _, r in df_k.iterrows():
+                movs.append({
+                    "id": int(r.get("id", 0)),
+                    "estabelecimento": limpar_texto(r.get("estabelecimento"), "FORTALEZA"),
+                    "centro_estoque": limpar_texto(r.get("centro_estoque"), "ALMOXARIFADO"),
+                    "codigo_item": limpar_texto(r.get("codigo_item"), ""),
+                    "descricao": limpar_texto(r.get("descricao"), ""),
+                    "grupo_itens": limpar_texto(r.get("grupo_itens"), ""),
+                    "data_mov": limpar_texto(r.get("data_mov"), ""),
+                    "hora_mov": limpar_texto(r.get("hora_mov"), ""),
+                    "tipo_mov": limpar_texto(r.get("tipo_mov"), ""),
+                    "qtd_entrada": limpar_float(r.get("qtd_entrada"), 0.0),
+                    "qtd_saida": limpar_float(r.get("qtd_saida"), 0.0),
+                    "saldo": limpar_float(r.get("saldo"), 0.0),
+                    "custo_medio": limpar_float(r.get("custo_medio"), 0.0),
+                    "numero_nf": limpar_texto(r.get("numero_nf"), ""),
+                    "documento": limpar_texto(r.get("documento"), ""),
+                    "observacao": limpar_texto(r.get("observacao"), ""),
+                })
+        except Exception as e:
+            print("Erro ao consultar kardex:", e)
+    return web.json_response({"ok": True, "total": len(movs), "movimentacoes": movs})
+
+
+
+async def api_ferramentas_listar(request: web.Request) -> web.Response:
+    """Retorna a lista atualizada de todas as ferramentas e instrumentos com seus status de cautela."""
+    ferramentas = []
+    with get_db_connection(DB_NAME) as conn:
+        try:
+            df_fer = pd.read_sql_query("SELECT * FROM ferramentas_cautela ORDER BY id ASC", conn)
+            for _, r in df_fer.iterrows():
+                ferramentas.append({
+                    "id": int(r.get("id", 0)),
+                    "codigo": limpar_texto(r.get("codigo_ferramenta"), ""),
+                    "nome": limpar_texto(r.get("nome_ferramenta"), ""),
+                    "status": limpar_texto(r.get("status"), "DISPONIVEL").upper(),
+                    "tecnico": limpar_texto(r.get("tecnico_responsavel"), "").upper(),
+                    "cliente": limpar_texto(r.get("destino_cliente"), "").upper(),
+                    "os_id": limpar_texto(r.get("os_id"), ""),
+                    "data_saida": limpar_texto(r.get("data_saida"), ""),
+                    "numero_serie": limpar_texto(r.get("numero_serie"), ""),
+                    "localizacao": limpar_texto(r.get("localizacao"), "ALMOXARIFADO CENTRAL"),
+                    "validade_calibracao": limpar_texto(r.get("data_validade_calibracao"), ""),
+                    "certificado": limpar_texto(r.get("certificado_calibracao"), ""),
+                    "observacao": limpar_texto(r.get("observacao"), "")
+                })
+        except Exception as e:
+            print("Erro ao listar ferramentas:", e)
+    return web.json_response({"ok": True, "ferramentas": ferramentas})
+
+
+async def api_ferramentas_acao(request: web.Request) -> web.Response:
+    """Registra movimentação via leitor de código de barras ou manual do Paulo."""
+    body = await request.json()
+    codigo = limpar_texto(body.get("codigo"), "").upper()
+    acao = limpar_texto(body.get("acao"), "RETIRADA").upper()
+    tecnico = limpar_texto(body.get("tecnico"), "").upper()
+    cliente = limpar_texto(body.get("cliente"), "").upper()
+    os_id = str(body.get("os_id", "")).strip()
+    obs = limpar_texto(body.get("observacao"), "")
+    operador = limpar_texto(body.get("operador"), "PAULO (ALMOXARIFADO)").upper()
+    agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT id, nome_ferramenta, status FROM ferramentas_cautela WHERE UPPER(codigo_ferramenta) = ? OR UPPER(numero_serie) = ?", (codigo, codigo))
+        row = cur.fetchone()
+        if not row:
+            return web.json_response({"ok": False, "msg": f"❌ Ferramenta '{codigo}' não encontrada no cadastro do Almoxarifado!"}, status=404)
+
+        f_id, f_nome, f_status = row[0], str(row[1]), str(row[2]).upper()
+
+        if acao == "RETIRADA":
+            if not tecnico:
+                return web.json_response({"ok": False, "msg": "Selecione o técnico responsável pela retirada."}, status=400)
+            cur.execute("""
+                UPDATE ferramentas_cautela 
+                SET status = 'EM_USO', tecnico_responsavel = ?, destino_cliente = ?, os_id = ?, data_saida = ?, observacao = ?
+                WHERE id = ?
+            """, (tecnico, cliente, os_id, agora, obs, f_id))
+            cur.execute("""
+                INSERT INTO historico_cautela_ferramentas (codigo_ferramenta, nome_ferramenta, tipo_acao, tecnico, destino_cliente, os_id, operador, data_hora, observacao)
+                VALUES (?, ?, 'RETIRADA', ?, ?, ?, ?, ?, ?)
+            """, (codigo, f_nome, tecnico, cliente, os_id, operador, agora, obs))
+            msg = f"📤 Ferramenta {codigo} entregue para 👷 {tecnico} com sucesso!"
+
+        elif acao == "DEVOLUCAO":
+            cur.execute("""
+                UPDATE ferramentas_cautela 
+                SET status = 'DISPONIVEL', tecnico_responsavel = '', destino_cliente = '', os_id = '', data_devolucao = ?, observacao = ?
+                WHERE id = ?
+            """, (agora, obs, f_id))
+            cur.execute("""
+                INSERT INTO historico_cautela_ferramentas (codigo_ferramenta, nome_ferramenta, tipo_acao, tecnico, destino_cliente, os_id, operador, data_hora, observacao)
+                VALUES (?, ?, 'DEVOLUCAO', '', '', '', ?, ?, ?)
+            """, (codigo, f_nome, operador, agora, obs))
+            msg = f"📥 Ferramenta {codigo} devolvida ao Almoxarifado Central (Pronta para uso)!"
+
+        elif acao == "CALIBRACAO_BANCADA":
+            cur.execute("""
+                UPDATE ferramentas_cautela 
+                SET status = 'CALIBRACAO_BANCADA', tecnico_responsavel = 'BANCADA / CALIBRAÇÃO RBC', destino_cliente = 'LABORATÓRIO', data_saida = ?, observacao = ?
+                WHERE id = ?
+            """, (agora, obs, f_id))
+            cur.execute("""
+                INSERT INTO historico_cautela_ferramentas (codigo_ferramenta, nome_ferramenta, tipo_acao, tecnico, destino_cliente, os_id, operador, data_hora, observacao)
+                VALUES (?, ?, 'ENVIO_CALIBRACAO', 'LABORATÓRIO', 'BANCADA', '', ?, ?, ?)
+            """, (codigo, f_nome, operador, agora, obs))
+            msg = f"🔬 Ferramenta {codigo} encaminhada para Bancada / Calibração RBC!"
+
+        elif acao == "RETORNO_CALIBRACAO":
+            nova_val = limpar_texto(body.get("validade_calibracao"), "")
+            novo_cert = limpar_texto(body.get("certificado"), "")
+            cur.execute("""
+                UPDATE ferramentas_cautela 
+                SET status = 'DISPONIVEL', tecnico_responsavel = '', destino_cliente = '', os_id = '', data_devolucao = ?, 
+                    data_validade_calibracao = CASE WHEN ? != '' THEN ? ELSE data_validade_calibracao END,
+                    certificado_calibracao = CASE WHEN ? != '' THEN ? ELSE certificado_calibracao END,
+                    observacao = ?
+                WHERE id = ?
+            """, (agora, nova_val, nova_val, novo_cert, novo_cert, obs, f_id))
+            cur.execute("""
+                INSERT INTO historico_cautela_ferramentas (codigo_ferramenta, nome_ferramenta, tipo_acao, operador, data_hora, observacao)
+                VALUES (?, ?, 'RETORNO_CALIBRACAO', ?, ?, ?)
+            """, (codigo, f_nome, operador, agora, obs))
+            msg = f"🟢 Calibração/Manutenção da Ferramenta {codigo} concluída e liberada para uso!"
+
+        else:
+            return web.json_response({"ok": False, "msg": f"Ação '{acao}' não reconhecida."}, status=400)
+
+        conn.commit()
+
+    return web.json_response({"ok": True, "msg": msg, "novo_status": acao})
 
 
 async def api_almox_status(request: web.Request) -> web.Response:
@@ -2930,6 +3062,19 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
         if row_p:
 
             saldo_disponivel = int(row_p[0] or 0)
+
+
+
+        # Validação impeditiva: não permitir venda com promessa de entrega imediata se o estoque estiver zerado/insuficiente sem pedido de compra
+        if saldo_disponivel < quantidade and not solicitar_compra and "IMEDIATO" in prazo_entrega.upper():
+
+            return web.json_response({
+
+                "ok": False,
+
+                "msg": f"⚠️ Saldo físico insuficiente no almoxarifado ({saldo_disponivel} un. disponível para {quantidade} un. solicitada)! Para prosseguir com entrega imediata, ajuste o estoque ou marque a opção 'Solicitar Compra'."
+
+            }, status=400)
 
 
 
@@ -3764,6 +3909,7 @@ def criar_app() -> web.Application:
     app.router.add_get("/healthz", api_ping)
 
     app.router.add_get("/api/bootstrap", api_bootstrap)
+    app.router.add_get("/api/kardex", api_kardex)
 
     app.router.add_get("/api/checklist", api_checklist)
 
@@ -3830,6 +3976,8 @@ def criar_app() -> web.Application:
 
     app.router.add_post("/api/satisfacao/registrar", api_satisfacao_registrar)
 
+    app.router.add_get("/api/ferramentas", api_ferramentas_listar)
+    app.router.add_post("/api/ferramentas/acao", api_ferramentas_acao)
     app.router.add_post("/api/almoxarifado/status", api_almox_status)
 
     app.router.add_post("/api/pix/gerar", api_pix_gerar)

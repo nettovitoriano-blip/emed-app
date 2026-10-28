@@ -9710,7 +9710,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
         { id: "GES_ROTAS", icone: "🗺️", titulo: "Mapa & Rotas", desc: "Agrupamento inteligente por hospital/cidade e despacho" },
         { id: "GES_CLIENTES", icone: "👥", titulo: "Clientes & Parque", desc: "Cadastro hospitalar, etiquetas QR Code e calibração" },
         { id: "GES_CALIBRACAO", icone: "⏰", titulo: "Calibração & Instrumentos", desc: "Semáforo RBC/ANVISA de instrumentos EMED e máquinas" },
-        { id: "GES_PIX", icone: "💳", titulo: "Financeiro & PIX", desc: "QR Code PIX oficial Banco Central (CRC16) e Notas Fiscais" },
+        { id: "GES_PIX", icone: "🏦", titulo: "Bloco Financeiro & Faturamento", desc: "Contas a receber, terminal PIX oficial, notas fiscais, cobrança WhatsApp e DRE" },
         { id: "GES_BI", icone: "📈", titulo: "BI & Faturamento", desc: "Indicadores visuais por Status, Técnico, Cidade e Faturamento" },
         { id: "TEC_MANUAIS", icone: "📚", titulo: "Manuais & ITs", desc: "Catálogo de ITs homologadas em PDF e vídeos MP4 de treinamento" },
         { id: "GES_ADMIN", icone: "🛰️", titulo: "Frota GPS & DETRAN", desc: "Telemetria GPS, Condutor, Robô DETRAN e Equipe" },
@@ -9854,7 +9854,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-        { id: "GES_PIX", icone: "💳", titulo: "Conciliação Bancária & PIX", desc: "QR Code PIX oficial Banco Central (CRC16) e Notas Fiscais" },
+        { id: "GES_PIX", icone: "🏦", titulo: "Bloco Financeiro & Faturamento", desc: "Contas a receber, terminal PIX oficial, notas fiscais, cobrança WhatsApp e DRE" },
 
 
 
@@ -10110,7 +10110,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-      navigator.serviceWorker.register("/sw.js?v=v29").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=v30").then(reg => { if(reg) reg.update(); }).catch(() => {});
 
 
 
@@ -19962,6 +19962,20 @@ function renderizarNavegacao() {
     if (!STATE.paginaEstoque) STATE.paginaEstoque = 1;
     if (STATE.buscaEstoque === undefined) STATE.buscaEstoque = "";
 
+        function formatarUnidadeLimpa(u) {
+      const s = String(u || '').trim().toUpperCase();
+      if (!s || s.includes('PÃ') || s === 'PC' || s === 'PÇ' || s === 'PÇA' || s === 'PEÇA' || s === 'PÇS') return 'PÇS';
+      if (s === 'UND' || s === 'UN' || s === 'UNI' || s === '1' || s === '0') return 'UN';
+      if (s === 'MT' || s === 'M' || s === 'MTS' || s === 'METRO' || s === 'METROS') return 'METROS';
+      if (s === 'KG') return 'KG';
+      if (s === 'KIT') return 'KIT';
+      if (s === 'RL' || s === 'ROLO') return 'ROLO';
+      if (s === 'CX' || s === 'CAIXA') return 'CX';
+      if (s === 'PCT' || s === 'PACOTE') return 'PCT';
+      if (s === 'PAR' || s === 'PR') return 'PAR';
+      return s || 'UN';
+    }
+
     function onBuscaEstoqueInput(val) {
       STATE.buscaEstoque = val;
       STATE.paginaEstoque = 1;
@@ -19988,7 +20002,8 @@ function renderizarNavegacao() {
           const nome = String(e.nome_peca || "").toLowerCase();
           const grp = String(e.grupo_item || "").toLowerCase();
           const cat = String(e.categoria || "").toLowerCase();
-          return cod.includes(q) || nome.includes(q) || grp.includes(q) || cat.includes(q);
+          const loc = String(e.localizacao || "").toLowerCase();
+          return cod.includes(q) || nome.includes(q) || grp.includes(q) || cat.includes(q) || loc.includes(q);
         });
       }
 
@@ -20007,20 +20022,22 @@ function renderizarNavegacao() {
       return lista;
     }
 
-    function preencherAjusteEstoque(codigo, nome, qtd, preco, cat) {
+    function preencherAjusteEstoque(codigo, nome, qtd, preco, cat, loc) {
       const elCod = document.getElementById("estCod");
       const elNome = document.getElementById("estNome");
       const elQtd = document.getElementById("estQtd");
       const elPreco = document.getElementById("estPreco");
       const elCat = document.getElementById("estCat");
+      const elLoc = document.getElementById("estLoc");
       if (elCod) elCod.value = codigo;
       if (elNome) elNome.value = nome;
       if (elQtd) elQtd.value = qtd;
       if (elPreco) elPreco.value = preco;
       if (elCat) elCat.value = cat;
+      if (elLoc) elLoc.value = loc || "Almoxarifado Central";
       const form = document.getElementById("formCadastroEstoque");
       if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      mostrarToast(`✏️ Item #${codigo} carregado para edição.`);
+      mostrarToast(`✏️ Item #${codigo} carregado para ajuste e mapeamento.`);
     }
 
     async function abrirModalKardex(filtroItem = "") {
@@ -20102,7 +20119,7 @@ function renderizarNavegacao() {
 
       boxTabela.innerHTML = `
         <!-- FILTROS POR CATEGORIA COM CORES ATIVAS CLARAS -->
-        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
           <button type="button" class="btn btn-xs ${catAtiva==='TODOS'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('TODOS')">Todos (${totalItens})</button>
           <button type="button" class="btn btn-xs ${catAtiva==='PECAS'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('PECAS')">🔩 Peças (${qtdRevenda})</button>
           <button type="button" class="btn btn-xs ${catAtiva==='CONSUMO'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('CONSUMO')">🧴 Consumíveis (${qtdConsumo})</button>
@@ -20111,44 +20128,64 @@ function renderizarNavegacao() {
           <button type="button" class="btn btn-xs ${catAtiva==='ZERADOS'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('ZERADOS')">🔴 Zerados (${zerados})</button>
         </div>
 
-        <!-- LISTA DOS ITENS PAGINADOS -->
+        <!-- LISTA DOS ITENS PAGINADOS FORMATADA COM ALTA LEGIBILIDADE -->
         <div style="display:flex;flex-direction:column;gap:8px;">
           ${itensExibidos.length ? itensExibidos.map(e => `
-            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
-                <div>
+            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+                
+                <!-- IDENTIFICAÇÃO E NOME DO ITEM -->
+                <div style="flex:1;min-width:260px;">
                   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                    <span style="font-weight:900;color:#0284c7;font-size:13px;">#${esc(e.codigo)}</span>
-                    <span class="badge ${String(e.categoria).includes('INSTRUMENTO') ? 'ativo' : 'concluido'}" style="font-size:10px;">${esc(e.categoria || e.grupo_item || 'ESTOQUE')}</span>
-                    ${e.grupo_item ? `<span style="font-size:10px;color:#64748b;background:#f1f5f9;padding:1px 5px;border-radius:3px;">${esc(e.grupo_item)}</span>` : ''}
+                    <span style="font-weight:900;color:#0284c7;font-size:13.5px;background:#f0f9ff;border:1px solid #bae6fd;padding:1px 6px;border-radius:4px;">#${esc(e.codigo)}</span>
+                    <span class="badge ${String(e.categoria).includes('INSTRUMENTO') ? 'ativo' : 'concluido'}" style="font-size:10.5px;">${esc(e.categoria || e.grupo_item || 'ESTOQUE')}</span>
+                    ${e.grupo_item ? `<span style="font-size:10px;color:#475569;background:#f1f5f9;padding:1px 6px;border-radius:4px;font-weight:600;">${esc(e.grupo_item)}</span>` : ''}
                   </div>
-                  <div style="font-weight:700;color:#1e293b;font-size:13px;margin-top:2px;">
+
+                  <div style="font-weight:800;color:#0f172a;font-size:13.5px;margin-top:4px;line-height:1.35;">
                     ${esc(e.nome_peca)}
                   </div>
+
+                  <!-- LOCALIZAÇÃO / ARMAZENAMENTO MAPEAÇÃO -->
+                  <div style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                    <span style="font-size:11.5px;color:#334155;background:#f8fafc;border:1px solid #cbd5e1;padding:2px 8px;border-radius:4px;display:inline-flex;align-items:center;gap:4px;">
+                      📍 <b>Local de Armazenamento:</b> <span style="color:#0284c7;font-weight:700;">${esc(e.localizacao || 'Almoxarifado Central (Aguardando Mapeamento)')}</span>
+                    </span>
+                  </div>
                 </div>
-                <div style="text-align:right;">
+
+                <!-- SALDO FÍSICO DISPONÍVEL (DIREITA) -->
+                <div style="text-align:right;min-width:130px;">
+                  <div style="font-size:10px;text-transform:uppercase;font-weight:800;color:#64748b;letter-spacing:0.5px;margin-bottom:3px;">
+                    Saldo em Estoque
+                  </div>
                   ${(e.quantidade || 0) > 0 ? `
-                    <span class="badge concluido" style="font-size:12px;font-weight:800;padding:3px 8px;">
-                      🟢 ${e.quantidade} ${esc(e.unidade || 'UND')}
+                    <span style="display:inline-flex;align-items:center;gap:5px;background:#dcfce7;color:#15803d;border:1px solid #86efac;font-size:13.5px;font-weight:900;padding:4px 10px;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                      🟢 ${e.quantidade} ${formatarUnidadeLimpa(e.unidade)}
                     </span>
                   ` : `
-                    <span class="badge" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-size:11.5px;font-weight:800;padding:3px 8px;">
-                      🔴 0.0 ${esc(e.unidade || 'UND')} (Zerado)
+                    <span style="display:inline-flex;align-items:center;gap:5px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-size:12px;font-weight:800;padding:4px 9px;border-radius:6px;">
+                      🔴 0.0 ${formatarUnidadeLimpa(e.unidade)} (Zerado)
                     </span>
                   `}
                 </div>
               </div>
 
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:6px;border-top:1px dashed #e2e8f0;flex-wrap:wrap;gap:6px;font-size:11.5px;">
-                <div style="color:#475569;">
-                  <span><b>Unitário:</b> R$ ${(e.preco_unitario || 0).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
-                  <span style="margin-left:8px;"><b>Total em Estoque:</b> R$ ${(Number(e.valor_total) || ((e.quantidade || 0) * (e.preco_unitario || 0))).toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
+              <!-- VALORES FINANCEIROS CLAROS (SUBTOTAL EM R$ E UNITÁRIO) -->
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px dashed #e2e8f0;flex-wrap:wrap;gap:8px;font-size:11.5px;">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#334155;">
+                  <span style="background:#f8fafc;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0;">
+                    💵 <b>Preço Unitário:</b> R$ ${(e.preco_unitario || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}
+                  </span>
+                  <span style="background:#f0fdf4;padding:3px 8px;border-radius:4px;border:1px solid #bbf7d0;color:#166534;">
+                    💰 <b>Subtotal em R$ (Valor Total):</b> R$ ${(Number(e.valor_total) || ((e.quantidade || 0) * (e.preco_unitario || 0))).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}
+                  </span>
                 </div>
-                <div style="display:flex;gap:4px;">
-                  <button type="button" class="btn btn-outline btn-xs" onclick="preencherAjusteEstoque('${esc(e.codigo)}', '${esc(e.nome_peca)}', ${e.quantidade||0}, ${e.preco_unitario||0}, '${esc(e.categoria||'PEÇA DE REPOSIÇÃO')}')" style="padding:2px 7px;">
-                    ✏️ Ajustar
+                <div style="display:flex;gap:5px;">
+                  <button type="button" class="btn btn-outline btn-xs" onclick="preencherAjusteEstoque('${esc(e.codigo)}', '${esc(e.nome_peca)}', ${e.quantidade||0}, ${e.preco_unitario||0}, '${esc(e.categoria||'PEÇA DE REPOSIÇÃO')}', '${esc(e.localizacao||'ALMOXARIFADO CENTRAL')}')" style="padding:4px 9px;font-weight:700;">
+                    ✏️ Ajustar / Mapear
                   </button>
-                  <button type="button" class="btn btn-outline btn-xs" onclick="abrirModalKardex('${esc(e.codigo)}')" style="padding:2px 7px;border-color:#0284c7;color:#0284c7;" title="Ver movimentações desta peça">
+                  <button type="button" class="btn btn-outline btn-xs" onclick="abrirModalKardex('${esc(e.codigo)}')" style="padding:4px 9px;border-color:#0284c7;color:#0284c7;font-weight:700;" title="Ver movimentações desta peça">
                     📑 Kardex
                   </button>
                 </div>
@@ -20248,9 +20285,9 @@ function renderizarNavegacao() {
           `}
         </div>
 
-        <!-- FORMULÁRIO DE CADASTRO / AJUSTE RÁPIDO DE ITEM -->
+        <!-- FORMULÁRIO DE CADASTRO / AJUSTE RÁPIDO DE ITEM COM LOCAL DE ARMAZENAMENTO -->
         <div class="section-box" id="formCadastroEstoque" style="margin-bottom:12px;">
-          <div class="section-title">➕ Cadastrar / Ajustar Item no Estoque</div>
+          <div class="section-title">➕ Cadastrar / Ajustar Item &amp; Local de Armazenamento</div>
           <div class="form-grid">
             <div><label class="field-label">Código Item (ERP)</label><input id="estCod" class="input" placeholder="Ex: 245 ou PEC-001" /></div>
             <div><label class="field-label">Nome da Peça / Instrumento</label><input id="estNome" class="input" placeholder="Ex: AMPOLA DE RAIOS-X 20/40" /></div>
@@ -20263,11 +20300,12 @@ function renderizarNavegacao() {
                 <option value="FERRAMENTA / IMOBILIZADO">🔨 FERRAMENTA / IMOBILIZADO</option>
               </select>
             </div>
-            <div><label class="field-label">Quantidade</label><input id="estQtd" type="number" step="0.1" class="input" value="1.0" /></div>
+            <div><label class="field-label">Quantidade Físico</label><input id="estQtd" type="number" step="0.1" class="input" value="1.0" /></div>
             <div><label class="field-label">Preço Unitário (R$)</label><input id="estPreco" type="number" step="0.01" class="input" value="150.00" /></div>
+            <div><label class="field-label">📍 Local de Armazenamento (Prateleira / Gaveta)</label><input id="estLoc" class="input" placeholder="Ex: Prateleira B3, Gaveta 12, Almox Central..." /></div>
             <div><label class="field-label">Validade Calibração RBC</label><input id="estVal" class="input" placeholder="DD/MM/AAAA (Se aplicável)" /></div>
           </div>
-          <button type="button" class="btn btn-primary" onclick="salvarItemEstoque()" style="margin-top:6px;">💾 Salvar no Estoque EMED</button>
+          <button type="button" class="btn btn-primary" onclick="salvarItemEstoque()" style="margin-top:6px;">💾 Salvar no Estoque &amp; Mapeamento</button>
         </div>
 
         <!-- INVENTÁRIO COMPLETO COM BUSCA E PAGINAÇÃO LEVE -->
@@ -20278,7 +20316,7 @@ function renderizarNavegacao() {
 
           <!-- BARRA DE BUSCA EM TEMPO REAL -->
           <div style="margin-bottom:10px;">
-            <input id="inputBuscaEstoque" type="text" class="input" style="width:100%;font-size:12.5px;padding:8px 12px;" placeholder="🔍 Buscar por código, nome da peça, ampola, cabo, placa, cobia, fusível..." value="${esc(STATE.buscaEstoque || '')}" oninput="onBuscaEstoqueInput(this.value)" />
+            <input id="inputBuscaEstoque" type="text" class="input" style="width:100%;font-size:12.5px;padding:8px 12px;" placeholder="🔍 Buscar por código, nome da peça, prateleira, gaveta, ampola, cabo, placa..." value="${esc(STATE.buscaEstoque || '')}" oninput="onBuscaEstoqueInput(this.value)" />
           </div>
 
           <!-- CONTAINER DO CATÁLOGO QUE ATUALIZA DINAMICAMENTE SEM RESETAR O INPUT -->
@@ -20289,109 +20327,30 @@ function renderizarNavegacao() {
       atualizarTabelaCatalogoEstoque();
     }
 
-
     async function salvarItemEstoque() {
+      const elCod = document.getElementById("estCod");
+      const elNome = document.getElementById("estNome");
+      const elCat = document.getElementById("estCat");
+      const elQtd = document.getElementById("estQtd");
+      const elPreco = document.getElementById("estPreco");
+      const elLoc = document.getElementById("estLoc");
+      const elVal = document.getElementById("estVal");
 
-
-
-
-
-
+      if (!elCod || !elNome) return;
 
       const res = await apiPost("/api/estoque/salvar", {
-
-
-
-
-
-
-
-        codigo: document.getElementById("estCod").value,
-
-
-
-
-
-
-
-        nome_peca: document.getElementById("estNome").value,
-
-
-
-
-
-
-
-        categoria: document.getElementById("estCat").value,
-
-
-
-
-
-
-
-        quantidade: document.getElementById("estQtd").value,
-
-
-
-
-
-
-
-        preco_unitario: document.getElementById("estPreco").value,
-
-
-
-
-
-
-
-        validade_calibracao: document.getElementById("estVal").value
-
-
-
-
-
-
-
+        codigo: elCod.value,
+        nome_peca: elNome.value,
+        categoria: elCat ? elCat.value : "PEÇA DE REPOSIÇÃO",
+        quantidade: elQtd ? elQtd.value : "1",
+        preco_unitario: elPreco ? elPreco.value : "0",
+        localizacao: elLoc ? elLoc.value : "Almoxarifado Central",
+        validade_calibracao: elVal ? elVal.value : ""
       });
 
-
-
-
-
-
-
-      mostrarToast(res.msg);
-
-
-
-
-
-
-
+      mostrarToast(res.msg || "Item salvo com sucesso!");
       await sincronizarTudo(false);
-
-
-
-
-
-
-
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     /********************************************************************
@@ -20794,503 +20753,724 @@ function renderizarNavegacao() {
 
 
 
-    function renderMenuGesPix(box) {
-
-
-
-
-
-
-
-      const nfs = STATE.data.notas_fiscais || [];
-
-
-
-
-
-
-
-      box.innerHTML = `
-
-
-
-
-
-
-
-        <div class="form-grid">
-
-
-
-
-
-
-
-          <div class="section-box">
-
-
-
-
-
-
-
-            <div class="section-title">💳 Gerador de QR Code PIX Oficial (Padrão Banco Central CRC16)</div>
-
-
-
-
-
-
-
-            <div style="margin-bottom:8px;">
-
-
-
-
-
-
-
-              <label class="field-label">Nº da OS ou Fatura</label>
-
-
-
-
-
-
-
-              <input id="pixOsId" class="input" value="1" />
-
-
-
-
-
-
-
-            </div>
-
-
-
-
-
-
-
-            <div style="margin-bottom:8px;">
-
-
-
-
-
-
-
-              <label class="field-label">Valor da Cobrança (R$)</label>
-
-
-
-
-
-
-
-              <input id="pixValor" type="number" step="0.01" class="input" value="450.00" />
-
-
-
-
-
-
-
-            </div>
-
-
-
-
-
-
-
-            <button class="btn btn-primary btn-block" onclick="gerarPixApp()">💠 Gerar QR Code PIX Copia e Cola</button>
-
-
-
-
-
-
-
-            <div id="pixResultadoBox" style="margin-top:12px;text-align:center;"></div>
-
-
-
-
-
-
-
-          </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <div class="section-box">
-
-
-
-
-
-
-
-            <div class="section-title">🧾 Notas Fiscais & Faturas Emitidas (${nfs.length})</div>
-
-
-
-
-
-
-
-            <div style="max-height:360px;overflow-y:auto;">
-
-
-
-
-
-
-
-              ${nfs.map(n => `
-
-
-
-
-
-
-
-                <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:9px;margin-bottom:8px;">
-
-
-
-
-
-
-
-                  <div style="display:flex;justify-content:space-between;align-items:center;">
-
-
-
-
-
-
-
-                    <b>${esc(n.numero_nf || 'FAT')} • OS #${esc(n.os_id)}</b>
-
-
-
-
-
-
-
-                    <span class="badge ${String(n.status_pagamento).includes('PAGO')?'concluido':'obs'}">${esc(n.status_pagamento)}</span>
-
-
-
-
-
-
-
-                  </div>
-
-
-
-
-
-
-
-                  <div style="font-size:12px;margin:4px 0;">${esc(n.cliente)} — <b>R$ ${Number(n.valor_total||0).toFixed(2)}</b></div>
-
-
-
-
-
-
-
-                  ${!String(n.status_pagamento).includes('PAGO') ? `
-
-
-
-
-
-
-
-                    <button class="btn btn-success btn-sm" onclick="liquidarPixApp('${esc(n.os_id)}')">✅ Confirmar Recebimento PIX</button>
-
-
-
-
-
-
-
-                  ` : ""}
-
-
-
-
-
-
-
-                </div>
-
-
-
-
-
-
-
-              `).join("") || "Nenhuma fatura pendente."}
-
-
-
-
-
-
-
-            </div>
-
-
-
-
-
-
-
-          </div>
-
-
-
-
-
-
-
-        </div>
-
-
-
-
-
-
-
-      `;
-
-
-
-
-
-
-
+        // ====================================================================
+    // BLOCO FINANCEIRO & FATURAMENTO 360° DO SISTEMA EMED
+    // ====================================================================
+
+    window._finAbaAtiva = window._finAbaAtiva || "FATURAS";
+    window._finFiltroStatus = window._finFiltroStatus || "TODAS";
+    window._finTermoBusca = window._finTermoBusca || "";
+
+    function trocarAbaFinanceira(aba) {
+      window._finAbaAtiva = aba;
+      const box = document.getElementById("conteudoModulo") || document.querySelector(".app-content") || document.getElementById("mainAppContainer");
+      if (box) renderMenuGesPix(box);
     }
 
+    function filtrarStatusFinanceiro(statusFiltro) {
+      window._finFiltroStatus = statusFiltro;
+      const box = document.getElementById("conteudoModulo") || document.querySelector(".app-content") || document.getElementById("mainAppContainer");
+      if (box) renderMenuGesPix(box);
+    }
 
+    function renderMenuGesPix(box) {
+      if (!box) return;
+      const ordens = STATE.data?.ordens || [];
+      const nfs = STATE.data?.notas_fiscais || [];
+      const solicitacoes = STATE.data?.solicitacoes_pecas || [];
+      const estoque = STATE.data?.estoque || [];
 
+      // Cálculos Financeiros em Tempo Real
+      let totalFaturadoGeral = 0;
+      let totalAReceberGeral = 0;
+      let totalLiquidadoPix = 0;
+      let totalPropostasEmAberto = 0;
 
+      ordens.forEach(o => {
+        const val = Number(o.valor_os) || 0;
+        const st = String(o.status || "").toUpperCase();
+        const cond = String(o.condicao_pagamento || "").toUpperCase();
+        
+        if (st === "CONCLUÍDO" || val > 0) {
+          totalFaturadoGeral += val;
+        }
+        if (cond.includes("PAGO") || cond.includes("LIQUIDADO")) {
+          totalLiquidadoPix += val;
+        } else if (val > 0) {
+          totalAReceberGeral += val;
+        }
 
+        if (String(o.status_proposta || "").includes("PROPOSTA")) {
+          totalPropostasEmAberto += val;
+        }
+      });
 
+      // Seletor de Abas
+      const abaAtiva = window._finAbaAtiva;
 
+      box.innerHTML = `
+        <div style="margin-bottom:14px;">
+          <!-- BARRA DE ACESSO RÁPIDO ENTRE MENUS -->
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#0b132b;">
+              <span>🧭 Navegação Rápida do Gestor:</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <button class="btn btn-sm btn-outline" onclick="selecionarMenu('GES_CHAMADOS')" style="font-size:11.5px;padding:4px 10px;">🎫 Chamados &amp; OS</button>
+              <button class="btn btn-sm btn-outline" onclick="selecionarMenu('GES_ESTOQUE')" style="font-size:11.5px;padding:4px 10px;">📦 Almoxarifado</button>
+              <button class="btn btn-sm btn-outline" onclick="selecionarMenu('GES_BI')" style="font-size:11.5px;padding:4px 10px;">📈 Painel BI</button>
+              <button class="btn btn-sm btn-outline" onclick="selecionarMenu('GES_CLIENTES')" style="font-size:11.5px;padding:4px 10px;">👥 Clientes &amp; Parque</button>
+            </div>
+          </div>
 
+          <!-- CARDS DE KPIS FINANCEIROS -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:10px;margin-bottom:14px;">
+            <div style="background:linear-gradient(135deg, #0b132b 0%, #1c2541 100%);color:#fff;border-radius:12px;padding:14px;box-shadow:0 4px 12px rgba(11,19,43,0.15);">
+              <div style="font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">💰 Faturamento Bruto (OS)</div>
+              <div style="font-size:22px;font-weight:900;color:#38bdf8;margin-top:4px;">R$ ${totalFaturadoGeral.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div style="font-size:11px;color:#cbd5e1;margin-top:2px;">Base consolidada de chamados clínicos</div>
+            </div>
 
+            <div style="background:linear-gradient(135deg, #78350f 0%, #b45309 100%);color:#fff;border-radius:12px;padding:14px;box-shadow:0 4px 12px rgba(180,83,9,0.15);">
+              <div style="font-size:11px;color:#fde68a;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">⏳ Contas a Receber / Pendente</div>
+              <div style="font-size:22px;font-weight:900;color:#fef08a;margin-top:4px;">R$ ${totalAReceberGeral.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div style="font-size:11px;color:#fef3c7;margin-top:2px;">Aguardando liquidação hospitalar</div>
+            </div>
 
+            <div style="background:linear-gradient(135deg, #064e3b 0%, #059669 100%);color:#fff;border-radius:12px;padding:14px;box-shadow:0 4px 12px rgba(5,150,105,0.15);">
+              <div style="font-size:11px;color:#a7f3d0;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">💠 Liquidado / Recebido</div>
+              <div style="font-size:22px;font-weight:900;color:#6ee7b7;margin-top:4px;">R$ ${totalLiquidadoPix.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div style="font-size:11px;color:#d1fae5;margin-top:2px;">Confirmado em conta bancária</div>
+            </div>
 
+            <div style="background:linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%);color:#fff;border-radius:12px;padding:14px;box-shadow:0 4px 12px rgba(124,58,237,0.15);">
+              <div style="font-size:11px;color:#ddd6fe;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">📋 Propostas &amp; Encomendas</div>
+              <div style="font-size:22px;font-weight:900;color:#c4b5fd;margin-top:4px;">R$ ${totalPropostasEmAberto.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div style="font-size:11px;color:#ede9fe;margin-top:2px;">Peças orçadas / sob encomenda</div>
+            </div>
+          </div>
 
+          <!-- ABAS INTERATIVAS DO BLOCO FINANCEIRO -->
+          <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;border-bottom:2px solid #e2e8f0;margin-bottom:14px;">
+            <button class="btn btn-sm" onclick="trocarAbaFinanceira('FATURAS')" style="font-weight:700;border-radius:8px;padding:8px 14px;${abaAtiva==='FATURAS'?'background:#0b132b;color:#fff;border-color:#0b132b;box-shadow:0 2px 6px rgba(11,19,43,0.3);':'background:#fff;color:#475569;border:1px solid #cbd5e1;'}">
+              📊 Faturas &amp; Contas a Receber
+            </button>
+            <button class="btn btn-sm" onclick="trocarAbaFinanceira('PIX')" style="font-weight:700;border-radius:8px;padding:8px 14px;${abaAtiva==='PIX'?'background:#0f766e;color:#fff;border-color:#0f766e;box-shadow:0 2px 6px rgba(15,118,110,0.3);':'background:#fff;color:#475569;border:1px solid #cbd5e1;'}">
+              💠 Terminal PIX Oficial
+            </button>
+            <button class="btn btn-sm" onclick="trocarAbaFinanceira('NFS')" style="font-weight:700;border-radius:8px;padding:8px 14px;${abaAtiva==='NFS'?'background:#6b21a8;color:#fff;border-color:#6b21a8;box-shadow:0 2px 6px rgba(107,33,168,0.3);':'background:#fff;color:#475569;border:1px solid #cbd5e1;'}">
+              🧾 Notas Fiscais (${nfs.length})
+            </button>
+            <button class="btn btn-sm" onclick="trocarAbaFinanceira('PROPOSTAS')" style="font-weight:700;border-radius:8px;padding:8px 14px;${abaAtiva==='PROPOSTAS'?'background:#b45309;color:#fff;border-color:#b45309;box-shadow:0 2px 6px rgba(180,83,9,0.3);':'background:#fff;color:#475569;border:1px solid #cbd5e1;'}">
+              📦 Propostas &amp; Encomendas
+            </button>
+            <button class="btn btn-sm" onclick="trocarAbaFinanceira('DRE')" style="font-weight:700;border-radius:8px;padding:8px 14px;${abaAtiva==='DRE'?'background:#1e3a8a;color:#fff;border-color:#1e3a8a;box-shadow:0 2px 6px rgba(30,58,138,0.3);':'background:#fff;color:#475569;border:1px solid #cbd5e1;'}">
+              📈 DRE &amp; Rentabilidade
+            </button>
+          </div>
 
+          <!-- CONTEÚDO DA ABA ATIVA -->
+          <div id="boxConteudoAbaFinanceira">
+            ${renderConteudoAbaFinanceira(abaAtiva, ordens, nfs, solicitacoes, estoque)}
+          </div>
+        </div>
+      `;
+    }
 
+    function renderConteudoAbaFinanceira(aba, ordens, nfs, solicitacoes, estoque) {
+      if (aba === "PIX") {
+        return renderAbaTerminalPix(ordens);
+      } else if (aba === "NFS") {
+        return renderAbaNotasFiscais(nfs, ordens);
+      } else if (aba === "PROPOSTAS") {
+        return renderAbaPropostasEncomendas(ordens, solicitacoes);
+      } else if (aba === "DRE") {
+        return renderAbaDRE(ordens, estoque);
+      } else {
+        return renderAbaFaturas(ordens);
+      }
+    }
 
+    // -------------------------------------------------------------
+    // ABA 1: FATURAS E CONTAS A RECEBER
+    // -------------------------------------------------------------
+    function renderAbaFaturas(ordens) {
+      const filtro = window._finFiltroStatus;
+      const termo = (window._finTermoBusca || "").toLowerCase().trim();
+
+      // Filtra ordens com algum valor ou faturáveis
+      let lista = ordens.filter(o => {
+        const val = Number(o.valor_os) || 0;
+        const cli = String(o.cliente || "").toLowerCase();
+        const eq = String(o.equipamento || "").toLowerCase();
+        const osId = String(o.id || o.os_id || "");
+        const cond = String(o.condicao_pagamento || "").toUpperCase();
+
+        const matchTermo = !termo || cli.includes(termo) || eq.includes(termo) || osId.includes(termo);
+        if (!matchTermo) return false;
+
+        if (filtro === "PENDENTES") {
+          return !cond.includes("PAGO") && !cond.includes("LIQUIDADO") && val > 0;
+        } else if (filtro === "PAGAS") {
+          return cond.includes("PAGO") || cond.includes("LIQUIDADO");
+        } else if (filtro === "PIX") {
+          return cond.includes("PIX");
+        } else if (filtro === "BOLETO") {
+          return cond.includes("BOLETO") || cond.includes("FATURAMENTO");
+        }
+        return true;
+      });
+
+      return `
+        <div class="section-box" style="margin-top:0;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+            <div>
+              <div class="section-title" style="margin:0;">💳 Gestão de Faturas &amp; Contas a Receber das OS</div>
+              <div style="font-size:12px;color:#64748b;">Consulte valores, envie cobranças no WhatsApp com 1 clique e confirme pagamentos</div>
+            </div>
+            <!-- FILTROS DE STATUS -->
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <button class="btn btn-sm ${filtro==='TODAS'?'btn-primary':'btn-outline'}" onclick="filtrarStatusFinanceiro('TODAS')">Todas (${ordens.length})</button>
+              <button class="btn btn-sm ${filtro==='PENDENTES'?'btn-primary':'btn-outline'}" onclick="filtrarStatusFinanceiro('PENDENTES')" style="${filtro==='PENDENTES'?'background:#b45309;border-color:#b45309;':''}">⏳ Em Aberto</button>
+              <button class="btn btn-sm ${filtro==='PAGAS'?'btn-primary':'btn-outline'}" onclick="filtrarStatusFinanceiro('PAGAS')" style="${filtro==='PAGAS'?'background:#059669;border-color:#059669;':''}">✅ Pagas</button>
+              <button class="btn btn-sm ${filtro==='PIX'?'btn-primary':'btn-outline'}" onclick="filtrarStatusFinanceiro('PIX')">💠 PIX</button>
+              <button class="btn btn-sm ${filtro==='BOLETO'?'btn-primary':'btn-outline'}" onclick="filtrarStatusFinanceiro('BOLETO')">📄 Boleto</button>
+            </div>
+          </div>
+
+          <!-- CAMPO DE BUSCA -->
+          <div style="margin-bottom:12px;">
+            <input id="buscaFaturasInput" class="input" placeholder="🔍 Filtrar por Hospital, Equipamento ou Nº da OS..." value="${esc(window._finTermoBusca)}" oninput="window._finTermoBusca=this.value;const b=document.getElementById('conteudoModulo')||document.querySelector('.app-content');if(b)renderMenuGesPix(b);" />
+          </div>
+
+          <!-- LISTA DE FATURAS -->
+          <div style="display:grid;gap:8px;">
+            ${lista.slice(0, 40).map(o => {
+              const osId = o.id || o.os_id;
+              const val = Number(o.valor_os) || 0;
+              const cond = String(o.condicao_pagamento || 'BOLETO 28 DDL').toUpperCase();
+              const isPago = cond.includes("PAGO") || cond.includes("LIQUIDADO");
+              const valPix = (val * 0.90).toFixed(2);
+              const cli = esc(o.cliente || 'CLIENTE');
+              const eq = esc(o.equipamento || 'EQUIPAMENTO');
+              const dataAg = _formatarDataBr(o.data_agendamento || '');
+
+              return `
+                <div style="background:#fff;border:1px solid ${isPago?'#86efac':'#cbd5e1'};border-radius:10px;padding:12px;box-shadow:0 1px 4px rgba(0,0,0,0.03);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                  <div style="flex:2;min-width:240px;">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                      <b style="font-size:14px;color:#0b132b;">OS #${osId} • ${cli}</b>
+                      <span class="badge ${isPago?'concluido':'obs'}" style="font-size:10.5px;">${isPago?'✅ LIQUIDADO':'⏳ A RECEBER'}</span>
+                      <span class="badge" style="font-size:10px;background:#f1f5f9;color:#475569;">${esc(o.tipo_servico || 'SERVIÇO')}</span>
+                    </div>
+                    <div style="font-size:12px;color:#475569;margin-top:2px;">
+                      ${eq} • Data: <b>${dataAg || 'Recente'}</b>
+                    </div>
+                    <div style="font-size:11.5px;color:#0f766e;margin-top:3px;">
+                      Condição: <b>${cond}</b> ${val > 0 && !isPago ? `• (À vista no PIX com 10%: <b>R$ ${valPix}</b>)` : ''}
+                    </div>
+                  </div>
+
+                  <div style="text-align:right;min-width:140px;">
+                    <div style="font-size:18px;font-weight:900;color:${val>0?'#0b132b':'#64748b'};">
+                      R$ ${val.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                    </div>
+                    <div style="font-size:10.5px;color:#64748b;">Valor Total da OS</div>
+                  </div>
+
+                  <!-- BOTÕES DE AÇÃO RÁPIDA -->
+                  <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+                    <button class="btn btn-sm" onclick="abrirTerminalPixParaOS('${osId}', ${val}, '${cli}', '${eq}')" style="background:#0f766e;color:#fff;border-color:#0f766e;font-size:11px;padding:5px 9px;">
+                      💠 PIX
+                    </button>
+                    <button class="btn btn-sm" onclick="dispararCobrancaWhatsApp('${osId}', ${val}, '${cli}', '${eq}')" style="background:#25d366;color:#fff;border-color:#25d366;font-size:11px;padding:5px 9px;">
+                      📲 WhatsApp
+                    </button>
+                    <a href="/api/pdf/${osId}" target="_blank" class="btn btn-sm btn-outline" style="font-size:11px;padding:5px 9px;text-decoration:none;">
+                      📄 Laudo
+                    </a>
+                    ${!isPago ? `
+                      <button class="btn btn-sm btn-success" onclick="liquidarPixApp('${osId}')" style="font-size:11px;padding:5px 9px;">
+                        ✅ Baixa
+                      </button>
+                    ` : `
+                      <span style="font-size:11px;color:#15803d;font-weight:700;">Pago ✔️</span>
+                    `}
+                  </div>
+                </div>
+              `;
+            }).join("") || `<div style="text-align:center;color:#64748b;padding:20px;">Nenhuma fatura encontrada com os filtros atuais.</div>`}
+          </div>
+        </div>
+      `;
+    }
+
+    // -------------------------------------------------------------
+    // ABA 2: TERMINAL PIX DINÂMICO
+    // -------------------------------------------------------------
+    function renderAbaTerminalPix(ordens) {
+      return `
+        <div class="form-grid">
+          <div class="section-box">
+            <div class="section-title">💠 Terminal de Cobrança PIX Oficial Banco Central (CRC16)</div>
+            <div style="font-size:12px;color:#475569;margin-bottom:12px;">Selecione a Ordem de Serviço ou informe os dados para emissão do QR Code e Copia e Cola</div>
+
+            <div style="margin-bottom:10px;">
+              <label class="field-label">Selecione a Ordem de Serviço (OS)</label>
+              <select id="pixOsId" class="select" onchange="aoSelecionarOsParaPix(this.value)">
+                <option value="AVULSO">-- Cobrança Avulsa / Manual --</option>
+                ${ordens.map(o => {
+                  const id = o.id || o.os_id;
+                  const v = Number(o.valor_os) || 0;
+                  return `<option value="${id}" data-valor="${v}" data-cli="${esc(o.cliente)}" data-eq="${esc(o.equipamento)}">OS #${id} — ${esc(o.cliente)} (R$ ${v.toFixed(2)})</option>`;
+                }).join("")}
+              </select>
+            </div>
+
+            <div class="form-grid" style="margin-bottom:10px;">
+              <div style="flex:1;">
+                <label class="field-label">Valor Original da OS (R$)</label>
+                <input id="pixValorOriginal" type="number" step="0.01" class="input" value="450.00" oninput="recalcularValorPix()" />
+              </div>
+              <div style="flex:1;">
+                <label class="field-label">Valor Final PIX a Cobrar (R$)</label>
+                <input id="pixValor" type="number" step="0.01" class="input" value="405.00" style="font-weight:bold;color:#0f766e;" />
+              </div>
+            </div>
+
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+              <input id="chkDescontoPix" type="checkbox" checked onchange="recalcularValorPix()" style="width:16px;height:16px;" />
+              <label for="chkDescontoPix" style="font-size:12px;font-weight:700;color:#166534;cursor:pointer;">
+                Aplicar 10% de desconto promocional para pagamento imediato via PIX
+              </label>
+            </div>
+
+            <div style="margin-bottom:12px;">
+              <label class="field-label">Chave PIX da Empresa</label>
+              <input id="pixChaveEmpresa" class="input" value="03611974000108 (CNPJ EMED ELETROMEDICINA)" readonly style="background:#f8fafc;" />
+            </div>
+
+            <button class="btn btn-primary btn-block" onclick="gerarPixApp()" style="padding:12px;font-size:14px;font-weight:bold;background:#0f766e;border-color:#0f766e;">
+              💠 Gerar QR Code PIX Oficial &amp; Copia e Cola
+            </button>
+
+            <div id="pixResultadoBox" style="margin-top:14px;text-align:center;"></div>
+          </div>
+
+          <div class="section-box">
+            <div class="section-title">ℹ️ Diretrizes de Cobrança Hospitalar EMED</div>
+            <div style="font-size:12.5px;color:#334155;line-height:1.5;">
+              <p><b>1. Desconto à Vista:</b> A EMED oferece 10% de desconto para liquidação via PIX no fechamento do atendimento.</p>
+              <p><b>2. Prazo Médio Faturado:</b> Boletos bancários corporativos são emitidos na condição padrão 28 DDL mediante aprovação de cadastro.</p>
+              <p><b>3. Envio Direto ao Financeiro:</b> Ao gerar o código PIX, você pode enviá-lo instantaneamente com a fatura e o laudo em PDF para o gestor hospitalar via WhatsApp.</p>
+            </div>
+            <div style="margin-top:16px;background:#f1f5f9;border-radius:8px;padding:12px;">
+              <div style="font-weight:bold;font-size:12px;color:#0b132b;">Favorecido Oficial:</div>
+              <div style="font-size:13px;color:#0f766e;font-weight:bold;margin-top:2px;">EMED ELETROMEDICINA LTDA.</div>
+              <div style="font-size:11.5px;color:#475569;">CNPJ: 03.611.974/0001-08 • Banco Santander / Inter</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function aoSelecionarOsParaPix(osId) {
+      const sel = document.getElementById("pixOsId");
+      if (!sel) return;
+      const opt = sel.options[sel.selectedIndex];
+      if (opt && opt.dataset.valor) {
+        const val = parseFloat(opt.dataset.valor) || 0;
+        document.getElementById("pixValorOriginal").value = val.toFixed(2);
+        recalcularValorPix();
+      }
+    }
+
+    function recalcularValorPix() {
+      const vOrig = parseFloat(document.getElementById("pixValorOriginal")?.value) || 0;
+      const aplicarDesc = document.getElementById("chkDescontoPix")?.checked;
+      const vFinal = aplicarDesc ? (vOrig * 0.90) : vOrig;
+      const inp = document.getElementById("pixValor");
+      if (inp) inp.value = vFinal.toFixed(2);
+    }
+
+    function abrirTerminalPixParaOS(osId, valor, cliente, equipamento) {
+      window._finAbaAtiva = "PIX";
+      const box = document.getElementById("conteudoModulo") || document.querySelector(".app-content");
+      if (box) renderMenuGesPix(box);
+
+      setTimeout(() => {
+        const sel = document.getElementById("pixOsId");
+        if (sel) {
+          sel.value = osId;
+          const inpOrig = document.getElementById("pixValorOriginal");
+          if (inpOrig) inpOrig.value = Number(valor || 0).toFixed(2);
+          recalcularValorPix();
+          gerarPixApp();
+        }
+      }, 50);
+    }
+
+    function dispararCobrancaWhatsApp(osId, valor, cliente, equipamento) {
+      const valPix = (valor * 0.90).toFixed(2);
+      const urlPdf = `${window.location.origin}/api/pdf/${osId}`;
+      const msg = `🏥 *EMED ELETROMEDICINA — FATURAMENTO & COBRANÇA*
+
+` +
+        `Prezado(a) Gestor(a) do *${cliente}*,
+` +
+        `Informamos a conclusão dos serviços técnicos na *OS #${osId}* no equipamento *${equipamento}*.
+
+` +
+        `💰 *Valor da OS:* R$ ${Number(valor).toFixed(2)}
+` +
+        `💠 *Valor c/ 10% de Desconto via PIX:* R$ ${valPix}
+` +
+        `🔑 *Chave PIX (CNPJ):* 03.611.974/0001-08 (EMED Eletromedicina)
+
+` +
+        `📄 *Laudo Técnico Oficial em PDF:* ${urlPdf}
+
+` +
+        `Agradecemos a confiança e permanecemos à disposição!`;
+
+      const linkWa = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+      window.open(linkWa, '_blank');
+    }
+
+    // -------------------------------------------------------------
+    // ABA 3: GESTÃO DE NOTAS FISCAIS (NFS-E / NF-E)
+    // -------------------------------------------------------------
+    function renderAbaNotasFiscais(nfs, ordens) {
+      return `
+        <div class="form-grid">
+          <div class="section-box">
+            <div class="section-title">🧾 Emissão &amp; Vínculo de Nota Fiscal da OS</div>
+            <div style="font-size:12px;color:#475569;margin-bottom:12px;">Registre os dados fiscais emitidos para vincular ao laudo e à contabilidade</div>
+
+            <div style="margin-bottom:8px;">
+              <label class="field-label">Vincular à OS</label>
+              <select id="nfOsId" class="select" onchange="aoSelecionarOsParaNf(this.value)">
+                ${ordens.map(o => {
+                  const id = o.id || o.os_id;
+                  const v = Number(o.valor_os) || 0;
+                  return `<option value="${id}" data-valor="${v}" data-cli="${esc(o.cliente)}" data-cnpj="${esc(o.cnpj||'')}">OS #${id} — ${esc(o.cliente)} (R$ ${v.toFixed(2)})</option>`;
+                }).join("")}
+              </select>
+            </div>
+
+            <div class="form-grid" style="margin-bottom:8px;">
+              <div style="flex:1;">
+                <label class="field-label">Número da NF</label>
+                <input id="nfNumero" class="input" placeholder="Ex: NFS-0145" value="NFS-00${nfs.length + 1}" />
+              </div>
+              <div style="flex:1;">
+                <label class="field-label">Tipo de Nota</label>
+                <select id="nfTipo" class="select">
+                  <option value="NFS-E">NFS-e (Serviço de Engenharia Clínica)</option>
+                  <option value="NF-E">NF-e (Venda/Reposição de Peça)</option>
+                  <option value="MISTA">NFS-e + NF-e (Mão de Obra e Peça)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-grid" style="margin-bottom:8px;">
+              <div style="flex:1;">
+                <label class="field-label">Valor de Serviços (R$)</label>
+                <input id="nfValorServicos" type="number" step="0.01" class="input" value="450.00" />
+              </div>
+              <div style="flex:1;">
+                <label class="field-label">Valor de Peças (R$)</label>
+                <input id="nfValorPecas" type="number" step="0.01" class="input" value="0.00" />
+              </div>
+            </div>
+
+            <div style="margin-bottom:10px;">
+              <label class="field-label">Chave de Acesso / Código de Verificação</label>
+              <input id="nfChave" class="input" placeholder="Chave de 44 dígitos ou código da prefeitura" />
+            </div>
+
+            <button class="btn btn-primary btn-block" onclick="salvarNotaFiscalApp()" style="background:#6b21a8;border-color:#6b21a8;padding:10px;font-weight:bold;">
+              🧾 Salvar Registro Fiscal da OS
+            </button>
+          </div>
+
+          <div class="section-box">
+            <div class="section-title">📋 Notas Fiscais Registradas (${nfs.length})</div>
+            <div style="max-height:380px;overflow-y:auto;display:grid;gap:8px;">
+              ${nfs.map(n => `
+                <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:10px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <b>${esc(n.numero_nf || 'NFS')} • OS #${esc(n.os_id)}</b>
+                    <span class="badge concluido">${esc(n.status_fiscal || 'EMITIDA')}</span>
+                  </div>
+                  <div style="font-size:12px;color:#334155;margin:4px 0;">
+                    ${esc(n.cliente)} — <b>R$ ${Number(n.valor_total||0).toFixed(2)}</b>
+                  </div>
+                  <div style="font-size:11px;color:#64748b;">
+                    Tipo: ${esc(n.tipo_nota || 'NFS-e')} • Emissão: ${esc(n.data_emissao || 'Recente')}
+                  </div>
+                </div>
+              `).join("") || `<div style="text-align:center;color:#64748b;padding:20px;">Nenhuma nota fiscal emitida ainda.</div>`}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function aoSelecionarOsParaNf(osId) {
+      const sel = document.getElementById("nfOsId");
+      if (!sel) return;
+      const opt = sel.options[sel.selectedIndex];
+      if (opt && opt.dataset.valor) {
+        const v = parseFloat(opt.dataset.valor) || 0;
+        const inpSrv = document.getElementById("nfValorServicos");
+        if (inpSrv) inpSrv.value = v.toFixed(2);
+      }
+    }
+
+    async function salvarNotaFiscalApp() {
+      const osId = document.getElementById("nfOsId")?.value;
+      const numNf = document.getElementById("nfNumero")?.value;
+      const chave = document.getElementById("nfChave")?.value || "";
+      const valSrv = parseFloat(document.getElementById("nfValorServicos")?.value) || 0;
+      const valPec = parseFloat(document.getElementById("nfValorPecas")?.value) || 0;
+
+      const res = await apiPost("/api/os/nf-salvar", {
+        os_id: osId,
+        numero_nf: numNf,
+        chave_acesso: chave,
+        status_fiscal: "EMITIDA",
+        valor_servicos: valSrv,
+        valor_pecas: valPec
+      });
+
+      mostrarToast(res.msg);
+      await sincronizarTudo(false);
+      trocarAbaFinanceira("NFS");
+    }
+
+    // -------------------------------------------------------------
+    // ABA 4: PROPOSTAS COMERCIAIS & ENCOMENDAS
+    // -------------------------------------------------------------
+    function renderAbaPropostasEncomendas(ordens, solicitacoes) {
+      const propostasOs = ordens.filter(o => String(o.status_proposta || '').includes('PROPOSTA'));
+      const comprasPendentes = solicitacoes.filter(s => String(s.status_pedido || '').includes('COMPRA') || String(s.status_pedido || '').includes('ENCOMENDA'));
+
+      return `
+        <div class="form-grid">
+          <div class="section-box">
+            <div class="section-title">📋 Propostas Comerciais Vinculadas às OS (${propostasOs.length})</div>
+            <div style="font-size:12px;color:#475569;margin-bottom:12px;">Orçamentos e peças com prazo de entrega acordado com os clientes</div>
+
+            <div style="display:grid;gap:8px;">
+              ${propostasOs.map(o => {
+                const id = o.id || o.os_id;
+                const v = Number(o.valor_os) || 0;
+                return `
+                  <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:10px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                      <b>OS #${id} • ${esc(o.cliente)}</b>
+                      <span class="badge obs">${esc(o.status_proposta)}</span>
+                    </div>
+                    <div style="font-size:12px;color:#334155;margin:3px 0;">
+                      ${esc(o.equipamento)} • Peça: <b>${esc(o.peca_selecionada || 'Peça em proposta')}</b>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+                      <div style="font-size:14px;font-weight:900;color:#b45309;">R$ ${v.toFixed(2)}</div>
+                      <div style="display:flex;gap:4px;">
+                        <button class="btn btn-sm btn-primary" onclick="abrirTerminalPixParaOS('${id}', ${v}, '${esc(o.cliente)}', '${esc(o.equipamento)}')">Faturar c/ PIX</button>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join("") || `<div style="text-align:center;color:#64748b;padding:20px;">Nenhuma proposta comercial ativa no momento.</div>`}
+            </div>
+          </div>
+
+          <div class="section-box">
+            <div class="section-title">📦 Encomendas &amp; Solicitações no Almoxarifado (${comprasPendentes.length})</div>
+            <div style="font-size:12px;color:#475569;margin-bottom:12px;">Itens sob encomenda vinculados aos prazos comerciais de 20 dias úteis</div>
+
+            <div style="display:grid;gap:8px;">
+              ${comprasPendentes.map(s => `
+                <div style="background:#fff;border:1px solid #fed7aa;border-radius:8px;padding:10px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <b>Pedido #${s.id}</b>
+                    <span class="badge pendente">${esc(s.status_pedido)}</span>
+                  </div>
+                  <div style="font-size:12px;color:#334155;margin:3px 0;">
+                    Destino: <b>${esc(s.destino_cliente)}</b>
+                  </div>
+                  <div style="font-size:11.5px;color:#9a3412;">
+                    Itens: ${esc(s.itens_solicitados || s.instrumentos_solicitados || '')}
+                  </div>
+                </div>
+              `).join("") || `<div style="text-align:center;color:#64748b;padding:20px;">Nenhuma encomenda pendente no almoxarifado.</div>`}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // -------------------------------------------------------------
+    // ABA 5: DRE & RENTABILIDADE POR SERVIÇO / CLIENTE
+    // -------------------------------------------------------------
+    function renderAbaDRE(ordens, estoque) {
+      let receitaTotal = 0;
+      let faturamentoPreventiva = 0;
+      let faturamentoCorretiva = 0;
+      let faturamentoCalibracao = 0;
+
+      // Ranking Clientes
+      const porCliente = {};
+
+      ordens.forEach(o => {
+        const v = Number(o.valor_os) || 0;
+        receitaTotal += v;
+        const tp = String(o.tipo_servico || "").toUpperCase();
+        if (tp.includes("PREV")) faturamentoPreventiva += v;
+        else if (tp.includes("CALIB")) faturamentoCalibracao += v;
+        else faturamentoCorretiva += v;
+
+        const cli = String(o.cliente || "OUTROS").toUpperCase();
+        porCliente[cli] = (porCliente[cli] || 0) + v;
+      });
+
+      const topClientes = Object.entries(porCliente).sort((a,b) => b[1] - a[1]).slice(0, 5);
+      const custoEstimadoPecas = receitaTotal * 0.28; // Média histórica de CMV em engenharia clínica (28%)
+      const margemBruta = Math.max(0, receitaTotal - custoEstimadoPecas);
+      const percMargem = receitaTotal > 0 ? ((margemBruta / receitaTotal) * 100).toFixed(1) : 0;
+
+      return `
+        <div class="form-grid">
+          <div class="section-box">
+            <div class="section-title">📈 DRE Gerencial Sintético (Demonstrativo de Resultado eMED)</div>
+            <div style="font-size:12px;color:#475569;margin-bottom:14px;">Análise consolidada de faturamento, custo de insumos e margem operacional</div>
+
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:14px;display:grid;gap:10px;">
+              <div style="display:flex;justify-content:space-between;padding-bottom:6px;border-bottom:1px dashed #cbd5e1;">
+                <span style="font-weight:bold;color:#0b132b;">(+) Receita Operacional Bruta (OS Faturadas)</span>
+                <b style="color:#0f766e;font-size:15px;">R$ ${receitaTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</b>
+              </div>
+
+              <div style="display:flex;justify-content:space-between;padding-bottom:6px;border-bottom:1px dashed #cbd5e1;">
+                <span style="color:#991b1b;">(-) Custo Estimado de Peças &amp; Deslocamento (CMV ~28%)</span>
+                <b style="color:#991b1b;">R$ ${custoEstimadoPecas.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</b>
+              </div>
+
+              <div style="display:flex;justify-content:space-between;padding-top:4px;">
+                <span style="font-weight:900;color:#065f46;font-size:14px;">(=) Margem de Contribuição Bruta (${percMargem}%)</span>
+                <b style="color:#065f46;font-size:18px;">R$ ${margemBruta.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</b>
+              </div>
+            </div>
+
+            <div style="margin-top:14px;">
+              <div style="font-weight:bold;font-size:12px;color:#0b132b;margin-bottom:6px;">Faturamento por Tipo de Atividade Técnica:</div>
+              <div style="display:grid;gap:6px;font-size:12px;">
+                <div style="display:flex;justify-content:space-between;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;">
+                  <span>🔧 Manutenção Corretiva &amp; Emergencial</span>
+                  <b>R$ ${faturamentoCorretiva.toFixed(2)}</b>
+                </div>
+                <div style="display:flex;justify-content:space-between;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;">
+                  <span>🛡️ Manutenção Preventiva Programada</span>
+                  <b>R$ ${faturamentoPreventiva.toFixed(2)}</b>
+                </div>
+                <div style="display:flex;justify-content:space-between;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;">
+                  <span>⏰ Calibração RBC &amp; Testes de Constância</span>
+                  <b>R$ ${faturamentoCalibracao.toFixed(2)}</b>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-box">
+            <div class="section-title">🏆 Top 5 Clientes em Volume Financeiro</div>
+            <div style="display:grid;gap:8px;">
+              ${topClientes.map((c, i) => {
+                const perc = receitaTotal > 0 ? ((c[1] / receitaTotal) * 100).toFixed(1) : 0;
+                return `
+                  <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:10px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                      <span style="font-weight:bold;color:#0b132b;">#${i+1} ${c[0]}</span>
+                      <span style="font-weight:900;color:#0f766e;">R$ ${c[1].toFixed(2)}</span>
+                    </div>
+                    <div style="background:#e2e8f0;border-radius:99px;height:6px;margin-top:6px;overflow:hidden;">
+                      <div style="background:#0f766e;width:${perc}%;height:100%;"></div>
+                    </div>
+                    <div style="font-size:10.5px;color:#64748b;margin-top:2px;">Representa ${perc}% do faturamento global</div>
+                  </div>
+                `;
+              }).join("") || `<div style="text-align:center;color:#64748b;padding:20px;">Nenhum cliente faturado ainda.</div>`}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // -------------------------------------------------------------
+    // FUNÇÕES DE AÇÃO DO PIX & LIQUIDAÇÃO
+    // -------------------------------------------------------------
     async function gerarPixApp() {
-
-
-
-
-
-
+      const osId = document.getElementById("pixOsId")?.value || "AVULSO";
+      const valor = document.getElementById("pixValor")?.value || "0";
 
       const res = await apiPost("/api/pix/gerar", {
-
-
-
-
-
-
-
-        os_id: document.getElementById("pixOsId").value,
-
-
-
-
-
-
-
-        valor: document.getElementById("pixValor").value
-
-
-
-
-
-
-
+        os_id: osId,
+        valor: valor
       }, false);
-
-
-
-
-
-
 
       if (!res.ok) return mostrarToast(res.msg);
 
+      const valNum = Number(res.valor || 0).toFixed(2);
+      const urlPdf = `${window.location.origin}/api/pdf/${osId}`;
+      const msgWa = `🏥 *EMED ELETROMEDICINA — COBRANÇA PIX OFICIAL*
 
+` +
+        `OS Nº: *#${osId}*
+` +
+        `Valor: *R$ ${valNum}*
+` +
+        `Chave (CNPJ): *03.611.974/0001-08*
 
-
-
-
+` +
+        `*Código Copia e Cola:* \n${res.payload_emv}\n\n` +
+        `📄 *Laudo Oficial:* ${urlPdf}`;
 
       document.getElementById("pixResultadoBox").innerHTML = `
+        <div style="background:#f8fafc;border:1.5px solid #0f766e;border-radius:12px;padding:14px;display:inline-block;max-width:380px;text-align:center;">
+          <img src="data:image/png;base64,${res.qr_base64}" style="width:200px;height:200px;border:1px solid #cbd5e1;border-radius:8px;padding:6px;background:#fff;" />
+          <div style="font-weight:900;color:#0f766e;font-size:18px;margin-top:8px;">R$ ${valNum}</div>
+          <div style="font-size:11px;color:#475569;">EMED ELETROMEDICINA • CNPJ: 03.611.974/0001-08</div>
 
-
-
-
-
-
-
-        <img src="data:image/png;base64,${res.qr_base64}" style="width:190px;height:190px;border:1px solid #cbd5e1;border-radius:8px;padding:6px;background:#fff;" />
-
-
-
-
-
-
-
-        <div style="margin-top:6px;">
-
-
-
-
-
-
-
-          <textarea class="textarea" rows="3" readonly style="font-size:11px;">${esc(res.payload_emv)}</textarea>
-
-
-
-
-
-
-
-          <button class="btn btn-outline btn-sm btn-block" style="margin-top:4px;" onclick="navigator.clipboard.writeText('${esc(res.payload_emv)}');mostrarToast('📋 Código PIX Copia e Cola copiado!');">
-
-
-
-
-
-
-
-            📋 Copiar Código PIX
-
-
-
-
-
-
-
-          </button>
-
-
-
-
-
-
-
+          <div style="margin-top:10px;">
+            <textarea class="textarea" rows="3" readonly style="font-size:10.5px;font-family:monospace;background:#fff;">${esc(res.payload_emv)}</textarea>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
+              <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText('${esc(res.payload_emv)}');mostrarToast('📋 Código PIX copiado!');">
+                📋 Copiar Código
+              </button>
+              <a href="https://api.whatsapp.com/send?text=${encodeURIComponent(msgWa)}" target="_blank" class="btn btn-sm" style="background:#25d366;color:#fff;border-color:#25d366;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:4px;">
+                📲 WhatsApp
+              </a>
+            </div>
+            <button class="btn btn-success btn-sm btn-block" style="margin-top:6px;" onclick="liquidarPixApp('${osId}')">
+              ✅ Confirmar Recebimento (Dar Baixa)
+            </button>
+          </div>
         </div>
-
-
-
-
-
-
-
       `;
-
-
-
-
-
-
-
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     async function liquidarPixApp(osId) {
-
-
-
-
-
-
-
+      if (!confirm(`Confirma o recebimento e liquidação financeira da OS #${osId}?`)) return;
       const res = await apiPost("/api/pix/liquidar", { os_id: osId });
-
-
-
-
-
-
-
       mostrarToast(res.msg);
-
-
-
-
-
-
-
       await sincronizarTudo(false);
-
-
-
-
-
-
-
+      const box = document.getElementById("conteudoModulo") || document.querySelector(".app-content") || document.getElementById("mainAppContainer");
+      if (box) renderMenuGesPix(box);
     }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-    /********************************************************************
+/********************************************************************
 
 
 
