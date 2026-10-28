@@ -10033,7 +10033,7 @@
 
 
 
-      navigator.serviceWorker.register("/sw.js?v=v25").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=v26").then(reg => { if(reg) reg.update(); }).catch(() => {});
 
 
 
@@ -12194,6 +12194,15 @@ function renderizarNavegacao() {
 
 
       centralizarAbaAtiva();
+    }
+
+    function centralizarAbaAtiva() {
+      try {
+        const ativa = document.querySelector(".submenu-pill.active");
+        if (ativa) {
+          ativa.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+        }
+      } catch (e) {}
     }
 
 
