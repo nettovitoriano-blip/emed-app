@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v28-bloco-financeiro';
+const CACHE_NAME = 'emed-pwa-v32-etiquetas-vizinhas-ferramentas';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

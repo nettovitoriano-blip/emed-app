@@ -4,8 +4,23 @@ import json
 import hashlib
 import sqlite3
 import datetime
+import threading
 from contextlib import contextmanager
 import pandas as pd
+
+TZ_BRASIL = datetime.timezone(datetime.timedelta(hours=-3))
+
+def obter_agora_brasil() -> datetime.datetime:
+    """Retorna datetime no fuso oficial do Brasil (UTC-3 / Fortaleza / Brasília)."""
+    return datetime.datetime.now(TZ_BRASIL)
+
+def obter_hoje_brasil() -> datetime.date:
+    """Retorna a data atual no fuso oficial do Brasil (UTC-3)."""
+    return datetime.datetime.now(TZ_BRASIL).date()
+
+def obter_agora_brasil_str(fmt: str = "%d/%m/%Y %H:%M") -> str:
+    """Retorna string formatada da data/hora oficial do Brasil (UTC-3)."""
+    return obter_agora_brasil().strftime(fmt)
 
 SCHEMA_COLUNAS_OS = [
     ("cliente", "TEXT DEFAULT ''"),
@@ -154,6 +169,25 @@ SUGESTOES_SEPARACAO_POR_ATIVIDADE = {
             "PEC-012: Kit Sortido de Fusíveis de Ação Rápida e Retardada",
         ],
     },
+    "SUBSTITUIÇÃO DE COLIMADOR & ALINHAMENTO ÓPTICO": {
+        "nome": "SUGESTÃO: SUBSTITUIÇÃO DE COLIMADOR & ALINHAMENTO ÓPTICO (FEIXE R/X)",
+        "itens": [
+            "FER-017: Kit de Alinhamento Óptico & Centralização de Feixe R/X (Beam Alignment Tools)",
+            "FER-008: Nível de Bolha de Precisão e Trena Laser Métrica",
+            "FER-010: Torquímetro Calibrado com Jogo de Chaves Hexagonais / Allen",
+            "PEC-015: Lâmpada Halógena de Colimador 12V/24V Sobressalente",
+            "CON-004: Panos de Microfibra ESD e Álcool Isopropílico 99%",
+        ],
+    },
+    "PREVENTIVA LIMPEZA & LUBRIFICAÇÃO": {
+        "nome": "SUGESTÃO: PREVENTIVA LIMPEZA & LUBRIFICAÇÃO HOSPITALAR",
+        "itens": [
+            "CON-003: Kit Limpeza Padrão (Limpa-Contatos, Desengripante, Veja, Panos e Aspirador ESD)",
+            "CON-005: Graxa Especial de Alta Rotação SlipRing e Rolamentos",
+            "FER-002: Multímetro Digital Calibrado True RMS",
+            "FER-005: Phantoms de Calibração Padrão (QA / Homogeneidade)",
+        ],
+    },
 }
 
 # Alias de compatibilidade retroativa
@@ -177,6 +211,10 @@ def obter_kit_por_servico(tipo_servico: str, defeito: str = "") -> dict:
         return SUGESTOES_SEPARACAO_POR_ATIVIDADE["TROCA DE TUBO & VÁCUO"]
     if any(k in texto_busca for k in ["LABORAT", "BANCADA", "PLACA"]):
         return SUGESTOES_SEPARACAO_POR_ATIVIDADE["DIAGNÓSTICO & BANCADA DE LABORATÓRIO"]
+    if any(k in texto_busca for k in ["COLIMAD", "COLIMA", "ALINHAMENTO", "FEIXE", "CAMPO LUMINOSO"]):
+        return SUGESTOES_SEPARACAO_POR_ATIVIDADE["SUBSTITUIÇÃO DE COLIMADOR & ALINHAMENTO ÓPTICO"]
+    if any(k in texto_busca for k in ["LIMPEZA", "ASPIRADOR", "LUBRIFICA", "SLIPRING", "BRUSH"]):
+        return SUGESTOES_SEPARACAO_POR_ATIVIDADE["PREVENTIVA LIMPEZA & LUBRIFICAÇÃO"]
     if any(k in texto_busca for k in ["PREVENT"]):
         return SUGESTOES_SEPARACAO_POR_ATIVIDADE["PREVENTIVA PADRÃO"]
     for chave, dados in SUGESTOES_SEPARACAO_POR_ATIVIDADE.items():
@@ -274,6 +312,15 @@ def garantir_pk_tabela_os(conn):
                     cur.execute(f"ALTER TABLE clientes_equipamentos ADD COLUMN {col_n} {col_t}")
                 except Exception:
                     pass
+    try:
+        cur.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_os_sync_hash 
+            ON clientes_equipamentos(sync_hash) 
+            WHERE sync_hash != '' AND sync_hash IS NOT NULL;
+        """)
+    except Exception:
+        pass
+
 
 
 def normalizar_dataframe_os(df):
@@ -296,6 +343,15 @@ def normalizar_dataframe_os(df):
                 df_norm[col] = ""
     df_norm["cliente"] = df_norm["cliente"].fillna("").astype(str).str.upper()
     return df_norm
+
+
+def _gravar_excel_background(df, excel_path, backup_path=None):
+    try:
+        df.to_excel(excel_path, index=False, engine="openpyxl")
+        if backup_path:
+            df.to_excel(backup_path, index=False, engine="openpyxl")
+    except Exception:
+        pass
 
 
 def salvar_dataframe_transacional(dataframe, db_path, excel_path=None, backup_path=None):
@@ -344,12 +400,11 @@ def salvar_dataframe_transacional(dataframe, db_path, excel_path=None, backup_pa
         df_export = pd.read_sql_query("SELECT * FROM clientes_equipamentos", conn)
 
     if excel_path:
-        try:
-            df_export.to_excel(excel_path, index=False, engine="openpyxl")
-            if backup_path:
-                df_export.to_excel(backup_path, index=False, engine="openpyxl")
-        except Exception:
-            pass
+        threading.Thread(
+            target=_gravar_excel_background,
+            args=(df_export.copy(), excel_path, backup_path),
+            daemon=True
+        ).start()
     return True
 
 
@@ -488,7 +543,7 @@ def sincronizar_os_offline_idempotente(df, dados_json, equipa_tecnica, utilizado
         "tecnico_responsavel": tec_off,
         "tipo_servico": "CORRETIVA / CAMPO OFFLINE",
         "confirmado": "SIM",
-        "data_agendamento": datetime.date.today().strftime("%Y-%m-%d"),
+        "data_agendamento": obter_hoje_brasil().strftime("%Y-%m-%d"),
         **campos_sync
     }
     df_out = pd.concat([df, pd.DataFrame([nova_off])], ignore_index=True)
@@ -557,7 +612,7 @@ def registrar_aplicacao_definitiva_e_fluxo_cobranca(
 
                 cur.execute("SELECT id FROM notas_fiscais WHERE os_id = ?", (int(os_id),))
                 ja_nf = cur.fetchone()
-                agora_iso = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                agora_iso = obter_agora_brasil_str('%Y-%m-%d %H:%M:%S')
                 if not ja_nf:
                     cur.execute("""
                         INSERT INTO notas_fiscais (
@@ -636,7 +691,7 @@ def registrar_aplicacao_definitiva_e_fluxo_cobranca(
         """, (f"%OS #{os_id}%", f"%{str(cliente).strip().upper()}%"))
         
         row_sol = cur.fetchone()
-        agora_str = datetime.datetime.now().strftime('%d/%m/%Y %H:%M')
+        agora_str = obter_agora_brasil_str('%d/%m/%Y %H:%M')
         if row_sol:
             id_sol = row_sol[0]
             cur.execute("""
@@ -666,7 +721,7 @@ def registrar_aplicacao_definitiva_e_fluxo_cobranca(
 
         cur.execute("SELECT id FROM notas_fiscais WHERE os_id = ?", (int(os_id),))
         ja_nf = cur.fetchone()
-        agora_iso = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        agora_iso = obter_agora_brasil_str('%Y-%m-%d %H:%M:%S')
 
         tipo_nota_final = "NF-e (PRODUTO/PEÇA) + NFS-e (SERVIÇO)" if valor_servicos > 0 else "NF-e (PEÇA DE REPOSIÇÃO)"
         natureza_op = f"VENDA/APLICAÇÃO DE {cod_peca} + MÃO DE OBRA [{condicao_pagamento}]"
@@ -751,7 +806,7 @@ def registrar_peca_em_teste_observacao(
             cur.execute("UPDATE estoque_pecas SET quantidade = max(0, quantidade - ?) WHERE codigo = ?", (qtd, cod_p))
 
         # 2. Registra na tabela solicitacoes_pecas como em observação/teste
-        agora_str = datetime.datetime.now().strftime('%d/%m/%Y %H:%M')
+        agora_str = obter_agora_brasil_str('%d/%m/%Y %H:%M')
         cur.execute("""
             SELECT id FROM solicitacoes_pecas
             WHERE (UPPER(destino_cliente) LIKE ? OR UPPER(destino_cliente) LIKE ?)
@@ -928,21 +983,21 @@ def retirar_peca_teste_e_devolver_estoque(
     return True, f"🔄 Peça '{nome_peca_dev}' estornada com sucesso! Saldo recomposto no Almoxarifado e OS mantida em aberto para novo direcionamento."
 
 
-def atualizar_status_solicitacao_peca(db_path, id_pedido, novo_status):
+def atualizar_status_solicitacao_peca(db_path, id_pedido, novo_status, tecnico=None, tipo_origem=None):
     with get_db_connection(db_path) as conn:
         cur = conn.cursor()
         cur.execute(
-            "SELECT itens_solicitados, status_pedido FROM solicitacoes_pecas WHERE id = ?",
+            "SELECT itens_solicitados, status_pedido, tecnico FROM solicitacoes_pecas WHERE id = ?",
             (int(id_pedido),)
         )
         row = cur.fetchone()
         if not row:
             return False, "Solicitação não encontrada."
 
-        itens_str, status_atual = str(row[0]), str(row[1]).upper()
+        itens_str, status_atual, tec_atual = str(row[0]), str(row[1]).upper(), str(row[2])
         novo_status_up = novo_status.strip().upper()
 
-        if status_atual == novo_status_up:
+        if status_atual == novo_status_up and not tecnico and not tipo_origem:
             return True, f"O pedido #{id_pedido} já está com o status '{novo_status_up}'."
 
         # Se devolver ao estoque (cancelado/estornado ou devolvido pelo técnico)
@@ -974,11 +1029,19 @@ def atualizar_status_solicitacao_peca(db_path, id_pedido, novo_status):
                 except Exception:
                     pass
 
-        cur.execute(
-            "UPDATE solicitacoes_pecas SET status_pedido = ? WHERE id = ?",
-            (novo_status_up, int(id_pedido))
-        )
-    return True, f"✅ Status do pedido #{id_pedido} atualizado para '{novo_status_up}'!"
+        tec_final = tecnico.strip().upper() if tecnico else tec_atual
+        if tipo_origem:
+            cur.execute(
+                "UPDATE solicitacoes_pecas SET status_pedido = ?, tecnico = ?, tipo_origem_peca = ? WHERE id = ?",
+                (novo_status_up, tec_final, tipo_origem.strip().upper(), int(id_pedido))
+            )
+        else:
+            cur.execute(
+                "UPDATE solicitacoes_pecas SET status_pedido = ?, tecnico = ? WHERE id = ?",
+                (novo_status_up, tec_final, int(id_pedido))
+            )
+        conn.commit()
+    return True, f"✅ Pedido #{id_pedido} entregue para 👷 {tec_final} ({novo_status_up})!"
 
 
 def acionar_separacao_automatica_almoxarifado(
@@ -1034,7 +1097,7 @@ def acionar_separacao_automatica_almoxarifado(
         if existente:
             return True, f"O Almoxarifado já está com o Pedido #{existente[0]} ({existente[1]}) em separação para {tec_up}."
 
-        data_ped_agora = datetime.datetime.now().strftime('%d/%m/%Y %H:%M')
+        data_ped_agora = obter_agora_brasil_str('%d/%m/%Y %H:%M')
         resumo_pecas = pecas_str if pecas_str else "NENHUMA PEÇA EXTRA"
 
         # Reserva itens do estoque se houver códigos padrão PEC-xxx, FER-xxx, CON-xxx
@@ -1108,7 +1171,7 @@ def agendar_proxima_etapa_circular(df, row_os_atual, etapa_concluida, dias_ciclo
     if not ja_existe.empty:
         return df, prox_etapa
 
-    prox_data = (datetime.date.today() + datetime.timedelta(days=int(dias_ciclo))).strftime("%Y-%m-%d")
+    prox_data = (obter_hoje_brasil() + datetime.timedelta(days=int(dias_ciclo))).strftime("%Y-%m-%d")
     nova_os_ciclo = {
         "cliente": cli,
         "cidade": limpar_texto(row_os_atual.get("cidade"), "FORTALEZA").upper(),
@@ -1181,7 +1244,7 @@ def calcular_status_calibracao(data_validade_str: str) -> dict:
             "nivel_alerta": 0
         }
 
-    hoje = datetime.date.today()
+    hoje = obter_hoje_brasil()
     dias = (dt_alvo - hoje).days
 
     if dias < 0:
@@ -1372,7 +1435,7 @@ def salvar_rascunho_provisorio(db_name: str, os_id: str, dados: dict) -> tuple:
     """Salva um snapshot provisório do preenchimento da OS no SQLite (proteção contra quedas de sinal)."""
     try:
         inicializar_tabela_rascunhos(db_name)
-        data_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        data_str = obter_agora_brasil_str("%d/%m/%Y %H:%M:%S")
         dados_json = json.dumps(dados, ensure_ascii=False)
         with get_db_connection(db_name) as conn:
             cur = conn.cursor()
@@ -1435,7 +1498,7 @@ def salvar_configuracao(db_name: str, chave: str, valor: str) -> bool:
     """Persiste parâmetro de configuração do sistema no SQLite."""
     try:
         inicializar_tabela_rascunhos(db_name)
-        dt = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        dt = obter_agora_brasil_str("%d/%m/%Y %H:%M:%S")
         with get_db_connection(db_name) as conn:
             cur = conn.cursor()
             cur.execute("""
@@ -1685,3 +1748,82 @@ def obter_checklist_acoes_sugeridas(equipamento: str, defeito: str = "") -> list
         "Teste de todos os comandos nos painéis de controle e paradas de emergência",
         "Realização de ensaios funcionais simulados de rotina com liberação clínica",
     ]
+
+
+def verificar_pendencias_financeiras_cliente(db_path: str, cliente: str, cnpj: str = "") -> dict:
+    """
+    Verifica se o cliente possui faturas em aberto ou notas fiscais pendentes de liquidação.
+    O chamado NUNCA é bloqueado, mas a informação é usada para acionar o setor financeiro.
+    """
+    cli_limpo = str(cliente or "").strip().upper()
+    cnpj_limpo = str(cnpj or "").strip()
+    
+    if not cli_limpo and not cnpj_limpo:
+        return {"tem_pendencia": False, "qtd_faturas": 0, "valor_total": 0.0, "faturas": []}
+
+    faturas_pendentes = []
+    valor_total = 0.0
+
+    try:
+        with get_db_connection(db_path) as conn:
+            cur = conn.cursor()
+            
+            # 1. Verifica na tabela notas_fiscais
+            # Utiliza colunas reais: COALESCE(valor_liquido, valor_servicos + valor_pecas, 0.0) e status_fiscal
+            cur.execute("""
+                SELECT id, numero_nf, os_id, COALESCE(valor_liquido, valor_servicos + valor_pecas, 0.0) as valor, 
+                       data_emissao, status_fiscal 
+                FROM notas_fiscais 
+                WHERE (UPPER(cliente) LIKE ? OR (cnpj_tomador != '' AND cnpj_tomador = ?))
+                  AND (UPPER(status_fiscal) NOT LIKE '%PAGO%' AND UPPER(status_fiscal) NOT LIKE '%LIQUIDADO%')
+                ORDER BY id DESC
+            """, (f"%{cli_limpo}%", cnpj_limpo))
+            
+            for row in cur.fetchall():
+                v = float(row[3] or 0.0)
+                if v > 0:
+                    valor_total += v
+                    faturas_pendentes.append({
+                        "origem": "NOTA_FISCAL",
+                        "id": row[0],
+                        "numero": row[1] or f"NF-{row[0]}",
+                        "os_id": row[2],
+                        "valor": v,
+                        "data": row[4],
+                        "status": row[5]
+                    })
+
+            # 2. Verifica se há OS concluídas com valor faturado ainda não pago
+            cur.execute("""
+                SELECT id, cliente, valor_os, data_agendamento, condicao_pagamento
+                FROM clientes_equipamentos
+                WHERE UPPER(cliente) LIKE ?
+                  AND valor_os > 0
+                  AND (UPPER(condicao_pagamento) NOT LIKE '%PAGO%' AND UPPER(condicao_pagamento) NOT LIKE '%LIQUIDADO%')
+            """, (f"%{cli_limpo}%",))
+            
+            os_ids_ja_em_nf = {str(f.get("os_id")) for f in faturas_pendentes if f.get("os_id")}
+            for row in cur.fetchall():
+                os_id_str = str(row[0])
+                if os_id_str not in os_ids_ja_em_nf:
+                    v = float(row[2] or 0.0)
+                    if v > 0:
+                        valor_total += v
+                        faturas_pendentes.append({
+                            "origem": "ORDEM_SERVICO",
+                            "id": row[0],
+                            "numero": f"FAT-OS-{row[0]}",
+                            "os_id": row[0],
+                            "valor": v,
+                            "data": row[3],
+                            "status": row[4] or "A FATURAR"
+                        })
+    except Exception:
+        pass
+
+    return {
+        "tem_pendencia": (len(faturas_pendentes) > 0 and valor_total > 0),
+        "qtd_faturas": len(faturas_pendentes),
+        "valor_total": valor_total,
+        "faturas": faturas_pendentes
+    }

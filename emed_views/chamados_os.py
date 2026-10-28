@@ -249,7 +249,7 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
 
     horario_atend_txt = f"{cin} às {cout} ({dur})" if cin != "-" and cin else "Horário comercial"
 
-    # Evidências Fotográficas da Intervenção Técnica
+    # Evidências Fotográficas da Intervenção Técnica (destinadas ao Anexo Oficial na última página)
     lista_fotos_b64 = []
     for c_foto in [row_c.get("foto_evidencia"), row_c.get("foto_depois"), row_c.get("fotos_adicionais")]:
         if c_foto:
@@ -258,24 +258,69 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
                 if b64_f and b64_f not in lista_fotos_b64:
                     lista_fotos_b64.append(b64_f)
 
-    bloco_fotos_html = ""
+    bloco_anexo_fotos_html = ""
     if lista_fotos_b64:
-        qtd_fotos = len(lista_fotos_b64)
-        largura_td = f"{100 // min(qtd_fotos, 3)}%"
-        celulas = []
-        for idx_f, f_b64 in enumerate(lista_fotos_b64[:3]):
-            celulas.append(
-                f'<td width="{largura_td}" align="center" style="text-align:center; padding:4px;">'
-                f'<div style="font-size:7pt; font-weight:bold; color:#0f766e; margin-bottom:2px;">EVIDÊNCIA TÉCNICA #{idx_f+1}</div>'
-                f'<img src="{f_b64}" width="165" height="88" style="width:165px; height:88px; object-fit:contain; border:1px solid #cbd5e1; border-radius:3px;" alt="Evidência #{idx_f+1}"/>'
-                f'</td>'
-            )
-        bloco_fotos_html = f"""
-  <div class="sec-title">{sec_num}. Evidências Fotográficas da Intervenção Técnica</div>
+        linhas_fotos = []
+        for i in range(0, len(lista_fotos_b64), 2):
+            par = lista_fotos_b64[i:i+2]
+            celulas = []
+            for j, f_b64 in enumerate(par):
+                idx_f = i + j + 1
+                rotulo = f"EVIDÊNCIA TÉCNICA #{idx_f}"
+                if idx_f == 1 and len(lista_fotos_b64) > 1:
+                    rotulo = "EVIDÊNCIA #1 — CONDIÇÃO INICIAL / ANTES"
+                elif idx_f == 2 and len(lista_fotos_b64) > 1:
+                    rotulo = "EVIDÊNCIA #2 — CONDIÇÃO FINAL / DEPOIS"
+                celulas.append(
+                    f'<td width="50%" align="center" valign="top" style="text-align:center; padding:6px; vertical-align:top;">'
+                    f'<div style="font-size:7.5pt; font-weight:bold; color:#0f766e; margin-bottom:3px; text-transform:uppercase;">📷 {rotulo}</div>'
+                    f'<div style="border:1px solid #cbd5e1; border-radius:4px; padding:3px; background:#ffffff; display:inline-block;">'
+                    f'<img src="{f_b64}" width="235" height="135" style="width:235px; height:135px; object-fit:contain; display:block;" alt="{rotulo}"/>'
+                    f'</div>'
+                    f'</td>'
+                )
+            if len(celulas) == 1:
+                celulas.append('<td width="50%"></td>')
+            linhas_fotos.append(f"<tr>{''.join(celulas)}</tr>")
+
+        bloco_anexo_fotos_html = f"""
+<div class="os-box" style="break-before:page; page-break-before:always; margin-top:14px;">
+  <table class="hdr-tbl" width="100%">
+    <tr>
+      <td width="17%" align="left" valign="middle">
+        {bloco_logo}
+      </td>
+      <td width="55%" align="left" valign="middle">
+        <div style="font-size:11pt; font-weight:bold; color:#0b132b; line-height:1.15;">EMED ELETROMEDICINA LTDA.</div>
+        <div style="font-size:7.5pt; color:#0f766e; font-weight:bold;">Anexo Fotográfico Oficial de Evidências Técnicas</div>
+        <div style="font-size:7pt; color:#475569;">Comprovação Operacional e Validação em Campo de Diagnóstico por Imagem</div>
+      </td>
+      <td width="28%" align="right" valign="top" style="text-align:right;">
+        <div style="font-size:8.5pt; font-weight:bold; color:#0b132b;">OS Nº #{id_os_c}</div>
+        <div style="font-size:7pt; color:#475569; margin-top:2px;">Data: {dt_agend}</div>
+        <div style="font-size:7pt; color:#047857; font-weight:bold; margin-top:1px;">DOCUMENTO ANEXO</div>
+      </td>
+    </tr>
+  </table>
+
+  <table class="os-banner" width="100%">
+    <tr>
+      <td width="100%" align="center">ANEXO FOTOGRÁFICO DE EVIDÊNCIAS TÉCNICAS</td>
+    </tr>
+  </table>
+
+  <div style="background:#f8fafc; border:1px solid #cbd5e1; padding:3.5px 7px; font-size:7.5pt; color:#334155; margin-bottom:5px;">
+    <b>Cliente:</b> {cliente} &nbsp;|&nbsp; <b>Equipamento:</b> {equipamento} &nbsp;|&nbsp; <b>Técnico:</b> {tec_princ} &nbsp;|&nbsp; <b>Total de Evidências:</b> {len(lista_fotos_b64)} foto(s)
+  </div>
+
   <table class="data-tbl" width="100%">
-    <tr>{''.join(celulas)}</tr>
-  </table>"""
-        sec_num += 1
+    {''.join(linhas_fotos)}
+  </table>
+
+  <div style="text-align:center; font-size:6.8pt; color:#64748b; margin-top:6px; border-top:1px dashed #cbd5e1; padding-top:4px;">
+    Registro fotográfico auditado e vinculado à Ordem de Serviço Nº #{id_os_c} • EMED Eletromedicina • Conforme POP/IT homologada
+  </div>
+</div>"""
 
     num_sec_aceite = str(sec_num)
 
@@ -373,7 +418,6 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
   </table>
 
   {bloco_observacoes_html}
-{bloco_fotos_html}
   <div class="sec-title">{num_sec_aceite}. Termo de Aceite &amp; Validação Técnica</div>
   <table class="data-tbl" width="100%">
     <tr>
@@ -395,6 +439,7 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     </tr>
   </table>
 </div>
+{bloco_anexo_fotos_html}
 </body>
 </html>"""
 
