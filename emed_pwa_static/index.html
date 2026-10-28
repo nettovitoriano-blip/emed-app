@@ -7520,7 +7520,24 @@
       }
     }
 
-    function htmlToolbarCampo(idCampo, categoria, label) {
+        function ajustarTextoEmCaixaAlta(el) {
+      if (!el) return;
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const original = el.value;
+      const upper = original.toUpperCase();
+      if (original !== upper) {
+        el.value = upper;
+        if (typeof start === "number" && typeof end === "number") {
+          try {
+            el.setSelectionRange(start, end);
+          } catch (e) {}
+        }
+      }
+      if (typeof autoSalvarRascunho === "function") autoSalvarRascunho();
+    }
+
+function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
@@ -9254,6 +9271,8 @@
       }
       // CENÁRIO 3: TOTALMENTE ZERADO
       else {
+        const selP = document.getElementById("propPrazoEntrega");
+        if (selP) selP.value = "SOB ENCOMENDA (20 DIAS ÚTEIS APÓS APROVAÇÃO)";
         box.innerHTML = `
           <div style="background:#fef2f2;border:2px solid #ef4444;border-radius:8px;padding:12px;margin-top:6px;">
             <div style="display:flex;align-items:flex-start;gap:10px;">
@@ -9374,6 +9393,7 @@
 
 
       const condPag = document.getElementById("propCondPag")?.value || "FATURAMENTO 28 DDL";
+      const prazoEnt = document.getElementById("propPrazoEntrega")?.value || "SOB ENCOMENDA (20 DIAS ÚTEIS APÓS APROVAÇÃO)";
 
 
 
@@ -9434,6 +9454,10 @@
 
 
         condicao_pagamento: condPag,
+
+
+
+        prazo_entrega: prazoEnt,
 
 
 
@@ -10033,7 +10057,7 @@
 
 
 
-      navigator.serviceWorker.register("/sw.js?v=v26").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=v27").then(reg => { if(reg) reg.update(); }).catch(() => {});
 
 
 
@@ -18416,7 +18440,16 @@ function renderizarNavegacao() {
           </div>
 
           <div class="form-grid" style="margin-top:10px;">
-            <div style="flex:2;">
+            <div style="flex:1.2;">
+              <label class="field-label">Prazo de Entrega da Peça</label>
+              <select id="propPrazoEntrega" class="select">
+                <option value="IMEDIATO (EM ESTOQUE — PRONTA ENTREGA)">⚡ IMEDIATO (EM ESTOQUE — PRONTA ENTREGA)</option>
+                <option value="SOB ENCOMENDA (20 DIAS ÚTEIS APÓS APROVAÇÃO)" selected>📦 SOB ENCOMENDA (20 DIAS ÚTEIS APÓS APROVAÇÃO)</option>
+                <option value="IMPORTAÇÃO ESPECIAL (30 A 45 DIAS ÚTEIS)">✈️ IMPORTAÇÃO ESPECIAL (30 A 45 DIAS ÚTEIS)</option>
+                <option value="A COMBINAR / PARADA PROGRAMADA">🗓️ A COMBINAR / CRONOGRAMA DO CLIENTE</option>
+              </select>
+            </div>
+            <div style="flex:1.2;">
               <label class="field-label">Condição de Pagamento</label>
               <select id="propCondPag" class="select">
                 <option value="PIX COM 10% DE DESCONTO">💠 PIX À VISTA (10% DE DESCONTO)</option>
@@ -25949,7 +25982,7 @@ function renderizarNavegacao() {
 
             ${htmlToolbarCampo('osDefeito', 'DEFEITO_DIAGNOSTICO', 'Defeito Relatado / Queixa do Cliente')}
 
-            <textarea id="osDefeito" class="textarea" rows="3" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('defeito_relatado', os.pendencia_limpa))}</textarea>
+            <textarea id="osDefeito" class="textarea" rows="3" style="text-transform:uppercase;" oninput="ajustarTextoEmCaixaAlta(this);" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('defeito_relatado', os.pendencia_limpa))}</textarea>
 
           </div>
 
@@ -25957,7 +25990,7 @@ function renderizarNavegacao() {
 
             ${htmlToolbarCampo('osProb', 'DEFEITO_DIAGNOSTICO', 'Diagnóstico Técnico & Causa Raiz')}
 
-            <textarea id="osProb" class="textarea" rows="3" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('problemas_encontrados'))}</textarea>
+            <textarea id="osProb" class="textarea" rows="3" style="text-transform:uppercase;" oninput="ajustarTextoEmCaixaAlta(this);" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('problemas_encontrados'))}</textarea>
 
           </div>
 
@@ -25977,7 +26010,7 @@ function renderizarNavegacao() {
 
           </div>
 
-          <textarea id="osSrvExec" class="textarea" rows="5" style="text-transform:uppercase;" placeholder="DESCREVA AQUI OS PROCEDIMENTOS, MEDIÇÕES E AJUSTES REALIZADOS OU EDITE O TEXTO SUGERIDO..." oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('servico_executado'))}</textarea>
+          <textarea id="osSrvExec" class="textarea" rows="5" style="text-transform:uppercase;" placeholder="DESCREVA AQUI OS PROCEDIMENTOS, MEDIÇÕES E AJUSTES REALIZADOS OU EDITE O TEXTO SUGERIDO..." oninput="ajustarTextoEmCaixaAlta(this);" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('servico_executado'))}</textarea>
 
         </div>
 
@@ -26091,7 +26124,7 @@ function renderizarNavegacao() {
 
 
 
-                <input id="osPecaManual" class="input" placeholder="DIGITE O NOME / CÓDIGO DA PEÇA APLICADA..." value="${esc(pecaManualAtual)}" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();" />
+                <input id="osPecaManual" class="input" placeholder="DIGITE O NOME / CÓDIGO DA PEÇA APLICADA..." value="${esc(pecaManualAtual)}" style="text-transform:uppercase;" oninput="ajustarTextoEmCaixaAlta(this);" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();" />
 
 
 
@@ -26301,7 +26334,7 @@ function renderizarNavegacao() {
 
           </div>
 
-          <textarea id="osObsGerais" class="textarea" rows="3" style="text-transform:uppercase;" placeholder="OBSERVAÇÕES ADICIONAIS, RECOMENDAÇÕES DE CLIMATIZAÇÃO OU RETORNO..." oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('observacoes_gerais'))}</textarea>
+          <textarea id="osObsGerais" class="textarea" rows="3" style="text-transform:uppercase;" placeholder="OBSERVAÇÕES ADICIONAIS, RECOMENDAÇÕES DE CLIMATIZAÇÃO OU RETORNO..." oninput="ajustarTextoEmCaixaAlta(this);" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('observacoes_gerais'))}</textarea>
 
         </div>
 
@@ -26329,7 +26362,7 @@ function renderizarNavegacao() {
 
               <label class="field-label">Número da NF-e / NFS-e</label>
 
-              <input id="osNumNF" class="input" placeholder="EX: NFS-E 2026/00145" value="${esc(val('numero_nf', os.numero_nf || ''))}" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();" />
+              <input id="osNumNF" class="input" placeholder="EX: NFS-E 2026/00145" value="${esc(val('numero_nf', os.numero_nf || ''))}" style="text-transform:uppercase;" oninput="ajustarTextoEmCaixaAlta(this);" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();" />
 
             </div>
 
@@ -26561,7 +26594,7 @@ function renderizarNavegacao() {
 
 
 
-          <input id="osAssNome" class="input" placeholder="NOME LEGÍVEL E CARGO DO RECEBEDOR NO HOSPITAL" value="${esc(val('assinatura_cliente', os.responsavel_hospital))}" style="margin-bottom:10px;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();autoSalvarRascunho();" />
+          <input id="osAssNome" class="input" placeholder="NOME LEGÍVEL E CARGO DO RECEBEDOR NO HOSPITAL" value="${esc(val('assinatura_cliente', os.responsavel_hospital))}" style="margin-bottom:10px;text-transform:uppercase;" oninput="ajustarTextoEmCaixaAlta(this);" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();" />
 
 
 

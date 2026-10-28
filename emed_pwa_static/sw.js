@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v26-fix-runtime-navegacao';
+const CACHE_NAME = 'emed-pwa-v27-fix-cursor-edicao-texto';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
