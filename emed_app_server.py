@@ -114,6 +114,10 @@ from emed_core import (
 
     salvar_dataframe_transacional,
 
+    sincronizar_os_offline_idempotente,
+
+    gerar_hash_os_offline,
+
 )
 
 from emed_services import (
@@ -2041,7 +2045,7 @@ async def api_nova_os(request: web.Request) -> web.Response:
 
     tec_aux = limpar_texto(body.get("tecnico_auxiliar"), "NENHUM (INDIVIDUAL)").upper()
 
-    data_ag = limpar_texto(body.get("data_agendamento"), datetime.date.today().strftime("%Y-%m-%d"))
+    data_ag = limpar_texto(body.get("data_agendamento"), obter_agora_brasil().strftime("%Y-%m-%d"))
 
     resp_hosp = limpar_texto(body.get("responsavel_hospital"), "").upper()
 
@@ -2425,7 +2429,7 @@ async def api_calibracao_equipamento(request: web.Request) -> web.Response:
 
     os_id = int(limpar_float(body.get("os_id"), 0))
 
-    dt_ult = limpar_texto(body.get("data_ultima"), datetime.date.today().strftime("%d/%m/%Y"))
+    dt_ult = limpar_texto(body.get("data_ultima"), obter_agora_brasil_str("%d/%m/%Y"))
 
     dt_val = limpar_texto(body.get("data_validade"), "")
 
@@ -3693,6 +3697,54 @@ async def api_frota_multa_status(request: web.Request) -> web.Response:
 
 
 
+
+async def api_sync_offline(request: web.Request) -> web.Response:
+    """Sincronização em lote ou individual de OS executadas offline com garantia de idempotência estrita."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
+    
+    pacotes = body if isinstance(body, list) else [body]
+    if not pacotes:
+        return web.json_response({"ok": False, "msg": "Nenhum pacote enviado."}, status=400)
+    
+    df = _carregar_df_direto()
+    equipa = _montar_equipa_direto()
+    
+    resultados = []
+    for item in pacotes:
+        df, acao = sincronizar_os_offline_idempotente(df, item, equipa, "ANTONIO")
+        s_hash = item.get("sync_hash") or gerar_hash_os_offline(item)
+        resultados.append({"sync_hash": s_hash, "acao": acao, "os_id": item.get("os_id")})
+    
+    _salvar_df_direto(df)
+    return web.json_response({"ok": True, "processados": len(resultados), "resultados": resultados})
+
+
+async def api_ordens(request: web.Request) -> web.Response:
+    """Multiplexador REST unificado para compatibilidade total com o contrato /api/ordens."""
+    if request.method == "POST":
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
+        
+        # Se for pacote offline com sync_hash ou flag offline
+        if body.get("sync_hash") or body.get("offline"):
+            return await api_sync_offline(request)
+        
+        # Se tiver os_id e não for nova OS explícita, salva/atualiza
+        if body.get("os_id") and not body.get("novo", False):
+            return await api_salvar_os(request)
+        else:
+            return await api_nova_os(request)
+    elif request.method == "GET":
+        df = _carregar_df_direto()
+        return web.json_response({"ok": True, "total": len(df), "ordens": df.to_dict(orient="records")})
+    return web.json_response({"ok": False, "msg": "Método não permitido."}, status=405)
+
+
 def criar_app() -> web.Application:
 
     app = web.Application(client_max_size=25 * 1024 * 1024)
@@ -3725,6 +3777,10 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/salvar-os", api_salvar_os)
 
     app.router.add_post("/api/nova-os", api_nova_os)
+    app.router.add_get("/api/ordens", api_ordens)
+    app.router.add_post("/api/ordens", api_ordens)
+    app.router.add_post("/api/sync_offline", api_sync_offline)
+    app.router.add_post("/api/propostas", api_proposta_salvar)
 
     app.router.add_post("/api/reabrir-os", api_reabrir_os)
 

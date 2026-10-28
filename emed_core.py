@@ -511,17 +511,20 @@ def aplicar_peca_os_idempotente(db_path, nome_peca, qtd_aplicada, ref_anterior="
             # Peça aplicada via preenchimento manual (avulsa / fora do estoque formal)
             # Permite o registro completo na OS e segue o fluxo sem travar o fechamento
             return True, f"[PEÇA MANUAL: {nova_ref}]", nova_ref
-        saldo_atual = int(row[0])
-        if int(qtd_aplicada) > saldo_atual:
+        # Blindagem Atômica contra Race Condition: UPDATE condicional com trava de saldo
+        cur.execute(
+            "UPDATE estoque_pecas SET quantidade = quantidade - ? WHERE UPPER(nome_peca) = ? AND quantidade >= ?",
+            (int(qtd_aplicada), nome_peca.strip().upper(), int(qtd_aplicada))
+        )
+        if cur.rowcount == 0:
+            cur.execute("SELECT quantidade FROM estoque_pecas WHERE UPPER(nome_peca) = ?", (nome_peca.strip().upper(),))
+            r_recheck = cur.fetchone()
+            saldo_recheck = int(r_recheck[0]) if r_recheck else 0
             return (
                 False,
-                f"⚠️ Saldo insuficiente para '{nome_peca}' no estoque! Disponível: {saldo_atual} un.",
+                f"⚠️ Saldo insuficiente para '{nome_peca}' no estoque! Disponível: {saldo_recheck} un.",
                 ref_anterior
             )
-        cur.execute(
-            "UPDATE estoque_pecas SET quantidade = quantidade - ? WHERE UPPER(nome_peca) = ?",
-            (int(qtd_aplicada), nome_peca.strip().upper())
-        )
     return True, f"[PEÇA APLICADA: {nova_ref}]", nova_ref
 
 
