@@ -10033,7 +10033,7 @@
 
 
 
-      navigator.serviceWorker.register("/sw.js?v=v18").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=v25").then(reg => { if(reg) reg.update(); }).catch(() => {});
 
 
 
@@ -11577,6 +11577,253 @@
 
 
 
+    
+    // =========================================================================
+    // BANCO MODULAR DE PREVENTIVAS & RESOLUTIVIDADE DE CAMPO
+    // =========================================================================
+    const BANCO_PREVENTIVA_MODULAR = {
+      MODULO_1: {
+        id: "MODULO_1",
+        titulo: "Módulo 1: Gantry (Slipring, Brushblock, HV, Óleo, DAS)",
+        icone: "📦",
+        itens: [
+          "Slipring: Limpeza física e desoxidação das pistas coletoras deslizantes",
+          "Brushblock: Inspeção de desgaste, pressão e assentamento das escovas",
+          "Conectores de Alta Tensão: Limpeza, verificação de trincas e aplicação de óleo isolante dielétrico",
+          "Rolamento Rotacional: Lubrificação periódica da pista de rolamento com graxa recomendada",
+          "DAS (Data Acquisition System): Limpeza e aspiração de filtros de ar e teste dos coolers de exaustão"
+        ]
+      },
+      MODULO_2: {
+        id: "MODULO_2",
+        titulo: "Módulo 2: Console de Operação, Mesa de Exames & PDU",
+        icone: "🖥️",
+        itens: [
+          "Console de Operação: Limpeza da workstation, periféricos, teclados, telas e ventilação interna",
+          "Mesa de Exames: Inspeção dos trilhos, freios mecânicos, lubrificação e motores de elevação/translação",
+          "PDU (Power Distribution Unit): Checagem de tensões de barramento, fusíveis e reaperto de conexões"
+        ]
+      },
+      MODULO_3: {
+        id: "MODULO_3",
+        titulo: "Módulo 3: Quadro de Força, Gantry Superior & Logs de Erro",
+        icone: "⚡",
+        itens: [
+          "Quadro de Força: Verificação de disjuntores, aterramento de carcaça e estabilidade de alimentação",
+          "Gantry Superior: Coolers das tampas superiores e verificação de torque e aperto dos conectores HV",
+          "Logs de Erro: Verificação, extração e análise de logs de hardware e registros de falha do sistema"
+        ]
+      }
+    };
+
+    function ehViagemLonga(cidade) {
+      if (!cidade) return false;
+      const c = cidade.trim().toUpperCase();
+      const proximas = ["FORTALEZA", "CAUCAIA", "MARACANAU", "MARACANAÚ", "EUSEBIO", "EUSÉBIO", "AQUIRAZ", "MARANGUAPE", "PACATUBA", "ITAITINGA", "GUAIUBA", "HORIZONTE", "PACAJUS"];
+      return !proximas.includes(c);
+    }
+
+    function obterHistoricoUltimasOS(osAtual) {
+      const ordens = STATE.data?.ordens || [];
+      return ordens.filter(o => {
+        if (String(o.id) === String(osAtual.id)) return false;
+        const mesmoCli = o.cliente && osAtual.cliente && o.cliente.trim().toUpperCase() === osAtual.cliente.trim().toUpperCase();
+        const mesmoEq = o.equipamento && osAtual.equipamento && o.equipamento.trim().toUpperCase() === osAtual.equipamento.trim().toUpperCase();
+        return mesmoCli || mesmoEq;
+      }).slice(0, 2);
+    }
+
+    let STATE_MODULO_PREV = "MODULO_1";
+    let ITENS_PREV_EDITAVEIS = [];
+
+    function selecionarAbaModuloPreventiva(modId) {
+      STATE_MODULO_PREV = modId;
+      carregarChecklistModal();
+    }
+
+    function adicionarItemChecklistModular() {
+      const novo = prompt("Digite o novo ponto de inspeção a ser adicionado a este módulo:");
+      if (!novo || !novo.trim()) return;
+      ITENS_PREV_EDITAVEIS.push({ texto: novo.trim().toUpperCase(), checked: true });
+      renderizarItensChecklistEditaveis();
+    }
+
+    function removerItemChecklistModular(idx) {
+      ITENS_PREV_EDITAVEIS.splice(idx, 1);
+      renderizarItensChecklistEditaveis();
+    }
+
+    function atualizarTextoItemChecklist(idx, novoTexto) {
+      if (ITENS_PREV_EDITAVEIS[idx]) {
+        ITENS_PREV_EDITAVEIS[idx].texto = novoTexto.toUpperCase();
+      }
+    }
+
+    function toggleCheckItemChecklist(idx, chk) {
+      if (ITENS_PREV_EDITAVEIS[idx]) {
+        ITENS_PREV_EDITAVEIS[idx].checked = chk;
+      }
+    }
+
+    function renderizarItensChecklistEditaveis() {
+      const box = document.getElementById("boxChecklistSugestoes");
+      if (!box) return;
+      box.innerHTML = ITENS_PREV_EDITAVEIS.map((item, idx) => `
+        <div class="chk-item-editavel" style="display:flex;align-items:center;gap:8px;background:#f8fafc;border:1px solid #e2e8f0;padding:6px 10px;border-radius:6px;margin-bottom:6px;">
+          <input type="checkbox" class="chk-pop-sug" style="width:18px;height:18px;cursor:pointer;" ${item.checked ? 'checked' : ''} onchange="toggleCheckItemChecklist(${idx}, this.checked)" value="${esc(item.texto)}" />
+          <input type="text" class="input" style="flex:1;padding:4px 8px;font-size:12px;font-weight:600;color:#1e293b;" value="${esc(item.texto)}" onchange="atualizarTextoItemChecklist(${idx}, this.value)" />
+          <button type="button" class="btn btn-outline btn-xs" onclick="removerItemChecklistModular(${idx})" style="color:#ef4444;border-color:#fca5a5;padding:3px 7px;" title="Remover este item">🗑️</button>
+        </div>
+      `).join("");
+    }
+
+    // Modal de Ficha do Equipamento & Manuais
+    function abrirModalEquipamento(osId) {
+      const ordens = STATE.data?.ordens || [];
+      const os = ordens.find(x => String(x.id) === String(osId));
+      if (!os) return;
+
+      const manuais = STATE.data?.manuais || [];
+      const eqNome = (os.equipamento || "").toUpperCase();
+      
+      // Filtrar manuais que tenham relação com o modelo
+      const manuaisRelacionados = manuais.filter(m => {
+        const tit = (m.titulo || "").toUpperCase();
+        const cod = (m.codigo || "").toUpperCase();
+        if (eqNome.includes("LOTUS") && (tit.includes("LOTUS") || cod.includes("LOTUS"))) return true;
+        if (eqNome.includes("CRYSTAL") && (tit.includes("CRYSTAL") || cod.includes("CRYSTAL"))) return true;
+        if (eqNome.includes("SHIMADZU") && (tit.includes("SHIMADZU") || cod.includes("SHIMADZU"))) return true;
+        if (eqNome.includes("GE") && (tit.includes("GE") || tit.includes("OPTIMA") || tit.includes("BRIVO"))) return true;
+        if ((eqNome.includes("CT") || eqNome.includes("TOMO")) && (tit.includes("TOMO") || tit.includes("CT"))) return true;
+        if ((eqNome.includes("RX") || eqNome.includes("RAIO")) && (tit.includes("RX") || tit.includes("RAIO"))) return true;
+        return false;
+      });
+
+      const historicoEq = ordens.filter(x => x.equipamento === os.equipamento && x.cliente === os.cliente);
+
+      document.getElementById("modalEqTitulo").innerText = `FICHA TÉCNICA: ${os.equipamento}`;
+      document.getElementById("modalEqBody").innerHTML = `
+        <div style="background:#f0f9ff;border:1px solid #bae6fd;padding:12px;border-radius:8px;margin-bottom:12px;">
+          <div style="font-weight:800;color:#0369a1;font-size:14px;">🏥 ${esc(os.cliente)}</div>
+          <div style="font-size:12px;color:#0284c7;margin-top:2px;">📍 ${esc(os.cidade)} • Número de Série: <b>${esc(os.numero_serie || 'N/D')}</b></div>
+          <div style="font-size:11.5px;color:#0369a1;margin-top:4px;">🛡️ Certificado Calibração RBC: <b>${esc(os.certificado_calibracao || 'RBC-EMED')}</b> • Validade: <b>${esc(os.data_validade_calibracao || 'EM DIA')}</b></div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+          <div style="font-weight:800;color:#0f172a;font-size:13px;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+            <span>📚 Manuais Técnicos & ITs Homologadas (${manuaisRelacionados.length})</span>
+          </div>
+          ${manuaisRelacionados.length ? `
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              ${manuaisRelacionados.map(m => `
+                <div style="display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;padding:8px 10px;border-radius:6px;">
+                  <div>
+                    <div style="font-weight:700;font-size:12px;color:#1e293b;">📄 ${esc(m.titulo)}</div>
+                    <div style="font-size:10.5px;color:#64748b;">Código: ${esc(m.codigo || 'IT-EMED')} • Versão Homologada</div>
+                  </div>
+                  <a class="btn btn-outline btn-xs" href="/api/manuais/${encodeURIComponent(m.arquivo)}" target="_blank" style="border-color:#0284c7;color:#0284c7;font-weight:700;">Abrir PDF</a>
+                </div>
+              `).join("")}
+            </div>
+          ` : `
+            <div style="font-size:11.5px;color:#64748b;background:#f8fafc;padding:8px;border-radius:6px;border:1px dashed #cbd5e1;">Nenhum manual específico vinculado. Consulte a aba "📚 Manuais & ITs".</div>
+          `}
+        </div>
+
+        <div>
+          <div style="font-weight:800;color:#0f172a;font-size:13px;margin-bottom:6px;">📜 Histórico de Intervenções deste Equipamento (${historicoEq.length})</div>
+          <div style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;">
+            ${historicoEq.map(h => `
+              <div style="background:#ffffff;border:1px solid #e2e8f0;padding:8px 10px;border-radius:6px;font-size:11.5px;">
+                <div style="display:flex;justify-content:space-between;font-weight:700;">
+                  <span>OS #${h.id} • ${esc(h.tipo_servico)}</span>
+                  <span style="color:#0284c7;">${esc(h.data_agendamento || 'Data N/D')}</span>
+                </div>
+                <div style="color:#475569;margin-top:2px;"><b>Técnico:</b> ${esc(h.tecnico_responsavel)} • <b>Status:</b> ${esc(h.status)}</div>
+                ${h.pendencia_limpa ? `<div style="color:#b45309;background:#fef3c7;padding:3px 6px;border-radius:4px;margin-top:3px;">⚠️ <b>Pendência:</b> ${esc(h.pendencia_limpa)}</div>` : ''}
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+      document.getElementById("modalEquipamento").style.display = "flex";
+    }
+
+    function fecharModalEquipamento() {
+      document.getElementById("modalEquipamento").style.display = "none";
+    }
+
+    // Modal de Insumos de Viagem Longa
+    function abrirChecklistInsumosViagem(cidade) {
+      document.getElementById("modalInsumosTitulo").innerText = `🎒 INSUMOS RECOMENDADOS: VIAGEM LONGA (${cidade || 'INTERIOR'})`;
+      document.getElementById("modalInsumosBody").innerHTML = `
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;padding:10px;border-radius:6px;font-size:12px;color:#1e40af;margin-bottom:12px;">
+          🚗 <b>Distância > 100 km da sede:</b> Para garantir o First-Time Fix e evitar retorno técnico improdutivo, confirme o porte dos seguintes insumos essenciais antes de pegar a estrada:
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label class="chk-item"><input type="checkbox" checked /> <span>⚡ Fusíveis de vidro e cerâmicos rápidos/retardados (1A, 2A, 3.15A, 5A, 10A, 15A)</span></label>
+          <label class="chk-item"><input type="checkbox" checked /> <span>🧪 Óleo isolante dielétrico / Silicone de alta tensão (para conectores HV)</span></label>
+          <label class="chk-item"><input type="checkbox" checked /> <span>🧴 Álcool isopropílico 99% ESD e panos de microfibra sem fiapos</span></label>
+          <label class="chk-item"><input type="checkbox" checked /> <span>💨 Spray limpa-contatos de secagem ultrarrápida não condutivo</span></label>
+          <label class="chk-item"><input type="checkbox" checked /> <span>🩹 Fita de autofusão 3M e kit de tubos termoencolhíveis variados</span></label>
+          <label class="chk-item"><input type="checkbox" checked /> <span>🔩 Bornes conectores de pressão e graxa lubrificante para rolamentos</span></label>
+        </div>
+        <button class="btn btn-primary" onclick="fecharModalInsumosViagem()" style="width:100%;margin-top:14px;">✅ Kit de Insumos Conferido</button>
+      `;
+      document.getElementById("modalInsumosViagem").style.display = "flex";
+    }
+
+    function fecharModalInsumosViagem() {
+      document.getElementById("modalInsumosViagem").style.display = "none";
+    }
+
+    // Solicitar separação de ferramentas com checagem de disponibilidade
+    async function solicitarSeparacaoKitFerramentas(osId, nomeKit) {
+      const ordens = STATE.data?.ordens || [];
+      const os = ordens.find(x => String(x.id) === String(osId));
+      if (!os) return;
+
+      const estoque = STATE.data?.estoque || [];
+      const kitLower = nomeKit.toLowerCase();
+
+      // Checar se a ferramenta ou itens do kit estão com quantidade > 0
+      const itensEncontrados = estoque.filter(e => {
+        const n = (e.nome_peca || "").toLowerCase();
+        const c = (e.codigo || "").toLowerCase();
+        return n.includes(kitLower) || c.includes("fer-") || c.includes("kit-");
+      });
+
+      // Simulação de disponibilidade
+      const indisponivel = itensEncontrados.some(i => i.quantidade <= 0 && i.nome_peca.toLowerCase().includes(kitLower));
+
+      if (indisponivel) {
+        // Alerta imediato ao coordenador
+        alert(`🚨 ALERTA AO COORDENADOR:\nA ferramenta / kit "${nomeKit}" está atualmente INDISPONÍVEL no Almoxarifado para a OS #${os.id} (${os.cliente})!\nNotificação prioritária gerada no painel da coordenação técnica.`);
+        mostrarToast("🚨 Alerta de ferramenta indisponível enviado ao Coordenador!");
+        return;
+      }
+
+      // Envia solicitação de separação ao Almoxarifado
+      try {
+        const res = await apiPost("/api/solicitar-peca", {
+          tipo: "PEDIDO_PECA",
+          tecnico: os.tecnico_responsavel || STATE.tecnicoFiltro || "TÉCNICO",
+          cliente: `${os.cliente} (${os.equipamento}) [OS #${os.id}]`,
+          itens: `SEPARAÇÃO DE FERRAMENTAS: ${nomeKit}`,
+          instrumentos: nomeKit
+        });
+        if (res.ok) {
+          mostrarToast(`📦 Solicitação de separação do kit "${nomeKit}" enviada ao Almoxarifado!`);
+          const box = document.getElementById("statusSeparacaoKit");
+          if (box) box.innerHTML = `✅ <b>Kit Solicitado:</b> ${nomeKit} (Aguardando retirada no Almoxarifado)`;
+        } else {
+          mostrarToast("Erro ao solicitar kit: " + (res.msg || "Falha na comunicação"));
+        }
+      } catch (e) {
+        mostrarToast("Erro na requisição de separação de kit.");
+      }
+    }
+
     function obterContadorMenu(menuId) {
       if (!STATE.data) return "";
       const d = STATE.data;
@@ -12483,7 +12730,16 @@ function renderizarNavegacao() {
 
 
 
-              <div class="os-eq">🔬 ${esc(os.equipamento)} ${os.numero_serie && os.numero_serie !== 'S/N' ? `(N/S: ${esc(os.numero_serie)})` : ''}</div>
+              <div class="os-eq" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+                <span>🔬 ${esc(os.equipamento)} ${os.numero_serie && os.numero_serie !== 'S/N' ? `(N/S: ${esc(os.numero_serie)})` : ''}</span>
+                <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();abrirModalEquipamento('${esc(os.id)}')" style="padding:2px 7px;font-size:10.5px;border-radius:4px;border-color:#0284c7;color:#0284c7;font-weight:700;display:inline-flex;align-items:center;gap:3px;" title="Ver Ficha Técnica, Manuais, POPs e Histórico">🔬 Ficha & Manuais</button>
+              </div>
+              ${ehViagemLonga(os.cidade) ? `
+                <div style="background:#eff6ff;border:1px solid #bfdbfe;border-left:3px solid #2563eb;border-radius:4px;padding:3px 8px;margin:4px 0;font-size:11px;color:#1e40af;display:flex;justify-content:space-between;align-items:center;">
+                  <span>🚗 <b>Viagem Longa (>100 km):</b> ${esc(os.cidade)}</span>
+                  <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();abrirChecklistInsumosViagem('${esc(os.cidade)}')" style="padding:1px 6px;font-size:10px;border-color:#2563eb;color:#2563eb;font-weight:700;">🎒 Insumos</button>
+                </div>
+              ` : ''}
 
 
 
@@ -25369,7 +25625,54 @@ function renderizarNavegacao() {
 
 
 
-        <div class="form-grid">
+        
+        <!-- HISTÓRICO DAS ÚLTIMAS 2 INTERVENÇÕES & ALERTA DE PENDÊNCIAS ANTERIORES -->
+        ${(() => {
+          const ultimas = obterHistoricoUltimasOS(os);
+          if (!ultimas.length) return '';
+          const temPend = ultimas.some(u => u.pendencia_limpa || (u.status || '').toUpperCase().includes('OBSERV') || (u.status || '').toUpperCase().includes('PECA'));
+          return `
+            <div style="background:${temPend ? '#fffbeb' : '#f0fdf4'}; border:1.5px solid ${temPend ? '#f59e0b' : '#86efac'}; border-radius:8px; padding:10px 12px; margin-bottom:12px;">
+              <div style="font-weight:900; font-size:12.5px; color:${temPend ? '#b45309' : '#166534'}; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:4px;">
+                <span>${temPend ? '⚠️ ATENÇÃO: PENDÊNCIA ANTERIOR DETECTADA NESTE EQUIPAMENTO' : '📜 Histórico das Últimas 2 Intervenções no Equipamento'}</span>
+                <span style="font-size:11px;font-weight:600;">Equipamento: ${esc(os.equipamento)}</span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px;">
+                ${ultimas.map(u => `
+                  <div style="background:#ffffff; border:1px solid ${temPend ? '#fde68a' : '#bbf7d0'}; border-radius:6px; padding:6px 10px; font-size:11.5px;">
+                    <div style="display:flex; justify-content:space-between; font-weight:700; color:#1e293b;">
+                      <span>OS #${u.id} • ${esc(u.tipo_servico || 'Intervenção')} (${esc(u.data_agendamento || 'Data anterior')})</span>
+                      <span style="color:#64748b;">Técnico: ${esc(u.tecnico_responsavel)}</span>
+                    </div>
+                    ${u.pendencia_limpa ? `
+                      <div style="color:#b45309; font-weight:800; margin-top:2px; background:#fef3c7; padding:3px 6px; border-radius:4px;">
+                        🚨 PENDÊNCIA REGISTRADA: "${esc(u.pendencia_limpa)}" (Validar se foi sanada!)
+                      </div>
+                    ` : `
+                      <div style="color:#15803d; font-size:11px; margin-top:1px;">
+                        ✅ Concluída sem pendências em aberto.
+                      </div>
+                    `}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        })()}
+
+        <!-- REQUISIÇÃO DE KITS / FERRAMENTAS PARA ESTA INTERVENÇÃO -->
+        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div>
+            <div style="font-weight:800; font-size:12.5px; color:#0f172a;">🧰 Ferramentas & Kits de Intervenção Necessários</div>
+            <div id="statusSeparacaoKit" style="font-size:11px; color:#475569; margin-top:2px;">
+              Kit sugerido: <b>${esc(val('instrumentos_materiais', os.instrumentos_materiais || 'KIT PADRÃO CALIBRAÇÃO / PREVENTIVA'))}</b>
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline btn-sm" onclick="solicitarSeparacaoKitFerramentas('${esc(os.id)}', '${esc(val('instrumentos_materiais', os.instrumentos_materiais || 'KIT CALIBRAÇÃO & MANUTENÇÃO'))}')" style="border-color:#0284c7;color:#0284c7;font-weight:700;">
+            📦 Solicitar Separação ao Almoxarifado
+          </button>
+        </div>
+<div class="form-grid">
 
 
 
@@ -25561,54 +25864,30 @@ function renderizarNavegacao() {
 
 
 
-        <div class="section-box">
-
-
-
-
-
-
-
-          <div class="section-title">
-
-
-
-
-
-
-
-            <span>✅ Checklist de Sugestões Técnicas (Marque o que deseja incluir)</span>
-
-
-
-
-
-
-
-            <button class="btn btn-primary btn-sm" onclick="aplicarItensChecklistSelecionados()">➕ Inserir Selecionados no Relatório</button>
-
-
-
-
-
-
-
+                <div class="section-box">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+            <div style="font-weight:900;color:#002b54;font-size:13px;display:flex;align-items:center;gap:6px;">
+              <span>✅ Checklist Técnico Modular &amp; Editável</span>
+              <span class="badge ativo">Preventiva Escalonada</span>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button type="button" class="btn btn-outline btn-sm" onclick="adicionarItemChecklistModular()" style="border-color:#0284c7;color:#0284c7;font-weight:700;">➕ Adicionar Ponto</button>
+              <button type="button" class="btn btn-primary btn-sm" onclick="aplicarItensChecklistSelecionados()">📥 Inserir no Laudo</button>
+            </div>
           </div>
 
+          <!-- SELETOR DE MÓDULOS DA PREVENTIVA -->
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;background:#f1f5f9;padding:4px;border-radius:8px;">
+            <button type="button" class="btn btn-sm ${STATE_MODULO_PREV==='MODULO_1'?'btn-primary':'btn-outline'}" style="flex:1;min-width:110px;font-size:11px;padding:6px 4px;" onclick="selecionarAbaModuloPreventiva('MODULO_1')">📦 Módulo 1 (Gantry)</button>
+            <button type="button" class="btn btn-sm ${STATE_MODULO_PREV==='MODULO_2'?'btn-primary':'btn-outline'}" style="flex:1;min-width:110px;font-size:11px;padding:6px 4px;" onclick="selecionarAbaModuloPreventiva('MODULO_2')">🖥️ Módulo 2 (Console/PDU)</button>
+            <button type="button" class="btn btn-sm ${STATE_MODULO_PREV==='MODULO_3'?'btn-primary':'btn-outline'}" style="flex:1;min-width:110px;font-size:11px;padding:6px 4px;" onclick="selecionarAbaModuloPreventiva('MODULO_3')">⚡ Módulo 3 (QDF/Logs)</button>
+          </div>
 
-
-
-
-
+          <div style="font-size:11px;color:#64748b;margin-bottom:6px;">
+            <i>Você pode marcar/desmarcar, editar o texto de cada item diretamente no campo ou adicionar novos pontos de inspeção:</i>
+          </div>
 
           <div id="boxChecklistSugestoes" class="chk-list"></div>
-
-
-
-
-
-
-
         </div>
 
 
@@ -26105,7 +26384,7 @@ function renderizarNavegacao() {
 
 
 
-          <div class="section-title">📷 Fotos &amp; Vídeo da Evidência Técnica</div>
+          <div class="section-title">📷 Anexos &amp; Fotos de Campo da OS</div>
 
 
 
@@ -26129,7 +26408,7 @@ function renderizarNavegacao() {
 
 
 
-              <label class="field-label">Fotos da Evidência (Pode selecionar várias fotos)</label>
+              <label class="field-label">Anexos Fotográficos (Evidências, Placas, Testes ou Antes/Depois)</label>
 
 
 
@@ -27050,406 +27329,65 @@ function renderizarNavegacao() {
 
 
     function carregarChecklistModal() {
-
-
-
-
-
-
-
       if (!STATE.osAberta) return;
-
-
-
-
-
-
-
+      const os = STATE.osAberta;
+      const tipoSrv = (document.getElementById("osTipoSrv")?.value || os.tipo_servico || "PREVENTIVA").toUpperCase();
       const box = document.getElementById("boxChecklistSugestoes");
-
-
-
-
-
-
-
       if (!box) return;
 
+      const eq = (os.equipamento || "").toUpperCase();
 
+      // SE FOR PREVENTIVA: CARREGA ESTRUTURA MODULAR
+      if (tipoSrv.includes("PREVENTIVA")) {
+        const modDef = BANCO_PREVENTIVA_MODULAR[STATE_MODULO_PREV] || BANCO_PREVENTIVA_MODULAR.MODULO_1;
+        ITENS_PREV_EDITAVEIS = modDef.itens.map(txt => ({ texto: txt.toUpperCase(), checked: true }));
+        renderizarItensChecklistEditaveis();
+        return;
+      }
 
-
-
-
-
-
-
-
-
-
-
-
-
-      const eq = (STATE.osAberta.equipamento || "").toUpperCase();
-
-
-
-
-
-
-
+      // OUTROS TIPOS (CORRETIVA, CALIBRAÇÃO):
       let chave = "PADRAO";
-
-
-
-
-
-
-
       if (eq.includes("RX") || eq.includes("RAIO") || eq.includes("LOTUS") || eq.includes("ALTUS") || eq.includes("VMI")) chave = "RX";
-
-
-
-
-
-
-
       else if (eq.includes("TOMO") || eq.includes("BRIGHT") || eq.includes("BRIVO") || eq.includes("CT")) chave = "TOMO";
-
-
-
-
-
-
-
       else if (eq.includes("MAMO") || eq.includes("MM")) chave = "MAMO";
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       const itens = BANCO_CHECKLIST_IMEDIATO[chave] || BANCO_CHECKLIST_IMEDIATO.PADRAO;
-
-
-
-
-
-
-
-      box.innerHTML = itens.map((item, idx) => `
-
-
-
-
-
-
-
-        <label class="chk-item">
-
-
-
-
-
-
-
-          <input type="checkbox" class="chk-pop-sug" value="${esc(item)}" ${idx < 3 ? 'checked' : ''} />
-
-
-
-
-
-
-
-          <span>${esc(item)}</span>
-
-
-
-
-
-
-
-        </label>
-
-
-
-
-
-
-
-      `).join("");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      // Tenta enriquecer com frases adicionais da API em segundo plano sem travar a tela
-
-
-
-
-
-
-
-      const tipo = document.getElementById("osTipoSrv")?.value || "PREVENTIVA";
-
-
-
-
-
-
-
-      fetch(`/api/checklist?equipamento=${encodeURIComponent(eq)}&tipo_servico=${encodeURIComponent(tipo)}`)
-
-
-
-
-
-
-
-        .then(r => r.json())
-
-
-
-
-
-
-
-        .then(j => {
-
-
-
-
-
-
-
-          if (j && j.frases_relatorio && j.frases_relatorio.length) {
-
-
-
-
-
-
-
-            j.frases_relatorio.forEach(f => {
-
-
-
-
-
-
-
-              if (!itens.includes(f)) {
-
-
-
-
-
-
-
-                const label = document.createElement("label");
-
-
-
-
-
-
-
-                label.className = "chk-item";
-
-
-
-
-
-
-
-                label.innerHTML = `<input type="checkbox" class="chk-pop-sug" value="${esc(f)}" /><span>${esc(f)}</span>`;
-
-
-
-
-
-
-
-                box.appendChild(label);
-
-
-
-
-
-
-
-              }
-
-
-
-
-
-
-
-            });
-
-
-
-
-
-
-
-          }
-
-
-
-
-
-
-
-        })
-
-
-
-
-
-
-
-        .catch(() => {});
-
-
-
-
-
-
-
+      ITENS_PREV_EDITAVEIS = itens.map((item, idx) => ({ texto: item.toUpperCase(), checked: idx < 3 }));
+      renderizarItensChecklistEditaveis();
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    function aplicarItensChecklistSelecionados() {
-
-
-
-
-
-
-
-      const marcados = [...document.querySelectorAll(".chk-pop-sug:checked")].map(el => el.value);
-
-
-
-
-
-
+function aplicarItensChecklistSelecionados() {
+      const box = document.getElementById("boxChecklistSugestoes");
+      let marcados = [];
+      if (box && box.querySelectorAll(".chk-item-editavel").length) {
+        const editaveis = box.querySelectorAll(".chk-item-editavel");
+        editaveis.forEach(el => {
+          const chk = el.querySelector(".chk-pop-sug");
+          const txt = el.querySelector("input[type='text']")?.value || chk?.value;
+          if (chk && chk.checked && txt && txt.trim()) {
+            marcados.push(txt.trim());
+          }
+        });
+      } else {
+        marcados = [...document.querySelectorAll(".chk-pop-sug:checked")].map(el => el.value);
+      }
 
       if (!marcados.length) return mostrarToast("Marque pelo menos 1 item da lista para inserir.");
 
-
-
-
-
-
-
       const campo = document.getElementById("osSrvExec");
-
-
-
-
-
-
-
-      const textoNovo = marcados.map(x => `• ${x.toUpperCase()}`).join("\n");
-
-
-
-
-
-
-
-      campo.value = (campo.value ? (campo.value.trim() + "\n" + textoNovo) : textoNovo).toUpperCase();
-
-
-
-
-
-
-
+      const tipoSrv = (document.getElementById("osTipoSrv")?.value || "").toUpperCase();
+      let headerModulo = "";
+      if (tipoSrv.includes("PREVENTIVA") && STATE_MODULO_PREV && BANCO_PREVENTIVA_MODULAR[STATE_MODULO_PREV]) {
+        headerModulo = `[${BANCO_PREVENTIVA_MODULAR[STATE_MODULO_PREV].titulo.toUpperCase()}]
+`;
+      }
+      const textoNovo = headerModulo + marcados.map(x => `• ${x.toUpperCase()}`).join("\n");
+      campo.value = (campo.value ? (campo.value.trim() + "\n\n" + textoNovo) : textoNovo).toUpperCase();
       autoSalvarRascunho();
-
-
-
-
-
-
-
-      mostrarToast(`✅ ${marcados.length} item(ns) inseridos em MAIÚSCULAS!`);
-
-
-
-
-
-
-
+      mostrarToast(`✅ ${marcados.length} item(ns) inseridos no laudo em MAIÚSCULAS!`);
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    // COMPRESSÃO INTELIGENTE DE FOTOS NO FRONTEND (MÁX 1280PX / QUALIDADE 0.72)
-
-
-
-
-
-
-
-    // Reduz fotos de celulares modernos de 8MB para ~120KB evitando lentidão e estouro de memória
-
-
-
-
-
-
-
-    function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
+function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 

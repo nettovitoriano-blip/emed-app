@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v24-fullwidth-menu-edicao-servicos';
+const CACHE_NAME = 'emed-pwa-v25-fix-syntax-carregamento';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
