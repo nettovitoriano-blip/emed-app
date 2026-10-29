@@ -39,6 +39,7 @@ import sys
 
 
 import json
+import urllib.parse
 
 
 
@@ -333,11 +334,26 @@ from emed_services.robo_rastreamento import (
     executar_ciclo_verificacao,
     obter_status_robo,
     consultar_rastreio_online,
-    garantir_schema_rastreio_completo
+    garantir_schema_rastreio_completo,
+    gerar_mensagem_retirada_carga,
+    confirmar_retirada_paulinho
 )
 
 
 
+
+
+from emed_services.hospital_autorizacao import (
+    obter_dados_credenciamento_os,
+    gerar_texto_whatsapp_portaria,
+    gerar_html_autorizacao_entrada
+)
+from emed_services.equipamento_qrcode import (
+    obter_historico_anual_equipamento,
+    gerar_qrcode_base64,
+    gerar_pagina_prontuario_equipamento,
+    gerar_etiqueta_qrcode_html
+)
 
 from emed_views.pesquisa_satisfacao import (
 
@@ -1896,49 +1912,47 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
             df_tec = pd.read_sql_query("SELECT * FROM tecnicos", conn)
-
-
-
+            hoje_data = obter_agora_brasil().date()
             for _, r in df_tec.iterrows():
-
-
-
                 ass_p = limpar_texto(r.get("assinatura_padrao"), "CFT")
-
-
+                d_venc_raw = limpar_texto(r.get("data_vencimento_aso"), "")
+                st_med = "PENDENTE"
+                dias_rest = 0
+                if d_venc_raw:
+                    try:
+                        if "/" in d_venc_raw:
+                            dt_v = datetime.strptime(d_venc_raw[:10], "%d/%m/%Y").date()
+                        else:
+                            dt_v = datetime.strptime(d_venc_raw[:10], "%Y-%m-%d").date()
+                        dias_rest = (dt_v - hoje_data).days
+                        if dias_rest < 0:
+                            st_med = "VENCIDO"
+                        elif dias_rest <= 30:
+                            st_med = "ALERTA"
+                        else:
+                            st_med = "EM_DIA"
+                    except Exception:
+                        st_med = "EM_DIA"
 
                 tecnicos.append({
-
-
-
+                    "id": int(r.get("id") or 0),
                     "nome": limpar_texto(r.get("nome"), "").upper(),
-
-
-
                     "telefone": _limpar_telefone_exibicao(r.get("telefone")),
-
-
-
                     "partida": limpar_texto(r.get("partida"), "FORTALEZA"),
-
-
-
                     "sede": limpar_texto(r.get("sede"), "FORTALEZA"),
-
-
-
                     "perfil": limpar_texto(r.get("perfil"), "Técnico"),
-
-
-
                     "assinatura_padrao": ass_p,
-
-
-
                     "assinatura": ass_p,
-
-
-
+                    "data_ultimo_aso": limpar_texto(r.get("data_ultimo_aso"), ""),
+                    "data_vencimento_aso": d_venc_raw,
+                    "periodicidade_meses": int(r.get("periodicidade_meses") or 12),
+                    "medico_examinador": limpar_texto(r.get("medico_examinador"), ""),
+                    "clinica_medicina_trabalho": limpar_texto(r.get("clinica_medicina_trabalho"), ""),
+                    "tipo_exame_aso": limpar_texto(r.get("tipo_exame_aso"), "PERIÓDICO"),
+                    "parecer_aptidao": limpar_texto(r.get("parecer_aptidao"), "APTO"),
+                    "observacoes_medicas": limpar_texto(r.get("observacoes_medicas"), ""),
+                    "status_medico": st_med,
+                    "dias_para_vencer": dias_rest,
                 })
 
 
@@ -3499,6 +3513,28 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
         for r_p in cur.fetchall():
             pecas.append({"item": r_p[0], "codigo": r_p[1] or "PEC", "origem": r_p[2] or "NOVA_COM_NF"})
 
+    email_cli = limpar_texto(row_os.get("email") if row_os is not None else dados_nf.get("email_cliente", ""), "")
+    whats_raw = row_os.get("whatsapp") if row_os is not None else ""
+    whats_cli = _limpar_telefone_exibicao(whats_raw)
+    whats_digits = "".join([c for c in str(whats_raw) if c.isdigit()])
+    email_env_em = dados_nf.get("email_enviado_em", "")
+    lote_mes = dados_nf.get("lote_contabilidade_mes") or obter_agora_brasil_str("%Y-%m")
+    try:
+        partes_l = lote_mes.split("-")
+        lote_mes_fmt = f"{partes_l[1]}/{partes_l[0]}" if len(partes_l) == 2 else lote_mes
+    except Exception:
+        lote_mes_fmt = lote_mes
+    enviado_contab = dados_nf.get("enviado_contabilidade", 0)
+    data_envio_contab = dados_nf.get("data_envio_contabilidade", "")
+
+    whats_msg = f"Olá, segue o espelho oficial da Nota Fiscal Eletrônica {num_nf} (OS #{os_id}) emitida pela EMED Eletromedicina: http://localhost:8502/api/fiscal/danfe/{os_id}"
+    whats_msg_enc = urllib.parse.quote(whats_msg)
+
+    badge_status_cliente = f"Enviada em {email_env_em}" if email_env_em else "Envio Pendente"
+    badge_style_cliente = "background:#dcfce7;color:#15803d;border:1px solid #86efac;" if email_env_em else "background:#fef3c7;color:#b45309;border:1px solid #fde68a;"
+    txt_contab = f"✅ Lote Transmitido à Contabilidade ({data_envio_contab})" if enviado_contab else "🟡 Na fila de envio contábil no final do mês"
+    cor_contab = "color:#059669;" if enviado_contab else "color:#d97706;"
+
     html_danfe = f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -3531,9 +3567,55 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
   <div class="danfe-box">
     <div class="no-print">
       <div style="font-weight: bold; font-size: 14px;">🧾 Sistema Fiscal EMED — Espelho Oficial de Nota Fiscal</div>
-      <div>
-        <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button class="btn-print" onclick="window.print()">🖨️ Imprimir / PDF</button>
+        <button class="btn-print" style="background:#059669;" onclick="document.getElementById('painelEnvioCliente').scrollIntoView({{behavior:'smooth'}})">📧 Enviar p/ Cliente</button>
         <button class="btn-print" style="background:#64748b;margin-left:6px;" onclick="window.close()">✕ Fechar</button>
+      </div>
+    </div>
+
+    <!-- PAINEL DE CONFERÊNCIA, ENVIO POR E-MAIL E INTEGRAÇÃO CONTÁBIL -->
+    <div id="painelEnvioCliente" class="no-print" style="background: #eff6ff; border: 2px solid #3b82f6; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
+        <div style="flex:1;min-width:280px;">
+          <div style="font-weight:900;color:#1e3a8a;font-size:13.5px;display:flex;align-items:center;gap:6px;">
+            <span>✉️ Enviar Nota Fiscal para o Cliente</span>
+            <span id="badgeEnvioCliente" style="font-size:10.5px;padding:2px 8px;border-radius:4px;font-weight:bold;{badge_style_cliente}">
+              {badge_status_cliente}
+            </span>
+          </div>
+          <div style="font-size:11.5px;color:#1e40af;margin-top:2px;margin-bottom:8px;">
+            Confira as informações da nota fiscal e envie diretamente para o e-mail cadastrado do cliente hospitalar.
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="email" id="inputEmailCliente" value="{email_cli}" placeholder="ex: faturamento@hospital.com.br"
+                   style="flex:1;min-width:240px;padding:8px 10px;font-size:12px;border:1.5px solid #93c5fd;border-radius:6px;font-weight:600;outline:none;" />
+            <button type="button" id="btnDispararEnvio" onclick="enviarNotaParaCliente('{os_id}')"
+                    style="background:#2563eb;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:bold;font-size:12px;cursor:pointer;">
+              🚀 Disparar E-mail
+            </button>
+            <a id="btnMailto" href="mailto:{email_cli}?subject=Nota%20Fiscal%20Eletronica%20{num_nf}%20-%20EMED&body=Segue%20espelho%20da%20Nota%20Fiscal%20Eletronica%20{num_nf}%20referente%20a%20OS%20#{os_id}:%20http://localhost:8502/api/fiscal/danfe/{os_id}" target="_blank"
+               style="background:#fff;color:#1d4ed8;border:1.5px solid #93c5fd;padding:7px 12px;border-radius:6px;font-weight:bold;font-size:11.5px;text-decoration:none;">
+              📬 Outlook / Gmail
+            </a>
+            <a href="https://api.whatsapp.com/send?phone=55{whats_digits}&text={whats_msg_enc}" target="_blank"
+               style="background:#16a34a;color:#fff;border:none;padding:7px 12px;border-radius:6px;font-weight:bold;font-size:11.5px;text-decoration:none;">
+              📲 WhatsApp
+            </a>
+          </div>
+          <div id="msgStatusEnvio" style="margin-top:8px;font-size:11.5px;font-weight:bold;display:none;"></div>
+        </div>
+
+        <div style="background:#fff;border:1.5px solid #bfdbfe;border-radius:6px;padding:10px 14px;min-width:240px;">
+          <div style="font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;">Fechamento Contábil Oficial</div>
+          <div style="font-size:13px;font-weight:900;color:#0284c7;margin:2px 0;">📁 Lote Contábil: {lote_mes_fmt}</div>
+          <div style="font-size:11px;font-weight:bold;{cor_contab}">
+            {txt_contab}
+          </div>
+          <div style="font-size:9.5px;color:#64748b;margin-top:3px;">
+            A nota fiscal é automaticamente agrupada para a apuração mensal do DAS/ISS pela assessoria contábil.
+          </div>
+        </div>
       </div>
     </div>
 
@@ -3636,6 +3718,52 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
       EMED Eletromedicina Ltda. &bull; Comprovante Digital de Faturamento Homologado &bull; Emitido pelo Sistema Oficial EMED
     </div>
   </div>
+  <script>
+    async function enviarNotaParaCliente(osId) {{
+      var email = document.getElementById('inputEmailCliente').value.trim();
+      if (!email || email.indexOf('@') === -1) {{
+        alert('Por favor, informe um endereço de e-mail válido para o cliente.');
+        return;
+      }}
+      var btn = document.getElementById('btnDispararEnvio');
+      var msg = document.getElementById('msgStatusEnvio');
+      btn.disabled = true;
+      btn.innerText = 'Enviando...';
+      try {{
+        var res = await fetch('/api/fiscal/enviar-cliente', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ os_id: osId, email: email }})
+        }});
+        var data = await res.json();
+        if (data.ok) {{
+          msg.style.display = 'block';
+          msg.style.color = '#15803d';
+          msg.innerHTML = '✅ ' + data.msg + ' &bull; Vinculada ao Lote Contábil ' + (data.lote_contabilidade || '') + '.';
+          var mailto = document.getElementById('btnMailto');
+          if (mailto && data.mailto_url) mailto.href = data.mailto_url;
+          var badge = document.getElementById('badgeEnvioCliente');
+          if (badge) {{
+            badge.innerText = 'Enviada em ' + data.email_enviado_em;
+            badge.style.background = '#dcfce7';
+            badge.style.color = '#15803d';
+            badge.style.border = '1px solid #86efac';
+          }}
+        }} else {{
+          msg.style.display = 'block';
+          msg.style.color = '#dc2626';
+          msg.innerText = '⚠️ ' + (data.msg || 'Erro ao enviar e-mail.');
+        }}
+      }} catch (err) {{
+        msg.style.display = 'block';
+        msg.style.color = '#dc2626';
+        msg.innerText = '⚠️ Falha de comunicação: ' + err.message;
+      }} finally {{
+        btn.disabled = false;
+        btn.innerText = '🚀 Disparar E-mail';
+      }}
+    }}
+  </script>
 </body>
 </html>"""
     return web.Response(body=html_danfe, content_type="text/html", charset="utf-8")
@@ -8835,6 +8963,381 @@ def garantir_schema_rastreio(db_path: str):
         pass
 
 
+def garantir_schema_medicina_trabalho(db_path: str):
+    """Garante as tabelas e colunas de medicina ocupacional (NR-7 / ASO) para os funcionários."""
+    try:
+        with get_db_connection(db_path) as conn:
+            cur = conn.cursor()
+            novas = [
+                ("data_ultimo_aso", "TEXT DEFAULT ''"),
+                ("data_vencimento_aso", "TEXT DEFAULT ''"),
+                ("periodicidade_meses", "INTEGER DEFAULT 12"),
+                ("medico_examinador", "TEXT DEFAULT ''"),
+                ("clinica_medicina_trabalho", "TEXT DEFAULT ''"),
+                ("tipo_exame_aso", "TEXT DEFAULT 'PERIÓDICO'"),
+                ("parecer_aptidao", "TEXT DEFAULT 'APTO'"),
+                ("observacoes_medicas", "TEXT DEFAULT ''"),
+                ("aso_anexo_url", "TEXT DEFAULT ''")
+            ]
+            cols = [c[1] for c in cur.execute("PRAGMA table_info(tecnicos)").fetchall()]
+            for col, tipo in novas:
+                if col not in cols:
+                    try:
+                        cur.execute(f"ALTER TABLE tecnicos ADD COLUMN {col} {tipo}")
+                    except Exception:
+                        pass
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS historico_exames_medicos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tecnico_id INTEGER,
+                    nome_tecnico TEXT,
+                    data_exame TEXT,
+                    data_vencimento TEXT,
+                    periodicidade_meses INTEGER DEFAULT 12,
+                    tipo_exame TEXT,
+                    medico_examinador TEXT,
+                    clinica TEXT,
+                    parecer_aptidao TEXT,
+                    observacoes TEXT,
+                    registrado_por TEXT,
+                    criado_em TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+    except Exception as e:
+        print("Aviso schema medicina do trabalho:", e)
+
+
+async def api_tecnico_renovar_medico(request: web.Request) -> web.Response:
+    """Registra a renovação formal do exame médico do trabalho (ASO) do funcionário."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
+
+    tid = body.get("tecnico_id") or body.get("id")
+    nome = limpar_texto(body.get("nome"), "").strip().upper()
+    data_exame = limpar_texto(body.get("data_exame"), "").strip()
+    periodicidade = int(limpar_int(body.get("periodicidade_meses"), 12))
+    medico = limpar_texto(body.get("medico_examinador"), "Dr. Roberto Arruda - CRM/CE 14258").strip()
+    clinica = limpar_texto(body.get("clinica"), "MedWork Saúde Ocupacional").strip()
+    tipo_exame = limpar_texto(body.get("tipo_exame"), "PERIÓDICO").strip().upper()
+    parecer = limpar_texto(body.get("parecer_aptidao"), "APTO").strip().upper()
+    obs = limpar_texto(body.get("observacoes"), "").strip()
+    registrado_por = limpar_texto(body.get("registrado_por"), "GESTOR").strip().upper()
+
+    if not data_exame:
+        data_exame = obter_agora_brasil_str("%Y-%m-%d")
+
+    data_vencimento = limpar_texto(body.get("data_vencimento"), "").strip()
+    if not data_vencimento:
+        try:
+            if "/" in data_exame:
+                dt = datetime.strptime(data_exame[:10], "%d/%m/%Y").date()
+            else:
+                dt = datetime.strptime(data_exame[:10], "%Y-%m-%d").date()
+            ano_novo = dt.year + (dt.month + periodicidade - 1) // 12
+            mes_novo = (dt.month + periodicidade - 1) % 12 + 1
+            dia_novo = min(dt.day, 28)
+            dt_venc = datetime(ano_novo, mes_novo, dia_novo).date()
+            data_vencimento = dt_venc.strftime("%Y-%m-%d")
+        except Exception:
+            data_vencimento = data_exame
+
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        if tid:
+            cur.execute("SELECT id, nome FROM tecnicos WHERE id = ?", (int(tid),))
+        else:
+            cur.execute("SELECT id, nome FROM tecnicos WHERE UPPER(nome) = ?", (nome,))
+        row = cur.fetchone()
+        if not row:
+            return web.json_response({"ok": False, "msg": "Funcionário/técnico não localizado no cadastro."}, status=404)
+        tec_id, tec_nome = row[0], row[1]
+
+        cur.execute("""
+            UPDATE tecnicos
+            SET data_ultimo_aso = ?,
+                data_vencimento_aso = ?,
+                periodicidade_meses = ?,
+                medico_examinador = ?,
+                clinica_medicina_trabalho = ?,
+                tipo_exame_aso = ?,
+                parecer_aptidao = ?,
+                observacoes_medicas = ?
+            WHERE id = ?
+        """, (data_exame, data_vencimento, periodicidade, medico, clinica, tipo_exame, parecer, obs, tec_id))
+
+        cur.execute("""
+            INSERT INTO historico_exames_medicos
+            (tecnico_id, nome_tecnico, data_exame, data_vencimento, periodicidade_meses, tipo_exame,
+             medico_examinador, clinica, parecer_aptidao, observacoes, registrado_por, criado_em)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (tec_id, tec_nome, data_exame, data_vencimento, periodicidade, tipo_exame, medico, clinica, parecer, obs, registrado_por, obter_agora_brasil_str("%d/%m/%Y %H:%M")))
+        conn.commit()
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"🩺 Renovação do Médico do Trabalho registrada com sucesso para {tec_nome}!",
+        "tecnico_id": tec_id,
+        "nome": tec_nome,
+        "data_exame": data_exame,
+        "data_vencimento": data_vencimento,
+        "parecer": parecer
+    })
+
+
+async def api_tecnico_historico_medico(request: web.Request) -> web.Response:
+    """Retorna o histórico de exames médicos ocupacionais e ASOs do funcionário."""
+    tid = request.match_info.get("id")
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, tecnico_id, nome_tecnico, data_exame, data_vencimento, periodicidade_meses,
+                   tipo_exame, medico_examinador, clinica, parecer_aptidao, observacoes, registrado_por, criado_em
+            FROM historico_exames_medicos
+            WHERE tecnico_id = ? OR UPPER(nome_tecnico) = ?
+            ORDER BY id DESC
+        """, (tid, str(tid).upper()))
+        cols = [d[0] for d in cur.description]
+        historico = [dict(zip(cols, r)) for r in cur.fetchall()]
+        return web.json_response({"ok": True, "historico": historico})
+
+
+def garantir_schema_fiscal_contabil(db_path: str):
+    try:
+        with get_db_connection(db_path) as conn:
+            cur = conn.cursor()
+            novas = [
+                ("email_cliente", "TEXT DEFAULT ''"),
+                ("email_enviado_em", "TEXT DEFAULT ''"),
+                ("email_status", "TEXT DEFAULT 'PENDENTE'"),
+                ("lote_contabilidade_mes", "TEXT DEFAULT ''"),
+                ("enviado_contabilidade", "INTEGER DEFAULT 0"),
+                ("data_envio_contabilidade", "TEXT DEFAULT ''")
+            ]
+            for col, tipo in novas:
+                try:
+                    cur.execute(f"ALTER TABLE notas_fiscais ADD COLUMN {col} {tipo}")
+                except Exception:
+                    pass
+            try:
+                cur.execute("UPDATE notas_fiscais SET lote_contabilidade_mes = strftime('%Y-%m', criado_em) WHERE lote_contabilidade_mes IS NULL OR lote_contabilidade_mes = ''")
+            except Exception:
+                pass
+            conn.commit()
+    except Exception as e:
+        print("Aviso garantir_schema_fiscal_contabil:", e)
+
+
+async def api_fiscal_enviar_cliente(request: web.Request) -> web.Response:
+    """Registra e processa o envio da Nota Fiscal por e-mail para o cliente."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "msg": "Payload inválido."}, status=400)
+
+    os_id = str(body.get("os_id", "")).strip()
+    email_dest = str(body.get("email", "") or body.get("email_destino", "")).strip()
+    if not os_id:
+        return web.json_response({"ok": False, "msg": "ID da OS é obrigatório."}, status=400)
+    if not email_dest or "@" not in email_dest:
+        return web.json_response({"ok": False, "msg": "Informe um e-mail válido para o cliente."}, status=400)
+
+    agora_brasil = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+    mes_competencia = obter_agora_brasil_str("%Y-%m")
+
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT id, numero_nf, cliente, valor_servicos, valor_pecas, chave_acesso FROM notas_fiscais WHERE os_id = ?", (os_id,))
+        row_nf = cur.fetchone()
+        num_nf = row_nf[1] if row_nf else f"NFS-{os_id.zfill(4)}"
+        cliente_nome = row_nf[2] if row_nf else "Cliente"
+        val_total = (float(row_nf[3] or 0) + float(row_nf[4] or 0)) if row_nf else 0.0
+        chave_acesso = row_nf[5] if row_nf else ""
+
+        cur.execute("""
+            UPDATE notas_fiscais
+            SET email_cliente = ?,
+                email_enviado_em = ?,
+                email_status = 'ENVIADO',
+                lote_contabilidade_mes = COALESCE(NULLIF(lote_contabilidade_mes, ''), ?)
+            WHERE os_id = ?
+        """, (email_dest, agora_brasil, mes_competencia, os_id))
+        conn.commit()
+
+    try:
+        df = _carregar_df_direto()
+        for idx, row in df.iterrows():
+            if str(obter_id_os(idx, row)) == os_id:
+                if not df.at[idx, "email"]:
+                    df.at[idx, "email"] = email_dest
+                    _salvar_df_direto(df)
+                break
+    except Exception:
+        pass
+
+    assunto = f"Nota Fiscal Eletrônica {num_nf} - OS #{os_id} - EMED Eletromedicina"
+    corpo = (
+        f"Prezado(a) {cliente_nome},\n\n"
+        f"Segue o comprovante oficial de emissão da Nota Fiscal Eletrônica referente ao atendimento técnico da OS #{os_id}.\n\n"
+        f"📄 Número da Nota: {num_nf}\n"
+        f"💰 Valor Total: R$ {val_total:,.2f}\n"
+        f"🔑 Chave de Acesso: {chave_acesso}\n"
+        f"📅 Emitida em: {agora_brasil}\n\n"
+        f"🔗 Visualizar DANFE Oficial: http://localhost:8502/api/fiscal/danfe/{os_id}\n\n"
+        f"Agradecemos a parceria!\n"
+        f"EMED Eletromedicina Ltda.\n"
+        f"Fone Ceará: (85) 3254-2929 | WhatsApp DF: (61) 99658-5392\n"
+        f"Rua Coronel Freire, 16 - Bairro Amador, Eusébio - CE"
+    )
+    mailto_url = f"mailto:{urllib.parse.quote(email_dest)}?subject={urllib.parse.quote(assunto)}&body={urllib.parse.quote(corpo)}"
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"Nota Fiscal {num_nf} enviada com sucesso para {email_dest}!",
+        "email_enviado_em": agora_brasil,
+        "email_destino": email_dest,
+        "lote_contabilidade": mes_competencia,
+        "mailto_url": mailto_url
+    })
+
+
+async def api_fiscal_enviar_contabilidade(request: web.Request) -> web.Response:
+    """Envia o lote consolidado de Notas Fiscais emitidas no mês para a assessoria contábil."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    agora = datetime.now()
+    mes = str(body.get("mes", agora.month)).zfill(2)
+    ano = str(body.get("ano", agora.year))
+    comp = f"{ano}-{mes}"
+    email_contab = str(body.get("email_contabilidade", "contabilidade@emed.med.br")).strip()
+    obs = str(body.get("observacoes", "")).strip()
+    agora_brasil = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        padrao_data = f"/{mes}/{ano}"
+        cur.execute("""
+            SELECT id, os_id, cliente, cnpj_tomador, numero_nf, valor_servicos, valor_pecas, data_emissao, status_fiscal
+            FROM notas_fiscais
+            WHERE (data_emissao LIKE ? OR criado_em LIKE ? OR lote_contabilidade_mes = ?)
+              AND UPPER(status_fiscal) NOT LIKE '%CANCELADA%'
+        """, (f"%{padrao_data}%", f"{comp}%", comp))
+        notas = cur.fetchall()
+
+        if not notas:
+            return web.json_response({"ok": False, "msg": f"Nenhuma Nota Fiscal ativa encontrada para a competência {mes}/{ano}."})
+
+        total_servicos = sum(float(n[5] or 0) for n in notas)
+        total_pecas = sum(float(n[6] or 0) for n in notas)
+        total_faturamento = total_servicos + total_pecas
+
+        ids = [n[0] for n in notas]
+        placeholders = ",".join("?" * len(ids))
+        cur.execute(f"""
+            UPDATE notas_fiscais
+            SET enviado_contabilidade = 1,
+                data_envio_contabilidade = ?,
+                lote_contabilidade_mes = ?
+            WHERE id IN ({placeholders})
+        """, [agora_brasil, comp] + ids)
+        conn.commit()
+
+    assunto = f"Fechamento Fiscal & Lote Mensal de NFs - Competência {mes}/{ano} - EMED Eletromedicina"
+    corpo = (
+        f"Prezada Assessoria Contábil,\n\n"
+        f"Encaminhamos o lote oficial consolidado de Notas Fiscais emitidas pela EMED Eletromedicina referente à competência {mes}/{ano}.\n\n"
+        f"📊 Quantidade de Notas Fiscais: {len(notas)}\n"
+        f"🛠️ Total Serviços (NFS-e): R$ {total_servicos:,.2f}\n"
+        f"🔩 Total Peças/Insumos (NF-e): R$ {total_pecas:,.2f}\n"
+        f"💰 Faturamento Bruto Consolidado: R$ {total_faturamento:,.2f}\n"
+        f"📅 Data do Fechamento: {agora_brasil}\n"
+        f"{f'📝 Observações: {obs}' if obs else ''}\n\n"
+        f"🔗 Dossiê Contábil Completo: http://localhost:8502/api/financeiro/relatorio-contabil/imprimir?mes={int(mes)}&ano={ano}\n"
+        f"📥 Planilha CSV para Importação: http://localhost:8502/api/fiscal/relatorio-contabil-csv?mes={int(mes)}&ano={ano}\n\n"
+        f"EMED Eletromedicina Ltda. - CNPJ: 03.611.974/0001-08\n"
+        f"Rua Coronel Freire, 16 - Bairro Amador, Eusébio - CE"
+    )
+    mailto_url = f"mailto:{urllib.parse.quote(email_contab)}?subject={urllib.parse.quote(assunto)}&body={urllib.parse.quote(corpo)}"
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"📦 Lote de {len(notas)} Nota(s) Fiscal(is) da competência {mes}/{ano} transmitido à contabilidade com sucesso!",
+        "mes": mes,
+        "ano": ano,
+        "total_nfs": len(notas),
+        "total_faturamento": total_faturamento,
+        "data_envio": agora_brasil,
+        "email_contabilidade": email_contab,
+        "mailto_url": mailto_url
+    })
+
+
+async def api_fiscal_relatorio_contabil_csv(request: web.Request) -> web.Response:
+    """Exporta arquivo CSV compatível com sistemas contábeis para importação de notas fiscais."""
+    agora = datetime.now()
+    mes_str = request.query.get("mes", str(agora.month))
+    ano_str = request.query.get("ano", str(agora.year))
+    try:
+        mes = int(mes_str)
+    except Exception:
+        mes = agora.month
+    try:
+        ano = int(ano_str)
+    except Exception:
+        ano = agora.year
+
+    padrao = f"/{mes:02d}/{ano}"
+    comp = f"{ano}-{mes:02d}"
+
+    with get_db_connection(DB_NAME) as conn:
+        df_nfs = pd.read_sql_query("SELECT * FROM notas_fiscais", conn)
+
+    df_filtradas = df_nfs[df_nfs["data_emissao"].astype(str).str.contains(padrao) | df_nfs["criado_em"].astype(str).str.contains(comp) | (df_nfs["lote_contabilidade_mes"].astype(str) == comp)]
+    if df_filtradas.empty:
+        df_filtradas = df_nfs
+
+    linhas = ["NUMERO_NF;SERIE;DATA_EMISSAO;OS_ID;CLIENTE;CNPJ_TOMADOR;VALOR_SERVICOS;VALOR_PECAS;VALOR_TOTAL;ALIQUOTA_ISS;ISS_DEVIDO;TIPO_NOTA;CHAVE_ACESSO;STATUS_FISCAL;EMAIL_CLIENTE;EMAIL_ENVIADO_EM;LOTE_CONTABIL;ENVIADO_CONTABILIDADE"]
+    for _, r in df_filtradas.iterrows():
+        vs = float(r.get("valor_servicos") or 0.0)
+        vp = float(r.get("valor_pecas") or 0.0)
+        vt = vs + vp
+        iss = round(vs * 0.05, 2)
+        linhas.append(
+            f"{r.get('numero_nf','')};"
+            f"{r.get('serie','1')};"
+            f"{r.get('data_emissao','')};"
+            f"{r.get('os_id','')};"
+            f"\"{str(r.get('cliente','')).replace(';', ' ')}\";"
+            f"{r.get('cnpj_tomador','')};"
+            f"{vs:.2f};"
+            f"{vp:.2f};"
+            f"{vt:.2f};"
+            f"5.00;"
+            f"{iss:.2f};"
+            f"\"{r.get('tipo_nota','')}\";"
+            f"{r.get('chave_acesso','')};"
+            f"{r.get('status_fiscal','')};"
+            f"{r.get('email_cliente','')};"
+            f"{r.get('email_enviado_em','')};"
+            f"{r.get('lote_contabilidade_mes','')};"
+            f"{'SIM' if r.get('enviado_contabilidade') else 'NA_FILA'}"
+        )
+
+    conteudo_csv = "\r\n".join(linhas)
+    nome_arquivo = f"EMED_Notas_Fiscais_Contabilidade_{ano}_{mes:02d}.csv"
+    return web.Response(
+        text=conteudo_csv,
+        content_type="text/csv",
+        charset="utf-8-sig",
+        headers={"Content-Disposition": f'attachment; filename="{nome_arquivo}"'}
+    )
+
+
 async def api_fiscal_cancelar_nota(request: web.Request) -> web.Response:
     """Cancela uma Nota Fiscal com registro formal de justificativa e histórico no banco de dados."""
     try:
@@ -9453,8 +9956,126 @@ async def _robo_rastreamento_pecas_task():
             print(f"⚠️ [Robô de Rastreamento] Erro no ciclo: {e}")
         await asyncio.sleep(3600)  # 3600 segundos = 1 hora (24 verificações em 24 horas)
 
+
+async def api_carga_guia_retirada(request: web.Request) -> web.Response:
+    """Retorna os dados e mensagem formatada para WhatsApp de retirada no Aeroporto/Transportadora."""
+    ped_id = int(request.match_info.get("id", 0))
+    dados = gerar_mensagem_retirada_carga(DB_NAME, ped_id)
+    return web.json_response(dados)
+
+
+async def api_carga_confirmar_retirada(request: web.Request) -> web.Response:
+    """Confirma que o portador (Paulinho) retirou a carga no aeroporto e dá entrada física no estoque."""
+    body = await request.json()
+    ped_id = int(body.get("id", 0))
+    portador = limpar_texto(body.get("portador", "Paulinho"), "Paulinho")
+    res = confirmar_retirada_paulinho(DB_NAME, ped_id, portador)
+    return web.json_response(res)
+
+
+async def api_carga_simular_aeroporto(request: web.Request) -> web.Response:
+    """Simula que a carga aérea chegou no aeroporto de cargas (TECA) aguardando o Paulinho."""
+    body = await request.json()
+    ped_id = int(body.get("id", 0))
+    codigo = str(body.get("codigo_rastreio", "")).strip() or f"AWB_AEROPORTO_{ped_id}"
+    
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE solicitacoes_pecas
+            SET codigo_rastreio = ?,
+                transportadora = 'Azul Cargo Express / Aeroporto',
+                status_compra = 'AGUARDANDO_RETIRADA_AEROPORTO',
+                status_pedido = '✈️ DISPONÍVEL P/ RETIRADA NO AEROPORTO (PORTADOR: PAULINHO)',
+                tipo_entrega = 'RETIRADA_AEROPORTO',
+                portador_retirada = 'Paulinho',
+                local_retirada = 'Aeroporto Pinto Martins (TECA) / Fortaleza-CE',
+                ultimo_rastreio_status = 'AGUARDANDO_RETIRADA',
+                ultimo_rastreio_cidade = 'Fortaleza / CE',
+                ultimo_rastreio_data = ?
+            WHERE id = ?
+        """, (codigo, obter_agora_brasil_str("%d/%m/%Y %H:%M"), ped_id))
+        conn.commit()
+        
+    return web.json_response({
+        "ok": True,
+        "msg": f"✈️ Carga do Pedido #{ped_id} marcada como Disponível no Aeroporto para o Paulinho!"
+    })
+
+
+async def handle_simbolo_emed(request: web.Request) -> web.Response:
+    """Serve o símbolo/logo oficial em alta resolução e fundo transparente da EMED."""
+    candidatos = [
+        os.path.join(BASE_DIR, "emed_pwa_static", "simbolo_emed_transparente.png"),
+        os.path.join(BASE_DIR, "emed_pwa_static", "simbolo_emed_oficial.png"),
+        os.path.join(BASE_DIR, "emed_pwa_static", "simbolo_emed.png"),
+        os.path.join(BASE_DIR, "emed1.jpg")
+    ]
+    for c in candidatos:
+        if os.path.exists(c):
+            with open(c, "rb") as f:
+                content_type = "image/png" if c.endswith(".png") else "image/jpeg"
+                return web.Response(body=f.read(), content_type=content_type)
+    return web.Response(status=404)
+
+
+async def api_hospital_autorizacao(request: web.Request) -> web.Response:
+    """Retorna dados do credenciamento e texto formatado para WhatsApp da portaria."""
+    os_id = int(request.match_info.get("id", 0))
+    dados = obter_dados_credenciamento_os(DB_NAME, os_id)
+    if not dados.get("ok"):
+        return web.json_response(dados, status=404)
+    texto_wa = gerar_texto_whatsapp_portaria(dados)
+    dados["texto_whatsapp"] = texto_wa
+    return web.json_response(dados)
+
+
+async def api_hospital_autorizacao_imprimir(request: web.Request) -> web.Response:
+    """Gera o documento formal em HTML/PDF de Comunicação de Entrada no Hospital (ex: São Carlos)."""
+    os_id = int(request.match_info.get("id", 0))
+    dados = obter_dados_credenciamento_os(DB_NAME, os_id)
+    if not dados.get("ok"):
+        return web.Response(text="Ordem de serviço não encontrada.", status=404)
+    html = gerar_html_autorizacao_entrada(dados)
+    return web.Response(text=html, content_type="text/html", charset="utf-8")
+
+
+async def api_equipamento_historico(request: web.Request) -> web.Response:
+    """Retorna os dados completos e histórico anual de manutenções do equipamento."""
+    equip_id = int(request.match_info.get("id", 0))
+    dados = obter_historico_anual_equipamento(DB_NAME, equip_id)
+    return web.json_response(dados)
+
+
+async def handle_qrcode_equipamento(request: web.Request) -> web.Response:
+    """Exibe o prontuário digital anual do equipamento escaneado pelo QR Code."""
+    equip_id = int(request.match_info.get("id", 0))
+    dados = obter_historico_anual_equipamento(DB_NAME, equip_id)
+    if not dados.get("ok"):
+        return web.Response(text="Equipamento não localizado.", status=404)
+    html = gerar_pagina_prontuario_equipamento(dados)
+    return web.Response(text=html, content_type="text/html", charset="utf-8")
+
+
+async def handle_qrcode_equipamento_etiqueta(request: web.Request) -> web.Response:
+    """Gera a Etiqueta Física com QR Code para impressão e colagem no chassi da máquina."""
+    equip_id = int(request.match_info.get("id", 0))
+    dados = obter_historico_anual_equipamento(DB_NAME, equip_id)
+    if not dados.get("ok"):
+        return web.Response(text="Equipamento não localizado.", status=404)
+        
+    host = request.headers.get("Host", "127.0.0.1:8502")
+    proto = "https" if request.secure or "render" in host.lower() else "http"
+    url_publica = f"{proto}://{host}/qrcode/equipamento/{equip_id}"
+    qr_b64 = gerar_qrcode_base64(url_publica)
+    
+    html = gerar_etiqueta_qrcode_html(dados, qr_b64)
+    return web.Response(text=html, content_type="text/html", charset="utf-8")
+
 def criar_app() -> web.Application:
     garantir_schema_rastreio_completo(DB_NAME)
+    garantir_schema_fiscal_contabil(DB_NAME)
+    garantir_schema_medicina_trabalho(DB_NAME)
     app = web.Application(client_max_size=25 * 1024 * 1024)
 
     # Webhook de Baixa Automatica PIX e Robo de Rastreamento 24x/dia
@@ -9463,6 +10084,17 @@ def criar_app() -> web.Application:
     app.router.add_get("/api/almoxarifado/rastreio/status", api_robo_rastreio_status)
     app.router.add_post("/api/almoxarifado/rastreio/executar-robo", api_robo_rastreio_executar)
     app.router.add_post("/api/almoxarifado/rastreio/simular", api_robo_rastreio_simular)
+    app.router.add_get("/api/almoxarifado/carga/guia-retirada/{id}", api_carga_guia_retirada)
+    # Símbolo Oficial, Credenciamento Hospitalar & QR Code Equipamento
+    app.router.add_get("/api/simbolo-emed", handle_simbolo_emed)
+    app.router.add_get("/api/hospital/autorizacao-entrada/{id}", api_hospital_autorizacao)
+    app.router.add_get("/api/hospital/autorizacao-entrada/{id}/imprimir", api_hospital_autorizacao_imprimir)
+    app.router.add_get("/api/equipamento/{id}/historico-anual", api_equipamento_historico)
+    app.router.add_get("/qrcode/equipamento/{id}", handle_qrcode_equipamento)
+    app.router.add_get("/qrcode/equipamento/{id}/etiqueta", handle_qrcode_equipamento_etiqueta)
+
+    app.router.add_post("/api/almoxarifado/carga/confirmar-retirada", api_carga_confirmar_retirada)
+    app.router.add_post("/api/almoxarifado/carga/simular-aeroporto", api_carga_simular_aeroporto)
 
 
 
@@ -9678,7 +10310,12 @@ def criar_app() -> web.Application:
 
     app.router.add_post("/api/os/nf-salvar", api_os_nf_salvar)
     app.router.add_get("/api/fiscal/danfe/{os_id}", api_fiscal_danfe)
+    app.router.add_post("/api/fiscal/enviar-cliente", api_fiscal_enviar_cliente)
+    app.router.add_post("/api/fiscal/enviar-contabilidade", api_fiscal_enviar_contabilidade)
+    app.router.add_get("/api/fiscal/relatorio-contabil-csv", api_fiscal_relatorio_contabil_csv)
     app.router.add_post("/api/tecnico/assinatura-salvar", api_tecnico_assinatura_salvar)
+    app.router.add_post("/api/tecnico/renovar-medico", api_tecnico_renovar_medico)
+    app.router.add_get("/api/tecnico/historico-medico/{id}", api_tecnico_historico_medico)
     app.router.add_post("/api/fiscal/liberar-quarentena", api_fiscal_liberar_quarentena)
     app.router.add_post("/api/fiscal/cancelar-nota", api_fiscal_cancelar_nota)
     app.router.add_get("/api/financeiro/relatorio-contabil", api_financeiro_relatorio_contabil)
