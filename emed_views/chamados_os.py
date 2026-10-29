@@ -488,22 +488,31 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
 <body>
 
 <div class="container">
-  <!-- CABEÇALHO OFICIAL TIMBRADO -->
-  <div class="header">
-    <div class="header-left">
-      {bloco_logo}
-      <div class="header-info">
-        <b style="font-size:10pt;color:#0f172a;letter-spacing:0.3px;">eMED ELETROMEDICINA LTDA.</b><br>
-        Engenharia Clínica &bull; Manutenção &bull; Calibração Rastreada RBC/Inmetro<br>
-        <b>CNPJ:</b> 07.842.190/0001-44 &bull; <b>Sede:</b> Fortaleza - CE &bull; <b>Tel:</b> (85) 3299-4400<br>
-        <b>Responsabilidade Técnica:</b> CREA-CE / CFT-CE &bull; ANVISA RDC 509/2021
-      </div>
-    </div>
-    <div class="header-right">
-      <div class="rts-badge">RTS Nº #{id_os_c}</div><br>
-      <div class="status-liberado">✅ {cond_fin}</div><br>
-      <span style="font-size:7pt;color:#64748b;font-weight:bold;">Emissão: {dt_agend} &bull; {horario_atend_txt}</span>
-    </div>
+  <!-- CABEÇALHO PADRÃO OFICIAL EMED -->
+  <table width="100%" style="border-collapse:collapse;margin-bottom:4px;border:none;">
+    <tr>
+      <td width="16%" align="left" valign="middle" style="padding:2px 4px;border:none;">
+        {bloco_logo}
+      </td>
+      <td width="56%" align="left" valign="middle" style="padding:2px 8px;border:none;">
+        <div style="font-size:11pt;font-weight:bold;color:#0b132b;line-height:1.15;">EMED ELETROMEDICINA LTDA.</div>
+        <div style="font-size:7.5pt;color:#0f766e;font-weight:bold;margin-top:1px;">Eletromedicina • Manutenção em Equipamentos de Diagnóstico por Imagem</div>
+        <div style="font-size:7pt;color:#475569;margin-top:2px;line-height:1.25;">
+          CNPJ: 03.611.974/0001-08 • Sede: Rua Coronel Freire, 16 - Amador, Eusébio - CE, CEP 61769-470<br>
+          Fone: (85) 3254-2929 | DF: (61) 99658-5392 • Site: emed.med.br
+        </div>
+      </td>
+      <td width="28%" align="right" valign="top" style="text-align:right;padding:2px 4px;border:none;">
+        <div style="font-size:8.5pt;font-weight:bold;color:#0b132b;">Data: {dt_agend}</div>
+        <div style="font-size:7pt;color:#475569;margin-top:2px;">Atendimento: {horario_atend_txt}</div>
+        <div style="font-size:7pt;color:#047857;font-weight:bold;margin-top:2px;text-transform:uppercase;">STATUS: {str(row_c.get("status") or "CONCLUÍDA").upper()}</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- BANNER CLÁSSICO EMED 100% LARGURA -->
+  <div style="background:#0b132b;color:#ffffff;font-size:10.5pt;font-weight:bold;text-align:center;padding:5px 8px;border-radius:4px;letter-spacing:0.6px;margin-top:4px;margin-bottom:6px;border:1px solid #0b132b;">
+    ORDEM DE SERVIÇO Nº #{id_os_c}
   </div>
 
   <!-- QUADRO 1: DADOS DO CLIENTE & UNIDADE HOSPITALAR -->
