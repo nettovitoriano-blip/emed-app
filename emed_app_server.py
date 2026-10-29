@@ -2284,22 +2284,49 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-                    "status_pagamento": st_f,
-
-
-
+                                        "status_pagamento": st_f,
                     "data_emissao": limpar_texto(r.get("data_emissao"), ""),
-
-
-
+                    "data_liberacao_fiscal": limpar_texto(r.get("data_liberacao_fiscal"), ""),
+                    "status_quarentena": limpar_texto(r.get("status_quarentena"), "LIBERADO"),
+                    "feedback_cliente_status": limpar_texto(r.get("feedback_cliente_status"), ""),
                 })
 
-
-
         except Exception:
+            pass
 
-
-
+        remessas_lista = []
+        try:
+            df_rem = pd.read_sql_query("SELECT * FROM remessas_diagnostico ORDER BY id DESC LIMIT 60", conn)
+            for _, r in df_rem.iterrows():
+                remessas_lista.append({
+                    "id": int(r.get("id", 0)),
+                    "numero_remessa": limpar_texto(r.get("numero_remessa"), ""),
+                    "os_id": limpar_texto(r.get("os_id"), ""),
+                    "cliente_origem": limpar_texto(r.get("cliente_origem"), ""),
+                    "cidade_origem": limpar_texto(r.get("cidade_origem"), ""),
+                    "uf_origem": limpar_texto(r.get("uf_origem"), "CE"),
+                    "cnpj_origem": limpar_texto(r.get("cnpj_origem"), ""),
+                    "destinatario_nome": limpar_texto(r.get("destinatario_nome"), ""),
+                    "destinatario_cnpj": limpar_texto(r.get("destinatario_cnpj"), ""),
+                    "cidade_destino": limpar_texto(r.get("cidade_destino"), ""),
+                    "uf_destino": limpar_texto(r.get("uf_destino"), "SP"),
+                    "cfop": limpar_texto(r.get("cfop"), "6.915"),
+                    "descricao_peca": limpar_texto(r.get("descricao_peca"), ""),
+                    "numero_serie": limpar_texto(r.get("numero_serie"), ""),
+                    "quantidade": int(r.get("quantidade", 1)),
+                    "valor_declarado": float(r.get("valor_declarado", 0.0)),
+                    "motivo_diagnostico": limpar_texto(r.get("motivo_diagnostico"), ""),
+                    "modalidade_transporte": limpar_texto(r.get("modalidade_transporte"), "TRANSPORTADORA"),
+                    "transportadora": limpar_texto(r.get("transportadora"), ""),
+                    "codigo_rastreio": limpar_texto(r.get("codigo_rastreio"), ""),
+                    "tecnico_portador": limpar_texto(r.get("tecnico_portador"), ""),
+                    "status_remessa": limpar_texto(r.get("status_remessa"), "EM_TRANSITO"),
+                    "data_envio": limpar_texto(r.get("data_envio"), ""),
+                    "data_retorno_prevista": limpar_texto(r.get("data_retorno_prevista"), ""),
+                    "data_retorno_real": limpar_texto(r.get("data_retorno_real"), ""),
+                    "observacoes": limpar_texto(r.get("observacoes"), ""),
+                })
+        except Exception:
             pass
 
 
@@ -2950,6 +2977,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
         "notas_fiscais": notas,
+        "remessas_diagnostico": remessas_lista,
 
 
 
@@ -4083,49 +4111,51 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
         df.at[idx_alvo, "status"] = "CONCLUÍDO"
 
-
-
         try:
-
-
-
             registrar_aplicacao_definitiva_e_fluxo_cobranca(
-
-
-
                 DB_NAME, int(os_id), limpar_texto(row_os.get("cliente"), ""),
-
-
-
                 limpar_texto(row_os.get("equipamento"), ""), tec_resp, peca_sel, qtd_peca, float(val_calc),
-
-
-
                 condicao_pagamento=resumo_pag,
-
-
-
                 tipo_contrato=limpar_texto(row_os.get("tipo_contrato"), "CONTRATO"),
-
-
-
             )
-
-
-
         except Exception:
-
-
-
             pass
 
+        # -------------------------------------------------------------
+        # 1. BAIXA AUTOMÁTICA DE TODAS AS PEÇAS E PEDIDOS DO ALMOXARIFADO
+        # -------------------------------------------------------------
+        try:
+            with get_db_connection(DB_NAME) as conn_b:
+                cur_b = conn_b.cursor()
+                cur_b.execute("""
+                    UPDATE solicitacoes_pecas 
+                    SET status_pedido = 'APLICADO EM DEFINITIVO NO CLIENTE / BAIXADO',
+                        confirmado_em = COALESCE(NULLIF(confirmado_em, ''), ?)
+                    WHERE (os_id = ? OR destino_cliente LIKE ? OR destino_cliente LIKE ?)
+                      AND UPPER(status_pedido) NOT LIKE '%APLICADO%'
+                      AND UPPER(status_pedido) NOT LIKE '%BAIXADO%'
+                      AND UPPER(status_pedido) NOT LIKE '%RECUSADO%'
+                """, (agora_str, str(os_id), f"%[OS #{os_id}]%", f"%OS #{os_id}%"))
 
+                # -------------------------------------------------------------
+                # 2. DELAY DE VALIDAÇÃO / FEEDBACK DO CLIENTE ANTES DE LIBERAR NF (24H)
+                # -------------------------------------------------------------
+                dt_lib = obter_agora_brasil() + timedelta(hours=24)
+                data_lib_str = dt_lib.strftime("%d/%m/%Y %H:%M")
+                cur_b.execute("""
+                    UPDATE notas_fiscais
+                    SET status_fiscal = 'QUARENTENA PÓS-SERVIÇO (AGUARDANDO FEEDBACK DO CLIENTE)',
+                        status_quarentena = 'QUARENTENA_FEEDBACK',
+                        data_liberacao_fiscal = ?,
+                        feedback_cliente_status = 'PENDENTE_FEEDBACK'
+                    WHERE os_id = ? AND (status_quarentena IS NULL OR status_quarentena = 'LIBERADO' OR status_quarentena = '')
+                """, (data_lib_str, int(os_id)))
+                conn_b.commit()
+        except Exception as e_baixa:
+            print("Aviso baixa automatica / quarentena:", e_baixa)
 
         limpar_rascunho_provisorio(DB_NAME, os_id)
-
-
-
-        msg_final = f"🏁 OS #{os_id} CONCLUÍDA e salva com sucesso no servidor EMED!"
+        msg_final = f"🏁 OS #{os_id} CONCLUÍDA! Peça baixada no almoxarifado e fatura em período de feedback com o cliente (24h) antes da NF."
 
 
 
@@ -4991,6 +5021,31 @@ async def api_satisfacao_registrar(request: web.Request) -> web.Response:
 
 
     ok, msg = registrar_pesquisa(DB_NAME, os_id, cliente, tecnico, nota, comentario)
+
+    if ok and os_id and os_id != "AVULSO":
+        try:
+            with get_db_connection(DB_NAME) as conn_sat:
+                cur_sat = conn_sat.cursor()
+                os_num = int(os_id) if os_id.isdigit() else 0
+                if nota >= 3:
+                    cur_sat.execute("""
+                        UPDATE notas_fiscais
+                        SET status_quarentena = 'LIBERADO_PELO_CLIENTE',
+                            status_fiscal = 'LIBERADO PARA EMISSÃO DE NOTA FISCAL (FEEDBACK OK)',
+                            feedback_cliente_status = ?
+                        WHERE os_id = ?
+                    """, (f"APROVADO PELO CLIENTE ({nota}⭐)", os_num))
+                else:
+                    cur_sat.execute("""
+                        UPDATE notas_fiscais
+                        SET status_quarentena = 'BLOQUEADO_REVISAO',
+                            status_fiscal = 'PAUSADO (CLIENTE SOLICITOU AJUSTE/REVISÃO)',
+                            feedback_cliente_status = ?
+                        WHERE os_id = ?
+                    """, (f"ALERTA_REVISAO ({nota}⭐)", os_num))
+                conn_sat.commit()
+        except Exception:
+            pass
 
 
 
@@ -8160,6 +8215,285 @@ async def api_ferramentas_minhas(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "tecnico": tecnico, "ferramentas": minhas})
 
 
+
+async def api_fiscal_liberar_quarentena(request: web.Request) -> web.Response:
+    """Libera a emissão da NF antecipadamente a partir da validação manual do gestor ou cliente."""
+    body = await request.json()
+    os_id = int(body.get("os_id", 0))
+    motivo = str(body.get("motivo", "LIBERAÇÃO MANUAL DO GESTOR")).strip()
+    
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE notas_fiscais
+            SET status_quarentena = 'LIBERADO',
+                status_fiscal = 'LIBERADO PARA EMISSÃO DE NOTA FISCAL',
+                feedback_cliente_status = ?
+            WHERE os_id = ?
+        """, (motivo, os_id))
+        conn.commit()
+        
+    return web.json_response({
+        "ok": True,
+        "msg": f"✅ OS #{os_id} liberada da quarentena para emissão da Nota Fiscal!",
+        "novo_status": "LIBERADO PARA EMISSÃO DE NOTA FISCAL"
+    })
+
+async def api_remessas_diagnostico_listar(request: web.Request) -> web.Response:
+    """Retorna o histórico de remessas para conserto e diagnóstico externo."""
+    with get_db_connection(DB_NAME) as conn:
+        df_rem = pd.read_sql_query("SELECT * FROM remessas_diagnostico ORDER BY id DESC LIMIT 100", conn)
+        return web.json_response({"ok": True, "remessas": df_rem.to_dict(orient="records")})
+
+async def api_remessas_diagnostico_salvar(request: web.Request) -> web.Response:
+    """Gera uma nova Nota/Guia de Remessa para Diagnóstico ou Conserto (CFOP 5.915 estadual ou 6.915 interestadual)."""
+    body = await request.json()
+    os_id = str(body.get("os_id", "")).strip()
+    cliente_origem = limpar_texto(body.get("cliente_origem"), "HOSPITAL CREDENCIADO")
+    cidade_origem = limpar_texto(body.get("cidade_origem"), "FORTALEZA")
+    uf_origem = limpar_texto(body.get("uf_origem"), "CE").upper()
+    cnpj_origem = limpar_texto(body.get("cnpj_origem"), "")
+    
+    destinatario_nome = limpar_texto(body.get("destinatario_nome"), "LABORATÓRIO MATRIZ EMED")
+    destinatario_cnpj = limpar_texto(body.get("destinatario_cnpj"), "")
+    cidade_destino = limpar_texto(body.get("cidade_destino"), "FORTALEZA")
+    uf_destino = limpar_texto(body.get("uf_destino"), "CE").upper()
+    
+    # Determina CFOP: 5.915 se dentro do CE, 6.915 se interestadual
+    cfop = "5.915" if uf_destino == uf_origem else "6.915"
+    
+    descricao_peca = limpar_texto(body.get("descricao_peca"), "PEÇA BIOMÉDICA PARA DIAGNÓSTICO")
+    numero_serie = limpar_texto(body.get("numero_serie"), "S/N")
+    quantidade = int(limpar_float(body.get("quantidade"), 1))
+    valor_declarado = float(limpar_float(body.get("valor_declarado"), 1000.0))
+    motivo_diagnostico = limpar_texto(body.get("motivo_diagnostico"), "DIAGNÓSTICO AVANÇADO EM BANCADA")
+    modalidade_transporte = limpar_texto(body.get("modalidade_transporte"), "TRANSPORTADORA").upper()
+    transportadora = limpar_texto(body.get("transportadora"), "")
+    codigo_rastreio = limpar_texto(body.get("codigo_rastreio"), "").strip()
+    tecnico_portador = limpar_texto(body.get("tecnico_portador"), "")
+    data_retorno_prevista = limpar_texto(body.get("data_retorno_prevista"), "")
+    observacoes = limpar_texto(body.get("observacoes"), "")
+    
+    agora_brasil = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+    ano_atual = obter_agora_brasil().strftime("%Y")
+    
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM remessas_diagnostico")
+        total_rem = cur.fetchone()[0] + 1
+        num_remessa = f"REM-{ano_atual}-{total_rem:04d}"
+        
+        cur.execute("""
+            INSERT INTO remessas_diagnostico (
+                numero_remessa, os_id, cliente_origem, cidade_origem, uf_origem, cnpj_origem,
+                destinatario_nome, destinatario_cnpj, cidade_destino, uf_destino, cfop,
+                descricao_peca, numero_serie, quantidade, valor_declarado, motivo_diagnostico,
+                modalidade_transporte, transportadora, codigo_rastreio, tecnico_portador,
+                status_remessa, data_envio, data_retorno_prevista, observacoes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            num_remessa, os_id, cliente_origem, cidade_origem, uf_origem, cnpj_origem,
+            destinatario_nome, destinatario_cnpj, cidade_destino, uf_destino, cfop,
+            descricao_peca, numero_serie, quantidade, valor_declarado, motivo_diagnostico,
+            modalidade_transporte, transportadora, codigo_rastreio, tecnico_portador,
+            "EM_TRANSITO", agora_brasil, data_retorno_prevista, observacoes
+        ))
+        
+        # Registra espelho em notas_fiscais
+        cur.execute("""
+            INSERT INTO notas_fiscais (
+                os_id, cliente, cnpj_tomador, tipo_nota, natureza_operacao, cfop,
+                valor_servicos, valor_pecas, valor_liquido, status_fiscal, numero_nf,
+                discriminacao_servico, data_emissao
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            int(os_id) if os_id.isdigit() else 0,
+            destinatario_nome, destinatario_cnpj, "REMESSA_DIAGNOSTICO",
+            f"REMESSA DE MERCADORIA P/ CONSERTO OU DIAGNÓSTICO ({'INTERESTADUAL' if cfop == '6.915' else 'ESTADUAL'})",
+            cfop, 0.0, valor_declarado, 0.0, "EMITIDA (EM TRÂNSITO FISCAL)", num_remessa,
+            f"Item: {descricao_peca} (S/N: {numero_serie}) - Motivo: {motivo_diagnostico}. Não gera crédito de ICMS/ISS.",
+            agora_brasil
+        ))
+        conn.commit()
+        
+    return web.json_response({
+        "ok": True,
+        "msg": f"✅ Nota de Remessa {num_remessa} emitida com sucesso (CFOP {cfop})!",
+        "numero_remessa": num_remessa,
+        "cfop": cfop
+    })
+
+async def api_remessas_diagnostico_retorno(request: web.Request) -> web.Response:
+    """Registra o retorno físico da mercadoria/peça do conserto (CFOP 1.916 / 2.916)."""
+    body = await request.json()
+    id_rem = int(body.get("id", 0))
+    obs_retorno = limpar_texto(body.get("observacao"), "Retorno de conserto concluído com sucesso.")
+    agora_brasil = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+    
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE remessas_diagnostico
+            SET status_remessa = 'RETORNADO',
+                data_retorno_real = ?,
+                observacoes = observacoes || ' | [RETORNO: ' || ? || ' às ' || ? || ']'
+            WHERE id = ?
+        """, (agora_brasil, obs_retorno, agora_brasil, id_rem))
+        
+        cur.execute("""
+            UPDATE notas_fiscais
+            SET status_fiscal = 'RETORNADO (CONSERTO FINALIZADO)'
+            WHERE numero_nf = (SELECT numero_remessa FROM remessas_diagnostico WHERE id = ?)
+        """, (id_rem,))
+        conn.commit()
+        
+    return web.json_response({"ok": True, "msg": f"✅ Retorno da remessa #{id_rem} registrado com sucesso!"})
+
+async def api_remessas_diagnostico_guia(request: web.Request) -> web.Response:
+    """Renderiza a Guia de Transporte e Remessa para Diagnóstico com visual timbrado oficial EMED."""
+    id_rem = int(request.match_info.get("id", 0))
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM remessas_diagnostico WHERE id = ?", (id_rem,))
+        row = cur.fetchone()
+        if not row:
+            return web.Response(text="Guia de remessa não localizada.", status=404)
+        
+        col_names = [d[0] for d in cur.description]
+        r = dict(zip(col_names, row))
+        
+    html = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Guia de Remessa para Diagnóstico - {r.get('numero_remessa')}</title>
+<style>
+  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 20px; color: #1e293b; background: #f8fafc; }}
+  .container {{ max-width: 820px; margin: 0 auto; background: #fff; padding: 30px; border: 1.5px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }}
+  .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; }}
+  .logo {{ font-size: 24px; font-weight: 900; color: #0284c7; letter-spacing: 1px; }}
+  .doc-title {{ text-align: right; }}
+  .doc-title h1 {{ font-size: 16px; margin: 0; color: #0f172a; text-transform: uppercase; }}
+  .doc-title span {{ font-size: 13px; font-weight: 800; color: #0284c7; }}
+  .box-info {{ border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; margin-bottom: 15px; background: #f8fafc; }}
+  .box-title {{ font-size: 12px; font-weight: 800; text-transform: uppercase; color: #475569; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }}
+  .grid-2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }}
+  .label {{ font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; }}
+  .val {{ font-size: 13px; font-weight: 700; color: #0f172a; margin-top: 2px; }}
+  table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+  th {{ background: #0284c7; color: #fff; text-align: left; padding: 8px 10px; font-size: 11px; text-transform: uppercase; }}
+  td {{ border: 1px solid #e2e8f0; padding: 8px 10px; font-size: 12px; }}
+  .cfop-badge {{ display: inline-block; background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 4px; font-weight: 800; font-size: 12px; border: 1px solid #7dd3fc; }}
+  .legal-notice {{ font-size: 10.5px; color: #64748b; background: #f1f5f9; padding: 10px; border-radius: 6px; margin-top: 20px; line-height: 1.4; border-left: 3px solid #0284c7; }}
+  .signatures {{ display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; }}
+  .sig-line {{ width: 45%; border-top: 1px solid #94a3b8; text-align: center; font-size: 11px; color: #475569; padding-top: 5px; }}
+  @media print {{ body {{ background: #fff; margin: 0; }} .container {{ border: none; box-shadow: none; padding: 0; }} .no-print {{ display: none; }} }}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="no-print" style="margin-bottom: 15px; display: flex; justify-content: flex-end; gap: 8px;">
+    <button onclick="window.print()" style="padding: 8px 16px; background: #0284c7; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">🖨️ Imprimir Guia / Salvar PDF</button>
+  </div>
+  
+  <div class="header">
+    <div>
+      <div class="logo">🏥 eMED ELETROMEDICINA</div>
+      <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Engenharia Clínica e Hospitalar Especializada</div>
+    </div>
+    <div class="doc-title">
+      <h1>Guia de Remessa para Diagnóstico / Conserto</h1>
+      <span>{r.get('numero_remessa')} &bull; CFOP {r.get('cfop')}</span>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="box-info">
+      <div class="box-title">📍 Unidade de Origem (Remetente)</div>
+      <div class="label">Cliente / Hospital:</div>
+      <div class="val">{r.get('cliente_origem')}</div>
+      <div class="label" style="margin-top: 6px;">Município / UF:</div>
+      <div class="val">{r.get('cidade_origem')} - {r.get('uf_origem')}</div>
+      <div class="label" style="margin-top: 6px;">OS Vinculada:</div>
+      <div class="val">OS #{r.get('os_id') or 'Avulsa'}</div>
+    </div>
+
+    <div class="box-info">
+      <div class="box-title">🎯 Destino / Centro Técnico de Reparo</div>
+      <div class="label">Destinatário:</div>
+      <div class="val">{r.get('destinatario_nome')}</div>
+      <div class="label" style="margin-top: 6px;">Município / UF de Destino:</div>
+      <div class="val">{r.get('cidade_destino')} - {r.get('uf_destino')}</div>
+      <div class="label" style="margin-top: 6px;">Enquadramento Tributário:</div>
+      <div class="val"><span class="cfop-badge">CFOP {r.get('cfop')} - {'INTERESTADUAL' if r.get('uf_destino') != r.get('uf_origem') else 'ESTADUAL'}</span></div>
+    </div>
+  </div>
+
+  <div class="box-info">
+    <div class="box-title">🔩 Descrição do Bem / Peça em Trânsito</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Item / Peça Biomédica</th>
+          <th>Nº de Série</th>
+          <th>Qtd</th>
+          <th>Valor Declarado (Seguro)</th>
+          <th>Motivo do Envio / Laudo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>{r.get('descricao_peca')}</b></td>
+          <td><code>{r.get('numero_serie')}</code></td>
+          <td style="text-align: center;">{r.get('quantidade')} UN</td>
+          <td style="font-weight: 800; color: #047857;">R$ {float(r.get('valor_declarado', 0.0)):,.2f}</td>
+          <td>{r.get('motivo_diagnostico')}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="box-info">
+    <div class="box-title">🚚 Dados Logísticos &amp; Transporte</div>
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+      <div>
+        <div class="label">Modalidade:</div>
+        <div class="val">{r.get('modalidade_transporte')}</div>
+      </div>
+      <div>
+        <div class="label">Transportadora / Operador:</div>
+        <div class="val">{r.get('transportadora') or 'Veículo Oficial EMED'}</div>
+      </div>
+      <div>
+        <div class="label">Código de Rastreamento:</div>
+        <div class="val"><code>{r.get('codigo_rastreio') or 'Trânsito em Frota'}</code></div>
+      </div>
+      <div>
+        <div class="label">Data de Emissão / Envio:</div>
+        <div class="val">{r.get('data_envio')}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legal-notice">
+    <b>DISPOSITIVO LEGAL &amp; DECLARAÇÃO DE TRÂNSITO FISCAL:</b><br>
+    Mercadoria destinada a conserto, diagnóstico e ensaios laboratoriais conforme Artigo correspondente do Regulamento do ICMS (RICMS) c/c CFOP {r.get('cfop')}. Operação ao abrigo de não-incidência / suspensão do ICMS. O valor acima destina-se exclusivamente para fins de cobertura de seguro de carga e fiscalização em trânsito rodoviário/aéreo.
+  </div>
+
+  <div class="signatures">
+    <div class="sig-line">
+      Responsável pela Expedição / Técnico EMED
+    </div>
+    <div class="sig-line">
+      Transportadora / Recebedor do Laboratório
+    </div>
+  </div>
+</div>
+</body>
+</html>"""
+    return web.Response(text=html, content_type="text/html", charset="utf-8")
+
+
 def garantir_schema_rastreio(db_path: str):
     try:
         with get_db_connection(db_path) as conn:
@@ -8389,6 +8723,11 @@ def criar_app() -> web.Application:
 
 
     app.router.add_post("/api/os/nf-salvar", api_os_nf_salvar)
+    app.router.add_post("/api/fiscal/liberar-quarentena", api_fiscal_liberar_quarentena)
+    app.router.add_get("/api/remessas-diagnostico", api_remessas_diagnostico_listar)
+    app.router.add_post("/api/remessas-diagnostico/salvar", api_remessas_diagnostico_salvar)
+    app.router.add_post("/api/remessas-diagnostico/retorno", api_remessas_diagnostico_retorno)
+    app.router.add_get("/api/remessas-diagnostico/guia/{id}", api_remessas_diagnostico_guia)
 
 
 

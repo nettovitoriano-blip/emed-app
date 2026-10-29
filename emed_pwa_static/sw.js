@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v36-rastreamento-automatico';
+const CACHE_NAME = 'emed-pwa-v37-remessas-e-quarentena-fiscal';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

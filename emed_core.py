@@ -1217,40 +1217,43 @@ def aplicar_peca_os_idempotente(db_path, nome_peca, qtd_aplicada, ref_anterior="
 
 
 def registrar_aplicacao_definitiva_e_fluxo_cobranca(
-
     db_path,
-
     os_id,
-
     cliente,
-
     equipamento,
-
     tecnico,
-
     nome_peca,
-
     qtd_aplicada,
-
     valor_total_os,
-
     condicao_pagamento="FATURAMENTO BOLETO BANCÁRIO",
-
     tipo_contrato="CONTRATO"
-
 ):
-
     """
-
-    Ao finalizar a OS com peça definitiva:
-
-    1. Atualiza o status da peça em solicitacoes_pecas para 'APLICADO EM DEFINITIVO NO CLIENTE / BAIXADO'
-
-    2. Garante a baixa permanente no estoque_pecas
-
-    3. Dá sequência automática ao fluxo de cobrança e faturamento (inserindo/atualizando em notas_fiscais)
-
+    Ao finalizar a OS:
+    1. Baixa automaticamente todas as solicitações de peças vinculadas no Almoxarifado para 'APLICADO EM DEFINITIVO NO CLIENTE / BAIXADO'.
+    2. Garante a baixa física no estoque_pecas.
+    3. Registra a fatura na esteira com período de validação/feedback do cliente (quarentena de 24h) antes da emissão definitiva da NF.
     """
+    agora_iso = obter_agora_brasil_str('%Y-%m-%d %H:%M:%S')
+    agora_br = obter_agora_brasil_str('%d/%m/%Y %H:%M')
+    dt_lib_str = (obter_agora_brasil() + datetime.timedelta(hours=24)).strftime('%d/%m/%Y %H:%M')
+
+    # 1. Garante a baixa automática imediata no Almoxarifado
+    try:
+        with get_db_connection(db_path) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE solicitacoes_pecas 
+                SET status_pedido = 'APLICADO EM DEFINITIVO NO CLIENTE / BAIXADO',
+                    confirmado_em = COALESCE(NULLIF(confirmado_em, ''), ?)
+                WHERE (os_id = ? OR destino_cliente LIKE ? OR destino_cliente LIKE ?)
+                  AND UPPER(status_pedido) NOT LIKE '%APLICADO%'
+                  AND UPPER(status_pedido) NOT LIKE '%BAIXADO%'
+                  AND UPPER(status_pedido) NOT LIKE '%RECUSADO%'
+            """, (agora_br, str(os_id), f"%[OS #{os_id}]%", f"%OS #{os_id}%"))
+            conn.commit()
+    except Exception:
+        pass
 
     if not nome_peca or nome_peca == "NENHUMA PEÇA":
 
@@ -1292,7 +1295,7 @@ def registrar_aplicacao_definitiva_e_fluxo_cobranca(
 
                         int(os_id), cliente, cnpj_val, "NFSE", float(valor_total_os), 0.0,
 
-                        float(valor_total_os), "AGUARDANDO FATURAMENTO / COBRANÇA",
+                        float(valor_total_os), "QUARENTENA PÓS-SERVIÇO (AGUARDANDO FEEDBACK DO CLIENTE)",
 
                         f"SERVIÇO TÉCNICO [{condicao_pagamento}]", agora_iso, agora_iso, agora_iso
 

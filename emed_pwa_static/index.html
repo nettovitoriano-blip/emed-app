@@ -12776,7 +12776,7 @@
 
       max-width: 100vw !important;
 
-      overflow-x: hidden !important;
+      overflow-x: clip !important;
 
       box-sizing: border-box !important;
 
@@ -12812,7 +12812,7 @@
 
       margin: 0 auto !important;
 
-      overflow-x: hidden !important;
+      overflow-x: clip !important;
 
     }
 
@@ -13148,6 +13148,115 @@
 
 
 
+  
+    /* MODERN SYSTEM NAVIGATION & RESPONSIVENESS */
+    .sticky-header-container {
+      position: sticky;
+      top: 0;
+      z-index: 300;
+      width: 100%;
+      background: #fff;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.10);
+    }
+    .topbar {
+      position: relative;
+      background: linear-gradient(135deg, var(--emed-navy) 0%, var(--emed-blue) 100%);
+      color: #fff;
+      padding: 8px 12px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .submenu-strip-wrap {
+      background: #ffffff;
+      border-bottom: 1.5px solid #e2e8f0;
+      width: 100%;
+      box-sizing: border-box;
+      position: relative;
+      top: 0;
+      box-shadow: none;
+    }
+    .submenu-strip {
+      width: 100%;
+      box-sizing: border-box;
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      white-space: nowrap;
+      padding: 8px 12px;
+      scrollbar-width: thin;
+      -webkit-overflow-scrolling: touch;
+    }
+    .submenu-strip::-webkit-scrollbar {
+      height: 4px;
+    }
+    .submenu-strip::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .submenu-pill {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #334155;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+    .submenu-pill:hover {
+      background: #e2e8f0;
+      border-color: #94a3b8;
+      color: #0f172a;
+    }
+    .submenu-pill.active {
+      background: var(--emed-blue);
+      border-color: var(--emed-navy);
+      color: #ffffff !important;
+      box-shadow: 0 2px 6px rgba(0, 75, 147, 0.3);
+    }
+    .submenu-badge {
+      background: #ef4444;
+      color: #fff;
+      border-radius: 10px;
+      padding: 1px 6px;
+      font-size: 11px;
+      font-weight: 800;
+      margin-left: 2px;
+    }
+    .submenu-pill.active .submenu-badge {
+      background: #ffffff;
+      color: #dc2626;
+    }
+
+    @media (min-width: 769px) {
+      .bottom-nav {
+        display: none !important;
+      }
+      body {
+        padding-bottom: 24px !important;
+      }
+      .hide-mobile {
+        display: inline-block !important;
+      }
+    }
+    @media (max-width: 768px) {
+      .bottom-nav {
+        display: flex !important;
+      }
+      body {
+        padding-bottom: 74px !important;
+      }
+      .hide-mobile {
+        display: none !important;
+      }
+    }
+
   </style>
 
 
@@ -13436,87 +13545,21 @@
 
 
 
-  <header class="topbar">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    <div class="topbar-row">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      <!-- BOTÃO ESQUERDO: ABRIR TODOS OS 18 MENUS -->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      <!-- CENTRO: LOGO AMPLIADA E NOME ESTENDIDO EMED ELETROMEDICINA -->
+    <!-- CONTAINER STICKY INTEGRADO DE NAVEGAÇÃO -->
+  <div id="appStickyHeader" class="sticky-header-container">
+    <header class="topbar">
+      <div class="topbar-row">
+        <!-- BOTÃO ESQUERDO: ABRIR TODOS OS 18 MENUS (DRAWER EMPRESARIAL) -->
+        <button class="btn-drawer-symbol" onclick="abrirDrawer()" title="Abrir Menu Completo de Módulos (18 Menus)" aria-label="Menu Principal" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.15);border:1.5px solid rgba(56,189,248,0.7);border-radius:10px;padding:6px 10px;color:#fff;cursor:pointer;">
+          <svg class="topbar-symbol-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;display:block;">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+          <span style="font-size:12px;font-weight:900;letter-spacing:0.5px;" class="hide-mobile">MENU</span>
+        </button>
+
+        <!-- CENTRO: LOGO AMPLIADA E NOME ESTENDIDO EMED ELETROMEDICINA -->
 
 
 
@@ -14035,6 +14078,7 @@
 
 
   </div>
+  </div><!-- /appStickyHeader -->
 
 
 
@@ -20272,7 +20316,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-      navigator.serviceWorker.register("/sw.js?v=v36").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=v37").then(reg => { if(reg) reg.update(); }).catch(() => {});
 
 
 
@@ -23089,182 +23133,65 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
     function selecionarMenu(menuId, perfilOpcional = null) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      if (perfilOpcional && perfilOpcional !== STATE.perfil) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        mudarPerfil(perfilOpcional, menuId);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      } else {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      if (STATE.perfil === "FULL") {
         STATE.menuAtivo = menuId;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         localStorage.setItem("emed_menu_ativo", menuId);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         renderizarNavegacao();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         renderizarTelaPrincipal();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      } else if (perfilOpcional && perfilOpcional !== STATE.perfil) {
+        mudarPerfil(perfilOpcional, menuId);
+      } else {
+        STATE.menuAtivo = menuId;
+        localStorage.setItem("emed_menu_ativo", menuId);
+        renderizarNavegacao();
+        renderizarTelaPrincipal();
       }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       fecharDrawer();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       window.scrollTo({ top: 0, behavior: "smooth" });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     }
+
+    function atualizarBottomNav() {
+      const bnav = document.querySelector(".bottom-nav");
+      if (!bnav) return;
+      if (STATE.perfil === "TECNICO") {
+        bnav.innerHTML = `
+          <button class="bnav-btn ${STATE.menuAtivo === 'TEC_OS' ? 'active' : ''}" onclick="selecionarMenu('TEC_OS')">
+            <span class="bnav-icon">⚡</span><span>Minhas OS</span>
+          </button>
+          <button class="bnav-btn ${STATE.menuAtivo === 'TEC_MANUAIS' ? 'active' : ''}" onclick="selecionarMenu('TEC_MANUAIS')">
+            <span class="bnav-icon">📚</span><span>Manuais</span>
+          </button>
+          <button class="bnav-btn ${STATE.menuAtivo === 'TEC_FERRAMENTAS' ? 'active' : ''}" onclick="selecionarMenu('TEC_FERRAMENTAS')">
+            <span class="bnav-icon">🧰</span><span>Ferramentas</span>
+          </button>
+          <button class="bnav-btn ${STATE.menuAtivo === 'TEC_PECAS' ? 'active' : ''}" onclick="selecionarMenu('TEC_PECAS')">
+            <span class="bnav-icon">📦</span><span>Peças</span>
+          </button>
+          <button class="bnav-btn" onclick="abrirDrawer()">
+            <span class="bnav-icon">☰</span><span>Mais</span>
+          </button>
+        `;
+      } else {
+        bnav.innerHTML = `
+          <button class="bnav-btn ${STATE.menuAtivo === 'GES_CHAMADOS' ? 'active' : ''}" onclick="selecionarMenu('GES_CHAMADOS')">
+            <span class="bnav-icon">🎫</span><span>Chamados</span>
+          </button>
+          <button class="bnav-btn ${STATE.menuAtivo === 'GES_ESTOQUE' ? 'active' : ''}" onclick="selecionarMenu('GES_ESTOQUE')">
+            <span class="bnav-icon">📦</span><span>Estoque</span>
+          </button>
+          <button class="bnav-btn ${STATE.menuAtivo === 'GES_PIX' ? 'active' : ''}" onclick="selecionarMenu('GES_PIX')">
+            <span class="bnav-icon">🏦</span><span>Financeiro</span>
+          </button>
+          <button class="bnav-btn ${STATE.menuAtivo === 'GES_BI' ? 'active' : ''}" onclick="selecionarMenu('GES_BI')">
+            <span class="bnav-icon">📈</span><span>BI</span>
+          </button>
+          <button class="bnav-btn" onclick="abrirDrawer()">
+            <span class="bnav-icon">☰</span><span>Mais</span>
+          </button>
+        `;
+      }
+    }
+
 
 
 
@@ -24336,311 +24263,74 @@ function renderizarNavegacao() {
 
 
 
-      const grupos = [
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        { chave: "TECNICO", label: "👷 App do Técnico (5 Menus de Campo)" },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        { chave: "GESTOR", label: "🏢 App do Gestor (12 Menus de Gestão)" },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        { chave: "CLIENTE", label: "🏥 Cliente & Triagem (2 Menus)" }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      // Drawer completo categorizado empresarialmente em 5 pilares operacionais
+      const gruposEmpresariais = [
+        {
+          label: "🛠️ Operações de Campo & OS",
+          menus: [
+            { id: "GES_CHAMADOS", icone: "🎫", titulo: "Chamados & Ordens de Serviço", desc: "Abertura, Gestão e Laudos Técnicos" },
+            { id: "TEC_OS", icone: "⚡", titulo: "Minhas OS de Campo", desc: "Execução, Check-in, Checklist POP e Assinatura" },
+            { id: "GES_TV", icone: "🚨", titulo: "Painel TV de Laboratório", desc: "Críticas, Peças e Programadas" },
+            { id: "TEC_MANUAIS", icone: "📚", titulo: "Manuais Técnicos, POPs & Vídeos", desc: "Acervo de ITs e Treinamento Offline" }
+          ]
+        },
+        {
+          label: "📦 Almoxarifado & Estoque",
+          menus: [
+            { id: "GES_ESTOQUE", icone: "📦", titulo: "Estoque & Almoxarifado", desc: "Kardex, Saldos, Separação e Devoluções" },
+            { id: "GES_ORCAMENTOS", icone: "⏳", titulo: "Orçamentos & Peças em Teste", desc: "Conversão e Retirada de Peças" }
+          ]
+        },
+        {
+          label: "💰 Financeiro & Faturamento",
+          menus: [
+            { id: "GES_PIX", icone: "🏦", titulo: "Faturas, PIX & Faturamento", desc: "Contas a Receber, PIX, Notas Fiscais e DRE" }
+          ]
+        },
+        {
+          label: "📊 Gestão Executiva & BI",
+          menus: [
+            { id: "GES_BI", icone: "📈", titulo: "Gráficos & BI Executivo", desc: "Indicadores de Produtividade e Metas" },
+            { id: "GES_MURAL", icone: "📊", titulo: "Mural WhatsApp & Despacho", desc: "Escala Diária e Notificações" },
+            { id: "GES_ROTAS", icone: "🗺️", titulo: "Mapa & Planejamento de Rotas", desc: "Roteirização por Região e Raio" },
+            { id: "GES_ADMIN", icone: "🛰️", titulo: "Frota GPS & DETRAN", desc: "Telemetria, Condutor e Infrações" },
+            { id: "GES_SATISFACAO", icone: "⭐", titulo: "Google Reviews 5★ & NPS", desc: "Avaliações e Satisfação de Clientes" }
+          ]
+        },
+        {
+          label: "🏥 Parque Hospitalar & Clientes",
+          menus: [
+            { id: "GES_CLIENTES", icone: "👥", titulo: "Clientes & Parque Instalado", desc: "Cadastro Hospitalar e Etiquetas QR" },
+            { id: "GES_CALIBRACAO", icone: "⏰", titulo: "Calibração RBC/ANVISA & Instrumentos", desc: "Rastreabilidade e Padrões" },
+            { id: "CLI_TRIAGEM", icone: "🤖", titulo: "Triagem Inteligente", desc: "Abertura Guiada de Chamados" },
+            { id: "CLI_PORTAL", icone: "🏥", titulo: "Portal do Cliente", desc: "Acompanhamento e 2ª Via de Laudos" }
+          ]
+        }
       ];
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       let htmlDrawer = "";
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      for (const g of grupos) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        htmlDrawer += `<div class="drawer-group-title">${g.label}</div>`;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        for (const m of MENUS_POR_PERFIL[g.chave]) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      for (const g of gruposEmpresariais) {
+        htmlDrawer += `<div class="drawer-group-title" style="color:#38bdf8;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;margin-top:14px;margin-bottom:6px;">${g.label}</div>`;
+        for (const m of g.menus) {
           const cnt = obterContadorMenu(m.id);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
           const ativo = (STATE.menuAtivo === m.id);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
           htmlDrawer += `
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <button class="drawer-item ${ativo ? 'active' : ''}" onclick="selecionarMenu('${m.id}','${g.chave}')">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <span>${m.icone} ${esc(m.titulo)}</span>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+            <button class="drawer-item ${ativo ? 'active' : ''}" onclick="selecionarMenu('${m.id}')" style="margin-bottom:4px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:16px;">${m.icone}</span>
+                <div>
+                  <div style="font-weight:700;font-size:12.5px;">${esc(m.titulo)}</div>
+                  <div style="font-size:10.5px;color:${ativo ? '#e0f2fe' : '#94a3b8'};">${esc(m.desc)}</div>
+                </div>
+              </div>
               ${cnt !== "" ? `<span class="submenu-badge">${cnt}</span>` : ""}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
             </button>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
           `;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      document.getElementById("drawerMenuContainer").innerHTML = htmlDrawer;
+      const drawerContainer = document.getElementById("drawerMenuContainer");
+      if (drawerContainer) drawerContainer.innerHTML = htmlDrawer;
+      atualizarBottomNav();
 
 
 
@@ -44574,13 +44264,13 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
     function trocarAbaFinanceira(aba) {
       window._finAbaAtiva = aba || "FATURAS";
-      const box = document.getElementById("conteudoModulo") || document.querySelector(".app-content") || document.getElementById("mainAppContainer");
+      const box = document.getElementById("mainContainer") || document.getElementById("conteudoModulo") || document.querySelector(".app-content") || document.getElementById("mainAppContainer");
       if (box) renderMenuGesPix(box);
     }
 
     function filtrarStatusFinanceiro(statusFiltro) {
       window._finFiltroStatus = statusFiltro || "TODAS";
-      const box = document.getElementById("conteudoModulo") || document.querySelector(".app-content") || document.getElementById("mainAppContainer");
+      const box = document.getElementById("mainContainer") || document.getElementById("conteudoModulo") || document.querySelector(".app-content") || document.getElementById("mainAppContainer");
       if (box) renderMenuGesPix(box);
     }
 
@@ -44591,6 +44281,7 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
       const ordens = STATE.data?.ordens || [];
 
       const nfs = STATE.data?.notas_fiscais || [];
+      const remessas = STATE.data?.remessas_diagnostico || [];
 
       const solicitacoes = (STATE.data?.solicitacoes_almox || []).concat(STATE.data?.solicitacoes_pecas || []);
 
@@ -44658,29 +44349,7 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
         <div style="margin-bottom:14px;">
 
-          <!-- BARRA DE ACESSO RÁPIDO ENTRE MENUS -->
-
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px;margin-bottom:14px;">
-
-            <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#0b132b;">
-
-              <span>🧭 Navegação Rápida do Gestor:</span>
-
-            </div>
-
-            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-
-              <button class="btn btn-sm btn-outline" onclick="selecionarMenu('GES_CHAMADOS')" style="font-size:11.5px;padding:4px 10px;">🎫 Chamados &amp; OS</button>
-
-              <button class="btn btn-sm btn-outline" onclick="selecionarMenu('GES_ESTOQUE')" style="font-size:11.5px;padding:4px 10px;">📦 Almoxarifado</button>
-
-              <button class="btn btn-sm btn-outline" onclick="selecionarMenu('GES_BI')" style="font-size:11.5px;padding:4px 10px;">📈 Painel BI</button>
-
-              <button class="btn btn-sm btn-outline" onclick="selecionarMenu('GES_CLIENTES')" style="font-size:11.5px;padding:4px 10px;">👥 Clientes &amp; Parque</button>
-
-            </div>
-
-          </div>
+          <!-- NAVEGAÇÃO PADRÃO INTEGRADA NO TOPO DO SISTEMA -->
 
 
 
@@ -44755,9 +44424,11 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
             </button>
 
             <button class="btn btn-sm" onclick="trocarAbaFinanceira('NFS')" style="font-weight:700;border-radius:8px;padding:8px 14px;${abaAtiva==='NFS'?'background:#6b21a8;color:#fff;border-color:#6b21a8;box-shadow:0 2px 6px rgba(107,33,168,0.3);':'background:#fff;color:#475569;border:1px solid #cbd5e1;'}">
-
               🧾 Notas Fiscais (${nfs.length})
+            </button>
 
+            <button class="btn btn-sm" onclick="trocarAbaFinanceira('REMESSAS')" style="font-weight:700;border-radius:8px;padding:8px 14px;${abaAtiva==='REMESSAS'?'background:#0284c7;color:#fff;border-color:#0284c7;box-shadow:0 2px 6px rgba(2,132,199,0.3);':'background:#fff;color:#475569;border:1px solid #cbd5e1;'}">
+              🚚 Remessas p/ Diagnóstico (${remessas.length})
             </button>
 
             <button class="btn btn-sm" onclick="trocarAbaFinanceira('PROPOSTAS')" style="font-weight:700;border-radius:8px;padding:8px 14px;${abaAtiva==='PROPOSTAS'?'background:#b45309;color:#fff;border-color:#b45309;box-shadow:0 2px 6px rgba(180,83,9,0.3);':'background:#fff;color:#475569;border:1px solid #cbd5e1;'}">
@@ -44780,7 +44451,7 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
           <div id="boxConteudoAbaFinanceira">
 
-            ${renderConteudoAbaFinanceira(abaAtiva, ordens, nfs, solicitacoes, estoque)}
+            ${renderConteudoAbaFinanceira(abaAtiva, ordens, nfs, solicitacoes, estoque, remessas)}
 
           </div>
 
@@ -44792,15 +44463,17 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
 
 
-    function renderConteudoAbaFinanceira(aba, ordens, nfs, solicitacoes, estoque) {
+    function renderConteudoAbaFinanceira(aba, ordens, nfs, solicitacoes, estoque, remessas) {
+      remessas = remessas || STATE.data?.remessas_diagnostico || [];
 
       if (aba === "PIX") {
 
         return renderAbaTerminalPix(ordens);
 
       } else if (aba === "NFS") {
-
         return renderAbaNotasFiscais(nfs, ordens);
+      } else if (aba === "REMESSAS") {
+        return renderAbaRemessasDiagnostico(remessas, ordens);
 
       } else if (aba === "PROPOSTAS") {
 
@@ -44918,7 +44591,7 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
           <div style="margin-bottom:12px;">
 
-            <input id="buscaFaturasInput" class="input" placeholder="🔍 Filtrar por Hospital, Equipamento ou Nº da OS..." value="${esc(window._finTermoBusca)}" oninput="window._finTermoBusca=this.value;const b=document.getElementById('conteudoModulo')||document.querySelector('.app-content');if(b)renderMenuGesPix(b);" />
+            <input id="buscaFaturasInput" class="input" placeholder="🔍 Filtrar por Hospital, Equipamento ou Nº da OS..." value="${esc(window._finTermoBusca)}" oninput="window._finTermoBusca=this.value;const b=document.getElementById('mainContainer')||document.getElementById('conteudoModulo')||document.querySelector('.app-content');if(b)renderMenuGesPix(b);" />
 
           </div>
 
@@ -45342,6 +45015,258 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
 
 
+    
+    /* ========================================================
+       MÓDULO DE REMESSA PARA DIAGNÓSTICO & CONSERTO (CFOP 5.915 / 6.915)
+       ======================================================== */
+    function renderAbaRemessasDiagnostico(remessas, ordens) {
+      remessas = remessas || STATE.data?.remessas_diagnostico || [];
+      return `
+        <div class="section-box" style="margin-bottom:16px;border-top:4px solid #0284c7;background:#f0f9ff;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+            <div>
+              <div class="section-title" style="margin:0;color:#0369a1;font-size:15px;display:flex;align-items:center;gap:6px;">
+                🚚 Notas &amp; Guias de Remessa para Diagnóstico e Conserto (CFOP 5.915 / 6.915)
+              </div>
+              <div style="font-size:12px;color:#0284c7;margin-top:2px;">
+                Emissão de guias oficiais para trânsito legal de peças e equipamentos biomédicos entre hospitais, laboratórios e outros estados (SP, RJ, MG).
+              </div>
+            </div>
+
+            <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalRemessaDiagnostico()" style="font-weight:800;display:flex;align-items:center;gap:6px;background:#0284c7;padding:8px 14px;">
+              ➕ Emitir Nova Remessa p/ Diagnóstico
+            </button>
+          </div>
+
+          ${remessas && remessas.length ? `
+            <div style="display:grid;gap:10px;">
+              ${remessas.map(r => {
+                const isInterestadual = (r.cfop === '6.915' || r.uf_destino !== r.uf_origem);
+                const isRetornado = (r.status_remessa === 'RETORNADO');
+                const rastreioInfo = r.codigo_rastreio ? identificarTransportadoraERastreio(r.codigo_rastreio, r.transportadora) : null;
+
+                return `
+                  <div style="background:#fff;border-radius:10px;border:1.5px solid ${isRetornado ? '#86efac' : '#7dd3fc'};padding:12px;box-shadow:0 2px 6px rgba(0,0,0,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+                      <div>
+                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                          <span style="font-size:15px;font-weight:900;color:#0f172a;">🏷️ ${esc(r.numero_remessa)}</span>
+                          <span class="badge" style="background:${isInterestadual ? '#fae8ff' : '#e0f2fe'};color:${isInterestadual ? '#86198f' : '#0369a1'};font-size:11px;font-weight:800;">
+                            CFOP ${esc(r.cfop)} &bull; ${isInterestadual ? 'Interestadual (CE ➔ ' + esc(r.uf_destino) + ')' : 'Estadual (CE)'}
+                          </span>
+                          <span class="badge ${isRetornado ? 'concluido' : 'ativo'}" style="font-size:11px;font-weight:800;">
+                            ${isRetornado ? '✔ RETORNADO DO CONSERTO' : '🟡 EM TRÂNSITO FISCAL'}
+                          </span>
+                        </div>
+
+                        <div style="font-size:13px;font-weight:800;color:#1e293b;margin-top:4px;">
+                          🔩 ${esc(r.descricao_peca)} ${r.numero_serie ? `&bull; S/N: <code>${esc(r.numero_serie)}</code>` : ''}
+                        </div>
+
+                        <div style="font-size:11.5px;color:#64748b;margin-top:3px;">
+                          📍 <b>Origem:</b> ${esc(r.cliente_origem)} (${esc(r.cidade_origem)}-${esc(r.uf_origem)}) ➔ <b>Destino:</b> ${esc(r.destinatario_nome)} (${esc(r.cidade_destino)}-${esc(r.uf_destino)})
+                        </div>
+
+                        <div style="font-size:11.5px;color:#475569;margin-top:3px;">
+                          🔬 <b>Motivo:</b> ${esc(r.motivo_diagnostico)} &bull; Valor Seguro: <b style="color:#047857;">R$ ${Number(r.valor_declarado || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</b>
+                        </div>
+                      </div>
+
+                      <div style="display:flex;flex-direction:column;gap:6px;min-width:180px;">
+                        <a href="/api/remessas-diagnostico/guia/${r.id}" target="_blank" class="btn btn-outline btn-xs" style="text-align:center;text-decoration:none;font-weight:800;color:#0284c7;border-color:#7dd3fc;padding:6px 10px;">
+                          📄 Imprimir Guia Oficial ↗
+                        </a>
+
+                        ${!isRetornado ? `
+                          <button type="button" class="btn btn-success btn-xs" style="font-weight:800;padding:6px 10px;" onclick="registrarRetornoRemessaModal(${r.id})">
+                            📥 Registrar Retorno de Conserto
+                          </button>
+                        ` : `
+                          <span style="font-size:11px;color:#047857;text-align:center;font-weight:700;">
+                            ✔ Retorno em ${esc(r.data_retorno_real || 'Concluído')}
+                          </span>
+                        `}
+
+                        ${rastreioInfo ? `
+                          <a href="${rastreioInfo.url}" target="_blank" class="btn btn-outline btn-xs" style="text-align:center;text-decoration:none;font-weight:700;padding:4px 8px;">
+                            ${rastreioInfo.icone} Rastrear Encomenda ↗
+                          </a>
+                        ` : ''}
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          ` : `
+            <div style="text-align:center;padding:30px 10px;background:#fff;border-radius:8px;border:1px dashed #cbd5e1;color:#64748b;">
+              <div style="font-size:32px;margin-bottom:6px;">📦</div>
+              <div style="font-weight:800;font-size:14px;color:#1e293b;">Nenhuma Remessa para Diagnóstico Registrada</div>
+              <div style="font-size:12px;margin-top:2px;">
+                Clique em "Emitir Nova Remessa" para gerar guias de trânsito interestadual (CFOP 6.915) ou estadual (CFOP 5.915) com cobertura de seguro de carga.
+              </div>
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    function abrirModalRemessaDiagnostico(osId = null) {
+      const modal = document.getElementById("modalRemessaDiagnostico");
+      if (!modal) return;
+
+      const selOs = document.getElementById("remessaOsVinculada");
+      const ordens = STATE.data?.ordens || [];
+      if (selOs) {
+        selOs.innerHTML = `<option value="">-- Sem vínculo / Avulso --</option>` + 
+          ordens.map(o => `<option value="${o.id}" ${String(osId) === String(o.id) ? 'selected' : ''}>OS #${o.id} - ${esc(o.cliente)} (${esc(o.equipamento)})</option>`).join("");
+      }
+
+      if (osId) {
+        onRemessaOsChange(osId);
+      } else {
+        const elCli = document.getElementById("remessaClienteOrigem"); if (elCli) elCli.value = "HOSPITAL CREDENCIADO EMED";
+        const elCid = document.getElementById("remessaCidadeOrigem"); if (elCid) elCid.value = "FORTALEZA";
+        const elUf = document.getElementById("remessaUfOrigem"); if (elUf) elUf.value = "CE";
+        const elPeca = document.getElementById("remessaPeca"); if (elPeca) elPeca.value = "";
+        const elSer = document.getElementById("remessaSerie"); if (elSer) elSer.value = "";
+        const elVal = document.getElementById("remessaValor"); if (elVal) elVal.value = "10000.00";
+        atualizarCfopRemessa();
+      }
+
+      modal.classList.add("open");
+    }
+
+    function fecharModalRemessaDiagnostico() {
+      const modal = document.getElementById("modalRemessaDiagnostico");
+      if (modal) modal.classList.remove("open");
+    }
+
+    function onRemessaOsChange(osId) {
+      const ordens = STATE.data?.ordens || [];
+      const o = ordens.find(ord => String(ord.id) === String(osId));
+      if (o) {
+        const elCli = document.getElementById("remessaClienteOrigem"); if (elCli) elCli.value = o.cliente || "";
+        const elCid = document.getElementById("remessaCidadeOrigem"); if (elCid) elCid.value = o.cidade || "FORTALEZA";
+        const elUf = document.getElementById("remessaUfOrigem"); if (elUf) elUf.value = "CE";
+        const elPeca = document.getElementById("remessaPeca"); if (elPeca) elPeca.value = o.equipamento ? `Módulo/Peça do equipamento ${o.equipamento}` : "";
+      }
+      atualizarCfopRemessa();
+    }
+
+    function atualizarCfopRemessa() {
+      const selDest = document.getElementById("remessaUfDestino");
+      const selOrig = document.getElementById("remessaUfOrigem");
+      const ufDestino = (selDest ? selDest.value : "SP").toUpperCase();
+      const ufOrigem = (selOrig ? selOrig.value : "CE").toUpperCase();
+      const badgeCfop = document.getElementById("remessaBadgeCfop");
+      const isEstadual = (ufDestino === ufOrigem);
+      const cfop = isEstadual ? "5.915" : "6.915";
+
+      if (badgeCfop) {
+        badgeCfop.innerHTML = `<span style="font-weight:900;color:${isEstadual ? '#047857' : '#0369a1'};">Enquadramento Automático: CFOP ${cfop} &bull; ${isEstadual ? 'Operação Interna / Estadual (CE)' : 'Operação Interestadual (CE ➔ ' + ufDestino + ')'}</span>`;
+      }
+    }
+
+    async function confirmarSalvarRemessa() {
+      const osId = document.getElementById("remessaOsVinculada")?.value || "";
+      const clienteOrigem = document.getElementById("remessaClienteOrigem")?.value || "";
+      const cidadeOrigem = document.getElementById("remessaCidadeOrigem")?.value || "FORTALEZA";
+      const ufOrigem = document.getElementById("remessaUfOrigem")?.value || "CE";
+      const destNome = document.getElementById("remessaDestNome")?.value || "LABORATÓRIO MATRIZ EMED";
+      const cidadeDest = document.getElementById("remessaCidadeDestino")?.value || "FORTALEZA";
+      const ufDest = document.getElementById("remessaUfDestino")?.value || "SP";
+      const peca = document.getElementById("remessaPeca")?.value || "";
+      const serie = document.getElementById("remessaSerie")?.value || "S/N";
+      const valor = document.getElementById("remessaValor")?.value || "1000.00";
+      const motivo = document.getElementById("remessaMotivo")?.value || "DIAGNÓSTICO AVANÇADO EM BANCADA";
+      const modalidade = document.getElementById("remessaModalidade")?.value || "TRANSPORTADORA";
+      const transportadora = document.getElementById("remessaTransportadora")?.value || "";
+      const rastreio = document.getElementById("remessaRastreio")?.value || "";
+      const tec = document.getElementById("remessaTecnico")?.value || "";
+      const obs = document.getElementById("remessaObs")?.value || "";
+
+      if (!peca.trim()) {
+        mostrarToast("⚠️ Informe a descrição da peça/equipamento para remessa.");
+        return;
+      }
+
+      try {
+        mostrarToast("⏳ Emitindo Guia e Nota de Remessa para Diagnóstico...");
+        const res = await apiPost("/api/remessas-diagnostico/salvar", {
+          os_id: osId,
+          cliente_origem: clienteOrigem,
+          cidade_origem: cidadeOrigem,
+          uf_origem: ufOrigem,
+          destinatario_nome: destNome,
+          cidade_destino: cidadeDest,
+          uf_destino: ufDest,
+          descricao_peca: peca,
+          numero_serie: serie,
+          valor_declarado: valor,
+          motivo_diagnostico: motivo,
+          modalidade_transporte: modalidade,
+          transportadora: transportadora,
+          codigo_rastreio: rastreio,
+          tecnico_portador: tec,
+          observacoes: obs
+        });
+
+        if (res && res.ok) {
+          mostrarToast(res.msg || "✅ Remessa emitida com sucesso!");
+          fecharModalRemessaDiagnostico();
+          await sincronizarTudo(false);
+          trocarAbaFinanceira('REMESSAS');
+        } else {
+          mostrarToast(`❌ Erro: ${res?.msg || 'Falha ao emitir remessa'}`);
+        }
+      } catch (err) {
+        console.error("Erro confirmarSalvarRemessa:", err);
+        mostrarToast("❌ Falha de comunicação.");
+      }
+    }
+
+    async function registrarRetornoRemessaModal(id) {
+      const obs = prompt("Informe as observações de retorno do diagnóstico/conserto (ex: Tubo reparado e testado em bancada, emitido laudo favorável):", "Peça reparada e testada, retornando ao cliente.");
+      if (obs === null) return;
+
+      try {
+        mostrarToast("⏳ Registrando retorno de conserto...");
+        const res = await apiPost("/api/remessas-diagnostico/retorno", { id: id, observacao: obs });
+        if (res && res.ok) {
+          mostrarToast(res.msg || "✅ Retorno registrado com sucesso!");
+          await sincronizarTudo(false);
+          trocarAbaFinanceira('REMESSAS');
+        } else {
+          mostrarToast(`❌ Erro: ${res?.msg || 'Falha ao registrar retorno'}`);
+        }
+      } catch (err) {
+        console.error("Erro registrarRetornoRemessaModal:", err);
+        mostrarToast("❌ Falha de conexão.");
+      }
+    }
+
+    async function liberarQuarentenaFiscal(osId, motivo = 'LIBERAÇÃO MANUAL DO GESTOR') {
+      try {
+        mostrarToast("⏳ Liberando ordem para emissão de NF...");
+        const res = await apiPost("/api/fiscal/liberar-quarentena", { os_id: osId, motivo: motivo });
+        if (res && res.ok) {
+          mostrarToast(res.msg || "✅ Ordem liberada para emissão de NF!");
+          const nf = (STATE.data?.notas_fiscais || []).find(n => String(n.os_id) === String(osId));
+          if (nf) {
+            nf.status_quarentena = 'LIBERADO';
+            nf.status_fiscal = 'LIBERADO PARA EMISSÃO DE NOTA FISCAL';
+          }
+          trocarAbaFinanceira(window._finAbaAtiva || 'NFS');
+        } else {
+          mostrarToast(`❌ Erro: ${res?.msg || 'Falha ao liberar quarentena'}`);
+        }
+      } catch (err) {
+        console.error("Erro liberarQuarentenaFiscal:", err);
+        mostrarToast("❌ Falha de comunicação.");
+      }
+    }
+
     function renderAbaNotasFiscais(nfs, ordens) {
 
       const solicitacoes = (STATE.data?.solicitacoes_almox || []).concat(STATE.data?.solicitacoes_pecas || []);
@@ -45351,15 +45276,17 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
       // Fila de Faturamento: Ordens executadas/concluídas ou com valor > 0 ou com solicitação de peças
 
       const filaFaturamento = ordens.filter(o => {
-
         const v = Number(o.valor_os) || 0;
-
         const st = String(o.status || '').toUpperCase();
-
         const temPecas = solicitacoes.some(s => String(s.os_id) === String(o.id) || (s.destino_cliente || '').includes(`[OS #${o.id}]`));
-
         return st.includes('CONCLU') || v > 0 || temPecas;
-
+      }).sort((a, b) => {
+        const nfA = nfs.find(n => String(n.os_id) === String(a.id || a.os_id));
+        const nfB = nfs.find(n => String(n.os_id) === String(b.id || b.os_id));
+        const qA = (nfA && (nfA.status_quarentena === 'QUARENTENA_FEEDBACK' || (nfA.status_fiscal || '').includes('QUARENTENA'))) ? 1 : 0;
+        const qB = (nfB && (nfB.status_quarentena === 'QUARENTENA_FEEDBACK' || (nfB.status_fiscal || '').includes('QUARENTENA'))) ? 1 : 0;
+        if (qA !== qB) return qB - qA;
+        return Number(b.id || b.os_id || 0) - Number(a.id || a.os_id || 0);
       });
 
 
@@ -45432,9 +45359,32 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
                         <span class="badge" style="background:#f1f5f9;color:#334155;font-size:11px;">${esc(o.equipamento)}</span>
 
-                        ${nfExistente ? `
+                        ${nfExistente && (nfExistente.status_quarentena === 'QUARENTENA_FEEDBACK' || (nfExistente.status_fiscal || '').includes('QUARENTENA')) ? `
+                        <div style="width:100%;background:#fffbeb;border:1.5px solid #fde68a;border-radius:8px;padding:8px 10px;margin:8px 0;">
+                          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">
+                            <span style="font-size:12px;font-weight:900;color:#92400e;display:flex;align-items:center;gap:6px;">
+                              ⏳ <span>Quarentena de Validação Clínica &amp; Feedback (Delay 24h)</span>
+                            </span>
+                            <span style="font-size:10.5px;font-weight:800;background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:4px;border:1px solid #fde68a;">
+                              Liberar em: ${esc(nfExistente.data_liberacao_fiscal || '24h')}
+                            </span>
+                          </div>
+                          <div style="font-size:11px;color:#78350f;margin-top:3px;">
+                            Período de segurança para avaliação clínica pelo hospital antes da emissão definitiva da nota fiscal.
+                          </div>
+                          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
+                            <button type="button" class="btn btn-outline btn-xs" style="border-color:#d97706;color:#b45309;font-weight:800;" onclick="event.stopPropagation(); abrirModalPesquisaSatisfacao(${osId}, '${esc(o.cliente)}')">
+                              ⭐ Registrar Feedback do Cliente
+                            </button>
+                            <button type="button" class="btn btn-success btn-xs" style="font-weight:800;" onclick="event.stopPropagation(); liberarQuarentenaFiscal(${osId})">
+                              ⚡ Liberar Emissão de NF Agora
+                            </button>
+                          </div>
+                        </div>
+                      ` : ''}
 
-                          <span class="badge concluido" style="font-size:10.5px;">🧾 NF: ${esc(nfExistente.numero_nf)} (${esc(nfExistente.status_fiscal)})</span>
+                      ${nfExistente ? `
+                        <span class="badge concluido" style="font-size:10.5px;">🧾 NF: ${esc(nfExistente.numero_nf)} (${esc(nfExistente.status_fiscal)})</span>
 
                         ` : `
 
@@ -46272,7 +46222,7 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
       await sincronizarTudo(false);
 
-      const box = document.getElementById("conteudoModulo") || document.querySelector(".app-content") || document.getElementById("mainAppContainer");
+      const box = document.getElementById("mainContainer") || document.getElementById("conteudoModulo") || document.querySelector(".app-content") || document.getElementById("mainAppContainer");
 
       if (box) renderMenuGesPix(box);
 
@@ -71328,6 +71278,116 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
           <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalExclusaoAuditavel()">Cancelar</button>
           <button type="button" class="btn btn-danger btn-sm" onclick="confirmarExclusaoAuditavel()" style="font-weight:bold;padding:8px 16px;">
             🗑️ Confirmar Exclusão com Registro de Auditoria
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL DE EMISSÃO DE NOTA / GUIA DE REMESSA PARA DIAGNÓSTICO (CFOP 5.915 / 6.915) -->
+  <div id="modalRemessaDiagnostico" class="modal-overlay" style="display:none;z-index:99999;">
+    <div style="background:#fff;border-radius:14px;max-width:560px;width:100%;box-shadow:0 20px 25px -5px rgba(0,0,0,0.3);overflow:hidden;border:1px solid #cbd5e1;">
+      <div style="background:#0284c7;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:18px;">🚚</span>
+          <span style="font-weight:900;font-size:15px;">Emitir Nota / Guia de Remessa p/ Diagnóstico</span>
+        </div>
+        <button type="button" onclick="fecharModalRemessaDiagnostico()" style="background:transparent;border:none;color:#e0f2fe;font-size:20px;cursor:pointer;font-weight:bold;">&times;</button>
+      </div>
+
+      <div style="padding:16px;max-height:80vh;overflow-y:auto;">
+        <div style="font-size:12px;color:#0369a1;background:#f0f9ff;border:1px solid #bae6fd;padding:8px 12px;border-radius:8px;margin-bottom:12px;">
+          Documento fiscal e legal de trânsito (não-incidência/suspensão de ICMS/ISS) para transporte de peças biomédicas para laudo ou conserto em laboratório ou outros estados.
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <label class="field-label">Vínculo com Ordem de Serviço (Opcional):</label>
+          <select id="remessaOsVinculada" class="input" onchange="onRemessaOsChange(this.value)"></select>
+        </div>
+
+        <input type="hidden" id="remessaCidadeOrigem" value="FORTALEZA" />
+        <input type="hidden" id="remessaCidadeDestino" value="SÃO PAULO" />
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:10px;">
+          <div>
+            <label class="field-label">Cliente / Hospital de Origem *:</label>
+            <input id="remessaClienteOrigem" class="input" placeholder="Ex: Hospital Clínico São Mateus" />
+          </div>
+          <div>
+            <label class="field-label">UF Origem:</label>
+            <input id="remessaUfOrigem" class="input" value="CE" readonly style="background:#f1f5f9;font-weight:bold;" />
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:10px;">
+          <div>
+            <label class="field-label">Destinatário / Centro de Reparo *:</label>
+            <input id="remessaDestNome" class="input" value="LABORATÓRIO MATRIZ EMED" placeholder="Ex: Laboratório Matriz EMED ou Fornecedor SP" />
+          </div>
+          <div>
+            <label class="field-label">UF Destino *:</label>
+            <select id="remessaUfDestino" class="input" onchange="atualizarCfopRemessa()" style="font-weight:bold;">
+              <option value="SP" selected>SP (São Paulo)</option>
+              <option value="CE">CE (Ceará)</option>
+              <option value="RJ">RJ (Rio de Janeiro)</option>
+              <option value="MG">MG (Minas Gerais)</option>
+              <option value="PR">PR (Paraná)</option>
+              <option value="RS">RS (Rio Grande do Sul)</option>
+              <option value="PE">PE (Pernambuco)</option>
+              <option value="PI">PI (Piauí)</option>
+              <option value="RN">RN (Rio Grande do Norte)</option>
+              <option value="MA">MA (Maranhão)</option>
+              <option value="DF">DF (Distrito Federal)</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="remessaBadgeCfop" style="margin-bottom:10px;padding:6px 10px;border-radius:6px;background:#f8fafc;border:1px solid #e2e8f0;font-size:11.5px;"></div>
+
+        <div style="margin-bottom:10px;">
+          <label class="field-label">Descrição da Peça / Bem Biomédico *:</label>
+          <input id="remessaPeca" class="input" placeholder="Ex: Tubo de Raio-X Shimadzu Circlex 0.6/1.2 ou Placa Inversora Gantry" />
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div>
+            <label class="field-label">Número de Série / Lote:</label>
+            <input id="remessaSerie" class="input" placeholder="Ex: SN-98442-B" />
+          </div>
+          <div>
+            <label class="field-label">Valor Declarado p/ Seguro (R$) *:</label>
+            <input id="remessaValor" class="input" type="number" step="0.01" value="10000.00" />
+          </div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <label class="field-label">Motivo do Diagnóstico / Reparo *:</label>
+          <input id="remessaMotivo" class="input" value="DIAGNÓSTICO AVANÇADO DE VÁCUO, EMISSÃO E ALTA TENSÃO EM BANCADA" />
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div>
+            <label class="field-label">Modalidade de Transporte:</label>
+            <select id="remessaModalidade" class="input">
+              <option value="TRANSPORTADORA">🚚 Transportadora</option>
+              <option value="TECNICO_FROTA">🚗 Veículo da Frota EMED</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">Transportadora / Técnico:</label>
+            <input id="remessaTransportadora" class="input" placeholder="Ex: Azul Cargo Express ou Nome Técnico" />
+          </div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+          <label class="field-label">Código de Rastreamento (Opcional):</label>
+          <input id="remessaRastreio" class="input" placeholder="Ex: 820-12345678, 1008..., ou link" />
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalRemessaDiagnostico()">Cancelar</button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="confirmarSalvarRemessa()" style="background:#0284c7;font-weight:800;">
+            📤 Emitir Guia &amp; Registrar Remessa
           </button>
         </div>
       </div>
