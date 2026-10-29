@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v38-fechamento-contabil-e-cotacoes-frete';
+const CACHE_NAME = 'emed-pwa-v39-redundancia-e-higienizacao';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

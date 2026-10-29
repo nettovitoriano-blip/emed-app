@@ -324,10 +324,18 @@ from emed_views.conciliacao_pix import (
 
 
     liquidar_pagamento_pix,
+    conciliar_pagamento_bancario_duplo,
 
 
 
 )
+from emed_services.robo_rastreamento import (
+    executar_ciclo_verificacao,
+    obter_status_robo,
+    consultar_rastreio_online,
+    garantir_schema_rastreio_completo
+)
+
 
 
 
@@ -8581,7 +8589,7 @@ async def api_remessas_diagnostico_salvar(request: web.Request) -> web.Response:
     # Determina CFOP: 5.915 se dentro do CE, 6.915 se interestadual
     cfop = "5.915" if uf_destino == uf_origem else "6.915"
     
-    descricao_peca = limpar_texto(body.get("descricao_peca"), "PEÇA BIOMÉDICA PARA DIAGNÓSTICO")
+    descricao_peca = limpar_texto(body.get("descricao_peca"), "PEÇA ELETROMÉDICA PARA DIAGNÓSTICO")
     numero_serie = limpar_texto(body.get("numero_serie"), "S/N")
     quantidade = int(limpar_float(body.get("quantidade"), 1))
     valor_declarado = float(limpar_float(body.get("valor_declarado"), 1000.0))
@@ -8753,7 +8761,7 @@ async def api_remessas_diagnostico_guia(request: web.Request) -> web.Response:
     <table>
       <thead>
         <tr>
-          <th>Item / Peça Biomédica</th>
+          <th>Item / Peça Eletromédica</th>
           <th>Nº de Série</th>
           <th>Qtd</th>
           <th>Valor Declarado (Seguro)</th>
@@ -9334,9 +9342,128 @@ async def api_despesas_recorrentes_salvar(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "msg": msg})
 
 
+
+# ==============================================================================
+# INTEGRAÇÃO BANCÁRIA PIX AUTOMÁTICA & ROBÔ DE RASTREAMENTO DE PEÇAS (24x/DIA)
+# ==============================================================================
+
+async def api_pix_webhook(request: web.Request) -> web.Response:
+    """
+    Webhook Oficial de Baixa Automática PIX / TED bancária.
+    Recebe payloads de bancos (Itaú, Cora, Inter, Asaas, etc.) e processa conciliação
+    automática em 3 níveis (txid, dupla checagem CNPJ + Valor, ou Nome + Valor).
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
+    
+    # Extração inteligente de campos compatível com BACEN e APIs bancárias
+    txid = str(body.get("txid", "")).strip()
+    valor = limpar_float(body.get("valor", 0.0))
+    cnpj = str(body.get("cnpj", "") or body.get("cpf", "")).strip()
+    nome = str(body.get("nome", "") or body.get("nome_pagador", "")).strip()
+    e2e = str(body.get("end_to_end_id", "") or body.get("endToEndId", "")).strip()
+    
+    # Suporte ao formato aninhado BACEN: {"pix": [{"txid": "...", "valor": "...", "pagador": {...}}]}
+    if "pix" in body and isinstance(body["pix"], list) and len(body["pix"]) > 0:
+        pix_item = body["pix"][0]
+        txid = txid or str(pix_item.get("txid", "")).strip()
+        valor = valor or limpar_float(pix_item.get("valor", 0.0))
+        e2e = e2e or str(pix_item.get("endToEndId", "")).strip()
+        pagador = pix_item.get("pagador", {})
+        if isinstance(pagador, dict):
+            cnpj = cnpj or str(pagador.get("cnpj", "") or pagador.get("cpf", "")).strip()
+            nome = nome or str(pagador.get("nome", "")).strip()
+
+    resultado = conciliar_pagamento_bancario_duplo(
+        DB_NAME,
+        cnpj=cnpj,
+        valor=valor,
+        txid=txid,
+        end_to_end_id=e2e,
+        nome_pagador=nome
+    )
+    
+    if resultado.get("conciliado"):
+        # Notifica console do servidor e atualiza estado
+        print(f"💰 [BAIXA AUTOMÁTICA PIX] OS #{resultado.get('os_id')} liquidada! Cliente: {resultado.get('cliente')} - R$ {resultado.get('valor'):.2f}")
+    
+    return web.json_response(resultado)
+
+
+async def api_pix_simular_webhook(request: web.Request) -> web.Response:
+    """Dispara uma simulação de webhook de baixa automática para testes do operador."""
+    body = await request.json()
+    os_id = str(body.get("os_id", "")).strip()
+    valor = limpar_float(body.get("valor", 0.0))
+    cnpj = str(body.get("cnpj", "")).strip()
+    nome = str(body.get("nome", "")).strip()
+    txid = str(body.get("txid", "")).strip()
+    
+    if os_id and not txid:
+        txid = f"EMED-OS-{os_id}"
+        
+    resultado = conciliar_pagamento_bancario_duplo(
+        DB_NAME,
+        cnpj=cnpj,
+        valor=valor,
+        txid=txid,
+        nome_pagador=nome
+    )
+    return web.json_response(resultado)
+
+
+async def api_robo_rastreio_status(request: web.Request) -> web.Response:
+    """Retorna o status atual, métricas e histórico recente do Robô de Rastreamento (24x/dia)."""
+    status_dados = obter_status_robo(DB_NAME)
+    return web.json_response({"ok": True, "robo": status_dados})
+
+
+async def api_robo_rastreio_executar(request: web.Request) -> web.Response:
+    """Executa manualmente 1 ciclo imediato do Robô de Rastreamento de Peças."""
+    res = executar_ciclo_verificacao(DB_NAME)
+    return web.json_response(res)
+
+
+async def api_robo_rastreio_simular(request: web.Request) -> web.Response:
+    """Simula a entrega de um pedido de compra para teste imediato de entrada em estoque."""
+    body = await request.json()
+    ped_id = int(body.get("id", 0))
+    codigo = str(body.get("codigo_rastreio", "")).strip() or f"SIMULA_ENTREGUE_{ped_id}"
+    
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("UPDATE solicitacoes_pecas SET codigo_rastreio = ? WHERE id = ?", (codigo, ped_id))
+        conn.commit()
+        
+    res = executar_ciclo_verificacao(DB_NAME)
+    return web.json_response({"ok": True, "simulacao": res})
+
+
+async def _robo_rastreamento_pecas_task():
+    """Tarefa em segundo plano do Robô de Rastreamento: executa 24 vezes por dia (a cada 60 minutos = 3600s)."""
+    await asyncio.sleep(20)  # Aguarda 20 segundos para estabilização do boot
+    while True:
+        try:
+            print("🤖 [Robô de Rastreamento] Iniciando verificação programada de encomendas (24x/dia)...")
+            res = executar_ciclo_verificacao(DB_NAME)
+            print(f"🤖 [Robô de Rastreamento] Ciclo #{res.get('ciclo')} finalizado: {res.get('itens_processados')} pedidos monitorados, {res.get('itens_entregues')} entregas registradas.")
+        except Exception as e:
+            print(f"⚠️ [Robô de Rastreamento] Erro no ciclo: {e}")
+        await asyncio.sleep(3600)  # 3600 segundos = 1 hora (24 verificações em 24 horas)
+
 def criar_app() -> web.Application:
-    garantir_schema_rastreio(DB_NAME)
+    garantir_schema_rastreio_completo(DB_NAME)
     app = web.Application(client_max_size=25 * 1024 * 1024)
+
+    # Webhook de Baixa Automatica PIX e Robo de Rastreamento 24x/dia
+    app.router.add_post("/api/pix/webhook", api_pix_webhook)
+    app.router.add_post("/api/pix/simular-webhook", api_pix_simular_webhook)
+    app.router.add_get("/api/almoxarifado/rastreio/status", api_robo_rastreio_status)
+    app.router.add_post("/api/almoxarifado/rastreio/executar-robo", api_robo_rastreio_executar)
+    app.router.add_post("/api/almoxarifado/rastreio/simular", api_robo_rastreio_simular)
+
 
 
 

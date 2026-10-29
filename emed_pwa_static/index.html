@@ -43059,9 +43059,29 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
 
-              <div class="section-title" style="margin:0;">
+              <!-- CARD DO ROBÔ DE RASTREAMENTO DE PEÇAS (24x/DIA - INTERVALO 60 MIN) -->
+          <div style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%);color:#fff;border-radius:10px;padding:12px 16px;margin-bottom:12px;box-shadow:0 4px 12px rgba(15,23,42,0.15);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="font-size:26px;">🤖</div>
+              <div>
+                <div style="font-size:13px;font-weight:800;letter-spacing:0.3px;display:flex;align-items:center;gap:8px;">
+                  <span>ROBÔ DE RASTREAMENTO DE PEÇAS</span>
+                  <span style="font-size:10px;background:#15803d;color:#dcfce7;padding:2px 8px;border-radius:12px;font-weight:700;">🟢 ATIVO (24x / 24 HORAS)</span>
+                </div>
+                <div style="font-size:11px;color:#94a3b8;margin-top:2px;">
+                  Varredura automática a cada 60 min. Ao constatar "Entregue" na transportadora, dá entrada automática no estoque.
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button class="btn btn-sm" onclick="executarCicloRoboRastreio()" style="background:#0284c7;color:#fff;border:none;font-weight:bold;font-size:11.5px;padding:7px 14px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                🔄 <span>Rastrear Agora</span>
+              </button>
+            </div>
+          </div>
 
-                🚚 Pedidos de Separação de Campo (${pedidos.length}) &bull; Esteira de Saldo &amp; Compras
+          <div class="section-title" style="margin:0;">
+            🚚 Pedidos de Separação de Campo (${pedidos.length}) &bull; Esteira de Saldo &amp; Compras
 
               </div>
 
@@ -43244,6 +43264,9 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
                                     </a>
                                     <button type="button" class="btn btn-outline btn-xs" style="font-weight:700;padding:4px 8px;" onclick="abrirModalPrevisaoCompra(${p.id})">
                                       ✏️ Rastreio
+                                    </button>
+                                    <button type="button" class="btn btn-success btn-xs" style="font-weight:700;padding:4px 8px;background:#15803d;color:#fff;border:none;" onclick="simularEntregaRastreio(${p.id})" title="Simula entrega da transportadora para entrada automática no estoque">
+                                      🤖 Chegou
                                     </button>
                                   </div>
                                 </div>
@@ -45217,7 +45240,7 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
                 🚚 Notas &amp; Guias de Remessa para Diagnóstico e Conserto (CFOP 5.915 / 6.915)
               </div>
               <div style="font-size:12px;color:#0284c7;margin-top:2px;">
-                Emissão de guias oficiais para trânsito legal de peças e equipamentos biomédicos entre hospitais, laboratórios e outros estados (SP, RJ, MG).
+                Emissão de guias oficiais para trânsito legal de peças e equipamentos eletromédicos e médico-hospitalares entre hospitais, laboratórios e outros estados (SP, RJ, MG).
               </div>
             </div>
 
@@ -45877,7 +45900,7 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
     function abrirWhatsappCotacao(telefone, nomeTransp, cotacaoId = null) {
       const fone = String(telefone || "").replace(/\D/g, "");
       const foneFinal = fone.length === 11 ? `55${fone}` : fone;
-      const texto = encodeURIComponent(`Olá, ${nomeTransp}! Sou da eMED Eletromedicina. Gostaria de solicitar cotação para transporte de maquinário biomédico hospitalar (Carga sensível com exigência de Seguro de Carga RCTR-C ativo). Podemos verificar rota, disponibilidade de munck/plataforma e valores?`);
+      const texto = encodeURIComponent(`Olá, ${nomeTransp}! Sou da eMED Eletromedicina. Gostaria de solicitar cotação para transporte de maquinário e equipamentos médicos de alta complexidade (Carga sensível com exigência de Seguro de Carga RCTR-C ativo). Podemos verificar rota, disponibilidade de munck/plataforma e valores?`);
       window.open(`https://api.whatsapp.com/send?phone=${foneFinal}&text=${texto}`, "_blank");
     }
 
@@ -45914,7 +45937,7 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
       const ordens = STATE.data?.ordens || [];
       const o = ordens.find(ord => String(ord.id) === String(osId));
       if (o) {
-        document.getElementById("cotacaoCarga").value = `Carga Biomédica do Equipamento ${o.equipamento || 'Hospitalar'}`;
+        document.getElementById("cotacaoCarga").value = `Equipamento Médico-Hospitalar ${o.equipamento || ''}`;
         document.getElementById("cotacaoDestinoCidade").value = o.cidade || "FORTALEZA";
       }
     }
@@ -46997,6 +47020,60 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
     }
 
 
+
+    async function simularBaixaPixWebhook(osId, valor, cnpj, nome) {
+      const idAlvo = osId || prompt("Informe o número da OS para simular baixa bancária automática (ex: 19):");
+      if (!idAlvo) return;
+      mostrarToast("🏦 Consultando confirmação bancária via Webhook...");
+      const res = await apiPost("/api/pix/simular-webhook", {
+        os_id: idAlvo,
+        valor: valor || 0,
+        cnpj: cnpj || "",
+        nome: nome || ""
+      });
+      if (res && res.conciliado) {
+        mostrarToast("✅ " + res.msg);
+      } else {
+        mostrarToast(res.msg || "Verificação de baixa processada.");
+      }
+      await sincronizarTudo(false);
+      const box = document.getElementById("mainContainer") || document.getElementById("conteudoModulo") || document.querySelector(".app-content") || document.getElementById("mainAppContainer");
+      if (box && typeof renderMenuGesPix === "function") renderMenuGesPix(box);
+    }
+
+    async function executarCicloRoboRastreio() {
+      mostrarToast("🤖 Robô de Rastreamento ativado! Consultando transportadoras...");
+      try {
+        const res = await apiPost("/api/almoxarifado/rastreio/executar-robo", {});
+        if (res && res.ok) {
+          const msg = `🤖 Ciclo #${res.ciclo}: ${res.itens_processados} encomendas checadas, ${res.itens_entregues} entregas confirmadas e estocadas!`;
+          mostrarToast(msg);
+        } else {
+          mostrarToast("Robô executado.");
+        }
+      } catch (e) {
+        mostrarToast("Erro ao executar ciclo do robô: " + e.message);
+      }
+      await sincronizarTudo(false);
+      const box = document.getElementById("mainContainer") || document.getElementById("conteudoModulo") || document.querySelector(".app-content") || document.getElementById("mainAppContainer");
+      if (box && STATE.menuAtivo === "GES_ESTOQUE" && typeof renderMenuGesEstoque === "function") renderMenuGesEstoque(box);
+    }
+
+    async function simularEntregaRastreio(pedId) {
+      if (!confirm(`Simular confirmação de entrega da transportadora para o Pedido #${pedId}?\n\nO Robô EMED dará entrada física automática no estoque e atualizará o status para SALDO DISPONÍVEL.`)) return;
+      mostrarToast("🚚 Robô registrando entrega e atualizando estoque...");
+      try {
+        const res = await apiPost("/api/almoxarifado/rastreio/simular", { id: pedId });
+        if (res && res.ok) {
+          mostrarToast("📦 Entrega confirmada! Saldo inserido no almoxarifado.");
+        }
+      } catch (e) {
+        mostrarToast("Erro ao simular entrega: " + e.message);
+      }
+      await sincronizarTudo(false);
+      const box = document.getElementById("mainContainer") || document.getElementById("conteudoModulo") || document.querySelector(".app-content") || document.getElementById("mainAppContainer");
+      if (box && STATE.menuAtivo === "GES_ESTOQUE" && typeof renderMenuGesEstoque === "function") renderMenuGesEstoque(box);
+    }
 
     async function liquidarPixApp(osId) {
 
@@ -72084,7 +72161,7 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
       <div style="padding:16px;max-height:80vh;overflow-y:auto;">
         <div style="font-size:12px;color:#0369a1;background:#f0f9ff;border:1px solid #bae6fd;padding:8px 12px;border-radius:8px;margin-bottom:12px;">
-          Documento fiscal e legal de trânsito (não-incidência/suspensão de ICMS/ISS) para transporte de peças biomédicas para laudo ou conserto em laboratório ou outros estados.
+          Documento fiscal e legal de trânsito (não-incidência/suspensão de ICMS/ISS) para transporte de peças e equipamentos médico-hospitalares para laudo ou conserto em laboratório ou outros estados.
         </div>
 
         <div style="margin-bottom:10px;">
@@ -72131,7 +72208,7 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
         <div id="remessaBadgeCfop" style="margin-bottom:10px;padding:6px 10px;border-radius:6px;background:#f8fafc;border:1px solid #e2e8f0;font-size:11.5px;"></div>
 
         <div style="margin-bottom:10px;">
-          <label class="field-label">Descrição da Peça / Bem Biomédico *:</label>
+          <label class="field-label">Descrição da Peça / Bem Eletromédico *:</label>
           <input id="remessaPeca" class="input" placeholder="Ex: Tubo de Raio-X Shimadzu Circlex 0.6/1.2 ou Placa Inversora Gantry" />
         </div>
 
