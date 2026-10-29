@@ -47,17 +47,22 @@ from emed_views.pesquisa_satisfacao import URL_GOOGLE_REVIEW_OFICIAL
 
 
 def _obter_logo_base64() -> str:
-    """Retorna o base64 da logo oficial da EMED (emed1.jpg) para renderização inline sem quebras em HTML e Streamlit."""
+    """Retorna o base64 da logo oficial da EMED para renderização inline sem quebras em HTML e Streamlit."""
+    import base64
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     caminhos = [
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), "emed1.jpg"),
+        os.path.join(base_dir, "emed_logo_clean_white_bg.png"),
+        os.path.join(base_dir, "emed_logo_user_dark.png"),
+        os.path.join(base_dir, "emed1.jpg"),
+        os.path.join(os.getcwd(), "emed_logo_clean_white_bg.png"),
         os.path.join(os.getcwd(), "emed1.jpg"),
-        "emed1.jpg",
     ]
     for c in caminhos:
         if os.path.exists(c):
             try:
+                mime = "image/png" if c.endswith(".png") else "image/jpeg"
                 with open(c, "rb") as f:
-                    return f"data:image/jpeg;base64,{base64.b64encode(f.read()).decode('utf-8')}"
+                    return f"data:{mime};base64,{base64.b64encode(f.read()).decode('utf-8')}"
             except Exception:
                 pass
     return ""
@@ -288,7 +293,7 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
 
     logo_b64 = _obter_logo_base64()
     bloco_logo = (
-        f'<img src="{logo_b64}" width="105" height="40" style="width:105px; height:40px; object-fit:contain;" alt="Logo eMED"/>'
+        f'<img src="{logo_b64}" width="135" height="48" style="width:135px; height:auto; max-height:48px; object-fit:contain;" alt="Logo eMED"/>'
         if logo_b64
         else '<b style="font-size:15pt; color:#0b132b;">🏥 eMED</b>'
     )
