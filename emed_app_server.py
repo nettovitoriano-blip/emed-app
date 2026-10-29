@@ -7154,74 +7154,10 @@ async def api_html_os(request: web.Request) -> web.Response:
 
 
             if modo_print:
+                pass
 
 
 
-                barra_superior = """
-
-
-
-                <div class="no-print" style="position:sticky;top:0;background:#002b54;color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;z-index:99999;box-shadow:0 2px 10px rgba(0,0,0,0.25);font-family:Arial,sans-serif;">
-
-
-
-                    <div style="font-weight:bold;font-size:13px;display:flex;align-items:center;gap:8px;">
-
-
-
-                        <span style="font-size:18px;">📄</span> Laudo Técnico Oficial — EMED Eletromedicina
-
-
-
-                    </div>
-
-
-
-                    <div style="display:flex;gap:8px;">
-
-
-
-                        <button onclick="window.print()" style="background:#15803d;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:bold;cursor:pointer;font-size:13px;">🖨️ Imprimir / Salvar PDF</button>
-
-
-
-                        <button onclick="window.close()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;">✕ Fechar</button>
-
-
-
-                    </div>
-
-
-
-                </div>
-
-
-
-                <script>
-
-
-
-                    window.addEventListener('load', function() {
-
-
-
-                        setTimeout(function() { window.print(); }, 400);
-
-
-
-                    });
-
-
-
-                </script>
-
-
-
-                """
-
-
-
-                html_os = html_os.replace("<body>", f"<body>{barra_superior}")
 
 
 
@@ -7273,71 +7209,6 @@ async def api_imprimir_os(request: web.Request) -> web.Response:
 
 
 
-            barra_superior = """
-
-
-
-            <div class="no-print" style="position:sticky;top:0;background:#002b54;color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;z-index:99999;box-shadow:0 2px 10px rgba(0,0,0,0.25);font-family:Arial,sans-serif;">
-
-
-
-                <div style="font-weight:bold;font-size:13px;display:flex;align-items:center;gap:8px;">
-
-
-
-                    <span style="font-size:18px;">📄</span> Laudo Oficial — OS #""" + str(os_id) + """
-
-
-
-                </div>
-
-
-
-                <div style="display:flex;gap:8px;">
-
-
-
-                    <button onclick="window.print()" style="background:#15803d;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:bold;cursor:pointer;font-size:13px;">🖨️ Imprimir / Salvar PDF</button>
-
-
-
-                    <button onclick="window.close()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;">✕ Fechar</button>
-
-
-
-                </div>
-
-
-
-            </div>
-
-
-
-            <script>
-
-
-
-                window.addEventListener('load', function() {
-
-
-
-                    setTimeout(function() { window.print(); }, 400);
-
-
-
-                });
-
-
-
-            </script>
-
-
-
-            """
-
-
-
-            html_os = html_os.replace("<body>", f"<body>{barra_superior}")
 
 
 

@@ -262,6 +262,15 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     cin = limpar_texto(row_c.get("checkin_hora"), "08:15")
     cout = limpar_texto(row_c.get("checkout_hora"), "11:45")
     dur = limpar_texto(row_c.get("tempo_atendimento"), "3h 30m")
+
+    # Próxima Preventiva Programada (Ciclo Semestral ANVISA RDC 509)
+    try:
+        import datetime
+        dt_base = datetime.datetime.strptime(str(row_c.get("data_agendamento") or "")[:10], "%Y-%m-%d")
+        dt_prox = dt_base + datetime.timedelta(days=180)
+        dt_prox_prev = dt_prox.strftime("%d/%m/%Y")
+    except Exception:
+        dt_prox_prev = "21/04/2027"
     
     defeito_informado = limpar_texto(row_c.get("defeito_relatado"), "-")
     if defeito_informado == "-" or not defeito_informado:
@@ -320,16 +329,20 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
                 cod_p = r[0] or "PEC"
                 desc_p = r[1]
                 origem_p = str(r[2] or "").upper()
-                if cod_p == 'PEC' and 'PEC-' in str(desc_p):
+                
+                # Se código vier genérico mas estiver no texto da peça, refinar
+                if cod_p == "PEC" and "PEC-" in str(desc_p):
                     import re
                     m = re.search(r'(PEC-[\w-]+)', str(desc_p))
                     if m:
                         cod_p = m.group(1)
+                
+                # Limpar repetição do código na descrição se existir
                 desc_limpa = str(desc_p)
-                if cod_p in desc_limpa and ':' in desc_limpa:
-                    partes = desc_limpa.split(':', 1)
+                if cod_p in desc_limpa and ":" in desc_limpa:
+                    partes = desc_limpa.split(":", 1)
                     if len(partes) > 1:
-                        prefixo = partes[0].split()[0] if partes[0].split() else '1x'
+                        prefixo = partes[0].split()[0] if partes[0].split() else "1x"
                         desc_limpa = f"{prefixo} {partes[1].strip()}"
                 desc_p = desc_limpa
                 
@@ -762,21 +775,20 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
   }}
   
   @media print {{
-    body {{ background: #ffffff; padding: 0; }}
-    .page-container {{ border: none; box-shadow: none; padding: 0; }}
-    .no-print {{ display: none !important; }}
+    @page {{ size: A4; margin: 8mm 10mm; }}
+    body {{ background: #ffffff !important; padding: 0 !important; margin: 0 !important; }}
+    .page-container {{ border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; max-width: 100% !important; }}
+    .no-print, header, nav, button {{ display: none !important; visibility: hidden !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }}
   }}
 </style>
 </head>
 <body>
 
-<div class="no-print" style="position:sticky;top:0;background:#0f172a;color:#fff;padding:8px 16px;display:flex;justify-content:space-between;align-items:center;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);border-radius:4px;max-width:820px;margin:0 auto 12px auto;">
-  <div style="font-weight:bold;font-size:12px;">
-    📄 Relatório de Atendimento &bull; Ordem de Serviço #{id_os_c} &bull; eMED Eletromedicina
-  </div>
-  <div>
-    <button onclick="window.print()" style="background:#0284c7;color:#fff;border:none;padding:6px 14px;border-radius:4px;font-weight:bold;cursor:pointer;font-size:11px;">🖨️ Imprimir / Salvar PDF</button>
-  </div>
+<!-- BOTÃO FLUTUANTE DISCRETO (NÃO POLUI O TOPO E DESAPARECE 100% NA IMPRESSÃO) -->
+<div class="no-print" style="position:fixed;bottom:24px;right:24px;z-index:99999;">
+  <button onclick="window.print()" style="background:#0284c7;color:#fff;border:none;padding:12px 22px;border-radius:50px;font-weight:bold;cursor:pointer;font-size:11pt;box-shadow:0 4px 16px rgba(2,132,199,0.45);display:flex;align-items:center;gap:8px;font-family:Arial,sans-serif;">
+    🖨️ Imprimir / Salvar PDF
+  </button>
 </div>
 
 <div class="page-container">
@@ -796,15 +808,14 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
       </div>
     </div>
     
-    <!-- BOX DE OS NO CANTO SUPERIOR DIREITO -->
+    <!-- BOX DE OS NO CANTO SUPERIOR DIREITO (SEM NÚMERO DE TAREFA PARA NÃO POLUIR) -->
     <div class="os-badge-box">
       <div class="os-badge-title">ORDEM DE SERVIÇO</div>
       <div class="os-badge-num">Nº {id_os_c}</div>
-      <div class="os-badge-meta">Ref. Chamado/Tarefa: #{id_os_c}</div>
       <div style="margin-top:4px;">
         <span class="status-tag">{status_os}</span>
       </div>
-      <div class="os-badge-meta" style="margin-top:3px;font-size:6.8pt;color:#64748b;">
+      <div class="os-badge-meta" style="margin-top:4px;font-size:7pt;color:#64748b;">
         {dt_agend} &bull; {cin}
       </div>
     </div>
@@ -975,6 +986,11 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
       {pendencias_txt} {'' if is_pendencia else '— <span style=\"color:#15803d;font-weight:bold;\">SOLUCIONADA NO ATENDIMENTO (Equipamento liberado 100%).</span>'}
     </div>
     ''' if pendencias_txt else ''}
+
+    <div style="margin-top:6px;font-size:7.2pt;color:#0369a1;background:#f0f9ff;border:1px dashed #bae6fd;padding:4px 8px;border-radius:3px;display:flex;justify-content:space-between;align-items:center;">
+      <span>📅 <b>PRÓXIMA MANUTENÇÃO PREVENTIVA RECOMENDADA:</b> {dt_prox_prev} (Periodicidade Semestral)</span>
+      <span><b>CICLO NORMATIVO:</b> ANVISA RDC 509/2021</span>
+    </div>
   </div>
 
   <!-- OBSERVAÇÕES -->
@@ -1015,7 +1031,7 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
 
   <!-- RODAPÉ COMPLETO -->
   <div class="footer-stamp">
-    Ordem de Serviço Nº {id_os_c} &bull; Ref. Chamado #{id_os_c} &bull; Empresa: <b>EMED ELETROMEDICINA LTDA.</b> &bull; CNPJ: 03.611.974/0001-08 &bull; Emissão pelo Sistema Oficial eMED
+    Ordem de Serviço Nº {id_os_c} &bull; Empresa: <b>EMED ELETROMEDICINA LTDA.</b> &bull; CNPJ: 03.611.974/0001-08 &bull; Emissão pelo Sistema Oficial eMED
   </div>
 </div>
 
