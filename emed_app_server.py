@@ -2289,6 +2289,12 @@ async def api_bootstrap(request: web.Request) -> web.Response:
                     "data_liberacao_fiscal": limpar_texto(r.get("data_liberacao_fiscal"), ""),
                     "status_quarentena": limpar_texto(r.get("status_quarentena"), "LIBERADO"),
                     "feedback_cliente_status": limpar_texto(r.get("feedback_cliente_status"), ""),
+                    "motivo_cancelamento": limpar_texto(r.get("motivo_cancelamento"), ""),
+                    "data_cancelamento": limpar_texto(r.get("data_cancelamento"), ""),
+                    "aliquota_iss": float(r.get("aliquota_iss", 5.0) or 5.0),
+                    "cnpj_tomador": limpar_texto(r.get("cnpj_tomador"), ""),
+                    "natureza_operacao": limpar_texto(r.get("natureza_operacao"), "PRESTAÇÃO DE SERVIÇOS TÉCNICOS HOSPITALARES"),
+                    "cfop": limpar_texto(r.get("cfop"), "5.933"),
                 })
 
         except Exception:
@@ -2324,6 +2330,75 @@ async def api_bootstrap(request: web.Request) -> web.Response:
                     "data_envio": limpar_texto(r.get("data_envio"), ""),
                     "data_retorno_prevista": limpar_texto(r.get("data_retorno_prevista"), ""),
                     "data_retorno_real": limpar_texto(r.get("data_retorno_real"), ""),
+                    "observacoes": limpar_texto(r.get("observacoes"), ""),
+                })
+        except Exception:
+            pass
+
+        despesas_lista = []
+        try:
+            df_desp = pd.read_sql_query("SELECT * FROM despesas_recorrentes ORDER BY dia_vencimento ASC", conn)
+            for _, r in df_desp.iterrows():
+                despesas_lista.append({
+                    "id": int(r.get("id", 0)),
+                    "categoria": limpar_texto(r.get("categoria"), "OUTROS"),
+                    "descricao": limpar_texto(r.get("descricao"), ""),
+                    "fornecedor": limpar_texto(r.get("fornecedor"), ""),
+                    "valor_mensal_estimado": float(r.get("valor_mensal_estimado", 0.0) or 0.0),
+                    "dia_vencimento": int(r.get("dia_vencimento", 10) or 10),
+                    "forma_pagamento": limpar_texto(r.get("forma_pagamento"), "BOLETO"),
+                    "status": limpar_texto(r.get("status"), "ATIVO"),
+                    "observacoes": limpar_texto(r.get("observacoes"), ""),
+                })
+        except Exception:
+            pass
+
+        transportadoras_lista = []
+        try:
+            df_transp = pd.read_sql_query("SELECT * FROM transportadoras_parceiras ORDER BY possui_seguro_carga DESC, avaliacao_estrelas DESC, id ASC", conn)
+            for _, r in df_transp.iterrows():
+                transportadoras_lista.append({
+                    "id": int(r.get("id", 0)),
+                    "nome": limpar_texto(r.get("nome"), ""),
+                    "cnpj": limpar_texto(r.get("cnpj"), ""),
+                    "telefone": limpar_texto(r.get("telefone"), ""),
+                    "whatsapp": limpar_texto(r.get("whatsapp"), ""),
+                    "contato_responsavel": limpar_texto(r.get("contato_responsavel"), ""),
+                    "cidades_atendidas": limpar_texto(r.get("cidades_atendidas"), ""),
+                    "tipos_veiculo": limpar_texto(r.get("tipos_veiculo"), ""),
+                    "possui_seguro_carga": int(r.get("possui_seguro_carga", 1) or 0),
+                    "valor_cobertura_seguro": float(r.get("valor_cobertura_seguro", 0.0) or 0.0),
+                    "avaliacao_estrelas": int(r.get("avaliacao_estrelas", 5) or 5),
+                    "status": limpar_texto(r.get("status"), "ATIVO"),
+                    "observacoes": limpar_texto(r.get("observacoes"), ""),
+                })
+        except Exception:
+            pass
+
+        cotacoes_lista = []
+        try:
+            df_cot = pd.read_sql_query("SELECT * FROM cotacoes_transporte ORDER BY id DESC LIMIT 100", conn)
+            for _, r in df_cot.iterrows():
+                cotacoes_lista.append({
+                    "id": int(r.get("id", 0)),
+                    "numero_cotacao": limpar_texto(r.get("numero_cotacao"), ""),
+                    "os_id": limpar_texto(r.get("os_id"), ""),
+                    "cliente": limpar_texto(r.get("cliente"), ""),
+                    "carga_descricao": limpar_texto(r.get("carga_descricao"), ""),
+                    "origem_cidade": limpar_texto(r.get("origem_cidade"), "FORTALEZA"),
+                    "origem_uf": limpar_texto(r.get("origem_uf"), "CE"),
+                    "destino_cidade": limpar_texto(r.get("destino_cidade"), ""),
+                    "destino_uf": limpar_texto(r.get("destino_uf"), "CE"),
+                    "tipo_veiculo": limpar_texto(r.get("tipo_veiculo"), "Caminhão Munck"),
+                    "peso_kg": float(r.get("peso_kg", 0.0) or 0.0),
+                    "dimensoes": limpar_texto(r.get("dimensoes"), ""),
+                    "valor_declarado_carga": float(r.get("valor_declarado_carga", 0.0) or 0.0),
+                    "exige_seguro": int(r.get("exige_seguro", 1) or 0),
+                    "transportadora_escolhida": limpar_texto(r.get("transportadora_escolhida"), ""),
+                    "valor_fechado": float(r.get("valor_fechado", 0.0) or 0.0),
+                    "status_cotacao": limpar_texto(r.get("status_cotacao"), "EM COTAÇÃO"),
+                    "data_cotacao": limpar_texto(r.get("data_cotacao"), ""),
+                    "data_prevista_transporte": limpar_texto(r.get("data_prevista_transporte"), ""),
                     "observacoes": limpar_texto(r.get("observacoes"), ""),
                 })
         except Exception:
@@ -2978,6 +3053,9 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
         "notas_fiscais": notas,
         "remessas_diagnostico": remessas_lista,
+        "despesas_recorrentes": despesas_lista,
+        "transportadoras_parceiras": transportadoras_lista,
+        "cotacoes_transporte": cotacoes_lista,
 
 
 
@@ -3363,6 +3441,227 @@ def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
 
 
 
+
+async def api_fiscal_danfe(request: web.Request) -> web.Response:
+    os_id = request.match_info.get("os_id", "").strip()
+    df = _carregar_df_direto()
+    row_os = None
+    for idx, row in df.iterrows():
+        if str(obter_id_os(idx, row)) == os_id:
+            row_os = row
+            break
+
+    dados_nf = {}
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM notas_fiscais WHERE os_id = ?", (os_id,))
+        r = cur.fetchone()
+        if r:
+            cols = [d[0] for d in cur.description]
+            dados_nf = dict(zip(cols, r))
+
+    # Fallback caso não esteja na tabela notas_fiscais ainda
+    cli_nome = limpar_texto(row_os.get("cliente") if row_os is not None else dados_nf.get("cliente", "CLIENTE EMED"), "CLIENTE EMED")
+    cnpj_cli = limpar_texto(row_os.get("cnpj") if row_os is not None else dados_nf.get("cnpj_tomador", ""), "00.000.000/0000-00")
+    end_cli = limpar_texto(row_os.get("endereco") if row_os is not None else "", "UNIDADE HOSPITALAR")
+    cid_cli = limpar_texto(row_os.get("cidade") if row_os is not None else "", "FORTALEZA")
+    uf_cli = limpar_texto(row_os.get("estado") if row_os is not None else "", "CE")
+    equip_nome = limpar_texto(row_os.get("equipamento") if row_os is not None else "", "EQUIPAMENTO HOSPITALAR")
+    tec_nome = limpar_texto(row_os.get("tecnico_responsavel") if row_os is not None else "", "MARCOS")
+    srv_tipo = limpar_texto(row_os.get("tipo_servico") if row_os is not None else "", "CORRETIVA (GERAL)")
+
+    num_nf = dados_nf.get("numero_nf") or (row_os.get("numero_nf") if row_os is not None else "") or f"NFS-{os_id.zfill(4)}"
+    st_fiscal = dados_nf.get("status_fiscal") or (row_os.get("status_fiscal") if row_os is not None else "EMITIDA")
+    tipo_nota = dados_nf.get("tipo_nota") or "100% NOTA DE SERVIÇO (NFS-e)"
+    dt_emissao = dados_nf.get("data_emissao") or (row_os.get("data_agendamento") if row_os is not None else "") or obter_agora_brasil_str("%d/%m/%Y")
+    chave = dados_nf.get("chave_acesso") or f"2326 1003 6119 7400 0108 5500 1000 {os_id.zfill(4)} 1004 8291 3824"
+    val_srv = float(dados_nf.get("valor_servicos") or 0.0)
+    val_pec = float(dados_nf.get("valor_pecas") or 0.0)
+    if val_srv == 0 and val_pec == 0 and row_os is not None:
+        val_total_os = float(row_os.get("valor_os") or 0.0)
+        val_srv = val_total_os
+    val_total = val_srv + val_pec
+    descr = dados_nf.get("discriminacao_servico") or f"Prestação de serviços especializados de engenharia clínica e manutenção técnica no equipamento {equip_nome}. Atendimento OS #{os_id}."
+
+    # Peças vinculadas
+    pecas = []
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT itens_solicitados, codigo_peca, tipo_origem_peca FROM solicitacoes_pecas WHERE os_id = ?", (os_id,))
+        for r_p in cur.fetchall():
+            pecas.append({"item": r_p[0], "codigo": r_p[1] or "PEC", "origem": r_p[2] or "NOVA_COM_NF"})
+
+    html_danfe = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>DANFE / Espelho da Nota Fiscal — OS #{os_id} ({num_nf})</title>
+  <style>
+    @page {{ size: A4 portrait; margin: 10mm; }}
+    * {{ box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }}
+    body {{ background: #f8fafc; margin: 0; padding: 20px; color: #0b132b; }}
+    .danfe-box {{ max-width: 820px; margin: 0 auto; background: #fff; border: 2px solid #002b54; border-radius: 8px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }}
+    .no-print {{ background: #002b54; color: #fff; padding: 10px 16px; margin: -20px -20px 20px -20px; border-radius: 6px 6px 0 0; display: flex; justify-content: space-between; align-items: center; }}
+    .btn-print {{ background: #0077b6; color: #fff; border: none; padding: 8px 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
+    .btn-print:hover {{ background: #023e8a; }}
+    .header-tbl {{ width: 100%; border-bottom: 2px solid #002b54; padding-bottom: 12px; margin-bottom: 12px; }}
+    .title-danfe {{ font-size: 16px; font-weight: 900; color: #002b54; text-transform: uppercase; }}
+    .badge-nf {{ background: #dcfce7; color: #15803d; border: 1.5px solid #86efac; padding: 3px 8px; border-radius: 4px; font-weight: 800; font-size: 11px; }}
+    .sec-header {{ background: #002b54; color: #fff; font-size: 11px; font-weight: 800; padding: 5px 8px; margin: 12px 0 4px 0; border-radius: 4px; text-transform: uppercase; }}
+    .data-tbl {{ width: 100%; border-collapse: collapse; font-size: 11.5px; margin-bottom: 6px; }}
+    .data-tbl td, .data-tbl th {{ border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }}
+    .data-tbl th {{ background: #f1f5f9; font-weight: 700; color: #334155; }}
+    .val-destaque {{ font-size: 15px; font-weight: 900; color: #059669; }}
+    @media print {{
+      body {{ background: #fff; padding: 0; }}
+      .danfe-box {{ border: 1px solid #000; box-shadow: none; max-width: 100%; padding: 12px; }}
+      .no-print {{ display: none !important; }}
+    }}
+  </style>
+</head>
+<body>
+  <div class="danfe-box">
+    <div class="no-print">
+      <div style="font-weight: bold; font-size: 14px;">🧾 Sistema Fiscal EMED — Espelho Oficial de Nota Fiscal</div>
+      <div>
+        <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+        <button class="btn-print" style="background:#64748b;margin-left:6px;" onclick="window.close()">✕ Fechar</button>
+      </div>
+    </div>
+
+    <!-- CABEÇALHO EMED -->
+    <table class="header-tbl">
+      <tr>
+        <td style="width: 140px; vertical-align: middle;">
+          <img src="/api/logo-circle" alt="EMED" style="width: 100px; height: auto;" onerror="this.src='/api/logo'" />
+        </td>
+        <td style="vertical-align: middle;">
+          <div class="title-danfe">EMED ELETROMEDICINA LTDA.</div>
+          <div style="font-size: 11px; color: #0077b6; font-weight: bold; margin-top: 1px;">Eletromedicina • Manutenção em Equipamentos de Diagnóstico por Imagem</div>
+          <div style="font-size: 10px; color: #475569; margin-top: 3px; line-height: 1.35;">
+            <b>CNPJ:</b> 03.611.974/0001-08 &bull; <b>Insc. Municipal:</b> 123456-7<br/>
+            <b>Matriz (Ceará):</b> Rua Coronel Freire, 16 - Bairro Amador, Eusébio - CE, CEP: 61769-470 &bull; <b>Fone CE:</b> (85) 3254-2929<br/>
+            <b>Base Brasília (DF):</b> Rua 3, Chácara 46A, Lote 01, Setor Habitacional, Brasília - DF, CEP: 72005-670 &bull; <b>Fone DF:</b> (61) 99658-5392<br/>
+            <b>Site:</b> emed.med.br &bull; <b>E-mail:</b> manutencao@emed.med.br
+          </div>
+        </td>
+        <td style="width: 220px; vertical-align: middle; text-align: right;">
+          <div style="border: 2px solid #002b54; border-radius: 6px; padding: 8px; background: #f8fafc; text-align: center;">
+            <div style="font-size: 10px; font-weight: 800; color: #002b54;">DOCUMENTO AUXILIAR DA NFS-e / NF-e</div>
+            <div style="font-size: 16px; font-weight: 900; color: #0b132b; margin: 3px 0;">{num_nf}</div>
+            <div class="badge-nf">STATUS: {st_fiscal}</div>
+            <div style="font-size: 9.5px; color: #64748b; margin-top: 4px;">Emissão: <b>{dt_emissao}</b></div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <div style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 4px; font-size: 10px; margin-bottom: 8px;">
+      <b>Chave de Autenticação / Protocolo Digital:</b> <span style="font-family: monospace; letter-spacing: 0.5px;">{chave}</span>
+    </div>
+
+    <!-- TOMADOR DOS SERVIÇOS -->
+    <div class="sec-header">1. Dados do Tomador / Cliente Hospitalar</div>
+    <table class="data-tbl">
+      <tr>
+        <td colspan="2"><span style="color:#64748b;">Razão Social / Nome:</span> <b>{cli_nome}</b></td>
+        <td><span style="color:#64748b;">CNPJ / CPF:</span> <b>{cnpj_cli}</b></td>
+      </tr>
+      <tr>
+        <td colspan="2"><span style="color:#64748b;">Endereço:</span> <b>{end_cli}</b></td>
+        <td><span style="color:#64748b;">Município / UF:</span> <b>{cid_cli} - {uf_cli}</b></td>
+      </tr>
+    </table>
+
+    <!-- DADOS DA ORDEM DE SERVIÇO -->
+    <div class="sec-header">2. Identificação da Ordem de Serviço & Atendimento Técnico</div>
+    <table class="data-tbl">
+      <tr>
+        <td><span style="color:#64748b;">OS Vinculada:</span> <b>#{os_id}</b></td>
+        <td><span style="color:#64748b;">Equipamento:</span> <b>{equip_nome}</b></td>
+        <td><span style="color:#64748b;">Tipo de Serviço:</span> <b>{srv_tipo}</b></td>
+        <td><span style="color:#64748b;">Técnico Responsável:</span> <b>{tec_nome}</b></td>
+      </tr>
+    </table>
+
+    <!-- DISCRIMINAÇÃO DOS SERVIÇOS & PEÇAS -->
+    <div class="sec-header">3. Discriminação dos Serviços de Engenharia Clínica & Peças</div>
+    <div style="border: 1px solid #cbd5e1; padding: 10px; border-radius: 4px; font-size: 11.5px; background: #fafafa; min-height: 80px; line-height: 1.5; margin-bottom: 8px;">
+      <b>{tipo_nota}</b><br/>
+      {descr}<br/><br/>
+      {"<b>Peças Aplicadas no Atendimento:</b><br/>" + "".join([f"&bull; [{p['origem']}] {p['item']} (Cód: {p['codigo']})<br/>" for p in pecas]) if pecas else "<i>Nenhuma peça faturada separadamente (mão de obra e insumos inclusos no serviço clínico).</i>"}
+    </div>
+
+    <!-- QUADRO DE VALORES -->
+    <div class="sec-header">4. Valores e Tributação Consolidada</div>
+    <table class="data-tbl">
+      <thead>
+        <tr>
+          <th>Valor Mão de Obra / Serviços</th>
+          <th>Valor Peças / Produtos</th>
+          <th>Deduções / Descontos</th>
+          <th>Base de Cálculo ISS</th>
+          <th>VALOR TOTAL DA NOTA FISCAL</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="font-weight: bold; font-size: 13px;">R$ {val_srv:,.2f}</td>
+          <td style="font-weight: bold; font-size: 13px;">R$ {val_pec:,.2f}</td>
+          <td>R$ 0,00</td>
+          <td>R$ {val_srv:,.2f}</td>
+          <td class="val-destaque">R$ {val_total:,.2f}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- INFORMAÇÕES COMPLEMENTARES -->
+    <div class="sec-header">5. Informações Complementares e Fiscais</div>
+    <div style="border: 1px solid #cbd5e1; padding: 8px; border-radius: 4px; font-size: 10px; color: #475569; line-height: 1.4; background: #fff;">
+      &bull; DOCUMENTO EMITIDO POR ME OU EPP OPTANTE PELO SIMPLES NACIONAL.<br/>
+      &bull; NÃO GERA DIREITO A CRÉDITO FISCAL DE IPI / ICMS.<br/>
+      &bull; Valor aproximado dos tributos federais e municipais (IBPT): R$ {(val_total * 0.1345):,.2f} (13,45%).<br/>
+      &bull; Serviços de Manutenção Preventiva/Corretiva e Validação Metrológica de Equipamentos Médicos Hospitalares em conformidade com as normas ANVISA RDC 611 e ABNT NBR IEC 60601.
+    </div>
+
+    <div style="margin-top: 14px; text-align: center; font-size: 9.5px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 8px;">
+      EMED Eletromedicina Ltda. &bull; Comprovante Digital de Faturamento Homologado &bull; Emitido pelo Sistema Oficial EMED
+    </div>
+  </div>
+</body>
+</html>"""
+    return web.Response(body=html_danfe, content_type="text/html", charset="utf-8")
+
+
+async def api_tecnico_assinatura_salvar(request: web.Request) -> web.Response:
+    body = await request.json()
+    nome = limpar_texto(body.get("nome"), "").strip().upper()
+    ass_img = str(body.get("assinatura_img") or "").strip()
+    ass_padrao = limpar_texto(body.get("assinatura_padrao"), "").strip()
+
+    if not nome:
+        return web.json_response({"ok": False, "msg": "Nome do técnico é obrigatório."})
+
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE tecnicos
+            SET rubrica_img = ?, assinatura_padrao = COALESCE(NULLIF(?, ''), assinatura_padrao)
+            WHERE UPPER(nome) = ?
+        """, (ass_img, ass_padrao, nome))
+        if cur.rowcount == 0:
+            cur.execute("""
+                INSERT INTO tecnicos (nome, perfil, assinatura_padrao, rubrica_img)
+                VALUES (?, 'Técnico', ?, ?)
+            """, (nome, ass_padrao, ass_img))
+        conn.commit()
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"✍️ Assinatura digital do técnico {nome} cadastrada e homologada com sucesso!"
+    })
+
+
 async def api_salvar_os(request: web.Request) -> web.Response:
 
 
@@ -3458,6 +3757,14 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
     duracao_str = calcular_duracao_os(cin_atual, agora_str)
+
+    if acao == "CONCLUIR":
+        tec_checagem = limpar_texto(body.get("tecnico_responsavel"), limpar_texto(row_os.get("tecnico_responsavel"), "")).strip().upper()
+        if not tec_checagem or "A DEFINIR" in tec_checagem or "PENDENTE" in tec_checagem:
+            return web.json_response({
+                "ok": False,
+                "msg": "⚠️ Não é permitido concluir uma Ordem de Serviço sem um Técnico Responsável atribuído! Defina o técnico antes do fechamento."
+            })
 
 
 
@@ -6251,7 +6558,19 @@ async def api_os_nf_salvar(request: web.Request) -> web.Response:
 
 
 
-        cur.execute("SELECT id FROM notas_fiscais WHERE os_id = ?", (os_id,))
+        cur.execute("SELECT id, numero_nf, status_fiscal, valor_servicos, valor_pecas, data_emissao FROM notas_fiscais WHERE os_id = ?", (os_id,))
+        row_nf_check = cur.fetchone()
+        confirmar_retificacao = bool(body.get("confirmar_retificacao", False))
+        if row_nf_check and row_nf_check[2] == "EMITIDA" and not confirmar_retificacao:
+            return web.json_response({
+                "ok": False,
+                "duplicidade": True,
+                "numero_nf": row_nf_check[1],
+                "data_emissao": row_nf_check[5],
+                "valor_total": float(row_nf_check[3] or 0) + float(row_nf_check[4] or 0),
+                "msg": f"⚠️ A Nota Fiscal {row_nf_check[1]} já foi emitida para a OS #{os_id}! Confirme a retificação para prosseguir."
+            })
+        row_nf = row_nf_check
 
 
 
@@ -8507,6 +8826,514 @@ def garantir_schema_rastreio(db_path: str):
     except Exception:
         pass
 
+
+async def api_fiscal_cancelar_nota(request: web.Request) -> web.Response:
+    """Cancela uma Nota Fiscal com registro formal de justificativa e histórico no banco de dados."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
+        
+    nota_id = body.get("nota_id") or body.get("id")
+    numero_nf = str(body.get("numero_nf", "")).strip()
+    motivo = str(body.get("motivo", "")).strip()
+    
+    if not motivo:
+        return web.json_response({"ok": False, "msg": "É obrigatório informar a justificativa/motivo do cancelamento."}, status=400)
+        
+    agora_brasil = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+    
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        row = None
+        if nota_id:
+            cur.execute("SELECT id, numero_nf, os_id, cliente, status_fiscal FROM notas_fiscais WHERE id = ?", (int(nota_id),))
+            row = cur.fetchone()
+        elif numero_nf:
+            cur.execute("SELECT id, numero_nf, os_id, cliente, status_fiscal FROM notas_fiscais WHERE UPPER(numero_nf) = ? OR chave_acesso = ?", (numero_nf.upper(), numero_nf))
+            row = cur.fetchone()
+            
+        if not row:
+            return web.json_response({"ok": False, "msg": "Nota Fiscal não localizada no sistema."}, status=404)
+            
+        nid, num_nf, os_id, cliente, st_ant = row
+        
+        cur.execute("""
+            UPDATE notas_fiscais
+            SET status_fiscal = 'CANCELADA',
+                status_quarentena = 'CANCELADA',
+                motivo_cancelamento = ?,
+                data_cancelamento = ?,
+                atualizado_em = ?
+            WHERE id = ?
+        """, (motivo, agora_brasil, agora_brasil, nid))
+        
+        # Desvincula pendência na OS e registra observação
+        if os_id:
+            try:
+                cur.execute("""
+                    UPDATE clientes_equipamentos
+                    SET observacao = COALESCE(observacao, '') || ' | [NF ' || ? || ' CANCELADA em ' || ? || ': ' || ? || ']'
+                    WHERE id = ?
+                """, (str(num_nf), agora_brasil, motivo, int(os_id)))
+            except Exception:
+                pass
+                
+        conn.commit()
+        
+    return web.json_response({
+        "ok": True,
+        "msg": f"Nota Fiscal #{num_nf} ({cliente}) cancelada com sucesso!",
+        "nota_id": nid,
+        "numero_nf": num_nf,
+        "status_fiscal": "CANCELADA",
+        "data_cancelamento": agora_brasil
+    })
+
+
+async def api_financeiro_relatorio_contabil(request: web.Request) -> web.Response:
+    """Gera o consolidado mensal de impostos, faturamento e despesas recorrentes para contabilidade."""
+    mes = request.query.get("mes") # Ex: "10"
+    ano = request.query.get("ano", str(datetime.now().year))
+    
+    with get_db_connection(DB_NAME) as conn:
+        df_nfs = pd.read_sql_query("SELECT * FROM notas_fiscais", conn)
+        df_desp = pd.read_sql_query("SELECT * FROM despesas_recorrentes WHERE status = 'ATIVO' ORDER BY dia_vencimento ASC", conn)
+        
+    if mes:
+        padrao = f"/{int(mes):02d}/{ano}"
+        df_filtradas = df_nfs[df_nfs["data_emissao"].astype(str).str.contains(padrao) | df_nfs["criado_em"].astype(str).str.contains(f"{ano}-{int(mes):02d}")]
+    else:
+        df_filtradas = df_nfs
+        
+    nfs_ativas = df_filtradas[~df_filtradas["status_fiscal"].astype(str).str.upper().str.contains("CANCELADA")]
+    nfs_canceladas = df_filtradas[df_filtradas["status_fiscal"].astype(str).str.upper().str.contains("CANCELADA")]
+    
+    total_servicos = float(nfs_ativas["valor_servicos"].sum() or 0.0)
+    total_pecas = float(nfs_ativas["valor_pecas"].sum() or 0.0)
+    total_bruto = total_servicos + total_pecas
+    total_cancelado = float(nfs_canceladas["valor_servicos"].sum() + nfs_canceladas["valor_pecas"].sum())
+    
+    # Cálculos tributários:
+    iss_devido = round(total_servicos * 0.05, 2)
+    simples_nacional_estimado = round(total_servicos * 0.085 + total_pecas * 0.045, 2)
+    pis_estimado = round(total_bruto * 0.0065, 2)
+    cofins_estimado = round(total_bruto * 0.0300, 2)
+    csll_estimada = round(total_servicos * 0.0100, 2)
+    irpj_estimado = round(total_servicos * 0.0120, 2)
+    total_tributos_federais = round(pis_estimado + cofins_estimado + csll_estimada + irpj_estimado, 2)
+    
+    total_despesas_recorrentes = float(df_desp["valor_mensal_estimado"].sum() or 0.0)
+    saldo_liquido_operacional = round(total_bruto - simples_nacional_estimado - total_despesas_recorrentes, 2)
+    
+    return web.json_response({
+        "ok": True,
+        "competencia": f"{mes or 'TODOS'}/{ano}",
+        "resumo": {
+            "total_servicos": total_servicos,
+            "total_pecas": total_pecas,
+            "total_faturado_bruto": total_bruto,
+            "total_cancelado": total_cancelado,
+            "total_faturado_liquido": total_bruto,
+            "iss_devido": iss_devido,
+            "simples_nacional_estimado": simples_nacional_estimado,
+            "pis_estimado": pis_estimado,
+            "cofins_estimado": cofins_estimado,
+            "csll_estimada": csll_estimada,
+            "irpj_estimado": irpj_estimado,
+            "total_tributos_federais": total_tributos_federais,
+            "total_despesas_recorrentes": total_despesas_recorrentes,
+            "saldo_liquido_operacional": saldo_liquido_operacional
+        },
+        "notas_ativas": nfs_ativas.to_dict(orient="records"),
+        "notas_canceladas": nfs_canceladas.to_dict(orient="records"),
+        "despesas_recorrentes": df_desp.to_dict(orient="records")
+    })
+
+
+async def api_financeiro_relatorio_contabil_imprimir(request: web.Request) -> web.Response:
+    """Renderiza a visão oficial impressa/PDF do Fechamento Contábil & Tributário Mensal para o escritório de contabilidade."""
+    mes_str = request.query.get("mes", str(datetime.now().month))
+    ano_str = request.query.get("ano", str(datetime.now().year))
+    try:
+        mes = int(mes_str)
+    except Exception:
+        mes = datetime.now().month
+    try:
+        ano = int(ano_str)
+    except Exception:
+        ano = datetime.now().year
+        
+    with get_db_connection(DB_NAME) as conn:
+        df_nfs = pd.read_sql_query("SELECT * FROM notas_fiscais", conn)
+        df_desp = pd.read_sql_query("SELECT * FROM despesas_recorrentes WHERE status = 'ATIVO' ORDER BY dia_vencimento ASC", conn)
+        
+    padrao = f"/{mes:02d}/{ano}"
+    df_filtradas = df_nfs[df_nfs["data_emissao"].astype(str).str.contains(padrao) | df_nfs["criado_em"].astype(str).str.contains(f"{ano}-{mes:02d}")]
+    if df_filtradas.empty:
+        df_filtradas = df_nfs
+        
+    nfs_ativas = df_filtradas[~df_filtradas["status_fiscal"].astype(str).str.upper().str.contains("CANCELADA")]
+    nfs_canceladas = df_filtradas[df_filtradas["status_fiscal"].astype(str).str.upper().str.contains("CANCELADA")]
+    
+    total_servicos = float(nfs_ativas["valor_servicos"].sum() or 0.0)
+    total_pecas = float(nfs_ativas["valor_pecas"].sum() or 0.0)
+    total_bruto = total_servicos + total_pecas
+    total_cancelado = float(nfs_canceladas["valor_servicos"].sum() + nfs_canceladas["valor_pecas"].sum())
+    
+    iss_devido = round(total_servicos * 0.05, 2)
+    simples_estimado = round(total_servicos * 0.085 + total_pecas * 0.045, 2)
+    total_despesas = float(df_desp["valor_mensal_estimado"].sum() or 0.0)
+    saldo_liquido = round(total_bruto - simples_estimado - total_despesas, 2)
+    
+    linhas_nfs = ""
+    for _, r in nfs_ativas.iterrows():
+        linhas_nfs += f"""
+        <tr>
+          <td><b>{r.get('numero_nf')}</b></td>
+          <td>OS #{r.get('os_id')}</td>
+          <td>{r.get('cliente')}</td>
+          <td>{r.get('data_emissao')}</td>
+          <td>R$ {float(r.get('valor_servicos', 0.0)):,.2f}</td>
+          <td>R$ {float(r.get('valor_pecas', 0.0)):,.2f}</td>
+          <td><b>R$ {float(r.get('valor_liquido', 0.0) or (float(r.get('valor_servicos',0))+float(r.get('valor_pecas',0)))):,.2f}</b></td>
+          <td><span style="color:#059669;font-weight:bold;">{r.get('status_fiscal')}</span></td>
+        </tr>
+        """
+        
+    linhas_canceladas = ""
+    for _, r in nfs_canceladas.iterrows():
+        linhas_canceladas += f"""
+        <tr style="background:#fef2f2;color:#991b1b;">
+          <td><b>{r.get('numero_nf')}</b></td>
+          <td>OS #{r.get('os_id')}</td>
+          <td>{r.get('cliente')}</td>
+          <td>{r.get('data_cancelamento') or r.get('atualizado_em')}</td>
+          <td colspan="2">Motivo: {r.get('motivo_cancelamento') or 'Cancelamento Solicitado'}</td>
+          <td><b>R$ {float(r.get('valor_liquido', 0.0) or (float(r.get('valor_servicos',0))+float(r.get('valor_pecas',0)))):,.2f}</b></td>
+          <td><span style="color:#dc2626;font-weight:bold;">CANCELADA</span></td>
+        </tr>
+        """
+        
+    linhas_despesas = ""
+    for _, d in df_desp.iterrows():
+        linhas_despesas += f"""
+        <tr>
+          <td><b>Dia {int(d.get('dia_vencimento', 10))}</b></td>
+          <td>{d.get('categoria')}</td>
+          <td>{d.get('descricao')}</td>
+          <td>{d.get('fornecedor')}</td>
+          <td>{d.get('forma_pagamento')}</td>
+          <td><b>R$ {float(d.get('valor_mensal_estimado', 0.0)):,.2f}</b></td>
+        </tr>
+        """
+
+    html = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Fechamento Contábil e Tributário - Competência {mes:02d}/{ano}</title>
+<style>
+  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 20px; color: #1e293b; background: #f8fafc; }}
+  .container {{ max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border: 1.5px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }}
+  .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2.5px solid #0f172a; padding-bottom: 15px; margin-bottom: 20px; }}
+  .logo {{ font-size: 24px; font-weight: 900; color: #0284c7; letter-spacing: 1px; }}
+  .kpi-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 25px; }}
+  .kpi-card {{ border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #f8fafc; text-align: center; }}
+  .kpi-val {{ font-size: 16px; font-weight: 900; margin-top: 4px; color: #0f172a; }}
+  .kpi-lbl {{ font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; }}
+  table {{ width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px; font-size: 12px; }}
+  th {{ background: #0f172a; color: #fff; text-align: left; padding: 8px 10px; font-size: 11px; text-transform: uppercase; }}
+  td {{ border: 1px solid #e2e8f0; padding: 7px 10px; }}
+  .section-title {{ font-size: 14px; font-weight: 900; color: #0f172a; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-top: 25px; }}
+  .signatures {{ display: flex; justify-content: space-between; margin-top: 45px; padding-top: 20px; }}
+  .sig-line {{ width: 45%; border-top: 1px solid #94a3b8; text-align: center; font-size: 11px; color: #475569; padding-top: 5px; }}
+  @media print {{ body {{ background: #fff; margin: 0; }} .container {{ border: none; box-shadow: none; padding: 0; }} .no-print {{ display: none; }} }}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="no-print" style="margin-bottom: 15px; display: flex; justify-content: flex-end; gap: 8px;">
+    <button onclick="window.print()" style="padding: 8px 16px; background: #0f172a; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">🖨️ Imprimir Relatório / Gerar PDF Contábil</button>
+  </div>
+  
+  <div class="header">
+    <div>
+      <div class="logo">🏥 eMED ELETROMEDICINA</div>
+      <div style="font-size: 11.5px; color: #475569; margin-top: 2px;">CNPJ: 07.842.190/0001-44 &bull; Engenharia Clínica &amp; Manutenção Hospitalar</div>
+      <div style="font-size: 11px; color: #64748b;">Fortaleza - CE &bull; Tel: (85) 3299-4400</div>
+    </div>
+    <div style="text-align: right;">
+      <h1 style="font-size: 15px; margin: 0; color: #0f172a; text-transform: uppercase;">Dossiê Contábil &amp; Fechamento Mensal</h1>
+      <span style="font-size: 13px; font-weight: 800; color: #0284c7;">Competência: {mes:02d}/{ano}</span>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card" style="border-top: 3px solid #0284c7;">
+      <div class="kpi-lbl">Faturamento Bruto</div>
+      <div class="kpi-val" style="color: #0369a1;">R$ {total_bruto:,.2f}</div>
+    </div>
+    <div class="kpi-card" style="border-top: 3px solid #b45309;">
+      <div class="kpi-lbl">Simples / Tributos Est.</div>
+      <div class="kpi-val" style="color: #b45309;">R$ {simples_estimado:,.2f}</div>
+    </div>
+    <div class="kpi-card" style="border-top: 3px solid #dc2626;">
+      <div class="kpi-lbl">Despesas Recorrentes</div>
+      <div class="kpi-val" style="color: #dc2626;">R$ {total_despesas:,.2f}</div>
+    </div>
+    <div class="kpi-card" style="border-top: 3px solid #059669;">
+      <div class="kpi-lbl">Resultado Pré-Contábil</div>
+      <div class="kpi-val" style="color: #059669;">R$ {saldo_liquido:,.2f}</div>
+    </div>
+  </div>
+
+  <div class="section-title">1. Notas Fiscais Emitidas &amp; Apuração de Tributos</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Nº NF</th>
+        <th>OS</th>
+        <th>Tomador / Hospital</th>
+        <th>Data Emissão</th>
+        <th>Serviços</th>
+        <th>Peças</th>
+        <th>Total NF</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {linhas_nfs or '<tr><td colspan="8" style="text-align:center;color:#64748b;">Nenhuma nota fiscal emitida nesta competência.</td></tr>'}
+    </tbody>
+  </table>
+
+  {f"""
+  <div class="section-title" style="color:#991b1b;border-color:#fecaca;">2. Notas Fiscais Canceladas no Período (Estornos Fiscais)</div>
+  <table>
+    <thead>
+      <tr style="background:#991b1b;">
+        <th>Nº NF</th>
+        <th>OS</th>
+        <th>Tomador</th>
+        <th>Cancelamento</th>
+        <th colspan="2">Justificativa Formal</th>
+        <th>Valor Estornado</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {linhas_canceladas}
+    </tbody>
+  </table>
+  """ if linhas_canceladas else ''}
+
+  <div class="section-title">3. Despesas Operacionais Recorrentes da Empresa (Custos Fixos)</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Vencimento</th>
+        <th>Categoria</th>
+        <th>Descrição da Obrigação</th>
+        <th>Fornecedor / Favorecido</th>
+        <th>Forma Pagto</th>
+        <th>Valor Mensal</th>
+      </tr>
+    </thead>
+    <tbody>
+      {linhas_despesas}
+      <tr style="background:#f1f5f9;font-weight:bold;">
+        <td colspan="5" style="text-align:right;">TOTAL DE DESPESAS OPERACIONAIS FIXAS:</td>
+        <td style="color:#b91c1c;">R$ {total_despesas:,.2f}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">4. Resumo de Encargos e Impostos Estimados para Guia (DAS / ISS)</div>
+  <table style="width:70%;">
+    <tr><td><b>ISS Municipal (Fortaleza 5.0% s/ Serviços):</b></td><td style="text-align:right;"><b>R$ {iss_devido:,.2f}</b></td></tr>
+    <tr><td><b>Simples Nacional DAS Estimado (Serviços + Peças):</b></td><td style="text-align:right;"><b>R$ {simples_estimado:,.2f}</b></td></tr>
+    <tr><td><b>PIS (0.65% Estimado s/ Faturamento):</b></td><td style="text-align:right;">R$ {round(total_bruto*0.0065, 2):,.2f}</td></tr>
+    <tr><td><b>COFINS (3.00% Estimado s/ Faturamento):</b></td><td style="text-align:right;">R$ {round(total_bruto*0.03, 2):,.2f}</td></tr>
+  </table>
+
+  <div class="signatures">
+    <div class="sig-line">
+      <b>eMED ELETROMEDICINA LTDA</b><br>
+      Diretoria Administrativa / Financeira
+    </div>
+    <div class="sig-line">
+      <b>ASSESSORIA CONTÁBIL &amp; FISCAL</b><br>
+      Contador Responsável / CRC-CE
+    </div>
+  </div>
+</div>
+</body>
+</html>"""
+    return web.Response(text=html, content_type="text/html")
+
+
+async def api_transportadoras_listar(request: web.Request) -> web.Response:
+    """Retorna o cadastro de transportadoras parceiras e operadores de carga pesada/munck."""
+    with get_db_connection(DB_NAME) as conn:
+        df = pd.read_sql_query("SELECT * FROM transportadoras_parceiras ORDER BY possui_seguro_carga DESC, avaliacao_estrelas DESC, id ASC", conn)
+        return web.json_response({"ok": True, "transportadoras": df.to_dict(orient="records")})
+
+
+async def api_transportadoras_salvar(request: web.Request) -> web.Response:
+    """Cadastra ou atualiza uma transportadora parceira."""
+    body = await request.json()
+    tid = body.get("id")
+    nome = limpar_texto(body.get("nome"), "")
+    if not nome:
+        return web.json_response({"ok": False, "msg": "Nome da transportadora é obrigatório."}, status=400)
+        
+    cnpj = limpar_texto(body.get("cnpj"), "")
+    telefone = limpar_texto(body.get("telefone"), "")
+    whatsapp = limpar_texto(body.get("whatsapp"), "")
+    contato = limpar_texto(body.get("contato_responsavel"), "")
+    cidades = limpar_texto(body.get("cidades_atendidas"), "Fortaleza e Região Metropolitana")
+    veiculos = limpar_texto(body.get("tipos_veiculo"), "Caminhão Munck, Plataforma Elevatória")
+    possui_seguro = 1 if body.get("possui_seguro_carga") in [1, True, "1", "true"] else 0
+    valor_seguro = float(limpar_float(body.get("valor_cobertura_seguro"), 500000.0))
+    estrelas = int(limpar_int(body.get("avaliacao_estrelas"), 5))
+    obs = limpar_texto(body.get("observacoes"), "")
+    agora = obter_agora_brasil_str("%Y-%m-%d %H:%M:%S")
+    
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        if tid:
+            cur.execute("""
+                UPDATE transportadoras_parceiras SET
+                    nome = ?, cnpj = ?, telefone = ?, whatsapp = ?, contato_responsavel = ?,
+                    cidades_atendidas = ?, tipos_veiculo = ?, possui_seguro_carga = ?,
+                    valor_cobertura_seguro = ?, avaliacao_estrelas = ?, observacoes = ?
+                WHERE id = ?
+            """, (nome, cnpj, telefone, whatsapp, contato, cidades, veiculos, possui_seguro, valor_seguro, estrelas, obs, int(tid)))
+            msg = f"Transportadora '{nome}' atualizada com sucesso!"
+        else:
+            cur.execute("""
+                INSERT INTO transportadoras_parceiras (
+                    nome, cnpj, telefone, whatsapp, contato_responsavel, cidades_atendidas,
+                    tipos_veiculo, possui_seguro_carga, valor_cobertura_seguro, avaliacao_estrelas,
+                    status, observacoes, criado_em
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ATIVO', ?, ?)
+            """, (nome, cnpj, telefone, whatsapp, contato, cidades, veiculos, possui_seguro, valor_seguro, estrelas, obs, agora))
+            msg = f"Transportadora '{nome}' cadastrada com sucesso!"
+        conn.commit()
+        
+    return web.json_response({"ok": True, "msg": msg})
+
+
+async def api_cotacoes_transporte_listar(request: web.Request) -> web.Response:
+    """Lista as cotações de transporte registradas."""
+    with get_db_connection(DB_NAME) as conn:
+        df = pd.read_sql_query("SELECT * FROM cotacoes_transporte ORDER BY id DESC LIMIT 100", conn)
+        return web.json_response({"ok": True, "cotacoes": df.to_dict(orient="records")})
+
+
+async def api_cotacoes_transporte_salvar(request: web.Request) -> web.Response:
+    """Registra uma nova cotação de transporte ou atualiza o status de aprovação."""
+    body = await request.json()
+    cid = body.get("id")
+    carga = limpar_texto(body.get("carga_descricao"), "")
+    if not carga:
+        return web.json_response({"ok": False, "msg": "Descrição da carga é obrigatória."}, status=400)
+        
+    os_id = str(body.get("os_id", "")).strip()
+    cliente = limpar_texto(body.get("cliente"), "")
+    origem_cidade = limpar_texto(body.get("origem_cidade"), "FORTALEZA")
+    origem_uf = limpar_texto(body.get("origem_uf"), "CE")
+    destino_cidade = limpar_texto(body.get("destino_cidade"), "FORTALEZA")
+    destino_uf = limpar_texto(body.get("destino_uf"), "CE")
+    tipo_veiculo = limpar_texto(body.get("tipo_veiculo"), "Caminhão Munck")
+    peso_kg = float(limpar_float(body.get("peso_kg"), 0.0))
+    dimensoes = limpar_texto(body.get("dimensoes"), "")
+    valor_declarado = float(limpar_float(body.get("valor_declarado_carga"), 0.0))
+    exige_seguro = 1 if body.get("exige_seguro") in [1, True, "1", "true"] else 0
+    transportadora = limpar_texto(body.get("transportadora_escolhida"), "")
+    valor_fechado = float(limpar_float(body.get("valor_fechado"), 0.0))
+    status_cotacao = limpar_texto(body.get("status_cotacao"), "EM COTAÇÃO")
+    data_prevista = limpar_texto(body.get("data_prevista_transporte"), "")
+    obs = limpar_texto(body.get("observacoes"), "")
+    agora_br = obter_agora_brasil_str("%d/%m/%Y")
+    agora_iso = obter_agora_brasil_str("%Y-%m-%d %H:%M:%S")
+    ano_atual = datetime.now().year
+    
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        if cid:
+            cur.execute("""
+                UPDATE cotacoes_transporte SET
+                    carga_descricao = ?, destino_cidade = ?, destino_uf = ?, tipo_veiculo = ?,
+                    peso_kg = ?, dimensoes = ?, valor_declarado_carga = ?, exige_seguro = ?,
+                    transportadora_escolhida = ?, valor_fechado = ?, status_cotacao = ?,
+                    data_prevista_transporte = ?, observacoes = ?
+                WHERE id = ?
+            """, (carga, destino_cidade, destino_uf, tipo_veiculo, peso_kg, dimensoes, valor_declarado, exige_seguro, transportadora, valor_fechado, status_cotacao, data_prevista, obs, int(cid)))
+            msg = f"Cotação atualizada com sucesso!"
+        else:
+            cur.execute("SELECT COUNT(*) FROM cotacoes_transporte")
+            tot = cur.fetchone()[0] + 1
+            num_cot = f"COT-{ano_atual}-{tot:04d}"
+            cur.execute("""
+                INSERT INTO cotacoes_transporte (
+                    numero_cotacao, os_id, cliente, carga_descricao, origem_cidade, origem_uf,
+                    destino_cidade, destino_uf, tipo_veiculo, peso_kg, dimensoes,
+                    valor_declarado_carga, exige_seguro, transportadora_escolhida, valor_fechado,
+                    status_cotacao, data_cotacao, data_prevista_transporte, observacoes, criado_em
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                num_cot, os_id, cliente, carga, origem_cidade, origem_uf,
+                destino_cidade, destino_uf, tipo_veiculo, peso_kg, dimensoes,
+                valor_declarado, exige_seguro, transportadora, valor_fechado,
+                status_cotacao, agora_br, data_prevista, obs, agora_iso
+            ))
+            msg = f"Cotação #{num_cot} registrada com sucesso!"
+        conn.commit()
+        
+    return web.json_response({"ok": True, "msg": msg})
+
+
+async def api_despesas_recorrentes_salvar(request: web.Request) -> web.Response:
+    """Salva ou atualiza uma despesa operacional recorrente da empresa."""
+    body = await request.json()
+    did = body.get("id")
+    categoria = limpar_texto(body.get("categoria"), "OUTROS")
+    descricao = limpar_texto(body.get("descricao"), "")
+    if not descricao:
+        return web.json_response({"ok": False, "msg": "Descrição da despesa é obrigatória."}, status=400)
+        
+    fornecedor = limpar_texto(body.get("fornecedor"), "")
+    valor = float(limpar_float(body.get("valor_mensal_estimado"), 0.0))
+    dia = int(limpar_int(body.get("dia_vencimento"), 10))
+    forma = limpar_texto(body.get("forma_pagamento"), "BOLETO")
+    status = limpar_texto(body.get("status"), "ATIVO")
+    obs = limpar_texto(body.get("observacoes"), "")
+    agora = obter_agora_brasil_str("%Y-%m-%d %H:%M:%S")
+    
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        if did:
+            cur.execute("""
+                UPDATE despesas_recorrentes SET
+                    categoria = ?, descricao = ?, fornecedor = ?, valor_mensal_estimado = ?,
+                    dia_vencimento = ?, forma_pagamento = ?, status = ?, observacoes = ?
+                WHERE id = ?
+            """, (categoria, descricao, fornecedor, valor, dia, forma, status, obs, int(did)))
+            msg = "Despesa recorrente atualizada!"
+        else:
+            cur.execute("""
+                INSERT INTO despesas_recorrentes (
+                    categoria, descricao, fornecedor, valor_mensal_estimado, dia_vencimento,
+                    forma_pagamento, status, observacoes, criado_em
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (categoria, descricao, fornecedor, valor, dia, forma, status, obs, agora))
+            msg = "Despesa recorrente cadastrada!"
+        conn.commit()
+        
+    return web.json_response({"ok": True, "msg": msg})
+
+
 def criar_app() -> web.Application:
     garantir_schema_rastreio(DB_NAME)
     app = web.Application(client_max_size=25 * 1024 * 1024)
@@ -8723,7 +9550,17 @@ def criar_app() -> web.Application:
 
 
     app.router.add_post("/api/os/nf-salvar", api_os_nf_salvar)
+    app.router.add_get("/api/fiscal/danfe/{os_id}", api_fiscal_danfe)
+    app.router.add_post("/api/tecnico/assinatura-salvar", api_tecnico_assinatura_salvar)
     app.router.add_post("/api/fiscal/liberar-quarentena", api_fiscal_liberar_quarentena)
+    app.router.add_post("/api/fiscal/cancelar-nota", api_fiscal_cancelar_nota)
+    app.router.add_get("/api/financeiro/relatorio-contabil", api_financeiro_relatorio_contabil)
+    app.router.add_get("/api/financeiro/relatorio-contabil/imprimir", api_financeiro_relatorio_contabil_imprimir)
+    app.router.add_get("/api/transportadoras", api_transportadoras_listar)
+    app.router.add_post("/api/transportadoras/salvar", api_transportadoras_salvar)
+    app.router.add_get("/api/cotacoes-transporte", api_cotacoes_transporte_listar)
+    app.router.add_post("/api/cotacoes-transporte/salvar", api_cotacoes_transporte_salvar)
+    app.router.add_post("/api/despesas-recorrentes/salvar", api_despesas_recorrentes_salvar)
     app.router.add_get("/api/remessas-diagnostico", api_remessas_diagnostico_listar)
     app.router.add_post("/api/remessas-diagnostico/salvar", api_remessas_diagnostico_salvar)
     app.router.add_post("/api/remessas-diagnostico/retorno", api_remessas_diagnostico_retorno)

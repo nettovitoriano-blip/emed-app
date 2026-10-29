@@ -18165,6 +18165,13 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
     function abrirModalDadosNF(osId, regraPreDefinida = null) {
+      const nfsList = (STATE.data?.notas_fiscais || []);
+      const nfExist = nfsList.find(n => String(n.os_id) === String(osId));
+      if (nfExist && nfExist.status_fiscal === 'EMITIDA' && !window._retificacaoAutorizada) {
+        tentarReemitirNF(osId);
+        return;
+      }
+      window._retificacaoAutorizada = false;
 
       const os = (STATE.data?.ordens || []).find(x => String(x.id) === String(osId));
 
@@ -18260,6 +18267,159 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
+    
+    /********************************************************************
+     * GESTÃO DE NOTAS FISCAIS: VISUALIZADOR & TRAVA DE DUPLICIDADE
+     ********************************************************************/
+    window._retificacaoAutorizada = false;
+
+    function tentarReemitirNF(osId) {
+      const nfs = (STATE.data?.notas_fiscais || []);
+      const nf = nfs.find(n => String(n.os_id) === String(osId));
+      const num = nf ? nf.numero_nf : ('NFS-' + osId);
+      const valTotal = nf ? (Number(nf.valor_servicos || 0) + Number(nf.valor_pecas || 0)).toFixed(2) : "0.00";
+      const dt = nf?.data_emissao || "recente";
+
+      const msg = `⚠️ TRAVA DE SEGURANÇA FISCAL & AUDITORIA:\n\n` +
+                  `A Nota Fiscal ${num} já foi emitida para a OS #${osId} em ${dt} no valor de R$ ${valTotal}.\n\n` +
+                  `• Clique em [OK] para VISUALIZAR / IMPRIMIR a Nota Fiscal emitida.\n` +
+                  `• Clique em [CANCELAR] se realmente deseja RETIFICAR / EDITAR os dados fiscais desta OS.`;
+
+      if (confirm(msg)) {
+        window.open('/api/fiscal/danfe/' + osId, '_blank');
+      } else {
+        window._retificacaoAutorizada = true;
+        abrirModalDadosNF(osId);
+      }
+    }
+
+    /********************************************************************
+     * CADASTRO DE ASSINATURA DIGITAL DO TÉCNICO NO CELULAR
+     ********************************************************************/
+    let _canvasTecDesenhando = false;
+    let _canvasTecHasDrawing = false;
+
+    function iniciarCanvasAssinaturaTecnico() {
+      const canvas = document.getElementById("canvasAssinaturaTecnico");
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * 2 || 700;
+      canvas.height = rect.height * 2 || 320;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(2, 2);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "#002b54";
+      ctx.lineWidth = 2.8;
+
+      function getPos(e) {
+        const r = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - r.left, y: clientY - r.top };
+      }
+
+      canvas.onmousedown = canvas.ontouchstart = (e) => {
+        e.preventDefault();
+        _canvasTecDesenhando = true;
+        _canvasTecHasDrawing = true;
+        const p = getPos(e);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+      };
+
+      canvas.onmousemove = canvas.ontouchmove = (e) => {
+        if (!_canvasTecDesenhando) return;
+        e.preventDefault();
+        const p = getPos(e);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+      };
+
+      window.onmouseup = window.ontouchend = () => {
+        _canvasTecDesenhando = false;
+      };
+    }
+
+    function limparCanvasAssinaturaTecnico() {
+      const canvas = document.getElementById("canvasAssinaturaTecnico");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      _canvasTecHasDrawing = false;
+    }
+
+    function abrirModalAssinaturaTecnico(tecNome = null) {
+      const modal = document.getElementById("modalAssinaturaTecnico");
+      if (!modal) return;
+      const sel = document.getElementById("modalAssTec_nome");
+      const inpPadrao = document.getElementById("modalAssTec_padrao");
+
+      const tecAlvo = tecNome || STATE.usuario || "MARCOS";
+      if (sel) sel.value = tecAlvo.toUpperCase();
+
+      const dTec = (STATE.data?.tecnicos || []).find(t => t.nome?.toUpperCase() === tecAlvo.toUpperCase());
+      if (inpPadrao) inpPadrao.value = dTec?.assinatura_padrao || `${tecAlvo.toUpperCase()} - CFT`;
+
+      modal.style.display = "flex";
+      modal.classList.add("open");
+      _canvasTecHasDrawing = false;
+
+      setTimeout(() => {
+        iniciarCanvasAssinaturaTecnico();
+        if (dTec?.rubrica_img) {
+          const img = new Image();
+          img.onload = () => {
+            const c = document.getElementById("canvasAssinaturaTecnico");
+            if (c) {
+              c.getContext("2d").drawImage(img, 20, 20, 180, 70);
+              _canvasTecHasDrawing = true;
+            }
+          };
+          img.src = dTec.rubrica_img;
+        }
+      }, 150);
+    }
+
+    function fecharModalAssinaturaTecnico() {
+      const modal = document.getElementById("modalAssinaturaTecnico");
+      if (modal) {
+        modal.style.display = "none";
+        modal.classList.remove("open");
+      }
+    }
+
+    async function salvarAssinaturaTecnico() {
+      const canvas = document.getElementById("canvasAssinaturaTecnico");
+      const nome = document.getElementById("modalAssTec_nome")?.value;
+      const padrao = document.getElementById("modalAssTec_padrao")?.value;
+
+      if (!_canvasTecHasDrawing) {
+        mostrarToast("⚠️ Por favor, desenhe sua assinatura na tela do celular antes de salvar.");
+        return;
+      }
+
+      const b64 = canvas.toDataURL("image/png");
+      try {
+        mostrarToast("⏳ Gravando assinatura digital no banco de dados...");
+        const res = await apiPost("/api/tecnico/assinatura-salvar", {
+          nome: nome,
+          assinatura_img: b64,
+          assinatura_padrao: padrao || `${nome} - CFT`
+        });
+
+        if (res && res.ok) {
+          mostrarToast(res.msg || "✅ Assinatura gravada e homologada com sucesso!");
+          fecharModalAssinaturaTecnico();
+          await sincronizarTudo(false);
+        } else {
+          mostrarToast("❌ " + (res?.msg || "Falha ao gravar"));
+        }
+      } catch (err) {
+        mostrarToast("❌ Erro de comunicação com o servidor.");
+      }
+    }
+
     function fecharModalDadosNF() {
 
       document.getElementById("modalDadosNF").classList.remove("open");
@@ -18316,7 +18476,8 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
           tipo_nota: tipoNota,
 
-          discriminacao_servico: descr
+          discriminacao_servico: descr,
+          confirmar_retificacao: window._retificacaoAutorizada || false
 
         });
 
@@ -23133,6 +23294,11 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
     function selecionarMenu(menuId, perfilOpcional = null) {
+      if (menuId === "TEC_ASSINATURA") {
+        abrirModalAssinaturaTecnico();
+        fecharDrawer();
+        return;
+      }
       if (STATE.perfil === "FULL") {
         STATE.menuAtivo = menuId;
         localStorage.setItem("emed_menu_ativo", menuId);
@@ -24271,7 +24437,8 @@ function renderizarNavegacao() {
             { id: "GES_CHAMADOS", icone: "🎫", titulo: "Chamados & Ordens de Serviço", desc: "Abertura, Gestão e Laudos Técnicos" },
             { id: "TEC_OS", icone: "⚡", titulo: "Minhas OS de Campo", desc: "Execução, Check-in, Checklist POP e Assinatura" },
             { id: "GES_TV", icone: "🚨", titulo: "Painel TV de Laboratório", desc: "Críticas, Peças e Programadas" },
-            { id: "TEC_MANUAIS", icone: "📚", titulo: "Manuais Técnicos, POPs & Vídeos", desc: "Acervo de ITs e Treinamento Offline" }
+            { id: "TEC_MANUAIS", icone: "📚", titulo: "Manuais Técnicos, POPs & Vídeos", desc: "Acervo de ITs e Treinamento Offline" },
+            { id: "TEC_ASSINATURA", icone: "✍️", titulo: "Minha Assinatura no Celular", desc: "Cadastrar e Atualizar Rubrica Digital Touch" }
           ]
         },
         {
@@ -42670,6 +42837,9 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
               📑 Consultar Kardex (1.796 Movimentos)
 
             </button>
+            <button type="button" class="btn btn-sm" onclick="selecionarMenu('GES_PIX');setTimeout(()=>trocarAbaFinanceira('FRETES'),250);" style="background:#0369a1;color:#fff;border:none;font-weight:800;display:inline-flex;align-items:center;gap:4px;">
+              🚛 Cotação Fretes &amp; Munck
+            </button>
 
           </div>
 
@@ -44282,6 +44452,9 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
       const nfs = STATE.data?.notas_fiscais || [];
       const remessas = STATE.data?.remessas_diagnostico || [];
+      const despesas = STATE.data?.despesas_recorrentes || [];
+      const transportadoras = STATE.data?.transportadoras_parceiras || [];
+      const cotacoes = STATE.data?.cotacoes_transporte || [];
 
       const solicitacoes = (STATE.data?.solicitacoes_almox || []).concat(STATE.data?.solicitacoes_pecas || []);
 
@@ -44431,6 +44604,14 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
               🚚 Remessas p/ Diagnóstico (${remessas.length})
             </button>
 
+            <button class="btn btn-sm" onclick="trocarAbaFinanceira('FRETES')" style="font-weight:700;border-radius:8px;padding:8px 14px;${abaAtiva==='FRETES'?'background:#0369a1;color:#fff;border-color:#0369a1;box-shadow:0 2px 6px rgba(3,105,161,0.3);':'background:#fff;color:#475569;border:1px solid #cbd5e1;'}">
+              🚛 Cotação de Frete &amp; Munck (${cotacoes.length})
+            </button>
+
+            <button class="btn btn-sm" onclick="trocarAbaFinanceira('CONTABIL')" style="font-weight:700;border-radius:8px;padding:8px 14px;${abaAtiva==='CONTABIL'?'background:#047857;color:#fff;border-color:#047857;box-shadow:0 2px 6px rgba(4,120,87,0.3);':'background:#fff;color:#475569;border:1px solid #cbd5e1;'}">
+              📑 Fechamento Contábil &amp; Impostos
+            </button>
+
             <button class="btn btn-sm" onclick="trocarAbaFinanceira('PROPOSTAS')" style="font-weight:700;border-radius:8px;padding:8px 14px;${abaAtiva==='PROPOSTAS'?'background:#b45309;color:#fff;border-color:#b45309;box-shadow:0 2px 6px rgba(180,83,9,0.3);':'background:#fff;color:#475569;border:1px solid #cbd5e1;'}">
 
               📦 Propostas &amp; Encomendas
@@ -44451,7 +44632,7 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
           <div id="boxConteudoAbaFinanceira">
 
-            ${renderConteudoAbaFinanceira(abaAtiva, ordens, nfs, solicitacoes, estoque, remessas)}
+            ${renderConteudoAbaFinanceira(abaAtiva, ordens, nfs, solicitacoes, estoque, remessas, despesas, transportadoras, cotacoes)}
 
           </div>
 
@@ -44463,8 +44644,11 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
 
 
-    function renderConteudoAbaFinanceira(aba, ordens, nfs, solicitacoes, estoque, remessas) {
+    function renderConteudoAbaFinanceira(aba, ordens, nfs, solicitacoes, estoque, remessas, despesas, transportadoras, cotacoes) {
       remessas = remessas || STATE.data?.remessas_diagnostico || [];
+      despesas = despesas || STATE.data?.despesas_recorrentes || [];
+      transportadoras = transportadoras || STATE.data?.transportadoras_parceiras || [];
+      cotacoes = cotacoes || STATE.data?.cotacoes_transporte || [];
 
       if (aba === "PIX") {
 
@@ -44474,6 +44658,10 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
         return renderAbaNotasFiscais(nfs, ordens);
       } else if (aba === "REMESSAS") {
         return renderAbaRemessasDiagnostico(remessas, ordens);
+      } else if (aba === "FRETES") {
+        return renderAbaCotacoesFretes(cotacoes, transportadoras, ordens);
+      } else if (aba === "CONTABIL") {
+        return renderAbaFechamentoContabil(nfs, despesas);
 
       } else if (aba === "PROPOSTAS") {
 
@@ -45267,6 +45455,582 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
       }
     }
 
+
+    /* ========================================================
+       MÓDULO DE CANCELAMENTO DE NOTAS FISCAIS
+       ======================================================== */
+    function buscarNotaPorCodigoEConfirmarCancelamento(termo) {
+      if (!termo || !termo.trim()) {
+        mostrarToast("⚠️ Bipe o código de barras ou digite o número da nota.");
+        return;
+      }
+      const busca = termo.trim().toUpperCase();
+      const nfs = STATE.data?.notas_fiscais || [];
+      const nf = nfs.find(n => 
+        String(n.numero_nf || "").toUpperCase() === busca ||
+        String(n.chave_acesso || "").toUpperCase() === busca ||
+        String(n.os_id || "") === busca ||
+        String(n.id || "") === busca
+      );
+      if (nf) {
+        abrirModalCancelamentoNota(nf.id);
+      } else {
+        mostrarToast("❌ Nenhuma nota fiscal localizada com o código/número: " + termo);
+      }
+    }
+
+    function abrirModalCancelamentoNota(idOuOsId) {
+      const modal = document.getElementById("modalCancelamentoNota");
+      if (!modal) return;
+      const nfs = STATE.data?.notas_fiscais || [];
+      const nf = nfs.find(n => String(n.id) === String(idOuOsId) || String(n.os_id) === String(idOuOsId) || String(n.numero_nf) === String(idOuOsId));
+      if (!nf) {
+        mostrarToast("❌ Dados da nota fiscal não encontrados para cancelamento.");
+        return;
+      }
+
+      document.getElementById("cancelaNfId").value = nf.id || "";
+      document.getElementById("cancelaNfNumero").innerText = nf.numero_nf || "S/N";
+      document.getElementById("cancelaNfCliente").innerText = `${nf.cliente || "Cliente"} ${nf.cnpj_tomador ? '(' + nf.cnpj_tomador + ')' : ''}`;
+      document.getElementById("cancelaNfOs").innerText = `OS #${nf.os_id || "Avulsa"}`;
+      document.getElementById("cancelaNfData").innerText = nf.data_emissao || nf.criado_em || "--";
+      document.getElementById("cancelaNfServicos").innerText = `R$ ${Number(nf.valor_servicos || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+      document.getElementById("cancelaNfPecas").innerText = `R$ ${Number(nf.valor_pecas || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+      const total = Number(nf.valor_total || (Number(nf.valor_servicos || 0) + Number(nf.valor_pecas || 0)));
+      document.getElementById("cancelaNfTotal").innerText = `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+      document.getElementById("cancelaNfChave").innerText = nf.chave_acesso || "Não gerada / Em processamento";
+      document.getElementById("cancelaMotivoDetalhe").value = "Erro de digitação nos valores ou alíquota fiscal";
+      document.getElementById("cancelaMotivoPadrao").selectedIndex = 0;
+
+      modal.classList.add("open");
+      modal.style.display = "flex";
+    }
+
+    function fecharModalCancelamentoNota() {
+      const modal = document.getElementById("modalCancelamentoNota");
+      if (modal) {
+        modal.classList.remove("open");
+        modal.style.display = "none";
+      }
+    }
+
+    async function confirmarCancelamentoNotaApi() {
+      const id = document.getElementById("cancelaNfId").value;
+      const motivo = document.getElementById("cancelaMotivoDetalhe").value;
+      if (!motivo || !motivo.trim()) {
+        mostrarToast("⚠️ Informe a justificativa formal para o cancelamento.");
+        return;
+      }
+      try {
+        mostrarToast("⏳ Processando cancelamento formal da Nota Fiscal...");
+        const res = await apiPost("/api/fiscal/cancelar-nota", { nota_id: id, motivo: motivo.trim() });
+        if (res && res.ok) {
+          mostrarToast(res.msg || "✅ Nota Fiscal cancelada com sucesso!");
+          fecharModalCancelamentoNota();
+          await sincronizarTudo(false);
+          trocarAbaFinanceira('NFS');
+        } else {
+          mostrarToast(`❌ Erro: ${res?.msg || "Falha ao cancelar nota"}`);
+        }
+      } catch (err) {
+        console.error("Erro confirmarCancelamentoNotaApi:", err);
+        mostrarToast("❌ Falha de comunicação.");
+      }
+    }
+
+    /* ========================================================
+       MÓDULO DE FECHAMENTO CONTÁBIL, IMPOSTOS & DESPESAS
+       ======================================================== */
+    function renderAbaFechamentoContabil(nfs, despesas) {
+      nfs = nfs || STATE.data?.notas_fiscais || [];
+      despesas = despesas || STATE.data?.despesas_recorrentes || [];
+
+      let totalServicos = 0;
+      let totalPecas = 0;
+      let totalCancelado = 0;
+
+      const nfsAtivas = nfs.filter(n => !String(n.status_fiscal || '').toUpperCase().includes('CANCELADA'));
+      const nfsCanceladas = nfs.filter(n => String(n.status_fiscal || '').toUpperCase().includes('CANCELADA'));
+
+      nfsAtivas.forEach(n => {
+        totalServicos += Number(n.valor_servicos || 0);
+        totalPecas += Number(n.valor_pecas || 0);
+      });
+
+      nfsCanceladas.forEach(n => {
+        totalCancelado += (Number(n.valor_servicos || 0) + Number(n.valor_pecas || 0));
+      });
+
+      const totalBruto = totalServicos + totalPecas;
+      const issDevido = Number((totalServicos * 0.05).toFixed(2));
+      const simplesEstimado = Number((totalServicos * 0.085 + totalPecas * 0.045).toFixed(2));
+      const totalDespesas = despesas.reduce((acc, d) => acc + (Number(d.valor_mensal_estimado) || 0), 0);
+      const saldoPreContabil = Number((totalBruto - simplesEstimado - totalDespesas).toFixed(2));
+
+      return `
+        <div class="section-box" style="margin-bottom:16px;border-top:4px solid #047857;background:#f0fdf4;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+            <div>
+              <div class="section-title" style="margin:0;color:#065f46;font-size:16px;display:flex;align-items:center;gap:6px;">
+                📑 Fechamento Contábil Mensal &amp; Apuração de Tributos
+              </div>
+              <div style="font-size:12px;color:#047857;margin-top:2px;">
+                Levantamento oficial de faturamento por serviço/peça, alíquotas de ISS/DAS e despesas recorrentes para contabilidade gerar guias e taxas.
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button type="button" class="btn btn-sm btn-outline" onclick="abrirModalNovaDespesaRecorrente()" style="background:#fff;border-color:#059669;color:#065f46;font-weight:800;">
+                ➕ Nova Despesa Fixa
+              </button>
+              <a href="/api/financeiro/relatorio-contabil/imprimir?mes=10&ano=2026" target="_blank" class="btn btn-primary btn-sm" style="background:#047857;font-weight:800;display:inline-flex;align-items:center;gap:6px;text-decoration:none;">
+                🖨️ Dossiê Contábil Completo (PDF / Impressão)
+              </a>
+            </div>
+          </div>
+
+          <!-- KPIS CONTÁBEIS -->
+          <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:10px;margin-bottom:16px;">
+            <div class="kpi-card" style="background:#fff;border-top:3px solid #0284c7;">
+              <div class="kpi-lbl">Faturamento Bruto (Serviços + Peças)</div>
+              <div class="kpi-val" style="color:#0369a1;">R$ ${totalBruto.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div style="font-size:10.5px;color:#64748b;margin-top:2px;">Srv: R$ ${totalServicos.toLocaleString('pt-BR')} | Peças: R$ ${totalPecas.toLocaleString('pt-BR')}</div>
+            </div>
+            <div class="kpi-card" style="background:#fff;border-top:3px solid #b45309;">
+              <div class="kpi-lbl">Simples Nacional (DAS Estimado)</div>
+              <div class="kpi-val" style="color:#b45309;">R$ ${simplesEstimado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div style="font-size:10.5px;color:#64748b;margin-top:2px;">ISS Municipal: R$ ${issDevido.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+            </div>
+            <div class="kpi-card" style="background:#fff;border-top:3px solid #dc2626;">
+              <div class="kpi-lbl">Despesas Recorrentes Fixas</div>
+              <div class="kpi-val" style="color:#dc2626;">R$ ${totalDespesas.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div style="font-size:10.5px;color:#64748b;margin-top:2px;">${despesas.length} obrigações contratuais ativas</div>
+            </div>
+            <div class="kpi-card" style="background:#fff;border-top:3px solid #059669;">
+              <div class="kpi-lbl">Resultado Pré-Contábil Líquido</div>
+              <div class="kpi-val" style="color:#059669;">R$ ${saldoPreContabil.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+              <div style="font-size:10.5px;color:#059669;margin-top:2px;">Margem após tributos e custos fixos</div>
+            </div>
+          </div>
+
+          <!-- TABELA DE DESPESAS RECORRENTES DA EMPRESA -->
+          <div style="background:#fff;border-radius:10px;border:1px solid #cbd5e1;padding:12px;margin-bottom:14px;">
+            <div style="font-size:13px;font-weight:900;color:#0f172a;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+              <span>🏢 Despesas Operacionais Recorrentes da Empresa (Custos Fixos)</span>
+              <span style="font-size:11px;font-weight:800;color:#b91c1c;">Total Mensal: R$ ${totalDespesas.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+            </div>
+            <div style="overflow-x:auto;">
+              <table style="width:100%;font-size:11.5px;border-collapse:collapse;">
+                <thead>
+                  <tr style="background:#f8fafc;color:#475569;text-align:left;border-bottom:1.5px solid #e2e8f0;">
+                    <th style="padding:6px 8px;">Vencimento</th>
+                    <th style="padding:6px 8px;">Categoria</th>
+                    <th style="padding:6px 8px;">Descrição do Custo</th>
+                    <th style="padding:6px 8px;">Fornecedor / Favorecido</th>
+                    <th style="padding:6px 8px;">Forma Pagto</th>
+                    <th style="padding:6px 8px;text-align:right;">Valor Mensal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${despesas.map(d => `
+                    <tr style="border-bottom:1px solid #f1f5f9;">
+                      <td style="padding:6px 8px;"><b>Dia ${d.dia_vencimento}</b></td>
+                      <td style="padding:6px 8px;"><span class="badge" style="background:#f1f5f9;color:#334155;">${esc(d.categoria)}</span></td>
+                      <td style="padding:6px 8px;font-weight:600;">${esc(d.descricao)}</td>
+                      <td style="padding:6px 8px;color:#64748b;">${esc(d.fornecedor)}</td>
+                      <td style="padding:6px 8px;">${esc(d.forma_pagamento)}</td>
+                      <td style="padding:6px 8px;text-align:right;font-weight:800;color:#0f172a;">R$ ${Number(d.valor_mensal_estimado).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- TABELA DE NOTAS FISCAIS & TRIBUTOS -->
+          <div style="background:#fff;border-radius:10px;border:1px solid #cbd5e1;padding:12px;">
+            <div style="font-size:13px;font-weight:900;color:#0f172a;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+              <span>🧾 Relação de Notas Fiscais Emitidas e Estornadas no Período</span>
+              <span style="font-size:11px;font-weight:800;color:#047857;">${nfsAtivas.length} Notas Válidas | ${nfsCanceladas.length} Canceladas</span>
+            </div>
+            <div style="overflow-x:auto;">
+              <table style="width:100%;font-size:11.5px;border-collapse:collapse;">
+                <thead>
+                  <tr style="background:#f8fafc;color:#475569;text-align:left;border-bottom:1.5px solid #e2e8f0;">
+                    <th style="padding:6px 8px;">Nº NF</th>
+                    <th style="padding:6px 8px;">OS</th>
+                    <th style="padding:6px 8px;">Cliente / Hospital</th>
+                    <th style="padding:6px 8px;">Data</th>
+                    <th style="padding:6px 8px;text-align:right;">Serviços</th>
+                    <th style="padding:6px 8px;text-align:right;">Peças</th>
+                    <th style="padding:6px 8px;text-align:right;">Total</th>
+                    <th style="padding:6px 8px;">Status Fiscal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${nfs.map(n => {
+                    const isCancel = String(n.status_fiscal || '').toUpperCase().includes('CANCELADA');
+                    const tot = Number(n.valor_total || (Number(n.valor_servicos||0) + Number(n.valor_pecas||0)));
+                    return `
+                      <tr style="border-bottom:1px solid #f1f5f9;${isCancel ? 'background:#fef2f2;' : ''}">
+                        <td style="padding:6px 8px;"><b>${esc(n.numero_nf)}</b></td>
+                        <td style="padding:6px 8px;">OS #${n.os_id}</td>
+                        <td style="padding:6px 8px;font-weight:600;">${esc(n.cliente)}</td>
+                        <td style="padding:6px 8px;color:#64748b;">${esc(n.data_emissao || n.criado_em)}</td>
+                        <td style="padding:6px 8px;text-align:right;">R$ ${Number(n.valor_servicos||0).toFixed(2)}</td>
+                        <td style="padding:6px 8px;text-align:right;">R$ ${Number(n.valor_pecas||0).toFixed(2)}</td>
+                        <td style="padding:6px 8px;text-align:right;font-weight:800;color:${isCancel ? '#991b1b' : '#0f172a'};">R$ ${tot.toFixed(2)}</td>
+                        <td style="padding:6px 8px;">
+                          ${isCancel ? `<span class="badge erro" style="font-size:10px;">CANCELADA</span>` : `<span class="badge concluido" style="font-size:10px;">${esc(n.status_fiscal)}</span>`}
+                        </td>
+                      </tr>
+                    `;
+                  }).join("")}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function abrirModalNovaDespesaRecorrente() {
+      const modal = document.getElementById("modalNovaDespesaRecorrente");
+      if (modal) {
+        modal.classList.add("open");
+        modal.style.display = "flex";
+      }
+    }
+
+    function fecharModalNovaDespesaRecorrente() {
+      const modal = document.getElementById("modalNovaDespesaRecorrente");
+      if (modal) {
+        modal.classList.remove("open");
+        modal.style.display = "none";
+      }
+    }
+
+    async function confirmarSalvarDespesaRecorrente() {
+      const desc = document.getElementById("despesaDescricao")?.value || "";
+      const cat = document.getElementById("despesaCategoria")?.value || "OUTROS";
+      const forn = document.getElementById("despesaFornecedor")?.value || "";
+      const val = document.getElementById("despesaValor")?.value || "0.0";
+      const dia = document.getElementById("despesaDiaVencimento")?.value || "10";
+      const forma = document.getElementById("despesaFormaPagamento")?.value || "BOLETO";
+      const obs = document.getElementById("despesaObs")?.value || "";
+
+      if (!desc.trim()) {
+        mostrarToast("⚠️ Informe a descrição da despesa.");
+        return;
+      }
+
+      try {
+        mostrarToast("⏳ Salvando despesa recorrente...");
+        const res = await apiPost("/api/despesas-recorrentes/salvar", {
+          categoria: cat,
+          descricao: desc,
+          fornecedor: forn,
+          valor_mensal_estimado: val,
+          dia_vencimento: dia,
+          forma_pagamento: forma,
+          observacoes: obs
+        });
+        if (res && res.ok) {
+          mostrarToast(res.msg || "✅ Despesa cadastrada!");
+          fecharModalNovaDespesaRecorrente();
+          await sincronizarTudo(false);
+          trocarAbaFinanceira('CONTABIL');
+        } else {
+          mostrarToast(`❌ Erro: ${res?.msg || "Falha ao salvar"}`);
+        }
+      } catch (e) {
+        console.error("Erro confirmarSalvarDespesaRecorrente:", e);
+        mostrarToast("❌ Falha de comunicação.");
+      }
+    }
+
+    /* ========================================================
+       MÓDULO DE COTAÇÕES DE TRANSPORTE PESADO & MUNCK
+       ======================================================== */
+    function renderAbaCotacoesFretes(cotacoes, transportadoras, ordens) {
+      cotacoes = cotacoes || STATE.data?.cotacoes_transporte || [];
+      transportadoras = transportadoras || STATE.data?.transportadoras_parceiras || [];
+      ordens = ordens || STATE.data?.ordens || [];
+
+      return `
+        <div class="section-box" style="margin-bottom:16px;border-top:4px solid #0369a1;background:#f0f9ff;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+            <div>
+              <div class="section-title" style="margin:0;color:#0369a1;font-size:16px;display:flex;align-items:center;gap:6px;">
+                🚛 Central de Cotação de Transporte Pesado &amp; Munck
+              </div>
+              <div style="font-size:12px;color:#0284c7;margin-top:2px;">
+                Transportadoras especializadas com seguro RCTR-C ativo, içamento com Munck/Guindauto e carretas com suspensão a ar para equipamentos hospitalares.
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button type="button" class="btn btn-sm btn-outline" onclick="abrirModalCadastroTransportadora()" style="background:#fff;border-color:#0284c7;color:#0369a1;font-weight:800;">
+                🏢 Credenciar Transportadora
+              </button>
+              <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalCotacaoTransporte()" style="background:#0284c7;font-weight:800;display:inline-flex;align-items:center;gap:6px;">
+                ➕ Nova Cotação de Transporte
+              </button>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 1: TRANSPORTADORAS PARCEIRAS (ORDENADAS POR SEGURO ATIVO) -->
+          <div style="margin-bottom:16px;">
+            <div style="font-size:13px;font-weight:900;color:#0f172a;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+              <span>🛡️ Transportadoras Credenciadas (Prioridade com Seguro de Carga RCTR-C)</span>
+              <span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:11px;">${transportadoras.length} Empresas Aptas</span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(310px, 1fr));gap:10px;">
+              ${transportadoras.map(t => {
+                const comSeguro = (t.possui_seguro_carga === 1);
+                return `
+                  <div style="background:#fff;border-radius:10px;border:1.5px solid ${comSeguro ? '#7dd3fc' : '#e2e8f0'};padding:12px;box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
+                      <div>
+                        <div style="font-weight:900;font-size:13.5px;color:#0f172a;">${esc(t.nome)}</div>
+                        <div style="font-size:11px;color:#64748b;">CNPJ: ${esc(t.cnpj || 'Sob consulta')} &bull; Contato: <b>${esc(t.contato_responsavel || 'Comercial')}</b></div>
+                      </div>
+                      ${comSeguro ? `
+                        <span class="badge" style="background:#ecfdf5;color:#047857;border:1px solid #6ee7b7;font-size:10.5px;font-weight:900;">
+                          🛡️ COM SEGURO
+                        </span>
+                      ` : `
+                        <span class="badge" style="background:#fef2f2;color:#991b1b;border:1px solid #fecaca;font-size:10.5px;font-weight:900;">
+                          ⚠️ SEM SEGURO
+                        </span>
+                      `}
+                    </div>
+
+                    <div style="margin-top:8px;font-size:11.5px;color:#334155;">
+                      <div>🚚 <b>Veículos:</b> ${esc(t.tipos_veiculo)}</div>
+                      <div style="margin-top:2px;">📍 <b>Cidades:</b> ${esc(t.cidades_atendidas)}</div>
+                      ${comSeguro ? `
+                        <div style="margin-top:4px;font-size:11px;color:#065f46;background:#f0fdf4;padding:3px 6px;border-radius:4px;border:1px solid #bbf7d0;">
+                          🛡️ Cobertura Segurada: <b>R$ ${Number(t.valor_cobertura_seguro || 500000).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</b>
+                        </div>
+                      ` : ''}
+                    </div>
+
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid #f1f5f9;">
+                      <span style="font-size:11.5px;font-weight:700;color:#0369a1;">📞 ${esc(t.telefone || t.whatsapp)}</span>
+                      <button type="button" class="btn btn-outline btn-xs" onclick="abrirWhatsappCotacao('${esc(t.whatsapp || t.telefone)}', '${esc(t.nome)}')" style="color:#047857;border-color:#10b981;font-weight:800;display:inline-flex;align-items:center;gap:4px;">
+                        📲 Cotar via WhatsApp
+                      </button>
+                    </div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          </div>
+
+          <!-- SEÇÃO 2: HISTÓRICO DE COTAÇÕES DE TRANSPORTE -->
+          <div style="background:#fff;border-radius:10px;border:1px solid #cbd5e1;padding:12px;">
+            <div style="font-size:13px;font-weight:900;color:#0f172a;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+              <span>📋 Cotações de Frete Registradas</span>
+              <span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:11px;">${cotacoes.length} Cotações</span>
+            </div>
+
+            ${cotacoes.length ? `
+              <div style="display:grid;gap:8px;">
+                ${cotacoes.map(c => `
+                  <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                    <div>
+                      <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-weight:900;color:#0369a1;font-size:13px;">${esc(c.numero_cotacao)}</span>
+                        ${c.os_id ? `<span class="badge" style="background:#f1f5f9;color:#334155;font-size:10.5px;">OS #${c.os_id}</span>` : ''}
+                        <span class="badge ${c.status_cotacao === 'APROVADA' ? 'concluido' : 'obs'}" style="font-size:10.5px;font-weight:800;">
+                          ${esc(c.status_cotacao)}
+                        </span>
+                      </div>
+                      <div style="font-size:12.5px;font-weight:700;color:#0f172a;margin-top:3px;">
+                        📦 ${esc(c.carga_descricao)}
+                      </div>
+                      <div style="font-size:11.5px;color:#64748b;margin-top:2px;">
+                        📍 ${esc(c.origem_cidade)}/${esc(c.origem_uf)} ➔ ${esc(c.destino_cidade)}/${esc(c.destino_uf)} &bull; Veículo: <b>${esc(c.tipo_veiculo)}</b> &bull; Peso: <b>${c.peso_kg} kg</b>
+                      </div>
+                    </div>
+                    <div style="text-align:right;">
+                      <div style="font-size:15px;font-weight:900;color:#0f172a;">
+                        R$ ${Number(c.valor_fechado || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </div>
+                      <div style="font-size:11px;color:#0369a1;font-weight:700;">
+                        🚚 ${esc(c.transportadora_escolhida || 'Em cotação')}
+                      </div>
+                    </div>
+                  </div>
+                `).join("")}
+              </div>
+            ` : `
+              <div style="text-align:center;padding:20px;color:#64748b;font-size:12px;">
+                Nenhuma cotação de frete registrada ainda. Clique em "Nova Cotação de Transporte" acima.
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    function abrirWhatsappCotacao(telefone, nomeTransp, cotacaoId = null) {
+      const fone = String(telefone || "").replace(/\D/g, "");
+      const foneFinal = fone.length === 11 ? `55${fone}` : fone;
+      const texto = encodeURIComponent(`Olá, ${nomeTransp}! Sou da eMED Eletromedicina. Gostaria de solicitar cotação para transporte de maquinário biomédico hospitalar (Carga sensível com exigência de Seguro de Carga RCTR-C ativo). Podemos verificar rota, disponibilidade de munck/plataforma e valores?`);
+      window.open(`https://api.whatsapp.com/send?phone=${foneFinal}&text=${texto}`, "_blank");
+    }
+
+    function abrirModalCotacaoTransporte(osId = null) {
+      const modal = document.getElementById("modalCotacaoTransporte");
+      if (!modal) return;
+      const ordens = STATE.data?.ordens || [];
+      const selOs = document.getElementById("cotacaoOsVinculada");
+      if (selOs) {
+        selOs.innerHTML = `<option value="">-- Cotação Avulsa (Sem OS) --</option>` +
+          ordens.map(o => `<option value="${o.id}" ${String(osId) === String(o.id) ? 'selected' : ''}>OS #${o.id} - ${esc(o.cliente)} (${esc(o.equipamento)})</option>`).join("");
+      }
+
+      const transp = STATE.data?.transportadoras_parceiras || [];
+      const selTransp = document.getElementById("cotacaoTransportadora");
+      if (selTransp) {
+        selTransp.innerHTML = `<option value="">-- Selecione ou Deixe em Cotação Aberta --</option>` +
+          transp.map(t => `<option value="${esc(t.nome)}">${esc(t.nome)} ${t.possui_seguro_carga ? '🛡️ [COM SEGURO]' : '⚠️ [S/ SEGURO]'}</option>`).join("");
+      }
+
+      modal.classList.add("open");
+      modal.style.display = "flex";
+    }
+
+    function fecharModalCotacaoTransporte() {
+      const modal = document.getElementById("modalCotacaoTransporte");
+      if (modal) {
+        modal.classList.remove("open");
+        modal.style.display = "none";
+      }
+    }
+
+    function onCotacaoOsChange(osId) {
+      const ordens = STATE.data?.ordens || [];
+      const o = ordens.find(ord => String(ord.id) === String(osId));
+      if (o) {
+        document.getElementById("cotacaoCarga").value = `Carga Biomédica do Equipamento ${o.equipamento || 'Hospitalar'}`;
+        document.getElementById("cotacaoDestinoCidade").value = o.cidade || "FORTALEZA";
+      }
+    }
+
+    async function confirmarSalvarCotacaoTransporte() {
+      const osId = document.getElementById("cotacaoOsVinculada")?.value || "";
+      const carga = document.getElementById("cotacaoCarga")?.value || "";
+      const origemCid = document.getElementById("cotacaoOrigemCidade")?.value || "FORTALEZA";
+      const destinoCid = document.getElementById("cotacaoDestinoCidade")?.value || "FORTALEZA";
+      const destinoUf = document.getElementById("cotacaoDestinoUf")?.value || "CE";
+      const veiculo = document.getElementById("cotacaoTipoVeiculo")?.value || "Caminhão Munck";
+      const peso = document.getElementById("cotacaoPeso")?.value || "0.0";
+      const dim = document.getElementById("cotacaoDimensoes")?.value || "";
+      const valorDec = document.getElementById("cotacaoValorDeclarado")?.value || "0.0";
+      const transp = document.getElementById("cotacaoTransportadora")?.value || "";
+      const valor = document.getElementById("cotacaoValorFechado")?.value || "0.0";
+      const obs = document.getElementById("cotacaoObs")?.value || "";
+
+      if (!carga.trim()) {
+        mostrarToast("⚠️ Descreva a carga ou equipamento a ser transportado.");
+        return;
+      }
+
+      try {
+        mostrarToast("⏳ Salvando cotação de transporte...");
+        const res = await apiPost("/api/cotacoes-transporte/salvar", {
+          os_id: osId,
+          carga_descricao: carga,
+          origem_cidade: origemCid,
+          destino_cidade: destinoCid,
+          destino_uf: destinoUf,
+          tipo_veiculo: veiculo,
+          peso_kg: peso,
+          dimensoes: dim,
+          valor_declarado_carga: valorDec,
+          transportadora_escolhida: transp,
+          valor_fechado: valor,
+          status_cotacao: (Number(valor) > 0 && transp) ? 'APROVADA' : 'EM COTAÇÃO',
+          observacoes: obs
+        });
+        if (res && res.ok) {
+          mostrarToast(res.msg || "✅ Cotação registrada!");
+          fecharModalCotacaoTransporte();
+          await sincronizarTudo(false);
+          trocarAbaFinanceira('FRETES');
+        } else {
+          mostrarToast(`❌ Erro: ${res?.msg || "Falha ao salvar cotação"}`);
+        }
+      } catch (err) {
+        console.error("Erro confirmarSalvarCotacaoTransporte:", err);
+        mostrarToast("❌ Falha de comunicação.");
+      }
+    }
+
+    function abrirModalCadastroTransportadora() {
+      const modal = document.getElementById("modalCadastroTransportadora");
+      if (modal) {
+        modal.classList.add("open");
+        modal.style.display = "flex";
+      }
+    }
+
+    function fecharModalCadastroTransportadora() {
+      const modal = document.getElementById("modalCadastroTransportadora");
+      if (modal) {
+        modal.classList.remove("open");
+        modal.style.display = "none";
+      }
+    }
+
+    async function confirmarSalvarTransportadora() {
+      const nome = document.getElementById("transpNome")?.value || "";
+      const cnpj = document.getElementById("transpCnpj")?.value || "";
+      const tel = document.getElementById("transpTelefone")?.value || "";
+      const zap = document.getElementById("transpWhatsapp")?.value || "";
+      const cont = document.getElementById("transpContato")?.value || "";
+      const cid = document.getElementById("transpCidades")?.value || "Fortaleza e Região";
+      const veic = document.getElementById("transpVeiculos")?.value || "Caminhão Munck, Plataforma Elevatória";
+      const seguro = document.getElementById("transpPossuiSeguro")?.checked ? 1 : 0;
+      const cob = document.getElementById("transpValorSeguro")?.value || "500000.00";
+      const obs = document.getElementById("transpObs")?.value || "";
+
+      if (!nome.trim()) {
+        mostrarToast("⚠️ Informe a razão social da transportadora.");
+        return;
+      }
+
+      try {
+        mostrarToast("⏳ Cadastrando transportadora parceira...");
+        const res = await apiPost("/api/transportadoras/salvar", {
+          nome: nome,
+          cnpj: cnpj,
+          telefone: tel,
+          whatsapp: zap,
+          contato_responsavel: cont,
+          cidades_atendidas: cid,
+          tipos_veiculo: veic,
+          possui_seguro_carga: seguro,
+          valor_cobertura_seguro: cob,
+          observacoes: obs
+        });
+        if (res && res.ok) {
+          mostrarToast(res.msg || "✅ Transportadora credenciada com sucesso!");
+          fecharModalCadastroTransportadora();
+          await sincronizarTudo(false);
+          trocarAbaFinanceira('FRETES');
+        } else {
+          mostrarToast(`❌ Erro: ${res?.msg || "Falha ao salvar"}`);
+        }
+      } catch (e) {
+        console.error("Erro confirmarSalvarTransportadora:", e);
+        mostrarToast("❌ Falha de comunicação.");
+      }
+    }
+
+
     function renderAbaNotasFiscais(nfs, ordens) {
 
       const solicitacoes = (STATE.data?.solicitacoes_almox || []).concat(STATE.data?.solicitacoes_pecas || []);
@@ -45292,6 +46056,26 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
 
       return `
+
+        <!-- BARRA DE LOCALIZAÇÃO / LEITOR DE CÓDIGO DE BARRAS DE NOTAS FISCAIS -->
+        <div style="background:#fff;border:1.5px solid #cbd5e1;border-radius:10px;padding:12px;margin-bottom:14px;box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <div style="flex:1;min-width:280px;">
+              <label class="field-label" style="font-size:11.5px;margin-bottom:3px;color:#1e293b;font-weight:800;">
+                📷 Leitor de Código de Barras / Chave de Acesso / Nº da NF:
+              </label>
+              <input id="inputLeitorCancelamentoNf" class="input" placeholder="Bipe o código de barras da nota ou digite o número da NF..." onkeydown="if(event.key==='Enter'){event.preventDefault();buscarNotaPorCodigoEConfirmarCancelamento(this.value);}" style="font-size:13px;" />
+            </div>
+            <div style="margin-top:16px;">
+              <button type="button" class="btn btn-primary btn-sm" onclick="buscarNotaPorCodigoEConfirmarCancelamento(document.getElementById('inputLeitorCancelamentoNf').value)" style="background:#0f172a;font-weight:800;padding:8px 14px;">
+                ⚡ Localizar p/ Cancelamento
+              </button>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#64748b;margin-top:4px;">
+            💡 <i>Bipe com leitor USB/Bluetooth para puxar a nota instantaneamente, ou clique no botão '🚫 Cancelar NF' diretamente no card da ordem desejada.</i>
+          </div>
+        </div>
 
         <!-- SEÇÃO 1: FILA DE FATURAMENTO FISCAL (OS REALIZADA + PROPOSTA APROVADA) -->
 
@@ -45384,12 +46168,16 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
                       ` : ''}
 
                       ${nfExistente ? `
-                        <span class="badge concluido" style="font-size:10.5px;">🧾 NF: ${esc(nfExistente.numero_nf)} (${esc(nfExistente.status_fiscal)})</span>
-
+                        <span class="badge ${String(nfExistente.status_fiscal||'').includes('CANCELADA') ? 'erro' : 'concluido'}" style="font-size:10.5px;">
+                          🧾 NF: ${esc(nfExistente.numero_nf)} (${esc(nfExistente.status_fiscal)})
+                        </span>
+                        ${String(nfExistente.status_fiscal||'').includes('CANCELADA') ? `
+                          <div style="font-size:11px;color:#991b1b;margin-top:4px;background:#fef2f2;border:1px solid #fecaca;padding:4px 8px;border-radius:6px;width:100%;">
+                            <b>🚫 Nota Fiscal Cancelada:</b> ${esc(nfExistente.motivo_cancelamento || 'Cancelamento solicitado')} &bull; em ${esc(nfExistente.data_cancelamento || '')}
+                          </div>
+                        ` : ''}
                         ` : `
-
                           <span class="badge obs" style="font-size:10.5px;">⏳ NF Pendente</span>
-
                         `}
 
                       </div>
@@ -45514,34 +46302,32 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
 
 
-                      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-
-                        ${temPecaUsadaSemNf ? `
-
+                      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                        ${nfExistente && (nfExistente.status_fiscal === 'EMITIDA' || nfExistente.numero_nf) ? `
+                          <a href="/api/fiscal/danfe/${osId}" target="_blank" class="btn btn-sm btn-primary" style="font-weight:bold;display:inline-flex;align-items:center;gap:6px;text-decoration:none;background:#0077b6;border-color:#0077b6;padding:6px 14px;">
+                            📄 Visualizar Nota Fiscal Emitida (${esc(nfExistente.numero_nf)})
+                          </a>
+                          <button type="button" class="btn btn-outline btn-xs" onclick="tentarReemitirNF('${osId}')" title="Retificar dados fiscais ou gerar 2ª via da Nota Fiscal" style="color:#64748b;border-color:#cbd5e1;">
+                            ⚙️ Retificar / 2ª Via
+                          </button>
+                          ${!String(nfExistente.status_fiscal||'').includes('CANCELADA') ? `
+                            <button type="button" class="btn btn-outline btn-xs" onclick="event.stopPropagation(); abrirModalCancelamentoNota('${nfExistente.id || osId}')" title="Cancelar Nota Fiscal no sistema" style="color:#dc2626;border-color:#fca5a5;font-weight:800;">
+                              🚫 Cancelar NF
+                            </button>
+                          ` : ''}
+                        ` : (temPecaUsadaSemNf ? `
                           <button type="button" class="btn btn-sm" onclick="abrirModalDadosNF('${osId}', 'SERVICO_TOTAL')" style="background:#6b21a8;color:#fff;border-color:#6b21a8;font-weight:bold;font-size:11.5px;">
-
                             ⚡ Gerar Espelho NFS-e (100% Serviço: R$ ${valTotal.toFixed(2)} | Peças: R$ 0,00)
-
                           </button>
-
                         ` : (temPecaNovaComNf ? `
-
                           <button type="button" class="btn btn-sm btn-success" onclick="abrirModalDadosNF('${osId}', 'CONJUGADA')" style="font-weight:bold;font-size:11.5px;">
-
                             ⚡ Emitir Nota Fiscal Conjugada (Peça + Mão de Obra)
-
                           </button>
-
                         ` : `
-
                           <button type="button" class="btn btn-sm btn-primary" onclick="abrirModalDadosNF('${osId}', 'SERVICO_TOTAL')" style="font-weight:bold;font-size:11.5px;">
-
                             🧾 Emitir NFS-e de Serviços Clínicos
-
                           </button>
-
-                        `)}
-
+                        `))}
                       </div>
 
                     </div>
@@ -71388,6 +72174,396 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
           <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalRemessaDiagnostico()">Cancelar</button>
           <button type="button" class="btn btn-primary btn-sm" onclick="confirmarSalvarRemessa()" style="background:#0284c7;font-weight:800;">
             📤 Emitir Guia &amp; Registrar Remessa
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: CONFIRMAÇÃO & PRÉVIA DE CANCELAMENTO DE NOTA FISCAL -->
+  <div id="modalCancelamentoNota" class="modal-overlay" style="display:none;z-index:999999;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(15,23,42,0.65);">
+    <div style="background:#fff;border-radius:14px;max-width:560px;width:95%;box-shadow:0 25px 35px -5px rgba(0,0,0,0.4);overflow:hidden;border:2px solid #ef4444;margin:auto;">
+      <div style="background:#dc2626;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">🚫</span>
+          <span style="font-weight:900;font-size:16px;">Prévia e Confirmação de Cancelamento de NF</span>
+        </div>
+        <button type="button" onclick="fecharModalCancelamentoNota()" style="background:transparent;border:none;color:#fee2e2;font-size:22px;cursor:pointer;font-weight:bold;">&times;</button>
+      </div>
+
+      <div style="padding:18px;max-height:82vh;overflow-y:auto;">
+        <input type="hidden" id="cancelaNfId" />
+        
+        <div style="background:#fef2f2;border:1.5px solid #fca5a5;padding:12px;border-radius:8px;margin-bottom:14px;">
+          <div style="font-size:12.5px;font-weight:800;color:#991b1b;display:flex;align-items:center;gap:6px;">
+            ⚠️ ATENÇÃO: Esta ação cancelará formalmente a nota fiscal na esteira contábil.
+          </div>
+          <div style="font-size:11.5px;color:#7f1d1d;margin-top:4px;">
+            Confira atentamente os dados da nota selecionada antes de efetuar o cancelamento definitivo.
+          </div>
+        </div>
+
+        <!-- PRÉVIA DOS DADOS DA NOTA -->
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;">
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin-bottom:6px;">
+            <span style="color:#64748b;">Número da Nota:</span>
+            <span id="cancelaNfNumero" style="font-weight:900;color:#0f172a;font-size:14px;">--</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin-bottom:6px;">
+            <span style="color:#64748b;">Tomador / Hospital:</span>
+            <span id="cancelaNfCliente" style="font-weight:700;color:#0f172a;text-align:right;">--</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin-bottom:6px;">
+            <span style="color:#64748b;">Ordem de Serviço:</span>
+            <span id="cancelaNfOs" style="font-weight:800;color:#0369a1;">--</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin-bottom:6px;">
+            <span style="color:#64748b;">Data de Emissão:</span>
+            <span id="cancelaNfData" style="font-weight:600;color:#334155;">--</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin-bottom:6px;">
+            <span style="color:#64748b;">Valor Serviços / Peças:</span>
+            <span style="font-weight:600;color:#334155;"><span id="cancelaNfServicos">--</span> | <span id="cancelaNfPecas">--</span></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin-bottom:6px;">
+            <span style="color:#64748b;font-weight:700;">Valor Total Líquido:</span>
+            <span id="cancelaNfTotal" style="font-weight:900;color:#0f172a;font-size:14px;">--</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:#64748b;">Chave de Acesso:</span>
+            <span id="cancelaNfChave" style="font-size:10px;font-family:monospace;color:#475569;">--</span>
+          </div>
+        </div>
+
+        <!-- JUSTIFICATIVA FORMAL -->
+        <div style="margin-bottom:12px;">
+          <label class="field-label" style="font-weight:800;color:#0f172a;">Motivo Padrão do Cancelamento *:</label>
+          <select id="cancelaMotivoPadrao" class="input" onchange="document.getElementById('cancelaMotivoDetalhe').value=this.value" style="font-weight:bold;">
+            <option value="Erro de digitação nos valores ou alíquota fiscal">Erro de digitação nos valores ou alíquota fiscal</option>
+            <option value="Serviço cancelado ou contestado pelo hospital/cliente">Serviço cancelado ou contestado pelo hospital/cliente</option>
+            <option value="Emissão em duplicidade para a mesma Ordem de Serviço">Emissão em duplicidade para a mesma Ordem de Serviço</option>
+            <option value="Substituição de Nota Fiscal por nova natureza de operação">Substituição de Nota Fiscal por nova natureza de operação</option>
+            <option value="Cliente solicitou faturamento direto via ordem de compra global">Cliente solicitou faturamento direto via ordem de compra global</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <label class="field-label" style="font-weight:800;color:#0f172a;">Detalhamento da Justificativa para a Contabilidade *:</label>
+          <textarea id="cancelaMotivoDetalhe" class="input" rows="2" placeholder="Descreva os detalhes da justificativa..."></textarea>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalCancelamentoNota()">Manter Nota</button>
+          <button type="button" class="btn btn-sm" onclick="confirmarCancelamentoNotaApi()" style="background:#dc2626;color:#fff;font-weight:900;padding:8px 16px;">
+            ❌ Confirmar Cancelamento da Nota Fiscal
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NOVA COTAÇÃO DE TRANSPORTE PESADO / MUNCK -->
+  <div id="modalCotacaoTransporte" class="modal-overlay" style="display:none;z-index:999999;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(15,23,42,0.65);">
+    <div style="background:#fff;border-radius:14px;max-width:560px;width:95%;box-shadow:0 25px 35px -5px rgba(0,0,0,0.4);overflow:hidden;border:1.5px solid #0284c7;margin:auto;">
+      <div style="background:#0284c7;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">🚛</span>
+          <span style="font-weight:900;font-size:16px;">Nova Cotação de Transporte Pesado / Munck</span>
+        </div>
+        <button type="button" onclick="fecharModalCotacaoTransporte()" style="background:transparent;border:none;color:#e0f2fe;font-size:22px;cursor:pointer;font-weight:bold;">&times;</button>
+      </div>
+
+      <div style="padding:18px;max-height:82vh;overflow-y:auto;">
+        <div style="margin-bottom:10px;">
+          <label class="field-label">Vínculo com OS (Opcional):</label>
+          <select id="cotacaoOsVinculada" class="input" onchange="onCotacaoOsChange(this.value)"></select>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <label class="field-label">Descrição da Carga / Equipamento *:</label>
+          <input id="cotacaoCarga" class="input" placeholder="Ex: Gantry Tomógrafo GE Optima 540 ou Tubo Shimadzu" />
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div>
+            <label class="field-label">Cidade Origem *:</label>
+            <input id="cotacaoOrigemCidade" class="input" value="FORTALEZA" />
+          </div>
+          <div>
+            <label class="field-label">Cidade Destino *:</label>
+            <input id="cotacaoDestinoCidade" class="input" placeholder="Ex: Sobral, Juazeiro ou SP" />
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:10px;">
+          <div>
+            <label class="field-label">Tipo de Caminhão / Remoção *:</label>
+            <select id="cotacaoTipoVeiculo" class="input" style="font-weight:bold;">
+              <option value="Caminhão Munck (Guindauto 15t/25t)">Caminhão Munck (Guindauto 15t/25t)</option>
+              <option value="Plataforma Elevatória Hidráulica">Plataforma Elevatória Hidráulica</option>
+              <option value="Caminhão Baú Climatizado c/ Suspensão a Ar">Caminhão Baú Climatizado c/ Suspensão a Ar</option>
+              <option value="Carreta Prancha Rebaixada">Carreta Prancha Rebaixada</option>
+              <option value="Utilitário / Fiorino Furgão">Utilitário / Fiorino Furgão</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">UF Destino:</label>
+            <select id="cotacaoDestinoUf" class="input">
+              <option value="CE" selected>CE</option>
+              <option value="SP">SP</option>
+              <option value="RJ">RJ</option>
+              <option value="MG">MG</option>
+              <option value="PE">PE</option>
+              <option value="PI">PI</option>
+              <option value="RN">RN</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div>
+            <label class="field-label">Peso Estimado (kg):</label>
+            <input id="cotacaoPeso" class="input" type="number" step="0.1" placeholder="Ex: 1850" />
+          </div>
+          <div>
+            <label class="field-label">Dimensões / Volumes:</label>
+            <input id="cotacaoDimensoes" class="input" placeholder="Ex: 2.10m x 1.40m x 1.95m" />
+          </div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <label class="field-label">Valor Declarado p/ Seguro de Carga (R$):</label>
+          <input id="cotacaoValorDeclarado" class="input" type="number" step="0.01" value="50000.00" />
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <label class="field-label">Transportadora Credenciada Escolhida:</label>
+          <select id="cotacaoTransportadora" class="input" style="font-weight:bold;"></select>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <label class="field-label">Valor Cotado / Fechado (R$):</label>
+          <input id="cotacaoValorFechado" class="input" type="number" step="0.01" placeholder="Ex: 1450.00" />
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <label class="field-label">Observações Técnicas:</label>
+          <textarea id="cotacaoObs" class="input" rows="2" placeholder="Ex: Acesso difícil, portão de entrada estreito, rampa hospitalar..."></textarea>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalCotacaoTransporte()">Cancelar</button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="confirmarSalvarCotacaoTransporte()" style="background:#0284c7;font-weight:900;">
+            💾 Salvar Cotação de Transporte
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CADASTRO DE TRANSPORTADORA PARCEIRA -->
+  <div id="modalCadastroTransportadora" class="modal-overlay" style="display:none;z-index:999999;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(15,23,42,0.65);">
+    <div style="background:#fff;border-radius:14px;max-width:540px;width:95%;box-shadow:0 25px 35px -5px rgba(0,0,0,0.4);overflow:hidden;border:1.5px solid #0369a1;margin:auto;">
+      <div style="background:#0f172a;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">🏢</span>
+          <span style="font-weight:900;font-size:16px;">Credenciar Transportadora / Operador de Munck</span>
+        </div>
+        <button type="button" onclick="fecharModalCadastroTransportadora()" style="background:transparent;border:none;color:#cbd5e1;font-size:22px;cursor:pointer;font-weight:bold;">&times;</button>
+      </div>
+
+      <div style="padding:18px;max-height:82vh;overflow-y:auto;">
+        <div style="margin-bottom:10px;">
+          <label class="field-label">Razão Social / Nome da Transportadora *:</label>
+          <input id="transpNome" class="input" placeholder="Ex: TransGuindastes Fortaleza Ltda" />
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div>
+            <label class="field-label">CNPJ:</label>
+            <input id="transpCnpj" class="input" placeholder="00.000.000/0001-00" />
+          </div>
+          <div>
+            <label class="field-label">Contato / Responsável:</label>
+            <input id="transpContato" class="input" placeholder="Ex: Eng. Marcos" />
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div>
+            <label class="field-label">Telefone Fixo:</label>
+            <input id="transpTelefone" class="input" placeholder="(85) 3299-0000" />
+          </div>
+          <div>
+            <label class="field-label">WhatsApp Comercial:</label>
+            <input id="transpWhatsapp" class="input" placeholder="85988000000" />
+          </div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <label class="field-label">Cidades / Regiões Atendidas *:</label>
+          <input id="transpCidades" class="input" value="Fortaleza, Sobral, Juazeiro do Norte, CE e Interestadual" />
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <label class="field-label">Tipos de Caminhão / Veículos Disponíveis *:</label>
+          <input id="transpVeiculos" class="input" value="Caminhão Munck 15t/25t, Plataforma Hidráulica, Baú Climatizado" />
+        </div>
+
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;margin-bottom:10px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:800;color:#065f46;">
+            <input type="checkbox" id="transpPossuiSeguro" checked style="width:18px;height:18px;" />
+            🛡️ Possui Seguro de Carga RCTR-C / RCF-DC Ativo
+          </label>
+          <div style="margin-top:6px;">
+            <label class="field-label" style="font-size:11px;color:#047857;">Valor da Cobertura da Apólice (R$):</label>
+            <input id="transpValorSeguro" class="input" type="number" step="1000" value="1000000.00" />
+          </div>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <label class="field-label">Observações / Equipamentos de Içamento:</label>
+          <textarea id="transpObs" class="input" rows="2" placeholder="Possui tartarugas de remoção, guincho hidráulico, cinta de amarração..."></textarea>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalCadastroTransportadora()">Cancelar</button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="confirmarSalvarTransportadora()" style="background:#0f172a;font-weight:900;">
+            🏢 Salvar Credenciamento
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NOVA DESPESA RECORRENTE DA EMPRESA -->
+  <div id="modalNovaDespesaRecorrente" class="modal-overlay" style="display:none;z-index:999999;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(15,23,42,0.65);">
+    <div style="background:#fff;border-radius:14px;max-width:520px;width:95%;box-shadow:0 25px 35px -5px rgba(0,0,0,0.4);overflow:hidden;border:1.5px solid #059669;margin:auto;">
+      <div style="background:#065f46;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">💵</span>
+          <span style="font-weight:900;font-size:16px;">Cadastrar Despesa Operacional Recorrente</span>
+        </div>
+        <button type="button" onclick="fecharModalNovaDespesaRecorrente()" style="background:transparent;border:none;color:#d1fae5;font-size:22px;cursor:pointer;font-weight:bold;">&times;</button>
+      </div>
+
+      <div style="padding:18px;max-height:82vh;overflow-y:auto;">
+        <div style="margin-bottom:10px;">
+          <label class="field-label">Categoria do Custo *:</label>
+          <select id="despesaCategoria" class="input" style="font-weight:bold;">
+            <option value="CONTABILIDADE & ASSESSORIA">Contabilidade &amp; Assessoria Jurídica</option>
+            <option value="SEDE & INFRAESTRUTURA">Sede, Aluguel &amp; Energia</option>
+            <option value="TELECOM & TI">Telecom, Internet &amp; Servidores</option>
+            <option value="SEGUROS & GARANTIAS">Seguros de Carga &amp; Responsabilidade</option>
+            <option value="SOFTWARES & LICENÇAS">Softwares de Calibração &amp; DICOM</option>
+            <option value="FROTA & LOGÍSTICA">Frota, Combustível &amp; Rastreamento</option>
+            <option value="FOLHA & PRÓ-LABORE">Encargos Sociais, FGTS &amp; Pró-Labore</option>
+            <option value="TAXAS & TRIBUTOS FIXOS">Taxas Bancárias, CREA &amp; Alvarás</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <label class="field-label">Descrição da Obrigação *:</label>
+          <input id="despesaDescricao" class="input" placeholder="Ex: Honorários Contabilidade ou Aluguel Sede" />
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <label class="field-label">Fornecedor / Favorecido:</label>
+          <input id="despesaFornecedor" class="input" placeholder="Ex: Silva Contabilidade Médica" />
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div>
+            <label class="field-label">Valor Mensal Estimado (R$) *:</label>
+            <input id="despesaValor" class="input" type="number" step="0.01" placeholder="Ex: 1450.00" />
+          </div>
+          <div>
+            <label class="field-label">Dia de Vencimento *:</label>
+            <input id="despesaDiaVencimento" class="input" type="number" min="1" max="31" value="10" />
+          </div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <label class="field-label">Forma de Pagamento:</label>
+          <select id="despesaFormaPagamento" class="input">
+            <option value="BOLETO">Boleto Bancário</option>
+            <option value="DÉBITO AUTOMÁTICO">Débito Automático</option>
+            <option value="PIX">PIX / Transferência</option>
+            <option value="GUIA DAE/FGTS">Guia DAE / Impostos</option>
+            <option value="CARTÃO CRÉDITO">Cartão de Crédito Corporativo</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <label class="field-label">Observações Contábeis:</label>
+          <input id="despesaObs" class="input" placeholder="Contrato anual, reajuste por IPCA, etc." />
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalNovaDespesaRecorrente()">Cancelar</button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="confirmarSalvarDespesaRecorrente()" style="background:#065f46;font-weight:900;">
+            💵 Salvar Despesa
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: CADASTRO DE ASSINATURA DIGITAL DO TÉCNICO NO CELULAR -->
+  <div id="modalAssinaturaTecnico" class="modal-overlay" style="display:none;z-index:999999;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(15,23,42,0.6);">
+    <div style="background:#fff;border-radius:14px;max-width:480px;width:94%;box-shadow:0 25px 35px -5px rgba(0,0,0,0.4);overflow:hidden;border:1.5px solid #0284c7;margin:auto;">
+      <div style="background:#002b54;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:18px;">✍️</span>
+          <span style="font-weight:900;font-size:15px;letter-spacing:0.3px;">Cadastrar Assinatura no Celular</span>
+        </div>
+        <button type="button" onclick="fecharModalAssinaturaTecnico()" style="background:transparent;border:none;color:#93c5fd;font-size:20px;cursor:pointer;font-weight:bold;">&times;</button>
+      </div>
+      <div style="padding:16px;">
+        <div style="margin-bottom:10px;">
+          <label class="field-label" style="font-weight:bold;color:#0b132b;font-size:12px;margin-bottom:4px;display:block;">Técnico Responsável</label>
+          <select id="modalAssTec_nome" class="input" style="font-weight:bold;width:100%;padding:8px;border-radius:6px;border:1px solid #cbd5e1;">
+            <option value="MARCOS">MARCOS</option>
+            <option value="PAULO">PAULO</option>
+            <option value="ANTONIO">ANTONIO</option>
+            <option value="ARQUIMEDES">ARQUIMEDES</option>
+            <option value="LEONARDO">LEONARDO</option>
+            <option value="NETTO">NETTO</option>
+            <option value="GABRIEL">GABRIEL</option>
+            <option value="SÉRGIO">SÉRGIO</option>
+            <option value="FELIPE">FELIPE</option>
+            <option value="JAIR">JAIR</option>
+            <option value="TONY">TONY</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <label class="field-label" style="font-weight:bold;color:#0b132b;font-size:12px;margin-bottom:4px;display:block;">Registro Profissional / Cargo (Carimbo do Laudo)</label>
+          <input id="modalAssTec_padrao" class="input" style="width:100%;padding:8px;border-radius:6px;border:1px solid #cbd5e1;box-sizing:border-box;" placeholder="Ex: CFT/CE 123456 - Responsável Técnico EMED" />
+        </div>
+
+        <div style="margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <label class="field-label" style="font-weight:bold;color:#002b54;font-size:12px;">Desenhe sua Assinatura / Rubrica no Celular:</label>
+            <button type="button" class="btn btn-outline btn-xs" onclick="limparCanvasAssinaturaTecnico()" style="color:#ef4444;border-color:#fca5a5;padding:2px 8px;font-size:11px;">🧹 Limpar</button>
+          </div>
+          <div style="border:1.5px dashed #0284c7;border-radius:10px;background:#f8fafc;position:relative;height:160px;touch-action:none;overflow:hidden;">
+            <canvas id="canvasAssinaturaTecnico" style="width:100%;height:100%;display:block;cursor:crosshair;"></canvas>
+            <div style="position:absolute;bottom:25px;left:10%;right:10%;border-bottom:1px dashed #94a3b8;pointer-events:none;text-align:center;">
+              <span style="background:#f8fafc;color:#94a3b8;font-size:10px;padding:0 8px;position:relative;top:6px;font-weight:bold;">LINHA DE ASSINATURA</span>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#64748b;margin-top:4px;">
+            📱 Use a ponta do dedo ou caneta stylus diretamente na tela do celular.
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalAssinaturaTecnico()">Cancelar</button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="salvarAssinaturaTecnico()" style="background:#0077b6;border-color:#0077b6;font-weight:bold;padding:8px 16px;">
+            💾 Salvar Minha Assinatura
           </button>
         </div>
       </div>

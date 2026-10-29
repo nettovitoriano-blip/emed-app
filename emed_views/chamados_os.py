@@ -231,6 +231,23 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     cond_fin = limpar_texto(row_c.get("condicao_final"), "LIBERADO PARA USO NORMAL")
     cond_pag = limpar_texto(row_c.get("condicao_pagamento"), "-")
     ass_tec = limpar_texto(row_c.get("assinatura_tecnico"), f"{tec_princ} - CFT")
+    rubrica_img_tec = ""
+    try:
+        import os, sqlite3
+        base_dir_c = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        db_file_c = os.path.join(base_dir_c, "emed.db")
+        if os.path.exists(db_file_c):
+            with sqlite3.connect(db_file_c) as conn_tec:
+                cur_tec = conn_tec.cursor()
+                cur_tec.execute("SELECT assinatura_padrao, rubrica_img FROM tecnicos WHERE UPPER(nome) = UPPER(?)", (tec_princ.strip(),))
+                r_tec = cur_tec.fetchone()
+                if r_tec:
+                    if r_tec[0] and (not ass_tec or 'A DEFINIR' in ass_tec.upper()):
+                        ass_tec = r_tec[0]
+                    if r_tec[1]:
+                        rubrica_img_tec = str(r_tec[1]).strip()
+    except Exception:
+        pass
     ass_cli = limpar_texto(row_c.get("assinatura_cliente"), resp_hosp)
     img_sig = limpar_texto(row_c.get("assinatura_cliente_img"), "")
 
@@ -355,12 +372,12 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
       <td width="55%" align="left" valign="middle">
         <div style="font-size:11pt; font-weight:bold; color:#0b132b; line-height:1.15;">EMED ELETROMEDICINA LTDA.</div>
         <div style="font-size:7.5pt; color:#0f766e; font-weight:bold;">Eletromedicina • Manutenção em Equipamentos de Diagnóstico por Imagem</div>
-        <div style="font-size:7pt; color:#475569;">CNPJ: 03.611.974/0001-08 • Fone: (85) 3254-2929 • Site: emed.med.br • Fortaleza - CE</div>
+        <div style="font-size:7pt; color:#475569;">CNPJ: 03.611.974/0001-08 • Sede: Rua Coronel Freire, 16 - Amador, Eusébio - CE, CEP 61769-470 • Fone: (85) 3254-2929 | DF: (61) 99658-5392 • Site: emed.med.br</div>
       </td>
       <td width="28%" align="right" valign="top" style="text-align:right;">
         <div style="font-size:8.5pt; font-weight:bold; color:#0b132b;">Data: {dt_agend}</div>
         <div style="font-size:7pt; color:#475569; margin-top:2px;">Atendimento: {horario_atend_txt}</div>
-        <div style="font-size:7pt; color:#047857; font-weight:bold; margin-top:1px;">STATUS: CONCLUÍDA</div>
+        {f'<div style="font-size:7pt; color:#047857; font-weight:bold; margin-top:1px;">STATUS: CONCLUÍDA</div>' if ('CONCLU' in str(row_c.get('status') or '').upper()) else f'<div style="font-size:7pt; color:#b45309; font-weight:bold; margin-top:1px;">STATUS: {str(row_c.get("status") or "EM ATENDIMENTO").upper()}</div>'}
       </td>
     </tr>
   </table>
@@ -422,9 +439,9 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
   <table class="data-tbl" width="100%">
     <tr>
       <td width="50%" align="center" style="text-align:center; padding:6px; background-color:#fafafa;">
-        <div style="font-size:10pt; font-weight:bold; font-style:italic; color:#0f766e; padding:6px 0;">{tec_princ.title()}</div>
+        {f'<img src="{rubrica_img_tec}" style="max-height:48px; max-width:180px; object-fit:contain; display:block; margin:0 auto 2px auto;" alt="Assinatura Digital" />' if rubrica_img_tec else (f'<div style="font-size:8.5pt; font-weight:bold; color:#dc2626; padding:6px 0;">⚠️ Técnico Não Atribuído (Aguardando Despacho)</div>' if ('A DEFINIR' in tec_princ.upper() or not tec_princ) else f'<div style="font-size:10pt; font-weight:bold; font-style:italic; color:#0f766e; padding:6px 0;">{tec_princ.title()}</div>')}
         <div style="border-top:1px solid #94a3b8; margin:3px 15px; padding-top:3px;">
-          <b>{ass_tec}</b><br/>
+          <b>{ass_tec if ('A DEFINIR' not in tec_princ.upper() and tec_princ) else 'Aguardando Atribuição do Técnico Responsável'}</b><br/>
           {f'<span style="font-size:7pt; color:#475569;">Auxiliar: {tec_aux}</span><br/>' if tec_aux and tec_aux.upper() != 'NENHUM (INDIVIDUAL)' else ''}
           <span style="font-size:7pt; color:#64748b;">Responsável Técnico EMED Eletromedicina</span>
         </div>
@@ -845,7 +862,7 @@ def _render_historico_concluidas(ctx: AppContext):
     <div style="min-width:0;">
       <div style="font-size:15px; font-weight:900; color:#ffffff; line-height:1.2;">EMED ELETROMEDICINA LTDA.</div>
       <div style="font-size:11px; color:#64dfdf; font-weight:600; line-height:1.25;">Manutenção em Equipamentos de Diagnóstico por Imagem</div>
-      <div style="font-size:10px; color:#94a3b8; line-height:1.25;">CNPJ: 03.611.974/0001-08 • (85) 3254-2929 • Fortaleza/CE</div>
+      <div style="font-size:10px; color:#94a3b8; line-height:1.25;">CNPJ: 03.611.974/0001-08 • Rua Coronel Freire, 16 - Eusébio/CE • Fone: (85) 3254-2929 | DF: (61) 99658-5392</div>
     </div>
   </div>
   <div class="emed-os-date-box">

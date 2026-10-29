@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v37-remessas-e-quarentena-fiscal';
+const CACHE_NAME = 'emed-pwa-v38-fechamento-contabil-e-cotacoes-frete';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
