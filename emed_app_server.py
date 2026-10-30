@@ -2990,7 +2990,27 @@ async def api_bootstrap(request: web.Request) -> web.Response:
     except Exception:
         pass
 
+        # Carga de Clientes e Parque Real do Auvo
+    lista_clientes_auvo = []
+    lista_equipamentos_auvo = []
+    try:
+        with get_db_connection(DB_NAME) as conn_auvo:
+            cur_a = conn_auvo.cursor()
+            cur_a.execute("SELECT id, codigo_auvo, nome, cpf_cnpj, razao_social, cidade, estado, telefone, email, contato, tipo_contrato FROM clientes_auvo ORDER BY nome ASC")
+            c_rows = cur_a.fetchall()
+            c_cols = [d[0] for d in cur_a.description]
+            lista_clientes_auvo = [dict(zip(c_cols, r)) for r in c_rows]
+
+            cur_a.execute("SELECT id, nome, cliente_nome, categoria_auvo, categoria_checklist, numero_serie, identificador, cidade, estado, status FROM equipamentos_auvo ORDER BY cliente_nome ASC, nome ASC")
+            e_rows = cur_a.fetchall()
+            e_cols = [d[0] for d in cur_a.description]
+            lista_equipamentos_auvo = [dict(zip(e_cols, r)) for r in e_rows]
+    except Exception as e:
+        print("Aviso ao carregar Auvo no bootstrap:", e)
+
     payload = {
+        "clientes_auvo": lista_clientes_auvo,
+        "equipamentos_auvo": lista_equipamentos_auvo,
         "logs_auditoria": logs_auditoria,
 
 
@@ -3125,7 +3145,81 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
+
+async def api_clientes_auvo(request: web.Request) -> web.Response:
+    """Retorna lista dos 504 clientes cadastrados do Auvo para busca e autocomplete."""
+    termo = request.query.get("q", "").strip().upper()
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        if termo:
+            cur.execute("""
+                SELECT id, codigo_auvo, nome, cpf_cnpj, razao_social, cidade, estado, telefone, email, contato, tipo_contrato
+                FROM clientes_auvo
+                WHERE nome LIKE ? OR razao_social LIKE ? OR cpf_cnpj LIKE ? OR cidade LIKE ?
+                ORDER BY nome ASC LIMIT 50
+            """, (f"%{termo}%", f"%{termo}%", f"%{termo}%", f"%{termo}%"))
+        else:
+            cur.execute("""
+                SELECT id, codigo_auvo, nome, cpf_cnpj, razao_social, cidade, estado, telefone, email, contato, tipo_contrato
+                FROM clientes_auvo ORDER BY nome ASC
+            """)
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description]
+    return web.json_response({"ok": True, "total": len(rows), "clientes": [dict(zip(cols, r)) for r in rows]})
+
+
+async def api_equipamentos_auvo(request: web.Request) -> web.Response:
+    """Retorna lista dos 1.146 equipamentos com filtros de cliente, categoria e número de série."""
+    cliente = request.query.get("cliente", "").strip().upper()
+    cat = request.query.get("categoria", "").strip().upper()
+    termo = request.query.get("q", "").strip().upper()
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        sql = "SELECT id, nome, cliente_nome, categoria_auvo, categoria_checklist, numero_serie, identificador, cidade, estado, status FROM equipamentos_auvo WHERE 1=1"
+        params = []
+        if cliente:
+            sql += " AND cliente_nome LIKE ?"
+            params.append(f"%{cliente}%")
+        if cat:
+            sql += " AND categoria_checklist LIKE ?"
+            params.append(f"%{cat}%")
+        if termo:
+            sql += " AND (nome LIKE ? OR numero_serie LIKE ? OR identificador LIKE ?)"
+            params.extend([f"%{termo}%", f"%{termo}%", f"%{termo}%"])
+        sql += " ORDER BY cliente_nome ASC, nome ASC"
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description]
+    return web.json_response({"ok": True, "total": len(rows), "equipamentos": [dict(zip(cols, r)) for r in rows]})
+
+
 async def api_checklist(request: web.Request) -> web.Response:
+    equip = request.query.get("equipamento", "")
+    defeito = request.query.get("defeito", "") or request.query.get("tipo_servico", "")
+    try:
+        from emed_services.checklists_especializados import obter_checklist_oficial, identificar_categoria_checklist
+        cat = identificar_categoria_checklist(equip)
+        chk = obter_checklist_oficial(equip, cat)
+        titulo = chk.get("titulo", "Checklist Preventivo Oficial")
+        itens_obj = chk.get("itens", [])
+        acoes = [it["item"] if isinstance(it, dict) else str(it) for it in itens_obj]
+    except Exception:
+        cat = "RAIOS-X FIXO"
+        titulo = "Checklist Preventivo Oficial"
+        acoes = obter_checklist_acoes_sugeridas(equip, defeito)
+        itens_obj = [{"item": a, "grupo": "Geral"} for a in acoes]
+
+    sugestao_ia = gerar_sugestao_relatorio_clinico(equip, defeito)
+    return web.json_response({
+        "ok": True,
+        "categoria": cat,
+        "titulo": titulo,
+        "acoes": acoes,
+        "itens_checklist": acoes,
+        "itens_estruturados": itens_obj,
+        "frases_relatorio": [sugestao_ia] if sugestao_ia else [],
+        "sugestao_ia": sugestao_ia,
+    })
 
 
 
@@ -10004,6 +10098,8 @@ def criar_app() -> web.Application:
 
 
 
+    app.router.add_get("/api/clientes_auvo", api_clientes_auvo)
+    app.router.add_get("/api/equipamentos_auvo", api_equipamentos_auvo)
     app.router.add_get("/api/checklist", api_checklist)
 
 
