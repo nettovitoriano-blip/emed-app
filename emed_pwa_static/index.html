@@ -13257,6 +13257,16 @@
       }
     }
 
+  
+    /* PADRONIZAÇÃO EMED: TODAS AS LETRAS EM MAIÚSCULAS */
+    input, textarea, select, .input, .select, .textarea {
+      text-transform: uppercase !important;
+      text-transform: uppercase !important;
+    }
+    input[type="email"], input[type="password"], input[type="url"], .no-upper, [data-no-upper] {
+      text-transform: none !important;
+    }
+
   </style>
 
 
@@ -14462,6 +14472,80 @@
 
 
 
+  
+  <!-- MODAL DE CADASTRO E EDIÇÃO DE EQUIPAMENTO HOSPITALAR -->
+  <div id="modalGerenciarEquipamento" class="modal-backdrop">
+    <div class="modal-box" style="max-width:560px;">
+      <div class="modal-header">
+        <div id="modalEqTitulo" style="font-size:15px;font-weight:900;">🔬 Gerenciar Equipamento</div>
+        <button class="btn btn-sm btn-outline" onclick="fecharModalEditarEquipamento()">✕</button>
+      </div>
+      <div class="modal-body" style="padding:16px;">
+        <input type="hidden" id="eqFormId" value="" />
+        <input type="hidden" id="eqFormCidade" value="" />
+        <input type="hidden" id="eqFormEstado" value="" />
+
+        <div style="margin-bottom:12px;">
+          <label class="field-label">Hospital / Cliente *</label>
+          <input type="text" id="eqFormCliente" class="input" readonly style="background:#f1f5f9;cursor:not-allowed;" />
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <label class="field-label">Nome / Modelo do Equipamento *</label>
+          <input type="text" id="eqFormNome" class="input" style="text-transform:uppercase;" placeholder="EX: MAMÓGRAFO HOLOGIC LORAD M-IV" />
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label class="field-label">Categoria / Checklist *</label>
+            <select id="eqFormCategoria" class="select">
+              <option value="TOMÓGRAFO">TOMÓGRAFO</option>
+              <option value="RAIOS-X FIXO">RAIOS-X FIXO</option>
+              <option value="RAIOS-X MÓVEL / TRANSPORTÁVEL">RAIOS-X MÓVEL / TRANSPORTÁVEL</option>
+              <option value="MAMÓGRAFO">MAMÓGRAFO</option>
+              <option value="DENSITOMETRIA ÓSSEA">DENSITOMETRIA ÓSSEA</option>
+              <option value="CR / DIGITALIZADOR">CR / DIGITALIZADOR</option>
+              <option value="ARCO CIRÚRGICO">ARCO CIRÚRGICO</option>
+              <option value="RESSONÂNCIA MAGNÉTICA">RESSONÂNCIA MAGNÉTICA</option>
+              <option value="ULTRASSONOGRAFIA">ULTRASSONOGRAFIA</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">Status Operacional *</label>
+            <select id="eqFormStatus" class="select">
+              <option value="Ativo">✅ Ativo no Parque</option>
+              <option value="Descontinuado">🚫 Descontinuado</option>
+              <option value="Inativo">⏸️ Inativo / Fora de Uso</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label class="field-label">Número de Série (N/S)</label>
+            <input type="text" id="eqFormNS" class="input" style="text-transform:uppercase;" placeholder="EX: 151030HL4" />
+          </div>
+          <div>
+            <label class="field-label">Identificador / TAG Auvo</label>
+            <input type="text" id="eqFormTag" class="input" style="text-transform:uppercase;" placeholder="EX: CLINICA-MM01" />
+          </div>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <label class="field-label">Descrição / Observações Técnicas</label>
+          <textarea id="eqFormDesc" class="textarea" rows="2" style="text-transform:uppercase;" placeholder="EX: LOCALIZADO NA SALA 02, DESCONTINUADO EM OUTUBRO/2026..."></textarea>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #e2e8f0;padding-top:12px;">
+          <button type="button" class="btn btn-outline" onclick="fecharModalEditarEquipamento()">Cancelar</button>
+          <button type="button" id="btnDescontinuarModal" class="btn btn-warning" onclick="descontinuarEquipamentoDoModal()" style="display:none;">🚫 Descontinuar</button>
+          <button type="button" class="btn btn-primary" onclick="salvarEquipamentoModal()">💾 Salvar Equipamento</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <div id="modalQR" class="modal-backdrop">
 
 
@@ -14941,6 +15025,30 @@
 
 
   <script>
+
+    // =========================================================================
+    // PADRONIZAÇÃO AUTOMÁTICA EM MAIÚSCULAS (CAIXA ALTA) PARA TODOS OS CAMPOS
+    // =========================================================================
+    document.addEventListener("input", function(e) {
+      var el = e.target;
+      if (!el || !el.tagName) return;
+      var tag = el.tagName.toUpperCase();
+      var type = (el.type || "").toLowerCase();
+      if ((tag === "INPUT" || tag === "TEXTAREA") && 
+          type !== "email" && type !== "password" && type !== "url" && 
+          !el.classList.contains("no-upper") && !el.dataset.noUpper) {
+        var start = el.selectionStart;
+        var end = el.selectionEnd;
+        var upper = el.value.toUpperCase();
+        if (el.value !== upper) {
+          el.value = upper;
+          if (start !== null && end !== null && typeof el.setSelectionRange === "function") {
+            try { el.setSelectionRange(start, end); } catch(err) {}
+          }
+        }
+      }
+    }, true);
+
 
 
 
@@ -23801,7 +23909,10 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
                   </div>
 
-                  <a class="btn btn-outline btn-xs" href="/api/manuais/${encodeURIComponent(m.arquivo)}" target="_blank" style="border-color:#0284c7;color:#0284c7;font-weight:700;">Abrir PDF</a>
+                  <div style="display:flex;gap:6px;align-items:center;">
+                    ${!m.somente_video ? `<a class="btn btn-outline btn-xs" href="/api/manual?path=${encodeURIComponent(m.caminho_rel || m.rel_path || '')}&file=${encodeURIComponent(m.arquivo || '')}&v=rev05" target="_blank" style="border-color:#0284c7;color:#0284c7;font-weight:700;">📄 Abrir PDF</a>` : ''}
+                    ${m.video ? `<a class="btn btn-amber btn-xs" href="/api/video?name=${encodeURIComponent(m.video)}" target="_blank" style="font-weight:700;text-decoration:none;">🎬 Vídeo MP4</a>` : ''}
+                  </div>
 
                 </div>
 
@@ -23851,15 +23962,15 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
       `;
 
-      document.getElementById("modalEquipamento").style.display = "flex";
+      document.getElementById("modalGerenciarEquipamento").style.display = "flex";
 
     }
 
 
 
-    function fecharModalEquipamento() {
+    function fecharModalEditarEquipamento() {
 
-      document.getElementById("modalEquipamento").style.display = "none";
+      document.getElementById("modalGerenciarEquipamento").style.display = "none";
 
     }
 
@@ -30420,102 +30531,21 @@ function renderizarNavegacao() {
 
 
 
-          <div id="videoPlayerContainer" style="display:none;margin-bottom:14px;background:#0f172a;padding:12px;border-radius:10px;color:#fff;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <b id="videoPlayerTitle">🎬 Vídeo de Treinamento</b>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <button class="btn btn-sm btn-danger" onclick="fecharVideoManual()">✕ Fechar Vídeo</button>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+          <div id="videoPlayerContainer" style="display:none;margin-bottom:16px;background:linear-gradient(135deg,#0f172a,#1e293b);padding:14px;border-radius:12px;color:#fff;border:2px solid #f59e0b;box-shadow:0 10px 25px rgba(0,0,0,0.25);">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+              <div>
+                <b id="videoPlayerTitle" style="font-size:14.5px;color:#fbbf24;">🎬 Vídeo Oficial de Instrução & Treinamento eMED</b>
+                <div style="font-size:11.5px;color:#cbd5e1;margin-top:2px;">Streaming Full HD 1080p Otimizado (FastStart) • Narrado em Português</div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <a id="videoDirectLink" href="#" target="_blank" class="btn btn-sm" style="background:#0284c7;color:#fff;text-decoration:none;font-weight:700;">↗️ Abrir em Tela Cheia / Baixar</a>
+                <button class="btn btn-sm btn-danger" onclick="fecharVideoManual()">✕ Fechar Player</button>
+              </div>
             </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <video id="videoTag" controls style="width:100%;max-height:380px;border-radius:8px;background:#000;"></video>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+            <div id="videoErrorBanner" style="display:none;background:#7f1d1d;border:1px solid #ef4444;color:#fecaca;padding:10px 12px;border-radius:8px;margin-bottom:8px;font-size:12.5px;font-weight:600;">
+              ⚠️ Falha ao carregar o stream de vídeo: o link temporário pode ter desconectado ou o servidor está reiniciando. Clique em "↗️ Abrir em Tela Cheia" ou verifique se o servidor eMED está online.
+            </div>
+            <video id="videoTag" controls playsinline preload="metadata" style="width:100%;max-height:440px;border-radius:8px;background:#000;display:block;"></video>
           </div>
 
 
@@ -30788,150 +30818,24 @@ function renderizarNavegacao() {
 
 
 
-                <div class="os-card-foot">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  <a class="btn btn-primary btn-sm" style="flex:1;" href="/api/manual?path=${encodeURIComponent(cam)}&file=${encodeURIComponent(m.arquivo || '')}&v=rev05" target="_blank">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                    📄 Abrir Manual Oficial (PDF c/ Logo EMED)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  </a>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  ${m.video ? `
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                    <button class="btn btn-amber btn-sm" onclick="tocarVideoManual('${esc(m.video)}','${esc(m.titulo)}')">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                      🎬 Vídeo MP4
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                <div class="os-card-foot" style="display:flex;gap:6px;flex-wrap:wrap;">
+                  ${m.somente_video ? `
+                    <button class="btn btn-amber btn-sm" style="flex:1;font-weight:800;" data-video="${esc(m.video)}" data-titulo="${esc(m.titulo)}" onclick="tocarVideoManual(this.dataset.video, this.dataset.titulo)">
+                      ▶️ Assistir Vídeo de Instrução (MP4)
                     </button>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  ` : ""}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                    <a class="btn btn-outline btn-sm" href="/api/video?name=${encodeURIComponent(m.video)}" download="${esc(m.video)}" target="_blank" style="text-decoration:none;font-weight:700;">
+                      ⬇️ Baixar
+                    </a>
+                  ` : `
+                    <a class="btn btn-primary btn-sm" style="flex:1;" href="/api/manual?path=${encodeURIComponent(cam)}&file=${encodeURIComponent(m.arquivo || '')}&v=rev05" target="_blank">
+                      📄 Abrir Manual Oficial (PDF c/ Logo EMED)
+                    </a>
+                    ${m.video ? `
+                      <button class="btn btn-amber btn-sm" style="font-weight:800;" data-video="${esc(m.video)}" data-titulo="${esc(m.titulo)}" onclick="tocarVideoManual(this.dataset.video, this.dataset.titulo)">
+                        🎬 Vídeo MP4
+                      </button>
+                    ` : ""}
+                  `}
                 </div>
 
 
@@ -31077,133 +30981,28 @@ function renderizarNavegacao() {
 
 
     function tocarVideoManual(nomeVid, titulo) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       const box = document.getElementById("videoPlayerContainer");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       const v = document.getElementById("videoTag");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      document.getElementById("videoPlayerTitle").innerText = "🎬 " + titulo;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      v.src = "/api/video?name=" + encodeURIComponent(nomeVid);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      const errBanner = document.getElementById("videoErrorBanner");
+      const directLink = document.getElementById("videoDirectLink");
+      const streamUrl = "/api/video?name=" + encodeURIComponent(nomeVid) + "&t=" + Date.now();
+      document.getElementById("videoPlayerTitle").innerText = "🎬 " + (titulo || nomeVid);
+      if (directLink) directLink.href = "/api/video?name=" + encodeURIComponent(nomeVid);
+      if (errBanner) errBanner.style.display = "none";
       box.style.display = "block";
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      v.play().catch(() => {});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      box.scrollIntoView({ behavior: "smooth" });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      try { v.pause(); } catch(e) {}
+      v.onerror = function() {
+        if (errBanner) errBanner.style.display = "block";
+      };
+      v.onloadeddata = function() {
+        if (errBanner) errBanner.style.display = "none";
+      };
+      v.src = streamUrl;
+      v.load();
+      v.play().catch((err) => {
+        console.warn("Autoplay bloqueado ou aguardando clique:", err);
+      });
+      box.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
 
@@ -35040,71 +34839,13 @@ function renderizarNavegacao() {
 
 
 
-              <input id="novaCli" class="input" placeholder="Ex: HOSPITAL REGIONAL UNIMED" />
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+              <input id="novaCli" class="input" list="listaClientesAuvo" autocomplete="off" oninput="onSelecionarClienteAuvo(this.value)" placeholder="DIGITE OU SELECIONE O HOSPITAL..." />
+              <datalist id="listaClientesAuvo"></datalist>
             </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
             <div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
               <label class="field-label">Equipamento / Modelo *</label>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <input id="novaEq" class="input" placeholder="Ex: TOMÓGRAFO GE OPTIMA CT660" />
+              <input id="novaEq" class="input" list="listaEquipamentosAuvo" autocomplete="off" oninput="onSelecionarEquipamentoAuvo(this.value)" placeholder="DIGITE OU SELECIONE A MÁQUINA..." />
+              <datalist id="listaEquipamentosAuvo"></datalist>
 
 
 
@@ -35168,7 +34909,7 @@ function renderizarNavegacao() {
 
 
 
-              <input id="novaCid" class="input" value="FORTALEZA" />
+              <input id="novaCid" class="input" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()" value="FORTALEZA" />
 
 
 
@@ -35552,7 +35293,7 @@ function renderizarNavegacao() {
 
 
 
-            <input id="novaDef" class="input" placeholder="Descreva a falha relatada pelo hospital..." />
+            <input id="novaDef" class="input" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()" placeholder="Descreva a falha relatada pelo hospital..." />
 
 
 
@@ -39206,3503 +38947,497 @@ function renderizarNavegacao() {
 
 
 
-    function renderMenuGesClientes(box) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      const ordens = STATE.data.ordens || [];
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      box.innerHTML = `
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        <div class="section-box">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <div class="section-title">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <span>👥 Parque Hospitalar de Clientes, Calibração & Etiquetas QR Code (${ordens.length})</span>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <div class="os-grid">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            ${ordens.map(o => `
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <div class="os-card">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                <div class="os-card-head">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  <span class="os-num">Patrimônio #${esc(o.id)} • ${esc(o.cidade)}</span>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  <span class="badge ativo">${esc(o.cal_badge_txt || 'Calibração')}</span>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                <div class="os-card-body">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  <div class="os-cli">🏥 ${esc(o.cliente)}</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  <div class="os-eq">🔬 ${esc(o.equipamento)} (N/S: ${esc(o.numero_serie)})</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  <div class="os-meta">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                    <div><b>Últ. Calibração:</b> ${esc(o.data_ultima_calibracao || 'N/D')}</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                    <div><b>Validade:</b> ${esc(o.data_validade_calibracao || 'N/D')}</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                <div class="os-card-foot">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  <button class="btn btn-primary btn-sm" onclick="gerarEtiquetaQR('${esc(o.id)}','${esc(o.cliente)}','${esc(o.equipamento)}','${esc(o.numero_serie)}')">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                    🏷️ Etiqueta QR Code
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  </button>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  <button class="btn btn-outline btn-sm" onclick="abrirModalOS('${esc(o.id)}')">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                    ✏️ Ficha / OS
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  </button>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            `).join("")}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      `;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    function gerarEtiquetaQR(id, cli, eq, ns) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      const urlPublica = `${window.location.origin}/?os=${encodeURIComponent(id)}`;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(urlPublica)}`;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      document.getElementById("modalQRBody").innerHTML = `
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        <div style="border:2px solid #002b54;border-radius:10px;padding:14px;background:#fff;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <div style="font-weight:900;color:#002b54;font-size:14px;">EMED ELETROMEDICINA</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <div style="font-size:11px;color:#475569;margin-bottom:8px;">ETIQUETA DE RASTREABILIDADE DE EQUIPAMENTO</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <img src="${qrImg}" alt="QR Code" style="width:170px;height:170px;margin:6px auto;display:block;" />
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <div style="font-weight:900;font-size:13px;margin-top:6px;">${esc(eq)}</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <div style="font-size:11.5px;color:#334155;">${esc(cli)} • ID #${esc(id)} • N/S: ${esc(ns)}</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        <button class="btn btn-primary btn-block" style="margin-top:12px;" onclick="window.print()">🖨️ Imprimir Etiqueta</button>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      `;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      document.getElementById("modalQR").classList.add("open");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    /********************************************************************
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-     * MENU 12 (GESTOR 7): GESTÃO DE ESTOQUE & ALMOXARIFADO
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-     ********************************************************************/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    
+    if (!STATE.clientesExpandidos) STATE.clientesExpandidos = {};
+    if (!STATE.regiaoParque) STATE.regiaoParque = "TODOS";
 
     
-
-    // =========================================================================
-
-    // GESTÃO AVANÇADA DE ESTOQUE, INVENTÁRIO (1010 ITENS) & KARDEX
-
-    // =========================================================================
-
-    if (!STATE.filtroCatEstoque) STATE.filtroCatEstoque = "TODOS";
-
-    if (!STATE.paginaEstoque) STATE.paginaEstoque = 1;
-
-    if (STATE.buscaEstoque === undefined) STATE.buscaEstoque = "";
-
-
-
-        if (!STATE.tabelaPrecificacao) STATE.tabelaPrecificacao = "AVULSO";
-
-
-
-    function formatarUnidadeLimpa(u) {
-
-      const s = String(u || '').trim().toUpperCase();
-
-      if (!s || s.includes('PÃ') || s === 'PC' || s === 'PÇ' || s === 'PÇA' || s === 'PEÇA' || s === 'PÇS') return 'PÇS';
-
-      if (s === 'UND' || s === 'UN' || s === 'UNI' || s === '1' || s === '0') return 'UN';
-
-      if (s === 'MT' || s === 'M' || s === 'MTS' || s === 'METRO' || s === 'METROS') return 'METROS';
-
-      if (s === 'KG') return 'KG';
-
-      if (s === 'KIT') return 'KIT';
-
-      if (s === 'RL' || s === 'ROLO') return 'ROLO';
-
-      if (s === 'CX' || s === 'CAIXA') return 'CX';
-
-      if (s === 'PCT' || s === 'PACOTE') return 'PCT';
-
-      if (s === 'PAR' || s === 'PR') return 'PAR';
-
-      return s || 'UN';
-
-    }
-
-
-
-    function calcularPrecosConsumidor(e) {
-
-      const custo = Number(e.preco_custo > 0 ? e.preco_custo : e.preco_unitario) || 0;
-
-      const mContrato = Number(e.margem_contrato !== undefined && e.margem_contrato !== null ? e.margem_contrato : 30);
-
-      const mAvulso = Number(e.margem_avulso !== undefined && e.margem_avulso !== null ? e.margem_avulso : 60);
-
-      const mAvista = Number(e.margem_avista !== undefined && e.margem_avista !== null ? e.margem_avista : 20);
-
-      const mDesestimulo = Number(e.margem_desestimulo !== undefined && e.margem_desestimulo !== null ? e.margem_desestimulo : 180);
-
-
-
-      const pContrato = Math.round((custo * (1 + mContrato / 100)) * 100) / 100;
-
-      const pAvulso = Math.round((custo * (1 + mAvulso / 100)) * 100) / 100;
-
-      const pAvista = Math.round((custo * (1 + mAvista / 100)) * 100) / 100;
-
-      const pDesestimulo = Math.round((custo * (1 + mDesestimulo / 100)) * 100) / 100;
-
-
-
-      return {
-
-        custo,
-
-        contrato: pContrato,
-
-        avulso: pAvulso,
-
-        avista: pAvista,
-
-        desestimulo: pDesestimulo,
-
-        mContrato,
-
-        mAvulso,
-
-        mAvista,
-
-        mDesestimulo
-
-      };
-
-    }
-
-
-
-    function mudarTabelaPreco(tab) {
-
-      STATE.tabelaPrecificacao = tab;
-
-      atualizarTabelaCatalogoEstoque();
-
-      const rotulos = {
-
-        'CONTRATO': 'Contrato (+30%)',
-
-        'AVULSO': 'Avulso (+60%)',
-
-        'AVISTA': 'À Vista / PIX (+20%)',
-
-        'DESESTIMULO': 'Não Quero Atender (+180%)',
-
-        'CUSTO': 'Custo Base'
-
-      };
-
-      mostrarToast(`🏷️ Tabela alterada para: ${rotulos[tab] || tab}`);
-
-    }
-
-
-
-    function togglePainelPrecosItem(cod) {
-
-      const el = document.getElementById("boxPrecos_" + cod);
-
-      if (!el) return;
-
-      el.style.display = (el.style.display === "none" || !el.style.display) ? "block" : "none";
-
-    }
-
-
-
-    function recalcularFormPreviaEstoque() {
-
-      const custo = parseFloat(document.getElementById("estCusto")?.value || 0) || 0;
-
-      const mCont = parseFloat(document.getElementById("estMargContrato")?.value || 30) || 30;
-
-      const mAvul = parseFloat(document.getElementById("estMargAvulso")?.value || 60) || 60;
-
-      const mAvis = parseFloat(document.getElementById("estMargAvista")?.value || 20) || 20;
-
-      const mDese = parseFloat(document.getElementById("estMargDesestimulo")?.value || 180) || 180;
-
-
-
-      const pCont = (custo * (1 + mCont / 100)).toFixed(2);
-
-      const pAvul = (custo * (1 + mAvul / 100)).toFixed(2);
-
-      const pAvis = (custo * (1 + mAvis / 100)).toFixed(2);
-
-      const pDese = (custo * (1 + mDese / 100)).toFixed(2);
-
-
-
-      const el = document.getElementById("boxPreviaCalculadaForm");
-
-      if (el) {
-
-        el.innerHTML = `
-
-          <div style="font-size:11px;font-weight:800;color:#334155;margin-bottom:4px;">📊 Prévia dos Preços de Venda Sugeridos por Consumidor:</div>
-
-          <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:11.5px;">
-
-            <span style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;padding:3px 8px;border-radius:4px;">🟢 Contrato: <b>R$ ${pCont}</b></span>
-
-            <span style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;padding:3px 8px;border-radius:4px;">🔵 Avulso: <b>R$ ${pAvul}</b></span>
-
-            <span style="background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;padding:3px 8px;border-radius:4px;">⚡ À Vista: <b>R$ ${pAvis}</b></span>
-
-            <span style="background:#fef2f2;color:#991b1b;border:1px solid #fecaca;padding:3px 8px;border-radius:4px;">⛔ Não Atender: <b>R$ ${pDese}</b></span>
-
-          </div>
-
-        `;
-
-      }
-
-    }
-
-
-
-    function onBuscaEstoqueInput(val) {
-
-      STATE.buscaEstoque = val;
-
-      STATE.paginaEstoque = 1;
-
-      atualizarTabelaCatalogoEstoque();
-
-    }
-
-
-
-    function mudarFiltroEstoque(cat) {
-
-      STATE.filtroCatEstoque = cat;
-
-      STATE.paginaEstoque = 1;
-
-      atualizarTabelaCatalogoEstoque();
-
-    }
-
-
-
-    function mudarPaginaEstoque(delta) {
-
-      STATE.paginaEstoque = Math.max(1, (STATE.paginaEstoque || 1) + delta);
-
-      atualizarTabelaCatalogoEstoque();
-
-    }
-
-
-
-    function filtrarEstoqueCompleto(estoque) {
-
-      let lista = estoque || [];
-
-      const q = (STATE.buscaEstoque || "").trim().toLowerCase();
-
-      if (q) {
-
-        lista = lista.filter(e => {
-
-          const cod = String(e.codigo || "").toLowerCase();
-
-          const nome = String(e.nome_peca || "").toLowerCase();
-
-          const grp = String(e.grupo_item || "").toLowerCase();
-
-          const cat = String(e.categoria || "").toLowerCase();
-
-          const loc = String(e.localizacao || "").toLowerCase();
-
-          return cod.includes(q) || nome.includes(q) || grp.includes(q) || cat.includes(q) || loc.includes(q);
-
-        });
-
-      }
-
-
-
-      const f = STATE.filtroCatEstoque || "TODOS";
-
-      if (f === "PECAS") {
-
-        lista = lista.filter(e => String(e.categoria || '').toUpperCase().includes('PEÇA') || String(e.grupo_item || '').toUpperCase().includes('REVENDA'));
-
-      } else if (f === "CONSUMO") {
-
-        lista = lista.filter(e => String(e.categoria || '').toUpperCase().includes('CONSUMÍVEL') || String(e.grupo_item || '').toUpperCase().includes('CONSUMO'));
-
-      } else if (f === "IMOBILIZADO") {
-
-        lista = lista.filter(e => String(e.categoria || '').toUpperCase().includes('IMOBILIZADO') || String(e.categoria || '').toUpperCase().includes('INSTRUMENTO') || String(e.grupo_item || '').toUpperCase().includes('IMOBILIZADO'));
-
-      } else if (f === "COM_SALDO") {
-
-        lista = lista.filter(e => (e.quantidade || 0) > 0);
-
-      } else if (f === "ZERADOS") {
-
-        lista = lista.filter(e => (e.quantidade || 0) <= 0);
-
-      }
-
-      return lista;
-
-    }
-
-
-
-    function preencherAjusteEstoque(codigo, nome, qtd, preco, cat, loc, custo, mCont, mAvul, mAvis, mDese) {
-
-      const elCod = document.getElementById("estCod");
-
-      const elNome = document.getElementById("estNome");
-
-      const elQtd = document.getElementById("estQtd");
-
-      const elPreco = document.getElementById("estPreco");
-
-      const elCat = document.getElementById("estCat");
-
-      const elLoc = document.getElementById("estLoc");
-
-      const elCusto = document.getElementById("estCusto");
-
-      const elMCont = document.getElementById("estMargContrato");
-
-      const elMAvul = document.getElementById("estMargAvulso");
-
-      const elMAvis = document.getElementById("estMargAvista");
-
-      const elMDese = document.getElementById("estMargDesestimulo");
-
-
-
-      if (elCod) elCod.value = codigo;
-
-      if (elNome) elNome.value = nome;
-
-      if (elQtd) elQtd.value = qtd;
-
-      if (elPreco) elPreco.value = preco;
-
-      if (elCat) elCat.value = cat;
-
-      if (elLoc) elLoc.value = loc || "Almoxarifado Central";
-
-      if (elCusto) elCusto.value = custo || preco || 0;
-
-      if (elMCont) elMCont.value = (mCont !== undefined && mCont !== null && mCont !== '') ? mCont : 30;
-
-      if (elMAvul) elMAvul.value = (mAvul !== undefined && mAvul !== null && mAvul !== '') ? mAvul : 60;
-
-      if (elMAvis) elMAvis.value = (mAvis !== undefined && mAvis !== null && mAvis !== '') ? mAvis : 20;
-
-      if (elMDese) elMDese.value = (mDese !== undefined && mDese !== null && mDese !== '') ? mDese : 180;
-
-
-
-      recalcularFormPreviaEstoque();
-
-      const form = document.getElementById("formCadastroEstoque");
-
-      if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-      mostrarToast(`✏️ Item #${codigo} carregado com tabela de precificação.`);
-
-    }
-
-
-
-    async function abrirModalKardex(filtroItem = "") {
-
-      const modal = document.getElementById("modalKardex");
-
+    /********************************************************************
+     * GERENCIAMENTO DE EQUIPAMENTOS (EDIÇÃO, DESCONTINUAÇÃO E CADASTRO)
+     ********************************************************************/
+    function abrirModalEditarEquipamento(eqId, clienteNome, cidade, estado) {
+      const modal = document.getElementById("modalGerenciarEquipamento");
+      const titulo = document.getElementById("modalEqTitulo");
+      const btnDesc = document.getElementById("btnDescontinuarModal");
       if (!modal) return;
 
-      modal.style.display = "flex";
-
-      carregarKardex(filtroItem);
-
-    }
-
-
-
-    function fecharModalKardex() {
-
-      const modal = document.getElementById("modalKardex");
-
-      if (modal) modal.style.display = "none";
-
-    }
-
-
-
-    async function carregarKardex(q = "") {
-
-      const box = document.getElementById("modalKardexBody");
-
-      if (!box) return;
-
-      box.innerHTML = `<div style="text-align:center;padding:20px;color:#64748b;">⏳ Carregando movimentações Kardex do Almoxarifado...</div>`;
-
-      try {
-
-        const res = await fetch(`/api/kardex?q=${encodeURIComponent(q)}&limite=80`).then(r => r.json());
-
-        const movs = res.movimentacoes || [];
-
-        if (!movs.length) {
-
-          box.innerHTML = `<div style="text-align:center;padding:30px;color:#94a3b8;">Nenhuma movimentação encontrada para o critério "${esc(q)}".</div>`;
-
-          return;
-
-        }
-
-        box.innerHTML = `
-
-          <div style="font-size:11.5px;color:#64748b;margin-bottom:8px;">Mostrando as últimas <b>${movs.length}</b> movimentações auditadas:</div>
-
-          <div style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto;">
-
-            ${movs.map(m => `
-
-              <div style="background:#ffffff;border:1px solid #e2e8f0;padding:8px 10px;border-radius:6px;font-size:11.5px;">
-
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-
-                  <span style="font-weight:800;color:#0284c7;">#${esc(m.codigo_item)} — ${esc(m.descricao)}</span>
-
-                  <span class="badge ${m.qtd_entrada > 0 ? 'concluido' : 'obs'}">${m.qtd_entrada > 0 ? '🟢 Entrada: +' + m.qtd_entrada : '🔴 Saída: -' + m.qtd_saida}</span>
-
-                </div>
-
-                <div style="color:#64748b;font-size:11px;margin-top:2px;display:flex;justify-content:space-between;">
-
-                  <span><b>Data:</b> ${esc(m.data_mov)} ${esc(m.hora_mov)} • <b>Saldo Atual:</b> ${m.saldo}</span>
-
-                  <span><b>NF:</b> ${esc(m.numero_nf || 'S/N')} • <b>Custo Médio:</b> R$ ${Number(m.custo_medio || 0).toFixed(2)}</span>
-
-                </div>
-
-                ${m.observacao ? `<div style="font-size:10.5px;color:#475569;margin-top:2px;background:#f8fafc;padding:2px 6px;border-radius:4px;"><b>Obs:</b> ${esc(m.observacao)}</div>` : ''}
-
-              </div>
-
-            `).join("")}
-
-          </div>
-
-        `;
-
-      } catch (e) {
-
-        box.innerHTML = `<div style="color:#ef4444;text-align:center;padding:20px;">Erro ao carregar movimentações do Kardex.</div>`;
-
-      }
-
-    }
-
-
-
-    function atualizarTabelaCatalogoEstoque() {
-
-      const boxTabela = document.getElementById("boxCatalogoEstoqueTabela");
-
-      if (!boxTabela) {
-
-        const mc = document.getElementById("mainContainer");
-
-        if (mc) renderMenuGesEstoque(mc);
-
-        return;
-
-      }
-
-
-
-      const d = STATE.data || {};
-
-      const estoque = d.estoque || [];
-
-      const totalItens = estoque.length;
-
-      const comSaldo = estoque.filter(e => (e.quantidade || 0) > 0).length;
-
-      const zerados = estoque.filter(e => (e.quantidade || 0) <= 0).length;
-
-      const qtdRevenda = estoque.filter(e => String(e.categoria || '').toUpperCase().includes('PEÇA') || String(e.grupo_item || '').toUpperCase().includes('REVENDA')).length;
-
-      const qtdConsumo = estoque.filter(e => String(e.categoria || '').toUpperCase().includes('CONSUMÍVEL') || String(e.grupo_item || '').toUpperCase().includes('CONSUMO')).length;
-
-      const qtdImob = estoque.filter(e => String(e.categoria || '').toUpperCase().includes('IMOBILIZADO') || String(e.categoria || '').toUpperCase().includes('INSTRUMENTO') || String(e.grupo_item || '').toUpperCase().includes('IMOBILIZADO')).length;
-
-
-
-      const filtrados = filtrarEstoqueCompleto(estoque);
-
-      const ITENS_PAG = 25;
-
-      const totalPaginas = Math.ceil(filtrados.length / ITENS_PAG) || 1;
-
-      STATE.paginaEstoque = Math.min(Math.max(1, STATE.paginaEstoque || 1), totalPaginas);
-
-      const inicio = (STATE.paginaEstoque - 1) * ITENS_PAG;
-
-      const itensExibidos = filtrados.slice(inicio, inicio + ITENS_PAG);
-
-
-
-      const elTitulo = document.getElementById("tituloContadorEstoque");
-
-      if (elTitulo) {
-
-        elTitulo.innerText = `📦 Catálogo Oficial do Almoxarifado (${filtrados.length} de ${totalItens})`;
-
-      }
-
-
-
-      const catAtiva = STATE.filtroCatEstoque || "TODOS";
-
-      const tabAtiva = STATE.tabelaPrecificacao || "AVULSO";
-
-
-
-      boxTabela.innerHTML = `
-
-        <!-- SIMULADOR DINÂMICO DE TABELA POR TIPO DE CONSUMIDOR -->
-
-        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:10px 12px;margin-bottom:12px;">
-
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
-
-            <div style="font-size:12px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:6px;">
-
-              <span>🏷️ Tabela Vigente por Tipo de Consumidor:</span>
-
-              <span class="badge" style="background:#0284c7;color:#fff;font-size:10.5px;">${tabAtiva === 'CONTRATO' ? '🟢 CONTRATO (+30%)' : tabAtiva === 'AVISTA' ? '⚡ À VISTA (+20%)' : tabAtiva === 'DESESTIMULO' ? '⛔ NÃO QUERO ATENDER (+180%)' : tabAtiva === 'CUSTO' ? '⚙️ CUSTO BASE' : '🔵 AVULSO SPOT (+60%)'}</span>
-
-            </div>
-
-            <div style="font-size:11px;color:#64748b;">Simule instantaneamente o preço de venda para qualquer perfil de cliente</div>
-
-          </div>
-
-          <div style="display:flex;gap:5px;flex-wrap:wrap;">
-
-            <button type="button" class="btn btn-xs ${tabAtiva==='CONTRATO'?'btn-success':'btn-outline'}" onclick="mudarTabelaPreco('CONTRATO')" style="${tabAtiva==='CONTRATO'?'background:#16a34a;color:#fff;border-color:#16a34a;font-weight:800;':''}">
-
-              🟢 Contrato (+30%)
-
-            </button>
-
-            <button type="button" class="btn btn-xs ${tabAtiva==='AVULSO'?'btn-primary':'btn-outline'}" onclick="mudarTabelaPreco('AVULSO')" style="${tabAtiva==='AVULSO'?'font-weight:800;':''}">
-
-              🔵 Avulso (+60%)
-
-            </button>
-
-            <button type="button" class="btn btn-xs ${tabAtiva==='AVISTA'?'btn-primary':'btn-outline'}" onclick="mudarTabelaPreco('AVISTA')" style="${tabAtiva==='AVISTA'?'background:#0284c7;color:#fff;border-color:#0284c7;font-weight:800;':''}">
-
-              ⚡ À Vista / PIX (+20%)
-
-            </button>
-
-            <button type="button" class="btn btn-xs ${tabAtiva==='DESESTIMULO'?'btn-danger':'btn-outline'}" onclick="mudarTabelaPreco('DESESTIMULO')" style="${tabAtiva==='DESESTIMULO'?'background:#dc2626;color:#fff;border-color:#dc2626;font-weight:800;':''}">
-
-              ⛔ Não Quero Atender (+180%)
-
-            </button>
-
-            <button type="button" class="btn btn-xs ${tabAtiva==='CUSTO'?'btn-neutral':'btn-outline'}" onclick="mudarTabelaPreco('CUSTO')" style="${tabAtiva==='CUSTO'?'background:#475569;color:#fff;border-color:#475569;font-weight:800;':''}">
-
-              ⚙️ Custo Base
-
-            </button>
-
-          </div>
-
-        </div>
-
-
-
-        <!-- FILTROS POR CATEGORIA COM CORES ATIVAS CLARAS -->
-
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
-
-          <button type="button" class="btn btn-xs ${catAtiva==='TODOS'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('TODOS')">Todos (${totalItens})</button>
-
-          <button type="button" class="btn btn-xs ${catAtiva==='PECAS'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('PECAS')">🔩 Peças (${qtdRevenda})</button>
-
-          <button type="button" class="btn btn-xs ${catAtiva==='CONSUMO'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('CONSUMO')">🧴 Consumíveis (${qtdConsumo})</button>
-
-          <button type="button" class="btn btn-xs ${catAtiva==='IMOBILIZADO'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('IMOBILIZADO')">🧰 Imobilizado/RBC (${qtdImob})</button>
-
-          <button type="button" class="btn btn-xs ${catAtiva==='COM_SALDO'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('COM_SALDO')">🟢 Com Saldo (${comSaldo})</button>
-
-          <button type="button" class="btn btn-xs ${catAtiva==='ZERADOS'?'btn-primary':'btn-outline'}" onclick="mudarFiltroEstoque('ZERADOS')">🔴 Zerados (${zerados})</button>
-
-        </div>
-
-
-
-        <!-- LISTA DOS ITENS PAGINADOS FORMATADA COM ALTA LEGIBILIDADE -->
-
-        <div style="display:flex;flex-direction:column;gap:8px;">
-
-          ${itensExibidos.length ? itensExibidos.map(e => {
-
-            const precos = calcularPrecosConsumidor(e);
-
-            
-
-            let precoAtivo = precos.avulso;
-
-            let rotuloTabela = `🔵 Avulso (+${precos.mAvulso}%)`;
-
-            let estiloBadgePreco = `background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;`;
-
-
-
-            if (tabAtiva === 'CONTRATO') {
-
-              precoAtivo = precos.contrato;
-
-              rotuloTabela = `🟢 Contrato (+${precos.mContrato}%)`;
-
-              estiloBadgePreco = `background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;`;
-
-            } else if (tabAtiva === 'AVISTA') {
-
-              precoAtivo = precos.avista;
-
-              rotuloTabela = `⚡ À Vista (+${precos.mAvista}%)`;
-
-              estiloBadgePreco = `background:#f0f9ff;border:1px solid #bae6fd;color:#0369a1;`;
-
-            } else if (tabAtiva === 'DESESTIMULO') {
-
-              precoAtivo = precos.desestimulo;
-
-              rotuloTabela = `⛔ Não Quero Atender (+${precos.mDesestimulo}%)`;
-
-              estiloBadgePreco = `background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-weight:800;`;
-
-            } else if (tabAtiva === 'CUSTO') {
-
-              precoAtivo = precos.custo;
-
-              rotuloTabela = `⚙️ Custo Base`;
-
-              estiloBadgePreco = `background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;`;
-
-            }
-
-
-
-            const subtotalAtivo = Math.round(((e.quantidade || 0) * precoAtivo) * 100) / 100;
-
-
-
-            return `
-
-              <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
-
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
-
-                  
-
-                  <!-- IDENTIFICAÇÃO E NOME DO ITEM -->
-
-                  <div style="flex:1;min-width:260px;">
-
-                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-
-                      <span style="font-weight:900;color:#0284c7;font-size:13.5px;background:#f0f9ff;border:1px solid #bae6fd;padding:1px 6px;border-radius:4px;">#${esc(e.codigo)}</span>
-
-                      <span class="badge ${String(e.categoria).includes('INSTRUMENTO') ? 'ativo' : 'concluido'}" style="font-size:10.5px;">${esc(e.categoria || e.grupo_item || 'ESTOQUE')}</span>
-
-                      ${e.grupo_item ? `<span style="font-size:10px;color:#475569;background:#f1f5f9;padding:1px 6px;border-radius:4px;font-weight:600;">${esc(e.grupo_item)}</span>` : ''}
-
-                    </div>
-
-
-
-                    <div style="font-weight:800;color:#0f172a;font-size:13.5px;margin-top:4px;line-height:1.35;">
-
-                      ${esc(e.nome_peca)}
-
-                    </div>
-
-
-
-                    <!-- LOCALIZAÇÃO / ARMAZENAMENTO MAPEAÇÃO -->
-
-                    <div style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-
-                      <span style="font-size:11.5px;color:#334155;background:#f8fafc;border:1px solid #cbd5e1;padding:2px 8px;border-radius:4px;display:inline-flex;align-items:center;gap:4px;">
-
-                        📍 <b>Local de Armazenamento:</b> <span style="color:#0284c7;font-weight:700;">${esc(e.localizacao || 'Almoxarifado Central (Aguardando Mapeamento)')}</span>
-
-                      </span>
-
-                    </div>
-
-                  </div>
-
-
-
-                  <!-- SALDO FÍSICO DISPONÍVEL (DIREITA) -->
-
-                  <div style="text-align:right;min-width:130px;">
-
-                    <div style="font-size:10px;text-transform:uppercase;font-weight:800;color:#64748b;letter-spacing:0.5px;margin-bottom:3px;">
-
-                      Saldo em Estoque
-
-                    </div>
-
-                    ${(e.quantidade || 0) > 0 ? `
-
-                      <span style="display:inline-flex;align-items:center;gap:5px;background:#dcfce7;color:#15803d;border:1px solid #86efac;font-size:13.5px;font-weight:900;padding:4px 10px;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
-
-                        🟢 ${e.quantidade} ${formatarUnidadeLimpa(e.unidade)}
-
-                      </span>
-
-                    ` : `
-
-                      <span style="display:inline-flex;align-items:center;gap:5px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-size:12px;font-weight:800;padding:4px 9px;border-radius:6px;">
-
-                        🔴 0.0 ${formatarUnidadeLimpa(e.unidade)} (Zerado)
-
-                      </span>
-
-                    `}
-
-                  </div>
-
-                </div>
-
-
-
-                <!-- VALORES FINANCEIROS DINÂMICOS CONFORME A TABELA DE CONSUMIDOR -->
-
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px dashed #e2e8f0;flex-wrap:wrap;gap:8px;font-size:11.5px;">
-
-                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:#334155;">
-
-                    <span style="padding:3px 8px;border-radius:4px;${estiloBadgePreco}">
-
-                      💵 <b>Preço (${rotuloTabela}):</b> R$ ${precoAtivo.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}
-
-                    </span>
-
-                    <span style="background:#f8fafc;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0;color:#475569;">
-
-                      🔍 Custo Base: R$ ${precos.custo.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}
-
-                    </span>
-
-                    <span style="background:#f0fdf4;padding:3px 8px;border-radius:4px;border:1px solid #bbf7d0;color:#166534;">
-
-                      💰 <b>Subtotal (${rotuloTabela}):</b> R$ ${subtotalAtivo.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}
-
-                    </span>
-
-                  </div>
-
-                  <div style="display:flex;gap:5px;">
-
-                    <button type="button" class="btn btn-outline btn-xs" onclick="togglePainelPrecosItem('${esc(e.codigo)}')" style="padding:4px 8px;border-color:#6366f1;color:#4f46e5;font-weight:700;" title="Ver cotação nas 4 tabelas de clientes">
-
-                      📊 4 Tabelas
-
-                    </button>
-
-                    <button type="button" class="btn btn-outline btn-xs" onclick="preencherAjusteEstoque('${esc(e.codigo)}', '${esc(e.nome_peca)}', ${e.quantidade||0}, ${e.preco_unitario||0}, '${esc(e.categoria||'PEÇA DE REPOSIÇÃO')}', '${esc(e.localizacao||'ALMOXARIFADO CENTRAL')}', ${precos.custo}, ${precos.mContrato}, ${precos.mAvulso}, ${precos.mAvista}, ${precos.mDesestimulo})" style="padding:4px 8px;font-weight:700;">
-
-                      ✏️ Ajustar / Mapear
-
-                    </button>
-
-                    <button type="button" class="btn btn-outline btn-xs" onclick="abrirModalKardex('${esc(e.codigo)}')" style="padding:4px 8px;border-color:#0284c7;color:#0284c7;font-weight:700;" title="Ver movimentações desta peça">
-
-                      📑 Kardex
-
-                    </button>
-
-                  </div>
-
-                </div>
-
-
-
-                <!-- GAVETA EXPANSÍVEL: MINI-TABELA DE PREÇOS POR PERFIL DE CONSUMIDOR -->
-
-                <div id="boxPrecos_${esc(e.codigo)}" style="display:none;margin-top:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:11.5px;">
-
-                  <div style="font-weight:800;color:#0f172a;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
-
-                    <span>🏷️ Comparativo de Precificação por Tipo de Consumidor (#${esc(e.codigo)}):</span>
-
-                    <button type="button" class="btn btn-xs btn-outline" onclick="togglePainelPrecosItem('${esc(e.codigo)}')" style="padding:1px 6px;">✕ Fechar</button>
-
-                  </div>
-
-                  <div style="overflow-x:auto;">
-
-                    <table style="width:100%;border-collapse:collapse;text-align:left;">
-
-                      <thead>
-
-                        <tr style="background:#e2e8f0;color:#334155;font-size:11px;">
-
-                          <th style="padding:5px 8px;border-radius:4px 0 0 4px;">Tipo de Consumidor</th>
-
-                          <th style="padding:5px 8px;">Margem Aplicada</th>
-
-                          <th style="padding:5px 8px;">Preço Unitário</th>
-
-                          <th style="padding:5px 8px;border-radius:0 4px 4px 0;">Lucro Bruto Estimado</th>
-
-                        </tr>
-
-                      </thead>
-
-                      <tbody>
-
-                        <tr style="border-bottom:1px solid #e2e8f0;background:#ffffff;">
-
-                          <td style="padding:6px 8px;font-weight:700;color:#166534;">🟢 Cliente Contrato (Mensalista)</td>
-
-                          <td style="padding:6px 8px;">+${precos.mContrato}%</td>
-
-                          <td style="padding:6px 8px;font-weight:800;color:#0f172a;">R$ ${precos.contrato.toFixed(2)}</td>
-
-                          <td style="padding:6px 8px;color:#16a34a;font-weight:700;">+ R$ ${(precos.contrato - precos.custo).toFixed(2)}</td>
-
-                        </tr>
-
-                        <tr style="border-bottom:1px solid #e2e8f0;background:#f8fafc;">
-
-                          <td style="padding:6px 8px;font-weight:700;color:#1e40af;">🔵 Cliente Avulso (Spot / Sem Contrato)</td>
-
-                          <td style="padding:6px 8px;">+${precos.mAvulso}%</td>
-
-                          <td style="padding:6px 8px;font-weight:800;color:#0f172a;">R$ ${precos.avulso.toFixed(2)}</td>
-
-                          <td style="padding:6px 8px;color:#2563eb;font-weight:700;">+ R$ ${(precos.avulso - precos.custo).toFixed(2)}</td>
-
-                        </tr>
-
-                        <tr style="border-bottom:1px solid #e2e8f0;background:#ffffff;">
-
-                          <td style="padding:6px 8px;font-weight:700;color:#0369a1;">⚡ À Vista / PIX (Liquidação Imediata)</td>
-
-                          <td style="padding:6px 8px;">+${precos.mAvista}%</td>
-
-                          <td style="padding:6px 8px;font-weight:800;color:#0f172a;">R$ ${precos.avista.toFixed(2)}</td>
-
-                          <td style="padding:6px 8px;color:#0284c7;font-weight:700;">+ R$ ${(precos.avista - precos.custo).toFixed(2)}</td>
-
-                        </tr>
-
-                        <tr style="background:#fef2f2;">
-
-                          <td style="padding:6px 8px;font-weight:800;color:#991b1b;">⛔ "Não Quero Atender" (Preço Desestímulo)</td>
-
-                          <td style="padding:6px 8px;font-weight:800;color:#991b1b;">+${precos.mDesestimulo}%</td>
-
-                          <td style="padding:6px 8px;font-weight:900;color:#991b1b;">R$ ${precos.desestimulo.toFixed(2)}</td>
-
-                          <td style="padding:6px 8px;color:#dc2626;font-weight:800;">+ R$ ${(precos.desestimulo - precos.custo).toFixed(2)} <span style="font-size:10px;font-weight:normal;">(Barreira)</span></td>
-
-                        </tr>
-
-                      </tbody>
-
-                    </table>
-
-                  </div>
-
-                </div>
-
-              </div>
-
-            `;
-
-          }).join("") : `
-
-            <div style="text-align:center;padding:28px 16px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;color:#64748b;">
-
-              <div style="font-size:26px;margin-bottom:6px;">🔍</div>
-
-              <div style="font-weight:700;color:#334155;font-size:13px;">Nenhum item encontrado no almoxarifado</div>
-
-              <div style="font-size:12px;margin-top:3px;color:#64748b;">Verifique a grafia do termo ou troque a categoria selecionada.</div>
-
-            </div>
-
-          `}
-
-        </div>
-
-
-
-        <!-- PAGINAÇÃO INFERIOR -->
-
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:8px;border-top:1px solid #e2e8f0;">
-
-          <div style="font-size:11px;color:#64748b;">
-
-            ${filtrados.length ? `Mostrando <b>${inicio + 1}</b> a <b>${Math.min(inicio + ITENS_PAG, filtrados.length)}</b> de <b>${filtrados.length}</b> itens` : `0 itens encontrados`}
-
-          </div>
-
-          <div style="display:flex;gap:4px;">
-
-            <button type="button" class="btn btn-outline btn-xs" ${STATE.paginaEstoque <= 1 ? 'disabled' : ''} onclick="mudarPaginaEstoque(-1)">◀ Anterior</button>
-
-            <span style="font-size:11px;font-weight:700;display:flex;align-items:center;padding:0 6px;color:#0f172a;">
-
-              Pág ${STATE.paginaEstoque} de ${totalPaginas}
-
-            </span>
-
-            <button type="button" class="btn btn-outline btn-xs" ${STATE.paginaEstoque >= totalPaginas ? 'disabled' : ''} onclick="mudarPaginaEstoque(1)">Próximo ▶</button>
-
-          </div>
-
-        </div>
-
-      `;
-
-    }
-
-
-
-    /********************************************************************
-
-     * ALMOXARIFADO: MURAIS DE FERRAMENTAS, LEITOR DE CÓDIGO & ESTEIRA DE COMPRA
-
-     ********************************************************************/
-
-    let ABA_ESTOQUE_ATIVA = "TODOS_MURAIS"; // 'TODOS_MURAIS', 'DISPONIVEIS', 'EM_USO', 'CALIBRACAO', 'SEPARACAO', 'CATALOGO'
-
-    let FILTRO_BUSCA_FERRAMENTA = "";
-
-    let ID_PEDIDO_COMPRA_EM_EDICAO = null;
-
-
-
-    function tocarBeepScanner() {
-
-      try {
-
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-
-        if (!AudioContext) return;
-
-        const ctx = new AudioContext();
-
-        const osc = ctx.createOscillator();
-
-        const gain = ctx.createGain();
-
-        osc.type = "sine";
-
-        osc.frequency.setValueAtTime(1400, ctx.currentTime);
-
-        gain.gain.setValueAtTime(0.2, ctx.currentTime);
-
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.14);
-
-        osc.connect(gain);
-
-        gain.connect(ctx.destination);
-
-        osc.start();
-
-        osc.stop(ctx.currentTime + 0.14);
-
-      } catch (e) {}
-
-    }
-
-
-
-    async function aprovarAlmox(id, novoStatus = null) {
-
-      const d = STATE.data || {};
-
-      const pedidos = d.solicitacoes_almox || [];
-
-      const ped = pedidos.find(p => p.id == id);
-
-      if (!ped) {
-
-        mostrarToast("⚠️ Pedido não localizado.");
-
-        return;
-
-      }
-
-
-
-      // Validação de Saldo: NÃO pode separar se for SEM SALDO e estiver tentando entregar
-
-      const itensUpper = (ped.itens_solicitados || "").toUpperCase();
-
-      const stUpper = (ped.status_pedido || "").toUpperCase();
-
-      const semSaldo = (itensUpper.includes("SEM SALDO") || stUpper.includes("PENDENTE DE COMPRA")) && !itensUpper.includes("SALDO DISPONÍVEL");
-
-
-
-      if (semSaldo && (!novoStatus || novoStatus.includes("SEPARADO") || novoStatus.includes("ENTREGUE"))) {
-
-        mostrarToast("⛔ BLOQUEIO: Este item não possui saldo físico no Almoxarifado! Solicite ou aguarde a chegada da compra antes de separar.");
-
-        return;
-
-      }
-
-
-
-      if (!novoStatus) {
-
-        if (stUpper.includes("SEPARADO") || stUpper.includes("ENTREGUE")) {
-
-          novoStatus = "A SEPARAR / AGUARDANDO ALMOXARIFADO";
-
-        } else {
-
-          novoStatus = "SEPARADO / ENTREGUE AO TÉCNICO";
-
-        }
-
-      }
-
-
-
-      try {
-
-        mostrarToast("⏳ Atualizando status no Almoxarifado...");
-
-        const res = await apiPost("/api/almoxarifado/status", { id: id, novo_status: novoStatus });
-
-        if (res && res.ok) {
-
-          ped.status_pedido = novoStatus;
-
-          mostrarToast(`✅ Pedido #${id} atualizado: ${novoStatus}`);
-
-          renderMenuGesEstoque();
-
-        } else {
-
-          mostrarToast(`❌ Erro: ${res?.msg || "Falha ao atualizar"}`);
-
-        }
-
-      } catch (err) {
-
-        console.error("Erro aprovarAlmox:", err);
-
-        mostrarToast("❌ Falha de comunicação com o servidor.");
-
-      }
-
-    }
-
-
-
-    let ID_PEDIDO_ENTREGA_EM_EDICAO = null;
-
-
-
-    function abrirModalEntregaTecnico(id) {
-
-      ID_PEDIDO_ENTREGA_EM_EDICAO = id;
-
-      const d = STATE.data || {};
-
-      const pedidos = d.solicitacoes_almox || [];
-
-      const ped = pedidos.find(p => p.id == id);
-
-      if (!ped) {
-
-        mostrarToast("⚠️ Pedido não localizado.");
-
-        return;
-
-      }
-
-
-
-      const modal = document.getElementById("modalEntregaTecnicoAlmox");
-
-      const hiddenId = document.getElementById("modalEntrega_pedidoId");
-
-      const infoBox = document.getElementById("modalEntrega_infoResumo");
-
-      const selTec = document.getElementById("modalEntrega_tecnico");
-
-
-
-      if (hiddenId) hiddenId.value = ped.id;
-
-
-
-      if (infoBox) {
-
-        infoBox.innerHTML = `
-
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">
-
-            <b>Pedido #${ped.id} &bull; ${esc(ped.destino_cliente)}</b>
-
-            <span class="badge ${ped.tipo_origem_peca === 'USADA_SEM_NF' ? 'obs' : 'concluido'}">${ped.tipo_origem_peca === 'USADA_SEM_NF' ? '♻️ Usada (Sem NF)' : '🏷️ Nova c/ NF'}</span>
-
-          </div>
-
-          <div style="margin-top:4px;color:#0b132b;font-weight:bold;">
-
-            🔩 Peça: ${esc(ped.itens_solicitados)}
-
-          </div>
-
-          ${ped.instrumentos_solicitados ? `<div style="font-size:11.5px;color:#64748b;margin-top:2px;">🧰 Kits / Ferramentas: ${esc(ped.instrumentos_solicitados)}</div>` : ''}
-
-        `;
-
-      }
-
-
-
-      const tecnicosLista = [
-
-        "ANTONIO", "LEONARDO", "NETTO", "ARQUIMEDES", "MARCOS", "PAULO", "ALAN", "GABRIEL", "VITOR", "PLANTÃO"
-
-      ];
-
-      if (d.tecnicos && Array.isArray(d.tecnicos)) {
-
-        d.tecnicos.forEach(t => {
-
-          const nome = typeof t === "string" ? t : (t.nome || "");
-
-          if (nome && !tecnicosLista.includes(nome.toUpperCase())) {
-
-            tecnicosLista.push(nome.toUpperCase());
-
-          }
-
-        });
-
-      }
-
-
-
-      let tecPre = ped.tecnico || "";
-
-      if (!tecPre || tecPre.includes("COMERCIAL") || tecPre.includes("ALMOXARIFADO") || tecPre.includes("PROPOSTA")) {
-
-        const mOs = (ped.destino_cliente || "").match(/#(\d+)/);
-
-        const osId = ped.os_id || (mOs ? mOs[1] : "");
-
-        if (osId) {
-
-          const os = (d.ordens || []).find(o => String(o.id) === String(osId));
-
-          if (os && os.tecnico_responsavel) tecPre = os.tecnico_responsavel;
-
-        }
-
-      }
-
-      if (!tecPre) tecPre = "ANTONIO";
-      const infoOsTec = document.getElementById("modalEntrega_infoOsTec");
-      if (infoOsTec) {
-        infoOsTec.innerHTML = `ℹ️ Técnico vinculado à OS: <b>${esc(tecPre)}</b> (selecionado automaticamente, editável caso tenha mudança de última hora)`;
-      }
-
-
-
-      if (selTec) {
-
-        selTec.innerHTML = tecnicosLista.map(t => `
-
-          <option value="${esc(t)}" ${t.toUpperCase() === tecPre.toUpperCase() ? 'selected' : ''}>👷 ${esc(t)}</option>
-
-        `).join("");
-
-      }
-
-
-
-      const radios = document.getElementsByName("modalEntrega_origem");
-
-      const origemAtual = ped.tipo_origem_peca || ((ped.itens_solicitados || "").toUpperCase().includes("USADA") ? "USADA_SEM_NF" : "NOVA_COM_NF");
-
-      for (let r of radios) {
-
-        r.checked = (r.value === origemAtual);
-
-      }
-
-
-
-      if (modal) modal.classList.add("open");
-
-    }
-
-
-
-    
-    /********************************************************************
-     * AUDITORIA FORENSE & EXCLUSÃO SEGURA COM RASTREABILIDADE
-     ********************************************************************/
-    let DADOS_EXCLUSAO_AUDITAVEL = null;
-
-    function abrirModalExclusaoAuditavel(tabela, id, descricaoItem, callbackSucesso) {
-      DADOS_EXCLUSAO_AUDITAVEL = {
-        tabela: tabela,
-        id: id,
-        descricao: descricaoItem,
-        callback: callbackSucesso
-      };
-
-      const usuarioAtivo = (STATE.usuario || "GESTOR / DIRETORIA").toUpperCase();
-      const modal = document.getElementById("modalExclusaoAuditavel");
-      const descEl = document.getElementById("modalExclusao_itemDesc");
-      const userEl = document.getElementById("modalExclusao_usuario");
-      const justEl = document.getElementById("modalExclusao_justificativa");
-
-      if (descEl) descEl.innerHTML = `<b>Registro:</b> ${esc(descricaoItem)} &bull; <b>Tabela:</b> ${esc(tabela)} &bull; <b>ID:</b> #${id}`;
-      if (userEl) userEl.value = usuarioAtivo;
-      if (justEl) justEl.value = "";
-
-      if (modal) modal.classList.add("open");
-    }
-
-    function fecharModalExclusaoAuditavel() {
-      const modal = document.getElementById("modalExclusaoAuditavel");
-      if (modal) modal.classList.remove("open");
-      DADOS_EXCLUSAO_AUDITAVEL = null;
-    }
-
-    async function confirmarExclusaoAuditavel() {
-      if (!DADOS_EXCLUSAO_AUDITAVEL) return;
-      const just = (document.getElementById("modalExclusao_justificativa")?.value || "").trim();
-      const user = (document.getElementById("modalExclusao_usuario")?.value || "GESTOR").trim();
-
-      if (!just || just.length < 5) {
-        mostrarToast("⚠️ Justificativa obrigatória (mínimo 5 caracteres) para registro de segurança cibernética e auditoria.");
-        return;
-      }
-
-      try {
-        mostrarToast("🛡️ Registrando exclusão no log forense de auditoria...");
-        const res = await apiPost("/api/auditoria/excluir", {
-          tabela: DADOS_EXCLUSAO_AUDITAVEL.tabela,
-          id: DADOS_EXCLUSAO_AUDITAVEL.id,
-          usuario: user,
-          justificativa: just
-        });
-
-        if (res && res.ok) {
-          mostrarToast(res.msg || "✅ Registro excluído com sucesso e carimbado no Log de Auditoria!");
-          const cb = DADOS_EXCLUSAO_AUDITAVEL.callback;
-          fecharModalExclusaoAuditavel();
-          await sincronizarTudo(false);
-          if (typeof cb === "function") cb();
-        } else {
-          mostrarToast(`❌ Erro: ${res?.msg || "Falha ao excluir"}`);
-        }
-      } catch (err) {
-        console.error("Erro confirmarExclusaoAuditavel:", err);
-        mostrarToast("❌ Falha de comunicação com o servidor.");
-      }
-    }
-
-    /********************************************************************
-     * CONFIRMAÇÃO & RECUSA DE RECEBIMENTO PELO TÉCNICO
-     ********************************************************************/
-    async function confirmarRecebimentoPeca(id) {
-      const d = STATE.data || {};
-      const ped = (d.solicitacoes_almox || []).find(p => p.id == id);
-      const tec = ped?.tecnico || "TÉCNICO";
-
-      if (!confirm(`Confirmar que você (👷 ${tec}) retirou e está em posse física da peça do Pedido #${id}?`)) return;
-
-      try {
-        mostrarToast("⏳ Confirmando recebimento da peça...");
-        const res = await apiPost("/api/almoxarifado/status", {
-          id: id,
-          novo_status: "SEPARADO / RECEBIDO PELO TÉCNICO",
-          tecnico: tec
-        });
-
-        if (res && res.ok) {
-          mostrarToast(`✅ Recebimento confirmado com sucesso por 👷 ${tec}!`);
-          if (ped) ped.status_pedido = "SEPARADO / RECEBIDO PELO TÉCNICO";
-          await sincronizarTudo(false);
-          renderMenuGesEstoque();
-        } else {
-          mostrarToast(`❌ Erro: ${res?.msg || "Falha ao confirmar"}`);
-        }
-      } catch (e) {
-        mostrarToast("❌ Falha de comunicação.");
-      }
-    }
-
-    async function recusarRecebimentoPeca(id) {
-      const d = STATE.data || {};
-      const ped = (d.solicitacoes_almox || []).find(p => p.id == id);
-      const tec = ped?.tecnico || "TÉCNICO";
-
-      const motivo = prompt(`⚠️ MOTIVO DA RECUSA DE RECEBIMENTO (👷 ${tec}):
-Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, não retirei no almoxarifado, outro técnico que retirou):`);
-      if (!motivo || !motivo.trim()) {
-        mostrarToast("⚠️ Recusa cancelada: motivo não informado.");
-        return;
-      }
-
-      try {
-        mostrarToast("⏳ Gravando recusa de recebimento e estornando ao estoque...");
-        const res = await apiPost("/api/almoxarifado/status", {
-          id: id,
-          novo_status: "RECUSADO PELO TÉCNICO - DEVOLVIDO AO ESTOQUE",
-          tecnico: tec,
-          motivo_recusa: motivo.trim()
-        });
-
-        if (res && res.ok) {
-          mostrarToast(`🚫 Negativa de recebimento registrada! Peça estornada ao saldo do Almoxarifado.`);
-          if (ped) {
-            ped.status_pedido = "RECUSADO PELO TÉCNICO - DEVOLVIDO AO ESTOQUE";
-            ped.motivo_recusa = motivo.trim();
-          }
-          await sincronizarTudo(false);
-          renderMenuGesEstoque();
-        } else {
-          mostrarToast(`❌ Erro: ${res?.msg || "Falha ao recusar"}`);
-        }
-      } catch (e) {
-        mostrarToast("❌ Falha de comunicação.");
-      }
-    }
-
-    function fecharModalEntregaTecnico() {
-
-      const modal = document.getElementById("modalEntregaTecnicoAlmox");
-
-      if (modal) modal.classList.remove("open");
-
-      ID_PEDIDO_ENTREGA_EM_EDICAO = null;
-
-    }
-
-
-
-    async function confirmarEntregaTecnicoAlmox() {
-
-      if (!ID_PEDIDO_ENTREGA_EM_EDICAO) return;
-
-      const id = ID_PEDIDO_ENTREGA_EM_EDICAO;
-
-      const selTec = document.getElementById("modalEntrega_tecnico");
-
-      const tec = selTec ? selTec.value : "LEONARDO";
-
-
-
-      const radios = document.getElementsByName("modalEntrega_origem");
-
-      let tipoOrigem = "NOVA_COM_NF";
-
-      for (let r of radios) {
-
-        if (r.checked) {
-
-          tipoOrigem = r.value;
-
-          break;
-
-        }
-
-      }
-
-
-
-      const d = STATE.data || {};
-
-      const pedidos = d.solicitacoes_almox || [];
-
-      const ped = pedidos.find(p => p.id == id);
-
-
-
-      try {
-
-        mostrarToast("⏳ Gravando entrega ao técnico e classificação fiscal...");
-
-        const res = await apiPost("/api/almoxarifado/status", {
-
-          id: id,
-
-          novo_status: "AGUARDANDO CONFIRMAÇÃO DO TÉCNICO",
-
-          tecnico: tec,
-
-          tipo_origem: tipoOrigem
-
-        });
-
-
-
-        if (res && res.ok) {
-
-          if (ped) {
-
-            ped.status_pedido = "SEPARADO / ENTREGUE AO TÉCNICO";
-
-            ped.tecnico = tec;
-
-            ped.tipo_origem_peca = tipoOrigem;
-
-          }
-
-          mostrarToast(`✅ Peça entregue ao técnico ${tec}! (${tipoOrigem === 'USADA_SEM_NF' ? 'Usada 100% Serviço' : 'Nova c/ NF'})`);
-
-          fecharModalEntregaTecnico();
-
-          renderMenuGesEstoque();
-
-        } else {
-
-          mostrarToast(`❌ Erro: ${res?.msg || "Falha ao registrar entrega"}`);
-
-        }
-
-      } catch (err) {
-
-        console.error("Erro confirmarEntregaTecnicoAlmox:", err);
-
-        mostrarToast("❌ Falha de comunicação com o servidor.");
-
-      }
-
-    }
-
-
-
-    
-    /* ========================================================
-       MOTOR DE RASTREAMENTO INTELIGENTE & AUTO-DETECÇÃO DE TRANSPORTADORA
-       ======================================================== */
-    function identificarTransportadoraERastreio(codigo, transportadoraManual = '', fornecedorTexto = '') {
-      const codLimpo = String(codigo || '').trim();
-      if (!codLimpo) return null;
-
-      // Se o usuário colou uma URL completa
-      if (codLimpo.startsWith('http://') || codLimpo.startsWith('https://')) {
-        return {
-          chave: 'LINK_DIRETO',
-          nome: 'Link Direto de Rastreio',
-          icone: '🔗',
-          corBg: '#eff6ff',
-          corBorder: '#93c5fd',
-          corTexto: '#1d4ed8',
-          codigo: codLimpo.length > 25 ? codLimpo.substring(0, 22) + '...' : codLimpo,
-          url: codLimpo,
-          autoDetectado: true
-        };
-      }
-
-      const codAlfanum = codLimpo.replace(/[\s\.\-\/]/g, '').toUpperCase();
-      const transpHint = (String(transportadoraManual || '') + ' ' + String(fornecedorTexto || '')).toUpperCase();
-      const manual = String(transportadoraManual || '').toUpperCase();
-
-      // 1. Correios (Padrão S10 UPU: 2 letras + 9 dígitos + 2 letras)
-      const regexCorreios = /^[A-Z]{2}[0-9]{9}[A-Z]{2}$/;
-      if (manual === 'CORREIOS' || regexCorreios.test(codAlfanum) || (transpHint.includes('CORREIO') || transpHint.includes('SEDEX') || transpHint.includes('PAC'))) {
-        if (regexCorreios.test(codAlfanum) || manual === 'CORREIOS' || /^[A-Z0-9]{13}$/.test(codAlfanum)) {
-          return {
-            chave: 'CORREIOS',
-            nome: 'Correios (Sedex / PAC)',
-            icone: '📦',
-            corBg: '#fef9c3',
-            corBorder: '#fde047',
-            corTexto: '#854d0e',
-            codigo: codAlfanum,
-            url: `https://www.linkcorreios.com.br/?id=${encodeURIComponent(codAlfanum)}`,
-            urlOficial: `https://rastreamento.correios.com.br/app/index.php?codigo=${encodeURIComponent(codAlfanum)}`,
-            autoDetectado: true
-          };
-        }
-      }
-
-      // 2. Jadlog (normalmente 14 dígitos numéricos, ex: 10084439201948 ou CTE)
-      if (manual === 'JADLOG' || transpHint.includes('JADLOG') || (/^\d{13,15}$/.test(codAlfanum) && (codAlfanum.startsWith('1008') || codAlfanum.startsWith('181')))) {
-        return {
-          chave: 'JADLOG',
-          nome: 'Jadlog Express',
-          icone: '🔴',
-          corBg: '#fee2e2',
-          corBorder: '#fca5a5',
-          corTexto: '#991b1b',
-          codigo: codAlfanum,
-          url: `https://www.jadlog.com.br/siteInstitucional/tracking.jad?cte=${encodeURIComponent(codAlfanum)}`,
-          autoDetectado: true
-        };
-      }
-
-      // 3. Azul Cargo Express (AWB com 8 a 11 dígitos, ex 820-...)
-      if (manual === 'AZUL' || transpHint.includes('AZUL') || (/^(820|020)\d{7,9}$/.test(codAlfanum)) || (codAlfanum.startsWith('AZU'))) {
-        return {
-          chave: 'AZUL',
-          nome: 'Azul Cargo Express',
-          icone: '✈️',
-          corBg: '#e0f2fe',
-          corBorder: '#7dd3fc',
-          corTexto: '#0369a1',
-          codigo: codAlfanum,
-          url: `https://www.azulcargoexpress.com.br/Rastreio/Rastreio?awb=${encodeURIComponent(codAlfanum)}`,
-          autoDetectado: true
-        };
-      }
-
-      // 4. Loggi (códigos com LOG ou no hint)
-      if (manual === 'LOGGI' || transpHint.includes('LOGGI') || codAlfanum.startsWith('LOG')) {
-        return {
-          chave: 'LOGGI',
-          nome: 'Loggi Tecnologia',
-          icone: '🛵',
-          corBg: '#ede9fe',
-          corBorder: '#c4b5fd',
-          corTexto: '#5b21b6',
-          codigo: codAlfanum,
-          url: `https://www.loggi.com/rastreador/${encodeURIComponent(codAlfanum)}`,
-          autoDetectado: true
-        };
-      }
-
-      // 5. Total Express / TexLog
-      if (manual === 'TOTAL' || transpHint.includes('TOTAL') || transpHint.includes('TEXLOG')) {
-        return {
-          chave: 'TOTAL',
-          nome: 'Total Express',
-          icone: '🚚',
-          corBg: '#ffedd5',
-          corBorder: '#fdba74',
-          corTexto: '#9a3412',
-          codigo: codAlfanum,
-          url: `https://tracking.totalexpress.com.br/tracking/0?awb=${encodeURIComponent(codAlfanum)}`,
-          autoDetectado: true
-        };
-      }
-
-      // 6. DHL Express (10 dígitos)
-      if (manual === 'DHL' || transpHint.includes('DHL') || (/^\d{10}$/.test(codAlfanum) && manual === 'DHL')) {
-        return {
-          chave: 'DHL',
-          nome: 'DHL Express',
-          icone: '🟡',
-          corBg: '#fef3c7',
-          corBorder: '#fde68a',
-          corTexto: '#92400e',
-          codigo: codAlfanum,
-          url: `https://www.dhl.com/br-pt/home/tracking/tracking-express.html?submit=1&tracking-id=${encodeURIComponent(codAlfanum)}`,
-          autoDetectado: true
-        };
-      }
-
-      // 7. FedEx (12 a 15 dígitos)
-      if (manual === 'FEDEX' || transpHint.includes('FEDEX')) {
-        return {
-          chave: 'FEDEX',
-          nome: 'FedEx Express',
-          icone: '🟣',
-          corBg: '#fae8ff',
-          corBorder: '#f0abfc',
-          corTexto: '#86198f',
-          codigo: codAlfanum,
-          url: `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(codAlfanum)}`,
-          autoDetectado: true
-        };
-      }
-
-      // 8. LATAM Cargo (AWB 045-...)
-      if (manual === 'LATAM' || transpHint.includes('LATAM') || codAlfanum.startsWith('045')) {
-        return {
-          chave: 'LATAM',
-          nome: 'LATAM Cargo',
-          icone: '✈️',
-          corBg: '#fee2e2',
-          corBorder: '#fca5a5',
-          corTexto: '#991b1b',
-          codigo: codAlfanum,
-          url: `https://www.latamcargo.com/pt/tracking?awb=${encodeURIComponent(codAlfanum)}`,
-          autoDetectado: true
-        };
-      }
-
-      // 9. GOLLOG (AWB 127-...)
-      if (manual === 'GOLLOG' || transpHint.includes('GOLLOG') || codAlfanum.startsWith('127')) {
-        return {
-          chave: 'GOLLOG',
-          nome: 'GOLLOG Aéreo',
-          icone: '✈️',
-          corBg: '#ffedd5',
-          corBorder: '#fdba74',
-          corTexto: '#9a3412',
-          codigo: codAlfanum,
-          url: `https://www.gollog.com.br/rastreie-sua-carga?cte=${encodeURIComponent(codAlfanum)}`,
-          autoDetectado: true
-        };
-      }
-
-      // 10. Fallback Inteligente Universal (Melhor Rastreio / Rastreie.com)
-      return {
-        chave: 'UNIVERSAL',
-        nome: 'Rastreador Universal (Melhor Rastreio)',
-        icone: '🌐',
-        corBg: '#f0fdf4',
-        corBorder: '#86efac',
-        corTexto: '#166534',
-        codigo: codAlfanum,
-        url: `https://melhorrastreio.com.br/rastreio/${encodeURIComponent(codAlfanum)}`,
-        autoDetectado: true
-      };
-    }
-
-    function atualizarPreviaRastreioModal() {
-      const inputRast = document.getElementById("inputCodigoRastreio");
-      const selTransp = document.getElementById("selectTransportadoraRastreio");
-      const inputForn = document.getElementById("inputFornecedorCompra");
-      const boxPrevia = document.getElementById("boxPreviaRastreioModal");
-      const badgeTransp = document.getElementById("badgeTranspDetectada");
-      const btnTestar = document.getElementById("btnTestarLinkRastreio");
-
-      if (!inputRast || !boxPrevia) return;
-
-      const cod = inputRast.value.trim();
-      const transpManual = selTransp ? selTransp.value : "AUTO";
-      const forn = inputForn ? inputForn.value.trim() : "";
-
-      if (!cod) {
-        boxPrevia.style.display = "none";
-        return;
-      }
-
-      const info = identificarTransportadoraERastreio(cod, transpManual, forn);
-      if (info) {
-        boxPrevia.style.display = "block";
-        boxPrevia.style.background = info.corBg;
-        boxPrevia.style.borderColor = info.corBorder;
-
-        if (badgeTransp) {
-          badgeTransp.innerHTML = `<span style="font-size:16px;">${info.icone}</span> <b>${esc(info.nome)}</b> &bull; Cód: <code style="background:rgba(255,255,255,0.8);padding:1px 5px;border-radius:3px;">${esc(info.codigo)}</code>`;
-          badgeTransp.style.color = info.corTexto;
-        }
-
-        if (btnTestar) {
-          btnTestar.href = info.url;
-          btnTestar.innerHTML = `🔍 Testar / Rastrear Agora (${info.nome}) ↗`;
+      if (eqId) {
+        const eq = (STATE.data.equipamentos_auvo || []).find(e => Number(e.id) === Number(eqId));
+        if (!eq) return alert("Equipamento não encontrado!");
+
+        if (titulo) titulo.innerText = "✏️ Editar Equipamento #" + eq.id;
+        document.getElementById("eqFormId").value = eq.id;
+        document.getElementById("eqFormCliente").value = eq.cliente_nome || "";
+        document.getElementById("eqFormNome").value = eq.nome || "";
+        document.getElementById("eqFormCategoria").value = eq.categoria_checklist || "RAIOS-X FIXO";
+        document.getElementById("eqFormStatus").value = eq.status || "Ativo";
+        document.getElementById("eqFormNS").value = eq.numero_serie || "";
+        document.getElementById("eqFormTag").value = eq.identificador || "";
+        document.getElementById("eqFormDesc").value = eq.descricao || "";
+        document.getElementById("eqFormCidade").value = eq.cidade || "";
+        document.getElementById("eqFormEstado").value = eq.estado || "";
+
+        if (btnDesc) {
+          btnDesc.style.display = (eq.status === "Descontinuado" || eq.status === "Inativo") ? "none" : "inline-block";
         }
       } else {
-        boxPrevia.style.display = "none";
+        if (titulo) titulo.innerText = "➕ Cadastrar Nova Máquina";
+        document.getElementById("eqFormId").value = "";
+        document.getElementById("eqFormCliente").value = clienteNome || "";
+        document.getElementById("eqFormNome").value = "";
+        document.getElementById("eqFormCategoria").value = "RAIOS-X FIXO";
+        document.getElementById("eqFormStatus").value = "Ativo";
+        document.getElementById("eqFormNS").value = "";
+        document.getElementById("eqFormTag").value = "";
+        document.getElementById("eqFormDesc").value = "";
+        document.getElementById("eqFormCidade").value = cidade || "FORTALEZA";
+        document.getElementById("eqFormEstado").value = estado || "CE";
+
+        if (btnDesc) btnDesc.style.display = "none";
       }
-    }
-
-    function abrirModalPrevisaoCompra(id) {
-      ID_PEDIDO_COMPRA_EM_EDICAO = id;
-      const d = STATE.data || {};
-      const pedidos = d.solicitacoes_almox || [];
-      const ped = pedidos.find(p => p.id == id);
-      if (!ped) return;
-
-      const modal = document.getElementById("modalPrevisaoCompra");
-      const sub = document.getElementById("modalPrevisaoCompraSub");
-      if (sub) sub.innerHTML = `Pedido #${ped.id} &bull; ${esc(ped.destino_cliente)}<br><b>Item:</b> ${esc(ped.itens_solicitados)}`;
-
-      const inputPrev = document.getElementById("inputPrevisaoEntrega");
-      if (inputPrev) inputPrev.value = ped.previsao_entrega || "Amanhã às 14:00";
-
-      const inputForn = document.getElementById("inputFornecedorCompra");
-      if (inputForn) inputForn.value = ped.fornecedor || "";
-
-      const inputRast = document.getElementById("inputCodigoRastreio");
-      if (inputRast) inputRast.value = ped.codigo_rastreio || "";
-
-      const selTransp = document.getElementById("selectTransportadoraRastreio");
-      if (selTransp) selTransp.value = ped.transportadora || "AUTO";
-
-      atualizarPreviaRastreioModal();
-
-      if (modal) modal.classList.add("open");
-    }
-
-    function fecharModalPrevisaoCompra() {
-      const modal = document.getElementById("modalPrevisaoCompra");
-      if (modal) modal.classList.remove("open");
-      ID_PEDIDO_COMPRA_EM_EDICAO = null;
-    }
-
-    async function confirmarAcaoCompraModal() {
-      if (!ID_PEDIDO_COMPRA_EM_EDICAO) return;
-      const inputPrev = document.getElementById("inputPrevisaoEntrega");
-      const inputForn = document.getElementById("inputFornecedorCompra");
-      const inputRast = document.getElementById("inputCodigoRastreio");
-      const selTransp = document.getElementById("selectTransportadoraRastreio");
-
-      const prev = inputPrev ? inputPrev.value.trim() : "";
-      const forn = inputForn ? inputForn.value.trim() : "";
-      const rast = inputRast ? inputRast.value.trim() : "";
-      const transp = selTransp ? selTransp.value.trim() : "AUTO";
-
-      await executarAcaoCompra(ID_PEDIDO_COMPRA_EM_EDICAO, "MARCAR_ADQUIRIDO", forn, prev, rast, transp);
-      fecharModalPrevisaoCompra();
-    }
-
-    async function executarAcaoCompra(id, acao, fornecedor = "", previsao = "", codigoRastreio = "", transportadora = "") {
-
-
-      const d = STATE.data || {};
-
-      const pedidos = d.solicitacoes_almox || [];
-
-      const ped = pedidos.find(p => p.id == id);
-
-      if (!ped) return;
-
-
-
-      try {
-
-        mostrarToast("⏳ Atualizando esteira de suprimentos...");
-
-        const res = await apiPost("/api/almoxarifado/compra-acao", {
-          id: id,
-          acao: acao,
-          fornecedor: fornecedor,
-          previsao_entrega: previsao,
-          codigo_rastreio: codigoRastreio,
-          transportadora: transportadora
-        });
-
-
-
-        if (res && res.ok) {
-
-          mostrarToast(res.msg || "✅ Suprimentos atualizado com sucesso!");
-
-          ped.status_pedido = res.novo_status_pedido || ped.status_pedido;
-
-          ped.status_compra = res.novo_status_compra || ped.status_compra;
-
-          if (res.previsao_entrega) ped.previsao_entrega = res.previsao_entrega;
-          if (fornecedor) ped.fornecedor = fornecedor;
-          if (res.codigo_rastreio !== undefined) ped.codigo_rastreio = res.codigo_rastreio;
-          if (res.transportadora !== undefined) ped.transportadora = res.transportadora;
-
-          
-
-          if (acao === "DAR_ENTRADA_CHEGOU") {
-
-            ped.itens_solicitados = (ped.itens_solicitados || "").replace("(SEM SALDO)", "(SALDO DISPONÍVEL - CHEGOU)");
-
-          }
-
-
-
-          renderMenuGesEstoque();
-
-        } else {
-
-          mostrarToast(`❌ Erro: ${res?.msg || "Falha na esteira de compras"}`);
-
-        }
-
-      } catch (err) {
-
-        console.error("Erro executarAcaoCompra:", err);
-
-        mostrarToast("❌ Falha de conexão.");
-
-      }
-
-    }
-
-
-
-    function processarLeitorCodigoBarras(event) {
-
-      if (event.key === "Enter" || event.keyCode === 13) {
-
-        event.preventDefault();
-
-        const input = document.getElementById("barcodeScannerInput");
-
-        if (!input) return;
-
-        const codigo = input.value.trim().toUpperCase();
-
-        if (!codigo) return;
-
-        tocarBeepScanner();
-
-        abrirModalCautela(codigo);
-
-        input.value = "";
-
-      }
-
-    }
-
-
-
-    function abrirModalCautela(codigoBusca) {
-
-      const d = STATE.data || {};
-
-      const ferramentas = d.ferramentas || [];
-
-      const codLimpo = (codigoBusca || "").trim().toUpperCase();
-
-
-
-      const f = ferramentas.find(item => 
-
-        (item.codigo || "").toUpperCase() === codLimpo || 
-
-        (item.numero_serie || "").toUpperCase() === codLimpo ||
-
-        (item.nome || "").toUpperCase().includes(codLimpo)
-
-      );
-
-
-
-      const modal = document.getElementById("modalCautelaFerramenta");
-
-      const body = document.getElementById("modalCautelaBody");
-
-      if (!modal || !body) return;
-
-
-
-      if (!f) {
-
-        mostrarToast(`⚠️ Instrumento ou código '${codLimpo}' não localizado no cadastro.`);
-
-        return;
-
-      }
-
-
-
-      const st = (f.status || "DISPONIVEL").toUpperCase();
-
-      let badgeCor = "#10b981";
-
-      let badgeTexto = "🟢 DISPONÍVEL NO ALMOXARIFADO";
-
-      if (st === "EM_USO") {
-
-        badgeCor = "#f59e0b";
-
-        badgeTexto = `🟡 EM USO EM CAMPO COM ${esc(f.tecnico || 'TÉCNICO')}`;
-
-      } else if (st === "CALIBRACAO_BANCADA") {
-
-        badgeCor = "#ef4444";
-
-        badgeTexto = "🔴 EM CALIBRAÇÃO RBC / BANCADA";
-
-      }
-
-
-
-      const tecnicos = (d.tecnicos || [
-
-        { nome: "ANTONIO" }, { nome: "LEONARDO" }, { nome: "NETTO" }, 
-
-        { nome: "ARQUIMEDES" }, { nome: "ALAN" }, { nome: "GABRIEL" }, 
-
-        { nome: "VITOR" }, { nome: "PAULO" }, { nome: "PLANTÃO" }
-
-      ]).map(t => t.nome);
-
-
-
-      const ordens = (d.ordens || []).filter(o => !(o.status || "").toUpperCase().includes("CONCLU"));
-
-
-
-      body.innerHTML = `
-
-        <div style="background:#f8fafc;padding:12px;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:14px;">
-
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-
-            <div>
-
-              <span style="display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:900;background:#0284c7;color:#fff;">
-
-                🏷️ CÓDIGO: ${esc(f.codigo)}
-
-              </span>
-
-              <div style="font-size:16px;font-weight:900;color:#0f172a;margin-top:4px;">
-
-                ${esc(f.nome)}
-
-              </div>
-
-              <div style="font-size:12px;color:#64748b;margin-top:2px;">
-
-                <b>Nº Série:</b> ${esc(f.numero_serie || 'N/D')} &bull; <b>Local:</b> ${esc(f.localizacao || 'Almoxarifado Central')}
-
-              </div>
-
-            </div>
-
-            <div style="text-align:right;">
-
-              <span style="display:inline-block;padding:4px 8px;border-radius:6px;font-size:11.5px;font-weight:800;background:${badgeCor}20;color:${badgeCor};border:1px solid ${badgeCor}60;">
-
-                ${badgeTexto}
-
-              </span>
-
-              ${f.validade_calibracao ? `
-
-                <div style="font-size:11px;color:#0284c7;margin-top:4px;font-weight:700;">
-
-                  📅 Validade RBC: ${esc(f.validade_calibracao)}
-
-                </div>
-
-              ` : ''}
-
-            </div>
-
-          </div>
-
-        </div>
-
-
-
-        ${st === "DISPONIVEL" ? `
-
-          <div style="background:#ecfdf5;border:1px solid #a7f3d0;padding:12px;border-radius:10px;margin-bottom:12px;">
-
-            <div style="font-weight:900;color:#065f46;margin-bottom:8px;font-size:14px;display:flex;align-items:center;gap:6px;">
-
-              📤 Registrar Saída / Entregar a Técnico
-
-            </div>
-
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-
-              <div>
-
-                <label class="field-label" style="color:#065f46;">👷 Técnico Responsável *</label>
-
-                <select id="cautelaTecnico" class="select" style="border-color:#34d399;">
-
-                  ${tecnicos.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join("")}
-
-                </select>
-
-              </div>
-
-              <div>
-
-                <label class="field-label" style="color:#065f46;">🏥 OS / Cliente de Destino</label>
-
-                <select id="cautelaOS" class="select" style="border-color:#34d399;">
-
-                  <option value="">-- Sem OS Vinculada (Uso Geral) --</option>
-
-                  ${ordens.map(o => `
-
-                    <option value="${o.id}|${esc(o.cliente)}">OS #${o.id} - ${esc(o.cliente)} (${esc(o.equipamento)})</option>
-
-                  `).join("")}
-
-                </select>
-
-              </div>
-
-            </div>
-
-            <div style="margin-bottom:10px;">
-
-              <label class="field-label" style="color:#065f46;">Observações da Saída</label>
-
-              <input id="cautelaObs" class="input" placeholder="Ex: Entregue estojo completo com ponteiras" style="border-color:#34d399;" />
-
-            </div>
-
-            <div style="display:flex;gap:8px;">
-
-              <button type="button" class="btn btn-success btn-block" onclick="executarAcaoCautela('${esc(f.codigo)}', 'RETIRADA')">
-
-                🚀 Confirmar Saída / Registrar Cautela
-
-              </button>
-
-              <button type="button" class="btn btn-danger" onclick="executarAcaoCautela('${esc(f.codigo)}', 'CALIBRACAO_BANCADA')" style="white-space:nowrap;">
-
-                🔬 Enviar p/ Calibração
-
-              </button>
-
-            </div>
-
-          </div>
-
-        ` : ''}
-
-
-
-        ${st === "EM_USO" ? `
-
-          <div style="background:#fffbeb;border:1px solid #fde68a;padding:12px;border-radius:10px;margin-bottom:12px;">
-
-            <div style="font-weight:900;color:#92400e;margin-bottom:6px;font-size:14px;display:flex;align-items:center;gap:6px;">
-
-              🟡 Instrumento em Campo com 👷 ${esc(f.tecnico)}
-
-            </div>
-
-            <div style="font-size:12px;color:#78350f;margin-bottom:10px;">
-
-              <b>Retirado em:</b> ${esc(f.data_saida || 'Recentemente')} &bull; <b>Destino:</b> ${esc(f.cliente || 'Atendimento de Campo')} ${f.os_id ? `(OS #${f.os_id})` : ''}
-
-            </div>
-
-            <div style="margin-bottom:10px;">
-
-              <label class="field-label" style="color:#92400e;">Observação na Devolução</label>
-
-              <input id="cautelaObs" class="input" placeholder="Ex: Devolvido limpo, sem avarias" style="border-color:#fbbf24;" />
-
-            </div>
-
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-
-              <button type="button" class="btn btn-success" onclick="executarAcaoCautela('${esc(f.codigo)}', 'DEVOLUCAO')">
-
-                📥 Confirmar Devolução ao Almoxarifado
-
-              </button>
-
-              <button type="button" class="btn btn-danger" onclick="executarAcaoCautela('${esc(f.codigo)}', 'CALIBRACAO_BANCADA')">
-
-                🔬 Enviar p/ Calibração / Bancada
-
-              </button>
-
-            </div>
-
-          </div>
-
-        ` : ''}
-
-
-
-        ${st === "CALIBRACAO_BANCADA" ? `
-
-          <div style="background:#fef2f2;border:1px solid #fecaca;padding:12px;border-radius:10px;margin-bottom:12px;">
-
-            <div style="font-weight:900;color:#991b1b;margin-bottom:6px;font-size:14px;display:flex;align-items:center;gap:6px;">
-
-              🔴 Instrumento em Calibração RBC / Manutenção
-
-            </div>
-
-            <div style="font-size:12px;color:#7f1d1d;margin-bottom:10px;">
-
-              Aguardando retorno do laboratório de calibração ou conserto de bancada.
-
-            </div>
-
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-
-              <div>
-
-                <label class="field-label" style="color:#991b1b;">Nova Validade RBC</label>
-
-                <input id="cautelaNovaValidade" class="input" type="date" style="border-color:#f87171;" />
-
-              </div>
-
-              <div>
-
-                <label class="field-label" style="color:#991b1b;">Nº Certificado RBC</label>
-
-                <input id="cautelaCertificado" class="input" placeholder="Ex: RBC-2027-991" style="border-color:#f87171;" />
-
-              </div>
-
-            </div>
-
-            <button type="button" class="btn btn-success btn-block" onclick="executarAcaoCautela('${esc(f.codigo)}', 'RETORNO_CALIBRACAO')">
-
-              🟢 Liberar Instrumento (Calibração Concluída)
-
-            </button>
-
-          </div>
-
-        ` : ''}
-
-
-
-        <div style="text-align:right;">
-
-          <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalCautela()">Fechar</button>
-
-        </div>
-
-      `;
-
-
 
       modal.classList.add("open");
-
     }
 
-
-
-    function fecharModalCautela() {
-
-      const modal = document.getElementById("modalCautelaFerramenta");
-
+    function fecharModalEditarEquipamento() {
+      const modal = document.getElementById("modalGerenciarEquipamento");
       if (modal) modal.classList.remove("open");
-
-      const input = document.getElementById("barcodeScannerInput");
-
-      if (input) input.focus();
-
     }
 
+    async function salvarEquipamentoModal() {
+      const id = document.getElementById("eqFormId").value;
+      const cliente_nome = document.getElementById("eqFormCliente").value.trim().toUpperCase();
+      const nome = document.getElementById("eqFormNome").value.trim().toUpperCase();
+      const categoria_checklist = document.getElementById("eqFormCategoria").value;
+      const status = document.getElementById("eqFormStatus").value;
+      const numero_serie = document.getElementById("eqFormNS").value.trim().toUpperCase();
+      const identificador = document.getElementById("eqFormTag").value.trim().toUpperCase();
+      const descricao = document.getElementById("eqFormDesc").value.trim();
+      const cidade = document.getElementById("eqFormCidade").value || "FORTALEZA";
+      const estado = document.getElementById("eqFormEstado").value || "CE";
 
+      if (!nome) return alert("Por favor, preencha o Nome / Modelo do equipamento!");
+      if (!cliente_nome) return alert("Hospital / Cliente não identificado!");
 
-    async function executarAcaoCautela(codigo, acao) {
-
-      let tecnico = "";
-
-      let cliente = "";
-
-      let os_id = "";
-
-      let obs = "";
-
-      let validade = "";
-
-      let cert = "";
-
-
-
-      const elTec = document.getElementById("cautelaTecnico");
-
-      if (elTec) tecnico = elTec.value;
-
-
-
-      const elOS = document.getElementById("cautelaOS");
-
-      if (elOS && elOS.value) {
-
-        const parts = elOS.value.split("|");
-
-        os_id = parts[0] || "";
-
-        cliente = parts[1] || "";
-
-      }
-
-
-
-      const elObs = document.getElementById("cautelaObs");
-
-      if (elObs) obs = elObs.value.trim();
-
-
-
-      const elVal = document.getElementById("cautelaNovaValidade");
-
-      if (elVal && elVal.value) {
-
-        const p = elVal.value.split("-");
-
-        if (p.length === 3) validade = `${p[2]}/${p[1]}/${p[0]}`;
-
-      }
-
-
-
-      const elCert = document.getElementById("cautelaCertificado");
-
-      if (elCert) cert = elCert.value.trim();
-
-
+      const payload = {
+        id: id ? Number(id) : null,
+        cliente_nome,
+        nome,
+        categoria_checklist,
+        status,
+        numero_serie,
+        identificador,
+        descricao,
+        cidade,
+        estado
+      };
 
       try {
-
-        mostrarToast("⏳ Registrando movimentação no Almoxarifado...");
-
-        const res = await apiPost("/api/ferramentas/acao", {
-
-          codigo: codigo,
-
-          acao: acao,
-
-          tecnico: tecnico,
-
-          cliente: cliente,
-
-          os_id: os_id,
-
-          observacao: obs,
-
-          validade_calibracao: validade,
-
-          certificado: cert
-
+        const resp = await fetch("/api/equipamento/salvar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
         });
-
-
-
-        if (res && res.ok) {
-
-          mostrarToast(res.msg || "✅ Movimentação registrada com sucesso!");
-
-          fecharModalCautela();
-
+        const res = await resp.json();
+        if (res.ok) {
+          fecharModalEditarEquipamento();
           
-
-          const d = STATE.data || {};
-
-          const ferramentas = d.ferramentas || [];
-
-          const f = ferramentas.find(item => item.codigo === codigo);
-
-          if (f) {
-
-            if (acao === "RETIRADA") {
-
-              f.status = "EM_USO";
-
-              f.tecnico = tecnico;
-
-              f.cliente = cliente;
-
-              f.os_id = os_id;
-
-              f.data_saida = "Agora";
-
-            } else if (acao === "DEVOLUCAO") {
-
-              f.status = "DISPONIVEL";
-
-              f.tecnico = "";
-
-              f.cliente = "";
-
-              f.os_id = "";
-
-            } else if (acao === "CALIBRACAO_BANCADA") {
-
-              f.status = "CALIBRACAO_BANCADA";
-
-              f.tecnico = "BANCADA / CALIBRAÇÃO RBC";
-
-            } else if (acao === "RETORNO_CALIBRACAO") {
-
-              f.status = "DISPONIVEL";
-
-              f.tecnico = "";
-
-              f.cliente = "";
-
-              f.os_id = "";
-
-              if (validade) f.validade_calibracao = validade;
-
-              if (cert) f.certificado = cert;
-
+          if (!STATE.data.equipamentos_auvo) STATE.data.equipamentos_auvo = [];
+          if (id) {
+            const idx = STATE.data.equipamentos_auvo.findIndex(e => Number(e.id) === Number(id));
+            if (idx !== -1) {
+              STATE.data.equipamentos_auvo[idx] = { ...STATE.data.equipamentos_auvo[idx], ...res.equipamento };
             }
-
+          } else {
+            STATE.data.equipamentos_auvo.unshift(res.equipamento);
           }
 
-          renderMenuGesEstoque();
-
+          alert("✅ " + res.msg);
+          renderMenuGesClientes(document.getElementById("mainContainer"));
         } else {
-
-          mostrarToast(`❌ Erro: ${res?.msg || "Falha na operação"}`);
-
+          alert("Erro ao salvar: " + (res.erro || "Falha na requisição"));
         }
-
       } catch (err) {
+        alert("Erro de conexão com o servidor: " + err.message);
+      }
+    }
 
-        console.error("Erro executarAcaoCautela:", err);
+    async function descontinuarEquipamentoDoModal() {
+      const id = document.getElementById("eqFormId").value;
+      const nome = document.getElementById("eqFormNome").value;
+      if (!id) return;
+      if (!confirm(`Deseja realmente marcar o equipamento "${nome}" como DESCONTINUADO?`)) return;
 
-        mostrarToast("❌ Falha de comunicação.");
+      await alterarStatusEquipamento(id, 'descontinuar', nome);
+      fecharModalEditarEquipamento();
+    }
 
+    async function alterarStatusEquipamento(eqId, acao, nomeEquip) {
+      if (acao === 'excluir') {
+        if (!confirm(`⚠️ ATENÇÃO: Deseja EXCLUIR DEFINITIVAMENTE o equipamento "${nomeEquip}" do cadastro hospitalar?\n\nEsta ação apagará a máquina do banco de dados.`)) return;
+      } else if (acao === 'descontinuar') {
+        if (!confirm(`Deseja marcar o equipamento "${nomeEquip}" como DESCONTINUADO?\n\nEle será mantido para fins de histórico e rastreabilidade, mas sinalizado como fora de linha.`)) return;
+      } else if (acao === 'reativar') {
+        if (!confirm(`Deseja REATIVAR o equipamento "${nomeEquip}" no parque ativo?`)) return;
       }
 
+      try {
+        const resp = await fetch("/api/equipamento/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: Number(eqId), acao })
+        });
+        const res = await resp.json();
+        if (res.ok) {
+          if (!STATE.data.equipamentos_auvo) STATE.data.equipamentos_auvo = [];
+          if (acao === 'excluir') {
+            STATE.data.equipamentos_auvo = STATE.data.equipamentos_auvo.filter(e => Number(e.id) !== Number(eqId));
+          } else {
+            const idx = STATE.data.equipamentos_auvo.findIndex(e => Number(e.id) === Number(eqId));
+            if (idx !== -1) {
+              STATE.data.equipamentos_auvo[idx].status = res.status;
+            }
+          }
+          alert("✅ " + res.msg);
+          renderMenuGesClientes(document.getElementById("mainContainer"));
+        } else {
+          alert("Erro: " + (res.erro || "Falha ao atualizar"));
+        }
+      } catch (err) {
+        alert("Erro de rede: " + err.message);
+      }
+    }
+
+    async function executarBackupOneDrive() {
+      const btn = document.getElementById("btnBkpOneDrive");
+      if (btn) btn.innerText = "⏳ Gerando Backup...";
+      try {
+        const resp = await fetch("/api/sistema/backup-onedrive", { method: "POST" });
+        const res = await resp.json();
+        if (res.ok) {
+          alert(res.msg);
+        } else {
+          alert("Erro ao gerar backup: " + (res.erro || "Falha no servidor"));
+        }
+      } catch (err) {
+        alert("Erro ao acionar backup: " + err.message);
+      } finally {
+        if (btn) btn.innerText = "☁️ Backup no OneDrive";
+      }
     }
 
 
-
-    function mudarAbaEstoque(aba) {
-
-      ABA_ESTOQUE_ATIVA = aba;
-
-      renderMenuGesEstoque();
-
+    function determinarRegiaoCliente(c) {
+      const uf = (c.estado || "").toUpperCase().trim();
+      const cid = (c.cidade || "").toUpperCase().trim();
+      if (uf === "CE") {
+        const rmf = ["FORTALEZA", "CAUCAIA", "MARACANAÚ", "MARACANAU", "EUSÉBIO", "EUSEBIO", "MARANGUAPE", "AQUIRAZ", "ITAITINGA", "PACAJUS", "HORIZONTE", "SÃO GONÇALO DO AMARANTE", "SAO GONCALO DO AMARANTE"];
+        return rmf.includes(cid) ? "CE_RMF" : "CE_INT";
+      }
+      if (uf === "DF") return "DF";
+      if (uf === "RN") return "RN";
+      if (uf === "PI" || uf === "MA") return "PI_MA";
+      if (uf === "PE" || uf === "PB") return "PE_PB";
+      return "OUTROS";
     }
 
+    function toggleExpandirCliente(cliId) {
+      STATE.clientesExpandidos[cliId] = !STATE.clientesExpandidos[cliId];
+      renderMenuGesClientes(document.getElementById('mainContainer'));
+    }
 
+    function alternarTodosClientes(expandir) {
+      const clientes = STATE.data.clientes_auvo || [];
+      clientes.forEach(c => {
+        STATE.clientesExpandidos[c.id] = expandir;
+      });
+      renderMenuGesClientes(document.getElementById('mainContainer'));
+    }
 
-        function obterIconeFerramenta(nome, codigo) {
+    function getCorModalidade(cat) {
+      cat = (cat || "").toUpperCase();
+      if (cat.includes("MÓVEL") || cat.includes("MOVEL") || cat.includes("TRANSP")) return "#f59e0b";
+      if (cat.includes("TOMÓGRAFO") || cat.includes("TOMOGRAFO")) return "#0284c7";
+      if (cat.includes("MAMÓGRAFO") || cat.includes("MAMOGRAFO")) return "#ec4899";
+      if (cat.includes("DENSITOMETRIA")) return "#8b5cf6";
+      if (cat.includes("ARCO")) return "#10b981";
+      if (cat.includes("CR") || cat.includes("DIGITALIZADOR")) return "#06b6d4";
+      return "#3b82f6";
+    }
 
-      const n = String(nome || '').toUpperCase();
-
-      const c = String(codigo || '').toUpperCase();
-
+    function renderMenuGesClientes(box) {
+      const clientes = STATE.data.clientes_auvo || [];
+      const eqs = STATE.data.equipamentos_auvo || [];
       
+      const filtro = (STATE.filtroParque || "").toUpperCase().trim();
+      const regiaoAtiva = STATE.regiaoParque || "TODOS";
+      const ocultarDescontinuadas = !!STATE.ocultarDescontinuadas;
 
-      if (n.includes('MULTÍMETRO') || n.includes('MULTIMETRO') || n.includes('FLUKE 87') || n.includes('TRUE RMS')) {
+      // 1. Mapeamento de equipamentos por cliente
+      const mapEquips = {};
+      eqs.forEach(eq => {
+        const k = (eq.cliente_nome || "").toUpperCase().trim();
+        if (!mapEquips[k]) mapEquips[k] = [];
+        mapEquips[k].push(eq);
+      });
 
-        return { icone: '⚡', corBg: '#dbeafe', corBorder: '#93c5fd', corTexto: '#1e40af', tag: 'MULTÍMETRO' };
+      // 2. Contadores por Região
+      const contadoresRegiao = {
+        "TODOS": clientes.length,
+        "CE_RMF": 0,
+        "CE_INT": 0,
+        "DF": 0,
+        "RN": 0,
+        "PI_MA": 0,
+        "PE_PB": 0,
+        "OUTROS": 0
+      };
 
+      clientes.forEach(c => {
+        const reg = determinarRegiaoCliente(c);
+        if (contadoresRegiao[reg] !== undefined) contadoresRegiao[reg]++;
+      });
+
+      const REGIOES = [
+        { id: "TODOS", rotulo: "🌐 TODAS AS REGIÕES", count: contadoresRegiao["TODOS"] },
+        { id: "CE_RMF", rotulo: "🏖️ CEARÁ (CAPITAL & RMF)", count: contadoresRegiao["CE_RMF"] },
+        { id: "CE_INT", rotulo: "🌵 CEARÁ (INTERIOR)", count: contadoresRegiao["CE_INT"] },
+        { id: "DF", rotulo: "🏛️ DISTRITO FEDERAL", count: contadoresRegiao["DF"] },
+        { id: "RN", rotulo: "☀️ RIO GRANDE DO NORTE", count: contadoresRegiao["RN"] },
+        { id: "PI_MA", rotulo: "🌴 PIAUÍ & MARANHÃO", count: contadoresRegiao["PI_MA"] },
+        { id: "PE_PB", rotulo: "🏞️ PERNAMBUCO & PARAÍBA", count: contadoresRegiao["PE_PB"] },
+        { id: "OUTROS", rotulo: "🏙️ DEMAIS ESTADOS (SP/GO/PR)", count: contadoresRegiao["OUTROS"] }
+      ];
+
+      // 3. Filtrar clientes por Região e Termo de Busca
+      let clientesFiltrados = clientes;
+      if (regiaoAtiva !== "TODOS") {
+        clientesFiltrados = clientesFiltrados.filter(c => determinarRegiaoCliente(c) === regiaoAtiva);
       }
 
-      if (n.includes('OSCILOSCÓPIO') || n.includes('OSCILOSCOPIO')) {
-
-        return { icone: '📈', corBg: '#dcfce7', corBorder: '#86efac', corTexto: '#15803d', tag: 'OSCILOSCÓPIO' };
-
+      if (filtro) {
+        clientesFiltrados = clientesFiltrados.filter(c => {
+          const nomeMatch = (c.nome || "").toUpperCase().includes(filtro);
+          const razaoMatch = (c.razao_social || "").toUpperCase().includes(filtro);
+          const cidMatch = (c.cidade || "").toUpperCase().includes(filtro);
+          const cnpjMatch = (c.cpf_cnpj || "").toUpperCase().includes(filtro);
+          
+          const meusEqs = mapEquips[(c.nome || "").toUpperCase().trim()] || [];
+          const eqMatch = meusEqs.some(e => 
+            (e.nome || "").toUpperCase().includes(filtro) ||
+            (e.numero_serie || "").toUpperCase().includes(filtro) ||
+            (e.identificador || "").toUpperCase().includes(filtro) ||
+            (e.categoria_checklist || "").toUpperCase().includes(filtro)
+          );
+          return nomeMatch || razaoMatch || cidMatch || cnpjMatch || eqMatch;
+        });
       }
 
-      if (n.includes('RADIOMÉTRICO') || n.includes('RADIOMETRICO') || n.includes('DOSE') || n.includes('KVP')) {
-
-        return { icone: '☢️', corBg: '#fef3c7', corBorder: '#fde68a', corTexto: '#92400e', tag: 'RADIOMETRIA' };
-
-      }
-
-      if (n.includes('MAMOGRAFIA') || n.includes('MAMO') || n.includes('COMPRESSÃO')) {
-
-        return { icone: '🩻', corBg: '#fce7f3', corBorder: '#fbcfe8', corTexto: '#9d174d', tag: 'MAMOGRAFIA' };
-
-      }
-
-      if (n.includes('PHANTOM') || n.includes('CTDI') || n.includes('DENSIDADE')) {
-
-        return { icone: '🎯', corBg: '#ede9fe', corBorder: '#ddd6fe', corTexto: '#6d28d9', tag: 'PHANTOM' };
-
-      }
-
-      if (n.includes('LASER') || n.includes('NÍVEL') || n.includes('NIVEL') || n.includes('TRIPÉ')) {
-
-        return { icone: '📐', corBg: '#fee2e2', corBorder: '#fca5a5', corTexto: '#991b1b', tag: 'NÍVEL LASER' };
-
-      }
-
-      if (n.includes('SEGURANÇA ELÉTRICA') || n.includes('SEGURANCA') || n.includes('IEC 60601') || n.includes('ESA')) {
-
-        return { icone: '🛡️', corBg: '#d1fae5', corBorder: '#6ee7b7', corTexto: '#065f46', tag: 'SEG. ELÉTRICA' };
-
-      }
-
-      if (n.includes('TORQUÍMETRO') || n.includes('TORQUIMETRO') || n.includes('DINAMOMÉTRICA') || n.includes('SOQUETES')) {
-
-        return { icone: '🔧', corBg: '#ffedd5', corBorder: '#fdba74', corTexto: '#9a3412', tag: 'TORQUÍMETRO' };
-
-      }
-
-      if (n.includes('LUXÍMETRO') || n.includes('LUXIMETRO') || n.includes('ILUMINÂNCIA')) {
-
-        return { icone: '💡', corBg: '#fef9c3', corBorder: '#fde047', corTexto: '#854d0e', tag: 'LUXÍMETRO' };
-
-      }
-
-      if (n.includes('TERMO') || n.includes('HIGRÔMETRO') || n.includes('HIGROMETRO') || n.includes('TEMPERATURA')) {
-
-        return { icone: '🌡️', corBg: '#ccfbf1', corBorder: '#5eead4', corTexto: '#115e59', tag: 'TERMO-HIGRO' };
-
-      }
-
-      if (n.includes('AMPERÍMETRO') || n.includes('AMPERIMETRO') || n.includes('GARRA')) {
-
-        return { icone: '🧲', corBg: '#e0e7ff', corBorder: '#a5b4fc', corTexto: '#3730a3', tag: 'AMPERÍMETRO' };
-
-      }
-
-      if (n.includes('MANÔMETRO') || n.includes('MANOMETRO') || n.includes('PRESSÃO')) {
-
-        return { icone: '⏱️', corBg: '#e0f2fe', corBorder: '#7dd3fc', corTexto: '#0369a1', tag: 'MANÔMETRO' };
-
-      }
-
-      if (n.includes('JEDI') || n.includes('GIGA') || n.includes('CABOS') || n.includes('COMUNICAÇÃO')) {
-
-        return { icone: '🔌', corBg: '#fae8ff', corBorder: '#f0abfc', corTexto: '#86198f', tag: 'GIGA/JEDI' };
-
-      }
-
-      if (n.includes('VÁCUO') || n.includes('VACUO') || n.includes('BOMBA') || n.includes('ÓLEO')) {
-
-        return { icone: '🧪', corBg: '#f1f5f9', corBorder: '#cbd5e1', corTexto: '#334155', tag: 'BOMBA VÁCUO' };
-
-      }
-
-      if (n.includes('DONGLE') || n.includes('DONG') || n.includes('LICENÇA') || n.includes('SERVICE KEY')) {
-
-        return { icone: '🗝️', corBg: '#fef3c7', corBorder: '#fde68a', corTexto: '#b45309', tag: 'SERVICE KEY' };
-
-      }
-
-      
-
-      return { icone: '🧰', corBg: '#f1f5f9', corBorder: '#cbd5e1', corTexto: '#475569', tag: 'FERRAMENTA' };
-
-    }
-
-
-
-    function renderCardFerramentaVizinha(f, tipoMural) {
-
-      const icoInfo = obterIconeFerramenta(f.nome, f.codigo);
-
-
-
-      let bordaCard = "#e2e8f0";
-
-      let statusHtml = "";
-
-      let botoesHtml = "";
-
-
-
-      if (tipoMural === "DISPONIVEL") {
-
-        bordaCard = "#86efac";
-
-        statusHtml = `
-
-          <div style="font-size:11px;color:#047857;background:#f0fdf4;border:1px solid #bbf7d0;padding:4px 6px;border-radius:4px;">
-
-            <div>🟢 <b>Pronta no Almoxarifado</b></div>
-
-            <div style="font-size:10.5px;color:#065f46;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-
-              📍 ${esc(f.localizacao || 'Almoxarifado Central')} ${f.validade_calibracao ? `&bull; 📅 Calib: <b>${esc(f.validade_calibracao)}</b>` : ''}
-
-            </div>
-
-          </div>
-
-        `;
-
-        botoesHtml = `
-
-          <button type="button" class="btn btn-success btn-xs btn-block" style="font-weight:800;padding:4px 8px;" onclick="event.stopPropagation(); abrirModalCautela('${esc(f.codigo)}')">
-
-            📤 Entregar a Técnico
-
-          </button>
-
-        `;
-
-      } else if (tipoMural === "EM_USO") {
-
-        bordaCard = "#fcd34d";
-
-        statusHtml = `
-
-          <div style="font-size:11px;color:#78350f;background:#fef9c3;border:1px solid #fef08a;padding:4px 6px;border-radius:4px;">
-
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-
-              <span style="font-weight:800;color:#92400e;">👷 ${esc(f.tecnico || 'Técnico')}</span>
-
-              <span style="font-size:10px;color:#b45309;">${esc(f.data_saida ? f.data_saida.split(' ')[0] : 'Em campo')}</span>
-
-            </div>
-
-            <div style="font-size:10.5px;color:#78350f;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-
-              🏥 <b>Destino:</b> ${esc(f.cliente || 'Atendimento de Campo')} ${f.os_id ? `(OS #${f.os_id})` : ''}
-
-            </div>
-
-          </div>
-
-        `;
-
-        botoesHtml = `
-
-          <button type="button" class="btn btn-outline btn-xs" style="flex:1;border-color:#10b981;color:#047857;font-weight:700;padding:3px 6px;" onclick="event.stopPropagation(); executarAcaoCautela('${esc(f.codigo)}', 'DEVOLUCAO')">
-
-            📥 Devolver
-
-          </button>
-
-          <button type="button" class="btn btn-outline btn-xs" style="flex:1;border-color:#ef4444;color:#b91c1c;font-weight:700;padding:3px 6px;" onclick="event.stopPropagation(); executarAcaoCautela('${esc(f.codigo)}', 'CALIBRACAO_BANCADA')">
-
-            🔬 Bancada
-
-          </button>
-
-        `;
-
-      } else if (tipoMural === "CALIBRACAO") {
-
-        bordaCard = "#fca5a5";
-
-        statusHtml = `
-
-          <div style="font-size:11px;color:#7f1d1d;background:#fee2e2;border:1px solid #fecaca;padding:4px 6px;border-radius:4px;">
-
-            <div style="font-weight:800;color:#991b1b;">🔴 Em Calibração / Revisão</div>
-
-            <div style="font-size:10.5px;color:#991b1b;margin-top:2px;">
-
-              Manutenção preventiva / Envio RBC
-
-            </div>
-
-          </div>
-
-        `;
-
-        botoesHtml = `
-
-          <button type="button" class="btn btn-success btn-xs btn-block" style="font-weight:800;padding:4px 8px;" onclick="event.stopPropagation(); abrirModalCautela('${esc(f.codigo)}')">
-
-            🟢 Liberar Ferramenta
-
-          </button>
-
-        `;
-
-      }
-
-
-
-      return `
-
-        <div class="ferramenta-card-vizinha" style="border:1.5px solid ${bordaCard};" onclick="abrirModalCautela('${esc(f.codigo)}')">
-
-          <!-- CABEÇALHO COM ÍCONE E IDENTIFICAÇÃO -->
-
-          <div style="display:flex;align-items:flex-start;gap:10px;">
-
-            <!-- ÍCONE TEMÁTICO DE ALTO RECONHECIMENTO VISUAL -->
-
-            <div class="ferramenta-avatar-icone" style="background:${icoInfo.corBg};border:1.5px solid ${icoInfo.corBorder};color:${icoInfo.corTexto};" title="${icoInfo.tag}">
-
-              ${icoInfo.icone}
-
-            </div>
-
-
-
-            <!-- CÓDIGO, TAG E NOME -->
-
-            <div style="flex:1;min-width:0;">
-
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;">
-
-                <span style="font-weight:900;color:#0284c7;font-size:12.5px;">🏷️ ${esc(f.codigo)}</span>
-
-                <span style="font-size:9.5px;font-weight:800;background:${icoInfo.corBg};color:${icoInfo.corTexto};border:1px solid ${icoInfo.corBorder};padding:1px 6px;border-radius:3px;">
-
-                  ${icoInfo.tag}
-
-                </span>
-
+      // Calcula total de máquinas da visão filtrada
+      let totalMaquinasVisiveis = 0;
+      let totalDescontinuadas = 0;
+      clientesFiltrados.forEach(c => {
+        const m = mapEquips[(c.nome || "").toUpperCase().trim()] || [];
+        m.forEach(eq => {
+          if (eq.status === 'Descontinuado' || eq.status === 'Inativo') totalDescontinuadas++;
+          else totalMaquinasVisiveis++;
+        });
+      });
+
+      box.innerHTML = `
+        <div class="section-box">
+          <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <span>👥 Cadastro Hospitalar por Região (${clientes.length} Clientes • ${eqs.length} Máquinas)</span>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button id="btnBkpOneDrive" class="btn btn-sm btn-outline" style="border-color:#0284c7;color:#0284c7;font-weight:700;" onclick="executarBackupOneDrive()">
+                ☁️ Backup no OneDrive
+              </button>
+              <div style="font-size:12px;font-weight:700;color:var(--text-muted);">
+                Exibindo <b>${clientesFiltrados.length}</b> clientes (${totalMaquinasVisiveis} ativas${totalDescontinuadas > 0 ? ` • ${totalDescontinuadas} descontinuadas` : ''})
               </div>
-
-
-
-              <div style="font-weight:800;color:#0f172a;font-size:11.5px;margin-top:2px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;" title="${esc(f.nome)}">
-
-                ${esc(f.nome)}
-
-              </div>
-
             </div>
-
           </div>
 
+          <!-- Barra de Busca Rápida e Filtros -->
+          <div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap;">
+            <input type="text" class="input" style="flex:1;min-width:280px;text-transform:uppercase;" 
+                   placeholder="🔍 BUSCAR POR HOSPITAL, CIDADE, EQUIPAMENTO OU NÚMERO DE SÉRIE..." 
+                   value="${esc(STATE.filtroParque || '')}"
+                   oninput="STATE.filtroParque = this.value; renderMenuGesClientes(document.getElementById('mainContainer'));" />
+            
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#475569;cursor:pointer;user-select:none;background:#f8fafc;padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;">
+              <input type="checkbox" ${ocultarDescontinuadas ? 'checked' : ''} 
+                     onchange="STATE.ocultarDescontinuadas = this.checked; renderMenuGesClientes(document.getElementById('mainContainer'));" />
+              Ocultar descontinuadas
+            </label>
 
-
-          <!-- SITUAÇÃO / DESTINO -->
-
-          ${statusHtml}
-
-
-
-          <!-- AÇÕES RÁPIDAS -->
-
-          <div style="display:flex;gap:4px;margin-top:auto;">
-
-            ${botoesHtml}
-
+            <button class="btn btn-sm btn-outline" onclick="alternarTodosClientes(true);">
+              📂 Expandir Todos
+            </button>
+            <button class="btn btn-sm btn-outline" onclick="alternarTodosClientes(false);">
+              📁 Recolher Todos
+            </button>
           </div>
 
+          <!-- Sub-menus de Filtro por Região -->
+          <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:16px;white-space:nowrap;">
+            ${REGIOES.map(r => `
+              <button class="btn btn-sm ${regiaoAtiva === r.id ? 'btn-primary' : 'btn-outline'}" 
+                      style="font-size:11px;font-weight:700;padding:6px 12px;border-radius:20px;"
+                      onclick="STATE.regiaoParque = '${r.id}'; renderMenuGesClientes(document.getElementById('mainContainer'));">
+                ${r.rotulo} <span style="opacity:0.8;font-size:10px;margin-left:4px;">(${r.count})</span>
+              </button>
+            `).join("")}
+          </div>
+
+          <!-- Lista de Cards de Clientes com os Equipamentos Agrupados Dentro -->
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            ${clientesFiltrados.length === 0 ? `
+              <div style="text-align:center;padding:40px;color:#94a3b8;font-size:14px;background:#fff;border-radius:12px;border:1px dashed #cbd5e1;">
+                Nenhum cliente ou equipamento encontrado para o filtro selecionado.
+              </div>
+            ` : clientesFiltrados.slice(0, 80).map(c => {
+              const k = (c.nome || "").toUpperCase().trim();
+              const todosEqs = mapEquips[k] || [];
+              const eqsAtivos = todosEqs.filter(e => e.status !== 'Descontinuado' && e.status !== 'Inativo');
+              const eqsDesc = todosEqs.filter(e => e.status === 'Descontinuado' || e.status === 'Inativo');
+              
+              const meusEqs = ocultarDescontinuadas ? eqsAtivos : todosEqs;
+              const isExpanded = !!STATE.clientesExpandidos[c.id];
+
+              return `
+                <div class="cliente-card" style="background:#ffffff;border-radius:10px;border:1px solid ${isExpanded ? '#0284c7' : '#e2e8f0'};box-shadow:0 1px 3px rgba(0,0,0,0.05);overflow:hidden;transition:border-color 0.2s;">
+                  
+                  <!-- Topo do Card do Cliente (Clicável) -->
+                  <div style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:${isExpanded ? '#f0f9ff' : '#ffffff'};transition:background 0.2s;"
+                       onclick="toggleExpandirCliente('${c.id}')">
+                    
+                    <div style="flex:1;min-width:0;padding-right:12px;">
+                      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <span style="font-size:14px;font-weight:800;color:var(--emed-navy);">${esc(c.nome)}</span>
+                        <span class="badge ${c.tipo_contrato === 'CONTRATO' ? 'concluido' : 'ativo'}" style="font-size:10px;">${esc(c.tipo_contrato || 'AVULSO')}</span>
+                        ${c.razao_social && c.razao_social !== c.nome ? `<span style="font-size:11px;color:#64748b;font-weight:600;">(${esc(c.razao_social)})</span>` : ''}
+                      </div>
+
+                      <div style="font-size:12px;color:#475569;margin-top:4px;display:flex;gap:12px;flex-wrap:wrap;">
+                        <span>📍 <b>${esc(c.cidade)} - ${esc(c.estado)}</b></span>
+                        ${c.contato ? `<span>👤 Contato: <b>${esc(c.contato)}</b></span>` : ''}
+                        ${c.telefone ? `<span>📞 ${esc(c.telefone)}</span>` : ''}
+                        ${c.cpf_cnpj ? `<span>📄 CNPJ: ${esc(c.cpf_cnpj)}</span>` : ''}
+                      </div>
+                    </div>
+
+                    <!-- Lado Direito: Quantidade de Máquinas Ativas / Descontinuadas e Seta de Expansão -->
+                    <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+                      <span style="display:inline-block;padding:5px 12px;border-radius:20px;font-size:11px;font-weight:800;background:${eqsAtivos.length > 0 ? '#e0f2fe' : '#f1f5f9'};color:${eqsAtivos.length > 0 ? '#0369a1' : '#64748b'};">
+                        🔬 ${eqsAtivos.length} ${eqsAtivos.length === 1 ? 'MÁQUINA' : 'MÁQUINAS'}
+                        ${eqsDesc.length > 0 ? `<span style="color:#b91c1c;margin-left:4px;">(${eqsDesc.length} desc.)</span>` : ''}
+                      </span>
+                      <div style="font-size:14px;color:#0284c7;font-weight:800;transform:${isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'};transition:transform 0.2s;">
+                        ▼
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Sub-menu Retrátil de Equipamentos daquele Cliente -->
+                  ${isExpanded ? `
+                    <div style="padding:14px 16px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+                      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+                        <div style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">
+                          🔬 Parque de Máquinas em ${esc(c.nome)} (${meusEqs.length}${eqsDesc.length > 0 ? ` • ${eqsDesc.length} descontinuada${eqsDesc.length > 1 ? 's' : ''}` : ''}):
+                        </div>
+                        <button class="btn btn-xs btn-primary" onclick="event.stopPropagation(); abrirModalEditarEquipamento(null, '${esc(c.nome)}', '${esc(c.cidade)}', '${esc(c.estado)}');">
+                          ➕ Cadastrar Máquina
+                        </button>
+                      </div>
+
+                      ${meusEqs.length === 0 ? `
+                        <div style="text-align:center;padding:16px;color:#94a3b8;font-size:12px;font-weight:600;background:#ffffff;border-radius:8px;border:1px dashed #cbd5e1;">
+                          ${ocultarDescontinuadas && eqsDesc.length > 0 ? 'Todas as máquinas deste hospital estão descontinuadas (desmarque "Ocultar descontinuadas" acima para ver).' : 'Nenhuma máquina vinculada a este hospital no momento.'}
+                          <div style="margin-top:8px;">
+                            <button class="btn btn-xs btn-outline" onclick="event.stopPropagation(); abrirModalEditarEquipamento(null, '${esc(c.nome)}', '${esc(c.cidade)}', '${esc(c.estado)}');">
+                              ➕ Adicionar Primeira Máquina
+                            </button>
+                          </div>
+                        </div>
+                      ` : `
+                        <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:10px;">
+                          ${meusEqs.map(eq => {
+                            const isDesc = (eq.status === 'Descontinuado' || eq.status === 'Inativo');
+                            return `
+                              <div style="background:#ffffff;border:1px solid ${isDesc ? '#fecaca' : '#cbd5e1'};border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;justify-content:space-between;border-left:4px solid ${isDesc ? '#991b1b' : getCorModalidade(eq.categoria_checklist)};box-shadow:0 1px 2px rgba(0,0,0,0.03);opacity:${isDesc ? '0.88' : '1'};">
+                                <div>
+                                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
+                                    <span style="font-size:12px;font-weight:800;color:${isDesc ? '#991b1b' : 'var(--text-main)'};">
+                                      ${esc(eq.nome)}
+                                    </span>
+                                    ${isDesc ? `
+                                      <span class="badge" style="background:#fef2f2;color:#991b1b;border:1px solid #fecaca;font-size:9.5px;font-weight:800;">
+                                        🚫 DESCONTINUADO
+                                      </span>
+                                    ` : `
+                                      <span class="badge ${eq.categoria_checklist === 'RAIOS-X MÓVEL / TRANSPORTÁVEL' ? 'pend-prog' : 'concluido'}" style="font-size:10px;">
+                                        ${esc(eq.categoria_checklist || eq.categoria_auvo)}
+                                      </span>
+                                    `}
+                                  </div>
+                                  <div style="font-size:11px;color:#64748b;margin-top:4px;">
+                                    <span><b>N/S:</b> ${esc(eq.numero_serie || 'NÃO INFORMADO')}</span>
+                                    ${eq.identificador ? ` • <span><b>TAG:</b> ${esc(eq.identificador)}</span>` : ''}
+                                    ${eq.descricao ? `<div style="font-size:10px;color:#94a3b8;margin-top:2px;">${esc(eq.descricao.slice(0, 60))}</div>` : ''}
+                                  </div>
+                                </div>
+                                <div style="margin-top:10px;padding-top:8px;border-top:1px dashed #e2e8f0;display:flex;gap:4px;flex-wrap:wrap;">
+                                  <button class="btn btn-xs btn-outline" style="flex:1;min-width:65px;" onclick="event.stopPropagation(); gerarQrCodeEquipamentoModal('${esc(eq.id)}', '${esc(eq.nome)}', '${esc(c.nome)}', '${esc(eq.numero_serie)}')">
+                                    🏷️ QR
+                                  </button>
+                                  ${isDesc ? `
+                                    <button class="btn btn-xs btn-outline" style="flex:1;min-width:65px;border-color:#16a34a;color:#16a34a;" onclick="event.stopPropagation(); alterarStatusEquipamento('${esc(eq.id)}', 'reativar', '${esc(eq.nome)}')">
+                                      🔄 Reativar
+                                    </button>
+                                  ` : `
+                                    <button class="btn btn-xs btn-primary" style="flex:1;min-width:65px;" onclick="event.stopPropagation(); abrirChamadoDireto('${esc(c.nome)}', '${esc(eq.nome)}', '${esc(c.cidade)}')">
+                                      ⚡ OS
+                                    </button>
+                                  `}
+                                  <button class="btn btn-xs btn-outline" style="flex:1;min-width:65px;border-color:#0284c7;color:#0284c7;" onclick="event.stopPropagation(); abrirModalEditarEquipamento('${esc(eq.id)}', '${esc(c.nome)}', '${esc(c.cidade)}', '${esc(c.estado)}')">
+                                    ✏️ Editar
+                                  </button>
+                                  ${!isDesc ? `
+                                    <button class="btn btn-xs btn-outline" style="flex:1;min-width:65px;border-color:#f59e0b;color:#b45309;" title="Marcar como descontinuada" onclick="event.stopPropagation(); alterarStatusEquipamento('${esc(eq.id)}', 'descontinuar', '${esc(eq.nome)}')">
+                                      🚫 Desc.
+                                    </button>
+                                  ` : ''}
+                                  <button class="btn btn-xs btn-outline" style="border-color:#ef4444;color:#b91c1c;padding:3px 6px;" title="Excluir permanentemente" onclick="event.stopPropagation(); alterarStatusEquipamento('${esc(eq.id)}', 'excluir', '${esc(eq.nome)}')">
+                                    🗑️
+                                  </button>
+                                </div>
+                              </div>
+                            `;
+                          }).join('')}
+                        </div>
+
+                        <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;">
+                          <button class="btn btn-xs btn-outline" onclick="event.stopPropagation(); abrirChamadoDireto('${esc(c.nome)}', '', '${esc(c.cidade)}');">
+                            ➕ Emitir Chamado Geral para ${esc(c.nome)}
+                          </button>
+                        </div>
+                      `}
+                    </div>
+                  ` : ''}
+                </div>
+              `;
+            }).join("")}
+
+            ${clientesFiltrados.length > 80 ? `
+              <div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px;font-weight:700;">
+                Exibindo os primeiros 80 clientes desta região. Utilize a barra de busca acima para localizar qualquer cliente específico entre todos os ${clientesFiltrados.length}.
+              </div>
+            ` : ''}
+          </div>
         </div>
-
       `;
-
     }
-
-
-
 
 
     function renderMenuGesEstoque(box) {
@@ -43115,6 +39850,7 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
                   
 
+                  const isAguardandoRetirada = stCompra === "AGUARDANDO_RETIRADA_AEROPORTO" || (p.ultimo_rastreio_status || "").toUpperCase() === "AGUARDANDO_RETIRADA" || stUpper.includes("RETIRADA NO AEROPORTO");
                   const isAdquirido = stCompra === "ADQUIRIDO_AGUARDANDO_CHEGAR" || stUpper.includes("ADQUIRID");
 
                   const isAguardandoAprovacao = stCompra === "AGUARDANDO_APROVACAO" || stUpper.includes("PENDENTE DE COMPRA") || stUpper.includes("AGUARDANDO APROVAÇÃO");
@@ -43148,6 +39884,14 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
                     badgeTexto = "✔ SEPARADO / ENTREGUE";
 
                     badgeCls = "concluido";
+
+                  } else if (isAguardandoRetirada) {
+
+                    corBorda = "#f59e0b";
+
+                    badgeTexto = "✈️ RETIRADA NO AEROPORTO";
+
+                    badgeCls = "ativo";
 
                   } else if (isAdquirido) {
 
@@ -43231,7 +39975,33 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
 
 
-                        ${isAdquirido ? (() => {
+                        ${isAguardandoRetirada ? `
+                          <!-- PAINEL DE CARGA DISPONÍVEL PARA RETIRADA NO AEROPORTO / FILIAL (PAULINHO) -->
+                          <div style="margin-top:8px;background:#fffbeb;border:1.5px solid #fde68a;border-radius:8px;padding:10px;font-size:11.5px;box-shadow:0 2px 6px rgba(245,158,11,0.08);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                              <span style="font-weight:900;color:#b45309;display:flex;align-items:center;gap:6px;">
+                                <span>✈️ Carga Aérea Disponível p/ Retirada</span>
+                              </span>
+                              <span style="font-size:10.5px;background:#fef3c7;color:#92400e;font-weight:800;padding:2px 8px;border-radius:4px;border:1px solid #fde68a;">
+                                👤 Portador: <b>${esc(p.portador_retirada || 'Paulinho')}</b>
+                              </span>
+                            </div>
+                            <div style="font-size:11px;color:#78350f;margin-bottom:6px;line-height:1.4;">
+                              📍 <b>Local:</b> ${esc(p.local_retirada || 'Aeroporto Pinto Martins (TECA) / Terminal')}<br/>
+                              🔢 <b>Código / AWB:</b> <code style="font-size:11px;background:#fff;padding:2px 5px;border-radius:4px;border:1px solid #fde68a;font-weight:bold;">${esc(p.codigo_rastreio || 'Sem código')}</code>
+                            </div>
+                            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+                              <button type="button" class="btn btn-sm" onclick="enviarGuiaRetiradaPaulinho(${p.id})" style="background:#25d366;color:#fff;border:none;font-weight:800;font-size:11px;padding:6px 10px;display:flex;align-items:center;gap:4px;border-radius:6px;cursor:pointer;">
+                                📲 Avisar Paulinho (WhatsApp)
+                              </button>
+                              <button type="button" class="btn btn-sm btn-success" onclick="confirmarRetiradaCargaEstoque(${p.id})" style="font-weight:800;font-size:11px;padding:6px 10px;border-radius:6px;cursor:pointer;">
+                                ✅ Carga Retirada (Dar Entrada)
+                              </button>
+                            </div>
+                          </div>
+                        ` : ''}
+
+                        ${isAdquirido && !isAguardandoRetirada ? (() => {
                           const rastreioInfo = p.codigo_rastreio ? identificarTransportadoraERastreio(p.codigo_rastreio, p.transportadora, p.fornecedor) : null;
                           return `
                             <div style="margin-top:6px;background:#f0f9ff;border:1.5px solid #7dd3fc;padding:8px 10px;border-radius:8px;font-size:11.5px;">
@@ -43267,6 +40037,9 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
                                     </button>
                                     <button type="button" class="btn btn-success btn-xs" style="font-weight:700;padding:4px 8px;background:#15803d;color:#fff;border:none;" onclick="simularEntregaRastreio(${p.id})" title="Simula entrega da transportadora para entrada automática no estoque">
                                       🤖 Chegou
+                                    </button>
+                                    <button type="button" class="btn btn-xs" style="font-weight:700;padding:4px 8px;background:#d97706;color:#fff;border:none;" onclick="simularCargaNoAeroporto(${p.id})" title="Simula que a carga aérea chegou no aeroporto para o Paulinho retirar">
+                                      ✈️ No Aeroporto
                                     </button>
                                   </div>
                                 </div>
@@ -45502,6 +42275,269 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
       }
     }
 
+    // =========================================================================
+    // MEDICINA OCUPACIONAL & RENOVAÇÃO DO MÉDICO DO TRABALHO (ASO / NR-7)
+    // =========================================================================
+    function formatarDataBr(dStr) {
+      if (!dStr) return "";
+      const s = String(dStr).trim();
+      if (s.includes("/")) return s.substring(0, 10);
+      if (s.includes("-")) {
+        const p = s.substring(0, 10).split("-");
+        if (p.length === 3) return `${p[2]}/${p[1]}/${p[0]}`;
+      }
+      return s;
+    }
+
+    function abrirModalRenovacaoMedico(tecId, tecNome, dataUltimo, dataVenc) {
+      const modal = document.getElementById("modalRenovacaoMedicoTrabalho");
+      if (!modal) return;
+      const tecnicos = STATE.data?.tecnicos || [];
+      const sel = document.getElementById("renovaAsoTecnicoSelect");
+      if (sel) {
+        sel.innerHTML = tecnicos.map(t => `<option value="${t.id || t.nome}" ${((tecId && (String(t.id) === String(tecId) || t.nome === tecId)) || t.nome === tecNome) ? 'selected' : ''}>👷 ${esc(t.nome)} (${esc(t.sede || 'Sede')})</option>`).join("");
+      }
+
+      const hoje = new Date().toISOString().substring(0, 10);
+      document.getElementById("renovaAsoDataExame").value = hoje;
+      document.getElementById("renovaAsoPeriodicidade").value = "12";
+      document.getElementById("renovaAsoTipoExame").value = "PERIÓDICO";
+      document.getElementById("renovaAsoParecer").value = "APTO";
+      document.getElementById("renovaAsoMedico").value = "Dr. Roberto Arruda - CRM/CE 14258";
+      document.getElementById("renovaAsoClinica").value = "MedWork Saúde Ocupacional";
+      document.getElementById("renovaAsoObs").value = "Apto para intervenção em equipamentos de imagem, metrologia e riscos elétricos (NR-10/NR-32).";
+
+      recalcularVencimentoAso();
+      modal.classList.add("open");
+      modal.style.display = "flex";
+    }
+
+    function fecharModalRenovacaoMedico() {
+      const modal = document.getElementById("modalRenovacaoMedicoTrabalho");
+      if (modal) {
+        modal.classList.remove("open");
+        modal.style.display = "none";
+      }
+    }
+
+    function onRenovaAsoTecnicoSelect(val) {
+      // Opcional: preencher clínica usual
+    }
+
+    function recalcularVencimentoAso() {
+      const dtExameStr = document.getElementById("renovaAsoDataExame").value;
+      const meses = parseInt(document.getElementById("renovaAsoPeriodicidade").value || "12", 10);
+      if (!dtExameStr) return;
+      try {
+        const parts = dtExameStr.split("-");
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const d = parseInt(parts[2], 10);
+        const dt = new Date(y, m, d);
+        dt.setMonth(dt.getMonth() + meses);
+        const yNew = dt.getFullYear();
+        const mNew = String(dt.getMonth() + 1).padStart(2, "0");
+        const dNew = String(dt.getDate()).padStart(2, "0");
+        document.getElementById("renovaAsoDataVencimento").value = `${yNew}-${mNew}-${dNew}`;
+      } catch (e) {
+        console.error("Erro ao calcular vencimento ASO:", e);
+      }
+    }
+
+    async function confirmarRenovacaoMedicoApi() {
+      const tecSelect = document.getElementById("renovaAsoTecnicoSelect");
+      const tecVal = tecSelect ? tecSelect.value : "";
+      const tecnicos = STATE.data?.tecnicos || [];
+      const tecObj = tecnicos.find(t => String(t.id) === String(tecVal) || t.nome === tecVal) || {};
+
+      const payload = {
+        tecnico_id: tecObj.id || tecVal,
+        nome: tecObj.nome || tecVal,
+        data_exame: document.getElementById("renovaAsoDataExame").value,
+        periodicidade_meses: parseInt(document.getElementById("renovaAsoPeriodicidade").value || "12", 10),
+        data_vencimento: document.getElementById("renovaAsoDataVencimento").value,
+        tipo_exame: document.getElementById("renovaAsoTipoExame").value,
+        parecer_aptidao: document.getElementById("renovaAsoParecer").value,
+        medico_examinador: document.getElementById("renovaAsoMedico").value.trim(),
+        clinica: document.getElementById("renovaAsoClinica").value.trim(),
+        observacoes: document.getElementById("renovaAsoObs").value.trim(),
+        registrado_por: STATE.usuario?.nome || "GESTOR"
+      };
+
+      if (!payload.data_exame) {
+        alert("Informe a data de realização do exame médico.");
+        return;
+      }
+
+      const btn = document.getElementById("btnSalvarRenovacaoAso");
+      btn.disabled = true;
+      btn.innerText = "Gravando...";
+
+      try {
+        const res = await apiPost("/api/tecnico/renovar-medico", payload);
+        if (res && res.ok) {
+          mostrarToast("✅ " + (res.msg || "Renovação do médico do trabalho registrada!"));
+          alert("🩺 " + (res.msg || "Renovação registrada com sucesso!") + "\n\nPróximo vencimento: " + formatarDataBr(res.data_vencimento));
+          fecharModalRenovacaoMedico();
+          if (typeof carregarDados === "function") carregarDados();
+        } else {
+          alert("⚠️ " + (res.msg || "Erro ao registrar renovação médica."));
+        }
+      } catch (err) {
+        alert("⚠️ Falha de rede: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "🩺 Gravar Renovação do Exame";
+      }
+    }
+
+    async function abrirModalHistoricoMedico(tecId, tecNome) {
+      const modal = document.getElementById("modalHistoricoMedico");
+      if (!modal) return;
+      document.getElementById("histAsoNomeColaborador").innerText = tecNome || "Colaborador";
+      const box = document.getElementById("histAsoConteudo");
+      box.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;">Carregando histórico do prontuário ocupacional...</div>';
+      modal.classList.add("open");
+      modal.style.display = "flex";
+
+      try {
+        const res = await apiGet(`/api/tecnico/historico-medico/${encodeURIComponent(tecId)}`);
+        const hist = (res && res.ok) ? (res.historico || []) : [];
+        if (!hist.length) {
+          box.innerHTML = `
+            <div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:20px;text-align:center;color:#64748b;">
+              ℹ️ Nenhum histórico de renovação anterior registrado para este colaborador.<br/>
+              <span style="font-size:11px;color:#94a3b8;">As próximas renovações de ASO gravadas ficarão armazenadas nesta linha do tempo.</span>
+            </div>
+          `;
+        } else {
+          box.innerHTML = `
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              ${hist.map(h => `
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #059669;border-radius:6px;padding:10px 12px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <span style="font-weight:900;color:#065f46;font-size:13px;">🩺 Exame ${esc(h.tipo_exame || 'Periódico')}</span>
+                    <span class="badge concluido" style="font-size:10px;">${esc(h.parecer_aptidao || 'APTO')}</span>
+                  </div>
+                  <div style="font-size:11.5px;color:#334155;">
+                    <b>Data do Exame:</b> ${formatarDataBr(h.data_exame)} &bull; <b>Validade / Vencimento:</b> ${formatarDataBr(h.data_vencimento)} (${h.periodicidade_meses} meses)
+                  </div>
+                  <div style="font-size:11px;color:#64748b;margin-top:2px;">
+                    <b>Clínica / Examinador:</b> ${esc(h.clinica || 'SST')} &bull; ${esc(h.medico_examinador || 'N/D')}
+                  </div>
+                  ${h.observacoes ? `<div style="font-size:11px;color:#0f172a;background:#fff;padding:6px;border-radius:4px;border:1px solid #e2e8f0;margin-top:4px;"><i>📝 ${esc(h.observacoes)}</i></div>` : ''}
+                  <div style="font-size:9.5px;color:#94a3b8;margin-top:4px;">Registrado em: ${esc(h.criado_em || '')} por ${esc(h.registrado_por || 'Gestor')}</div>
+                </div>
+              `).join("")}
+            </div>
+          `;
+        }
+      } catch (err) {
+        box.innerHTML = `<div style="color:#dc2626;padding:12px;">Erro ao carregar histórico: ${err.message}</div>`;
+      }
+    }
+
+    function fecharModalHistoricoMedico() {
+      const modal = document.getElementById("modalHistoricoMedico");
+      if (modal) {
+        modal.classList.remove("open");
+        modal.style.display = "none";
+      }
+    }
+
+    function abrirModalEnvioNfCliente(osId, cliente, email, numeroNf, whats) {
+      const modal = document.getElementById("modalEnvioNfCliente");
+      if (!modal) return;
+      document.getElementById("envioClienteOsId").value = osId;
+      document.getElementById("envioClienteNome").innerText = cliente || "Cliente EMED";
+      document.getElementById("envioClienteOs").innerText = "OS #" + osId;
+      document.getElementById("envioClienteNumeroNf").innerText = numeroNf || "NFS-" + String(osId).padStart(4, "0");
+      document.getElementById("envioClienteEmailInput").value = email || "";
+      document.getElementById("envioClienteWhats").value = whats || "";
+      
+      const feedback = document.getElementById("envioClienteStatusFeedback");
+      if (feedback) feedback.style.display = "none";
+
+      const danfeUrl = `${window.location.origin}/api/fiscal/danfe/${osId}`;
+      const assunto = encodeURIComponent(`Nota Fiscal Eletrônica ${numeroNf || ''} - OS #${osId} - EMED Eletromedicina`);
+      const corpo = encodeURIComponent(`Olá, segue a Nota Fiscal Eletrônica referente ao atendimento da OS #${osId} prestado pela EMED Eletromedicina: ${danfeUrl}`);
+      
+      const btnOutlook = document.getElementById("btnEnvioOutlook");
+      if (btnOutlook) btnOutlook.href = `mailto:${encodeURIComponent(email || '')}?subject=${assunto}&body=${corpo}`;
+      
+      const whatsDigits = (whats || "").replace(/\D/g, "");
+      const btnWhats = document.getElementById("btnEnvioWhatsDirect");
+      if (btnWhats) btnWhats.href = `https://api.whatsapp.com/send?phone=55${whatsDigits}&text=${corpo}`;
+
+      modal.classList.add("open");
+      modal.style.display = "flex";
+    }
+
+    function fecharModalEnvioNfCliente() {
+      const modal = document.getElementById("modalEnvioNfCliente");
+      if (modal) {
+        modal.classList.remove("open");
+        modal.style.display = "none";
+      }
+    }
+
+    async function confirmarEnvioNfClienteApi() {
+      const osId = document.getElementById("envioClienteOsId").value;
+      const email = document.getElementById("envioClienteEmailInput").value.trim();
+      const feedback = document.getElementById("envioClienteStatusFeedback");
+      const btn = document.getElementById("btnConfirmarEnvioClienteApi");
+
+      if (!email || !email.includes("@")) {
+        alert("Por favor, digite um e-mail válido para o cliente.");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerText = "Enviando...";
+
+      try {
+        const res = await apiPost("/api/fiscal/enviar-cliente", { os_id: osId, email: email });
+        if (res && res.ok) {
+          mostrarToast("✅ " + (res.msg || "Nota Fiscal enviada para o cliente com sucesso!"));
+          if (feedback) {
+            feedback.style.display = "block";
+            feedback.style.background = "#dcfce7";
+            feedback.style.color = "#15803d";
+            feedback.style.border = "1px solid #86efac";
+            feedback.innerText = "✅ " + res.msg + " (Incluída no lote contábil de final de mês).";
+          }
+          setTimeout(() => {
+            fecharModalEnvioNfCliente();
+            if (typeof carregarDados === "function") carregarDados();
+          }, 1200);
+        } else {
+          alert("⚠️ " + (res.msg || "Erro ao processar envio do e-mail."));
+        }
+      } catch (err) {
+        alert("⚠️ Falha de comunicação com o servidor: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "🚀 Disparar E-mail Agora";
+      }
+    }
+
+    async function enviarLoteContabilidadeMensal() {
+      if (!confirm("Deseja transmitir formalmente o lote das Notas Fiscais de Outubro/2026 para a Assessoria Contábil da EMED?")) return;
+      try {
+        mostrarToast("📤 Transmitindo lote de notas fiscais à contabilidade...");
+        const res = await apiPost("/api/fiscal/enviar-contabilidade", { mes: "10", ano: "2026" });
+        if (res && res.ok) {
+          mostrarToast(res.msg || "✅ Lote transmitido com sucesso!");
+          alert("📦 " + (res.msg || "Lote transmitido com sucesso à contabilidade!") + "\n\nTotal de NFs: " + (res.total_nfs || 0) + "\nFaturamento: R$ " + Number(res.total_faturamento || 0).toFixed(2));
+          if (typeof carregarDados === "function") carregarDados();
+        } else {
+          alert("⚠️ " + (res.msg || "Nenhuma nota fiscal encontrada para a competência."));
+        }
+      } catch (err) {
+        alert("⚠️ Erro ao transmitir lote contábil: " + err.message);
+      }
+    }
+
     function abrirModalCancelamentoNota(idOuOsId) {
       const modal = document.getElementById("modalCancelamentoNota");
       if (!modal) return;
@@ -46100,6 +43136,46 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
           </div>
         </div>
 
+        <!-- BLOCO OFICIAL DE FECHAMENTO FISCAL & CONTABILIDADE MENSAL -->
+        <div style="background:#fff;border-radius:10px;border:1.5px solid #0284c7;padding:14px;margin-bottom:14px;box-shadow:0 3px 8px rgba(2,132,199,0.08);">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <div>
+              <div style="font-size:15px;font-weight:900;color:#0369a1;display:flex;align-items:center;gap:6px;">
+                📁 Fechamento Mensal &amp; Lote das NFs para Contabilidade
+              </div>
+              <div style="font-size:11.5px;color:#0284c7;margin-top:2px;">
+                Todas as notas fiscais emitidas no mês entram automaticamente nesta esteira contábil para remessa no final do mês.
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button type="button" class="btn btn-sm btn-primary" onclick="enviarLoteContabilidadeMensal()" style="background:#0284c7;border-color:#0284c7;font-weight:800;display:inline-flex;align-items:center;gap:6px;">
+                📤 Transmitir Lote do Mês à Contabilidade
+              </button>
+              <a href="/api/fiscal/relatorio-contabil-csv?mes=10&ano=2026" target="_blank" class="btn btn-outline btn-sm" style="border-color:#0284c7;color:#0369a1;font-weight:800;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">
+                📥 Baixar CSV p/ Contador
+              </a>
+              <a href="/api/financeiro/relatorio-contabil/imprimir?mes=10&ano=2026" target="_blank" class="btn btn-outline btn-sm" style="border-color:#64748b;color:#334155;font-weight:800;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">
+                📑 Dossiê Fiscal (PDF)
+              </a>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:8px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px;font-size:12px;">
+            <div>
+              <span style="color:#0369a1;font-weight:bold;">Competência:</span> <b>Outubro/2026</b>
+            </div>
+            <div>
+              <span style="color:#0369a1;font-weight:bold;">NFs Emitidas no Mês:</span> <b>${nfs.filter(n => !String(n.status_fiscal||'').toUpperCase().includes('CANCELADA')).length || 1} nota(s)</b>
+            </div>
+            <div>
+              <span style="color:#0369a1;font-weight:bold;">Faturamento Mês:</span> <b style="color:#047857;">R$ ${nfs.filter(n => !String(n.status_fiscal||'').toUpperCase().includes('CANCELADA')).reduce((acc, n) => acc + (Number(n.valor_servicos||0)+Number(n.valor_pecas||0)), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</b>
+            </div>
+            <div>
+              <span style="color:#0369a1;font-weight:bold;">Status do Lote:</span> <b>${nfs.some(n => n.enviado_contabilidade) ? '✅ Transmitido à Contabilidade' : '🟡 Na fila de fechamento no fim do mês'}</b>
+            </div>
+          </div>
+        </div>
+
         <!-- SEÇÃO 1: FILA DE FATURAMENTO FISCAL (OS REALIZADA + PROPOSTA APROVADA) -->
 
         <div class="section-box" style="margin-bottom:16px;border-top:4px solid #6b21a8;background:#faf5ff;">
@@ -46193,6 +43269,18 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
                       ${nfExistente ? `
                         <span class="badge ${String(nfExistente.status_fiscal||'').includes('CANCELADA') ? 'erro' : 'concluido'}" style="font-size:10.5px;">
                           🧾 NF: ${esc(nfExistente.numero_nf)} (${esc(nfExistente.status_fiscal)})
+                        </span>
+                        ${nfExistente.email_enviado_em ? `
+                          <span class="badge" style="background:#dcfce7;color:#15803d;font-size:10px;" title="Enviado para ${esc(nfExistente.email_cliente || '')}">
+                            ✉️ Enviada ao Cliente (${esc(nfExistente.email_enviado_em)})
+                          </span>
+                        ` : `
+                          <span class="badge" style="background:#fef3c7;color:#b45309;font-size:10px;">
+                            ✉️ E-mail ao Cliente Pendente
+                          </span>
+                        `}
+                        <span class="badge" style="background:#e0f2fe;color:#0369a1;font-size:10px;">
+                          📁 Contabilidade: ${esc(nfExistente.lote_contabilidade_mes || '10/2026')}
                         </span>
                         ${String(nfExistente.status_fiscal||'').includes('CANCELADA') ? `
                           <div style="font-size:11px;color:#991b1b;margin-top:4px;background:#fef2f2;border:1px solid #fecaca;padding:4px 8px;border-radius:6px;width:100%;">
@@ -46330,6 +43418,9 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
                           <a href="/api/fiscal/danfe/${osId}" target="_blank" class="btn btn-sm btn-primary" style="font-weight:bold;display:inline-flex;align-items:center;gap:6px;text-decoration:none;background:#0077b6;border-color:#0077b6;padding:6px 14px;">
                             📄 Visualizar Nota Fiscal Emitida (${esc(nfExistente.numero_nf)})
                           </a>
+                          <button type="button" class="btn btn-sm" onclick="abrirModalEnvioNfCliente('${osId}', '${esc(o.cliente)}', '${esc(o.email || nfExistente.email_cliente || '')}', '${esc(nfExistente.numero_nf)}', '${esc(o.whatsapp || '')}')" style="background:#2563eb;color:#fff;border-color:#2563eb;font-weight:bold;display:inline-flex;align-items:center;gap:4px;padding:6px 12px;">
+                            📧 Enviar ao Cliente
+                          </button>
                           <button type="button" class="btn btn-outline btn-xs" onclick="tentarReemitirNF('${osId}')" title="Retificar dados fiscais ou gerar 2ª via da Nota Fiscal" style="color:#64748b;border-color:#cbd5e1;">
                             ⚙️ Retificar / 2ª Via
                           </button>
@@ -47053,6 +44144,61 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
         }
       } catch (e) {
         mostrarToast("Erro ao executar ciclo do robô: " + e.message);
+      }
+      await sincronizarTudo(false);
+      const box = document.getElementById("mainContainer") || document.getElementById("conteudoModulo") || document.querySelector(".app-content") || document.getElementById("mainAppContainer");
+      if (box && STATE.menuAtivo === "GES_ESTOQUE" && typeof renderMenuGesEstoque === "function") renderMenuGesEstoque(box);
+    }
+
+    async function enviarGuiaRetiradaPaulinho(pedId) {
+      mostrarToast("✈️ Gerando guia de retirada de carga para o Paulinho...");
+      try {
+        const resp = await fetch("/api/almoxarifado/carga/guia-retirada/" + pedId);
+        const data = await resp.json();
+        if (data && data.ok) {
+          const urlWa = "https://api.whatsapp.com/send?text=" + encodeURIComponent(data.texto_whatsapp);
+          window.open(urlWa, "_blank");
+          mostrarToast("📲 Guia aberta para envio no WhatsApp do Paulinho!");
+        } else {
+          mostrarToast(data.msg || "Erro ao gerar guia.");
+        }
+      } catch (e) {
+        mostrarToast("Erro na requisição: " + e.message);
+      }
+    }
+
+    async function confirmarRetiradaCargaEstoque(pedId, portador) {
+      const respPortador = portador || prompt("Confirmar nome do portador que retirou a mercadoria:", "Paulinho");
+      if (!respPortador) return;
+      mostrarToast(`📦 Registrando carga retirada por ${respPortador} e dando entrada no estoque...`);
+      try {
+        const res = await apiPost("/api/almoxarifado/carga/confirmar-retirada", {
+          id: pedId,
+          portador: respPortador
+        });
+        if (res && res.ok) {
+          mostrarToast(res.msg);
+        } else {
+          mostrarToast(res.msg || "Erro ao confirmar retirada.");
+        }
+      } catch (e) {
+        mostrarToast("Erro: " + e.message);
+      }
+      await sincronizarTudo(false);
+      const box = document.getElementById("mainContainer") || document.getElementById("conteudoModulo") || document.querySelector(".app-content") || document.getElementById("mainAppContainer");
+      if (box && STATE.menuAtivo === "GES_ESTOQUE" && typeof renderMenuGesEstoque === "function") renderMenuGesEstoque(box);
+    }
+
+    async function simularCargaNoAeroporto(pedId) {
+      if (!confirm(`Simular chegada da mercadoria no Aeroporto de Cargas (TECA) para o Paulinho retirar?\n\nO sistema atualizará a esteira e gerará o card de autorização de retirada.`)) return;
+      mostrarToast("✈️ Atualizando status para carga disponível no aeroporto...");
+      try {
+        const res = await apiPost("/api/almoxarifado/carga/simular-aeroporto", { id: pedId });
+        if (res && res.ok) {
+          mostrarToast(res.msg);
+        }
+      } catch (e) {
+        mostrarToast("Erro: " + e.message);
       }
       await sincronizarTudo(false);
       const box = document.getElementById("mainContainer") || document.getElementById("conteudoModulo") || document.querySelector(".app-content") || document.getElementById("mainAppContainer");
@@ -51879,325 +49025,113 @@ Informe o motivo pelo qual você NÃO recebeu este item (ex: peça incorreta, n�
 
 
 
-        <div class="section-box">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <div class="section-title">👷 Equipe Técnica Cadastrada (${tecnicos.length} profissionais)</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <div class="os-grid">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            ${tecnicos.map(t => `
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <div class="os-card">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                <div class="os-card-head">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  <span class="os-num">👷 ${esc(t.nome)}</span>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  <span class="badge ativo">${esc(t.sede)}</span>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                <div class="os-card-body">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  <div><b>📞 Telefone:</b> ${esc(t.telefone || 'N/D')}</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  <div><b>✒️ Credencial:</b> ${esc(t.assinatura)}</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                <!-- PAINEL DE MEDICINA OCUPACIONAL & EQUIPE TÉCNICA (NR-7 / PCMSO) -->
+        <div class="section-box" style="border-top:4px solid #059669;background:#f0fdf4;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+            <div>
+              <div class="section-title" style="margin:0;color:#065f46;font-size:15px;display:flex;align-items:center;gap:6px;">
+                🩺 Medicina Ocupacional &amp; Renovação do Médico do Trabalho (PCMSO / NR-7)
               </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            `).join("")}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+              <div style="font-size:11.5px;color:#047857;margin-top:2px;">
+                Controle periódico de Atestado de Saúde Ocupacional (ASO), aptidão clínica e renovação médica dos colaboradores da EMED.
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-primary" onclick="abrirModalRenovacaoMedico()" style="background:#059669;border-color:#059669;font-weight:900;display:inline-flex;align-items:center;gap:6px;">
+              🩺 Registrar Renovação de Exame Médico (ASO)
+            </button>
           </div>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+          <!-- INDICADORES DE VENCIMENTO DO ASO -->
+          <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:10px;margin-bottom:14px;">
+            <div class="kpi-card" style="background:#fff;border-top:3px solid #0284c7;">
+              <div class="kpi-lbl">Total da Equipe</div>
+              <div class="kpi-val" style="color:#0369a1;">${tecnicos.length} Colaboradores</div>
+              <div style="font-size:10px;color:#64748b;margin-top:2px;">Ceará e Brasília</div>
+            </div>
+            <div class="kpi-card" style="background:#fff;border-top:3px solid #16a34a;">
+              <div class="kpi-lbl">ASO em Dia (Apto)</div>
+              <div class="kpi-val" style="color:#16a34a;">${tecnicos.filter(t => t.status_medico === 'EM_DIA').length}</div>
+              <div style="font-size:10px;color:#16a34a;margin-top:2px;">Validade &gt; 30 dias</div>
+            </div>
+            <div class="kpi-card" style="background:#fff;border-top:3px solid #d97706;">
+              <div class="kpi-lbl">Renovação Próxima (≤ 30d)</div>
+              <div class="kpi-val" style="color:#d97706;">${tecnicos.filter(t => t.status_medico === 'ALERTA').length}</div>
+              <div style="font-size:10px;color:#b45309;margin-top:2px;">Agendar no Médico</div>
+            </div>
+            <div class="kpi-card" style="background:#fff;border-top:3px solid #dc2626;">
+              <div class="kpi-lbl">ASO Vencido / Urgente</div>
+              <div class="kpi-val" style="color:#dc2626;">${tecnicos.filter(t => t.status_medico === 'VENCIDO').length}</div>
+              <div style="font-size:10px;color:#dc2626;margin-top:2px;">Exige Renovação</div>
+            </div>
+          </div>
         </div>
 
+        <div class="section-box">
+          <div class="section-title">👷 Equipe Cadastrada &amp; Vencimento do Exame Médico (${tecnicos.length} profissionais)</div>
+          <div class="os-grid">
+            ${tecnicos.map(t => {
+              const vencFormat = formatarDataBr(t.data_vencimento_aso);
+              const ultFormat = formatarDataBr(t.data_ultimo_aso);
+              return `
+                <div class="os-card" style="border: 1.5px solid ${t.status_medico === 'VENCIDO' ? '#fca5a5' : (t.status_medico === 'ALERTA' ? '#fde68a' : '#cbd5e1')};">
+                  <div class="os-card-head" style="display:flex;justify-content:space-between;align-items:center;">
+                    <span class="os-num">👷 ${esc(t.nome)}</span>
+                    <div style="display:flex;gap:4px;align-items:center;">
+                      <span class="badge" style="background:#f1f5f9;color:#334155;font-size:10px;">${esc(t.perfil || 'Técnico')}</span>
+                      <span class="badge ativo" style="font-size:10px;">${esc(t.sede)}</span>
+                    </div>
+                  </div>
+                  <div class="os-card-body" style="font-size:12px;">
+                    <div><b>📞 Telefone:</b> ${esc(t.telefone || 'N/D')}</div>
+                    <div><b>✒️ Credencial:</b> ${esc(t.assinatura || 'CFT')}</div>
 
+                    <!-- FAIXA DE MEDICINA DO TRABALHO -->
+                    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #cbd5e1;">
+                      ${t.status_medico === 'VENCIDO' ? `
+                        <div style="background:#fef2f2;border:1px solid #f87171;border-radius:6px;padding:6px 8px;margin-bottom:6px;">
+                          <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="color:#991b1b;font-weight:900;font-size:11px;">🚨 ASO VENCIDO HÁ ${Math.abs(t.dias_para_vencer)} DIAS</span>
+                            <span class="badge erro" style="font-size:9.5px;">Venceu: ${vencFormat}</span>
+                          </div>
+                        </div>
+                      ` : (t.status_medico === 'ALERTA' ? `
+                        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 8px;margin-bottom:6px;">
+                          <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="color:#b45309;font-weight:900;font-size:11px;">⚠️ RENOVAR EM ${t.dias_para_vencer} DIAS</span>
+                            <span class="badge obs" style="font-size:9.5px;">Vence: ${vencFormat}</span>
+                          </div>
+                        </div>
+                      ` : `
+                        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:6px 8px;margin-bottom:6px;">
+                          <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="color:#166534;font-weight:900;font-size:11px;">🟢 ASO EM DIA (Apto)</span>
+                            <span class="badge concluido" style="font-size:9.5px;">Vence: ${vencFormat}</span>
+                          </div>
+                        </div>
+                      `)}
 
+                      <div style="font-size:11px;color:#475569;line-height:1.4;">
+                        <b>Último ASO:</b> ${ultFormat || '--'} &bull; <b>Aptidão:</b> <span style="color:#059669;font-weight:bold;">${esc(t.parecer_aptidao || 'APTO')}</span><br/>
+                        <b>Clínica / Médico:</b> ${esc(t.clinica_medicina_trabalho || 'MedWork')} &bull; ${esc(t.medico_examinador || 'N/D')}
+                      </div>
 
-
-
-
-
-
-
-
-
-
-
-
+                      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+                        <button type="button" class="btn btn-sm btn-primary" onclick="abrirModalRenovacaoMedico('${t.id || t.nome}', '${esc(t.nome)}', '${esc(t.data_ultimo_aso||'')}', '${esc(t.data_vencimento_aso||'')}')" style="background:#059669;border-color:#059669;font-weight:800;font-size:11px;padding:5px 10px;flex:1;">
+                          🩺 Renovar Médico
+                        </button>
+                        <button type="button" class="btn btn-outline btn-xs" onclick="abrirModalHistoricoMedico('${t.id || t.nome}', '${esc(t.nome)}')" style="font-weight:700;font-size:10.5px;color:#475569;border-color:#cbd5e1;">
+                          📜 Histórico ASO
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>
       `;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     async function executarRoboDetranAgora() {
 
@@ -68403,6 +65337,88 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
+
+    /********************************************************************
+     * CONTROLE UNIVERSAL DE CAIXA ALTA (TODOS OS INPUTS EM MAIÚSCULAS)
+     ********************************************************************/
+    ['input', 'change', 'blur', 'paste', 'keyup'].forEach(function(evtName) {
+      document.addEventListener(evtName, function(e) {
+        var el = e.target;
+        if (!el || !el.tagName) return;
+        var tag = el.tagName.toUpperCase();
+        var type = (el.type || "").toLowerCase();
+        if ((tag === "INPUT" || tag === "TEXTAREA") && 
+            type !== "email" && type !== "password" && type !== "url" && 
+            !el.classList.contains("no-upper") && !el.dataset.noUpper) {
+          setTimeout(function() {
+            var start = el.selectionStart;
+            var end = el.selectionEnd;
+            var val = el.value || "";
+            var upper = val.toUpperCase();
+            if (val !== upper) {
+              el.value = upper;
+              if (start !== null && end !== null && typeof el.setSelectionRange === "function") {
+                try { el.setSelectionRange(start, end); } catch(err) {}
+              }
+            }
+          }, 0);
+        }
+      }, true);
+    });
+
+    /********************************************************************
+     * INTEGRAÇÃO AUVO: AUTOCOMPLETE E PARQUE INSTALADO HOSPITALAR
+     ********************************************************************/
+    function atualizarDatalistsAuvo() {
+      const cliList = document.getElementById("listaClientesAuvo");
+      if (cliList && STATE.data.clientes_auvo) {
+        cliList.innerHTML = STATE.data.clientes_auvo.slice(0, 300).map(c => 
+          `<option value="${esc(c.nome)}">${esc(c.cidade)} - ${esc(c.tipo_contrato || 'AVULSO')}</option>`
+        ).join("");
+      }
+    }
+
+    function onSelecionarClienteAuvo(nomeCliente) {
+      if (!nomeCliente) return;
+      nomeCliente = nomeCliente.toUpperCase().trim();
+      const cli = (STATE.data.clientes_auvo || []).find(c => c.nome.toUpperCase() === nomeCliente || (c.razao_social && c.razao_social.toUpperCase() === nomeCliente));
+      if (cli) {
+        const cidInput = document.getElementById("novaCid");
+        if (cidInput && cli.cidade) cidInput.value = cli.cidade.toUpperCase();
+      }
+
+      // Filtra equipamentos do cliente selecionado
+      const eqList = document.getElementById("listaEquipamentosAuvo");
+      if (eqList && STATE.data.equipamentos_auvo) {
+        const eqsDoCliente = STATE.data.equipamentos_auvo.filter(e => e.cliente_nome.toUpperCase().includes(nomeCliente) || nomeCliente.includes(e.cliente_nome.toUpperCase()));
+        if (eqsDoCliente.length > 0) {
+          eqList.innerHTML = eqsDoCliente.map(e => 
+            `<option value="${esc(e.nome)}">${esc(e.categoria_checklist || e.categoria_auvo)} | NS: ${esc(e.numero_serie || 'S/N')}</option>`
+          ).join("");
+        } else {
+          eqList.innerHTML = STATE.data.equipamentos_auvo.slice(0, 100).map(e => 
+            `<option value="${esc(e.nome)}">${esc(e.categoria_checklist)}</option>`
+          ).join("");
+        }
+      }
+    }
+
+    function onSelecionarEquipamentoAuvo(nomeEquip) {
+      if (!nomeEquip) return;
+      nomeEquip = nomeEquip.toUpperCase().trim();
+      const eq = (STATE.data.equipamentos_auvo || []).find(e => e.nome.toUpperCase() === nomeEquip);
+      if (eq) {
+        // Pré-carrega checklist correspondente
+        fetch(`/api/checklist?equipamento=${encodeURIComponent(eq.nome)}&tipo_servico=PREVENTIVA`)
+          .then(r => r.json())
+          .then(res => {
+            if (res && res.acoes) {
+              console.log("Checklist especializado carregado:", res.categoria, res.acoes.length, "itens");
+            }
+          }).catch(console.error);
+      }
+    }
+
 </script>
 
 
@@ -71833,7 +68849,7 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
         <div id="modalEqTitulo" style="font-weight:900;font-size:14px;">Histórico do Equipamento</div>
 
-        <button type="button" class="btn btn-xs" onclick="fecharModalEquipamento()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;cursor:pointer;">✕</button>
+        <button type="button" class="btn btn-xs" onclick="fecharModalEditarEquipamento()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;cursor:pointer;">✕</button>
 
       </div>
 
@@ -71841,7 +68857,7 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
       <div class="modal-foot" style="padding:10px 16px;text-align:right;border-top:1px solid #e2e8f0;">
 
-        <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalEquipamento()">Fechar</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalEditarEquipamento()">Fechar</button>
 
       </div>
 
@@ -72642,6 +69658,180 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
           <button type="button" class="btn btn-primary btn-sm" onclick="salvarAssinaturaTecnico()" style="background:#0077b6;border-color:#0077b6;font-weight:bold;padding:8px 16px;">
             💾 Salvar Minha Assinatura
           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ENVIO DE NOTA FISCAL AO CLIENTE POR E-MAIL & WHATSAPP -->
+  <div id="modalEnvioNfCliente" class="modal-overlay" style="display:none;z-index:999999;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(15,23,42,0.65);">
+    <div style="background:#fff;border-radius:14px;max-width:540px;width:95%;box-shadow:0 25px 35px -5px rgba(0,0,0,0.4);overflow:hidden;border:1.5px solid #2563eb;margin:auto;">
+      <div style="background:#2563eb;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">✉️</span>
+          <span style="font-weight:900;font-size:15.5px;">Enviar Nota Fiscal para o Cliente</span>
+        </div>
+        <button type="button" onclick="fecharModalEnvioNfCliente()" style="background:transparent;border:none;color:#dbeafe;font-size:22px;cursor:pointer;font-weight:bold;">&times;</button>
+      </div>
+
+      <div style="padding:18px;">
+        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="color:#0369a1;font-weight:bold;">Tomador / Hospital:</span>
+            <span id="envioClienteNome" style="font-weight:800;color:#0f172a;">--</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="color:#0369a1;font-weight:bold;">Ordem de Serviço:</span>
+            <span id="envioClienteOs" style="font-weight:800;color:#0f172a;">--</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:#0369a1;font-weight:bold;">Nota Fiscal:</span>
+            <span id="envioClienteNumeroNf" style="font-weight:900;color:#1e40af;">--</span>
+          </div>
+        </div>
+
+        <input type="hidden" id="envioClienteOsId" />
+        <input type="hidden" id="envioClienteWhats" />
+
+        <div style="margin-bottom:12px;">
+          <label class="field-label" style="font-size:12px;font-weight:800;color:#1e293b;margin-bottom:4px;">
+            Endereço de E-mail do Cliente:
+          </label>
+          <input id="envioClienteEmailInput" class="input" type="email" placeholder="ex: faturamento@hospital.com.br" style="font-size:13px;font-weight:600;" />
+          <div style="font-size:10.5px;color:#64748b;margin-top:4px;">
+            Ao confirmar, o sistema registrará o envio por e-mail e adicionará a nota ao lote contábil de final de mês.
+          </div>
+        </div>
+
+        <div id="envioClienteStatusFeedback" style="display:none;padding:8px 12px;border-radius:6px;font-size:11.5px;font-weight:bold;margin-bottom:12px;"></div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;border-top:1px solid #e2e8f0;padding-top:14px;">
+          <div style="display:flex;gap:6px;">
+            <a id="btnEnvioOutlook" href="#" target="_blank" class="btn btn-outline btn-xs" style="color:#1d4ed8;border-color:#93c5fd;font-weight:bold;text-decoration:none;">
+              📬 Abrir no Outlook
+            </a>
+            <a id="btnEnvioWhatsDirect" href="#" target="_blank" class="btn btn-outline btn-xs" style="color:#16a34a;border-color:#86efac;font-weight:bold;text-decoration:none;">
+              📲 WhatsApp
+            </a>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalEnvioNfCliente()">Cancelar</button>
+            <button type="button" id="btnConfirmarEnvioClienteApi" class="btn btn-primary btn-sm" onclick="confirmarEnvioNfClienteApi()" style="background:#2563eb;font-weight:900;">
+              🚀 Disparar E-mail Agora
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: RENOVAÇÃO DO MÉDICO DO TRABALHO (ASO / SST) -->
+  <div id="modalRenovacaoMedicoTrabalho" class="modal-overlay" style="display:none;z-index:999999;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(15,23,42,0.65);">
+    <div style="background:#fff;border-radius:14px;max-width:560px;width:95%;box-shadow:0 25px 35px -5px rgba(0,0,0,0.4);overflow:hidden;border:1.5px solid #059669;margin:auto;">
+      <div style="background:#059669;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">🩺</span>
+          <span style="font-weight:900;font-size:15.5px;">Renovação do Exame Médico do Trabalho (ASO)</span>
+        </div>
+        <button type="button" onclick="fecharModalRenovacaoMedico()" style="background:transparent;border:none;color:#d1fae5;font-size:22px;cursor:pointer;font-weight:bold;">&times;</button>
+      </div>
+
+      <div style="padding:18px;max-height:82vh;overflow-y:auto;">
+        <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#065f46;">
+          💡 Registre a consulta periódica e emissão do Atestado de Saúde Ocupacional (ASO) conforme as normas NR-7 (PCMSO). O vencimento será calculado automaticamente para alertar a próxima renovação.
+        </div>
+
+        <input type="hidden" id="renovaAsoTecnicoId" />
+
+        <div style="margin-bottom:12px;">
+          <label class="field-label" style="font-weight:800;color:#1e293b;font-size:12px;margin-bottom:4px;">Colaborador / Funcionário *</label>
+          <select id="renovaAsoTecnicoSelect" class="input" style="font-size:13px;font-weight:700;" onchange="onRenovaAsoTecnicoSelect(this.value)">
+          </select>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div>
+            <label class="field-label" style="font-weight:800;color:#1e293b;font-size:12px;margin-bottom:4px;">Data do Exame Clínico *</label>
+            <input id="renovaAsoDataExame" type="date" class="input" style="font-size:13px;" onchange="recalcularVencimentoAso()" />
+          </div>
+          <div>
+            <label class="field-label" style="font-weight:800;color:#1e293b;font-size:12px;margin-bottom:4px;">Periodicidade / Validade</label>
+            <select id="renovaAsoPeriodicidade" class="input" style="font-size:13px;" onchange="recalcularVencimentoAso()">
+              <option value="6">6 Meses (Semestral)</option>
+              <option value="12" selected>12 Meses (1 Ano - Recomendado)</option>
+              <option value="24">24 Meses (2 Anos)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div>
+            <label class="field-label" style="font-weight:800;color:#1e293b;font-size:12px;margin-bottom:4px;">Data Prevista de Vencimento</label>
+            <input id="renovaAsoDataVencimento" type="date" class="input" style="font-size:13px;background:#f8fafc;font-weight:bold;color:#0f172a;" />
+          </div>
+          <div>
+            <label class="field-label" style="font-weight:800;color:#1e293b;font-size:12px;margin-bottom:4px;">Tipo de Exame Ocupacional</label>
+            <select id="renovaAsoTipoExame" class="input" style="font-size:13px;">
+              <option value="PERIÓDICO" selected>Periódico Anual</option>
+              <option value="ADMISSIONAL">Admissional</option>
+              <option value="RETORNO_AO_TRABALHO">Retorno ao Trabalho</option>
+              <option value="MUDANÇA_DE_RISCO">Mudança de Risco / Função</option>
+              <option value="DEMISSIONAL">Demissional</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <label class="field-label" style="font-weight:800;color:#1e293b;font-size:12px;margin-bottom:4px;">Parecer de Aptidão Clínica *</label>
+          <select id="renovaAsoParecer" class="input" style="font-size:13px;font-weight:bold;">
+            <option value="APTO" selected style="color:#15803d;">🟢 APTO (Sem restrições para trabalho em campo)</option>
+            <option value="APTO COM RESTRIÇÃO" style="color:#b45309;">🟡 APTO COM RESTRIÇÃO (Com recomendações médicas)</option>
+            <option value="INAPTO" style="color:#b91c1c;">🔴 INAPTO TEMPORARIAMENTE</option>
+          </select>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div>
+            <label class="field-label" style="font-weight:800;color:#1e293b;font-size:12px;margin-bottom:4px;">Médico do Trabalho / CRM</label>
+            <input id="renovaAsoMedico" class="input" placeholder="ex: Dr. Roberto Arruda - CRM/CE 14258" style="font-size:12.5px;" />
+          </div>
+          <div>
+            <label class="field-label" style="font-weight:800;color:#1e293b;font-size:12px;margin-bottom:4px;">Clínica de Saúde Ocupacional</label>
+            <input id="renovaAsoClinica" class="input" placeholder="ex: MedWork Saúde Ocupacional" style="font-size:12.5px;" />
+          </div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+          <label class="field-label" style="font-weight:800;color:#1e293b;font-size:12px;margin-bottom:4px;">Observações Clínicas &amp; Exames Complementares</label>
+          <textarea id="renovaAsoObs" class="input" rows="2" style="font-size:12px;height:auto;resize:vertical;" placeholder="Ex: Audiometria normal, ECG sem alterações, acuidade visual 20/20. Liberado para radiação e trabalho em altura."></textarea>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #e2e8f0;padding-top:14px;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalRenovacaoMedico()">Cancelar</button>
+          <button type="button" id="btnSalvarRenovacaoAso" class="btn btn-primary btn-sm" onclick="confirmarRenovacaoMedicoApi()" style="background:#059669;border-color:#059669;font-weight:900;">
+            🩺 Gravar Renovação do Exame
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: HISTÓRICO DE EXAMES MÉDICOS DO COLABORADOR -->
+  <div id="modalHistoricoMedico" class="modal-overlay" style="display:none;z-index:999999;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(15,23,42,0.65);">
+    <div style="background:#fff;border-radius:14px;max-width:620px;width:95%;box-shadow:0 25px 35px -5px rgba(0,0,0,0.4);overflow:hidden;border:1.5px solid #0284c7;margin:auto;">
+      <div style="background:#0284c7;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">📜</span>
+          <span style="font-weight:900;font-size:15.5px;">Histórico de ASOs &bull; <span id="histAsoNomeColaborador">--</span></span>
+        </div>
+        <button type="button" onclick="fecharModalHistoricoMedico()" style="background:transparent;border:none;color:#e0f2fe;font-size:22px;cursor:pointer;font-weight:bold;">&times;</button>
+      </div>
+      <div style="padding:18px;max-height:80vh;overflow-y:auto;">
+        <div id="histAsoConteudo" style="font-size:12px;">
+          <div style="text-align:center;color:#64748b;padding:20px;">Carregando histórico...</div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:14px;border-top:1px solid #e2e8f0;padding-top:12px;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalHistoricoMedico()">Fechar</button>
         </div>
       </div>
     </div>

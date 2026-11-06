@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v39-redundancia-e-higienizacao';
+const CACHE_NAME = 'emed-pwa-v46-videos-faststart-24x7';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

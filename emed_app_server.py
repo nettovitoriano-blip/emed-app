@@ -599,7 +599,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-    pastas_ignorar = {"media", "content", "css", "scripts", "icons", "search", "toc", "forms", "images", "system utiliies"}
+    pastas_ignorar = {"media", "content", "css", "scripts", "icons", "search", "toc", "forms", "images", "system utiliies", "ge_ct_service_methods_2002", "old"}
 
 
 
@@ -903,10 +903,42 @@ def _listar_manuais_homologados() -> list:
 
 
 
+    # Inclui os Vídeos de Treinamento Operacional & Gestão do Sistema eMED no catálogo
+    videos_operacionais = [
+        ("Video_Apresentacao_Sistema_Emed_PRO.mp4", "🎬 Vídeo Institucional: Apresentação Geral & Arquitetura do Sistema eMED PRO", "TREINAMENTO_SISTEMA", "PLATAFORMA EMED"),
+        ("Video_Apresentacao_Sistema_Emed_Real.mp4", "🎬 Vídeo Operacional: Demonstração do Sistema eMED em Operação Real (Triagem ao Laudo)", "TREINAMENTO_SISTEMA", "PLATAFORMA EMED"),
+        ("Video_Tutorial_Abertura_OS_Manual.mp4", "🎬 Tutorial Operacional: Abertura e Gestão Manual de Ordens de Serviço (OS)", "TREINAMENTO_SISTEMA", "MÓDULO DE OS"),
+        ("Video_Tutorial_Cliente_Abertura_EmedOnline.mp4", "🎬 Tutorial do Cliente: Abertura de Chamados Hospitalares via Portal eMED Online", "TREINAMENTO_SISTEMA", "PORTAL DO CLIENTE"),
+        ("Video_Tutorial_Fluxo_Kits_Separacao_Entrega_Devolucao.mp4", "🎬 Tutorial Logística: Fluxo de Kits de Ferramentas (Separação, Envio, Entrega e Devolução)", "TREINAMENTO_SISTEMA", "ALMOXARIFADO & KITS"),
+        ("Video_Tutorial_Solicitacao_Pecas_Baseada_na_IT.mp4", "🎬 Tutorial Engenharia: Solicitação de Peças e Insumos Críticos com Base na IT", "TREINAMENTO_SISTEMA", "ESTOQUE & PEÇAS"),
+        ("Video_Guia_Completo_Cliente_EmedOnline_Com_NotaFiscal.mp4", "🎬 Guia Completo: Portal do Cliente Integrado ao Faturamento e Nota Fiscal (NFS-e)", "TREINAMENTO_SISTEMA", "MÓDULO FISCAL"),
+        ("Video_Tutorial_Emissao_Nota_Fiscal.mp4", "🎬 Tutorial Financeiro: Emissão de Notas Fiscais (NFS-e) e Faturamento Desacoplado", "TREINAMENTO_SISTEMA", "MÓDULO FISCAL"),
+        ("Video_Gestao_Frota_KM_e_Incentivo_ao_Zelo.mp4", "🎬 Treinamento de Equipe: Gestão de Frota, Apontamento de KM & Programa de Zelo", "TREINAMENTO_SISTEMA", "GESTÃO DE FROTA"),
+        ("Video_Rotina_Semanal_Frota_KM_eMed.mp4", "🎬 Tutorial Gestor: Rotina Semanal de Controle e Auditoria de KM da Frota", "TREINAMENTO_SISTEMA", "GESTÃO DE FROTA"),
+        ("Video_Tutorial_Gestao_Frota_KM.mp4", "🎬 Tutorial Rápido do Técnico: Apontamento de Hodômetro e KM pelo Celular", "TREINAMENTO_SISTEMA", "GESTÃO DE FROTA"),
+    ]
+    for v_arq, v_tit, v_mod, v_fab in videos_operacionais:
+        v_abs = os.path.join(BASE_DIR, v_arq)
+        if not os.path.exists(v_abs):
+            v_abs = os.path.join(BASE_DIR, "Videos_Treinamento_ITs", v_arq)
+        if os.path.exists(v_abs):
+            catalogo_map[v_tit.upper()] = {
+                "arquivo": v_arq,
+                "titulo": v_tit,
+                "modalidade": v_mod,
+                "fabricante": v_fab,
+                "modelo": "TREINAMENTO OFICIAL",
+                "rel_path": v_arq,
+                "caminho_rel": v_arq,
+                "ext": ".mp4",
+                "formato": "VÍDEO FULL HD",
+                "tamanho_kb": round(os.path.getsize(v_abs) / 1024, 1),
+                "video": v_arq,
+                "somente_video": True,
+                "_ordem": 1,
+            }
+
     catalogo = list(catalogo_map.values())
-
-
-
     catalogo.sort(key=lambda x: (x.get("_ordem", 1), 0 if x["modalidade"] != "GERAL" else 1, x["modalidade"], x["titulo"]))
 
 
@@ -3166,6 +3198,148 @@ async def api_clientes_auvo(request: web.Request) -> web.Response:
         rows = cur.fetchall()
         cols = [d[0] for d in cur.description]
     return web.json_response({"ok": True, "total": len(rows), "clientes": [dict(zip(cols, r)) for r in rows]})
+
+
+
+async def api_equipamento_salvar(request: web.Request) -> web.Response:
+    """Cria ou atualiza um equipamento hospitalar na base de dados (equipamentos_auvo)."""
+    try:
+        dados = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "erro": "JSON inválido"}, status=400)
+
+    eq_id = dados.get("id")
+    nome = str(dados.get("nome", "")).strip().upper()
+    cliente_nome = str(dados.get("cliente_nome", "")).strip().upper()
+    categoria_checklist = str(dados.get("categoria_checklist", "")).strip().upper()
+    categoria_auvo = str(dados.get("categoria_auvo", "")).strip().upper() or categoria_checklist
+    numero_serie = str(dados.get("numero_serie", "")).strip().upper()
+    identificador = str(dados.get("identificador", "")).strip().upper()
+    descricao = str(dados.get("descricao", "")).strip()
+    status = str(dados.get("status", "Ativo")).strip()
+    cidade = str(dados.get("cidade", "FORTALEZA")).strip().upper()
+    estado = str(dados.get("estado", "CE")).strip().upper()
+
+    if not nome:
+        return web.json_response({"ok": False, "erro": "Nome do equipamento é obrigatório"}, status=400)
+    if not cliente_nome:
+        return web.json_response({"ok": False, "erro": "Nome do hospital/cliente é obrigatório"}, status=400)
+
+    if not categoria_checklist:
+        from emed_services.checklists_especializados import identificar_categoria_checklist
+        categoria_checklist = identificar_categoria_checklist(nome)
+
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        if eq_id and int(eq_id) > 0:
+            cur.execute("""
+                UPDATE equipamentos_auvo
+                SET nome = ?, cliente_nome = ?, categoria_auvo = ?, categoria_checklist = ?,
+                    numero_serie = ?, identificador = ?, descricao = ?, status = ?, cidade = ?, estado = ?
+                WHERE id = ?
+            """, (nome, cliente_nome, categoria_auvo, categoria_checklist, numero_serie, identificador, descricao, status, cidade, estado, int(eq_id)))
+            msg = "Equipamento atualizado com sucesso!"
+            salvo_id = int(eq_id)
+        else:
+            cur.execute("""
+                INSERT INTO equipamentos_auvo (
+                    nome, cliente_nome, categoria_auvo, categoria_checklist,
+                    numero_serie, identificador, descricao, cidade, estado, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (nome, cliente_nome, categoria_auvo, categoria_checklist, numero_serie, identificador, descricao, cidade, estado, status))
+            salvo_id = cur.lastrowid
+            msg = "Novo equipamento cadastrado com sucesso!"
+        conn.commit()
+
+    return web.json_response({
+        "ok": True,
+        "msg": msg,
+        "id": salvo_id,
+        "equipamento": {
+            "id": salvo_id,
+            "nome": nome,
+            "cliente_nome": cliente_nome,
+            "categoria_checklist": categoria_checklist,
+            "categoria_auvo": categoria_auvo,
+            "numero_serie": numero_serie,
+            "identificador": identificador,
+            "descricao": descricao,
+            "cidade": cidade,
+            "estado": estado,
+            "status": status
+        }
+    })
+
+
+async def api_equipamento_status(request: web.Request) -> web.Response:
+    """Altera o status de um equipamento (descontinuar, reativar ou excluir permanentemente)."""
+    try:
+        dados = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "erro": "JSON inválido"}, status=400)
+
+    eq_id = dados.get("id")
+    acao = str(dados.get("acao", "")).strip().lower()
+
+    if not eq_id:
+        return web.json_response({"ok": False, "erro": "ID do equipamento é obrigatório"}, status=400)
+
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        if acao == "excluir":
+            cur.execute("DELETE FROM equipamentos_auvo WHERE id = ?", (int(eq_id),))
+            msg = "Equipamento removido permanentemente com sucesso!"
+            novo_status = "Excluído"
+        elif acao == "reativar":
+            cur.execute("UPDATE equipamentos_auvo SET status = 'Ativo' WHERE id = ?", (int(eq_id),))
+            msg = "Equipamento REATIVADO com sucesso!"
+            novo_status = "Ativo"
+        else:
+            cur.execute("UPDATE equipamentos_auvo SET status = 'Descontinuado' WHERE id = ?", (int(eq_id),))
+            msg = "Equipamento marcado como DESCONTINUADO."
+            novo_status = "Descontinuado"
+        conn.commit()
+
+    return web.json_response({"ok": True, "msg": msg, "id": int(eq_id), "status": novo_status})
+
+
+async def api_fazer_backup_onedrive(request: web.Request) -> web.Response:
+    """Garante WAL checkpoint e realiza backup íntegro diretamente para a pasta do OneDrive."""
+    import shutil
+    from datetime import datetime
+
+    onedrive_base = r"C:\Users\vitor\OneDrive\Backups_Sistema_EMED"
+    os.makedirs(onedrive_base, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    pasta_destino = os.path.join(onedrive_base, f"Backup_EMED_{timestamp}")
+    os.makedirs(pasta_destino, exist_ok=True)
+
+    try:
+        with get_db_connection(DB_NAME) as conn_sq:
+            conn_sq.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+            conn_sq.commit()
+    except Exception as e:
+        print("Aviso no checkpoint:", e)
+
+    db_origem = os.path.join(BASE_DIR, "emed.db")
+    db_destino = os.path.join(pasta_destino, "emed.db")
+    shutil.copy2(db_origem, db_destino)
+
+    excel_origem = os.path.join(BASE_DIR, "base_clientes.xlsx")
+    if os.path.exists(excel_origem):
+        shutil.copy2(excel_origem, os.path.join(pasta_destino, "base_clientes.xlsx"))
+
+    db_raiz_destino = os.path.join(onedrive_base, f"emed_{timestamp}.db")
+    shutil.copy2(db_origem, db_raiz_destino)
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"✅ Backup realizado com sucesso no OneDrive!\nPasta: {pasta_destino}",
+        "pasta": pasta_destino,
+        "arquivo_db": db_raiz_destino,
+        "timestamp": timestamp
+    })
 
 
 async def api_equipamentos_auvo(request: web.Request) -> web.Response:
@@ -7583,42 +7757,33 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 async def api_video_stream(request: web.Request) -> web.Response:
-
-
-
-    nome_vid = os.path.basename(request.query.get("name", ""))
-
-
-
+    nome_vid = os.path.basename(request.query.get("name", "").strip())
     if not nome_vid:
-
-
-
-        return web.Response(status=404)
-
-
+        return web.Response(status=404, text="Nome do vídeo não informado")
 
     cand1 = os.path.join(BASE_DIR, "Videos_Treinamento_ITs", nome_vid)
-
-
-
     cand2 = os.path.join(BASE_DIR, nome_vid)
-
-
-
     alvo = cand1 if os.path.exists(cand1) else (cand2 if os.path.exists(cand2) else None)
 
-
-
     if not alvo:
+        # Busca recursiva em Manuais/ caso o vídeo esteja apenas colocalizado na pasta do equipamento
+        pasta_manuais = os.path.join(BASE_DIR, "Manuais")
+        for r, _, files in os.walk(pasta_manuais):
+            if nome_vid in files:
+                alvo = os.path.join(r, nome_vid)
+                break
 
+    if not alvo or not os.path.exists(alvo):
+        return web.Response(status=404, text=f"Vídeo não encontrado: {nome_vid}")
 
-
-        return web.Response(status=404)
-
-
-
-    return web.FileResponse(alvo)
+    return web.FileResponse(
+        alvo,
+        headers={
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "public, max-age=3600",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
 
 
 
@@ -10099,6 +10264,10 @@ def criar_app() -> web.Application:
 
 
     app.router.add_get("/api/clientes_auvo", api_clientes_auvo)
+    app.router.add_post("/api/equipamento/salvar", api_equipamento_salvar)
+    app.router.add_post("/api/equipamento/status", api_equipamento_status)
+    app.router.add_post("/api/sistema/backup-onedrive", api_fazer_backup_onedrive)
+    app.router.add_get("/api/sistema/backup-onedrive", api_fazer_backup_onedrive)
     app.router.add_get("/api/equipamentos_auvo", api_equipamentos_auvo)
     app.router.add_get("/api/checklist", api_checklist)
 
