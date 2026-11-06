@@ -20585,7 +20585,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-      navigator.serviceWorker.register("/sw.js?v=v37").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=v47").then(reg => { if(reg) reg.update(); }).catch(() => {});
 
 
 
@@ -39260,10 +39260,18 @@ function renderizarNavegacao() {
 
           <!-- Barra de Busca Rápida e Filtros -->
           <div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap;">
-            <input type="text" class="input" style="flex:1;min-width:280px;text-transform:uppercase;" 
-                   placeholder="🔍 BUSCAR POR HOSPITAL, CIDADE, EQUIPAMENTO OU NÚMERO DE SÉRIE..." 
-                   value="${esc(STATE.filtroParque || '')}"
-                   oninput="STATE.filtroParque = this.value; renderMenuGesClientes(document.getElementById('mainContainer'));" />
+            <div style="flex:1;min-width:280px;position:relative;display:flex;align-items:center;">
+              <input type="text" class="input" style="width:100%;text-transform:uppercase;padding-right:34px;" 
+                     placeholder="🔍 BUSCAR POR HOSPITAL, CIDADE, EQUIPAMENTO OU NÚMERO DE SÉRIE..." 
+                     value="${esc(STATE.filtroParque || '')}"
+                     oninput="STATE.filtroParque = this.value; renderMenuGesClientes(document.getElementById('mainContainer'));" />
+              ${STATE.filtroParque ? `
+                <button type="button" title="Limpar busca" style="position:absolute;right:8px;background:none;border:none;color:#64748b;font-size:16px;font-weight:700;cursor:pointer;padding:4px 6px;line-height:1;border-radius:50%;" 
+                        onclick="STATE.filtroParque = ''; renderMenuGesClientes(document.getElementById('mainContainer'));">
+                  ✕
+                </button>
+              ` : ''}
+            </div>
             
             <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#475569;cursor:pointer;user-select:none;background:#f8fafc;padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;">
               <input type="checkbox" ${ocultarDescontinuadas ? 'checked' : ''} 
@@ -39284,7 +39292,7 @@ function renderizarNavegacao() {
             ${REGIOES.map(r => `
               <button class="btn btn-sm ${regiaoAtiva === r.id ? 'btn-primary' : 'btn-outline'}" 
                       style="font-size:11px;font-weight:700;padding:6px 12px;border-radius:20px;"
-                      onclick="STATE.regiaoParque = '${r.id}'; renderMenuGesClientes(document.getElementById('mainContainer'));">
+                      onclick="STATE.regiaoParque = '${r.id}'; STATE.filtroParque = ''; renderMenuGesClientes(document.getElementById('mainContainer'));">
                 ${r.rotulo} <span style="opacity:0.8;font-size:10px;margin-left:4px;">(${r.count})</span>
               </button>
             `).join("")}
@@ -39293,8 +39301,28 @@ function renderizarNavegacao() {
           <!-- Lista de Cards de Clientes com os Equipamentos Agrupados Dentro -->
           <div style="display:flex;flex-direction:column;gap:10px;">
             ${clientesFiltrados.length === 0 ? `
-              <div style="text-align:center;padding:40px;color:#94a3b8;font-size:14px;background:#fff;border-radius:12px;border:1px dashed #cbd5e1;">
-                Nenhum cliente ou equipamento encontrado para o filtro selecionado.
+              <div style="text-align:center;padding:36px 20px;color:#64748b;font-size:14px;background:#fff;border-radius:12px;border:1px dashed #cbd5e1;">
+                <div style="font-size:32px;margin-bottom:10px;">🔍</div>
+                <div style="font-weight:700;color:#1e293b;margin-bottom:6px;font-size:15px;">Nenhum cliente ou equipamento encontrado</div>
+                ${filtro ? `
+                  <div style="margin-bottom:14px;font-size:13px;color:#64748b;">
+                    O termo "<b>${esc(STATE.filtroParque)}</b>" não retornou resultados na região selecionada (${REGIOES.find(r=>r.id===regiaoAtiva)?.rotulo || regiaoAtiva}).
+                  </div>
+                  <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+                    <button class="btn btn-sm btn-primary" onclick="STATE.filtroParque = ''; renderMenuGesClientes(document.getElementById('mainContainer'));">
+                      🔄 Limpar Busca e Ver Todos os Clientes desta Região
+                    </button>
+                    ${regiaoAtiva !== 'TODOS' ? `
+                      <button class="btn btn-sm btn-outline" onclick="STATE.regiaoParque = 'TODOS'; renderMenuGesClientes(document.getElementById('mainContainer'));">
+                        🌐 Buscar em Todas as Regiões
+                      </button>
+                    ` : ''}
+                  </div>
+                ` : `
+                  <div style="font-size:13px;color:#64748b;">
+                    Nenhum cliente cadastrado nesta categoria de região.
+                  </div>
+                `}
               </div>
             ` : clientesFiltrados.slice(0, 80).map(c => {
               const k = (c.nome || "").toUpperCase().trim();

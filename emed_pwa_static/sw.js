@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v46-videos-faststart-24x7';
+const CACHE_NAME = 'emed-pwa-v47-filtro-regiao-e-10-os';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

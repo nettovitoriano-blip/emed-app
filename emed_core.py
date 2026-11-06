@@ -3628,225 +3628,95 @@ def gerar_sugestao_relatorio_clinico(equipamento: str, defeito: str = "", tipo_s
 
 
 def obter_checklist_acoes_sugeridas(equipamento: str, defeito: str = "") -> list:
-
-    """Retorna itens práticos de checklist de intervenção para o técnico marcar no celular."""
+    """
+    Retorna checklist técnico especializado por modalidade (diferenciando rigorosamente
+    RX Fixo de RX Móvel/Transportável, Tomógrafo, Mamógrafo, CR, etc.).
+    """
+    try:
+        from emed_services.checklists_especializados import obter_checklist_oficial, identificar_categoria_checklist
+        cat = identificar_categoria_checklist(equipamento)
+        dados_oficiais = obter_checklist_oficial(equipamento, cat)
+        itens = [it["item"] if isinstance(it, dict) else str(it) for it in dados_oficiais.get("itens", [])]
+        if itens:
+            return itens
+    except Exception:
+        pass
 
     eq_norm = str(equipamento).upper().replace("Ó", "O").replace("Ã", "A").replace("Õ", "O").replace("É", "E")
-
     def_norm = str(defeito).upper().replace("Ó", "O").replace("Ã", "A").replace("Õ", "O").replace("É", "E")
 
-
-
-    # 1. Tomografia
-
+    # Tomógrafo
     if any(k in eq_norm for k in ["TOMO", "TC", "BRIGHTSPEED", "BRIVO", "OPTIMA"]):
-
-        if any(w in def_norm for w in ["MESA", "UP", "DOWN", "SUBIDA", "DESCIDA", "ELEVACAO", "TRAV"]):
-
-            return [
-
-                "Desmontagem e remoção dos painéis laterais de proteção da mesa",
-
-                "Inspeção visual dos trilhos, correntes e cabos de sustentação mecânica",
-
-                "Limpeza química e desengraxe das guias lineares verticais",
-
-                "Aplicação de graxa sintética de alta viscosidade nos rolamentos e guias",
-
-                "Ajuste de tensão mecânica da correia e fuso de acionamento",
-
-                "Calibração dos potenciômetros e encoders de elevação (up/down)",
-
-                "Ajuste e teste de acionamento dos limit switches (sensores de fim de curso)",
-
-                "Teste de movimentação contínua em curso completo sem ruídos ou travamento",
-
-                "Teste funcional com carga nominal de 150 kg com retorno suave",
-
-                "Liberação do equipamento para a equipe clínica conforme POP-EMED-TC-004",
-
-            ]
-
-        elif any(w in def_norm for w in ["TUBO", "KV", "MA", "DISPARO", "ALTA TENSAO", "ARCING", "GERADOR", "JEDI"]):
-
-            return [
-
-                "Verificação visual e teste de isolação das conexões e buchas de alta tensão (HV cables)",
-
-                "Checagem do nível, fluxo e temperatura do óleo de arrefecimento do monobloco",
-
-                "Leitura e limpeza do histórico de erros de arcing no gerador JEDI e console",
-
-                "Calibração da corrente de filamento e tensão de aceleração (kVp / mA)",
-
-                "Execução do protocolo de aquecimento progressivo do ânodo (warm-up)",
-
-                "Calibração de ar nos detectores (Air Calibration / DAS)",
-
-                "Verificação dos intertravamentos de segurança e paradas de emergência do Gantry",
-
-                "Disparos de validação de qualidade de feixe e homogeneidade",
-
-            ]
-
-        else:
-
-            return [
-
-                "Abertura das tampas do Gantry e aspiração de poeira/resíduos internos",
-
-                "Inspeção visual das escovas e pistas do slip-ring com medição de desgaste",
-
-                "Limpeza técnica especializada dos trilhos e anéis de contato do slip-ring",
-
-                "Checagem do sistema de refrigeração líquida e arrefecimento do Gantry",
-
-                "Alinhamento e teste dos lasers de posicionamento sagital, coronal e axial",
-
-                "Aferição de segurança elétrica: resistência de terra e corrente de fuga (NBR IEC 60601)",
-
-                "Execução de calibração periódica de detectores e teste de homogeneidade de imagem",
-
-                "Equipamento 100% operacional e liberado para rotina de exames",
-
-            ]
-
-
-
-    # 2. Mamografia
-
-    elif any(k in eq_norm for k in ["MAMO", "SENOGRAPHE", "LILLY", "SELENIA"]):
-
-        if any(w in def_norm for w in ["COMPRESS", "PEDAL", "FORCA", "DANO"]):
-
-            return [
-
-                "Desmontagem da tampa da coluna e inspeção da caixa de redução da compressão",
-
-                "Inspeção mecânica das engrenagens, fusos e lubrificação com graxa técnica",
-
-                "Teste de continuidade elétrica e resposta nos microswitches dos pedais de acionamento",
-
-                "Calibração da célula de carga e ajuste da força máxima de compressão (limite 18 daN)",
-
-                "Teste funcional do sistema de descompressão automática de emergência",
-
-                "Alinhamento da bandeja de compressão e teste de paralelismo com o receptor de imagem",
-
-                "Aferição da fotocélula (AEC) em phantom acrílico padrão",
-
-                "Certificação dos parâmetros de compressão conforme requisitos da RDC 611/ANVISA",
-
-            ]
-
-        else:
-
-            return [
-
-                "Inspeção mecânica geral do braço C e travamentos angulares",
-
-                "Aferição dos eletrofreios de rotação e verificação de folgas mecânicas",
-
-                "Limpeza e higienização técnica da mesa de exame e bandejas de compressão",
-
-                "Teste dos pedais de controle e comandos no painel da workstation",
-
-                "Controle de qualidade de imagem radiográfica com phantom de mamografia padrão",
-
-                "Verificação de reprodutibilidade e linearidade de dose do feixe",
-
-                "Equipamento liberado e em conformidade técnica para exames clínicos",
-
-            ]
-
-
-
-    # 3. Raio-X
-
-    elif any(k in eq_norm for k in ["RAIO", "RX", "LOTUS", "SHIMADZU", "MOBILEDART", "NEUVISION"]):
-
-        if any(w in def_norm for w in ["FREIO", "ESTATIVA", "MESA", "CABO", "PESO"]):
-
-            return [
-
-                "Inspeção visual e teste de tração nos cabos de aço de sustentação do contrapeso",
-
-                "Regulagem de pressão e alinhamento das sapatas dos eletrofreios longitudinal e vertical",
-
-                "Limpeza técnica e lubrificação das colunas de deslizamento e roldanas",
-
-                "Verificação dos botões de liberação de freios no comando do colimador",
-
-                "Teste de movimentação suave em toda a extensão do curso da estativa e mesa",
-
-                "Reaperto de parafusos estruturais e verificação de batentes de fim de curso",
-
-                "Trava mecânica e elétrica testada com carga e validada",
-
-            ]
-
-        elif any(w in def_norm for w in ["COLIMADOR", "LUZ", "CAMPO", "LAMPADA"]):
-
-            return [
-
-                "Abertura do conjunto colimador e substituição da lâmpada de projeção halógena",
-
-                "Limpeza e ajuste do espelho refletor interno e lâminas de chumbo",
-
-                "Calibração de coincidência do campo de luz com o campo de radiação X (tolerância < 2%)",
-
-                "Aferição do temporizador automático de desligamento da luz do colimador",
-
-                "Verificação dos botões de ajuste de abertura de campo transversal e longitudinal",
-
-                "Disparos de radiografia teste com chassi/detector para validação de bordas",
-
-            ]
-
-        else:
-
-            return [
-
-                "Inspeção geral da estativa, mesa de exames e cabeçote monobloco",
-
-                "Aferição radiométrica de kVp, mA e tempo com multímetro calibrado",
-
-                "Teste de repetibilidade e linearidade da taxa de kerma no ar (RDC 611)",
-
-                "Checagem do estado dos cabos de alta tensão e aterramento de carcaça",
-
-                "Revisão dos freios mecânicos e fluidez de movimentação de todos os eixos",
-
-                "Equipamento aprovado nos ensaios de segurança e liberado para uso médico",
-
-            ]
-
-
-
-    # 4. Padrão Geral / Preventiva
-
+        return [
+            "Verificação do funcionamento das luzes, lasers de alinhamento e displays do Gantry",
+            "Verificação dos sensores de posicionamento e segurança do paciente",
+            "Verificação mecânica e eletrônica do funcionamento do TILT (angulação do Gantry)",
+            "Verificação do funcionamento dos botões de emergência (Gantry, Mesa e Console)",
+            "Verificação da parte rotacional, acoplamento e sistema de acionamento",
+            "Limpeza das carenagens e verificação rigorosa do SLIP RING e BRUSH BLOCK",
+            "Limpeza e desobstrução dos filtros de ar e ventiladores do gerador de alta tensão",
+            "Limpeza dos filtros, grelhas de entrada de ar e ventiladores do Gantry",
+            "Verificação e aplicação de graxa técnica no rolamento principal do Gantry",
+            "Limpeza dos filtros de ar e ventiladores do sistema de aquisição de dados (DAS)",
+            "Limpeza do detector na janela de aquisição (MYLAR) com material apropriado",
+            "Limpeza e verificação do radiador, filtros, fluído térmico e ventiladores do tubo de raios-X",
+            "Limpeza, alinhamento e lubrificação da mecânica e trilhos da mesa de exames",
+            "Verificação de tensão e integridade do cabo de aço do potenciômetro da mesa",
+            "Verificação e leitura de logs de erros do sistema operacional e hardware",
+            "Verificação do número de pacientes cadastrados e total de rotações/disparos do tubo",
+            "Inspeção física, escovas e limpeza dos motores de avanço e rotação",
+            "Limpeza interna, ventoinhas e verificação dos computadores (Console e Recon)",
+            "Verificação e teste de comunicação com o SCAN BOX",
+            "Realização do teste de calibração com phanton de água e análise de ruído com ROI",
+            "Realização de limpeza interna geral, externa e testes funcionais de exposição"
+        ]
+
+    # Raio-X Móvel / Transportável
+    if any(k in eq_norm for k in ["MOVEL", "MÓVEL", "TRANSP", "PORTATIL", "PORTÁTIL", "LEITO", "AQUILA", "PEGASO", "MOBILEDART", "TITANIUM"]):
+        return [
+            "Verificação do banco de baterias de tração, conexões e indicador de nível de carga no display",
+            "Verificação do acionamento e suavidade da tração motorizada (avanço e recuo)",
+            "Verificação do sistema de freio de estacionamento mecânico (Dead-Man) e rodízios direcionais",
+            "Verificação da trava mecânica de transporte do braço telescópico e travamento da coluna",
+            "Verificação do balanceamento do braço articulado e rotação do cabeçote (0º a 180º)",
+            "Verificação das esteiras protetoras e cabos de alta tensão retráteis",
+            "Verificação do cabo espiral retrátil do disparador à distância (extensão de segurança > 2m)",
+            "Verificação do colimador manual integrado com trena métrica retrátil para conferência do DFO",
+            "Verificação da lâmpada de campo luminoso e desligamento automático do temporizador",
+            "Verificação da coincidência do campo de luz e radiação em 100 cm (DFO padrão)",
+            "Verificação da integridade do compartimento de guarda e transporte de detectores FPD/chassis",
+            "Verificação do cabo de força AC, enrolador automático e plugue de carga de rede (110V/220V)",
+            "Verificação do painel digital sensível ao toque, membranas e seleção de parâmetros kV/mAs",
+            "Verificação dos botões de parada de emergência e sensores anticolisão do para-choque",
+            "Verificação de acionamento do alarme sonoro e aviso visual luminoso de emissão de raios-X",
+            "Verificação de trincas, folgas mecânicas e integridade das carenagens de proteção",
+            "Limpeza técnica e assepsia das superfícies para conformidade hospitalar de UTI/Isolamento",
+            "Teste de emissão de raios-X com medição de parâmetros de exposição de tórax no leito"
+        ]
+
+    # Raio-X Fixo
     return [
-
-        "Inspeção visual externa e interna do chassi, conectores e fiações",
-
-        "Limpeza técnica interna especializada para eliminação de impurezas e poeira",
-
-        "Reaperto de bornes elétricos, barramentos de alimentação e conexões de aterramento",
-
-        "Teste de segurança elétrica: resistência de condutor de proteção e corrente de fuga",
-
-        "Lubrificação técnica dos pontos mecânicos móveis, eixos e articulações",
-
-        "Aferição dos parâmetros nominais e calibração de sensores operacionais",
-
-        "Teste de todos os comandos nos painéis de controle e paradas de emergência",
-
-        "Realização de ensaios funcionais simulados de rotina com liberação clínica",
-
+        "Verificação da rede elétrica trifásica/bifásica (+- 10%) e aterramento de segurança (PE)",
+        "Verificação da integridade dos cabos elétricos de força, neutro e chicotes de comando",
+        "Verificação dos cabos blindados de alta tensão (HT cables) e conectores do anodo/catodo",
+        "Verificação da integridade, fixação e tensão dos cabos de aço e contrapesos da estativa",
+        "Verificação do funcionamento do painel de controle principal e console do gerador",
+        "Verificação do funcionamento dos freios mecânicos e eletromagnéticos da estativa e mesa",
+        "Verificação do funcionamento do colimador manual/motorizado e temporizador da lâmpada",
+        "Verificação mecânica de trilhos de piso e teto (alinhamento, lubrificação e travas de fim de curso)",
+        "Verificação do balanceamento mecânico e alinhamento perpendicular da estativa de parede",
+        "Verificação de acionamento da lâmpada de sinalização de radiação externa à sala (luz vermelha)",
+        "Verificação da centralização exata da luz de colimação com o feixe de radiação e cruz central",
+        "Verificação do funcionamento do bucky mural e bucky mesa (oscilação e disparo)",
+        "Verificação da integridade física e alinhamento da grade anti-difusora",
+        "Verificação da integridade mecânica, travas e tampo de acrílico flutuante da mesa",
+        "Verificação do funcionamento e travas das bandejas de receptores/chassis",
+        "Verificação de avarias na pintura, soldas e carenagens protetoras",
+        "Backup completo das configurações do gerador, curvas de kV/mAs e parâmetros de fábrica",
+        "Verificação de espaço em disco, logs do sistema e comunicação DICOM/Worklist",
+        "Limpeza do console de operação, monitor de laudo, teclado e mouse",
+        "Teste de funcionamento e autonomia do nobreak e estabilizador de linha"
     ]
-
-
-
 
 
 def verificar_pendencias_financeiras_cliente(db_path: str, cliente: str, cnpj: str = "") -> dict:
