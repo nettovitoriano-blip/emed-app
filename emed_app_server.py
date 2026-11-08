@@ -3961,55 +3961,94 @@ async def api_checkin(request: web.Request) -> web.Response:
 
 
 
+def aplicar_carimbo_forense_pil(img_bytes: bytes, os_id: str) -> bytes:
+    """Aplica carimbo d'água forense inviolável com Logo Oficial EMED, Hospital e Coordenadas."""
+    try:
+        from PIL import Image, ImageDraw
+        import io
+        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        w, h = img.size
+        banner_h = max(90, int(h * 0.12))
+        overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        draw_ov = ImageDraw.Draw(overlay)
+        draw_ov.rectangle([0, h - banner_h, w, h], fill=(11, 19, 43, 225))
+        draw_ov.line([0, h - banner_h, w, h - banner_h], fill=(0, 180, 216, 255), width=max(3, int(w * 0.003)))
+
+        cliente = "HOSPITAL ATENDIDO"
+        cidade = "CEARÁ"
+        equip = "EQUIPAMENTO MÉDICO"
+        tec = "TÉCNICO EMED"
+        dt_serv = datetime.now().strftime("%d/%m/%Y")
+        lat, lon = -3.7319, -38.5267
+
+        try:
+            with get_db_connection(DB_NAME) as conn:
+                conn.row_factory = sqlite3.Row
+                cur = conn.cursor()
+                cur.execute("SELECT cliente, cidade, equipamento, tecnico_responsavel, data_agendamento, latitude, longitude FROM clientes_equipamentos WHERE rowid = ? OR id = ?", (os_id, os_id))
+                row = cur.fetchone()
+                if row:
+                    cliente = (row["cliente"] or cliente).upper()
+                    cidade = (row["cidade"] or cidade).upper()
+                    equip = (row["equipamento"] or equip).upper()
+                    tec = (row["tecnico_responsavel"] or tec).upper()
+                    dt_serv = row["data_agendamento"] or dt_serv
+                    lat = row["latitude"] or lat
+                    lon = row["longitude"] or lon
+        except Exception:
+            pass
+
+        logo_path = os.path.join(STATIC_DIR, "simbolo_emed_transparente.png")
+        if os.path.exists(logo_path):
+            try:
+                logo = Image.open(logo_path).convert("RGBA")
+                logo.thumbnail((int(banner_h * 0.8), int(banner_h * 0.8)))
+                logo_x = w - logo.width - 20
+                logo_y = h - banner_h + (banner_h - logo.height) // 2
+                overlay.paste(logo, (logo_x, logo_y), logo)
+            except Exception:
+                pass
+
+        img_comp = Image.alpha_composite(img.convert("RGBA"), overlay)
+        draw = ImageDraw.Draw(img_comp)
+
+        agora_str = obter_agora_brasil_str("%d/%m/%Y %H:%M:%S")
+        y1 = h - banner_h + int(banner_h * 0.12)
+        y2 = h - banner_h + int(banner_h * 0.38)
+        y3 = h - banner_h + int(banner_h * 0.65)
+
+        draw.text((25, y1), f"🏥 {cliente} ({cidade})", fill=(56, 189, 248, 255))
+        draw.text((25, y2), f"📍 COORDENADAS OFICIAIS: {lat:.4f}, {lon:.4f} • OS #{os_id} ({equip})", fill=(248, 250, 252, 255))
+        draw.text((25, y3), f"🕒 DATA SERVIÇO: {dt_serv} • REGISTRO: {agora_str} • TÉCNICO: {tec} • EMED ELETROMEDICINA", fill=(148, 163, 184, 255))
+
+        out_io = io.BytesIO()
+        img_comp.convert("RGB").save(out_io, format="JPEG", quality=90)
+        return out_io.getvalue()
+    except Exception:
+        return img_bytes
+
+
 def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
-
-
-
     if not b64_str or not str(b64_str).startswith("data:image"):
-
-
-
+        return ""
+    try:
+        header, encoded = str(b64_str).split(",", 1)
+        ext = "jpg"
+        pasta = os.path.join(BASE_DIR, "uploads_os")
+        os.makedirs(pasta, exist_ok=True)
+        ts = obter_agora_brasil_str("%Y%m%d_%H%M%S")
+        caminho = os.path.join(pasta, f"{prefixo}_OS{os_id}_{ts}.{ext}")
+        
+        raw_bytes = base64.b64decode(encoded)
+        carimbada_bytes = aplicar_carimbo_forense_pil(raw_bytes, str(os_id))
+        
+        with open(caminho, "wb") as f:
+            f.write(carimbada_bytes)
+        return caminho
+    except Exception as e:
+        print("Erro salvando imagem base64:", e)
         return ""
 
-
-
-    try:
-
-
-
-        header, encoded = str(b64_str).split(",", 1)
-
-
-
-        ext = "png" if "png" in header.lower() else "jpg"
-
-
-
-        pasta = os.path.join(BASE_DIR, "uploads_os")
-
-
-
-        os.makedirs(pasta, exist_ok=True)
-
-
-
-        ts = obter_agora_brasil_str("%Y%m%d_%H%M%S")
-
-
-
-        caminho = os.path.join(pasta, f"{prefixo}_OS{os_id}_{ts}.{ext}")
-
-
-
-        with open(caminho, "wb") as f:
-
-
-
-            f.write(base64.b64decode(encoded))
-
-
-
-        return caminho
 
 
 
