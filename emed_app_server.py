@@ -4096,17 +4096,17 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
     cor_contab = "color:#059669;" if enviado_contab else "color:#d97706;"
 
     filial_emissora = dados_nf.get("filial_emissora") or ("FILIAL_DF" if uf_cli == "DF" else "MATRIZ_CE")
-    prestador_razao = dados_nf.get("prestador_razao") or ("EMED ELETROMEDICINA LTDA. - FILIAL BRASÍLIA" if filial_emissora == "FILIAL_DF" else "EMED ELETROMEDICINA LTDA.")
+    prestador_razao = dados_nf.get("prestador_razao") or ("EMED ELETROMEDICINA LTDA." if filial_emissora == "FILIAL_DF" else "EMED ELETROMEDICINA LTDA.")
     prestador_cnpj = dados_nf.get("prestador_cnpj") or ("03.611.974/0002-80" if filial_emissora == "FILIAL_DF" else "03.611.974/0001-08")
-    prestador_im = dados_nf.get("prestador_im") or ("61-3234-3647" if filial_emissora == "FILIAL_DF" else "123456-7")
-    prestador_end = dados_nf.get("prestador_endereco") or ("Rua 3, Chácara 46A, Lote 01 - Vicente Pires, CEP 72007-850" if filial_emissora == "FILIAL_DF" else "Rua Coronel Freire, 16 - Bairro Amador, CEP 61769-470")
+    prestador_im = dados_nf.get("prestador_im") or ("0745733000236" if filial_emissora == "FILIAL_DF" else "123456-7")
+    prestador_end = dados_nf.get("prestador_endereco") or ("3 Chácara 46A, Lote 01 - Setor Habitacional Vicente Pires, CEP 72005-670" if filial_emissora == "FILIAL_DF" else "Rua Coronel Freire, 16 - Bairro Amador, CEP 61769-470")
     prestador_cid = dados_nf.get("prestador_cidade") or ("Brasília" if filial_emissora == "FILIAL_DF" else "Eusébio")
     prestador_uf = dados_nf.get("prestador_uf") or ("DF" if filial_emissora == "FILIAL_DF" else "CE")
-    prestador_fone = dados_nf.get("prestador_fone") or ("(61) 3234-3647 / (61) 99658-5392" if filial_emissora == "FILIAL_DF" else "(85) 3254-2929")
-    prestador_email = dados_nf.get("prestador_email") or ("brasilia@emed.med.br" if filial_emissora == "FILIAL_DF" else "financeiro@emed.med.br")
-    orgao_emissor = "SECRETARIA DE FAZENDA DO DISTRITO FEDERAL (SEFAZ-DF)" if filial_emissora == "FILIAL_DF" else "PREFEITURA MUNICIPAL DE EUSÉBIO - CE"
+    prestador_fone = dados_nf.get("prestador_fone") or ("(61) 3038-1104" if filial_emissora == "FILIAL_DF" else "(85) 3254-2929")
+    prestador_email = dados_nf.get("prestador_email") or ("dxc@dxc.cnt.br" if filial_emissora == "FILIAL_DF" else "financeiro@emed.med.br")
+    orgao_emissor = "SECRETARIA DE ESTADO DE ECONOMIA DO DISTRITO FEDERAL (SEFAZ-DF) - SISTEMA NOTA CONTROL" if filial_emissora == "FILIAL_DF" else "PREFEITURA MUNICIPAL DE EUSÉBIO - CE"
     doc_aux_titulo = "DOCUMENTO AUXILIAR DA NFS-e DF" if filial_emissora == "FILIAL_DF" else "DOCUMENTO AUXILIAR DA NFS-e / NF-e"
-    sub_titulo_unidade = "Unidade Brasília (DF)" if filial_emissora == "FILIAL_DF" else "Matriz Ceará"
+    sub_titulo_unidade = "SCIENZA ELETROMEDICINA - Filial Brasília (DF)" if filial_emissora == "FILIAL_DF" else "Matriz Ceará"
 
     html_danfe = f"""<!DOCTYPE html>
 <html lang="pt-BR">

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v49-sanitizacao-limite';
+const CACHE_NAME = 'emed-pwa-v50-fiscal-limpo';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

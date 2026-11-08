@@ -41816,7 +41816,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-      navigator.serviceWorker.register("/sw.js?v=v47").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=v50").then(reg => { if(reg) reg.update(); }).catch(() => {});
 
 
 
@@ -45706,7 +45706,11 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-        const cache = localStorage.getItem("emed_bootstrap_cache");
+        let cache = localStorage.getItem("emed_bootstrap_cache");
+        if (cache && cache.toUpperCase().includes("CLEMIR")) {
+          localStorage.removeItem("emed_bootstrap_cache");
+          cache = null;
+        }
 
 
 
