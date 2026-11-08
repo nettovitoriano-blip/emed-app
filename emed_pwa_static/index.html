@@ -19648,6 +19648,78 @@
 
     .tv-kpi .num { font-size: 28px; font-weight: 900; }
 
+    /* EMED INTERATIVA - CALENDÁRIO & TRELLO */
+    .interativa-kanban-board {
+      display: flex;
+      gap: 16px;
+      overflow-x: auto;
+      padding-bottom: 16px;
+      margin-top: 14px;
+      align-items: flex-start;
+      scrollbar-width: thin;
+      scrollbar-color: #38bdf8 #0f172a;
+    }
+    .interativa-kanban-board::-webkit-scrollbar {
+      height: 8px;
+    }
+    .interativa-kanban-board::-webkit-scrollbar-track {
+      background: #0f172a;
+      border-radius: 4px;
+    }
+    .interativa-kanban-board::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    .interativa-kanban-board::-webkit-scrollbar-thumb:hover {
+      background: #38bdf8;
+    }
+    .interativa-col {
+      flex: 0 0 320px;
+      min-width: 290px;
+      max-width: 340px;
+      background: #090d16;
+      border-radius: 12px;
+      border: 1px solid #1e293b;
+      display: flex;
+      flex-direction: column;
+      max-height: 75vh;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    }
+    .interativa-col-header {
+      padding: 12px 14px;
+      background: #111827;
+      border-top-left-radius: 12px;
+      border-top-right-radius: 12px;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .interativa-col-body {
+      padding: 12px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scrollbar-width: thin;
+    }
+    .interativa-card {
+      background: #1e293b;
+      border-radius: 10px;
+      padding: 12px;
+      border: 1px solid #334155;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .interativa-card:hover {
+      border-color: #38bdf8;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(56, 189, 248, 0.2);
+    }
+
 
 
 
@@ -29980,7 +30052,7 @@
 
 
 
-      <span class="bnav-icon">🚨</span><span>Painel TV</span>
+      <span class="bnav-icon">📺</span><span>Emed Interativa</span>
 
 
 
@@ -40197,7 +40269,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-        { id: "GES_TV", icone: "🚨", titulo: "Painel TV", desc: "Painel de Laboratório: Críticas, Peças e Programadas" },
+        { id: "GES_TV", icone: "📺", titulo: "Emed Interativa", desc: "Escala Diária no Calendário, Kanban Trello e Disparo WhatsApp" },
 
 
 
@@ -40607,7 +40679,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-        { id: "GES_TV", icone: "🚨", titulo: "Painel TV", desc: "Painel de Laboratório separando Críticas, Peças e Programadas" },
+        { id: "GES_TV", icone: "📺", titulo: "Emed Interativa", desc: "Escala Diária no Calendário, Kanban Trello e Disparo WhatsApp" },
 
 
 
@@ -41823,7 +41895,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-      navigator.serviceWorker.register("/sw.js?v=v56").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=v57").then(reg => { if(reg) reg.update(); }).catch(() => {});
 
 
 
@@ -49707,7 +49779,7 @@ function renderizarNavegacao() {
 
             { id: "TEC_OS", icone: "⚡", titulo: "Minhas OS de Campo", desc: "Execução, Check-in, Checklist POP e Assinatura" },
 
-            { id: "GES_TV", icone: "🚨", titulo: "Painel TV de Laboratório", desc: "Críticas, Peças e Programadas" },
+            { id: "GES_TV", icone: "📺", titulo: "Emed Interativa", desc: "Escala Diária no Calendário, Kanban Trello e Disparo WhatsApp" },
 
             { id: "TEC_MANUAIS", icone: "📚", titulo: "Manuais Técnicos, POPs & Vídeos", desc: "Acervo de ITs e Treinamento Offline" },
 
@@ -72331,7 +72403,7 @@ function renderizarNavegacao() {
 
 
 
-     * MENU 8 (GESTOR 3): GESTÃO DE PENDÊNCIAS (PAINEL TV LABORATÓRIO)
+     * MENU 8 (GESTOR 3): EMED INTERATIVA (CALENDÁRIO & ESCALA TRELLO)
 
 
 
@@ -72395,1285 +72467,443 @@ function renderizarNavegacao() {
 
 
 
-    function renderMenuGesTV(box) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      const d = STATE.data;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      const pendentes = (d.ordens || []).filter(o => {
-
-
-
-        const st = (o.status || "").toUpperCase();
-
-
-
-        return !st.includes("CONCLU") && !st.includes("FINALIZ");
-
-
-
-      });
-
-
-
-      const qtdCriticas = pendentes.filter(o => o.categoria_tv === "CRITICA").length;
-
-
-
-      const qtdPeca = pendentes.filter(o => o.categoria_tv === "PECA_ORCAMENTO").length;
-
-
-
-      const qtdProgramadas = pendentes.length - qtdCriticas - qtdPeca;
-
-
-
-
-
-
-
-      const filtradas = pendentes.filter(o => {
-
-
-
-        if (STATE.filtroTV === "TODAS") return true;
-
-
-
-        if (STATE.filtroTV === "CRITICA") return o.categoria_tv === "CRITICA";
-
-
-
-        if (STATE.filtroTV === "PECA_ORCAMENTO") return o.categoria_tv === "PECA_ORCAMENTO";
-
-
-
-        if (STATE.filtroTV === "PROGRAMADA") return o.categoria_tv === "PROGRAMADA" || !["CRITICA", "PECA_ORCAMENTO"].includes(o.categoria_tv);
-
-
-
-        return true;
-
-
-
-      });
-
-
-
-
-
-
-
-      box.innerHTML = `
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        <div class="tv-panel" id="tvFullscreenBox">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <div style="font-size:18px;font-weight:900;color:#38bdf8;">🚨 PAINEL TV DO LABORATÓRIO & GESTÃO DE PENDÊNCIAS</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <div style="font-size:12px;color:#94a3b8;">Monitoramento em Tempo Real de Chamados Críticos, Peças e Preventivas</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <button class="btn btn-amber btn-sm" onclick="alternarTelaCheiaTV()">🖥️ Modo TV Tela Cheia</button>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <div class="tv-kpi-grid">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <div class="tv-kpi" onclick="STATE.filtroTV='TODAS';renderizarTelaPrincipal();" style="cursor:pointer;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <div style="font-size:11px;color:#94a3b8;">TOTAL EM ABERTO</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <div class="num" style="color:#fff;">${pendentes.length}</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <div class="tv-kpi" onclick="STATE.filtroTV='CRITICA';renderizarTelaPrincipal();" style="cursor:pointer;border-color:#ef4444;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <div style="font-size:11px;color:#fca5a5;">🔴 CRÍTICAS / PARADO</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <div class="num" style="color:#f87171;">${qtdCriticas}</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <div class="tv-kpi" onclick="STATE.filtroTV='PECA_ORCAMENTO';renderizarTelaPrincipal();" style="cursor:pointer;border-color:#f59e0b;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <div style="font-size:11px;color:#fde68a;">🟠 AGUARDA PEÇA / ORÇ.</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <div class="num" style="color:#fbbf24;">${qtdPeca}</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <div class="tv-kpi" onclick="STATE.filtroTV='PROGRAMADA';renderizarTelaPrincipal();" style="cursor:pointer;border-color:#38bdf8;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <div style="font-size:11px;color:#bae6fd;">🔵 PROGRAMADAS / PREV.</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <div class="num" style="color:#38bdf8;">${qtdProgramadas}</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <div class="os-grid">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            ${filtradas.map(o => htmlCardOS(o, true)).join("")}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      `;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    function formatarDataInterativa(dtStr) {
+      if (!dtStr || dtStr === "SEM_DATA") return "📋 A Definir / Sem Data";
+      try {
+        const partes = dtStr.split("-");
+        if (partes.length === 3) {
+          const ano = parseInt(partes[0], 10);
+          const mes = parseInt(partes[1], 10) - 1;
+          const dia = parseInt(partes[2], 10);
+          const d = new Date(ano, mes, dia);
+          const diasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+          const diaSem = diasSemana[d.getDay()] || "";
+          const dBr = String(dia).padStart(2, '0') + "/" + String(mes + 1).padStart(2, '0');
+          
+          const hoje = new Date();
+          const hojeStr = hoje.getFullYear() + "-" + String(hoje.getMonth()+1).padStart(2, '0') + "-" + String(hoje.getDate()).padStart(2, '0');
+          if (dtStr === hojeStr) return "🌟 Hoje (" + dBr + ") • " + diaSem;
+          
+          const amg = new Date(); amg.setDate(amg.getDate() + 1);
+          const amgStr = amg.getFullYear() + "-" + String(amg.getMonth()+1).padStart(2, '0') + "-" + String(amg.getDate()).padStart(2, '0');
+          if (dtStr === amgStr) return "⏭️ Amanhã (" + dBr + ") • " + diaSem;
+          
+          return "📅 " + dBr + " • " + diaSem;
+        }
+      } catch(e) {}
+      return dtStr;
     }
 
+    function renderCardInterativo(o) {
+      const st = (o.status || "").toUpperCase();
+      let corBorda = "#38bdf8";
+      let badgeCor = "#0284c7";
+      let badgeTxt = "🔵 " + (o.tipo_servico || "PROGRAMADA");
+      if (o.categoria_tv === "CRITICA" || st.includes("CRITIC") || st.includes("PARAD")) {
+        corBorda = "#ef4444";
+        badgeCor = "#ef4444";
+        badgeTxt = "🔴 CRÍTICA";
+      } else if (o.categoria_tv === "PECA_ORCAMENTO" || (o.solicitacoes_pecas && o.solicitacoes_pecas.length > 0)) {
+        corBorda = "#f59e0b";
+        badgeCor = "#f59e0b";
+        badgeTxt = "🟠 AGUARDA PEÇA";
+      }
+      const dataAg = o.data_agendamento ? String(o.data_agendamento).slice(0, 10).split("-").reverse().join("/") : "--/--";
+      const pendencia = o.pendencia_limpa || o.defeito_relatado || o.servico_executado || "";
+      const pendenciaCurta = pendencia ? esc(pendencia.slice(0, 75)) : "";
 
+      return `
+        <div class="interativa-card" style="border-left: 4px solid ${corBorda};" onclick="abrirModalOS('${esc(o.id)}')">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-weight:900;color:#38bdf8;font-size:13px;">OS #${esc(o.id)}</span>
+            <span style="background:${badgeCor};color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;">${badgeTxt}</span>
+          </div>
+          <div style="font-weight:800;font-size:13px;color:#f8fafc;line-height:1.3;margin-bottom:4px;">${esc(o.cliente || "CLIENTE NÃO INFORMADO")}</div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+            <span style="background:#0f172a;border:1px solid #334155;color:#38bdf8;font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;">🔬 ${esc(o.equipamento || "EQUIPAMENTO")}</span>
+            <span style="font-size:11px;color:#94a3b8;">📍 ${esc(o.cidade || "FORTALEZA")}</span>
+          </div>
+          <div style="font-size:11px;color:#cbd5e1;margin-bottom:6px;">
+            👤 <b>Técnico:</b> <span style="color:#67e8f9;">${esc(o.tecnico_responsavel || "A DEFINIR")}</span> &bull; 🗓️ ${dataAg}
+          </div>
+          ${pendenciaCurta ? `
+            <div style="background:#0b1120;border:1px dashed #334155;border-radius:6px;padding:4px 6px;font-size:10.5px;color:#fde047;margin-bottom:8px;line-height:1.2;">
+              ⚠️ ${pendenciaCurta}
+            </div>
+          ` : ''}
+          <div style="display:flex;gap:6px;margin-top:6px;" onclick="event.stopPropagation();">
+            <button class="btn btn-primary btn-xs" style="flex:1;padding:3px 6px;font-size:11px;border-radius:4px;" onclick="abrirModalOS('${esc(o.id)}')">⚡ Executar</button>
+            <button class="btn btn-outline btn-xs" style="border-color:#38bdf8;color:#38bdf8;padding:3px 6px;font-size:11px;border-radius:4px;" onclick="iniciarRotaTecnico('${esc(o.id)}')">🗺️ Rota</button>
+            <button class="btn btn-xs" style="background:#25d366;color:#fff;border:none;padding:3px 6px;font-size:11px;border-radius:4px;" onclick="interativaDispararZapOS('${esc(o.id)}')">💬 Zap</button>
+          </div>
+        </div>
+      `;
+    }
 
+    function renderMenuGesTV(box) {
+      const d = STATE.data;
+      if (!STATE.interativaTecnico) STATE.interativaTecnico = "TODOS";
+      if (!STATE.interativaVisao) STATE.interativaVisao = "CALENDARIO"; // 'CALENDARIO' ou 'TRELLO_TECNICOS'
+      if (!STATE.filtroTV) STATE.filtroTV = "TODAS";
 
+      const pendentes = (d.ordens || []).filter(o => {
+        const st = (o.status || "").toUpperCase();
+        return !st.includes("CONCLU") && !st.includes("FINALIZ");
+      });
 
+      const qtdCriticas = pendentes.filter(o => o.categoria_tv === "CRITICA").length;
+      const qtdPeca = pendentes.filter(o => o.categoria_tv === "PECA_ORCAMENTO").length;
+      const qtdProgramadas = pendentes.length - qtdCriticas - qtdPeca;
 
+      // Lista de técnicos para o dropdown
+      const setTecnicos = new Set();
+      (d.tecnicos || []).forEach(t => {
+        const nm = typeof t === "string" ? t : (t.nome || "");
+        if (nm) setTecnicos.add(nm.toUpperCase());
+      });
+      pendentes.forEach(o => {
+        if (o.tecnico_responsavel) setTecnicos.add(o.tecnico_responsavel.toUpperCase());
+      });
+      const listaTecnicos = Array.from(setTecnicos).sort();
 
+      // Filtragem por status e por técnico
+      const filtradas = pendentes.filter(o => {
+        if (STATE.filtroTV === "CRITICA" && o.categoria_tv !== "CRITICA") return false;
+        if (STATE.filtroTV === "PECA_ORCAMENTO" && o.categoria_tv !== "PECA_ORCAMENTO") return false;
+        if (STATE.filtroTV === "PROGRAMADA" && (o.categoria_tv === "CRITICA" || o.categoria_tv === "PECA_ORCAMENTO")) return false;
+        if (STATE.interativaTecnico !== "TODOS" && (o.tecnico_responsavel || "").toUpperCase() !== STATE.interativaTecnico) return false;
+        return true;
+      });
 
+      // Montagem do Kanban
+      let kanbanHtml = "";
+      if (filtradas.length === 0) {
+        kanbanHtml = `
+          <div style="background:#1e293b;border-radius:12px;padding:36px;text-align:center;color:#94a3b8;margin-top:20px;border:1px dashed #334155;">
+            <div style="font-size:36px;margin-bottom:8px;">✅</div>
+            <div style="font-size:16px;font-weight:700;color:#f8fafc;">Nenhum chamado encontrado para este filtro</div>
+            <div style="font-size:13px;color:#64748b;margin-top:4px;">Altere o técnico selecionado ou o status para visualizar outras escalas.</div>
+          </div>
+        `;
+      } else if (STATE.interativaVisao === "CALENDARIO") {
+        // Agrupar por data de agendamento
+        const gruposData = {};
+        filtradas.forEach(o => {
+          const dKey = o.data_agendamento ? String(o.data_agendamento).slice(0, 10) : "SEM_DATA";
+          if (!gruposData[dKey]) gruposData[dKey] = [];
+          gruposData[dKey].push(o);
+        });
 
+        const chavesOrdenadas = Object.keys(gruposData).sort((a, b) => {
+          if (a === "SEM_DATA") return 1;
+          if (b === "SEM_DATA") return -1;
+          return a.localeCompare(b);
+        });
 
+        kanbanHtml = `<div class="interativa-kanban-board">`;
+        chavesOrdenadas.forEach(dKey => {
+          const chamadosDia = gruposData[dKey];
+          const labelDia = formatarDataInterativa(dKey);
+          kanbanHtml += `
+            <div class="interativa-col">
+              <div class="interativa-col-header">
+                <div>
+                  <div style="font-size:13px;font-weight:800;color:#f8fafc;display:flex;align-items:center;gap:6px;">
+                    ${labelDia}
+                  </div>
+                  <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${chamadosDia.length} chamado(s) alocado(s)</div>
+                </div>
+                <button class="btn btn-xs" onclick="interativaDispararWhatsAppDia('${dKey}')" title="Disparar escala deste dia no WhatsApp" style="background:#22c55e;color:#fff;border:none;border-radius:6px;padding:3px 7px;font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer;">
+                  📲 Zap Dia
+                </button>
+              </div>
+              <div class="interativa-col-body">
+                ${chamadosDia.map(o => renderCardInterativo(o)).join("")}
+              </div>
+            </div>
+          `;
+        });
+        kanbanHtml += `</div>`;
+      } else {
+        // Visão Trello por Técnicos
+        const gruposTec = {};
+        filtradas.forEach(o => {
+          const tKey = (o.tecnico_responsavel || "A DEFINIR / PLANTÃO").toUpperCase();
+          if (!gruposTec[tKey]) gruposTec[tKey] = [];
+          gruposTec[tKey].push(o);
+        });
 
+        const tecsOrdenados = Object.keys(gruposTec).sort();
 
+        kanbanHtml = `<div class="interativa-kanban-board">`;
+        tecsOrdenados.forEach(tKey => {
+          const chamadosTec = gruposTec[tKey];
+          chamadosTec.sort((a, b) => String(a.data_agendamento || "").localeCompare(String(b.data_agendamento || "")));
+          kanbanHtml += `
+            <div class="interativa-col">
+              <div class="interativa-col-header">
+                <div>
+                  <div style="font-size:13px;font-weight:800;color:#f8fafc;display:flex;align-items:center;gap:6px;">
+                    👤 ${tKey}
+                  </div>
+                  <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${chamadosTec.length} chamado(s) atribuído(s)</div>
+                </div>
+                <button class="btn btn-xs" onclick="interativaDispararWhatsAppTecnico('${tKey}')" title="Disparar escala deste técnico no WhatsApp" style="background:#22c55e;color:#fff;border:none;border-radius:6px;padding:3px 7px;font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer;">
+                  📲 Zap Escala
+                </button>
+              </div>
+              <div class="interativa-col-body">
+                ${chamadosTec.map(o => renderCardInterativo(o)).join("")}
+              </div>
+            </div>
+          `;
+        });
+        kanbanHtml += `</div>`;
+      }
 
+      box.innerHTML = `
+        <div class="tv-panel" id="tvFullscreenBox">
+          <!-- CABEÇALHO EMED INTERATIVA -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+            <div>
+              <div style="font-size:20px;font-weight:900;color:#38bdf8;display:flex;align-items:center;gap:8px;">
+                📺 EMED INTERATIVA
+              </div>
+              <div style="font-size:12px;color:#94a3b8;">Escala Diária no Calendário & Distribuição da Equipe estilo Trello</div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn btn-sm" onclick="interativaDispararWhatsAppTecnico()" style="background:#22c55e;color:#fff;border:none;display:inline-flex;align-items:center;gap:5px;font-weight:700;cursor:pointer;">
+                📲 Zap Técnico
+              </button>
+              <button class="btn btn-sm" onclick="interativaDispararWhatsAppGrupo()" style="background:#16a34a;color:#fff;border:none;display:inline-flex;align-items:center;gap:5px;font-weight:700;cursor:pointer;">
+                👥 Zap Grupo EMED
+              </button>
+              <button class="btn btn-amber btn-sm" onclick="alternarTelaCheiaTV()">
+                🖥️ Modo TV Tela Cheia
+              </button>
+            </div>
+          </div>
 
+          <!-- BARRA DE CONTROLE: SELETOR DE TÉCNICO & MODO DE VISÃO -->
+          <div style="background:#111827;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;border:1px solid #1e293b;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span style="font-size:12px;font-weight:800;color:#94a3b8;">FILTRAR TÉCNICO:</span>
+              <select id="tvFiltroTecnico" class="form-control" style="background:#1e293b;color:#f8fafc;border-color:#334155;font-weight:700;border-radius:6px;padding:4px 10px;font-size:12px;" onchange="STATE.interativaTecnico=this.value;renderMenuGesTV(document.getElementById('conteudoPrincipal'));">
+                <option value="TODOS" ${STATE.interativaTecnico==='TODOS'?'selected':''}>👥 Todos os Técnicos (${pendentes.length} OS)</option>
+                ${listaTecnicos.map(t => {
+                  const qtd = pendentes.filter(o => (o.tecnico_responsavel || '').toUpperCase() === t).length;
+                  return `<option value="${t}" ${STATE.interativaTecnico===t?'selected':''}>👤 ${t} (${qtd} OS)</option>`;
+                }).join("")}
+              </select>
+            </div>
 
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:12px;font-weight:800;color:#94a3b8;">VISUALIZAÇÃO:</span>
+              <button class="btn btn-xs ${STATE.interativaVisao==='CALENDARIO'?'btn-primary':'btn-outline'}" style="font-size:11.5px;padding:4px 10px;border-radius:6px;" onclick="STATE.interativaVisao='CALENDARIO';renderMenuGesTV(document.getElementById('conteudoPrincipal'));">
+                📅 Calendário (Dias)
+              </button>
+              <button class="btn btn-xs ${STATE.interativaVisao==='TRELLO_TECNICOS'?'btn-primary':'btn-outline'}" style="font-size:11.5px;padding:4px 10px;border-radius:6px;" onclick="STATE.interativaVisao='TRELLO_TECNICOS';renderMenuGesTV(document.getElementById('conteudoPrincipal'));">
+                📋 Trello (Técnicos)
+              </button>
+            </div>
+          </div>
 
+          <!-- KPIS DE STATUS (FILTROS) -->
+          <div class="tv-kpi-grid">
+            <div class="tv-kpi" onclick="STATE.filtroTV='TODAS';renderMenuGesTV(document.getElementById('conteudoPrincipal'));" style="cursor:pointer;${STATE.filtroTV==='TODAS'?'border-color:#38bdf8;box-shadow:0 0 10px rgba(56,189,248,0.3);':''}">
+              <div style="font-size:11px;color:#94a3b8;">TOTAL EM ABERTO</div>
+              <div class="num" style="color:#fff;">${pendentes.length}</div>
+            </div>
+            <div class="tv-kpi" onclick="STATE.filtroTV='CRITICA';renderMenuGesTV(document.getElementById('conteudoPrincipal'));" style="cursor:pointer;border-color:#ef4444;${STATE.filtroTV==='CRITICA'?'box-shadow:0 0 10px rgba(239,68,68,0.4);':''}">
+              <div style="font-size:11px;color:#fca5a5;">🔴 CRÍTICAS / PARADO</div>
+              <div class="num" style="color:#f87171;">${qtdCriticas}</div>
+            </div>
+            <div class="tv-kpi" onclick="STATE.filtroTV='PECA_ORCAMENTO';renderMenuGesTV(document.getElementById('conteudoPrincipal'));" style="cursor:pointer;border-color:#f59e0b;${STATE.filtroTV==='PECA_ORCAMENTO'?'box-shadow:0 0 10px rgba(245,158,11,0.4);':''}">
+              <div style="font-size:11px;color:#fde68a;">🟠 AGUARDA PEÇA / ORÇ.</div>
+              <div class="num" style="color:#fbbf24;">${qtdPeca}</div>
+            </div>
+            <div class="tv-kpi" onclick="STATE.filtroTV='PROGRAMADA';renderMenuGesTV(document.getElementById('conteudoPrincipal'));" style="cursor:pointer;border-color:#38bdf8;${STATE.filtroTV==='PROGRAMADA'?'box-shadow:0 0 10px rgba(56,189,248,0.4);':''}">
+              <div style="font-size:11px;color:#bae6fd;">🔵 PROGRAMADAS / PREV.</div>
+              <div class="num" style="color:#38bdf8;">${qtdProgramadas}</div>
+            </div>
+          </div>
 
+          <!-- KANBAN CALENDÁRIO / TRELLO -->
+          ${kanbanHtml}
+        </div>
+      `;
+    }
 
+    function interativaDispararWhatsAppTecnico(tecAlvo) {
+      const d = STATE.data;
+      let tec = tecAlvo || STATE.interativaTecnico;
+      if (!tec || tec === "TODOS") {
+        const tecsComOS = [...new Set((d.ordens || []).filter(o => {
+          const st = (o.status || "").toUpperCase();
+          return !st.includes("CONCLU") && !st.includes("FINALIZ");
+        }).map(o => (o.tecnico_responsavel || "").toUpperCase()).filter(Boolean))];
+        if (tecsComOS.length === 0) {
+          alert("Nenhum técnico com chamados pendentes no momento.");
+          return;
+        }
+        tec = prompt("Digite o nome do técnico para envio da escala:\n\nOpções disponíveis: " + tecsComOS.join(", "), tecsComOS[0]);
+        if (!tec) return;
+        tec = tec.trim().toUpperCase();
+      }
 
+      const ordensTec = (d.ordens || []).filter(o => {
+        const st = (o.status || "").toUpperCase();
+        return !st.includes("CONCLU") && !st.includes("FINALIZ") && (o.tecnico_responsavel || "").toUpperCase() === tec;
+      });
+      if (ordensTec.length === 0) {
+        alert("Não há chamados pendentes para o técnico " + tec);
+        return;
+      }
 
+      const infoTec = (d.tecnicos || []).find(t => (t.nome || "").toUpperCase() === tec);
+      let fone = infoTec && infoTec.telefone ? String(infoTec.telefone).replace(/\D/g, "") : "";
+      if (fone && !fone.startsWith("55") && (fone.length === 10 || fone.length === 11)) {
+        fone = "55" + fone;
+      }
 
+      const agoraData = new Date().toLocaleDateString("pt-BR");
+      let msg = "🏥 *EMED ELETRONICA & MEDICINA*\n";
+      msg += "📅 *ESCALA DE ATENDIMENTOS EM CAMPO*\n";
+      msg += "👤 *Técnico:* " + tec + "\n";
+      msg += "🗓️ *Data de Emissão:* " + agoraData + "\n";
+      msg += "------------------------------------\n\n";
 
+      ordensTec.forEach((o) => {
+        const dataAg = o.data_agendamento ? String(o.data_agendamento).slice(0, 10).split("-").reverse().join("/") : "A Definir";
+        const statusTxt = o.categoria_tv === "CRITICA" ? "🔴 CRÍTICA" : (o.categoria_tv === "PECA_ORCAMENTO" ? "🟠 AGUARDA PEÇA" : "🔵 PROGRAMADA");
+        msg += "🛠️ *CHAMADO #" + o.id + "* [" + statusTxt + "]\n";
+        msg += "• *Cliente:* " + (o.cliente || "N/D") + "\n";
+        msg += "• *Equipamento:* " + (o.equipamento || "N/D") + "\n";
+        msg += "• *Cidade:* " + (o.cidade || "FORTALEZA") + "\n";
+        msg += "• *Data Agendada:* " + dataAg + "\n";
+        msg += "• *Tipo:* " + (o.tipo_servico || "CORRETIVA") + "\n";
+        if (o.pendencia_limpa || o.defeito_relatado) {
+          msg += "• *Relato/Pendência:* " + String(o.pendencia_limpa || o.defeito_relatado).slice(0, 100) + "\n";
+        }
+        msg += "\n";
+      });
 
+      msg += "------------------------------------\n";
+      msg += "⚡ Total de atendimentos: *" + ordensTec.length + "*\n";
+      msg += "📱 Acesse o PWA EMED para check-in, laudo e fotos com chancela forense.\n";
+      msg += "🚀 Bom trabalho! Conte com o suporte da central EMED.";
 
+      const url = fone 
+        ? "https://api.whatsapp.com/send?phone=" + fone + "&text=" + encodeURIComponent(msg)
+        : "https://api.whatsapp.com/send?text=" + encodeURIComponent(msg);
+      window.open(url, "_blank");
+    }
 
+    function interativaDispararWhatsAppGrupo() {
+      const d = STATE.data;
+      const pendentes = (d.ordens || []).filter(o => {
+        const st = (o.status || "").toUpperCase();
+        return !st.includes("CONCLU") && !st.includes("FINALIZ");
+      });
+      if (pendentes.length === 0) {
+        alert("Não há chamados pendentes para distribuição.");
+        return;
+      }
 
+      const tecMap = {};
+      pendentes.forEach(o => {
+        const tec = (o.tecnico_responsavel || "A DEFINIR / PLANTÃO").toUpperCase();
+        if (!tecMap[tec]) tecMap[tec] = [];
+        tecMap[tec].push(o);
+      });
 
+      const agoraData = new Date().toLocaleDateString("pt-BR");
+      let msg = "📋 *EMED INTERATIVA - DISTRIBUIÇÃO DIÁRIA DE CHAMADOS* 📋\n";
+      msg += "📅 *Escala Operacional EMED* • " + agoraData + "\n";
+      msg += "------------------------------------\n\n";
 
+      const tecs = Object.keys(tecMap).sort();
+      tecs.forEach(tec => {
+        const lista = tecMap[tec];
+        msg += "👤 *TÉCNICO: " + tec + "* (" + lista.length + " chamado" + (lista.length > 1 ? "s" : "") + ")\n";
+        lista.forEach(o => {
+          const dataAg = o.data_agendamento ? String(o.data_agendamento).slice(0, 10).split("-").reverse().join("/") : "--/--";
+          const badgeStatus = o.categoria_tv === "CRITICA" ? "🔴" : (o.categoria_tv === "PECA_ORCAMENTO" ? "🟠" : "🔵");
+          msg += "  " + badgeStatus + " *OS #" + o.id + "* - " + o.cliente + " (" + (o.equipamento || "Equipamento") + " - " + (o.cidade || "CE") + ") | " + dataAg + "\n";
+        });
+        msg += "\n";
+      });
 
+      msg += "------------------------------------\n";
+      msg += "⚡ *Total de Atendimentos em Aberto:* " + pendentes.length + "\n";
+      msg += "🏥 *Equipe Técnica EMED em Campo com Excelência!* 🚀";
 
+      const url = "https://api.whatsapp.com/send?text=" + encodeURIComponent(msg);
+      window.open(url, "_blank");
+    }
 
+    function interativaDispararWhatsAppDia(dKey) {
+      const d = STATE.data;
+      const pendentes = (d.ordens || []).filter(o => {
+        const st = (o.status || "").toUpperCase();
+        if (st.includes("CONCLU") || st.includes("FINALIZ")) return false;
+        const oKey = o.data_agendamento ? String(o.data_agendamento).slice(0, 10) : "SEM_DATA";
+        return oKey === dKey;
+      });
 
+      if (pendentes.length === 0) {
+        alert("Não há chamados para esta data.");
+        return;
+      }
 
+      const labelData = formatarDataInterativa(dKey);
+      let msg = "📅 *EMED INTERATIVA - ESCALA DO DIA* 📅\n";
+      msg += "🗓️ *Referência:* " + labelData + "\n";
+      msg += "------------------------------------\n\n";
 
+      const tecMap = {};
+      pendentes.forEach(o => {
+        const tec = (o.tecnico_responsavel || "A DEFINIR / PLANTÃO").toUpperCase();
+        if (!tecMap[tec]) tecMap[tec] = [];
+        tecMap[tec].push(o);
+      });
 
+      const tecs = Object.keys(tecMap).sort();
+      tecs.forEach(tec => {
+        const lista = tecMap[tec];
+        msg += "👤 *Técnico:* " + tec + " (" + lista.length + " atendimento" + (lista.length > 1 ? "s" : "") + ")\n";
+        lista.forEach(o => {
+          msg += "• *OS #" + o.id + "* - " + o.cliente + " (" + (o.equipamento || "Equipamento") + " - " + (o.cidade || "CE") + ")\n";
+        });
+        msg += "\n";
+      });
 
+      msg += "------------------------------------\n";
+      msg += "⚡ *Total de atendimentos neste dia:* " + pendentes.length + "\n";
+      msg += "🚀 Equipe EMED em ação!";
 
+      const url = "https://api.whatsapp.com/send?text=" + encodeURIComponent(msg);
+      window.open(url, "_blank");
+    }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    function interativaDispararZapOS(osId) {
+      const o = (STATE.data.ordens || []).find(x => String(x.id) === String(osId));
+      if (!o) return;
+      const dataAg = o.data_agendamento ? String(o.data_agendamento).slice(0, 10).split("-").reverse().join("/") : "A Definir";
+      let msg = "🏥 *EMED ELETRONICA & MEDICINA*\n";
+      msg += "📋 *Chamado Técnico OS #" + o.id + "*\n";
+      msg += "• *Cliente:* " + o.cliente + "\n";
+      msg += "• *Equipamento:* " + o.equipamento + "\n";
+      msg += "• *Cidade:* " + (o.cidade || "FORTALEZA") + "\n";
+      msg += "• *Técnico Responsável:* " + (o.tecnico_responsavel || "A DEFINIR") + "\n";
+      msg += "• *Data Agendada:* " + dataAg + "\n";
+      msg += "• *Status:* " + (o.status || "ATIVO") + "\n";
+      if (o.pendencia_limpa || o.defeito_relatado) {
+        msg += "• *Defeito/Pendência:* " + (o.pendencia_limpa || o.defeito_relatado) + "\n";
+      }
+      const url = "https://api.whatsapp.com/send?text=" + encodeURIComponent(msg);
+      window.open(url, "_blank");
+    }
 
     function alternarTelaCheiaTV() {
 

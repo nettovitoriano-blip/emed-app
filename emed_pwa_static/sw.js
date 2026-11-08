@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v56-icones-limpos';
+const CACHE_NAME = 'emed-pwa-v57-emed-interativa';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
