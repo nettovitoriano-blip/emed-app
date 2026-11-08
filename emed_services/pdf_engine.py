@@ -453,22 +453,50 @@ def render_markdown_to_pdf(md_file_path: str, output_pdf_path: str) -> str:
 
 
 def converter_html_para_pdf_bytes(html_content: str) -> bytes:
-    """Converte conteúdo HTML diretamente para bytes de PDF na memória."""
+    """Converte conteúdo HTML diretamente para bytes de PDF na memória.
+    Mantém a OS inteira na Página 1 A4 e posiciona Anexos/Checklist/Fotos a partir da Página 2."""
     import tempfile
+    import re as _re
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         tmp_path = tmp.name
 
     try:
-        story = pymupdf.Story(html=html_content)
-        writer = pymupdf.DocumentWriter(tmp_path)
+        html_content = _re.sub(r'<div class="no-print"[^>]*>.*?</div>', "", html_content, flags=_re.S)
         mediabox = pymupdf.Rect(0, 0, 595, 842)
-        content_rect = pymupdf.Rect(28, 28, 595 - 28, 842 - 28)
-        more = 1
-        while more:
-            dev = writer.begin_page(mediabox)
-            more, filled = story.place(content_rect)
-            story.draw(dev)
-            writer.end_page()
+        content_rect = pymupdf.Rect(20, 16, 595 - 20, 842 - 16)
+        writer = pymupdf.DocumentWriter(tmp_path)
+
+        if "<!-- PAGE_BREAK_ANEXOS -->" in html_content:
+            m_head = _re.search(r"(<head>.*?</head>)", html_content, flags=_re.S | _re.I)
+            head_html = m_head.group(1) if m_head else ""
+            partes = html_content.split("<!-- PAGE_BREAK_ANEXOS -->")
+            for idx_p, parte in enumerate(partes):
+                if "<html" not in parte.lower():
+                    parte_full = f"<!DOCTYPE html><html>{head_html}<body>{parte}</body></html>"
+                else:
+                    if not parte.strip().endswith("</html>"):
+                        parte_full = parte + "</body></html>"
+                    else:
+                        parte_full = parte
+                story = pymupdf.Story(html=parte_full)
+                more = 1
+                while more:
+                    dev = writer.begin_page(mediabox)
+                    more, filled = story.place(content_rect)
+                    story.draw(dev)
+                    writer.end_page()
+                    if idx_p == 0:
+                        # Garantir que a Página 1 (OS principal) ocupe apenas 1 página
+                        break
+        else:
+            story = pymupdf.Story(html=html_content)
+            more = 1
+            while more:
+                dev = writer.begin_page(mediabox)
+                more, filled = story.place(content_rect)
+                story.draw(dev)
+                writer.end_page()
+
         writer.close()
 
         with open(tmp_path, "rb") as f:

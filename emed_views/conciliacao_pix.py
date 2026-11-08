@@ -150,17 +150,76 @@ def liquidar_pagamento_pix(db_name: str, os_id: str, txid: str = "", metodo: str
                     atualizado_em = ?
                 WHERE os_id = ? OR os_id = ?
             """, (agora, target_os_id, str(os_id)))
-
-            # Atualiza a tabela operacional clientes_equipamentos (para mudar na tela para PAGO)
-            cursor.execute("""
-                UPDATE clientes_equipamentos
-                SET condicao_pagamento = 'PAGO VIA PIX (CONCILIAÇÃO BANCÁRIA)'
-                WHERE id = ? OR id = ?
-            """, (str(os_id), str(target_os_id)))
             conn.commit()
         return True, f"Pagamento da OS #{os_id} confirmado com sucesso via {metodo}! E2E ID: {e2e_id}"
     except Exception as e:
         return False, f"Erro ao liquidar pagamento: {str(e)}"
+
+
+def conciliar_pagamento_bancario_duplo(
+    db_name: str,
+    cnpj: str = "",
+    valor: float = 0.0,
+    txid: str = "",
+    end_to_end_id: str = "",
+    nome_pagador: str = ""
+) -> dict:
+    """Realiza a conciliação bancária dupla de pagamentos PIX:
+    1º Cruzamento: Via TXID / Identificador da OS (ex: EMED-OS-41 ou 41).
+    2º Cruzamento: Via CNPJ do pagador + Valor exato (tolerância de R$ 0,05).
+    Se identificado, liquida a OS automaticamente no sistema."""
+    inicializar_tabela_pix(db_name)
+    os_id_encontrado = ""
+    cliente_encontrado = nome_pagador or "CLIENTE NÃO IDENTIFICADO"
+    valor_float = float(valor or 0.0)
+
+    # 1. Tentar por TXID
+    if txid:
+        match = re.search(r'\d+', txid)
+        if match:
+            candidato_os = match.group(0)
+            with sqlite3.connect(db_name) as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT os_id, cliente FROM notas_fiscais WHERE os_id = ? OR os_id = ?", (candidato_os, str(candidato_os)))
+                row = cur.fetchone()
+                if row:
+                    os_id_encontrado = str(row[0])
+                    cliente_encontrado = row[1] or cliente_encontrado
+
+    # 2. Se não encontrou por TXID, tentar por CNPJ limpo + Valor
+    if not os_id_encontrado and (cnpj or valor_float > 0):
+        with sqlite3.connect(db_name) as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT os_id, cliente, valor_liquido FROM notas_fiscais WHERE status_fiscal != 'LIQUIDADO / PAGO VIA PIX'")
+            for r in cur.fetchall():
+                v_db = float(r[2] or 0.0)
+                if abs(v_db - valor_float) <= 0.05:
+                    os_id_encontrado = str(r[0])
+                    cliente_encontrado = r[1] or cliente_encontrado
+                    break
+
+    if os_id_encontrado:
+        sucesso, msg = liquidar_pagamento_pix(
+            db_name,
+            os_id=os_id_encontrado,
+            txid=txid,
+            metodo=f"CONCILIAÇÃO_BANCÁRIA_DUPLA (E2E: {end_to_end_id or 'N/A'})"
+        )
+        return {
+            "conciliado": True,
+            "os_id": os_id_encontrado,
+            "cliente": cliente_encontrado,
+            "valor": valor_float,
+            "mensagem": msg
+        }
+
+    return {
+        "conciliado": False,
+        "os_id": "",
+        "cliente": cliente_encontrado,
+        "valor": valor_float,
+        "mensagem": "Pagamento recebido mas não vinculado automaticamente a nenhuma OS em aberto."
+    }
 
 
 def render_conciliacao_pix(ctx: AppContext):
@@ -379,91 +438,3 @@ def render_conciliacao_pix(ctx: AppContext):
             st.session_state["cfg_nome_pix"] = cfg_nome
             st.session_state["cfg_cidade_pix"] = cfg_cid
             st.success("✅ Configurações de recebimento PIX atualizadas com sucesso!")
-
-
-
-def conciliar_pagamento_bancario_duplo(db_name: str, cnpj: str = "", valor: float = 0.0, txid: str = "", end_to_end_id: str = "", nome_pagador: str = "") -> dict:
-    """
-    Inteligência de Conciliação Bancária Automática:
-    1º Tenta identificar pelo txid único (PIX padrão BACEN).
-    2º Caso seja Pix avulso/TED, cruza o CNPJ do tomador + Valor exato da OS pendente.
-    3º Realiza a baixa automática imediata em clientes_equipamentos e notas_fiscais.
-    """
-    cnpj_limpo = re.sub(r'\D', '', str(cnpj or ""))
-    val_float = float(valor or 0.0)
-    txid_limpo = str(txid or "").strip()
-    agora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    e2e = end_to_end_id or f"E2E{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{os.urandom(3).hex().upper()}"
-
-    os_encontrada = None
-    cliente_encontrado = ""
-
-    with sqlite3.connect(db_name) as conn:
-        cur = conn.cursor()
-
-        # 1. Busca por txid se fornecido
-        if txid_limpo:
-            # Tenta extrair ID numérico do txid (ex: EMED-OS-84 ou PIX_APP_84)
-            match_os = re.search(r'OS[-_]?(\d+)', txid_limpo, re.IGNORECASE)
-            if match_os:
-                cand_id = match_os.group(1)
-                cur.execute("SELECT id, cliente, valor_os FROM clientes_equipamentos WHERE id = ?", (cand_id,))
-                r = cur.fetchone()
-                if r:
-                    os_encontrada = str(r[0])
-                    cliente_encontrado = str(r[1])
-
-        # 2. Se não achou por txid, faz o Cruzamento Duplo: CNPJ do Pagador + Valor Exato
-        if not os_encontrada and val_float > 0:
-            # Busca OS aberta compatível com o CNPJ ou nome do cliente
-            query = """
-                SELECT id, cliente, valor_os 
-                FROM clientes_equipamentos 
-                WHERE (UPPER(condicao_pagamento) NOT LIKE '%PAGO%' AND UPPER(condicao_pagamento) NOT LIKE '%LIQUIDADO%')
-                  AND abs(valor_os - ?) < 0.05
-            """
-            params = [val_float]
-
-            if cnpj_limpo:
-                query += " AND (replace(replace(replace(cnpj, '.', ''), '/', ''), '-', '') = ? OR UPPER(cliente) LIKE ?)"
-                params.extend([cnpj_limpo, f"%{str(nome_pagador or '').strip().upper()}%"])
-            elif nome_pagador:
-                query += " AND UPPER(cliente) LIKE ?"
-                params.append(f"%{str(nome_pagador).strip().upper()}%")
-
-            query += " ORDER BY id DESC LIMIT 1"
-            cur.execute(query, tuple(params))
-            r = cur.fetchone()
-            if r:
-                os_encontrada = str(r[0])
-                cliente_encontrado = str(r[1])
-
-    if os_encontrada:
-        ok, msg = liquidar_pagamento_pix(db_name, os_encontrada, txid=txid_limpo, metodo="WEBHOOK_AUTOMATICO_BANCO")
-        return {
-            "ok": True,
-            "conciliado": True,
-            "os_id": os_encontrada,
-            "cliente": cliente_encontrado,
-            "valor": val_float,
-            "e2e_id": e2e,
-            "metodo_identificacao": "TXID_BACEN" if txid_limpo and os_encontrada in txid_limpo else "CRUZAMENTO_CNPJ_VALOR",
-            "msg": f"✅ Baixa bancária automática confirmada! OS #{os_encontrada} ({cliente_encontrado}) liquidada via Pix/Banco."
-        }
-    else:
-        # Registra como crédito recebido a conciliar para o financeiro
-        with sqlite3.connect(db_name) as conn:
-            cur = conn.cursor()
-            cur.execute("""
-                INSERT INTO pagamentos_pix (os_id, cliente, cnpj, valor, chave_pix, status_pagamento, txid, e2e_id, data_geracao, data_pagamento, metodo)
-                VALUES ('PENDENTE', ?, ?, ?, 'financeiro@emed.med.br', 'A_CONCILIAR', ?, ?, ?, ?, 'PIX_AVULSO_SEM_OS')
-            """, (str(nome_pagador or 'CLIENTE DESCONHECIDO'), str(cnpj or ''), val_float, txid_limpo, e2e, agora, agora))
-            conn.commit()
-
-        return {
-            "ok": True,
-            "conciliado": False,
-            "valor": val_float,
-            "e2e_id": e2e,
-            "msg": f"⚠️ Recebimento de R$ {val_float:,.2f} registrado. Nenhuma OS em aberto com valor/CNPJ correspondente exato. Registro salvo em 'A Conciliar'."
-        }

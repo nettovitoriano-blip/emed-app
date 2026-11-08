@@ -536,45 +536,207 @@ def render_solicitacao_pecas(ctx: AppContext):
             st.dataframe(df_sol_vis[cols_exibir].rename(columns=cols_renomear), use_container_width=True, hide_index=True)
 
 
+def _normalizar_cidade(txt: str) -> str:
+    if not txt:
+        return ""
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize('NFKD', str(txt)) if not unicodedata.combining(c)).strip().lower()
+
+
+COORDENADAS_BRASIL = {
+    # DISTRITO FEDERAL & POLO CENTRO-OESTE
+    "brasilia": (-15.7975, -47.8919),
+    "taguatinga": (-15.8331, -48.0567),
+    "asa sul": (-15.8205, -47.9300),
+    "asa norte": (-15.7650, -47.8850),
+    "vicente pires": (-15.8080, -48.0170),
+    "aguas claras": (-15.8398, -48.0264),
+    "ceilandia": (-15.8200, -48.1100),
+    "guara": (-15.8190, -47.9850),
+    "sobradinho": (-15.6520, -47.7880),
+    "gama": (-16.0200, -48.0600),
+    "goiania": (-16.6869, -49.2648),
+    "anapolis": (-16.3267, -48.9533),
+    "rio verde": (-17.7925, -50.9192),
+
+    # CEARÁ & POLO NORDESTE
+    "fortaleza": (-3.7172, -38.5433),
+    "fotaleza": (-3.7172, -38.5433),
+    "eusebio": (-3.8856, -38.4614),
+    "juazeiro": (-7.2009, -39.3148),
+    "juazeiro do norte": (-7.2009, -39.3148),
+    "crato": (-7.2347, -39.4069),
+    "barbalha": (-7.3086, -39.3039),
+    "sobral": (-3.6895, -40.3486),
+    "taua": (-6.0044, -40.2934),
+    "iguatu": (-6.3594, -39.2986),
+    "tiangua": (-3.7325, -40.9922),
+    "crateus": (-5.1764, -40.6761),
+    "quixada": (-4.9714, -39.0153),
+    "russas": (-4.9403, -37.9753),
+    "itapipoca": (-3.4947, -39.5786),
+    "maracanau": (-3.8681, -38.6253),
+    "caucaia": (-3.7364, -38.6531),
+    "poranga": (-4.7450, -40.9256),
+
+    # DEMAIS ESTADOS / POLOS REGIONAIS
+    "araripina": (-7.4811, -40.4994),
+    "petrolina": (-9.3875, -40.5028),
+    "recife": (-8.0476, -34.8770),
+    "caruaru": (-8.2833, -35.9761),
+    "mossoro": (-5.1878, -37.3442),
+    "natal": (-5.7945, -35.2110),
+    "joao pessoa": (-7.1153, -34.8610),
+    "campina grande": (-7.2247, -35.8772),
+    "catole": (-6.3439, -37.7467),
+    "teresina": (-5.0920, -42.8038),
+    "parnaiba": (-3.0039, -41.7761),
+    "salvador": (-12.9777, -38.5016),
+    "sao luis": (-2.5307, -44.3068),
+    "belo horizonte": (-19.9167, -43.9345),
+    "sao paulo": (-23.5505, -46.6333),
+    "rio de janeiro": (-22.9068, -43.1729)
+}
+
+
+def resolver_coordenadas_cliente(cidade: str, estado: str = "", endereco: str = "", lat_cad=None, lon_cad=None):
+    try:
+        if lat_cad is not None and lon_cad is not None and not pd.isna(lat_cad) and not pd.isna(lon_cad):
+            l1, l2 = float(lat_cad), float(lon_cad)
+            if l1 != 0.0 and l2 != 0.0:
+                return l1, l2
+    except Exception:
+        pass
+
+    cid_n = _normalizar_cidade(cidade)
+    end_n = _normalizar_cidade(endereco)
+    uf_n = str(estado or "").strip().upper()
+
+    for k, coords in COORDENADAS_BRASIL.items():
+        if k in cid_n or k in end_n:
+            return coords
+
+    if uf_n == "DF" or "brasilia" in end_n or "distrito federal" in end_n:
+        return COORDENADAS_BRASIL["brasilia"]
+    elif uf_n == "PE":
+        return COORDENADAS_BRASIL["petrolina"]
+    elif uf_n == "RN":
+        return COORDENADAS_BRASIL["mossoro"]
+    elif uf_n == "PB":
+        return COORDENADAS_BRASIL["joao pessoa"]
+    elif uf_n == "PI":
+        return COORDENADAS_BRASIL["teresina"]
+    elif uf_n == "BA":
+        return COORDENADAS_BRASIL["salvador"]
+    elif uf_n == "GO":
+        return COORDENADAS_BRASIL["goiania"]
+    elif uf_n == "MA":
+        return COORDENADAS_BRASIL["sao luis"]
+
+    return COORDENADAS_BRASIL["fortaleza"]
+
+
 def render_mapa_rotas(ctx: AppContext):
     df = ctx.df
 
-    st.markdown("### 🗺️ Mapa Operacional & Planeamento de Rotas")
-    coordenadas_cidades = {
-        "fortaleza": (-3.7172, -38.5433), "juazeiro": (-7.2009, -39.3148),
-        "araripina": (-7.4811, -40.4994), "petrolina": (-9.3875, -40.5028),
-        "taua": (-6.0044, -40.2934), "sobral": (-3.6895, -40.3486),
-        "crato": (-7.2347, -39.4069), "eusebio": (-3.8856, -38.4614),
-        "brasilia": (-15.7975, -47.8919), "iguatu": (-6.3594, -39.2986),
-        "mossoro": (-5.1878, -37.3442), "catole": (-6.3439, -37.7467),
-        "poranga": (-4.7450, -40.9256)
-    }
+    st.markdown("### 🗺️ Mapa Operacional & Planeamento de Rotas EMED")
+    st.caption("Acompanhamento georreferenciado dos hospitais, bases operacionais e planeamento de rotas técnicas.")
+
+    c_topo1, c_topo2 = st.columns([1.8, 1.2])
+    with c_topo1:
+        polo_sel = st.radio(
+            "📍 **Filtrar Polo no Mapa:**",
+            ["🌐 Todos os Polos (Brasil)", "🏢 Polo Brasília (DF)", "🏛️ Polo Matriz (Ceará & NE)"],
+            horizontal=True,
+            key="filtro_polo_mapa"
+        )
+    with c_topo2:
+        mostrar_bases = st.checkbox("📍 Destacar Bases Operacionais EMED", value=True)
+
     cores_hex = ["#64dfdf", "#f72585", "#7209b7", "#4cc9f0", "#ff9f1c", "#2ec4b6", "#e71d36", "#ffb703"]
     pontos_mapa = []
-    clientes_ordenados = sorted([
-        c for c in df['cliente'].unique()
-        if str(c).strip() != '' and "NENHUM (AGUARDANDO" not in str(c).upper()
-    ])
 
-    for idx_c, cliente_nome in enumerate(clientes_ordenados):
-        grupo = df[df['cliente'] == cliente_nome]
-        primeira = grupo.iloc[0]
-        cidade_str = str(primeira.get('cidade', '')).strip().lower()
-        lat, lon = -3.7172, -38.5433
-        for cid_key, coords in coordenadas_cidades.items():
-            if cid_key in cidade_str:
-                lat, lon = coords
-                break
+    # Bases Operacionais EMED
+    if mostrar_bases:
+        if "Brasília" in polo_sel or "Todos" in polo_sel:
+            pontos_mapa.append({
+                'lat': -15.8080, 'lon': -48.0170,
+                'cliente': "🏢 BASE FILIAL EMED (BRASÍLIA - DF)",
+                'cidade': "BRASÍLIA - DF",
+                'tipo': 'BASE',
+                'color': "#ffb703"
+            })
+        if "Matriz" in polo_sel or "Todos" in polo_sel:
+            pontos_mapa.append({
+                'lat': -3.8856, 'lon': -38.4614,
+                'cliente': "🏛️ MATRIZ EMED (EUSÉBIO - CE)",
+                'cidade': "EUSÉBIO - CE",
+                'tipo': 'BASE',
+                'color': "#ffb703"
+            })
+
+    clientes_agrupados = []
+    df_validos = df[
+        df['cliente'].fillna('').str.strip().ne('') &
+        ~df['cliente'].str.upper().str.contains("NENHUM (AGUARDANDO", regex=False)
+    ]
+
+    for idx_c, (cli_nome, grp) in enumerate(df_validos.groupby('cliente')):
+        r0 = grp.iloc[0]
+        cid = str(r0.get('cidade', '')).strip().upper()
+        uf = str(r0.get('estado', '')).strip().upper()
+        end = str(r0.get('endereco', '')).strip().upper()
+        lat_banco = r0.get('latitude') if 'latitude' in r0 else None
+        lon_banco = r0.get('longitude') if 'longitude' in r0 else None
+
+        lat, lon = resolver_coordenadas_cliente(cid, uf, end, lat_banco, lon_banco)
+
+        eh_df = (uf == "DF" or "BRASIL" in cid or "DF" in end)
+        if "Brasília" in polo_sel and not eh_df:
+            continue
+        if "Matriz" in polo_sel and eh_df:
+            continue
+
+        equip_lista = [str(e) for e in grp['equipamento'].unique() if str(e).strip() and "NENHUM" not in str(e).upper()]
+        equip_str = ", ".join(equip_lista[:3]) if equip_lista else "Equipamentos Hospitalares"
+
+        cor_p = cores_hex[idx_c % len(cores_hex)]
         pontos_mapa.append({
-            'lat': lat, 'lon': lon, 'cliente': cliente_nome,
-            'cidade': str(primeira.get('cidade', '')).upper(),
-            'color': cores_hex[idx_c % len(cores_hex)]
+            'lat': lat, 'lon': lon,
+            'cliente': cli_nome,
+            'cidade': f"{cid} - {uf}" if uf else cid,
+            'tipo': 'CLIENTE',
+            'color': cor_p
+        })
+        clientes_agrupados.append({
+            'cliente': cli_nome,
+            'cidade': cid,
+            'estado': uf,
+            'endereco': end,
+            'lat': lat,
+            'lon': lon,
+            'equipamentos': equip_str,
+            'qtd_os': len(grp),
+            'color': cor_p
         })
 
-    clientes_selecionados_rota = st.multiselect("Selecione os clientes para a rota:", options=clientes_ordenados)
+    df_pontos = pd.DataFrame(pontos_mapa)
+    if not df_pontos.empty:
+        zoom_nivel = 9 if "Brasília" in polo_sel else (6 if "Matriz" in polo_sel else 4)
+        st.map(df_pontos, latitude="lat", longitude="lon", size=350, color="color", zoom=zoom_nivel)
+    else:
+        st.warning("Nenhum cliente encontrado para o polo selecionado.")
+
+    st.markdown("#### 🛣️ Planeador de Rotas Técnicas & Itinerário")
+    nomes_clientes_opcao = [c['cliente'] for c in clientes_agrupados]
+    clientes_selecionados_rota = st.multiselect(
+        "Selecione os hospitais para traçar o itinerário da rota:",
+        options=nomes_clientes_opcao,
+        key="multiselect_rota_clientes"
+    )
+
     if clientes_selecionados_rota:
-        pts_filtrados = [p for p in pontos_mapa if p['cliente'] in clientes_selecionados_rota]
-        st.map(pd.DataFrame(pts_filtrados), latitude="lat", longitude="lon", size=400, color="color", zoom=7)
+        pts_filtrados = [c for c in clientes_agrupados if c['cliente'] in clientes_selecionados_rota]
         if len(pts_filtrados) >= 2:
             km_total = 0.0
             for i_r in range(len(pts_filtrados) - 1):
@@ -582,9 +744,62 @@ def render_mapa_rotas(ctx: AppContext):
                     pts_filtrados[i_r]['lat'], pts_filtrados[i_r]['lon'],
                     pts_filtrados[i_r+1]['lat'], pts_filtrados[i_r+1]['lon']
                 )
-            st.info(f"🛣️ **Distância Estimada da Rota:** {km_total:.1f} KM | ⏱️ **Tempo Estimado de Deslocamento:** {formatar_tempo(km_total)}")
-    else:
-        st.map(pd.DataFrame(pontos_mapa), latitude="lat", longitude="lon", size=400, color="color", zoom=6)
+            destinos_enc = "/".join([urllib.parse.quote(c['endereco'] if c['endereco'] else f"{c['cidade']}, {c['estado']}") for c in pts_filtrados])
+            origem_base = "Rua 3 Chacara 46A Vicente Pires Brasilia DF" if "Brasília" in polo_sel else "Rua Coronel Freire 16 Eusebio CE"
+            gmaps_rota_url = f"https://www.google.com/maps/dir/{urllib.parse.quote(origem_base)}/{destinos_enc}"
+
+            st.info(f"🛣️ **Distância Total Estimada:** {km_total:.1f} KM | ⏱️ **Tempo Estimado:** {formatar_tempo(km_total)}")
+            st.markdown(f"""
+                <a href="{gmaps_rota_url}" target="_blank" style="background:#0284c7; color:white; padding:8px 16px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:13px; display:inline-block; margin-bottom:12px;">
+                    🧭 Abrir Itinerário Completo no Google Maps (Navegação GPS)
+                </a>
+            """, unsafe_allow_html=True)
+
+    st.markdown("#### 🏥 Hospitais & Unidades no Mapa")
+    colunas_cartoes = st.columns(2)
+    for idx_card, c_info in enumerate(clientes_agrupados):
+        col_c = colunas_cartoes[idx_card % 2]
+        with col_c:
+            end_gps = c_info['endereco'] if c_info['endereco'] else f"{c_info['cidade']}, {c_info['estado']}"
+            waze_url = f"https://waze.com/ul?q={urllib.parse.quote(end_gps)}"
+            gmaps_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(end_gps)}"
+            st.markdown(f"""
+            <div style="background: #1c2541; border-left: 4px solid {c_info['color']}; border-radius: 6px; padding: 10px 14px; margin-bottom: 10px;">
+                <div style="font-size: 14px; font-weight: 800; color: #f8fafc;">{c_info['cliente']}</div>
+                <div style="font-size: 11.5px; color: #64dfdf; font-weight: bold; margin-top: 2px;">📍 {c_info['cidade']} - {c_info['estado']}</div>
+                <div style="font-size: 11px; color: #cbd5e1; margin-top: 3px;">⚙️ <b>Equipamentos:</b> {c_info['equipamentos']}</div>
+                <div style="font-size: 10.5px; color: #94a3b8; margin-top: 2px;">🏠 <i>{end_gps}</i></div>
+                <div style="margin-top: 8px; display: flex; gap: 8px;">
+                    <a href="{waze_url}" target="_blank" style="background:#334155; color:#64dfdf; padding:4px 10px; border-radius:4px; font-size:11px; text-decoration:none; font-weight:bold;">
+                        🚗 Waze
+                    </a>
+                    <a href="{gmaps_url}" target="_blank" style="background:#0284c7; color:white; padding:4px 10px; border-radius:4px; font-size:11px; text-decoration:none; font-weight:bold;">
+                        🗺️ Google Maps
+                    </a>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+
+
+def _gerar_proximo_codigo_item(df_est: pd.DataFrame, categoria: str) -> str:
+    pref = "PEC"
+    cat_upper = str(categoria or "").upper()
+    if "INSTRUMENTO" in cat_upper or "FERRAMENTA" in cat_upper:
+        pref = "INST"
+    elif "CONSUM" in cat_upper:
+        pref = "CONS"
+
+    numeros = []
+    if not df_est.empty and 'codigo' in df_est.columns:
+        for c in df_est['codigo'].dropna():
+            c_str = str(c).strip().upper()
+            if c_str.startswith(pref):
+                nums = ''.join([ch for ch in c_str if ch.isdigit()])
+                if nums:
+                    numeros.append(int(nums))
+    proximo = max(numeros) + 1 if numeros else 1
+    return f"{pref}-{proximo:03d}"
 
 
 def render_gestao_estoque(ctx: AppContext):
@@ -705,33 +920,43 @@ def render_gestao_estoque(ctx: AppContext):
             cod_sel_ed = escolha_peca_ed.split(" - ")[0].strip()
             row_p_ed = df_est_view[df_est_view['codigo'] == cod_sel_ed].iloc[0]
 
+        cod_sugerido_padrao = _gerar_proximo_codigo_item(df_est_view, "PEÇA COMERCIAL (OS)") if row_p_ed is None else limpar_texto(row_p_ed['codigo'])
+
         with st.form("form_novo_ou_editar_peca"):
             cp1, cp2 = st.columns(2)
             with cp1:
                 cod_p = st.text_input(
-                    "Código do Item *",
-                    value=limpar_texto(row_p_ed['codigo']) if row_p_ed is not None else "",
-                    placeholder="EX: PEC-005 ou FER-018"
+                    "Código Padronizado do Item *",
+                    value=cod_sugerido_padrao,
+                    help="Código gerado automaticamente no padrão da empresa (PEC-, INST- ou CONS-). Pode ser editado se necessário."
                 )
                 nome_p = st.text_input(
-                    "Nome / Descrição *",
+                    "Nome / Descrição do Item *",
                     value=limpar_texto(row_p_ed['nome_peca']) if row_p_ed is not None else "",
-                    placeholder="EX: ESTABILIZADOR DE FILAMENTO ou MULTÍMETRO DIGITAL"
+                    placeholder="EX: ESTABILIZADOR DE FILAMENTO GE ou MULTÍMETRO DIGITAL"
                 )
                 idx_cat_p = 0 if row_p_ed is None or "COMERCIAL" in str(row_p_ed.get('tipo_item', '')) else (
                     2 if "INSTRUMENTO" in str(row_p_ed.get('tipo_item', '')).upper() or "FERRAMENTA" in str(row_p_ed.get('tipo_item', '')).upper() else 1
                 )
                 tipo_item_p = st.selectbox(
-                    "Categoria do Item *",
+                    "Categoria Padrão do Item *",
                     ["PEÇA COMERCIAL (OS)", "CONSUMÍVEL INTERNO (USO DIÁRIO / SEM NF SAÍDA)", "INSTRUMENTO / FERRAMENTA"],
                     index=idx_cat_p
                 )
+                opcoes_loc = ["Almoxarifado Matriz (Eusébio - CE)", "Base Avançada (Filial Brasília - DF)", "Veículo Técnico / Mala"]
+                loc_salva = str(row_p_ed.get('localizacao', '')) if row_p_ed is not None else ""
+                idx_loc = 1 if "Brasília" in loc_salva or "DF" in loc_salva else 0
+                localizacao_p = st.selectbox("Unidade / Localização do Almoxarifado *", opcoes_loc, index=idx_loc)
+
             with cp2:
                 qtd_p = st.number_input(
                     "Quantidade Total em Estoque *",
                     min_value=0,
                     value=limpar_int(row_p_ed['quantidade'], 1) if row_p_ed is not None else 1
                 )
+                estoque_min_salvo = limpar_int(row_p_ed.get('estoque_minimo'), 2) if row_p_ed is not None else 2
+                estoque_min_p = st.number_input("Estoque Mínimo (Ponto de Reposição Padrão) *", min_value=0, value=estoque_min_salvo)
+
                 custo_p = st.number_input(
                     "Preço de Custo Unitário (R$)",
                     min_value=0.0,
@@ -740,8 +965,12 @@ def render_gestao_estoque(ctx: AppContext):
                 )
                 val_mc = limpar_float(row_p_ed.get('margem_contrato'), 30.0) if row_p_ed is not None else 30.0
                 val_ma = limpar_float(row_p_ed.get('margem_avulso'), 60.0) if row_p_ed is not None else 60.0
-                m_cont_p = st.number_input("Margem Contrato (%)", min_value=0.0, value=val_mc, step=5.0)
-                m_avul_p = st.number_input("Margem Avulso (%)", min_value=0.0, value=val_ma, step=5.0)
+                m_cont_p = st.number_input("Margem Padrão Contrato (%)", min_value=0.0, value=val_mc, step=5.0)
+                m_avul_p = st.number_input("Margem Padrão Avulso (%)", min_value=0.0, value=val_ma, step=5.0)
+
+                pv_cont = custo_p * (1 + m_cont_p / 100.0)
+                pv_avul = custo_p * (1 + m_avul_p / 100.0)
+                st.caption(f"💰 **Preço Sugerido Contrato:** R$ {pv_cont:,.2f} | **Preço Sugerido Avulso:** R$ {pv_avul:,.2f}")
 
             st.markdown("##### 🔬 Parâmetros de Calibração & Créditos Anuais (Opcional para Instrumentos)")
             ci1, ci2, ci3 = st.columns(3)
@@ -790,8 +1019,8 @@ def render_gestao_estoque(ctx: AppContext):
                                 INSERT INTO estoque_pecas
                                 (codigo, nome_peca, quantidade, preco_custo, margem_contrato, margem_avulso, tipo_item,
                                  requer_calibracao, data_ultima_calibracao, data_validade_calibracao, certificado_calibracao,
-                                 requer_creditos, saldo_creditos)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                 requer_creditos, saldo_creditos, localizacao, estoque_minimo)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                 ON CONFLICT(codigo) DO UPDATE SET
                                     nome_peca = excluded.nome_peca,
                                     quantidade = excluded.quantidade,
@@ -804,7 +1033,9 @@ def render_gestao_estoque(ctx: AppContext):
                                     data_validade_calibracao = excluded.data_validade_calibracao,
                                     certificado_calibracao = excluded.certificado_calibracao,
                                     requer_creditos = excluded.requer_creditos,
-                                    saldo_creditos = excluded.saldo_creditos
+                                    saldo_creditos = excluded.saldo_creditos,
+                                    localizacao = excluded.localizacao,
+                                    estoque_minimo = excluded.estoque_minimo
                             """, (
                                 cod_p.strip().upper(), nome_p.strip().upper(),
                                 int(qtd_p), float(custo_p), float(m_cont_p), float(m_avul_p), tipo_item_p,
@@ -813,7 +1044,9 @@ def render_gestao_estoque(ctx: AppContext):
                                 dt_val_cal.strip() or None,
                                 cert_cal.strip() or None,
                                 1 if chk_req_cred else 0,
-                                int(saldo_cred)
+                                int(saldo_cred),
+                                localizacao_p.strip(),
+                                float(estoque_min_p)
                             ))
                         st.cache_data.clear()
                         st.success(f"✅ Item '{nome_p.strip().upper()}' guardado e tabela atualizada com sucesso!")

@@ -210,6 +210,10 @@ def render_clientes_equipamentos(ctx: AppContext):
                         obs_final = eq_obs.strip().upper() if eq_obs.strip() else "SEM PENDENCIAS APARENTES"
                         matriz_info = df[df['cliente'] == matriz_vinculada].iloc[0]
 
+                        from emed_views.logistica_estoque import resolver_coordenadas_cliente
+                        lat_geo, lon_geo = resolver_coordenadas_cliente(unidade_cidade, unidade_estado, unidade_endereco)
+                        unidade_resp_filial = "FILIAL_DF" if (unidade_estado.strip().upper() == "DF" or "BRASIL" in unidade_cidade.strip().upper()) else "MATRIZ_CE"
+
                         nova_unidade_eq = {
                             'cliente': cliente_final_os,
                             'cidade': unidade_cidade.strip().upper(),
@@ -230,7 +234,10 @@ def render_clientes_equipamentos(ctx: AppContext):
                             'email': limpar_texto(matriz_info.get('email')),
                             'whatsapp': limpar_texto(matriz_info.get('whatsapp')),
                             'endereco_fiscal': limpar_texto(matriz_info.get('endereco_fiscal')),
-                            'tipo_contrato': limpar_texto(matriz_info.get('tipo_contrato'), 'CONTRATO')
+                            'tipo_contrato': limpar_texto(matriz_info.get('tipo_contrato'), 'CONTRATO'),
+                            'latitude': lat_geo,
+                            'longitude': lon_geo,
+                            'unidade_responsavel': unidade_resp_filial
                         }
                         df = pd.concat([df, pd.DataFrame([nova_unidade_eq])], ignore_index=True)
                         if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
@@ -268,6 +275,129 @@ def render_clientes_equipamentos(ctx: AppContext):
                         <p>👤 <strong>Contacto Local:</strong> {resp} ({tel_resp})</p>
                     </div>
                 """, unsafe_allow_html=True)
+
+                col_btn_ed_c, col_btn_add_eq = st.columns([1, 1])
+                with col_btn_ed_c:
+                    if st.button("✏️ Editar Unidade", key=f"btn_edit_cli_{card_idx}", use_container_width=True):
+                        st.session_state[f"editando_cliente_{cliente_nome}"] = not st.session_state.get(f"editando_cliente_{cliente_nome}", False)
+                with col_btn_add_eq:
+                    if st.button("➕ Novo Aparelho", key=f"btn_add_eq_fast_{card_idx}", use_container_width=True):
+                        st.session_state[f"add_eq_cli_{cliente_nome}"] = not st.session_state.get(f"add_eq_cli_{cliente_nome}", False)
+
+                # Formulário Inline de Edição da Unidade / Cliente
+                if st.session_state.get(f"editando_cliente_{cliente_nome}", False):
+                    with st.expander(f"📝 Editar Cadastro da Unidade — {cliente_nome}", expanded=True):
+                        with st.form(f"form_ed_cli_{card_idx}"):
+                            st.markdown(f"##### ✏️ Atualizar Dados de **{cliente_nome}**")
+                            novo_nome_cli = st.text_input("Nome da Unidade / Hospital *", value=cliente_nome)
+                            c_ed1, c_ed2 = st.columns(2)
+                            with c_ed1:
+                                novo_cnpj_cli = st.text_input("CNPJ da Unidade", value=cnpj_cli if cnpj_cli != "N/D" else "")
+                                nova_cidade_cli = st.text_input("Cidade *", value=cidade)
+                                novo_estado_cli = st.text_input("UF / Estado *", value=estado)
+                            with c_ed2:
+                                novo_resp_cli = st.text_input("Responsável Local / Contato", value=resp if resp != "NÃO INFORMADO" else "")
+                                novo_tel_cli = st.text_input("Telefone / WhatsApp", value=tel_resp)
+                                novo_end_cli = st.text_input("Endereço Operacional Completo *", value=endereco)
+
+                            st.markdown("---")
+                            c_sub1, c_sub2, c_sub3 = st.columns([2, 1, 1])
+                            with c_sub1:
+                                sub_cli = st.form_submit_button("💾 Salvar Alterações", type="primary", use_container_width=True)
+                            with c_sub2:
+                                canc_cli = st.form_submit_button("❌ Fechar", use_container_width=True)
+                            with c_sub3:
+                                del_cli = st.form_submit_button("🗑️ Excluir", use_container_width=True)
+
+                            if sub_cli:
+                                if not novo_nome_cli.strip() or not nova_cidade_cli.strip():
+                                    st.error("Nome da unidade e cidade são obrigatórios!")
+                                else:
+                                    mask_cli = df['cliente'] == cliente_nome
+                                    df.loc[mask_cli, 'cliente'] = novo_nome_cli.strip().upper()
+                                    df.loc[mask_cli, 'cnpj'] = novo_cnpj_cli.strip() if novo_cnpj_cli else 'N/D'
+                                    df.loc[mask_cli, 'cidade'] = nova_cidade_cli.strip().upper()
+                                    df.loc[mask_cli, 'estado'] = novo_estado_cli.strip().upper()
+                                    df.loc[mask_cli, 'endereco'] = novo_end_cli.strip().upper()
+                                    df.loc[mask_cli, 'responsavel_hospital'] = novo_resp_cli.strip().upper() if novo_resp_cli else 'NÃO INFORMADO'
+                                    df.loc[mask_cli, 'contato_responsavel'] = novo_tel_cli.strip()
+
+                                    if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
+                                        try:
+                                            with get_db_connection(ctx.db_name) as conn_u:
+                                                conn_u.execute("""
+                                                    UPDATE clientes_equipamentos 
+                                                    SET cliente = ?, cidade = ?, estado = ?, endereco = ?, responsavel_hospital = ?, contato_responsavel = ?
+                                                    WHERE cliente = ?
+                                                """, (novo_nome_cli.strip().upper(), nova_cidade_cli.strip().upper(), novo_estado_cli.strip().upper(),
+                                                      novo_end_cli.strip().upper(), novo_resp_cli.strip().upper(), novo_tel_cli.strip(), cliente_nome))
+                                                conn_u.commit()
+                                        except Exception:
+                                            pass
+                                        st.cache_data.clear()
+                                        st.session_state[f"editando_cliente_{cliente_nome}"] = False
+                                        st.success(f"✅ Dados da unidade '{novo_nome_cli.strip().upper()}' atualizados com sucesso!")
+                                        st.rerun()
+
+                            if canc_cli:
+                                st.session_state[f"editando_cliente_{cliente_nome}"] = False
+                                st.rerun()
+
+                            if del_cli:
+                                mask_manter = df['cliente'] != cliente_nome
+                                df = df[mask_manter]
+                                if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
+                                    st.cache_data.clear()
+                                    st.session_state[f"editando_cliente_{cliente_nome}"] = False
+                                    st.success(f"🗑️ Unidade '{cliente_nome}' removida com sucesso!")
+                                    st.rerun()
+
+                # Formulário Rápido para Adicionar Novo Equipamento Nesta Unidade
+                if st.session_state.get(f"add_eq_cli_{cliente_nome}", False):
+                    with st.expander(f"➕ Cadastrar Novo Equipamento em {cliente_nome}", expanded=True):
+                        with st.form(f"form_add_eq_fast_{card_idx}"):
+                            novo_eq_tipo = st.text_input("Tipo / Nome do Equipamento *", placeholder="Ex: MAMÓGRAFO DIGITAL")
+                            c_eqf1, c_eqf2 = st.columns(2)
+                            with c_eqf1:
+                                novo_eq_fab = st.text_input("Fabricante / Modelo", placeholder="Ex: GE Senographe")
+                                novo_eq_ns = st.text_input("Número de Série (N/S)", placeholder="Ex: SN-2026-X")
+                            with c_eqf2:
+                                novo_eq_sala = st.text_input("Sala / Setor", placeholder="Ex: Sala 02 - Imagem")
+                                novo_eq_srv = st.selectbox("Tipo de Serviço Inicial", ["PREVENTIVA", "CORRETIVA", "CALIBRAÇÃO"])
+
+                            c_feq1, c_feq2 = st.columns(2)
+                            with c_feq1:
+                                sub_add_eq = st.form_submit_button("💾 Adicionar Aparelho", type="primary", use_container_width=True)
+                            with c_feq2:
+                                canc_add_eq = st.form_submit_button("❌ Fechar", use_container_width=True)
+
+                            if sub_add_eq and novo_eq_tipo.strip():
+                                desc_completa = f"{novo_eq_tipo.strip().upper()} ({novo_eq_fab.strip().upper()})" if novo_eq_fab.strip() else novo_eq_tipo.strip().upper()
+                                nova_linha_eq = {
+                                    'cliente': cliente_nome,
+                                    'cidade': cidade,
+                                    'estado': estado,
+                                    'equipamento': desc_completa,
+                                    'endereco': endereco,
+                                    'tipo_servico': novo_eq_srv,
+                                    'tecnico_responsavel': 'A DEFINIR',
+                                    'confirmado': 'NÃO',
+                                    'pendencias': f"N/S: {novo_eq_ns.strip()} | SALA: {novo_eq_sala.strip()}" if novo_eq_ns.strip() else '',
+                                    'status': 'ATIVO',
+                                    'cnpj': cnpj_cli,
+                                    'responsavel_hospital': resp,
+                                    'contato_responsavel': tel_resp
+                                }
+                                df = pd.concat([df, pd.DataFrame([nova_linha_eq])], ignore_index=True)
+                                if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
+                                    st.cache_data.clear()
+                                    st.session_state[f"add_eq_cli_{cliente_nome}"] = False
+                                    st.success(f"✅ Equipamento '{desc_completa}' adicionado com sucesso a {cliente_nome}!")
+                                    st.rerun()
+
+                            if canc_add_eq:
+                                st.session_state[f"add_eq_cli_{cliente_nome}"] = False
+                                st.rerun()
 
                 with st.expander(f"⚙️ Ver Equipamentos & QR Codes ({qtd_equipamentos} registados)"):
                     if equipamentos_validos.empty:

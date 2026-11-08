@@ -21,6 +21,8 @@ from emed_views.alarmes_calibracao import render_alarmes_calibracao
 from emed_views.portal_cliente import render_portal_cliente
 from emed_views.conciliacao_pix import render_conciliacao_pix
 from emed_views.pesquisa_satisfacao import render_pesquisa_satisfacao
+from emed_views.workspace_tecnico import render_workspace_tecnico
+from emed_views.emed_car import render_emed_car
 
 
 def _render_alarmes_almoxarifado(ctx):
@@ -34,6 +36,8 @@ VIEW_ROUTER = {
     "🏥 Portal do Cliente (Autoatendimento)": render_portal_cliente,
     "💳 Conciliação Bancária & Pagamentos PIX": render_conciliacao_pix,
     "⭐ Pesquisa de Satisfação & Google Reviews": render_pesquisa_satisfacao,
+    "🚗 EmedCar (GPS, Rotas & Radares)": render_emed_car,
+    "🛠️ Workspace do Técnico & Fábrica de ITs": render_workspace_tecnico,
     "⏰ Alarmes de Calibração & Créditos": _render_alarmes_almoxarifado,
     "📊 Mural & Despacho WhatsApp": render_mural_despacho,
     "📋 Minhas Pendências (Técnico)": render_minhas_pendencias,
@@ -57,6 +61,8 @@ __all__ = [
     "render_portal_cliente",
     "render_conciliacao_pix",
     "render_pesquisa_satisfacao",
+    "render_workspace_tecnico",
+    "render_emed_car",
     "render_alarmes_calibracao",
     "render_mural_despacho",
     "render_minhas_pendencias",

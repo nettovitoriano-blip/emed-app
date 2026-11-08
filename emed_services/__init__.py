@@ -33,6 +33,13 @@ from emed_services.pdf_engine import (
     vincular_it_ao_equipamento,
     gerar_link_whatsapp,
 )
+from emed_services.auditoria_fiscal import (
+    avaliar_conformidade_fiscal,
+    registrar_evento_auditoria_fiscal,
+    obter_historico_eventos_fiscais,
+    obter_detalhe_evento,
+    obter_resumo_dashboard_fiscal,
+)
 
 __all__ = [
     "AppContext",
@@ -64,4 +71,9 @@ __all__ = [
     "converter_html_para_pdf_bytes",
     "vincular_it_ao_equipamento",
     "gerar_link_whatsapp",
+    "avaliar_conformidade_fiscal",
+    "registrar_evento_auditoria_fiscal",
+    "obter_historico_eventos_fiscais",
+    "obter_detalhe_evento",
+    "obter_resumo_dashboard_fiscal",
 ]

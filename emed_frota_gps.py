@@ -178,6 +178,84 @@ def calcular_distancia_haversine_km(lat1: float, lon1: float, lat2: float, lon2:
         return 0.0
 
 
+
+def verificar_e_disparar_autocheckin_250m(conn, condutor: str, lat_veic: float, lon_veic: float, agora_str: str):
+    """
+    Motor Geofence EMED (250 Metros):
+    Ao aproximar-se a menos de 250m do hospital/clínica cadastrado em clientes,
+    dispara automaticamente o Check-in na Ordem de Serviço aberta para o técnico!
+    """
+    if abs(lat_veic) < 0.1 or abs(lon_veic) < 0.1:
+        return None
+
+    cur = conn.cursor()
+    primeiro_nome = condutor.split()[0].upper() if condutor else ""
+    if not primeiro_nome or "DISPON" in primeiro_nome:
+        return None
+
+    try:
+        cur.execute("""
+            SELECT id, cliente, cidade FROM clientes_equipamentos
+            WHERE UPPER(tecnico_responsavel) LIKE ?
+              AND UPPER(status) NOT IN ('CONCLUÍDO', 'CANCELADO', 'FINALIZADO')
+              AND (checkin_hora IS NULL OR checkin_hora = '' OR checkin_hora = 'None')
+            ORDER BY id DESC
+        """, (f"%{primeiro_nome}%",))
+        ordens = cur.fetchall()
+        if not ordens:
+            return None
+
+        for os_id, cliente_os, cidade_os in ordens:
+            # Extrai palavras-chave do nome do cliente (ignora HOSPITAL, CLINICA, LTDA)
+            palavras = [p for p in re.sub(r'[^A-Za-z0-9]', ' ', str(cliente_os).upper()).split() if len(p) >= 4 and p not in ('HOSPITAL', 'CLINICA', 'LTDA', 'SAUDE')]
+            row_c = None
+            for p in palavras:
+                cur.execute("""
+                    SELECT latitude, longitude, nome FROM clientes
+                    WHERE (UPPER(nome) LIKE ? OR UPPER(razao_social) LIKE ?)
+                      AND latitude IS NOT NULL AND latitude != ''
+                    LIMIT 1
+                """, (f"%{p}%", f"%{p}%"))
+                row_c = cur.fetchone()
+                if row_c:
+                    break
+
+            if not row_c:
+                continue
+
+            try:
+                lat_c = float(str(row_c[0]).replace(",", ".").strip())
+                lon_c = float(str(row_c[1]).replace(",", ".").strip())
+            except Exception:
+                continue
+
+            r_terra = 6371.0
+            p1 = math.radians(lat_veic)
+            p2 = math.radians(lat_c)
+            dp = math.radians(lat_c - lat_veic)
+            dl = math.radians(lon_c - lon_veic)
+            a = math.sin(dp / 2.0) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2.0) ** 2
+            c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+            dist_km = r_terra * c
+
+            if dist_km <= 0.250:
+                cur.execute("""
+                    UPDATE clientes_equipamentos
+                    SET checkin_hora = ?, status = 'EM ATENDIMENTO'
+                    WHERE id = ?
+                """, (agora_str, os_id))
+                conn.commit()
+                return {
+                    "autocheckin_disparado": True,
+                    "os_id": os_id,
+                    "cliente": cliente_os,
+                    "distancia_metros": round(dist_km * 1000, 1),
+                    "hora": agora_str
+                }
+    except Exception as e:
+        pass
+    return None
+
 def _normalizar_placa(placa_raw: str) -> str:
     """Padroniza placas antigas (ABC-1234) ou Mercosul (ABC1D23) para busca sem falha."""
     s = limpar_texto(placa_raw, "").upper().strip()
@@ -388,6 +466,32 @@ def registrar_telemetria_ou_viagem_gps(db_name: str, payload: Dict[str, Any]) ->
     lon = limpar_float(payload.get("longitude") or viagem_obj.get("lon_fim"), -38.5267)
     vel = limpar_float(payload.get("velocidade_kmh") or viagem_obj.get("velocidade_max_kmh"), 0.0)
 
+    # Sanitização e Validação Anti-Null Island (Evita que o carro apareça no oceano a 0,0)
+    coordenadas_validas = True
+    if abs(lat) < 0.5 and abs(lon) < 0.5:
+        coordenadas_validas = False
+    elif not (-45.0 <= lat <= 12.0 and -85.0 <= lon <= -30.0): # Fora do Brasil / América do Sul
+        coordenadas_validas = False
+
+    if not coordenadas_validas:
+        try:
+            with get_db_connection(db_name) as conn_prev:
+                cur_p = conn_prev.cursor()
+                cur_p.execute("SELECT ultima_lat, ultima_lon FROM veiculos WHERE placa = ?", (placa,))
+                row_p = cur_p.fetchone()
+                if row_p and row_p[0] and row_p[1] and abs(float(row_p[0])) > 0.5:
+                    lat, lon = float(row_p[0]), float(row_p[1])
+                else:
+                    lat, lon = -3.7319, -38.5267 # Sede Fortaleza
+        except Exception:
+            lat, lon = -3.7319, -38.5267
+
+    # Filtro de velocidade anômala (ignora ruídos e glitches de satélite acima de 180 km/h)
+    if vel < 0:
+        vel = 0.0
+    elif vel > 180.0:
+        vel = 180.0
+
     with get_db_connection(db_name) as conn:
         cur = conn.cursor()
 
@@ -468,6 +572,11 @@ def registrar_telemetria_ou_viagem_gps(db_name: str, payload: Dict[str, Any]) ->
         else:
             status_manut = "REVISÃO PREVENTIVA NECESSÁRIA" if novo_km >= km_prox_rev else ("Alerta de Revisão Próxima" if alerta_revisao else "Disponível")
             ignicao = 0
+
+                # Geofencing EMED (250 Metros): Auto-Checkin na OS
+        autocheckin = verificar_e_disparar_autocheckin_250m(conn, condutor, lat, lon, agora_str)
+        if autocheckin and autocheckin.get("autocheckin_disparado"):
+            print(f"🎯 [GEOFENCE 250M] Check-in automático disparado na OS #{autocheckin['os_id']} ({autocheckin['cliente']}) a {autocheckin['distancia_metros']}m!")
 
         if renavam:
             cur.execute("""

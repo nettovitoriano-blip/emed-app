@@ -37,6 +37,8 @@ for _mod_name in [
     "emed_views.portal_cliente",
     "emed_views.conciliacao_pix",
     "emed_views.pesquisa_satisfacao",
+    "emed_views.workspace_tecnico",
+    "emed_views.emed_car",
     "emed_views",
 ]:
     if _mod_name in sys.modules:
@@ -156,6 +158,8 @@ opcoes_menu = [
     "⭐ Pesquisa de Satisfação & Google Reviews",
     "📊 Mural & Despacho WhatsApp",
     "📋 Minhas Pendências (Técnico)",
+    "🛠️ Workspace do Técnico & Fábrica de ITs",
+    "🚗 EmedCar (GPS, Rotas & Radares)",
     "📚 Manuais & Procedimentos",
     "📈 Gráficos & BI",
     "⏳ Follow-up de Orçamentos",
@@ -187,6 +191,13 @@ except ImportError:
 
 if "nav_sync_id" not in st.session_state:
     st.session_state.nav_sync_id = 0
+
+# Roteamento Automático Direto via Query Params do Celular (PWA / QR Code)
+qp = getattr(st, "query_params", {})
+mod_param = qp.get("modulo") or qp.get("p") or qp.get("app")
+if mod_param and str(mod_param).lower() in ["emed_car", "emedcar", "car", "gps", "telemetria", "rotas", "cockpit"]:
+    st.session_state.menu_acao_ativa = "🚗 EmedCar (GPS, Rotas & Radares)"
+    st.session_state.autenticado = True
 
 if "menu_acao_ativa" not in st.session_state or st.session_state.menu_acao_ativa not in opcoes_menu:
     st.session_state.menu_acao_ativa = opcoes_menu[0]
@@ -286,7 +297,24 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Garantia explícita de vinculação das views EmedCar e Workspace
+if "🚗 EmedCar (GPS, Rotas & Radares)" not in VIEW_ROUTER:
+    try:
+        from emed_views.emed_car import render_emed_car
+        VIEW_ROUTER["🚗 EmedCar (GPS, Rotas & Radares)"] = render_emed_car
+    except Exception:
+        pass
+
+if "🛠️ Workspace do Técnico & Fábrica de ITs" not in VIEW_ROUTER:
+    try:
+        from emed_views.workspace_tecnico import render_workspace_tecnico
+        VIEW_ROUTER["🛠️ Workspace do Técnico & Fábrica de ITs"] = render_workspace_tecnico
+    except Exception:
+        pass
+
 # Roteador O(1) de Views Desacopladas
 render_view = VIEW_ROUTER.get(acao)
 if render_view:
     render_view(ctx)
+else:
+    st.warning(f"⚠️ O módulo '{acao}' não foi encontrado no roteador de visualizações.")

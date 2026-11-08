@@ -219,12 +219,14 @@ def extrair_local_instalacao(equip_nome, end_atend):
         setor = "Engenharia / Sala Técnica de Equipamentos Médicos"
     return setor
 
-def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: dict = None) -> str:
-    """Gera o Relatório de Atendimento e OS Oficial eMED Completo com Respaldo Técnico e Jurídico."""
+def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: dict = None, incluir_botao_print: bool = True) -> str:
+    """Gera o Relatório de Atendimento e OS Oficial EMED ocupando toda a Página 1 A4,
+    e joga Anexos / Fotos / Checklist automaticamente para a Página 2."""
+    import re as _re
     dir_atual = os.path.dirname(os.path.abspath(__file__))
     dir_emed = dir_atual if os.path.exists(os.path.join(dir_atual, "emed.db")) else os.path.abspath(os.path.join(dir_atual, ".."))
     db_file = os.path.join(dir_emed, "emed.db")
-    
+
     if row_c is None and isinstance(id_os_c, (pd.Series, dict)):
         row_c = pd.Series(id_os_c)
         id_os_c = str(obter_id_os(0, row_c))
@@ -241,50 +243,55 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     id_os_c = str(id_os_c)
     cliente = limpar_texto(row_c.get("cliente"), "HOSPITAL SAO LUIZ LTDA")
     cnpj = limpar_texto(row_c.get("cnpj"), "-")
-    endereco_fiscal = limpar_texto(row_c.get("endereco_fiscal"), row_c.get("endereco") or "-")
-    endereco_atend = limpar_texto(row_c.get("endereco"), "Avenida Principal, 100")
+    endereco_atend = limpar_texto(row_c.get("endereco"), "Fortaleza - CE")
     cidade = limpar_texto(row_c.get("cidade"), "FORTALEZA")
     estado = limpar_texto(row_c.get("estado"), "CE")
     whats_cli = _limpar_telefone_exibicao(row_c.get("whatsapp") or row_c.get("contato_responsavel"))
-    resp_hosp = limpar_texto(row_c.get("responsavel_hospital"), "Coordenação de Engenharia / Biomédica")
-    
-    equipamento = limpar_texto(row_c.get("equipamento"), "-")
+    resp_hosp = limpar_texto(row_c.get("responsavel_hospital"), "Coordenação Local")
+
+    raw_eq = limpar_texto(row_c.get("equipamento"), "-")
+    ns_embutido = ""
+    m_ns = _re.search(r"N/S:\s*([^|\]]+)", raw_eq, flags=_re.I)
+    if m_ns:
+        ns_embutido = m_ns.group(1).strip()
+    equipamento = _re.sub(r"\s*\[.*?\]", "", raw_eq).strip() or raw_eq
+
     fab, mod = extrair_fabricante_modelo(equipamento)
-    num_serie = limpar_texto(row_c.get("numero_serie"), f"SN-{fab[:3]}-{id_os_c:0>4}")
+    num_serie = limpar_texto(row_c.get("numero_serie"), "")
+    if not num_serie or num_serie.upper() in ("-", "S/N", "N/D"):
+        num_serie = ns_embutido if ns_embutido and ns_embutido.upper() != "S/N" else f"SN-{fab[:3]}-{id_os_c:0>4}"
     patrimonio = f"PAT-MED-{int(id_os_c):03d}" if id_os_c.isdigit() else f"PAT-MED-{id_os_c}"
     local_instalacao = extrair_local_instalacao(equipamento, endereco_atend)
 
     tec_princ = limpar_texto(row_c.get("tecnico_responsavel"), "VALFREDO V. DE OLIVEIRA NETTO")
     if tec_princ.strip().upper() in ["NETTO", "NETTO VITORIANO", "VITORIANO"]:
         tec_princ = "VALFREDO V. DE OLIVEIRA NETTO"
-        
+
     dt_agend = _formatar_data_br(row_c.get("data_agendamento"))
+    if dt_agend in ("-", "--", ""):
+        dt_agend = ""
     cin = limpar_texto(row_c.get("checkin_hora"), "08:15")
     cout = limpar_texto(row_c.get("checkout_hora"), "11:45")
     dur = limpar_texto(row_c.get("tempo_atendimento"), "3h 30m")
 
-    # Próxima Preventiva Programada (Ciclo Semestral ANVISA RDC 509)
-    try:
-        import datetime
-        dt_base = datetime.datetime.strptime(str(row_c.get("data_agendamento") or "")[:10], "%Y-%m-%d")
-        dt_prox = dt_base + datetime.timedelta(days=180)
-        dt_prox_prev = dt_prox.strftime("%d/%m/%Y")
-    except Exception:
-        dt_prox_prev = "21/04/2027"
-    
+    data_hora_topo = f"{dt_agend} • {cin}" if dt_agend and dt_agend not in cin else cin
+    inicio_fmt = f"{dt_agend} {cin}".strip() if dt_agend and dt_agend not in cin else cin
+    fim_fmt = f"{dt_agend} {cout}".strip() if dt_agend and dt_agend not in cout else cout
+
     defeito_informado = limpar_texto(row_c.get("defeito_relatado"), "-")
     if defeito_informado == "-" or not defeito_informado:
         defeito_informado = limpar_texto(row_c.get("problemas_encontrados"), "Manutenção preventiva / corretiva programada pelo cliente.")
-        
+
     raw_srv = limpar_texto(row_c.get("servico_executado"), "")
+    raw_srv = _re.sub(r"\s*\|\s*\[PE[ÇC]A[^\]]*\]", "", raw_srv, flags=_re.I)
     obs_ger = limpar_texto(row_c.get("observacoes_gerais"), "")
     pendencias_txt = limpar_texto(row_c.get("pendencias"), "")
     condicao_final = limpar_texto(row_c.get("condicao_final"), "LIBERADO PARA USO NORMAL").upper()
-    
-    status_os = str(row_c.get("status") or "Finalizada").capitalize()
-    if "Conclu" in status_os: status_os = "Finalizada"
 
-    # Avaliar status técnico pós-atendimento
+    status_os = str(row_c.get("status") or "Finalizada").capitalize()
+    if "Conclu" in status_os:
+        status_os = "Finalizada"
+
     is_pendencia = False
     is_observacao = False
     is_liberado = True
@@ -299,24 +306,22 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
         is_pendencia = True
         is_liberado = False
 
-    # Quebrar serviços executados em linhas
     linhas_acoes = []
     if raw_srv:
-        for l in raw_srv.split("\n"):
-            l_str = l.strip()
+        partes_srv = _re.split(r"\n|(?=•)", raw_srv)
+        for l in partes_srv:
+            l_str = l.strip().lstrip("•").lstrip("-").strip()
             if l_str:
-                if not l_str.startswith("-") and not l_str.startswith("•"):
-                    l_str = f"- {l_str}"
-                linhas_acoes.append(l_str)
+                linhas_acoes.append(f"• {l_str}")
     if not linhas_acoes:
         linhas_acoes = [
-            "- Inspeção e desmontagem dos módulos mecânicos e elétricos de comando.",
-            "- Testes de segurança física, elétrica e aterramento operacional aferidos.",
-            "- Calibração e validação de funcionamento operacional 100% aprovada."
+            "• Inspeção e desmontagem dos módulos mecânicos e elétricos de comando.",
+            "• Testes de segurança física, elétrica e aterramento operacional aferidos.",
+            "• Calibração e validação de funcionamento operacional 100% aprovada."
         ]
 
-    # Buscar peças aplicadas no banco com indicação Cliente vs Empresa (eMED)
     pecas_itens = []
+    pecas_vistas = set()
     try:
         with sqlite3.connect(db_file) as conn:
             cur = conn.cursor()
@@ -327,43 +332,34 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
             """, (str(id_os_c), f"%OS #{id_os_c}%"))
             for r in cur.fetchall():
                 cod_p = r[0] or "PEC"
-                desc_p = r[1]
+                desc_p = str(r[1] or "")
+                if not desc_p.strip() or "NENHUMA PE" in desc_p.upper():
+                    continue
                 origem_p = str(r[2] or "").upper()
-                
-                # Se código vier genérico mas estiver no texto da peça, refinar
-                if cod_p == "PEC" and "PEC-" in str(desc_p):
-                    import re
-                    m = re.search(r'(PEC-[\w-]+)', str(desc_p))
+                if cod_p == "PEC" and "PEC-" in desc_p:
+                    m = _re.search(r"(PEC-[\w-]+)", desc_p)
                     if m:
                         cod_p = m.group(1)
-                
-                # Limpar repetição do código na descrição se existir
-                desc_limpa = str(desc_p)
-                if cod_p in desc_limpa and ":" in desc_limpa:
-                    partes = desc_limpa.split(":", 1)
-                    if len(partes) > 1:
-                        prefixo = partes[0].split()[0] if partes[0].split() else "1x"
-                        desc_limpa = f"{prefixo} {partes[1].strip()}"
-                desc_p = desc_limpa
-                
-                # Definir se é Empresa (eMED) ou Cliente
-                if "CLIENTE" in origem_p:
-                    origem_lbl = "CLIENTE (Fornecido pelo Hospital)"
-                    origem_badge = '<span style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:3px;font-size:7pt;font-weight:bold;">FORNECIDA PELO CLIENTE</span>'
-                else:
-                    origem_lbl = "EMPRESA (eMED - Estoque Próprio)"
-                    origem_badge = '<span style="background:#e0f2fe;color:#0369a1;padding:2px 6px;border-radius:3px;font-size:7pt;font-weight:bold;">EMPRESA / eMED (Estoque Próprio)</span>'
-                
+                desc_limpa = _re.sub(r"\(\s*" + _re.escape(cod_p) + r"\s*\)", "", desc_p).strip()
+                desc_limpa = _re.sub(r"^(\d+x)\s+" + _re.escape(cod_p) + r"\s*[-:]\s*", r"\1 ", desc_limpa).strip()
+                chave_dedup_p = (cod_p.upper(), (desc_limpa or desc_p).upper())
+                if chave_dedup_p in pecas_vistas:
+                    continue
+                pecas_vistas.add(chave_dedup_p)
+                origem_lbl = "CLIENTE" if "CLIENTE" in origem_p else "EMPRESA EMED"
                 pecas_itens.append({
                     "codigo": cod_p,
-                    "descricao": desc_p,
-                    "origem_badge": origem_badge,
+                    "descricao": desc_limpa or desc_p,
                     "origem_lbl": origem_lbl
                 })
     except Exception:
         pass
 
-    # Carregar logo oficial que o usuário enviou
+    # Preencher espaço vertical na seção 4 quando houver poucas linhas para manter o padrão de página cheia da OS
+    linhas_ocupadas = len(linhas_acoes) + max(1, len(pecas_itens))
+    linhas_extras_espaco = max(0, 8 - linhas_ocupadas)
+    espacador_srv_html = "".join('<div style="padding: 3px 0; font-size: 7.8pt;">&nbsp;</div>' for _ in range(linhas_extras_espaco))
+
     logo_path = os.path.join(dir_emed, "emed_logo_oficial.png")
     if not os.path.exists(logo_path):
         logo_path = os.path.join(dir_emed, "emed_logo_clean_white_bg.png")
@@ -372,7 +368,6 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
         with open(logo_path, "rb") as f:
             logo_b64 = f"data:image/png;base64,{base64.b64encode(f.read()).decode('utf-8')}"
 
-    # Assinatura do técnico
     rubrica_tec = ""
     try:
         with sqlite3.connect(db_file) as conn:
@@ -384,7 +379,7 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     except Exception:
         pass
 
-    # Fotos se houver
+    # Coletar Fotos / Evidências e Checklist para a Página 2 (somente se existirem)
     lista_fotos_b64 = []
     for c_foto in [row_c.get("foto_evidencia"), row_c.get("foto_depois"), row_c.get("fotos_adicionais")]:
         if c_foto:
@@ -393,648 +388,365 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
                 if b64_f and b64_f not in lista_fotos_b64:
                     lista_fotos_b64.append(b64_f)
 
-    bloco_fotos = ""
-    if lista_fotos_b64:
-        bloco_fotos = '<div style="margin-top:14px;"><div style="font-size:8.5pt;font-weight:bold;color:#0284c7;text-transform:uppercase;margin-bottom:6px;border-bottom:1px solid #e2e8f0;padding-bottom:2px;">EVIDÊNCIAS FOTOGRÁFICAS / FOTOS DO ATENDIMENTO:</div><div style="display:flex;flex-wrap:wrap;gap:10px;">'
-        for idx_f, f_b64 in enumerate(lista_fotos_b64):
-            bloco_fotos += f'''
-            <div style="text-align:center;">
-                <img src="{f_b64}" style="width:190px;height:130px;object-fit:cover;border:1px solid #cbd5e1;border-radius:4px;display:block;" />
-                <span style="font-size:7pt;color:#64748b;">foto_evidencia_{idx_f+1}.jpg</span>
-            </div>
-            '''
-        bloco_fotos += '</div></div>'
+    checklist_raw = limpar_texto(row_c.get("checklist_json") or row_c.get("checklist_dados") or "", "")
+    checklist_itens = []
+    if checklist_raw and checklist_raw != "-":
+        for item_ck in str(checklist_raw).split(";"):
+            if item_ck.strip():
+                checklist_itens.append(item_ck.strip())
+
+    tipo_srv = limpar_texto(row_c.get("tipo_servico"), "CORRETIVA").upper()
+    if is_pendencia:
+        cor_num_bg = "#dc2626"
+        cor_num_borda = "#b91c1c"
+        status_label = "PENDÊNCIA"
+    elif is_observacao:
+        cor_num_bg = "#d97706"
+        cor_num_borda = "#b45309"
+        status_label = "EM OBSERVAÇÃO"
+    elif status_os.upper() in ("FINALIZADA", "CONCLUÍDO", "CONCLUIDO", "FECHADA"):
+        cor_num_bg = "#16a34a"
+        cor_num_borda = "#15803d"
+        status_label = "CONCLUÍDA"
+    else:
+        cor_num_bg = "#0284c7"
+        cor_num_borda = "#0369a1"
+        status_label = status_os.upper()
+
+    cabecalho_padrao_html = f"""
+  <table style="border-bottom: 2px solid #0284c7; margin-bottom: 8px; padding-bottom: 6px;">
+    <tr>
+      <td style="width: 27%; vertical-align: middle; padding-right: 8px;">
+        <img src="{logo_b64}" width="138" style="width: 138px; max-height: 58px; object-fit: contain; display: block;" alt="EMED Eletromedicina" />
+      </td>
+      <td style="width: 57%; vertical-align: middle; text-align: center; border-left: 1.5px solid #e2e8f0; border-right: 1.5px solid #e2e8f0; padding: 0 8px;">
+        <div style="font-size: 10pt; font-weight: bold; color: #0f172a;">EMED&nbsp;ELETROMEDICINA&nbsp;LTDA.</div>
+        <div style="font-size: 6.8pt; font-weight: bold; color: #0284c7; margin-bottom: 2px;">Manuten&ccedil;&atilde;o em Equipamentos de Diagn&oacute;stico por Imagem</div>
+        <div style="font-size: 6.3pt; color: #334155; line-height: 1.3;">
+          <b>Matriz (CE):</b> CNPJ: 03.611.974/0001-08 &bull; Rua Coronel Freire, 16 - Centro - Eus&eacute;bio / Fortaleza - CE &bull; CEP: 61760-000 &bull; Fone: (85) 3254-2929
+        </div>
+        <div style="font-size: 6.3pt; color: #334155; line-height: 1.3;">
+          <b>Filial (DF):</b> CNPJ: 03.611.974/0002-80 &bull; Rua 3, Ch&aacute;cara 46A, Lote 01 - Vicente Pires - Bras&iacute;lia - DF &bull; Fone: (61) 3234-3647 / (61) 99658-5392
+        </div>
+      </td>
+      <td style="width: 16%; vertical-align: middle; padding-left: 8px;">
+        <table style="border: 1.5px solid {cor_num_borda}; width: 100%;">
+          <tr>
+            <td style="background: {cor_num_bg}; color: #ffffff; text-align: center; padding: 2px 4px;">
+              <div style="font-size: 5.2pt; font-weight: bold; letter-spacing: 0.2px;">ORDEM DE SERVI&Ccedil;O</div>
+              <div style="font-size: 9pt; font-weight: bold; line-height: 1.15;">N&ordm; {id_os_c}</div>
+              <div style="font-size: 5.5pt; font-weight: bold;">{status_label}</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="background: #f8fafc; color: #334155; text-align: center; font-size: 5.8pt; font-weight: bold; padding: 2px 4px;">
+              {data_hora_topo}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>"""
+
+    pagina2_anexos_html = ""
+    if lista_fotos_b64 or checklist_itens:
+        fotos_rows = ""
+        if lista_fotos_b64:
+            fotos_rows = '<div class="sec-box"><div class="sec-title-blue">ANEXO I — EVIDÊNCIAS FOTOGRÁFICAS DO ATENDIMENTO</div><table><tr>'
+            for idx_f, f_b64 in enumerate(lista_fotos_b64[:4]):
+                if idx_f > 0 and idx_f % 2 == 0:
+                    fotos_rows += "</tr><tr>"
+                fotos_rows += f'<td style="width:50%;text-align:center;padding:8px;"><img src="{f_b64}" width="230" style="width:230px;height:155px;object-fit:cover;border:1px solid #cbd5e1;" /><div style="font-size:6.8pt;color:#475569;margin-top:3px;">Registro Fotográfico #{idx_f+1} — OS Nº {id_os_c}</div></td>'
+            if len(lista_fotos_b64[:4]) % 2 == 1:
+                fotos_rows += '<td style="width:50%;"></td>'
+            fotos_rows += '</tr></table></div>'
+
+        ck_rows = ""
+        if checklist_itens:
+            ck_rows = '<div class="sec-box"><div class="sec-title">ANEXO II — CHECKLIST TÉCNICO DE VERIFICAÇÃO</div><div style="padding:6px 10px;">'
+            for c_it in checklist_itens:
+                ck_rows += f'<div style="padding:3px 0;font-size:7.6pt;border-bottom:1px solid #f1f5f9;">&#10003; {c_it}</div>'
+            ck_rows += '</div></div>'
+
+        pagina2_anexos_html = f"""<!-- PAGE_BREAK_ANEXOS -->
+<div class="page-container" style="page-break-before: always; margin-top: 12px;">
+  {cabecalho_padrao_html}
+  <div class="sec-box">
+    <div class="sec-title">IDENTIFICAÇÃO VINCULADA AO ANEXO — OS Nº {id_os_c}</div>
+    <table>
+      <tr>
+        <td class="lbl">CLIENTE / UNIDADE:</td>
+        <td class="val"><b>{cliente}</b></td>
+        <td class="lbl">EQUIPAMENTO / N/S:</td>
+        <td class="val"><b>{equipamento} ({num_serie})</b></td>
+      </tr>
+    </table>
+  </div>
+  {ck_rows}
+  {fotos_rows}
+  <div style="text-align: center; font-size: 6.5pt; color: #64748b; margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 4px;">
+    Anexo Técnico da Ordem de Serviço Nº {id_os_c} (Página 2) &bull; <b>EMED ELETROMEDICINA LTDA.</b>
+  </div>
+</div>"""
 
     html = f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Relatório de Atendimento e OS #{id_os_c} - eMED Eletromedicina</title>
+<title>Relatório Técnico OS #{id_os_c} - EMED Eletromedicina</title>
 <style>
-  @page {{ size: A4; margin: 10mm 12mm; }}
+  @page {{ size: A4; margin: 6mm 8mm; }}
   body {{
     font-family: Arial, Helvetica, sans-serif;
     color: #1e293b;
     margin: 0;
-    padding: 14px;
+    padding: 6px;
     background: #f8fafc;
-    font-size: 8.5pt;
-    line-height: 1.35;
+    font-size: 8pt;
+    line-height: 1.32;
   }}
   .page-container {{
-    max-width: 820px;
-    margin: auto;
+    max-width: 790px;
+    margin: 0 auto;
     background: #ffffff;
     border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    padding: 20px 24px;
-  }}
-  
-  /* CABEÇALHO COM LOGO + DADOS COMPLETOS EMED + BOX DE OS NO CANTO SUPERIOR DIREITO */
-  .top-header {{
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 2px solid #0284c7;
-    padding-bottom: 12px;
-    margin-bottom: 14px;
-    gap: 12px;
-  }}
-  .header-left {{
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    flex: 1;
-  }}
-  .logo-img {{
-    width: 140px;
-    height: auto;
-    max-height: 60px;
-    object-fit: contain;
-    display: block;
-  }}
-  .company-info {{
-    border-left: 2px solid #e2e8f0;
-    padding-left: 12px;
-    font-size: 7.5pt;
-    color: #475569;
-    line-height: 1.35;
-  }}
-  .company-name {{
-    font-size: 11pt;
-    font-weight: bold;
-    color: #0f172a;
-    letter-spacing: -0.2px;
-    margin-bottom: 2px;
-  }}
-  .company-subtitle {{
-    font-size: 7.8pt;
-    font-weight: bold;
-    color: #0284c7;
-    margin-bottom: 2px;
-  }}
-  
-  /* BOX OS NO CANTO SUPERIOR DIREITO */
-  .os-badge-box {{
-    background: #f8fafc;
-    border: 1.5px solid #0284c7;
-    border-radius: 6px;
-    padding: 8px 14px;
-    text-align: right;
-    min-width: 175px;
-    flex-shrink: 0;
-    box-shadow: 0 1px 4px rgba(2, 132, 199, 0.08);
-  }}
-  .os-badge-title {{
-    font-size: 7pt;
-    font-weight: bold;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }}
-  .os-badge-num {{
-    font-size: 15pt;
-    font-weight: bold;
-    color: #0284c7;
-    line-height: 1.1;
-    margin: 2px 0;
-  }}
-  .os-badge-meta {{
-    font-size: 7.2pt;
-    color: #334155;
-    font-weight: 600;
-  }}
-  .status-tag {{
-    display: inline-block;
-    background: #dcfce7;
-    color: #15803d;
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-size: 7pt;
-    font-weight: bold;
-  }}
-
-  /* GRID 2 COLUNAS: CLIENTE & ORDEM DE SERVIÇO / EQUIPAMENTO */
-  .grid-two-blocks {{
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 14px;
-  }}
-  .card-block {{
-    flex: 1;
-    border: 1px solid #cbd5e1;
-    border-radius: 5px;
-    background: #ffffff;
-    overflow: hidden;
-  }}
-  .card-header {{
-    background: #f1f5f9;
-    border-bottom: 1px solid #cbd5e1;
-    padding: 5px 10px;
-    font-size: 8.5pt;
-    font-weight: bold;
-    color: #0284c7;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }}
-  .card-body {{
-    padding: 8px 10px;
-  }}
-  .field-row {{
-    display: flex;
-    margin-bottom: 4px;
-    font-size: 7.8pt;
-    line-height: 1.35;
-  }}
-  .field-lbl {{
-    font-weight: bold;
-    color: #475569;
-    width: 125px;
-    flex-shrink: 0;
-    text-transform: uppercase;
-    font-size: 7.2pt;
-  }}
-  .field-val {{
-    color: #0f172a;
-    font-weight: 500;
-    word-break: break-word;
-  }}
-  .fiscal-highlight {{
-    background: #f8fafc;
-    border: 1px dashed #cbd5e1;
-    padding: 3px 6px;
     border-radius: 4px;
-    margin: 4px 0 6px 0;
+    padding: 12px 14px;
   }}
-
-  /* DEFEITO INFORMADO */
-  .defeito-box {{
-    background: #fff7ed;
-    border: 1px solid #fed7aa;
-    border-radius: 4px;
-    padding: 6px 10px;
-    margin-top: 6px;
-    font-size: 7.8pt;
-  }}
-  .defeito-title {{
-    font-size: 7.2pt;
-    font-weight: bold;
-    color: #c2410c;
-    text-transform: uppercase;
-    margin-bottom: 2px;
-  }}
-
-  /* SERVIÇOS EXECUTADOS CENTRALIZADO */
-  .services-section {{
-    margin-top: 14px;
-    margin-bottom: 14px;
-    border: 1px solid #cbd5e1;
-    border-radius: 5px;
-    overflow: hidden;
-  }}
-  .services-header-center {{
-    background: #0284c7;
-    color: #ffffff;
-    text-align: center;
-    font-weight: bold;
-    font-size: 9.5pt;
-    letter-spacing: 0.5px;
-    padding: 6px 12px;
-    text-transform: uppercase;
-  }}
-  .services-body {{
-    padding: 10px 14px;
-    background: #ffffff;
-  }}
-  .services-list {{
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }}
-  .services-list li {{
-    padding: 2.5px 0;
-    color: #1e293b;
-    font-size: 8.2pt;
-    line-height: 1.4;
-  }}
-
-  /* PEÇAS UTILIZADAS COM ORIGEM CLIENTE / EMPRESA */
-  .parts-section {{
-    margin-top: 12px;
-    margin-bottom: 14px;
-    border: 1px solid #cbd5e1;
-    border-radius: 5px;
-    overflow: hidden;
-  }}
-  .parts-header {{
-    background: #f1f5f9;
-    border-bottom: 1px solid #cbd5e1;
-    padding: 5px 10px;
-    font-size: 8.2pt;
-    font-weight: bold;
-    color: #0369a1;
-    text-transform: uppercase;
-    display: flex;
-    justify-content: space-between;
-  }}
-  .parts-table {{
+  table {{
     width: 100%;
     border-collapse: collapse;
-    font-size: 7.8pt;
   }}
-  .parts-table th {{
-    background: #f8fafc;
-    color: #475569;
-    text-align: left;
-    padding: 4px 8px;
-    font-size: 7pt;
-    text-transform: uppercase;
-    border-bottom: 1px solid #e2e8f0;
-  }}
-  .parts-table td {{
-    padding: 5px 8px;
-    border-bottom: 1px solid #f1f5f9;
-    color: #1e293b;
-  }}
-
-  /* CONDIÇÃO DO EQUIPAMENTO E PENDÊNCIAS */
-  .status-condition-box {{
-    margin-top: 12px;
-    border: 1.5px solid #cbd5e1;
-    border-radius: 5px;
-    padding: 8px 12px;
-    background: #fafafa;
-  }}
-  .condition-grid {{
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 6px;
-  }}
-  .cond-item {{
-    flex: 1;
+  .sec-box {{
     border: 1px solid #cbd5e1;
-    border-radius: 4px;
-    padding: 5px 8px;
-    background: #ffffff;
+    margin-bottom: 7px;
+  }}
+  .sec-title {{
+    background: #0f172a;
+    color: #ffffff;
     font-size: 7.6pt;
     font-weight: bold;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    padding: 4px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
   }}
-  .cond-active-liberado {{
-    border-color: #10b981;
-    background: #f0fdf4;
-    color: #15803d;
+  .sec-title-blue {{
+    background: #0284c7;
+    color: #ffffff;
+    font-size: 7.6pt;
+    font-weight: bold;
+    padding: 4px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
   }}
-  .cond-active-observacao {{
-    border-color: #f59e0b;
-    background: #fffbeb;
-    color: #b45309;
-  }}
-  .cond-active-pendencia {{
-    border-color: #ef4444;
-    background: #fef2f2;
-    color: #b91c1c;
-  }}
-  .pendencia-alert {{
-    margin-top: 6px;
-    background: #fff1f2;
-    border: 1px solid #fecdd3;
-    padding: 5px 8px;
-    border-radius: 4px;
-    font-size: 7.5pt;
-    color: #9f1239;
-  }}
-  .resolvido-alert {{
-    margin-top: 6px;
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    padding: 5px 8px;
-    border-radius: 4px;
-    font-size: 7.5pt;
-    color: #166534;
-  }}
-
-  /* OBSERVAÇÕES */
-  .obs-box {{
-    margin-top: 10px;
-    border: 1px solid #e2e8f0;
-    border-radius: 4px;
-    padding: 6px 10px;
-    background: #ffffff;
-    font-size: 7.8pt;
-  }}
-
-  /* APONTAMENTOS DE TEMPO */
-  .apont-bar {{
-    margin-top: 10px;
-    border: 1px solid #e2e8f0;
-    border-radius: 4px;
-    padding: 6px 10px;
+  .lbl {{
+    font-size: 6.8pt;
+    font-weight: bold;
+    color: #475569;
+    text-transform: uppercase;
+    width: 18%;
+    padding: 4px 6px;
     background: #f8fafc;
-    display: flex;
-    justify-content: space-between;
-    font-size: 7.5pt;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px solid #e2e8f0;
   }}
-
-  /* ASSINATURAS */
-  .sig-section {{
-    display: flex;
-    justify-content: space-between;
-    margin-top: 24px;
-    padding-top: 10px;
-    border-top: 1.5px solid #0284c7;
-  }}
-  .sig-block {{
-    width: 45%;
-    text-align: center;
-  }}
-  .sig-line {{
-    border-top: 1px solid #64748b;
-    margin-top: 35px;
-    padding-top: 3px;
+  .val {{
     font-size: 7.8pt;
     color: #0f172a;
+    padding: 4px 7px;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px solid #e2e8f0;
   }}
-  
-  .footer-stamp {{
-    text-align: center;
-    font-size: 7pt;
-    color: #64748b;
-    margin-top: 16px;
-    border-top: 1px solid #e2e8f0;
-    padding-top: 5px;
+  .parts-th {{
+    background: #f1f5f9;
+    color: #334155;
+    font-size: 6.8pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    padding: 4px 7px;
+    border-bottom: 1px solid #cbd5e1;
+    text-align: left;
   }}
-  
+  .parts-td {{
+    font-size: 7.6pt;
+    color: #1e293b;
+    padding: 4px 7px;
+    border-bottom: 1px solid #e2e8f0;
+  }}
   @media print {{
-    @page {{ size: A4; margin: 8mm 10mm; }}
+    @page {{ size: A4; margin: 6mm 8mm; }}
     body {{ background: #ffffff !important; padding: 0 !important; margin: 0 !important; }}
-    .page-container {{ border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; max-width: 100% !important; }}
-    .no-print, header, nav, button {{ display: none !important; visibility: hidden !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }}
+    .page-container {{ border: none !important; padding: 0 !important; margin: 0 !important; max-width: 100% !important; }}
+    .no-print, button {{ display: none !important; visibility: hidden !important; height: 0 !important; }}
   }}
 </style>
 </head>
 <body>
 
-<!-- BOTÃO FLUTUANTE DISCRETO (NÃO POLUI O TOPO E DESAPARECE 100% NA IMPRESSÃO) -->
-<div class="no-print" style="position:fixed;bottom:24px;right:24px;z-index:99999;">
-  <button onclick="window.print()" style="background:#0284c7;color:#fff;border:none;padding:12px 22px;border-radius:50px;font-weight:bold;cursor:pointer;font-size:11pt;box-shadow:0 4px 16px rgba(2,132,199,0.45);display:flex;align-items:center;gap:8px;font-family:Arial,sans-serif;">
-    🖨️ Imprimir / Salvar PDF
+{"""<div class="no-print" style="position:fixed;bottom:22px;right:22px;z-index:99999;">
+  <button onclick="window.print()" style="background:#0284c7;color:#fff;border:none;padding:11px 20px;border-radius:50px;font-weight:bold;cursor:pointer;font-size:10.5pt;box-shadow:0 4px 14px rgba(2,132,199,0.4);">
+    Imprimir / Salvar PDF
   </button>
-</div>
+</div>""" if incluir_botao_print else ""}
 
 <div class="page-container">
-  <!-- CABEÇALHO COMPLETO COM DADOS EMED E OS NO CANTO SUPERIOR DIREITO -->
-  <div class="top-header">
-    <div class="header-left">
-      <div>
-        <img src="{logo_b64}" class="logo-img" alt="eMED Eletromedicina Ltda." />
-      </div>
-      <div class="company-info">
-        <div class="company-name">EMED ELETROMEDICINA LTDA.</div>
-        <div class="company-subtitle">Manutenção em Equipamentos de Diagnóstico por Imagem</div>
-        <div><b>CNPJ:</b> 03.611.974/0001-08 &bull; <b>Insc. Municipal:</b> 123456-7</div>
-        <div><b>Sede:</b> Rua Coronel Freire, 16 - Centro - Eusébio / Fortaleza - CE &bull; <b>CEP:</b> 61760-000</div>
-        <div><b>Contato:</b> (85) 3299-4400 / (85) 98888-0000 &bull; <b>E-mail:</b> contato@emed.com.br</div>
-        <div><b>Responsabilidade Técnica:</b> CFT / CREA-CE &bull; ANVISA RDC 509/2021</div>
-      </div>
-    </div>
-    
-    <!-- BOX DE OS NO CANTO SUPERIOR DIREITO (SEM NÚMERO DE TAREFA PARA NÃO POLUIR) -->
-    <div class="os-badge-box">
-      <div class="os-badge-title">ORDEM DE SERVIÇO</div>
-      <div class="os-badge-num">Nº {id_os_c}</div>
-      <div style="margin-top:4px;">
-        <span class="status-tag">{status_os}</span>
-      </div>
-      <div class="os-badge-meta" style="margin-top:4px;font-size:7pt;color:#64748b;">
-        {dt_agend} &bull; {cin}
-      </div>
+  {cabecalho_padrao_html}
+
+  <!-- 1. IDENTIFICAÇÃO DA EMPRESA / CLIENTE -->
+  <div class="sec-box">
+    <div class="sec-title">1. IDENTIFICAÇÃO DA EMPRESA / CLIENTE</div>
+    <table>
+      <tr>
+        <td class="lbl">CLIENTE / UNIDADE:</td>
+        <td class="val" style="width: 38%;"><b>{cliente}</b></td>
+        <td class="lbl">CNPJ / CPF:</td>
+        <td class="val" style="width: 26%;">{cnpj}</td>
+      </tr>
+      <tr>
+        <td class="lbl">ENDEREÇO:</td>
+        <td class="val">{endereco_atend}</td>
+        <td class="lbl">CIDADE / UF:</td>
+        <td class="val">{cidade} - {estado}</td>
+      </tr>
+      <tr>
+        <td class="lbl">RESPONSÁVEL LOCAL:</td>
+        <td class="val">{resp_hosp}</td>
+        <td class="lbl">TELEFONE / CONTATO:</td>
+        <td class="val">{whats_cli}</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- 2. IDENTIFICAÇÃO DO EQUIPAMENTO -->
+  <div class="sec-box">
+    <div class="sec-title">2. IDENTIFICAÇÃO DO EQUIPAMENTO</div>
+    <table>
+      <tr>
+        <td class="lbl">EQUIPAMENTO:</td>
+        <td class="val" style="width: 38%;"><b>{equipamento}</b></td>
+        <td class="lbl">FABRICANTE / MODELO:</td>
+        <td class="val" style="width: 26%;">{fab} / {mod}</td>
+      </tr>
+      <tr>
+        <td class="lbl">Nº DE SÉRIE:</td>
+        <td class="val"><b>{num_serie}</b></td>
+        <td class="lbl">PATRIMÔNIO / TAG:</td>
+        <td class="val"><b>{patrimonio}</b></td>
+      </tr>
+      <tr>
+        <td class="lbl">SETOR / LOCAL:</td>
+        <td class="val">{local_instalacao}</td>
+        <td class="lbl">TIPO DE SERVIÇO:</td>
+        <td class="val"><b>{tipo_srv}</b></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- 3. PROBLEMA / SOLICITAÇÃO RELATADA -->
+  <div class="sec-box">
+    <div class="sec-title" style="background: #334155;">3. PROBLEMA / SOLICITAÇÃO RELATADA</div>
+    <div style="padding: 6px 9px; background: #fffbeb; color: #78350f; font-size: 7.8pt; font-weight: bold;">
+      {defeito_informado}
     </div>
   </div>
 
-  <!-- GRID DE 2 BLOCOS: DADOS DO CLIENTE & ORDEM DE SERVIÇO / EQUIPAMENTO -->
-  <div class="grid-two-blocks">
-    <!-- BLOCO 1: DADOS DO CLIENTE (COM ENDEREÇO FISCAL SEMPRE VISÍVEL) -->
-    <div class="card-block">
-      <div class="card-header">
-        <span>👤 DADOS DO CLIENTE / TOMADOR</span>
-      </div>
-      <div class="card-body">
-        <div class="field-row">
-          <span class="field-lbl">RAZÃO SOCIAL:</span>
-          <span class="field-val"><b>{cliente}</b></span>
-        </div>
-        <div class="field-row">
-          <span class="field-lbl">CNPJ / CPF:</span>
-          <span class="field-val">{cnpj}</span>
-        </div>
-        
-        <!-- ENDEREÇO FISCAL DESTACADO ABAIXO DO CNPJ -->
-        <div class="fiscal-highlight">
-          <div style="font-size:6.8pt;font-weight:bold;color:#0284c7;text-transform:uppercase;margin-bottom:1px;">
-            🏢 ENDEREÇO FISCAL / FATURAMENTO (SEMPRE VISÍVEL):
-          </div>
-          <div style="font-size:7.5pt;color:#1e293b;font-weight:500;">
-            {endereco_fiscal}
-          </div>
-        </div>
-
-        <div class="field-row">
-          <span class="field-lbl">RESPONSÁVEL:</span>
-          <span class="field-val">{resp_hosp}</span>
-        </div>
-        <div class="field-row">
-          <span class="field-lbl">CIDADE / UF:</span>
-          <span class="field-val">{cidade} - {estado}</span>
-        </div>
-        <div class="field-row">
-          <span class="field-lbl">TELEFONE:</span>
-          <span class="field-val">{whats_cli}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- BLOCO 2: DADOS DO EQUIPAMENTO & ORDEM DE SERVIÇO (DIRECIONAMENTO TÉCNICO) -->
-    <div class="card-block">
-      <div class="card-header">
-        <span>⚙️ EQUIPAMENTO & ATENDIMENTO</span>
-      </div>
-      <div class="card-body">
-        <div class="field-row">
-          <span class="field-lbl">EQUIPAMENTO:</span>
-          <span class="field-val"><b>{equipamento}</b></span>
-        </div>
-        <div class="field-row">
-          <span class="field-lbl">FABRICANTE:</span>
-          <span class="field-val">{fab}</span>
-        </div>
-        <div class="field-row">
-          <span class="field-lbl">MODELO / VERSÃO:</span>
-          <span class="field-val">{mod}</span>
-        </div>
-        <div class="field-row">
-          <span class="field-lbl">Nº DE SÉRIE (N/S):</span>
-          <span class="field-val"><b>{num_serie}</b></span>
-        </div>
-        <div class="field-row">
-          <span class="field-lbl">PATRIMÔNIO / TAG:</span>
-          <span class="field-val"><b>{patrimonio}</b></span>
-        </div>
-        
-        <!-- LOCAL EXATO DE INSTALAÇÃO PARA NÃO IR NO LUGAR ERRADO -->
-        <div style="background:#f1f5f9;border-left:3px solid #0284c7;padding:3px 6px;margin:4px 0;border-radius:2px;">
-          <div style="font-size:6.8pt;font-weight:bold;color:#0284c7;text-transform:uppercase;">
-            📍 LOCAL DE INSTALAÇÃO (SALA / SETOR):
-          </div>
-          <div style="font-size:7.4pt;color:#0f172a;font-weight:600;">
-            {local_instalacao}
-          </div>
-        </div>
-
-        <div class="field-row">
-          <span class="field-lbl">ENDEREÇO ATENDIMENTO:</span>
-          <span class="field-val">{endereco_atend}, {cidade} - {estado}</span>
-        </div>
-
-        <!-- DEFEITO INFORMADO JUNTO AOS DADOS DA OS -->
-        <div class="defeito-box">
-          <div class="defeito-title">⚠️ DEFEITO INFORMADO PELO USUÁRIO:</div>
-          <div style="color:#7c2d12;font-weight:500;">
-            {defeito_informado}
-          </div>
-        </div>
-      </div>
+  <!-- 4. RELATÓRIO TÉCNICO & SERVIÇOS EXECUTADOS -->
+  <div class="sec-box">
+    <div class="sec-title-blue">4. RELATÓRIO TÉCNICO — SERVIÇOS EXECUTADOS</div>
+    <div style="padding: 7px 9px; background: #ffffff;">
+      {''.join(f'<div style="padding: 2.2px 0; font-size: 7.8pt; color: #1e293b;">{a}</div>' for a in linhas_acoes)}
+      {espacador_srv_html}
     </div>
   </div>
 
-  <!-- SEÇÃO SERVIÇOS EXECUTADOS CENTRALIZADO -->
-  <div class="services-section">
-    <div class="services-header-center">
-      SERVIÇOS EXECUTADOS
-    </div>
-    <div class="services-body">
-      <ul class="services-list">
-        {''.join(f'<li>{a}</li>' for a in linhas_acoes)}
-      </ul>
-    </div>
-  </div>
-
-  <!-- PEÇAS UTILIZADAS (ORIGEM CLIENTE / EMPRESA) -->
-  <div class="parts-section">
-    <div class="parts-header">
-      <span>🔩 PEÇAS & COMPONENTES APLICADOS</span>
-      <span style="font-size:7pt;color:#64748b;font-weight:normal;">Identificação de Origem e Fornecimento</span>
-    </div>
+  <!-- 5. PEÇAS & COMPONENTES APLICADOS -->
+  <div class="sec-box">
+    <div class="sec-title" style="background: #475569;">5. PEÇAS E COMPONENTES APLICADOS</div>
     {f'''
-    <table class="parts-table">
+    <table>
       <thead>
         <tr>
-          <th style="width:15%;">CÓDIGO</th>
-          <th style="width:50%;">DESCRIÇÃO DO COMPONENTE</th>
-          <th style="width:35%;">ORIGEM DO FORNECIMENTO</th>
+          <th class="parts-th" style="width: 18%;">CÓDIGO</th>
+          <th class="parts-th" style="width: 54%;">DESCRIÇÃO DO COMPONENTE</th>
+          <th class="parts-th" style="width: 28%;">ORIGEM</th>
         </tr>
       </thead>
       <tbody>
         {''.join(f"""
         <tr>
-          <td><b>{p['codigo']}</b></td>
-          <td>{p['descricao']}</td>
-          <td>{p['origem_badge']}</td>
+          <td class="parts-td"><b>{p['codigo']}</b></td>
+          <td class="parts-td">{p['descricao']}</td>
+          <td class="parts-td"><b>{p['origem_lbl']}</b></td>
         </tr>
         """ for p in pecas_itens)}
       </tbody>
     </table>
     ''' if pecas_itens else '''
-    <div style="padding:7px 10px;font-size:7.5pt;color:#64748b;font-style:italic;">
-      Nenhuma peça substituída neste atendimento (serviço exclusivo de mão de obra / calibração).
+    <div style="padding: 5px 9px; font-size: 7.5pt; color: #64748b; font-style: italic;">
+      Nenhuma peça substituída neste atendimento.
     </div>
     '''}
   </div>
 
-  <!-- STATUS / CONDIÇÃO PÓS-INTERVENÇÃO & PENDÊNCIAS -->
-  <div class="status-condition-box">
-    <div style="font-size:7.5pt;font-weight:bold;color:#334155;text-transform:uppercase;margin-bottom:6px;">
-      STATUS TÉCNICO PÓS-ATENDIMENTO DO EQUIPAMENTO:
-    </div>
-    <div class="condition-grid">
-      <div class="cond-item {'cond-active-liberado' if is_liberado else ''}">
-        <span>{'☑' if is_liberado else '☐'}</span>
-        <span>LIBERADO PARA USO CLÍNICO</span>
-      </div>
-      <div class="cond-item {'cond-active-observacao' if is_observacao else ''}">
-        <span>{'☑' if is_observacao else '☐'}</span>
-        <span>EQUIPAMENTO EM OBSERVAÇÃO</span>
-      </div>
-      <div class="cond-item {'cond-active-pendencia' if is_pendencia else ''}">
-        <span>{'☑' if is_pendencia else '☐'}</span>
-        <span>PENDÊNCIA TÉCNICA</span>
-      </div>
-    </div>
-
+  <!-- 6. PARECER FINAL E CONDIÇÃO PÓS-ATENDIMENTO (SEM PRÓXIMA PREVENTIVA) -->
+  <div class="sec-box">
+    <div class="sec-title">6. PARECER FINAL E CONDIÇÃO PÓS-ATENDIMENTO</div>
+    <table>
+      <tr>
+        <td style="width: 33.3%; padding: 5px 6px; font-size: 7.4pt; font-weight: bold; text-align: center; border-right: 1px solid #e2e8f0; background: {'#dcfce7' if is_liberado else '#ffffff'}; color: {'#166534' if is_liberado else '#64748b'};">
+          [{'X' if is_liberado else ' '}] LIBERADO PARA USO CLÍNICO
+        </td>
+        <td style="width: 33.3%; padding: 5px 6px; font-size: 7.4pt; font-weight: bold; text-align: center; border-right: 1px solid #e2e8f0; background: {'#fef3c7' if is_observacao else '#ffffff'}; color: {'#92400e' if is_observacao else '#64748b'};">
+          [{'X' if is_observacao else ' '}] EQUIPAMENTO EM OBSERVAÇÃO
+        </td>
+        <td style="width: 33.3%; padding: 5px 6px; font-size: 7.4pt; font-weight: bold; text-align: center; background: {'#fee2e2' if is_pendencia else '#ffffff'}; color: {'#991b1b' if is_pendencia else '#64748b'};">
+          [{'X' if is_pendencia else ' '}] PENDÊNCIA TÉCNICA
+        </td>
+      </tr>
+    </table>
     {f'''
-    <div class="{'pendencia-alert' if is_pendencia else 'resolvido-alert'}">
-      <b>{'⚠️ PENDÊNCIA TÉCNICA ATIVA REGISTRADA:' if is_pendencia else '✔️ PENDÊNCIA INICIAL INFORMADA:'}</b><br/>
-      {pendencias_txt} {'' if is_pendencia else '— <span style=\"color:#15803d;font-weight:bold;\">SOLUCIONADA NO ATENDIMENTO (Equipamento liberado 100%).</span>'}
+    <div style="padding: 4px 9px; font-size: 7.4pt; border-top: 1px solid #e2e8f0; background: {'#fef2f2' if is_pendencia else '#f0fdf4'}; color: {'#991b1b' if is_pendencia else '#166534'};">
+      <b>{'PENDÊNCIA REGISTRADA:' if is_pendencia else 'HISTÓRICO DA PENDÊNCIA:'}</b> {pendencias_txt} {'' if is_pendencia else '— Solucionada no atendimento.'}
     </div>
     ''' if pendencias_txt else ''}
-
-    <div style="margin-top:6px;font-size:7.2pt;color:#0369a1;background:#f0f9ff;border:1px dashed #bae6fd;padding:4px 8px;border-radius:3px;display:flex;justify-content:space-between;align-items:center;">
-      <span>📅 <b>PRÓXIMA MANUTENÇÃO PREVENTIVA RECOMENDADA:</b> {dt_prox_prev} (Periodicidade Semestral)</span>
-      <span><b>CICLO NORMATIVO:</b> ANVISA RDC 509/2021</span>
+    <div style="padding: 4px 9px; font-size: 7.4pt; border-top: 1px solid #e2e8f0; color: #1e293b;">
+      <b>OBSERVAÇÕES TÉCNICAS:</b> {obs_ger if obs_ger else "Equipamento revisado, testado e liberado dentro dos padrões operacionais especificados pelo fabricante."}
     </div>
+    <table style="border-top: 1px solid #e2e8f0; background: #f8fafc;">
+      <tr>
+        <td style="width: 34%; padding: 4px 9px; font-size: 7.2pt; color: #334155;"><b>Início:</b> {inicio_fmt}</td>
+        <td style="width: 33%; padding: 4px 9px; font-size: 7.2pt; color: #334155; text-align: center;"><b>Término:</b> {fim_fmt}</td>
+        <td style="width: 33%; padding: 4px 9px; font-size: 7.2pt; color: #334155; text-align: right;"><b>Duração:</b> {dur}</td>
+      </tr>
+    </table>
   </div>
 
-  <!-- OBSERVAÇÕES -->
-  <div class="obs-box">
-    <div style="font-size:7.2pt;font-weight:bold;color:#475569;text-transform:uppercase;margin-bottom:2px;">
-      OBSERVAÇÕES TÉCNICAS E RECOMENDAÇÕES:
-    </div>
-    <div style="color:#1e293b;line-height:1.4;">
-      {obs_ger if obs_ger else "Equipamento revisado, testado e calibrado dentro dos padrões operacionais especificados pelo fabricante."}
-    </div>
-  </div>
+  <!-- 7. ASSINATURAS NO RODAPÉ DA PÁGINA 1 -->
+  <table style="margin-top: 10px; border-top: 1.5px solid #0284c7; padding-top: 6px;">
+    <tr>
+      <td style="width: 48%; text-align: center; vertical-align: bottom; padding: 18px 12px 2px 12px;">
+        <div style="border-top: 1px solid #475569; padding-top: 4px; font-size: 7.8pt; color: #0f172a;">
+          <b>{resp_hosp if resp_hosp != "-" else cliente}</b><br/>
+          <span style="font-size: 6.8pt; color: #64748b;">Assinatura do Cliente / Responsável da Unidade</span>
+        </div>
+      </td>
+      <td style="width: 4%;"></td>
+      <td style="width: 48%; text-align: center; vertical-align: bottom; padding: 2px 12px 2px 12px;">
+        {f'<div style="text-align:center;margin-bottom:2px;"><img src="{rubrica_tec}" style="height:24px;max-width:110px;object-fit:contain;" /></div>' if rubrica_tec else '<div style="height:18px;"></div>'}
+        <div style="border-top: 1px solid #475569; padding-top: 4px; font-size: 7.8pt; color: #0f172a;">
+          <b>{tec_princ}</b><br/>
+          <span style="font-size: 6.8pt; color: #64748b;">Técnico Executor &bull; EMED Eletromedicina</span>
+        </div>
+      </td>
+    </tr>
+  </table>
 
-  <!-- APONTAMENTOS DE TEMPO -->
-  <div class="apont-bar">
-    <div><b>Status OS:</b> <span style="color:#15803d;font-weight:bold;">{status_os}</span></div>
-    <div><b>Início Atendimento:</b> {dt_agend} {cin}</div>
-    <div><b>Fim Atendimento:</b> {dt_agend} {cout}</div>
-    <div><b>Duração Total:</b> {dur}</div>
-    <div><b>Técnico:</b> {tec_princ}</div>
-  </div>
-
-  <!-- ASSINATURAS -->
-  <div class="sig-section">
-    <div class="sig-block">
-      <div class="sig-line">
-        <b>{resp_hosp if resp_hosp != "-" else cliente}</b><br/>
-        <span style="font-size:7pt;color:#64748b;">Assinatura do Cliente / Responsável Local da Unidade</span>
-      </div>
-    </div>
-    <div class="sig-block">
-      {f'<img src="{rubrica_tec}" style="height:36px;max-width:130px;object-fit:contain;margin-bottom:-25px;display:block;margin-left:auto;margin-right:auto;" />' if rubrica_tec else ''}
-      <div class="sig-line">
-        <b>{tec_princ}</b><br/>
-        <span style="font-size:7pt;color:#64748b;">Técnico Responsável &bull; CFT / CREA-CE</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- RODAPÉ COMPLETO -->
-  <div class="footer-stamp">
-    Ordem de Serviço Nº {id_os_c} &bull; Empresa: <b>EMED ELETROMEDICINA LTDA.</b> &bull; CNPJ: 03.611.974/0001-08 &bull; Emissão pelo Sistema Oficial eMED
+  <div style="text-align: center; font-size: 6.6pt; color: #64748b; margin-top: 5px; border-top: 1px solid #e2e8f0; padding-top: 3px;">
+    Relatório Técnico de Ordem de Serviço Nº {id_os_c} &bull; <b>EMED ELETROMEDICINA LTDA.</b> &bull; Matriz (CE): 03.611.974/0001-08 &bull; Filial (DF): 03.611.974/0002-80
   </div>
 </div>
-
+{pagina2_anexos_html}
 </body>
 </html>
     """
@@ -1502,7 +1214,7 @@ def _render_historico_concluidas(ctx: AppContext):
     <div style="font-family:'Brush Script MT',cursive; font-size:22px; color:#34d399; min-height:36px; line-height:36px;">{tec_hist_c.title()}</div>
     <hr style="border:0; border-top:1px solid #475569; margin:4px 16px;"/>
     <div style="font-size:11.5px; font-weight:bold; color:#ffffff;">{tec_hist_c}</div>
-    <div style="font-size:10.5px; color:#94a3b8;">Registro Técnico CFT / CREA</div>
+    <div style="font-size:10.5px; color:#94a3b8;">Técnico Executor • eMED Eletromedicina</div>
     {f'<div style="font-size:10.5px; color:#38bdf8; margin-top:2px;">Auxiliar: {tec_aux_c}</div>' if tec_aux_c else ''}
   </div>
   <div style="background:#1c2541; padding:10px 12px; border-radius:8px; border:1px solid #3a506b; text-align:center;">

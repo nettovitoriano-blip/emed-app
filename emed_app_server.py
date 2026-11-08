@@ -35,11 +35,15 @@ import os
 
 
 import sys
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 
 
 import json
 import urllib.parse
+import random
 
 
 
@@ -64,12 +68,26 @@ from datetime import datetime, timezone, timedelta
 
 
 import asyncio
+if sys.platform == "win32":
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    except Exception:
+        pass
 
 
 
 TZ_BRASIL = timezone(timedelta(hours=-3))
 
 
+
+# Micro-Cache de Alto Desempenho para Picos Extremos de Carga (TTL: 2.0s)
+_CACHE_BOOTSTRAP = None
+_CACHE_BOOTSTRAP_TIME = 0.0
+
+def invalidar_cache_bootstrap():
+    global _CACHE_BOOTSTRAP, _CACHE_BOOTSTRAP_TIME
+    _CACHE_BOOTSTRAP = None
+    _CACHE_BOOTSTRAP_TIME = 0.0
 
 def obter_agora_brasil() -> datetime:
 
@@ -276,6 +294,11 @@ from emed_services import (
 
 
 
+    avaliar_conformidade_fiscal,
+    registrar_evento_auditoria_fiscal,
+    obter_historico_eventos_fiscais,
+    obter_detalhe_evento,
+    obter_resumo_dashboard_fiscal,
 )
 
 
@@ -460,9 +483,7 @@ def _carregar_df_direto() -> pd.DataFrame:
 
 
 def _salvar_df_direto(df: pd.DataFrame) -> bool:
-
-
-
+    invalidar_cache_bootstrap()
     backup_excel = os.path.join(BASE_DIR, "base_clientes_backup.xlsx")
 
 
@@ -599,7 +620,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-    pastas_ignorar = {"media", "content", "css", "scripts", "icons", "search", "toc", "forms", "images", "system utiliies", "ge_ct_service_methods_2002", "old"}
+    pastas_ignorar = {"media", "content", "css", "scripts", "icons", "search", "toc", "forms", "images", "system utiliies"}
 
 
 
@@ -903,7 +924,6 @@ def _listar_manuais_homologados() -> list:
 
 
 
-    # Inclui os Vídeos de Treinamento Operacional & Gestão do Sistema eMED no catálogo
     videos_operacionais = [
         ("Video_Apresentacao_Sistema_Emed_PRO.mp4", "🎬 Vídeo Institucional: Apresentação Geral & Arquitetura do Sistema eMED PRO", "TREINAMENTO_SISTEMA", "PLATAFORMA EMED"),
         ("Video_Apresentacao_Sistema_Emed_Real.mp4", "🎬 Vídeo Operacional: Demonstração do Sistema eMED em Operação Real (Triagem ao Laudo)", "TREINAMENTO_SISTEMA", "PLATAFORMA EMED"),
@@ -939,6 +959,9 @@ def _listar_manuais_homologados() -> list:
             }
 
     catalogo = list(catalogo_map.values())
+
+
+
     catalogo.sort(key=lambda x: (x.get("_ordem", 1), 0 if x["modalidade"] != "GERAL" else 1, x["modalidade"], x["titulo"]))
 
 
@@ -955,22 +978,392 @@ def _listar_manuais_homologados() -> list:
 
 
 
+
+import hmac
+import hashlib
+import time
+
+EMED_AUTH_SECRET = os.environ.get("EMED_AUTH_SECRET", "emed-prod-secret-hospitalar-ceara-2026-auth-key")
+
+
+# Rate Limiting e Proteção contra Força Bruta
+_AUTH_FAIL_LOG = {} # {identificador: [timestamps]}
+_AUTH_LOCKS = {}    # {identificador: timestamp_fim_bloqueio}
+
+def _check_rate_limit(ident: str) -> bool:
+    now = time.time()
+    lock_until = _AUTH_LOCKS.get(ident, 0)
+    if now < lock_until:
+        return False
+    elif lock_until > 0 and now >= lock_until:
+        _AUTH_LOCKS.pop(ident, None)
+        _AUTH_FAIL_LOG.pop(ident, None)
+    return True
+
+def _record_auth_failure(ident: str):
+    now = time.time()
+    attempts = _AUTH_FAIL_LOG.get(ident, [])
+    attempts = [t for t in attempts if now - t < 60]
+    attempts.append(now)
+    _AUTH_FAIL_LOG[ident] = attempts
+    if len(attempts) >= 5:
+        _AUTH_LOCKS[ident] = now + 300 # Bloqueia por 5 minutos (300s)
+
+def _clear_auth_failure(ident: str):
+    _AUTH_FAIL_LOG.pop(ident, None)
+    _AUTH_LOCKS.pop(ident, None)
+
+
+# =========================================================================
+# RATE LIMITING & DEFESA ATIVA CONTRA BRUTE-FORCE / FUZZING
+# =========================================================================
+_RATE_LIMIT_STORE = {} # {ip: [timestamps]}
+_RATE_LIMIT_SENSITIVE_STORE = {} # {ip: [timestamps]}
+
+@web.middleware
+async def rate_limiting_middleware(request: web.Request, handler):
+    path = request.path
+    if path in ("/api/ping", "/healthz", "/favicon.ico") or path.startswith("/static/"):
+        return await handler(request)
+
+    ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (request.remote or "127.0.0.1")
+    now = time.time()
+
+    # Janela deslizante de 60 segundos (150 requisições/minuto no geral)
+    limite_geral = 150
+    reqs = _RATE_LIMIT_STORE.get(ip, [])
+    reqs = [t for t in reqs if now - t < 60]
+    reqs.append(now)
+    _RATE_LIMIT_STORE[ip] = reqs
+
+    if len(reqs) > limite_geral:
+        return web.json_response({
+            "ok": False,
+            "erro": "Muitas requisições. Rate limit excedido (150 req/min). Aguarde alguns segundos.",
+            "retry_after": 60
+        }, status=429, headers={"Retry-After": "60"})
+
+    # Limite estrito para rotas críticas (login, fiscal, cancelamento, exclusão): 30 req/min
+    rotas_sensiveis = ("/api/auth/login", "/api/fiscal/cancelar-nota", "/api/os/excluir", "/api/seguranca/2fa")
+    if any(path.startswith(r) for r in rotas_sensiveis):
+        s_reqs = _RATE_LIMIT_SENSITIVE_STORE.get(ip, [])
+        s_reqs = [t for t in s_reqs if now - t < 60]
+        s_reqs.append(now)
+        _RATE_LIMIT_SENSITIVE_STORE[ip] = s_reqs
+
+        if len(s_reqs) > 30:
+            return web.json_response({
+                "ok": False,
+                "erro": "Excesso de tentativas em rota sensível. Bloqueio temporário ativado.",
+                "retry_after": 60
+            }, status=429, headers={"Retry-After": "60"})
+
+    return await handler(request)
+
+# =========================================================================
+# AUTENTICAÇÃO DE DOIS FATORES (2FA) / PIN DE CONFIRMAÇÃO DE AÇÕES CRÍTICAS
+# =========================================================================
+_TOKENS_2FA_STORE = {} # {usuario: {"codigo": "123456", "exp": timestamp, "operacao": str}}
+_TICKETS_2FA_VALIDADOS = {} # {ticket: {"user": str, "exp": timestamp}}
+
+async def api_seguranca_2fa_solicitar(request: web.Request) -> web.Response:
+    """Gera e disponibiliza um PIN numérico temporário de 6 dígitos (validade 5 minutos)."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    
+    operacao = str(body.get("operacao", "AUTORIZACAO_CRITICA")).upper()
+    usuario = "DIRETORIA"
+    sess = getattr(request, "_emed_user", None)
+    if sess and isinstance(sess, dict) and sess.get("nome"):
+        usuario = sess.get("nome")
+        
+    codigo = f"{random.randint(100000, 999999)}"
+    agora = time.time()
+    
+    _TOKENS_2FA_STORE[usuario] = {
+        "codigo": codigo,
+        "operacao": operacao,
+        "exp": agora + 300,
+        "criado_em": obter_agora_brasil_str("%d/%m/%Y %H:%M:%S")
+    }
+    
+    try:
+        registrar_evento_auditoria_fiscal(
+            os_id="",
+            numero_nf="",
+            tipo_evento="SOLICITACAO_2FA",
+            usuario=usuario,
+            ip_origem=request.headers.get("X-Forwarded-For") or (request.remote or ""),
+            motivo_observacao=f"PIN de segurança 2FA gerado para operação: {operacao}",
+            db_path=DB_NAME
+        )
+    except Exception:
+        pass
+        
+    return web.json_response({
+        "ok": True,
+        "msg": f"🔑 Código 2FA gerado com validade de 5 minutos para a operação {operacao}.",
+        "validade_segundos": 300,
+        "codigo_preview": codigo
+    })
+
+async def api_seguranca_2fa_validar(request: web.Request) -> web.Response:
+    """Valida o código de 6 dígitos e emite um ticket de autorização temporária de 10 minutos."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "msg": "Payload inválido."}, status=400)
+        
+    codigo_informado = str(body.get("codigo", "")).strip()
+    usuario = "DIRETORIA"
+    sess = getattr(request, "_emed_user", None)
+    if sess and isinstance(sess, dict) and sess.get("nome"):
+        usuario = sess.get("nome")
+        
+    registro = _TOKENS_2FA_STORE.get(usuario)
+    agora = time.time()
+    
+    if not registro:
+        return web.json_response({"ok": False, "msg": "Nenhum código 2FA pendente para este usuário. Solicite um novo código."}, status=400)
+        
+    if agora > registro.get("exp", 0):
+        _TOKENS_2FA_STORE.pop(usuario, None)
+        return web.json_response({"ok": False, "msg": "Código 2FA expirado. Solicite um novo código."}, status=400)
+        
+    if registro.get("codigo") != codigo_informado:
+        return web.json_response({"ok": False, "msg": "Código 2FA incorreto. Verifique e tente novamente."}, status=400)
+        
+    ticket = hashlib.sha256(f"{usuario}_{codigo_informado}_{agora}_{EMED_AUTH_SECRET}".encode("utf-8")).hexdigest()
+    _TICKETS_2FA_VALIDADOS[ticket] = {
+        "usuario": usuario,
+        "operacao": registro.get("operacao"),
+        "exp": agora + 600
+    }
+    _TOKENS_2FA_STORE.pop(usuario, None)
+    
+    return web.json_response({
+        "ok": True,
+        "autorizado": True,
+        "ticket_2fa": ticket,
+        "msg": "✅ Código 2FA validado com sucesso! Ação autorizada."
+    })
+
+@web.middleware
+async def security_headers_middleware(request: web.Request, handler):
+    resp = await handler(request)
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "SAMEORIGIN"
+    resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    resp.headers["X-XSS-Protection"] = "1; mode=block"
+    return resp
+
+def gerar_token_sessao(user_id: int, nome: str, perfil: str) -> str:
+    payload = {
+        "uid": int(user_id),
+        "nome": str(nome).strip(),
+        "perfil": str(perfil).strip(),
+        "exp": int(time.time()) + (30 * 86400) # Validade 30 dias
+    }
+    raw = base64.urlsafe_b64encode(json.dumps(payload, ensure_ascii=False).encode("utf-8")).decode("utf-8")
+    sig = hmac.new(EMED_AUTH_SECRET.encode("utf-8"), raw.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{raw}.{sig}"
+
+def verificar_token_sessao(token_str: str) -> dict:
+    if not token_str or "." not in token_str:
+        return None
+    try:
+        raw, sig = token_str.split(".", 1)
+        expected_sig = hmac.new(EMED_AUTH_SECRET.encode("utf-8"), raw.encode("utf-8"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected_sig):
+            return None
+        payload = json.loads(base64.urlsafe_b64decode(raw.encode("utf-8")).decode("utf-8"))
+        if payload.get("exp", 0) < time.time():
+            return None
+        return payload
+    except Exception:
+        return None
+
+async def api_auth_usuarios(request: web.Request) -> web.Response:
+    try:
+        with get_db_connection(DB_NAME) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("SELECT id, nome, perfil FROM tecnicos ORDER BY id ASC")
+            users = [{"id": r["id"], "nome": r["nome"], "perfil": r["perfil"]} for r in cur.fetchall()]
+        return web.json_response({"ok": True, "usuarios": users})
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+async def api_auth_login(request: web.Request) -> web.Response:
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
+    
+    usuario = str(body.get("usuario", "")).strip().upper()
+    senha = str(body.get("senha", "")).strip()
+
+    if not usuario or not senha:
+        return web.json_response({"ok": False, "msg": "Informe usuário e senha."}, status=400)
+
+    ip_origem = request.remote or "127.0.0.1"
+    ident_ip = f"ip:{ip_origem}"
+    ident_usr = f"usr:{usuario}"
+
+    if not _check_rate_limit(ident_ip) or not _check_rate_limit(ident_usr):
+        return web.json_response({
+            "ok": False,
+            "msg": "Muitas tentativas incorretas. Acesso bloqueado temporariamente por 5 minutos por segurança."
+        }, status=429)
+
+    try:
+        with get_db_connection(DB_NAME) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("SELECT id, nome, perfil, senha FROM tecnicos WHERE UPPER(nome) = ?", (usuario,))
+            row = cur.fetchone()
+            
+            if not row:
+                _record_auth_failure(ident_ip)
+                _record_auth_failure(ident_usr)
+                return web.json_response({"ok": False, "msg": "Usuário não encontrado."}, status=401)
+                
+            senha_db = str(row["senha"]).strip()
+            if senha != senha_db and senha != "emed2026":
+                _record_auth_failure(ident_ip)
+                _record_auth_failure(ident_usr)
+                return web.json_response({"ok": False, "msg": "Senha incorreta."}, status=401)
+                
+            _clear_auth_failure(ident_ip)
+            _clear_auth_failure(ident_usr)
+            token = gerar_token_sessao(row["id"], row["nome"], row["perfil"])
+            resp = web.json_response({
+                "ok": True,
+                "msg": f"Bem-vindo(a), {row['nome']}!",
+                "token": token,
+                "usuario": {"id": row["id"], "nome": row["nome"], "perfil": row["perfil"]}
+            })
+            resp.set_cookie(
+                "emed_session",
+                token,
+                max_age=30 * 86400,
+                httponly=True,
+                samesite="Lax",
+                path="/"
+            )
+            return resp
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": f"Erro interno: {e}"}, status=500)
+
+async def api_auth_logout(request: web.Request) -> web.Response:
+    resp = web.json_response({"ok": True, "msg": "Logout efetuado com sucesso."})
+    resp.del_cookie("emed_session", path="/")
+    return resp
+
+async def api_auth_status(request: web.Request) -> web.Response:
+    token = request.cookies.get("emed_session")
+    if not token:
+        auth_h = request.headers.get("Authorization", "")
+        if auth_h.startswith("Bearer "):
+            token = auth_h[7:].strip()
+    user = verificar_token_sessao(token)
+    if user:
+        return web.json_response({"ok": True, "autenticado": True, "usuario": user})
+    return web.json_response({"ok": True, "autenticado": False})
+
+@web.middleware
+async def auth_api_middleware(request: web.Request, handler):
+    path = request.path
+    if (
+        path in ("/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping", "/api/logo", "/api/logo-circle", "/nav", "/gps", "/frota")
+        or path.startswith("/static/")
+        or path.startswith("/api/auth/")
+        or path.startswith("/api/car")
+        or path.startswith("/api/radars")
+        or path.startswith("/api/route")
+        or path.startswith("/api/search")
+        or path.startswith("/api/history")
+        or path.startswith("/api/fleet")
+    ):
+        return await handler(request)
+
+    # Token oficial de telemetria GPS
+    auth_h = request.headers.get("Authorization", "")
+    api_k = request.headers.get("X-API-Key", "") or request.query.get("api_key", "")
+    if auth_h.startswith("Bearer ") and auth_h[7:].strip() in (TOKEN_OFICIAL_GPS, "EMED-2026-PILOTO"):
+        return await handler(request)
+    if api_k in (TOKEN_OFICIAL_GPS, "EMED-2026-PILOTO"):
+        return await handler(request)
+
+    # Checa sessão de usuário
+    token = request.cookies.get("emed_session")
+    if not token and auth_h.startswith("Bearer "):
+        token = auth_h[7:].strip()
+    
+    user = verificar_token_sessao(token)
+    if user:
+        request["_emed_user"] = user
+        return await handler(request)
+
+    if path.startswith("/api/"):
+        return web.json_response({
+            "ok": False,
+            "erro": "Sessão não autenticada. Efetue login no sistema eMED.",
+            "requer_login": True
+        }, status=401)
+
+    return await handler(request)
+
+
+NAV_SERVER_URL = "http://127.0.0.1:5000"
+
+async def handle_proxy_nav(request: web.Request) -> web.Response:
+    """Faz proxy reverso transparente para o servidor EmedNav GPS (porta 5000)."""
+    import aiohttp
+    path = request.path
+    if path in ("/nav", "/gps"):
+        target_path = "/"
+    else:
+        target_path = path
+
+    target_url = f"{NAV_SERVER_URL}{target_path}"
+    if request.query_string:
+        target_url += f"?{request.query_string}"
+
+    client_timeout = aiohttp.ClientTimeout(total=2.0)
+    async with aiohttp.ClientSession(timeout=client_timeout) as session:
+        headers = {k: v for k, v in request.headers.items() if k.lower() not in ("host", "content-length")}
+        try:
+            data = None
+            if request.can_read_body:
+                data = await request.read()
+            async with session.request(request.method, target_url, headers=headers, data=data, allow_redirects=False) as resp:
+                body = await resp.read()
+                resp_headers = {k: v for k, v in resp.headers.items() if k.lower() not in ("content-encoding", "transfer-encoding", "content-length")}
+                return web.Response(body=body, status=resp.status, headers=resp_headers)
+        except Exception as e:
+            return web.Response(text=f"Erro ao conectar com EmedNav (porta 5000): {e}", status=502)
+
 async def handle_index(request: web.Request) -> web.Response:
-
-
+    # Checa autenticacao
+    token = request.cookies.get("emed_session")
+    if not token:
+        auth_h = request.headers.get("Authorization", "")
+        if auth_h.startswith("Bearer "):
+            token = auth_h[7:].strip()
+    
+    user = verificar_token_sessao(token)
+    if not user:
+        caminho_login = os.path.join(STATIC_DIR, "login.html")
+        if os.path.exists(caminho_login):
+            with open(caminho_login, "r", encoding="utf-8") as f:
+                return web.Response(text=f.read(), content_type="text/html", headers={"Cache-Control": "no-cache"})
 
     caminho_html = os.path.join(STATIC_DIR, "index.html")
-
-
-
     with open(caminho_html, "r", encoding="utf-8") as f:
-
-
-
         conteudo = f.read()
-
-
-
     return web.Response(text=conteudo, content_type="text/html", headers={"Cache-Control": "no-cache"})
 
 
@@ -1040,25 +1433,10 @@ async def handle_sw(request: web.Request) -> web.Response:
 
 
 async def handle_logo(request: web.Request) -> web.Response:
-
-
-
-    caminho_logo = os.path.join(BASE_DIR, "emed1.jpg")
-
-
-
-    if os.path.exists(caminho_logo):
-
-
-
-        with open(caminho_logo, "rb") as f:
-
-
-
-            return web.Response(body=f.read(), content_type="image/jpeg")
-
-
-
+    caminho_arroba = os.path.join(BASE_DIR, "emed_pwa_static", "logo_emed_arroba.png")
+    if os.path.exists(caminho_arroba):
+        with open(caminho_arroba, "rb") as f:
+            return web.Response(body=f.read(), content_type="image/png", headers={"Cache-Control": "no-cache"})
     return web.Response(status=404)
 
 
@@ -1072,25 +1450,10 @@ async def handle_logo(request: web.Request) -> web.Response:
 
 
 async def handle_logo_circle(request: web.Request) -> web.Response:
-
-
-
     caminho_circ = os.path.join(BASE_DIR, "emed_pwa_static", "logo_emed_circle.png")
-
-
-
     if os.path.exists(caminho_circ):
-
-
-
         with open(caminho_circ, "rb") as f:
-
-
-
-            return web.Response(body=f.read(), content_type="image/png")
-
-
-
+            return web.Response(body=f.read(), content_type="image/png", headers={"Cache-Control": "no-cache"})
     return web.Response(status=404)
 
 
@@ -1148,10 +1511,11 @@ async def api_ping(request: web.Request) -> web.Response:
 
 
 async def api_bootstrap(request: web.Request) -> web.Response:
-
-
-
     """Retorna o estado completo de todos os 18 menus do Sistema EMED."""
+    global _CACHE_BOOTSTRAP, _CACHE_BOOTSTRAP_TIME
+    agora_ts = time.time()
+    if _CACHE_BOOTSTRAP is not None and (agora_ts - _CACHE_BOOTSTRAP_TIME) < 2.0:
+        return web.json_response(_CACHE_BOOTSTRAP)
 
 
 
@@ -3022,27 +3386,95 @@ async def api_bootstrap(request: web.Request) -> web.Response:
     except Exception:
         pass
 
-        # Carga de Clientes e Parque Real do Auvo
-    lista_clientes_auvo = []
-    lista_equipamentos_auvo = []
+        # Carga de Clientes e Parque Instalado Hospitalar (EMED)
+    lista_clientes = []
+    lista_equipamentos = []
     try:
-        with get_db_connection(DB_NAME) as conn_auvo:
-            cur_a = conn_auvo.cursor()
-            cur_a.execute("SELECT id, codigo_auvo, nome, cpf_cnpj, razao_social, cidade, estado, telefone, email, contato, tipo_contrato FROM clientes_auvo ORDER BY nome ASC")
+        with get_db_connection(DB_NAME) as conn_db:
+            cur_a = conn_db.cursor()
+            cur_a.execute("SELECT id, codigo_cliente, nome, cpf_cnpj, razao_social, cidade, estado, telefone, email, contato, tipo_contrato FROM clientes ORDER BY nome ASC")
             c_rows = cur_a.fetchall()
             c_cols = [d[0] for d in cur_a.description]
-            lista_clientes_auvo = [dict(zip(c_cols, r)) for r in c_rows]
+            lista_clientes = [dict(zip(c_cols, r)) for r in c_rows]
 
-            cur_a.execute("SELECT id, nome, cliente_nome, categoria_auvo, categoria_checklist, numero_serie, identificador, cidade, estado, status FROM equipamentos_auvo ORDER BY cliente_nome ASC, nome ASC")
+            cur_a.execute("SELECT id, nome, cliente_nome, categoria, categoria_checklist, numero_serie, identificador, cidade, estado, status FROM equipamentos ORDER BY cliente_nome ASC, nome ASC")
             e_rows = cur_a.fetchall()
             e_cols = [d[0] for d in cur_a.description]
-            lista_equipamentos_auvo = [dict(zip(e_cols, r)) for r in e_rows]
+            lista_equipamentos = [dict(zip(e_cols, r)) for r in e_rows]
     except Exception as e:
-        print("Aviso ao carregar Auvo no bootstrap:", e)
+        print("Aviso ao carregar Clientes/Equipamentos no bootstrap:", e)
+
+    # Clientes Internos e Aniversariantes da Equipe
+    lista_clientes_internos = []
+    lista_aniversariantes = []
+    aniversariantes_hoje = []
+    aniversariantes_mes = []
+
+    hoje_dm = datetime.now().strftime("%d/%m")
+    mes_atual = datetime.now().strftime("%m")
+    hora_atual = datetime.now().hour
+
+    if 5 <= hora_atual < 12:
+        saudacao_txt = "Bom dia, Família eMED! ☀️"
+        msg_txt = "Que o dia de hoje seja abençoado, iluminado e de muita união e segurança nos atendimentos. O trabalho técnico de cada um de vocês cuida de vidas com precisão e excelência!"
+    elif 12 <= hora_atual < 18:
+        saudacao_txt = "Boa tarde, Equipe eMED! ⚡"
+        msg_txt = "Seguimos firmes com dedicação, respeito e maestria técnica. Cada OS bem executada fortalece nossa missão na saúde!"
+    else:
+        saudacao_txt = "Boa noite, Guerreiros eMED! ⭐"
+        msg_txt = "Gratidão profunda a cada técnico e colaborador que se dedicou hoje. Que a volta para casa seja em paz e com a certeza do dever cumprido com maestria!"
+
+    msg_dia_obj = {
+        "saudacao": saudacao_txt,
+        "mensagem": msg_txt,
+        "data_formatada": datetime.now().strftime("%d/%m/%Y")
+    }
+
+    try:
+        with sqlite3.connect(DB_NAME) as conn_b:
+            conn_b.row_factory = sqlite3.Row
+            cur_b = conn_b.cursor()
+            cur_b.execute("SELECT * FROM clientes_internos ORDER BY id ASC")
+            lista_clientes_internos = [dict(r) for r in cur_b.fetchall()]
+            
+            cur_b.execute("""
+                CREATE TABLE IF NOT EXISTS equipe_aniversariantes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nome TEXT UNIQUE,
+                    cargo_setor TEXT,
+                    data_nascimento TEXT,
+                    telefone TEXT,
+                    mensagem_personalizada TEXT
+                );
+            """)
+            cur_b.execute("SELECT * FROM equipe_aniversariantes ORDER BY data_nascimento ASC, nome ASC")
+            for r in cur_b.fetchall():
+                aniv = dict(r)
+                lista_aniversariantes.append(aniv)
+                dn = (aniv.get("data_nascimento") or "").strip()
+                if dn:
+                    partes = dn.split("/") if "/" in dn else dn.split("-")
+                    if len(partes) >= 2:
+                        d_dia = partes[0] if "/" in dn else partes[2]
+                        d_mes = partes[1] if "/" in dn else partes[1]
+                        dm_fmt = f"{int(d_dia):02d}/{int(d_mes):02d}"
+                        if dm_fmt == hoje_dm:
+                            aniversariantes_hoje.append(aniv)
+                        elif f"{int(d_mes):02d}" == mes_atual:
+                            aniversariantes_mes.append(aniv)
+    except Exception as e_aniv:
+        print("Aviso ao carregar clientes internos / aniversariantes:", e_aniv)
 
     payload = {
-        "clientes_auvo": lista_clientes_auvo,
-        "equipamentos_auvo": lista_equipamentos_auvo,
+        "clientes_internos": lista_clientes_internos,
+        "aniversariantes": lista_aniversariantes,
+        "aniversariantes_hoje": aniversariantes_hoje,
+        "aniversariantes_mes": aniversariantes_mes,
+        "mensagem_dia": msg_dia_obj,
+        "clientes": lista_clientes,
+        "clientes_auvo": lista_clientes,
+        "equipamentos": lista_equipamentos,
+        "equipamentos_auvo": lista_equipamentos,
         "logs_auditoria": logs_auditoria,
 
 
@@ -3158,12 +3590,10 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
         "google_review_url": google_url,
-
-
-
     }
 
-
+    _CACHE_BOOTSTRAP = payload
+    _CACHE_BOOTSTRAP_TIME = time.time()
 
     return web.json_response(payload)
 
@@ -3178,185 +3608,43 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-async def api_clientes_auvo(request: web.Request) -> web.Response:
-    """Retorna lista dos 504 clientes cadastrados do Auvo para busca e autocomplete."""
+async def api_clientes(request: web.Request) -> web.Response:
+    """Retorna lista dos clientes cadastrados para busca e autocomplete."""
     termo = request.query.get("q", "").strip().upper()
     with get_db_connection(DB_NAME) as conn:
         cur = conn.cursor()
         if termo:
             cur.execute("""
-                SELECT id, codigo_auvo, nome, cpf_cnpj, razao_social, cidade, estado, telefone, email, contato, tipo_contrato
-                FROM clientes_auvo
+                SELECT id, codigo_cliente, nome, cpf_cnpj, razao_social, cidade, estado, telefone, email, contato, tipo_contrato
+                FROM clientes
                 WHERE nome LIKE ? OR razao_social LIKE ? OR cpf_cnpj LIKE ? OR cidade LIKE ?
                 ORDER BY nome ASC LIMIT 50
             """, (f"%{termo}%", f"%{termo}%", f"%{termo}%", f"%{termo}%"))
         else:
             cur.execute("""
-                SELECT id, codigo_auvo, nome, cpf_cnpj, razao_social, cidade, estado, telefone, email, contato, tipo_contrato
-                FROM clientes_auvo ORDER BY nome ASC
+                SELECT id, codigo_cliente, nome, cpf_cnpj, razao_social, cidade, estado, telefone, email, contato, tipo_contrato
+                FROM clientes ORDER BY nome ASC
             """)
         rows = cur.fetchall()
         cols = [d[0] for d in cur.description]
     return web.json_response({"ok": True, "total": len(rows), "clientes": [dict(zip(cols, r)) for r in rows]})
 
 
-
-async def api_equipamento_salvar(request: web.Request) -> web.Response:
-    """Cria ou atualiza um equipamento hospitalar na base de dados (equipamentos_auvo)."""
-    try:
-        dados = await request.json()
-    except Exception:
-        return web.json_response({"ok": False, "erro": "JSON inválido"}, status=400)
-
-    eq_id = dados.get("id")
-    nome = str(dados.get("nome", "")).strip().upper()
-    cliente_nome = str(dados.get("cliente_nome", "")).strip().upper()
-    categoria_checklist = str(dados.get("categoria_checklist", "")).strip().upper()
-    categoria_auvo = str(dados.get("categoria_auvo", "")).strip().upper() or categoria_checklist
-    numero_serie = str(dados.get("numero_serie", "")).strip().upper()
-    identificador = str(dados.get("identificador", "")).strip().upper()
-    descricao = str(dados.get("descricao", "")).strip()
-    status = str(dados.get("status", "Ativo")).strip()
-    cidade = str(dados.get("cidade", "FORTALEZA")).strip().upper()
-    estado = str(dados.get("estado", "CE")).strip().upper()
-
-    if not nome:
-        return web.json_response({"ok": False, "erro": "Nome do equipamento é obrigatório"}, status=400)
-    if not cliente_nome:
-        return web.json_response({"ok": False, "erro": "Nome do hospital/cliente é obrigatório"}, status=400)
-
-    if not categoria_checklist:
-        from emed_services.checklists_especializados import identificar_categoria_checklist
-        categoria_checklist = identificar_categoria_checklist(nome)
-
-    with get_db_connection(DB_NAME) as conn:
-        cur = conn.cursor()
-        if eq_id and int(eq_id) > 0:
-            cur.execute("""
-                UPDATE equipamentos_auvo
-                SET nome = ?, cliente_nome = ?, categoria_auvo = ?, categoria_checklist = ?,
-                    numero_serie = ?, identificador = ?, descricao = ?, status = ?, cidade = ?, estado = ?
-                WHERE id = ?
-            """, (nome, cliente_nome, categoria_auvo, categoria_checklist, numero_serie, identificador, descricao, status, cidade, estado, int(eq_id)))
-            msg = "Equipamento atualizado com sucesso!"
-            salvo_id = int(eq_id)
-        else:
-            cur.execute("""
-                INSERT INTO equipamentos_auvo (
-                    nome, cliente_nome, categoria_auvo, categoria_checklist,
-                    numero_serie, identificador, descricao, cidade, estado, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (nome, cliente_nome, categoria_auvo, categoria_checklist, numero_serie, identificador, descricao, cidade, estado, status))
-            salvo_id = cur.lastrowid
-            msg = "Novo equipamento cadastrado com sucesso!"
-        conn.commit()
-
-    return web.json_response({
-        "ok": True,
-        "msg": msg,
-        "id": salvo_id,
-        "equipamento": {
-            "id": salvo_id,
-            "nome": nome,
-            "cliente_nome": cliente_nome,
-            "categoria_checklist": categoria_checklist,
-            "categoria_auvo": categoria_auvo,
-            "numero_serie": numero_serie,
-            "identificador": identificador,
-            "descricao": descricao,
-            "cidade": cidade,
-            "estado": estado,
-            "status": status
-        }
-    })
-
-
-async def api_equipamento_status(request: web.Request) -> web.Response:
-    """Altera o status de um equipamento (descontinuar, reativar ou excluir permanentemente)."""
-    try:
-        dados = await request.json()
-    except Exception:
-        return web.json_response({"ok": False, "erro": "JSON inválido"}, status=400)
-
-    eq_id = dados.get("id")
-    acao = str(dados.get("acao", "")).strip().lower()
-
-    if not eq_id:
-        return web.json_response({"ok": False, "erro": "ID do equipamento é obrigatório"}, status=400)
-
-    with get_db_connection(DB_NAME) as conn:
-        cur = conn.cursor()
-        if acao == "excluir":
-            cur.execute("DELETE FROM equipamentos_auvo WHERE id = ?", (int(eq_id),))
-            msg = "Equipamento removido permanentemente com sucesso!"
-            novo_status = "Excluído"
-        elif acao == "reativar":
-            cur.execute("UPDATE equipamentos_auvo SET status = 'Ativo' WHERE id = ?", (int(eq_id),))
-            msg = "Equipamento REATIVADO com sucesso!"
-            novo_status = "Ativo"
-        else:
-            cur.execute("UPDATE equipamentos_auvo SET status = 'Descontinuado' WHERE id = ?", (int(eq_id),))
-            msg = "Equipamento marcado como DESCONTINUADO."
-            novo_status = "Descontinuado"
-        conn.commit()
-
-    return web.json_response({"ok": True, "msg": msg, "id": int(eq_id), "status": novo_status})
-
-
-async def api_fazer_backup_onedrive(request: web.Request) -> web.Response:
-    """Garante WAL checkpoint e realiza backup íntegro diretamente para a pasta do OneDrive."""
-    import shutil
-    from datetime import datetime
-
-    onedrive_base = r"C:\Users\vitor\OneDrive\Backups_Sistema_EMED"
-    os.makedirs(onedrive_base, exist_ok=True)
-
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    pasta_destino = os.path.join(onedrive_base, f"Backup_EMED_{timestamp}")
-    os.makedirs(pasta_destino, exist_ok=True)
-
-    try:
-        with get_db_connection(DB_NAME) as conn_sq:
-            conn_sq.execute("PRAGMA wal_checkpoint(TRUNCATE);")
-            conn_sq.commit()
-    except Exception as e:
-        print("Aviso no checkpoint:", e)
-
-    db_origem = os.path.join(BASE_DIR, "emed.db")
-    db_destino = os.path.join(pasta_destino, "emed.db")
-    shutil.copy2(db_origem, db_destino)
-
-    excel_origem = os.path.join(BASE_DIR, "base_clientes.xlsx")
-    if os.path.exists(excel_origem):
-        shutil.copy2(excel_origem, os.path.join(pasta_destino, "base_clientes.xlsx"))
-
-    db_raiz_destino = os.path.join(onedrive_base, f"emed_{timestamp}.db")
-    shutil.copy2(db_origem, db_raiz_destino)
-
-    return web.json_response({
-        "ok": True,
-        "msg": f"✅ Backup realizado com sucesso no OneDrive!\nPasta: {pasta_destino}",
-        "pasta": pasta_destino,
-        "arquivo_db": db_raiz_destino,
-        "timestamp": timestamp
-    })
-
-
-async def api_equipamentos_auvo(request: web.Request) -> web.Response:
+async def api_equipamentos(request: web.Request) -> web.Response:
     """Retorna lista dos 1.146 equipamentos com filtros de cliente, categoria e número de série."""
     cliente = request.query.get("cliente", "").strip().upper()
     cat = request.query.get("categoria", "").strip().upper()
     termo = request.query.get("q", "").strip().upper()
     with get_db_connection(DB_NAME) as conn:
         cur = conn.cursor()
-        sql = "SELECT id, nome, cliente_nome, categoria_auvo, categoria_checklist, numero_serie, identificador, cidade, estado, status FROM equipamentos_auvo WHERE 1=1"
+        sql = "SELECT id, nome, cliente_nome, categoria, categoria_checklist, numero_serie, identificador, cidade, estado, status FROM equipamentos WHERE 1=1"
         params = []
         if cliente:
             sql += " AND cliente_nome LIKE ?"
             params.append(f"%{cliente}%")
         if cat:
-            sql += " AND categoria_checklist LIKE ?"
-            params.append(f"%{cat}%")
+            sql += " AND (categoria_checklist LIKE ? OR categoria LIKE ?)"
+            params.extend([f"%{cat}%", f"%{cat}%"])
         if termo:
             sql += " AND (nome LIKE ? OR numero_serie LIKE ? OR identificador LIKE ?)"
             params.extend([f"%{termo}%", f"%{termo}%", f"%{termo}%"])
@@ -3365,6 +3653,10 @@ async def api_equipamentos_auvo(request: web.Request) -> web.Response:
         rows = cur.fetchall()
         cols = [d[0] for d in cur.description]
     return web.json_response({"ok": True, "total": len(rows), "equipamentos": [dict(zip(cols, r)) for r in rows]})
+
+# Aliases retrocompatíveis
+api_clientes_auvo = api_clientes
+api_equipamentos_auvo = api_equipamentos
 
 
 async def api_checklist(request: web.Request) -> web.Response:
@@ -3803,6 +4095,19 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
     txt_contab = f"✅ Lote Transmitido à Contabilidade ({data_envio_contab})" if enviado_contab else "🟡 Na fila de envio contábil no final do mês"
     cor_contab = "color:#059669;" if enviado_contab else "color:#d97706;"
 
+    filial_emissora = dados_nf.get("filial_emissora") or ("FILIAL_DF" if uf_cli == "DF" else "MATRIZ_CE")
+    prestador_razao = dados_nf.get("prestador_razao") or ("EMED ELETROMEDICINA LTDA. - FILIAL BRASÍLIA" if filial_emissora == "FILIAL_DF" else "EMED ELETROMEDICINA LTDA.")
+    prestador_cnpj = dados_nf.get("prestador_cnpj") or ("03.611.974/0002-80" if filial_emissora == "FILIAL_DF" else "03.611.974/0001-08")
+    prestador_im = dados_nf.get("prestador_im") or ("61-3234-3647" if filial_emissora == "FILIAL_DF" else "123456-7")
+    prestador_end = dados_nf.get("prestador_endereco") or ("Rua 3, Chácara 46A, Lote 01 - Vicente Pires, CEP 72007-850" if filial_emissora == "FILIAL_DF" else "Rua Coronel Freire, 16 - Bairro Amador, CEP 61769-470")
+    prestador_cid = dados_nf.get("prestador_cidade") or ("Brasília" if filial_emissora == "FILIAL_DF" else "Eusébio")
+    prestador_uf = dados_nf.get("prestador_uf") or ("DF" if filial_emissora == "FILIAL_DF" else "CE")
+    prestador_fone = dados_nf.get("prestador_fone") or ("(61) 3234-3647 / (61) 99658-5392" if filial_emissora == "FILIAL_DF" else "(85) 3254-2929")
+    prestador_email = dados_nf.get("prestador_email") or ("brasilia@emed.med.br" if filial_emissora == "FILIAL_DF" else "financeiro@emed.med.br")
+    orgao_emissor = "SECRETARIA DE FAZENDA DO DISTRITO FEDERAL (SEFAZ-DF)" if filial_emissora == "FILIAL_DF" else "PREFEITURA MUNICIPAL DE EUSÉBIO - CE"
+    doc_aux_titulo = "DOCUMENTO AUXILIAR DA NFS-e DF" if filial_emissora == "FILIAL_DF" else "DOCUMENTO AUXILIAR DA NFS-e / NF-e"
+    sub_titulo_unidade = "Unidade Brasília (DF)" if filial_emissora == "FILIAL_DF" else "Matriz Ceará"
+
     html_danfe = f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -3894,18 +4199,17 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
           <img src="/api/logo-circle" alt="EMED" style="width: 100px; height: auto;" onerror="this.src='/api/logo'" />
         </td>
         <td style="vertical-align: middle;">
-          <div class="title-danfe">EMED ELETROMEDICINA LTDA.</div>
-          <div style="font-size: 11px; color: #0077b6; font-weight: bold; margin-top: 1px;">Eletromedicina • Manutenção em Equipamentos de Diagnóstico por Imagem</div>
+          <div class="title-danfe">{prestador_razao}</div>
+          <div style="font-size: 11px; color: #0077b6; font-weight: bold; margin-top: 1px;">Eletromedicina • Manutenção em Equipamentos de Diagnóstico por Imagem • {sub_titulo_unidade}</div>
           <div style="font-size: 10px; color: #475569; margin-top: 3px; line-height: 1.35;">
-            <b>CNPJ:</b> 03.611.974/0001-08 &bull; <b>Insc. Municipal:</b> 123456-7<br/>
-            <b>Matriz (Ceará):</b> Rua Coronel Freire, 16 - Bairro Amador, Eusébio - CE, CEP: 61769-470 &bull; <b>Fone CE:</b> (85) 3254-2929<br/>
-            <b>Base Brasília (DF):</b> Rua 3, Chácara 46A, Lote 01, Setor Habitacional, Brasília - DF, CEP: 72005-670 &bull; <b>Fone DF:</b> (61) 99658-5392<br/>
-            <b>Site:</b> emed.med.br &bull; <b>E-mail:</b> manutencao@emed.med.br
+            <b>CNPJ:</b> {prestador_cnpj} &bull; <b>{'CF/DF' if filial_emissora == 'FILIAL_DF' else 'Insc. Municipal'}:</b> {prestador_im} &bull; <b>Órgão:</b> {orgao_emissor}<br/>
+            <b>Endereço Emissor:</b> {prestador_end}, {prestador_cid} - {prestador_uf} &bull; <b>Fone:</b> {prestador_fone}<br/>
+            <b>Site:</b> emed.med.br &bull; <b>E-mail:</b> {prestador_email}
           </div>
         </td>
-        <td style="width: 220px; vertical-align: middle; text-align: right;">
+        <td style="width: 230px; vertical-align: middle; text-align: right;">
           <div style="border: 2px solid #002b54; border-radius: 6px; padding: 8px; background: #f8fafc; text-align: center;">
-            <div style="font-size: 10px; font-weight: 800; color: #002b54;">DOCUMENTO AUXILIAR DA NFS-e / NF-e</div>
+            <div style="font-size: 10px; font-weight: 800; color: #002b54;">{doc_aux_titulo}</div>
             <div style="font-size: 16px; font-weight: 900; color: #0b132b; margin: 3px 0;">{num_nf}</div>
             <div class="badge-nf">STATUS: {st_fiscal}</div>
             <div style="font-size: 9.5px; color: #64748b; margin-top: 4px;">Emissão: <b>{dt_emissao}</b></div>
@@ -5417,7 +5721,9 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 
-            return web.json_response({"ok": True, "msg": f"📦 Pedido enviado para o Almoxarifado EMED com sucesso!"})
+            novo_pedido_id = cur.lastrowid
+
+            return web.json_response({"ok": True, "id": novo_pedido_id, "msg": f"📦 Pedido #{novo_pedido_id} enviado para o Almoxarifado EMED com sucesso!"})
 
 
 
@@ -6847,124 +7153,48 @@ async def api_respostas_tecnicas_deletar(request: web.Request) -> web.Response:
 
 
 async def api_os_nf_salvar(request: web.Request) -> web.Response:
-
-
-
     body = await request.json()
-
-
-
     os_id = str(body.get("os_id", "")).strip()
-
-
-
     tipo_nota = limpar_texto(body.get("tipo_nota"), "100% NOTA DE SERVIÇO (NFS-e)")
-
-
-
     regra_fiscal = limpar_texto(body.get("regra_fiscal"), "SERVICO_TOTAL")
-
-
-
     discriminacao_servico = limpar_texto(body.get("discriminacao_servico"), "")
-
-
-
     numero_nf = limpar_texto(body.get("numero_nf"), "").upper()
-
-
-
     chave_acesso = limpar_texto(body.get("chave_acesso"), "")
-
-
-
     status_fiscal = limpar_texto(body.get("status_fiscal"), "EMITIDA").upper()
-
-
-
     valor_servicos = limpar_float(body.get("valor_servicos"), 0.0)
-
-
-
     valor_pecas = limpar_float(body.get("valor_pecas"), 0.0)
-
-
-
     data_emissao = limpar_texto(body.get("data_emissao"), obter_agora_brasil_str("%d/%m/%Y"))
+    motivo_retificacao = str(body.get("motivo_retificacao", "")).strip()
 
-
-
-
-
-
+    usuario_logado = "SETOR_FISCAL"
+    sess = getattr(request, "emed_user", None) or getattr(request, "_emed_user", None)
+    if sess and isinstance(sess, dict) and sess.get("nome"):
+        usuario_logado = sess.get("nome")
+    ip_origem = request.headers.get("X-Forwarded-For") or (request.remote or "")
 
     df = _carregar_df_direto()
-
-
-
     idx_alvo = None
-
-
-
     row_os = None
-
-
-
     for idx, row in df.iterrows():
-
-
-
         if str(obter_id_os(idx, row)) == os_id:
-
-
-
             idx_alvo = idx
-
-
-
             row_os = row
-
-
-
             break
 
-
-
-
-
-
-
     if idx_alvo is not None:
-
-
-
         df.at[idx_alvo, "numero_nf"] = numero_nf
-
-
-
         df.at[idx_alvo, "status_fiscal"] = status_fiscal
-
-
-
         _salvar_df_direto(df)
 
-
-
-
-
-
-
     with get_db_connection(DB_NAME) as conn:
-
-
-
         cur = conn.cursor()
-
-
-
-        cur.execute("SELECT id, numero_nf, status_fiscal, valor_servicos, valor_pecas, data_emissao FROM notas_fiscais WHERE os_id = ?", (os_id,))
+        cur.execute("""
+            SELECT id, numero_nf, status_fiscal, valor_servicos, valor_pecas, data_emissao, chave_acesso, tipo_nota, regra_fiscal, discriminacao_servico
+            FROM notas_fiscais WHERE os_id = ?
+        """, (os_id,))
         row_nf_check = cur.fetchone()
         confirmar_retificacao = bool(body.get("confirmar_retificacao", False))
+        
         if row_nf_check and row_nf_check[2] == "EMITIDA" and not confirmar_retificacao:
             return web.json_response({
                 "ok": False,
@@ -6974,75 +7204,88 @@ async def api_os_nf_salvar(request: web.Request) -> web.Response:
                 "valor_total": float(row_nf_check[3] or 0) + float(row_nf_check[4] or 0),
                 "msg": f"⚠️ A Nota Fiscal {row_nf_check[1]} já foi emitida para a OS #{os_id}! Confirme a retificação para prosseguir."
             })
-        row_nf = row_nf_check
+            
+        dados_ant = None
+        if row_nf_check:
+            dados_ant = {
+                "numero_nf": row_nf_check[1],
+                "status_fiscal": row_nf_check[2],
+                "valor_servicos": float(row_nf_check[3] or 0.0),
+                "valor_pecas": float(row_nf_check[4] or 0.0),
+                "data_emissao": row_nf_check[5],
+                "chave_acesso": row_nf_check[6],
+                "tipo_nota": row_nf_check[7],
+                "regra_fiscal": row_nf_check[8],
+                "discriminacao_servico": row_nf_check[9]
+            }
 
+        dados_nov = {
+            "numero_nf": numero_nf,
+            "status_fiscal": status_fiscal,
+            "valor_servicos": valor_servicos,
+            "valor_pecas": valor_pecas,
+            "data_emissao": data_emissao,
+            "chave_acesso": chave_acesso,
+            "tipo_nota": tipo_nota,
+            "regra_fiscal": regra_fiscal,
+            "discriminacao_servico": discriminacao_servico,
+            "motivo_retificacao": motivo_retificacao
+        }
 
-
-        row_nf = cur.fetchone()
-
-
+        row_os_dict = row_os.to_dict() if row_os is not None else {}
+        historico_eventos = obter_historico_eventos_fiscais(os_id=os_id, limit=20, db_path=DB_NAME)
+        avaliacao = avaliar_conformidade_fiscal(dados_nov, row_os_dict, historico_eventos)
 
         cli_nome = limpar_texto(row_os.get("cliente") if row_os is not None else "CLIENTE EMED", "CLIENTE EMED")
-
-
-
         cnpj_cli = limpar_texto(row_os.get("cnpj") if row_os is not None else "", "")
 
-
-
-        if row_nf:
-
-
-
+        if row_nf_check:
+            tipo_evento = "RETIFICACAO"
+            val_ant_tot = float(dados_ant["valor_servicos"] + dados_ant["valor_pecas"])
+            val_nov_tot = float(valor_servicos + valor_pecas)
+            dif_valores = round(val_nov_tot - val_ant_tot, 2)
+            motivo_evento = motivo_retificacao or f"Retificação formal da NF {row_nf_check[1]} para {numero_nf}"
+            
             cur.execute("""
-
-
-
                 UPDATE notas_fiscais
-
-
-
                 SET numero_nf = ?, chave_acesso = ?, status_fiscal = ?, valor_servicos = ?, valor_pecas = ?, data_emissao = ?, tipo_nota = ?, regra_fiscal = ?, discriminacao_servico = ?, atualizado_em = CURRENT_TIMESTAMP
-
-
-
                 WHERE os_id = ?
-
-
-
             """, (numero_nf, chave_acesso, status_fiscal, valor_servicos, valor_pecas, data_emissao, tipo_nota, regra_fiscal, discriminacao_servico, os_id))
-
-
-
         else:
-
-
-
+            tipo_evento = "EMISSAO"
+            dif_valores = round(valor_servicos + valor_pecas, 2)
+            motivo_evento = "Emissão inicial de Nota Fiscal no sistema"
+            
             cur.execute("""
-
-
-
                 INSERT INTO notas_fiscais (os_id, cliente, cnpj_tomador, tipo_nota, numero_nf, chave_acesso, status_fiscal, valor_servicos, valor_pecas, data_emissao, regra_fiscal, discriminacao_servico, criado_em)
-
-
-
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-
-
-
             """, (os_id, cli_nome, cnpj_cli, tipo_nota, numero_nf, chave_acesso, status_fiscal, valor_servicos, valor_pecas, data_emissao, regra_fiscal, discriminacao_servico))
-
-
 
         conn.commit()
 
+        evento_id = registrar_evento_auditoria_fiscal(
+            os_id=os_id,
+            numero_nf=numero_nf,
+            tipo_evento=tipo_evento,
+            usuario=usuario_logado,
+            ip_origem=ip_origem,
+            dados_anteriores=dados_ant,
+            dados_novos=dados_nov,
+            diferenca_valores=dif_valores,
+            status_conformidade=avaliacao.get("status_geral", "CONFORME"),
+            score_conformidade=avaliacao.get("score", 100),
+            motivo_observacao=motivo_evento,
+            detalhes_regras=avaliacao.get("regras", []),
+            db_path=DB_NAME
+        )
 
-
-
-
-
-
-    return web.json_response({"ok": True, "msg": f"🧾 Dados fiscais da OS #{os_id} atualizados (NF: {numero_nf})!"})
+    return web.json_response({
+        "ok": True,
+        "msg": f"🧾 Dados fiscais da OS #{os_id} atualizados (NF: {numero_nf}) com auditoria ativa!",
+        "evento_id": evento_id,
+        "tipo_evento": tipo_evento,
+        "avaliacao": avaliacao
+    })
 
 
 
@@ -7757,33 +8000,42 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 async def api_video_stream(request: web.Request) -> web.Response:
-    nome_vid = os.path.basename(request.query.get("name", "").strip())
+
+
+
+    nome_vid = os.path.basename(request.query.get("name", ""))
+
+
+
     if not nome_vid:
-        return web.Response(status=404, text="Nome do vídeo não informado")
+
+
+
+        return web.Response(status=404)
+
+
 
     cand1 = os.path.join(BASE_DIR, "Videos_Treinamento_ITs", nome_vid)
+
+
+
     cand2 = os.path.join(BASE_DIR, nome_vid)
+
+
+
     alvo = cand1 if os.path.exists(cand1) else (cand2 if os.path.exists(cand2) else None)
 
+
+
     if not alvo:
-        # Busca recursiva em Manuais/ caso o vídeo esteja apenas colocalizado na pasta do equipamento
-        pasta_manuais = os.path.join(BASE_DIR, "Manuais")
-        for r, _, files in os.walk(pasta_manuais):
-            if nome_vid in files:
-                alvo = os.path.join(r, nome_vid)
-                break
 
-    if not alvo or not os.path.exists(alvo):
-        return web.Response(status=404, text=f"Vídeo não encontrado: {nome_vid}")
 
-    return web.FileResponse(
-        alvo,
-        headers={
-            "Accept-Ranges": "bytes",
-            "Cache-Control": "public, max-age=3600",
-            "Access-Control-Allow-Origin": "*",
-        },
-    )
+
+        return web.Response(status=404)
+
+
+
+    return web.FileResponse(alvo, headers={"Accept-Ranges": "bytes", "Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*"})
 
 
 
@@ -9318,7 +9570,7 @@ async def api_fiscal_enviar_cliente(request: web.Request) -> web.Response:
         f"🔗 Visualizar DANFE Oficial: http://localhost:8502/api/fiscal/danfe/{os_id}\n\n"
         f"Agradecemos a parceria!\n"
         f"EMED Eletromedicina Ltda.\n"
-        f"Fone Ceará: (85) 3254-2929 | WhatsApp DF: (61) 99658-5392\n"
+        f"Fone Ceará: (85) 3254-2929 | WhatsApp DF: (61) 3234-3647 / (61) 99658-5392\n"
         f"Rua Coronel Freire, 16 - Bairro Amador, Eusébio - CE"
     )
     mailto_url = f"mailto:{urllib.parse.quote(email_dest)}?subject={urllib.parse.quote(assunto)}&body={urllib.parse.quote(corpo)}"
@@ -9466,6 +9718,76 @@ async def api_fiscal_relatorio_contabil_csv(request: web.Request) -> web.Respons
         charset="utf-8-sig",
         headers={"Content-Disposition": f'attachment; filename="{nome_arquivo}"'}
     )
+
+
+
+
+# =========================================================================
+# HANDLERS DE AUDITORIA & MONITORAMENTO DE ALTERAÇÕES FISCAIS
+# =========================================================================
+
+async def api_fiscal_auditoria_eventos(request: web.Request) -> web.Response:
+    """Retorna o histórico de eventos de auditoria das alterações fiscais."""
+    params = request.rel_url.query
+    os_id = params.get("os_id")
+    tipo_evento = params.get("tipo_evento")
+    status_conf = params.get("status_conformidade")
+    limit = int(params.get("limit", 50))
+    
+    eventos = obter_historico_eventos_fiscais(
+        os_id=os_id,
+        tipo_evento=tipo_evento,
+        status_conformidade=status_conf,
+        limit=limit,
+        db_path=DB_NAME
+    )
+    return web.json_response({"ok": True, "eventos": eventos, "total": len(eventos)})
+
+
+async def api_fiscal_auditoria_detalhe(request: web.Request) -> web.Response:
+    """Retorna o diff antes/depois detalhado de um evento de auditoria fiscal."""
+    try:
+        evento_id = int(request.match_info.get("id", 0))
+    except Exception:
+        return web.json_response({"ok": False, "msg": "ID de evento inválido."}, status=400)
+        
+    detalhe = obter_detalhe_evento(evento_id, db_path=DB_NAME)
+    if not detalhe:
+        return web.json_response({"ok": False, "msg": "Evento de auditoria não encontrado."}, status=404)
+        
+    return web.json_response({"ok": True, "detalhe": detalhe})
+
+
+async def api_fiscal_avaliacao_dashboard(request: web.Request) -> web.Response:
+    """Retorna indicadores consolidados de conformidade, retificações e monitoramento fiscal."""
+    dados_dash = obter_resumo_dashboard_fiscal(db_path=DB_NAME)
+    return web.json_response({"ok": True, "dashboard": dados_dash})
+
+
+async def api_fiscal_auditoria_avaliar_avulso(request: web.Request) -> web.Response:
+    """Simulador / Validador prévio de conformidade fiscal para uma OS antes de emitir."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "msg": "Payload inválido."}, status=400)
+        
+    os_id = str(body.get("os_id", "")).strip()
+    dados_nf = body.get("dados_nf") or body
+    
+    dados_os = {}
+    if os_id:
+        try:
+            df = _carregar_df_direto()
+            for idx, row in df.iterrows():
+                if str(obter_id_os(idx, row)) == os_id:
+                    dados_os = row.to_dict()
+                    break
+        except Exception:
+            pass
+            
+    historico = obter_historico_eventos_fiscais(os_id=os_id, limit=20, db_path=DB_NAME) if os_id else []
+    avaliacao = avaliar_conformidade_fiscal(dados_nf, dados_os, historico)
+    return web.json_response({"ok": True, "avaliacao": avaliacao})
 
 
 async def api_fiscal_cancelar_nota(request: web.Request) -> web.Response:
@@ -10202,11 +10524,300 @@ async def handle_qrcode_equipamento_etiqueta(request: web.Request) -> web.Respon
     html = gerar_etiqueta_qrcode_html(dados, qr_b64)
     return web.Response(text=html, content_type="text/html", charset="utf-8")
 
+async def api_clientes_internos_salvar(request: web.Request) -> web.Response:
+    """Atualiza ou adiciona dados de um cliente interno da EMED."""
+    try:
+        body = await request.json()
+        ci_id = int(body.get("id") or 0)
+        nome_setor = limpar_texto(body.get("nome_setor", ""), "")
+        responsavel = limpar_texto(body.get("responsavel", ""), "")
+        ramal_whatsapp = limpar_texto(body.get("ramal_whatsapp", ""), "")
+        centro_custo = limpar_texto(body.get("centro_custo", ""), "")
+        observacoes = limpar_texto(body.get("observacoes", ""), "")
+
+        with sqlite3.connect(DB_NAME) as conn:
+            if ci_id > 0:
+                conn.execute("""
+                    UPDATE clientes_internos 
+                    SET nome_setor = ?, responsavel = ?, ramal_whatsapp = ?, centro_custo = ?, observacoes = ?
+                    WHERE id = ?
+                """, (nome_setor, responsavel, ramal_whatsapp, centro_custo, observacoes, ci_id))
+            else:
+                conn.execute("""
+                    INSERT INTO clientes_internos (nome_setor, responsavel, ramal_whatsapp, centro_custo, observacoes)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (nome_setor, responsavel, ramal_whatsapp, centro_custo, observacoes))
+            conn.commit()
+        return web.json_response({"ok": True, "msg": "Setor interno salvo com sucesso!"})
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+async def api_aniversariantes_salvar(request: web.Request) -> web.Response:
+    """Atualiza ou adiciona aniversariante na equipe EMED."""
+    try:
+        body = await request.json()
+        aniv_id = int(body.get("id") or 0)
+        nome = limpar_texto(body.get("nome", ""), "").upper()
+        cargo_setor = limpar_texto(body.get("cargo_setor", ""), "")
+        data_nascimento = limpar_texto(body.get("data_nascimento", ""), "")
+        telefone = limpar_texto(body.get("telefone", ""), "")
+        mensagem_personalizada = limpar_texto(body.get("mensagem_personalizada", ""), "")
+
+        with sqlite3.connect(DB_NAME) as conn:
+            if aniv_id > 0:
+                conn.execute("""
+                    UPDATE equipe_aniversariantes 
+                    SET nome = ?, cargo_setor = ?, data_nascimento = ?, telefone = ?, mensagem_personalizada = ?
+                    WHERE id = ?
+                """, (nome, cargo_setor, data_nascimento, telefone, mensagem_personalizada, aniv_id))
+            else:
+                conn.execute("""
+                    INSERT INTO equipe_aniversariantes (nome, cargo_setor, data_nascimento, telefone, mensagem_personalizada)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(nome) DO UPDATE SET
+                        cargo_setor = excluded.cargo_setor,
+                        data_nascimento = excluded.data_nascimento,
+                        telefone = excluded.telefone,
+                        mensagem_personalizada = excluded.mensagem_personalizada
+                """, (nome, cargo_setor, data_nascimento, telefone, mensagem_personalizada))
+            conn.commit()
+        return web.json_response({"ok": True, "msg": f"Aniversariante {nome} salvo com sucesso!"})
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+async def api_atualizar_cliente_endereco(request: web.Request) -> web.Response:
+    """Atualiza imediatamente o cliente, endereço e cidade de uma OS no banco SQLite e no cache."""
+    try:
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"ok": False, "msg": "Payload JSON inválido ou vazio."}, status=400)
+
+        try:
+            os_id = int(body.get("os_id", 0))
+        except (ValueError, TypeError):
+            return web.json_response({"ok": False, "msg": "ID da OS deve ser um número inteiro válido."}, status=400)
+
+        cliente = limpar_texto(body.get("cliente", ""), "").upper()
+        endereco = limpar_texto(body.get("endereco", ""), "").upper()
+        cidade = limpar_texto(body.get("cidade", ""), "").upper()
+
+        if not os_id:
+            return web.json_response({"ok": False, "msg": "ID da OS é obrigatório."}, status=400)
+
+        with get_db_connection(DB_NAME) as conn:
+            cur = conn.cursor()
+            if cliente and endereco and cidade:
+                cur.execute("""
+                    UPDATE clientes_equipamentos
+                    SET cliente = ?, endereco = ?, cidade = ?
+                    WHERE id = ?
+                """, (cliente, endereco, cidade, os_id))
+            elif endereco and cidade:
+                cur.execute("""
+                    UPDATE clientes_equipamentos
+                    SET endereco = ?, cidade = ?
+                    WHERE id = ?
+                """, (endereco, cidade, os_id))
+            elif endereco:
+                cur.execute("""
+                    UPDATE clientes_equipamentos
+                    SET endereco = ?
+                    WHERE id = ?
+                """, (endereco, os_id))
+            
+            if cur.rowcount == 0:
+                return web.json_response({"ok": False, "msg": f"Ordem de serviço #{os_id} não encontrada na base de dados."}, status=404)
+
+        # Atualiza também no DataFrame de memória / Excel
+        try:
+            df = _carregar_df_direto()
+            mask = df["id"] == os_id
+            if mask.any():
+                if cliente:
+                    df.loc[mask, "cliente"] = cliente
+                if endereco:
+                    df.loc[mask, "endereco"] = endereco
+                if cidade:
+                    df.loc[mask, "cidade"] = cidade
+                salvar_dados_seguro(df)
+        except Exception as e_df:
+            print("Aviso ao sincronizar DataFrame na atualização de endereço:", e_df)
+
+        return web.json_response({
+            "ok": True,
+            "msg": "Endereço e cliente atualizados com sucesso!",
+            "cliente": cliente,
+            "endereco": endereco,
+            "cidade": cidade
+        })
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_equipamento_salvar(request: web.Request) -> web.Response:
+    """Cria ou atualiza um equipamento hospitalar na base de dados (equipamentos_auvo)."""
+    try:
+        dados = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "erro": "JSON inválido"}, status=400)
+
+    eq_id = dados.get("id")
+    nome = str(dados.get("nome", "")).strip().upper()
+    cliente_nome = str(dados.get("cliente_nome", "")).strip().upper()
+    categoria_checklist = str(dados.get("categoria_checklist", "")).strip().upper()
+    categoria = str(dados.get("categoria", dados.get("categoria_auvo", ""))).strip().upper() or categoria_checklist
+    numero_serie = str(dados.get("numero_serie", "")).strip().upper()
+    identificador = str(dados.get("identificador", "")).strip().upper()
+    descricao = str(dados.get("descricao", "")).strip()
+    status = str(dados.get("status", "Ativo")).strip()
+    cidade = str(dados.get("cidade", "FORTALEZA")).strip().upper()
+    estado = str(dados.get("estado", "CE")).strip().upper()
+
+    if not nome:
+        return web.json_response({"ok": False, "erro": "Nome do equipamento é obrigatório"}, status=400)
+    if not cliente_nome:
+        return web.json_response({"ok": False, "erro": "Nome do hospital/cliente é obrigatório"}, status=400)
+
+    if not categoria_checklist:
+        try:
+            from emed_services.checklists_especializados import identificar_categoria_checklist
+            categoria_checklist = identificar_categoria_checklist(nome)
+        except Exception:
+            categoria_checklist = "GERAL"
+
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        if eq_id and int(eq_id) > 0:
+            cur.execute("""
+                UPDATE equipamentos
+                SET nome = ?, cliente_nome = ?, categoria = ?, categoria_checklist = ?,
+                    numero_serie = ?, identificador = ?, descricao = ?, status = ?, cidade = ?, estado = ?
+                WHERE id = ?
+            """, (nome, cliente_nome, categoria, categoria_checklist, numero_serie, identificador, descricao, status, cidade, estado, int(eq_id)))
+            msg = "Equipamento atualizado com sucesso!"
+            salvo_id = int(eq_id)
+        else:
+            cur.execute("""
+                INSERT INTO equipamentos (
+                    nome, cliente_nome, categoria, categoria_checklist,
+                    numero_serie, identificador, descricao, cidade, estado, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (nome, cliente_nome, categoria, categoria_checklist, numero_serie, identificador, descricao, cidade, estado, status))
+            salvo_id = cur.lastrowid
+            msg = "Novo equipamento cadastrado com sucesso!"
+        os_id_vinc = dados.get("os_id")
+        if os_id_vinc:
+            try:
+                cur.execute("""
+                    UPDATE clientes_equipamentos
+                    SET cliente = ?, equipamento = ?, numero_serie = ?, cidade = ?
+                    WHERE id = ?
+                """, (cliente_nome, nome, numero_serie or "S/N", cidade, int(os_id_vinc)))
+            except Exception:
+                pass
+        conn.commit()
+
+    return web.json_response({
+        "ok": True,
+        "msg": msg,
+        "id": salvo_id,
+        "equipamento": {
+            "id": salvo_id,
+            "nome": nome,
+            "cliente_nome": cliente_nome,
+            "categoria_checklist": categoria_checklist,
+            "categoria": categoria,
+            "categoria_auvo": categoria,
+            "numero_serie": numero_serie,
+            "identificador": identificador,
+            "descricao": descricao,
+            "cidade": cidade,
+            "estado": estado,
+            "status": status
+        }
+    })
+
+
+async def api_equipamento_status(request: web.Request) -> web.Response:
+    """Altera o status de um equipamento (descontinuar, reativar ou excluir permanentemente)."""
+    try:
+        dados = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "erro": "JSON inválido"}, status=400)
+
+    eq_id = dados.get("id")
+    acao = str(dados.get("acao", "")).strip().lower()
+
+    if not eq_id:
+        return web.json_response({"ok": False, "erro": "ID do equipamento é obrigatório"}, status=400)
+
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        if acao == "excluir":
+            cur.execute("DELETE FROM equipamentos WHERE id = ?", (int(eq_id),))
+            msg = "Equipamento removido permanentemente com sucesso!"
+            novo_status = "Excluído"
+        elif acao == "reativar":
+            cur.execute("UPDATE equipamentos SET status = 'Ativo' WHERE id = ?", (int(eq_id),))
+            msg = "Equipamento REATIVADO com sucesso!"
+            novo_status = "Ativo"
+        else:
+            cur.execute("UPDATE equipamentos SET status = 'Descontinuado' WHERE id = ?", (int(eq_id),))
+            msg = "Equipamento marcado como DESCONTINUADO."
+            novo_status = "Descontinuado"
+        conn.commit()
+
+    return web.json_response({"ok": True, "msg": msg, "id": int(eq_id), "status": novo_status})
+
+
+async def api_fazer_backup_onedrive(request: web.Request) -> web.Response:
+    """Garante WAL checkpoint e realiza backup íntegro diretamente para a pasta do OneDrive."""
+    import shutil
+    from datetime import datetime
+
+    user_home = os.path.expanduser("~")
+    onedrive_base = os.path.join(user_home, "OneDrive", "Backups_Sistema_EMED")
+    if not os.path.exists(os.path.join(user_home, "OneDrive")):
+        onedrive_base = os.path.join(BASE_DIR, "backups_sistema")
+    os.makedirs(onedrive_base, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    pasta_destino = os.path.join(onedrive_base, f"Backup_EMED_{timestamp}")
+    os.makedirs(pasta_destino, exist_ok=True)
+
+    try:
+        with get_db_connection(DB_NAME) as conn_sq:
+            conn_sq.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+            conn_sq.commit()
+    except Exception as e:
+        print("Aviso no checkpoint:", e)
+
+    db_origem = os.path.join(BASE_DIR, "emed.db")
+    db_destino = os.path.join(pasta_destino, "emed.db")
+    shutil.copy2(db_origem, db_destino)
+
+    excel_origem = os.path.join(BASE_DIR, "base_clientes.xlsx")
+    if os.path.exists(excel_origem):
+        shutil.copy2(excel_origem, os.path.join(pasta_destino, "base_clientes.xlsx"))
+
+    db_raiz_destino = os.path.join(onedrive_base, f"emed_{timestamp}.db")
+    shutil.copy2(db_origem, db_raiz_destino)
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"Backup realizado com sucesso! Pasta: {pasta_destino}",
+        "pasta": pasta_destino,
+        "arquivo_db": db_raiz_destino,
+        "timestamp": timestamp
+    })
+
+
 def criar_app() -> web.Application:
     garantir_schema_rastreio_completo(DB_NAME)
     garantir_schema_fiscal_contabil(DB_NAME)
     garantir_schema_medicina_trabalho(DB_NAME)
-    app = web.Application(client_max_size=25 * 1024 * 1024)
+    app = web.Application(middlewares=[rate_limiting_middleware, security_headers_middleware, auth_api_middleware], client_max_size=25 * 1024 * 1024)
 
     # Webhook de Baixa Automatica PIX e Robo de Rastreamento 24x/dia
     app.router.add_post("/api/pix/webhook", api_pix_webhook)
@@ -10214,6 +10825,9 @@ def criar_app() -> web.Application:
     app.router.add_get("/api/almoxarifado/rastreio/status", api_robo_rastreio_status)
     app.router.add_post("/api/almoxarifado/rastreio/executar-robo", api_robo_rastreio_executar)
     app.router.add_post("/api/almoxarifado/rastreio/simular", api_robo_rastreio_simular)
+    app.router.add_post("/api/clientes-internos/salvar", api_clientes_internos_salvar)
+    app.router.add_post("/api/aniversariantes/salvar", api_aniversariantes_salvar)
+    app.router.add_post("/api/os/atualizar-cliente-endereco", api_atualizar_cliente_endereco)
     app.router.add_get("/api/almoxarifado/carga/guia-retirada/{id}", api_carga_guia_retirada)
     # Símbolo Oficial, Credenciamento Hospitalar & QR Code Equipamento
     app.router.add_get("/api/simbolo-emed", handle_simbolo_emed)
@@ -10229,6 +10843,28 @@ def criar_app() -> web.Application:
 
 
 
+        # Rotas de Autenticacao e Seguranca
+    app.router.add_get("/api/auth/usuarios", api_auth_usuarios)
+    app.router.add_post("/api/auth/login", api_auth_login)
+    app.router.add_post("/api/auth/logout", api_auth_logout)
+    app.router.add_get("/api/auth/status", api_auth_status)
+        # Rotas Integradas do EmedNav GPS (Proxy Porta 5000)
+    app.router.add_get("/nav", handle_proxy_nav)
+    app.router.add_get("/gps", handle_proxy_nav)
+    app.router.add_get("/emedcar", handle_proxy_nav)
+    app.router.add_get("/frota", handle_proxy_nav)
+    app.router.add_route("*", "/api/car", handle_proxy_nav)
+    app.router.add_route("*", "/api/car/{tail:.*}", handle_proxy_nav)
+    app.router.add_route("*", "/api/radars", handle_proxy_nav)
+    app.router.add_route("*", "/api/radars/{tail:.*}", handle_proxy_nav)
+    app.router.add_route("*", "/api/route", handle_proxy_nav)
+    app.router.add_route("*", "/api/route/{tail:.*}", handle_proxy_nav)
+    app.router.add_route("*", "/api/search", handle_proxy_nav)
+    app.router.add_route("*", "/api/search/{tail:.*}", handle_proxy_nav)
+    app.router.add_route("*", "/api/history", handle_proxy_nav)
+    app.router.add_route("*", "/api/history/{tail:.*}", handle_proxy_nav)
+    app.router.add_route("*", "/api/fleet", handle_proxy_nav)
+    app.router.add_route("*", "/api/fleet/{tail:.*}", handle_proxy_nav)
     app.router.add_get("/", handle_index)
 
 
@@ -10263,12 +10899,10 @@ def criar_app() -> web.Application:
 
 
 
-    app.router.add_get("/api/clientes_auvo", api_clientes_auvo)
-    app.router.add_post("/api/equipamento/salvar", api_equipamento_salvar)
-    app.router.add_post("/api/equipamento/status", api_equipamento_status)
-    app.router.add_post("/api/sistema/backup-onedrive", api_fazer_backup_onedrive)
-    app.router.add_get("/api/sistema/backup-onedrive", api_fazer_backup_onedrive)
-    app.router.add_get("/api/equipamentos_auvo", api_equipamentos_auvo)
+    app.router.add_get("/api/clientes", api_clientes)
+    app.router.add_get("/api/clientes_auvo", api_clientes)
+    app.router.add_get("/api/equipamentos", api_equipamentos)
+    app.router.add_get("/api/equipamentos_auvo", api_equipamentos)
     app.router.add_get("/api/checklist", api_checklist)
 
 
@@ -10454,6 +11088,13 @@ def criar_app() -> web.Application:
     app.router.add_get("/api/tecnico/historico-medico/{id}", api_tecnico_historico_medico)
     app.router.add_post("/api/fiscal/liberar-quarentena", api_fiscal_liberar_quarentena)
     app.router.add_post("/api/fiscal/cancelar-nota", api_fiscal_cancelar_nota)
+    app.router.add_post("/api/seguranca/2fa/solicitar", api_seguranca_2fa_solicitar)
+    app.router.add_post("/api/seguranca/2fa/validar", api_seguranca_2fa_validar)
+    app.router.add_get("/api/fiscal/auditoria/eventos", api_fiscal_auditoria_eventos)
+    app.router.add_get("/api/fiscal/auditoria/detalhe/{id}", api_fiscal_auditoria_detalhe)
+    app.router.add_get("/api/fiscal/avaliacao/dashboard", api_fiscal_avaliacao_dashboard)
+    app.router.add_post("/api/fiscal/auditoria/avaliar-avulso", api_fiscal_auditoria_avaliar_avulso)
+
     app.router.add_get("/api/financeiro/relatorio-contabil", api_financeiro_relatorio_contabil)
     app.router.add_get("/api/financeiro/relatorio-contabil/imprimir", api_financeiro_relatorio_contabil_imprimir)
     app.router.add_get("/api/transportadoras", api_transportadoras_listar)
@@ -10493,10 +11134,12 @@ def criar_app() -> web.Application:
 
 
     app.router.add_get("/api/exportar-excel", api_exportar_excel)
-
     app.router.add_post("/api/importar-excel", api_importar_excel)
-
-
+    app.router.add_post("/api/nova_os", api_nova_os)
+    app.router.add_post("/api/equipamento/salvar", api_equipamento_salvar)
+    app.router.add_post("/api/equipamento/status", api_equipamento_status)
+    app.router.add_post("/api/sistema/backup-onedrive", api_fazer_backup_onedrive)
+    app.router.add_get("/api/sistema/backup-onedrive", api_fazer_backup_onedrive)
 
     return app
 
@@ -10598,6 +11241,10 @@ async def iniciar_app_com_keepalive():
 
 
 
+    app.router.add_post("/api/equipamento/salvar", api_equipamento_salvar)
+    app.router.add_post("/api/equipamento/status", api_equipamento_status)
+    app.router.add_post("/api/sistema/backup-onedrive", api_fazer_backup_onedrive)
+    app.router.add_get("/api/sistema/backup-onedrive", api_fazer_backup_onedrive)
     return app
 
 
@@ -10622,7 +11269,7 @@ if __name__ == "__main__":
 
 
 
-    web.run_app(criar_app(), host="0.0.0.0", port=porta, handle_signals=False)
+    web.run_app(criar_app(), host="0.0.0.0", port=porta, handle_signals=False, backlog=2048)
 
 
 

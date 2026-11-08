@@ -305,7 +305,10 @@ def salvar_dados_seguro(dataframe: pd.DataFrame, db_name: str = DB_NAME, caminho
         caminho_bkp = os.path.join(BASE_DIR, "base_clientes_backup.xlsx")
         return salvar_dataframe_transacional(dataframe, db_name, caminho_excel, caminho_bkp)
     except Exception as e:
-        st.error(f"⚠️ Erro ao salvar dados: {e}")
+        try:
+            st.error(f"⚠️ Erro ao salvar dados: {e}")
+        except Exception:
+            print(f"[REPOSITORIES] Erro ao salvar dados: {e}")
         return False
 
 

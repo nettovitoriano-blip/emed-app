@@ -17,7 +17,7 @@ def render_mural_despacho(ctx: AppContext):
     count_concluidos = len(df[df['status'].astype(str).str.upper() == 'CONCLUÍDO'])
     tecnicos_agenda = {}
 
-    for _, row in df.iterrows():
+    for idx, row in df.iterrows():
         cliente = limpar_texto(row.get('cliente'), '').upper()
         cidade = limpar_texto(row.get('cidade'), '').upper()
         estado = limpar_texto(row.get('estado'), '').upper()
@@ -46,8 +46,12 @@ def render_mural_despacho(ctx: AppContext):
         tipo_srv = limpar_texto(row.get('tipo_servico'), 'PREVENTIVA').upper()
 
         query_mapa = urllib.parse.quote(f"{cliente} {endereco}")
-        link_maps = f"https://www.google.com/maps/search/?api=1&query={query_mapa}"
-        link_waze = f"https://waze.com/ul?q={query_mapa}&navigate=yes"
+        cli_key = cliente.strip().upper()
+        if cli_key in coords_clientes:
+            c_lat, c_lon = coords_clientes[cli_key]
+            link_emedcar = f"https://emed-app-6ofv.onrender.com/gps?dest={urllib.parse.quote(cliente)}&lat={c_lat}&lon={c_lon}"
+        else:
+            link_emedcar = f"https://emed-app-6ofv.onrender.com/gps?dest={urllib.parse.quote(cliente)}&query={query_mapa}"
 
         if 0 <= (data_agend.normalize() - hoje).days <= 15:
             count_alertas += 1
@@ -64,7 +68,7 @@ def render_mural_despacho(ctx: AppContext):
                     'equipamento': equipamento, 'data': data_agend, 'pendencias': pendencias,
                     'instrumento': instrumento, 'etapa_preventiva': etapa_prev,
                     'endereco': endereco, 'resp': resp_cliente, 'tel': tel_cliente,
-                    'maps': link_maps, 'waze': link_waze, 'tipo_servico': tipo_srv
+                    'emedcar': link_emedcar, 'tipo_servico': tipo_srv
                 })
 
     k1, k2, k3, k4 = st.columns(4)
@@ -111,8 +115,7 @@ def render_mural_despacho(ctx: AppContext):
                 texto_msg += f"📍 Endereço: {i['endereco']}\n"
                 texto_msg += f"👤 Responsável: {i['resp']} ({i['tel']})\n"
                 texto_msg += f"📅 Data: {d_str}\n"
-                texto_msg += f"🗺️ Maps: {i['maps']}\n"
-                texto_msg += f"🚗 Waze: {i['waze']}\n"
+                texto_msg += f"🚗 *@eMEDcar GPS:* {i['emedcar']}\n"
                 os_id_link = i.get('id', '')
                 texto_msg += f"👉 🚗 *Atender / Iniciar Rota:* https://emed-app-6ofv.onrender.com/?acao=atender&os={os_id_link}\n-----------------------------------\n"
 
@@ -144,9 +147,8 @@ def render_mural_despacho(ctx: AppContext):
                 with c_lk2:
                     for i_at in itens:
                         cli_lbl = i_at['cliente']
-                        mp_url = i_at['maps']
-                        wz_url = i_at['waze']
-                        st.markdown(f"🗺️ **[{cli_lbl} - Google Maps]({mp_url})** | 🚗 **[Waze]({wz_url})**")
+                        emed_url = i_at['emedcar']
+                        st.markdown(f"🚗 **[@eMEDcar GPS - {cli_lbl}]({emed_url})**")
 
                 # Acionamento Automático do Almoxarifado para os Materiais/Kits deste Técnico
                 itens_com_materiais = [it for it in itens if str(it.get('instrumento', '')).strip()]

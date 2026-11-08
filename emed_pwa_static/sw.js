@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v47-filtro-regiao-e-10-os';
+const CACHE_NAME = 'emed-pwa-v49-sanitizacao-limite';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
