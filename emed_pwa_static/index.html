@@ -41402,12 +41402,15 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-      window._toastTimer = setTimeout(() => { el.style.display = "none"; }
+      window._toastTimer = setTimeout(() => {
+        el.style.display = "none";
+      }, tempo);
+    }
+
     function toastSucesso(msg, tempo = 3800) {
       mostrarToast(msg, tempo);
     }
     window.toastSucesso = toastSucesso;
-, tempo);
 
 
 
@@ -41439,7 +41442,6 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-    }
 
 
 
