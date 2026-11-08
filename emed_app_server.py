@@ -10615,7 +10615,7 @@ async def api_cotacoes_transporte_salvar(request: web.Request) -> web.Response:
 
 
 async def api_logistica_deslocamento_salvar(request: web.Request) -> web.Response:
-    """Registra uma referência de deslocamento e logística auditada (combustível, hotel, refeição e contrato)."""
+    """Registra uma referência de deslocamento e logística auditada (combustível estrada/cidade até 7,39, hotel alta/baixa, refeição 100 e desgaste 0,31)."""
     try:
         body = await request.json()
     except Exception:
@@ -10624,18 +10624,22 @@ async def api_logistica_deslocamento_salvar(request: web.Request) -> web.Respons
     os_id = str(body.get("os_id", "")).strip()
     cliente = limpar_texto(body.get("cliente"), "CLIENTE NÃO INFORMADO")
     cidade = limpar_texto(body.get("cidade"), "FORTALEZA / CE")
-    enquadramento = limpar_texto(body.get("enquadramento_contrato"), "AVULSO")
+    enquadramento = limpar_texto(body.get("enquadramento_contrato"), "EM_APURACAO")
     km_ida = float(limpar_float(body.get("km_estimado_ida"), 0.0))
+    km_estrada = float(limpar_float(body.get("km_estrada"), km_ida * 2))
     km_local = float(limpar_float(body.get("km_rodagem_local"), 30.0))
-    km_total = float(limpar_float(body.get("km_estimado_total"), km_ida * 2 + km_local))
+    km_total = float(limpar_float(body.get("km_estimado_total"), km_estrada + km_local))
     tipo_rota = limpar_texto(body.get("tipo_rota"), "EXCLUSIVA")
-    consumo_kml = float(limpar_float(body.get("consumo_medio_kml"), 11.5))
-    preco_comb = float(limpar_float(body.get("preco_combustivel"), 5.99))
+    consumo_estrada_kml = float(limpar_float(body.get("consumo_estrada_kml"), 11.5))
+    consumo_cidade_kml = float(limpar_float(body.get("consumo_cidade_kml"), 8.8))
+    preco_comb = float(limpar_float(body.get("preco_combustivel"), 6.89))
     custo_comb = float(limpar_float(body.get("custo_combustivel"), 0.0))
+    temporada_hotel = limpar_texto(body.get("temporada_hotel"), "PADRAO")
     pernoites = int(limpar_float(body.get("qtd_pernoites"), 0))
     custo_hotel = float(limpar_float(body.get("custo_hospedagem"), 0.0))
     dias_refeicao = int(limpar_float(body.get("qtd_dias_refeicao"), 1))
     custo_refeicao = float(limpar_float(body.get("custo_alimentacao"), 0.0))
+    taxa_desgaste_km = float(limpar_float(body.get("taxa_desgaste_km"), 0.31))
     custo_desgaste = float(limpar_float(body.get("custo_desgaste"), 0.0))
     custo_total = float(limpar_float(body.get("custo_total_operacional"), 0.0))
     valor_faturar = float(limpar_float(body.get("valor_faturar_cliente"), 0.0))
@@ -10650,13 +10654,13 @@ async def api_logistica_deslocamento_salvar(request: web.Request) -> web.Respons
                 os_id TEXT,
                 cliente TEXT,
                 cidade TEXT,
-                enquadramento_contrato TEXT DEFAULT 'AVULSO',
+                enquadramento_contrato TEXT DEFAULT 'EM_APURACAO',
                 km_estimado_ida REAL,
                 km_rodagem_local REAL DEFAULT 30.0,
                 km_estimado_total REAL,
                 tipo_rota TEXT,
                 consumo_medio_kml REAL DEFAULT 11.5,
-                preco_combustivel REAL DEFAULT 5.99,
+                preco_combustivel REAL DEFAULT 6.89,
                 custo_combustivel REAL,
                 qtd_pernoites INTEGER DEFAULT 0,
                 custo_hospedagem REAL DEFAULT 0.0,
@@ -10670,15 +10674,10 @@ async def api_logistica_deslocamento_salvar(request: web.Request) -> web.Respons
                 data_calculo TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        # Adicionar colunas caso a tabela já existisse
         for col_def in [
-            ("enquadramento_contrato", "TEXT DEFAULT 'AVULSO'"),
-            ("km_rodagem_local", "REAL DEFAULT 30.0"),
-            ("qtd_pernoites", "INTEGER DEFAULT 0"),
-            ("custo_hospedagem", "REAL DEFAULT 0.0"),
-            ("qtd_dias_refeicao", "INTEGER DEFAULT 1"),
-            ("custo_alimentacao", "REAL DEFAULT 0.0"),
-            ("valor_faturar_cliente", "REAL DEFAULT 0.0")
+            ("consumo_cidade_kml", "REAL DEFAULT 8.8"),
+            ("taxa_desgaste_km", "REAL DEFAULT 0.31"),
+            ("temporada_hotel", "TEXT DEFAULT 'PADRAO'")
         ]:
             try:
                 cur.execute(f"ALTER TABLE logistica_orcamentos_deslocamento ADD COLUMN {col_def[0]} {col_def[1]}")
@@ -10694,7 +10693,7 @@ async def api_logistica_deslocamento_salvar(request: web.Request) -> web.Respons
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             os_id, cliente, cidade, enquadramento, km_ida, km_local,
-            km_total, tipo_rota, consumo_kml, preco_comb, custo_comb,
+            km_total, tipo_rota, consumo_estrada_kml, preco_comb, custo_comb,
             pernoites, custo_hotel, dias_refeicao, custo_refeicao,
             custo_desgaste, custo_total, valor_faturar, obs, criado_por
         ))
@@ -10702,9 +10701,8 @@ async def api_logistica_deslocamento_salvar(request: web.Request) -> web.Respons
 
     return web.json_response({
         "ok": True,
-        "msg": f"Referência logística auditada para {cidade} gravada com sucesso! Base histórica atualizada."
+        "msg": f"Auditoria logística calibrada para {cidade} gravada com sucesso!"
     })
-
 
 async def api_logistica_deslocamento_historico(request: web.Request) -> web.Response:
     """Retorna os últimos cálculos e referências de deslocamento para orçamentos da EMED."""
