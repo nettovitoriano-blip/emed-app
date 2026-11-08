@@ -10612,6 +10612,86 @@ async def api_cotacoes_transporte_salvar(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "msg": msg})
 
 
+
+
+async def api_logistica_deslocamento_salvar(request: web.Request) -> web.Response:
+    """Registra uma referência de deslocamento e logística para inteligência de orçamentos futuros."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    os_id = str(body.get("os_id", "")).strip()
+    cliente = limpar_texto(body.get("cliente"), "CLIENTE NÃO INFORMADO")
+    cidade = limpar_texto(body.get("cidade"), "FORTALEZA / CE")
+    km_ida = float(limpar_float(body.get("km_estimado_ida"), 0.0))
+    km_total = float(limpar_float(body.get("km_estimado_total"), km_ida * 2))
+    tipo_rota = limpar_texto(body.get("tipo_rota"), "EXCLUSIVA")
+    consumo_kml = float(limpar_float(body.get("consumo_medio_kml"), 13.0))
+    preco_comb = float(limpar_float(body.get("preco_combustivel"), 5.89))
+    custo_comb = float(limpar_float(body.get("custo_combustivel"), 0.0))
+    custo_desgaste = float(limpar_float(body.get("custo_desgaste"), 0.0))
+    custo_total = float(limpar_float(body.get("custo_total_operacional"), 0.0))
+    valor_sugerido = float(limpar_float(body.get("valor_sugerido_orcamento"), 0.0))
+    obs = limpar_texto(body.get("observacoes"), "")
+    criado_por = limpar_texto(body.get("criado_por"), "SISTEMA")
+
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS logistica_orcamentos_deslocamento (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                os_id TEXT,
+                cliente TEXT,
+                cidade TEXT,
+                km_estimado_ida REAL,
+                km_estimado_total REAL,
+                tipo_rota TEXT,
+                consumo_medio_kml REAL DEFAULT 13.0,
+                preco_combustivel REAL DEFAULT 5.89,
+                custo_combustivel REAL,
+                custo_desgaste REAL,
+                custo_total_operacional REAL,
+                valor_sugerido_orcamento REAL,
+                observacoes TEXT,
+                criado_por TEXT,
+                data_calculo TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cur.execute("""
+            INSERT INTO logistica_orcamentos_deslocamento (
+                os_id, cliente, cidade, km_estimado_ida, km_estimado_total, tipo_rota,
+                consumo_medio_kml, preco_combustivel, custo_combustivel, custo_desgaste,
+                custo_total_operacional, valor_sugerido_orcamento, observacoes, criado_por
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            os_id, cliente, cidade, km_ida, km_total, tipo_rota,
+            consumo_kml, preco_comb, custo_comb, custo_desgaste,
+            custo_total, valor_sugerido, obs, criado_por
+        ))
+        conn.commit()
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"Referência logística para {cidade} gravada com sucesso! Base histórica alimentada."
+    })
+
+
+async def api_logistica_deslocamento_historico(request: web.Request) -> web.Response:
+    """Retorna os últimos cálculos e referências de deslocamento para orçamentos da EMED."""
+    with get_db_connection(DB_NAME) as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        try:
+            rows = cur.execute("""
+                SELECT * FROM logistica_orcamentos_deslocamento ORDER BY id DESC LIMIT 50
+            """).fetchall()
+            dados = [dict(r) for r in rows]
+        except Exception:
+            dados = []
+    return web.json_response({"ok": True, "historico": dados})
+
+
 async def api_despesas_recorrentes_salvar(request: web.Request) -> web.Response:
     """Salva ou atualiza uma despesa operacional recorrente da empresa."""
     body = await request.json()
@@ -11461,6 +11541,8 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/transportadoras/salvar", api_transportadoras_salvar)
     app.router.add_get("/api/cotacoes-transporte", api_cotacoes_transporte_listar)
     app.router.add_post("/api/cotacoes-transporte/salvar", api_cotacoes_transporte_salvar)
+    app.router.add_post("/api/logistica/deslocamento/salvar", api_logistica_deslocamento_salvar)
+    app.router.add_get("/api/logistica/deslocamento/historico", api_logistica_deslocamento_historico)
     app.router.add_post("/api/despesas-recorrentes/salvar", api_despesas_recorrentes_salvar)
     app.router.add_get("/api/remessas-diagnostico", api_remessas_diagnostico_listar)
     app.router.add_post("/api/remessas-diagnostico/salvar", api_remessas_diagnostico_salvar)

@@ -41823,7 +41823,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-      navigator.serviceWorker.register("/sw.js?v=v52").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=v53").then(reg => { if(reg) reg.update(); }).catch(() => {});
 
 
 
@@ -52076,6 +52076,7 @@ function renderizarNavegacao() {
 
 
                   <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();abrirChecklistInsumosViagem('${esc(os.cidade)}')" style="padding:1px 6px;font-size:10px;border-color:#2563eb;color:#2563eb;font-weight:700;">🎒 Insumos</button>
+                  <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();abrirModalCalculadoraLogistica('${esc(os.id)}')" style="padding:1px 6px;font-size:10px;border-color:#059669;color:#059669;font-weight:700;margin-left:4px;" title="Calculadora Logística de Deslocamento & Orçamento">⛽ Deslocamento</button>
 
 
 
@@ -80939,12 +80940,84 @@ function renderizarNavegacao() {
 
     /********************************************************************
      * INOVAÇÃO 2: COPILOTO DE DIAGNÓSTICO TÉCNICO & CÓDIGOS DE ERRO
-     * Base de conhecimento homologada de 20 falhas médicas
+     * Filtrado ESTRITAMENTE pela Modalidade do Equipamento do Chamado (DO, RX, MM, TC, ARCO)
      ********************************************************************/
     window._campoAlvoCopiloto = null;
     window._filtroModalidadeCopiloto = "TODOS";
 
+    function detectarModalidadeEquipamento(nomeEquipamento) {
+      if (!nomeEquipamento) return "TODOS";
+      const eq = String(nomeEquipamento).toUpperCase().trim();
+      if (eq.includes("DO") || eq.includes("DENSITO") || eq.includes("LUNAR") || eq.includes("HOLOGIC") || eq.includes("DEXA") || eq.includes("OSTEOPOROSE")) {
+        return "DO";
+      }
+      if (eq.includes("MM") || eq.includes("MAMO") || eq.includes("SENOGRAPHE") || eq.includes("MAMOMAT") || eq.includes("CRYSTAL") || eq.includes("DIAMOND")) {
+        return "MAMOGRAFIA";
+      }
+      if (eq.includes("TC") || eq.includes("TOMO") || eq.includes("BRIGHTSPEED") || eq.includes("OPTIMA") || eq.includes("SOMATOM") || eq.includes("LIGHTSPEED") || eq.includes("EMOTION")) {
+        return "TOMOGRAFIA";
+      }
+      if (eq.includes("ARCO") || eq.includes("C-ARM") || eq.includes("ZIEHM") || eq.includes("CARM") || eq.includes("CIRURGICO") || eq.includes("BV ENDURA") || eq.includes("BV PULSERA")) {
+        return "ARCO";
+      }
+      if (eq.includes("RX") || eq.includes("RAIO") || eq.includes("COMPACTO") || eq.includes("RAD") || eq.includes("XR") || eq.includes("PHILIPS") || eq.includes("VMI") || eq.includes("ALTUS") || eq.includes("SHIMADZU")) {
+        return "RAIO-X";
+      }
+      return "GERAL";
+    }
+
     const BANCO_FALHAS_COPILOTO = [
+      // --- DENSITOMETRIA ÓSSEA (DO / DEXA) ---
+      {
+        id: "DO-01",
+        modalidade: "DO",
+        codigo: "ERR-DO01",
+        titulo: "Densitometria: Falha no Teste Diário de QA / Desvio de BMD no Phantom de Coluna",
+        causa: "Variação na sensibilidade do detector de cintilação (NaI/CZT) ou atenuação por condensação óptica.",
+        procedimento: "Executar ciclo de aquecimento térmico do detector; verificar se o phantom de calibração está alinhado na cruz laser; repetir aquisição de controle de qualidade com 3 repetições consecutivas."
+      },
+      {
+        id: "DO-02",
+        modalidade: "DO",
+        codigo: "ERR-DO02",
+        titulo: "Densitometria: Erro de Comunicação / Contagem de Fótons do Detector NaI / CZT",
+        causa: "Ruído no cabo coaxial de alta frequência ou placa discriminadora de contagem (Pulse Height Analyzer) instável.",
+        procedimento: "Limpar conectores BNC do detector com limpa-contatos ESD; conferir estabilidade da tensão de alta do detector; checar se a malha de aterramento do braço C está firme."
+      },
+      {
+        id: "DO-03",
+        modalidade: "DO",
+        codigo: "ERR-DO03",
+        titulo: "Densitometria: Travamento Mecânico nos Eixos de Varredura XY (Mesa / Braço)",
+        causa: "Resíduo nos trilhos e guias lineares ou correias dentadas de tracionamento frouxas.",
+        procedimento: "Limpar e aplicar graxa branca técnica nas guias lineares dos eixos X e Y; verificar tensão mecânica das correias; testar curso dos sensores ópticos de fim de curso (Home Sensor)."
+      },
+      {
+        id: "DO-04",
+        modalidade: "DO",
+        codigo: "ERR-DO04",
+        titulo: "Densitometria: Desalinhamento do Feixe e Colimador (Fan-Beam / Pencil-Beam Alignment)",
+        causa: "Deslocamento milimétrico do bloco do tubo de raios-x ou da abertura do colimador de feixe em leque.",
+        procedimento: "Realizar rotina de calibração de geometria e alinhamento mecânico (Beam Alignment); ajustar parafusos micrométricos do colimador até centralizar a contagem máxima no detector."
+      },
+      {
+        id: "DO-05",
+        modalidade: "DO",
+        codigo: "ERR-DO05",
+        titulo: "Densitometria: Mira Laser de Posicionamento Desalinhada ou Não Acende",
+        causa: "Interrupção na linha de 5VDC do diodo laser ou desvio angular no prisma óptico de projeção cruzada.",
+        procedimento: "Medir alimentação de 5V nos bornes do diodo laser; ajustar espelho colimador de projeção cruzada sobre o ponto de referência anatômica (L1-L4 / Fêmur)."
+      },
+      {
+        id: "DO-06",
+        modalidade: "DO",
+        codigo: "ERR-DO06",
+        titulo: "Densitometria: Oscilação de Alta Tensão / kV Drift durante Varredura",
+        causa: "Flutuação na tensão de feedback do inversor de alta tensão ou capacitor do gerador com fuga.",
+        procedimento: "Inspecionar placa geradora HT; recalibrar níveis de baixa energia (70 kV) e alta energia (140 kV); verificar se a rede elétrica hospitalar está fornecendo 220VAC estabilizados."
+      },
+
+      // --- RAIO-X (FIXO / MÓVEL / DIGITAL DR) ---
       {
         id: "RX-01",
         modalidade: "RAIO-X",
@@ -80993,6 +81066,8 @@ function renderizarNavegacao() {
         causa: "Falta de alimentação de 24VDC nas bobinas solenoide ou botões de comando da manopla oxidados.",
         procedimento: "Medir saída da fonte chaveada 24VDC; testar botões microswitch na empunhadura; conferir cabos flexíveis da calha esteira contra rompimento mecânico."
       },
+
+      // --- MAMOGRAFIA (MM) ---
       {
         id: "MM-01",
         modalidade: "MAMOGRAFIA",
@@ -81017,6 +81092,8 @@ function renderizarNavegacao() {
         causa: "Micro-motor de posicionamento de filtro travado por resíduo mecânico ou sensor óptico encoberto.",
         procedimento: "Limpeza com álcool isopropílico no encoder óptico do carrossel de filtros; lubrificação suave dos eixos com graxa branca especial; teste de transição manual Mo -> Rh."
       },
+
+      // --- TOMOGRAFIA COMPUTADORIZADA (TC) ---
       {
         id: "CT-01",
         modalidade: "TOMOGRAFIA",
@@ -81049,6 +81126,8 @@ function renderizarNavegacao() {
         causa: "Canal do detector DAS com desvio de ganho ou calibração de ar (Air Calibration) desatualizada.",
         procedimento: "Executar rotina de aquecimento do tubo (Tube Warmup) seguida de calibração completa de ar (Full Air Calibration) em todos os KVs e collimations homologadas."
       },
+
+      // --- ARCO CIRÚRGICO ---
       {
         id: "AR-01",
         modalidade: "ARCO",
@@ -81065,6 +81144,8 @@ function renderizarNavegacao() {
         causa: "Desgaste na fita de atrito orbital ou parafusos de aperto da guia do arco folgados.",
         procedimento: "Ajustar pré-carga das sapatas de frenagem mecânica; inspecionar rolamentos guia e aplicar torque correto nas travas angulares."
       },
+
+      // --- INFRAESTRUTURA GERAL / REDE / ATERRAMENTO ---
       {
         id: "GEN-01",
         modalidade: "GERAL",
@@ -81085,10 +81166,38 @@ function renderizarNavegacao() {
 
     function abrirModalCopilotoFalhas(idCampoAlvo) {
       window._campoAlvoCopiloto = idCampoAlvo;
+      
+      // Identificar o equipamento da OS ativa
+      const ordens = STATE.data?.ordens || [];
+      const osAtiva = window._osAtivaObj || ordens.find(x => String(x.id) === String(window._osAtivaId)) || {};
+      const nomeEquip = (osAtiva.equipamento || document.getElementById("propEquipamento")?.value || "Equipamento Geral").toUpperCase();
+      
+      // Detectar modalidade estrita
+      const mod = detectarModalidadeEquipamento(nomeEquip);
+      window._filtroModalidadeCopiloto = mod;
+
       const modal = document.getElementById("modalCopilotoFalhas");
       if (modal) {
         modal.style.display = "flex";
+        
+        // Atualizar banner de equipamento do chamado
+        const elNome = document.getElementById("copilotoNomeEquipamento");
+        if (elNome) {
+          const nomesMod = {
+            "DO": "🦴 Densitometria Óssea (DO)",
+            "RAIO-X": "⚡ Raio-X (Fixo / Móvel)",
+            "MAMOGRAFIA": "🎀 Mamografia (MM)",
+            "TOMOGRAFIA": "🔄 Tomografia Computadorizada (TC)",
+            "ARCO": "🩺 Arco Cirúrgico",
+            "GERAL": "🌐 Elétrica / Rede Hospitalar",
+            "TODOS": "Todos os Equipamentos"
+          };
+          elNome.innerHTML = `${nomeEquip} &bull; <span style="color:#0284c7;">${nomesMod[mod] || mod}</span>`;
+        }
+
+        atualizarEstiloPillsCopiloto(mod);
         renderizarListaCopiloto();
+
         const inp = document.getElementById("buscaCopiloto");
         if (inp) { inp.value = ""; inp.focus(); }
       }
@@ -81101,7 +81210,20 @@ function renderizarNavegacao() {
 
     function filtrarCopilotoModalidade(mod) {
       window._filtroModalidadeCopiloto = mod;
+      atualizarEstiloPillsCopiloto(mod);
       renderizarListaCopiloto();
+    }
+
+    function atualizarEstiloPillsCopiloto(modAtiva) {
+      document.querySelectorAll(".btn-cop-pill").forEach(btn => {
+        btn.style.background = "#e2e8f0";
+        btn.style.color = "#334155";
+      });
+      const ativa = document.getElementById("copPill_" + modAtiva);
+      if (ativa) {
+        ativa.style.background = "#0284c7";
+        ativa.style.color = "#ffffff";
+      }
     }
 
     function filtrarCopilotoFalhas() {
@@ -81125,7 +81247,7 @@ function renderizarNavegacao() {
       });
 
       if (filtrados.length === 0) {
-        box.innerHTML = `<div style="text-align:center;padding:24px;color:#64748b;font-weight:600;">Nenhuma falha encontrada para este termo.</div>`;
+        box.innerHTML = `<div style="text-align:center;padding:24px;color:#64748b;font-weight:600;">Nenhuma sugestão encontrada nesta modalidade. Toque em "Ver Todas" se desejar ver outros equipamentos.</div>`;
         return;
       }
 
@@ -81174,50 +81296,201 @@ function renderizarNavegacao() {
     }
 
     /********************************************************************
-     * INOVAÇÃO 3: CALCULADORA DE CUSTOS DE VIAGEM & AUTONOMIA DA FROTA
-     * Cálculo de combustível (Argo 13 km/l Flex) e alerta de revisão
+     * INOVAÇÃO 3: CALCULADORA LOGÍSTICA DE DESLOCAMENTO & PRECIFICAÇÃO
+     * Coleta de dados com flexibilidade para não sobrecarregar orçamentos
      ********************************************************************/
-    function calcularCustosViagemOS(osId) {
-      const ordens = STATE.data?.ordens || [];
-      const os = ordens.find(x => String(x.id) === String(osId));
-      if (!os) {
-        mostrarToast("OS não localizada.");
-        return;
-      }
-
-      const veiculos = STATE.data?.veiculos || [];
-      const carroAtivo = veiculos[0] || { modelo: "FIAT ARGO 1.0 FLEX", km_atual: 45000, km_proxima_revisao: 50000 };
-
-      // Distâncias estimadas padrão de Fortaleza (sede) até polos
-      const cidade = (os.cidade || "").toUpperCase();
-      let distKmIda = 15; // padrão intra-urbano Fortaleza
-      if (cidade.includes("JUAZEIRO") || cidade.includes("CRATO") || cidade.includes("BARBALHA")) distKmIda = 500;
-      else if (cidade.includes("SOBRAL")) distKmIda = 235;
-      else if (cidade.includes("PETROLINA")) distKmIda = 620;
-      else if (cidade.includes("IGUATU")) distKmIda = 380;
-      else if (cidade.includes("QUIXADÁ") || cidade.includes("QUIXADA")) distKmIda = 168;
-      else if (cidade.includes("RUSSAS")) distKmIda = 165;
-      else if (cidade.includes("CRATEÚS") || cidade.includes("CRATEUS")) distKmIda = 350;
-
-      const distTotal = distKmIda * 2;
-      const consumoKmL = 13.0; // Fiat Argo Flex média estrada/cidade
-      const precoLitroGasolina = 5.89;
-      const litros = (distTotal / consumoKmL).toFixed(1);
-      const custoCombustivel = (litros * precoLitroGasolina).toFixed(2);
-      const pedagios = distKmIda > 100 ? 0.0 : 0.0; // Ceará sem pedágios em rodovias estaduais
-
-      const kmEstimadoPosViagem = (carroAtivo.km_atual || 0) + distTotal;
-      const alertaRevisao = (carroAtivo.km_proxima_revisao && kmEstimadoPosViagem >= carroAtivo.km_proxima_revisao);
-
-      const msg = `⛽ PLANEJAMENTO DE VIAGEM — ${os.cliente}\n` +
-                  `📍 Destino: ${cidade} (${distKmIda} km ida | Total ida/volta: ${distTotal} km)\n` +
-                  `🚗 Veículo: ${carroAtivo.modelo} (Média: ${consumoKmL} km/l)\n` +
-                  `⛽ Combustível Estimado: ${litros} Litros (R$ ${custoCombustivel})\n` +
-                  `🏁 KM Atual: ${carroAtivo.km_atual} km ➔ KM Final Previsto: ${kmEstimadoPosViagem} km\n` +
-                  (alertaRevisao ? `⚠️ ATENÇÃO: Esta viagem atingirá a margem de REVISÃO PREVENTIVA do veículo (${carroAtivo.km_proxima_revisao} km)!` : `🟢 Autonomia e margem de revisão 100% seguras.`);
-
-      alert(msg);
+    function obterDistanciaReferenciaCidade(cidadeNome) {
+      const cid = (cidadeNome || "").toUpperCase();
+      if (cid.includes("JUAZEIRO") || cid.includes("CRATO") || cid.includes("BARBALHA")) return 500;
+      if (cid.includes("SOBRAL") || cid.includes("FORQUILHA")) return 235;
+      if (cid.includes("PETROLINA")) return 620;
+      if (cid.includes("ARARIPINA")) return 660;
+      if (cid.includes("IGUATU")) return 380;
+      if (cid.includes("QUIXADÁ") || cid.includes("QUIXADA")) return 168;
+      if (cid.includes("RUSSAS") || cid.includes("LIMOEIRO")) return 165;
+      if (cid.includes("CRATEÚS") || cid.includes("CRATEUS")) return 350;
+      if (cid.includes("ITAPIPOCA")) return 130;
+      if (cid.includes("TIANGUÁ") || cid.includes("TIANGUA")) return 315;
+      if (cid.includes("CANINDÉ") || cid.includes("CANINDE")) return 120;
+      if (cid.includes("FORTALEZA") || cid.includes("CAUCAIA") || cid.includes("MARACANAÚ") || cid.includes("EUSÉBIO")) return 20;
+      return 50; // Padrão
     }
+
+    function abrirModalCalculadoraLogistica(osId) {
+      const ordens = STATE.data?.ordens || [];
+      const os = ordens.find(x => String(x.id) === String(osId)) || {};
+      
+      const modal = document.getElementById("modalCalculadoraLogistica");
+      if (!modal) return;
+
+      const cliente = os.cliente || "HOSPITAL ATENDIDO";
+      const cidade = os.cidade || "FORTALEZA / CE";
+      const distSugerida = obterDistanciaReferenciaCidade(cidade);
+
+      document.getElementById("calc_os_id").value = os.id || "";
+      document.getElementById("calc_cliente").value = cliente;
+      document.getElementById("calc_cidade").value = cidade;
+      document.getElementById("calc_lbl_cliente_cidade").innerHTML = `🏥 ${esc(cliente)} &bull; 📍 ${esc(cidade)} (OS #${os.id || 'N/A'})`;
+      document.getElementById("calc_km_ida").value = distSugerida;
+      document.getElementById("calc_tipo_rota").value = distSugerida > 200 ? "COMPARTILHADA_2" : "EXCLUSIVA";
+      document.getElementById("calc_obs").value = "";
+
+      modal.style.display = "flex";
+      recalcularLogisticaViagem();
+    }
+
+    function fecharModalCalculadoraLogistica() {
+      const modal = document.getElementById("modalCalculadoraLogistica");
+      if (modal) modal.style.display = "none";
+    }
+
+    function recalcularLogisticaViagem() {
+      const kmIda = Math.max(0, parseFloat(document.getElementById("calc_km_ida")?.value) || 0);
+      const kmTotal = kmIda * 2;
+      const consumo = Math.max(1, parseFloat(document.getElementById("calc_consumo")?.value) || 13.0);
+      const precoLitro = Math.max(0, parseFloat(document.getElementById("calc_preco_litro")?.value) || 5.89);
+      const tipoRota = document.getElementById("calc_tipo_rota")?.value || "EXCLUSIVA";
+
+      // Fator de rateio
+      let fatorRateio = 1.0;
+      if (tipoRota === "COMPARTILHADA_2") fatorRateio = 0.50; // 50% de rateio
+      if (tipoRota === "COMPARTILHADA_3") fatorRateio = 0.33; // 33% de rateio
+
+      const litrosTotais = (kmTotal / consumo);
+      const custoCombustivelTotal = litrosTotais * precoLitro;
+      const custoDesgasteKm = kmTotal * 0.20; // R$ 0,20 por km para manutenção, óleo e pneus
+      const custoOperacionalIntegral = custoCombustivelTotal + custoDesgasteKm;
+
+      // Custo alocado a este orçamento
+      const custoOperacionalCliente = custoOperacionalIntegral * fatorRateio;
+      // Preço sugerido de taxa de deslocamento (Margem justa de 30% sobre o custo direto)
+      const precoSugeridoOrcamento = Math.ceil(custoOperacionalCliente * 1.30);
+
+      // Atualizar DOM
+      const elKm = document.getElementById("res_km_total");
+      if (elKm) elKm.innerText = `${kmTotal} km`;
+
+      const elComb = document.getElementById("res_combustivel");
+      if (elComb) elComb.innerText = `${(litrosTotais * fatorRateio).toFixed(1)} L (R$ ${(custoCombustivelTotal * fatorRateio).toFixed(2)})`;
+
+      const elCusto = document.getElementById("res_custo_total");
+      if (elCusto) elCusto.innerText = `R$ ${custoOperacionalCliente.toFixed(2)}`;
+
+      const elSug = document.getElementById("res_valor_sugerido");
+      if (elSug) elSug.innerText = `R$ ${precoSugeridoOrcamento.toFixed(2)}`;
+
+      // Alerta de Odômetro da Frota
+      const veiculos = STATE.data?.veiculos || [];
+      const carro = veiculos[0] || { km_atual: 45000, km_proxima_revisao: 50000 };
+      const elAlerta = document.getElementById("res_alerta_revisao");
+      if (elAlerta) {
+        const kmFinalPrevisto = (carro.km_atual || 0) + kmTotal;
+        if (carro.km_proxima_revisao && kmFinalPrevisto >= carro.km_proxima_revisao) {
+          elAlerta.style.display = "block";
+          elAlerta.style.background = "#fff7ed";
+          elAlerta.style.border = "1px solid #fed7aa";
+          elAlerta.style.color = "#c2410c";
+          elAlerta.innerHTML = `⚠️ <b>Atenção de Frota:</b> Esta rota levará o carro para ${kmFinalPrevisto} km (atinge o limite de revisão de ${carro.km_proxima_revisao} km). Agendar troca de óleo/filtros antes ou no retorno.`;
+        } else {
+          elAlerta.style.display = "block";
+          elAlerta.style.background = "#f0fdf4";
+          elAlerta.style.border = "1px solid #bbf7d0";
+          elAlerta.style.color = "#166534";
+          elAlerta.innerHTML = `🟢 <b>Frota OK:</b> Previsão pós-viagem: ${kmFinalPrevisto} km (Margem segura até revisão de ${carro.km_proxima_revisao || 50000} km).`;
+        }
+      }
+    }
+
+    async function salvarReferenciaLogistica() {
+      const osId = document.getElementById("calc_os_id")?.value;
+      const cliente = document.getElementById("calc_cliente")?.value;
+      const cidade = document.getElementById("calc_cidade")?.value;
+      const kmIda = parseFloat(document.getElementById("calc_km_ida")?.value) || 0;
+      const kmTotal = kmIda * 2;
+      const tipoRota = document.getElementById("calc_tipo_rota")?.value || "EXCLUSIVA";
+      const consumo = parseFloat(document.getElementById("calc_consumo")?.value) || 13.0;
+      const precoLitro = parseFloat(document.getElementById("calc_preco_litro")?.value) || 5.89;
+      const obs = document.getElementById("calc_obs")?.value || "";
+
+      let fatorRateio = 1.0;
+      if (tipoRota === "COMPARTILHADA_2") fatorRateio = 0.50;
+      if (tipoRota === "COMPARTILHADA_3") fatorRateio = 0.33;
+
+      const litrosTotais = (kmTotal / consumo);
+      const custoCombustivelTotal = (litrosTotais * precoLitro) * fatorRateio;
+      const custoDesgasteKm = (kmTotal * 0.20) * fatorRateio;
+      const custoOperacionalTotal = custoCombustivelTotal + custoDesgasteKm;
+      const valorSugerido = Math.ceil(custoOperacionalTotal * 1.30);
+
+      try {
+        const payload = {
+          os_id: osId,
+          cliente: cliente,
+          cidade: cidade,
+          km_estimado_ida: kmIda,
+          km_estimado_total: kmTotal,
+          tipo_rota: tipoRota,
+          consumo_medio_kml: consumo,
+          preco_combustivel: precoLitro,
+          custo_combustivel: custoCombustivelTotal,
+          custo_desgaste: custoDesgasteKm,
+          custo_total_operacional: custoOperacionalTotal,
+          valor_sugerido_orcamento: valorSugerido,
+          observacoes: obs,
+          criado_por: STATE.usuarioAtual?.nome || "GESTOR"
+        };
+
+        const resp = await fetch("/api/logistica/deslocamento/salvar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const resJson = await resp.json();
+        if (resJson.ok) {
+          mostrarToast("✅ " + resJson.msg);
+          fecharModalCalculadoraLogistica();
+        } else {
+          mostrarToast("⚠️ Erro: " + (resJson.msg || "Não foi possível gravar"));
+        }
+      } catch (err) {
+        mostrarToast("⚠️ Erro de rede ao gravar logística: " + err.message);
+      }
+    }
+
+    function copiarOrcamentoLogistica() {
+      const cliente = document.getElementById("calc_cliente")?.value || "Cliente";
+      const cidade = document.getElementById("calc_cidade")?.value || "Interior";
+      const kmIda = document.getElementById("calc_km_ida")?.value || "0";
+      const kmTotal = (parseFloat(kmIda) * 2).toFixed(0);
+      const tipoRota = document.getElementById("calc_tipo_rota")?.value;
+      const valorSugerido = document.getElementById("res_valor_sugerido")?.innerText || "R$ 0,00";
+
+      const rotaDesc = (tipoRota === "EXCLUSIVA") ? "Viagem Direta Exclusiva" : "Rota Compartilhada (Custos Otimizados)";
+
+      const texto = `📍 *TAXA DE DESLOCAMENTO TÉCNICO ESPECIALIZADO — EMED*\n` +
+                    `• *Cliente:* ${cliente}\n` +
+                    `• *Destino:* Fortaleza / CE ➔ ${cidade} (${kmTotal} km ida e volta)\n` +
+                    `• *Modalidade:* ${rotaDesc}\n` +
+                    `• *Valor de Deslocamento:* ${valorSugerido}\n` +
+                    `_(Inclui combustível, logística de equipamentos de calibração e responsabilidade de trânsito técnico)_`;
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(texto.replace(/\\n/g, '\n')).then(() => {
+          mostrarToast("📋 Texto do orçamento copiado para a área de transferência!");
+        }).catch(() => {
+          prompt("Copie o texto da proposta de deslocamento:", texto.replace(/\\n/g, '\n'));
+        });
+      } else {
+        prompt("Copie o texto da proposta de deslocamento:", texto.replace(/\\n/g, '\n'));
+      }
+    }
+
+    // Compatibilidade com a chamada anterior
+    function calcularCustosViagemOS(osId) {
+      abrirModalCalculadoraLogistica(osId);
+    }
+
 
     function fecharModalFichaVeiculo() {
       const m = document.getElementById("modalFichaVeiculo");
@@ -110711,6 +110984,7 @@ function fecharModalInsumosViagem() {
 
 
               <button class="btn btn-outline btn-sm" onclick="iniciarRotaTecnico('${esc(os.id)}')" style="border-color:#2563eb;color:#2563eb;font-weight:600;" title="Iniciar rota para este equipamento">🚗 Iniciar Rota</button>
+              <button class="btn btn-outline btn-sm" onclick="abrirModalCalculadoraLogistica('${esc(os.id)}')" style="border-color:#059669;color:#059669;font-weight:700;" title="Calculadora Logística de Deslocamento & Precificação de Orçamento">⛽ Logística &amp; Orçamento</button>
 
 
 
@@ -144021,7 +144295,7 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
   <!-- MODAL COPILOTO DE DIAGNÓSTICO TÉCNICO & CÓDIGOS DE ERRO EMED -->
   <div id="modalCopilotoFalhas" class="modal-overlay" style="display:none; z-index:999999;">
-    <div class="modal-box" style="max-width:720px;width:95%;max-height:90vh;display:flex;flex-direction:column;">
+    <div class="modal-box" style="max-width:760px;width:95%;max-height:92vh;display:flex;flex-direction:column;">
       <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;background:#002b54;color:#fff;padding:14px 18px;border-radius:8px 8px 0 0;">
         <div style="font-weight:900;font-size:15px;display:flex;align-items:center;gap:8px;">
           <span>🧠</span> Copiloto de Falhas &amp; Diagnóstico Técnico EMED
@@ -144029,25 +144303,132 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
         <button type="button" class="btn btn-xs" onclick="fecharModalCopilotoFalhas()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;cursor:pointer;font-size:16px;">✕</button>
       </div>
       <div class="modal-body" style="padding:16px;overflow-y:auto;flex:1;">
-        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#0369a1;">
-          💡 <b>Solução em 1 Clique:</b> Pesquise o sintoma ou código de erro. Clique no card desejado para inserir o diagnóstico técnico e procedimento de reparo diretamente na sua Ordem de Serviço.
+        <!-- Banner de Filtro Estrito por Modalidade do Chamado -->
+        <div id="bannerModalidadeCopiloto" style="background:#f0fdf4;border:1px solid #86efac;border-left:4px solid #16a34a;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#166534;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <div>
+            🎯 <b>Equipamento do Chamado:</b> <span id="copilotoNomeEquipamento" style="font-weight:800;color:#0f172a;">Detectando...</span>
+            <div style="font-size:11.5px;color:#15803d;margin-top:2px;">Sugestões de falha filtradas exclusivamente para esta modalidade.</div>
+          </div>
+          <button type="button" class="btn btn-xs" onclick="filtrarCopilotoModalidade('TODOS')" style="background:#ffffff;border:1px solid #cbd5e1;color:#475569;font-size:11px;">Exibir Todas</button>
         </div>
+
         <div style="margin-bottom:12px;">
-          <input type="text" id="buscaCopiloto" class="field-input" placeholder="🔍 Buscar por código (ex: E-01, ERR-03) ou sintoma (tubo, freio, detector, chiller)..." oninput="filtrarCopilotoFalhas()" style="font-size:14px;padding:10px 12px;border:2px solid #0284c7;border-radius:8px;width:100%;">
+          <input type="text" id="buscaCopiloto" class="field-input" placeholder="🔍 Buscar erro nesta modalidade (ex: código, sintoma, detector, laser, calibração)..." oninput="filtrarCopilotoFalhas()" style="font-size:14px;padding:10px 12px;border:2px solid #0284c7;border-radius:8px;width:100%;">
         </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
-          <button type="button" class="btn btn-xs" onclick="filtrarCopilotoModalidade('TODOS')" style="background:#0284c7;color:#fff;font-weight:700;">Todos</button>
-          <button type="button" class="btn btn-xs" onclick="filtrarCopilotoModalidade('RAIO-X')" style="background:#e2e8f0;color:#334155;">Raio-X</button>
-          <button type="button" class="btn btn-xs" onclick="filtrarCopilotoModalidade('MAMOGRAFIA')" style="background:#e2e8f0;color:#334155;">Mamógrafo</button>
-          <button type="button" class="btn btn-xs" onclick="filtrarCopilotoModalidade('TOMOGRAFIA')" style="background:#e2e8f0;color:#334155;">Tomógrafo</button>
-          <button type="button" class="btn btn-xs" onclick="filtrarCopilotoModalidade('ARCO')" style="background:#e2e8f0;color:#334155;">Arco Cirúrgico</button>
+        
+        <div id="pillsModalidadeCopiloto" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+          <button type="button" class="btn btn-xs btn-cop-pill" id="copPill_DO" onclick="filtrarCopilotoModalidade('DO')" style="background:#e2e8f0;color:#334155;font-weight:700;">🦴 Densitometria (DO)</button>
+          <button type="button" class="btn btn-xs btn-cop-pill" id="copPill_RAIO-X" onclick="filtrarCopilotoModalidade('RAIO-X')" style="background:#e2e8f0;color:#334155;font-weight:700;">⚡ Raio-X</button>
+          <button type="button" class="btn btn-xs btn-cop-pill" id="copPill_MAMOGRAFIA" onclick="filtrarCopilotoModalidade('MAMOGRAFIA')" style="background:#e2e8f0;color:#334155;font-weight:700;">🎀 Mamografia (MM)</button>
+          <button type="button" class="btn btn-xs btn-cop-pill" id="copPill_TOMOGRAFIA" onclick="filtrarCopilotoModalidade('TOMOGRAFIA')" style="background:#e2e8f0;color:#334155;font-weight:700;">🔄 Tomografia (TC)</button>
+          <button type="button" class="btn btn-xs btn-cop-pill" id="copPill_ARCO" onclick="filtrarCopilotoModalidade('ARCO')" style="background:#e2e8f0;color:#334155;font-weight:700;">🩺 Arco Cirúrgico</button>
+          <button type="button" class="btn btn-xs btn-cop-pill" id="copPill_GERAL" onclick="filtrarCopilotoModalidade('GERAL')" style="background:#e2e8f0;color:#334155;font-weight:700;">🌐 Rede / Aterramento</button>
+          <button type="button" class="btn btn-xs btn-cop-pill" id="copPill_TODOS" onclick="filtrarCopilotoModalidade('TODOS')" style="background:#e2e8f0;color:#334155;font-weight:700;">Ver Todas</button>
         </div>
+
         <div id="listaCopilotoFalhas" style="display:flex;flex-direction:column;gap:10px;">
           <!-- Renderizado via JavaScript -->
         </div>
       </div>
       <div class="modal-foot" style="padding:12px 16px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;">
         <button type="button" class="btn btn-secondary btn-sm" onclick="fecharModalCopilotoFalhas()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CALCULADORA LOGÍSTICA DE DESLOCAMENTO & PRECIFICAÇÃO DE ORÇAMENTO -->
+  <div id="modalCalculadoraLogistica" class="modal-overlay" style="display:none; z-index:999999;">
+    <div class="modal-box" style="max-width:680px;width:95%;max-height:92vh;display:flex;flex-direction:column;">
+      <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;background:#059669;color:#fff;padding:14px 18px;border-radius:8px 8px 0 0;">
+        <div style="font-weight:900;font-size:15px;display:flex;align-items:center;gap:8px;">
+          <span>⛽</span> Calculadora Logística de Deslocamento &amp; Precificação de Orçamento
+        </div>
+        <button type="button" class="btn btn-xs" onclick="fecharModalCalculadoraLogistica()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;cursor:pointer;font-size:16px;">✕</button>
+      </div>
+      <div class="modal-body" style="padding:16px;overflow-y:auto;flex:1;">
+        <input type="hidden" id="calc_os_id">
+        <input type="hidden" id="calc_cliente">
+        <input type="hidden" id="calc_cidade">
+
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:14px;">
+          <div style="font-weight:800;font-size:14px;color:#166534;" id="calc_lbl_cliente_cidade">Carregando dados da rota...</div>
+          <div style="font-size:12px;color:#15803d;margin-top:2px;">Referência inteligente para orçamentos justos (sem perdas na operação e sem sobrecusto para o cliente).</div>
+        </div>
+
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+          <div class="field">
+            <label class="field-label" style="font-weight:700;color:#0f172a;">Distância Aproximada (Só Ida em KM) *</label>
+            <input type="number" step="1" id="calc_km_ida" class="field-input" oninput="recalcularLogisticaViagem()" style="font-size:15px;font-weight:700;color:#0369a1;border:2px solid #38bdf8;">
+            <div style="font-size:10.5px;color:#64748b;margin-top:3px;">💡 Ajustável conforme desvios ou zona rural.</div>
+          </div>
+          <div class="field">
+            <label class="field-label" style="font-weight:700;color:#0f172a;">Tipo de Rota &amp; Rateio de Custos</label>
+            <select id="calc_tipo_rota" class="field-input" onchange="recalcularLogisticaViagem()" style="font-size:13px;font-weight:600;">
+              <option value="EXCLUSIVA">🚗 Viagem Exclusiva (100% de alocação)</option>
+              <option value="COMPARTILHADA_2">🤝 Rota Compartilhada - 2 Clientes (50% de rateio)</option>
+              <option value="COMPARTILHADA_3">🤝 Rota Compartilhada - 3 Clientes (33% de rateio)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
+          <div class="field">
+            <label class="field-label">Veículo da Frota</label>
+            <input type="text" id="calc_veiculo" class="field-input" value="FIAT ARGO 1.0 FLEX" readonly style="background:#f8fafc;font-size:12px;">
+          </div>
+          <div class="field">
+            <label class="field-label">Consumo Médio</label>
+            <input type="number" step="0.1" id="calc_consumo" class="field-input" value="13.0" oninput="recalcularLogisticaViagem()" style="font-size:12px;">
+          </div>
+          <div class="field">
+            <label class="field-label">Preço da Gasolina (R$/L)</label>
+            <input type="number" step="0.01" id="calc_preco_litro" class="field-input" value="5.89" oninput="recalcularLogisticaViagem()" style="font-size:12px;">
+          </div>
+        </div>
+
+        <!-- Painel de Resultados Operacionais e Orçamento -->
+        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:14px;margin-bottom:14px;">
+          <div style="font-size:12px;font-weight:800;color:#334155;text-transform:uppercase;margin-bottom:10px;">📊 Balanço Operacional &amp; Sugestão de Orçamento</div>
+          
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px;margin-bottom:12px;">
+            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:8px;text-align:center;">
+              <div style="font-size:11px;color:#64748b;">Distância Total (Ida+Volta)</div>
+              <div id="res_km_total" style="font-size:16px;font-weight:900;color:#0f172a;">0 km</div>
+            </div>
+            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:8px;text-align:center;">
+              <div style="font-size:11px;color:#64748b;">Combustível Estimado</div>
+              <div id="res_combustivel" style="font-size:16px;font-weight:900;color:#0284c7;">0 L (R$ 0)</div>
+            </div>
+            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:8px;text-align:center;">
+              <div style="font-size:11px;color:#64748b;">Custo Operacional Total</div>
+              <div id="res_custo_total" style="font-size:16px;font-weight:900;color:#dc2626;">R$ 0,00</div>
+            </div>
+          </div>
+
+          <div style="background:#ecfdf5;border:2px solid #10b981;border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div>
+              <div style="font-size:11px;font-weight:800;color:#047857;text-transform:uppercase;">💡 Sugestão de Taxa de Deslocamento para o Orçamento</div>
+              <div id="res_valor_sugerido" style="font-size:22px;font-weight:900;color:#065f46;">R$ 0,00</div>
+              <div style="font-size:11px;color:#047857;">Margem técnica justa (combustível + desgaste + margem de segurança).</div>
+            </div>
+            <button type="button" class="btn btn-sm btn-primary" onclick="copiarOrcamentoLogistica()" style="background:#059669;border-color:#059669;padding:8px 14px;font-weight:700;">
+              📋 Copiar para Proposta
+            </button>
+          </div>
+        </div>
+
+        <div id="res_alerta_revisao" style="font-size:12px;padding:8px 12px;border-radius:6px;margin-bottom:12px;display:none;"></div>
+
+        <div class="field">
+          <label class="field-label">Observações / Notas da Rota</label>
+          <input type="text" id="calc_obs" class="field-input" placeholder="Ex: Viagem combinada com preventiva em Juazeiro; cliente aceitou taxa rateada.">
+        </div>
+      </div>
+      <div class="modal-foot" style="padding:12px 16px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="fecharModalCalculadoraLogistica()">Fechar</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="salvarReferenciaLogistica()" style="background:#059669;border-color:#059669;font-weight:700;">
+          💾 Salvar Referência Histórica
+        </button>
       </div>
     </div>
   </div>
