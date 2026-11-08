@@ -110429,8 +110429,6 @@ function fecharModalInsumosViagem() {
 
 
 
-              <button class="btn btn-primary btn-sm" onclick="abrirModalCheckinInteligente('${esc(os.id)}')" style="font-weight:700;">📍 Check-in / Horário de Chegada</button>
-              <button class="btn btn-outline btn-sm" onclick="abrirModalCalculadoraLogistica('${esc(os.id)}')" style="border-color:#059669;color:#059669;font-weight:700;" title="Calculadora Logística de Deslocamento & Precificação de Orçamento">⛽ Logística &amp; Orçamento</button>
               <button class="btn btn-outline btn-sm" onclick="acionarEncerramentoEquipamentoEmUso()" style="border-color:#d97706;color:#b45309;font-weight:600;" title="Encerrar visita: Equipamento em uso clínico">⏳ Equip. em Uso</button>
 
 
@@ -110595,24 +110593,37 @@ function fecharModalInsumosViagem() {
 
 
 
-        <!-- BANNER INTELIGENTE DE CHECK-IN PENDENTE -->
+        <!-- CARD INTERATIVO DE CHECK-IN COM HORARIO EDITAVEL -->
         ${(() => {
-          const chk = (os.checkin_hora || '').toLowerCase();
-          const pend = !chk || chk.includes('pend') || chk === '-';
-          if (!pend) return '';
+          const chk = (os.checkin_hora || '').trim();
+          const isPend = !chk || chk.toLowerCase().includes('pend') || chk === '-';
+          const horaPadrao = (new Date()).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
           return `
-            <div id="bannerCheckinAviso" style="background:#eff6ff; border:1.5px solid #3b82f6; border-radius:8px; padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-              <div style="font-size:12.5px; color:#1e40af; font-weight:700;">
-                📍 <b>Check-in Pendente:</b> Você já está no cliente/hospital? Deseja confirmar seu horário de chegada?
+            <div id="cardCheckinAtendimento" style="background:${isPend ? '#f0fdf4' : '#f8fafc'}; border:1.5px solid ${isPend ? '#16a34a' : '#cbd5e1'}; border-radius:10px; padding:12px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="width:36px; height:36px; border-radius:50%; background:${isPend ? '#dcfce7' : '#e2e8f0'}; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                  📍
+                </div>
+                <div>
+                  <div style="font-weight:800; font-size:13px; color:#0f172a;">Horário de Chegada ao Cliente (Check-in)</div>
+                  <div style="font-size:12px; margin-top:2px;">
+                    Status: <span id="lblStatusCheckinBadge" style="font-weight:800; padding:2px 8px; border-radius:12px; font-size:11.5px; ${isPend ? 'background:#fee2e2;color:#b91c1c;' : 'background:#dcfce7;color:#15803d;'}">
+                      ${esc(chk || 'Pendente')}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalCheckinInteligente('${esc(os.id)}')" style="background:#2563eb; border-color:#2563eb; font-weight:700;">
-                📍 Confirmar Chegada Agora
-              </button>
+
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <label style="font-size:12px; font-weight:700; color:#334155;">Horário Real:</label>
+                <input type="time" id="inputCheckinHoraReal" value="${horaPadrao}" class="form-control" style="font-size:15px; font-weight:800; padding:6px 10px; border:2px solid #94a3b8; border-radius:8px; width:110px; text-align:center; background:#ffffff;">
+                <button type="button" class="btn btn-sm" onclick="executarCheckinHoraDireto('${esc(os.id)}')" style="background:#16a34a; color:#ffffff; font-weight:800; padding:7px 14px; border-radius:8px; border:none; cursor:pointer;" id="btnSalvarCheckinDireto">
+                  📍 ${isPend ? 'Confirmar Check-in' : 'Atualizar Horário'}
+                </button>
+              </div>
             </div>
           `;
         })()}
-
-
 
 <div class="form-grid">
 
@@ -123505,6 +123516,94 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
       } catch(err) {
         alert("Erro no Check-in: " + err.message);
       } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = "📍 Confirmar Check-in";
+        }
+      }
+    }
+
+    async function executarCheckinHoraDireto(osId) {
+      const inp = document.getElementById("inputCheckinHoraReal");
+      const horaVal = inp ? inp.value.trim() : "";
+      const btn = document.getElementById("btnSalvarCheckinDireto");
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = "Gravando com GPS...";
+      }
+
+      let coords = { latitude: null, longitude: null, precisao_gps: null };
+      if (navigator.geolocation) {
+        try {
+          const pos = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true, timeout: 3500, maximumAge: 60000
+            });
+          });
+          if (pos && pos.coords) {
+            coords.latitude = pos.coords.latitude;
+            coords.longitude = pos.coords.longitude;
+            coords.precisao_gps = pos.coords.accuracy;
+          }
+        } catch(e){}
+      }
+
+      try {
+        const horaDisp = obterHoraLocalDispositivo();
+        const res = await apiPost("/api/checkin", {
+          os_id: osId,
+          hora_local: horaDisp,
+          hora_ajustada: horaVal,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          precisao_gps: coords.precisao_gps
+        });
+
+        if (res && res.ok === false) {
+          alert(res.msg || "Erro ao registrar check-in.");
+          if (btn) {
+            btn.disabled = false;
+            btn.innerText = "📍 Confirmar Check-in";
+          }
+          return;
+        }
+
+        const horaSalva = (res && res.checkin_hora) ? res.checkin_hora : (horaVal || horaDisp);
+
+        // Atualizar badges visuais na tela imediatamente
+        const badge = document.getElementById("lblStatusCheckinBadge");
+        if (badge) {
+          badge.innerText = `${horaSalva} (Confirmado)`;
+          badge.style.background = "#dcfce7";
+          badge.style.color = "#15803d";
+        }
+
+        const lblHeader = document.getElementById("lblCheckinHora");
+        if (lblHeader) {
+          lblHeader.innerText = horaSalva;
+        }
+
+        // Atualizar estado em memoria
+        const ordens = STATE.data?.ordens || [];
+        const osObj = ordens.find(o => String(o.id) === String(osId));
+        if (osObj) {
+          osObj.checkin_hora = horaSalva;
+          osObj.confirmado = "SIM";
+        }
+        if (STATE.osAberta) {
+          STATE.osAberta.checkin_hora = horaSalva;
+          STATE.osAberta.confirmado = "SIM";
+        }
+
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = "✓ Atualizar Horário";
+          btn.style.background = "#059669";
+        }
+
+        toastSucesso(`📍 Check-in confirmado com sucesso às ${horaSalva}!`);
+      } catch(err) {
+        alert("Erro na conexão do check-in: " + err.message);
         if (btn) {
           btn.disabled = false;
           btn.innerText = "📍 Confirmar Check-in";
