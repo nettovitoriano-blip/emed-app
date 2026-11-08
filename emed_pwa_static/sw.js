@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v55-logistica-calibrada';
+const CACHE_NAME = 'emed-pwa-v56-icones-limpos';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
