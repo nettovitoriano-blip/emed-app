@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v50-fiscal-limpo';
+const CACHE_NAME = 'emed-pwa-v51-frota-fichas';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
