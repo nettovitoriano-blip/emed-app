@@ -21,8 +21,9 @@ def gerar_mural():
     count_alertas = 0
     count_confirmados = 0
     tecnicos_agenda = {}
+    coords_clientes = {}
 
-    for _, row in df.iterrows():
+    for idx, row in df.iterrows():
         cliente = str(row.get('cliente', '')).strip()
         cidade = str(row.get('cidade', '')).strip()
         estado = str(row.get('estado', '')).strip()
@@ -68,8 +69,12 @@ def gerar_mural():
 
         # Links de navegação GPS
         query_mapa = urllib.parse.quote(f"{cliente} {endereco}")
-        link_maps = f"https://www.google.com/maps/search/?api=1&query={query_mapa}"
-        link_waze = f"https://waze.com/ul?q={query_mapa}&navigate=yes"
+        cli_key = cliente.strip().upper()
+        if cli_key in coords_clientes:
+            c_lat, c_lon = coords_clientes[cli_key]
+            link_emedcar = f"https://emed-app-6ofv.onrender.com/gps?dest={urllib.parse.quote(cliente)}&lat={c_lat}&lon={c_lon}"
+        else:
+            link_emedcar = f"https://emed-app-6ofv.onrender.com/gps?dest={urllib.parse.quote(cliente)}&query={query_mapa}"
 
         dias_restantes = (data_agend.normalize() - hoje).days
         alerta_ativo = 0 <= dias_restantes <= 15
@@ -90,7 +95,7 @@ def gerar_mural():
                 'id': str(row.get('id', idx)), 'cliente': cliente, 'cidade': cidade, 'estado': estado, 
                 'equipamento': equipamento, 'data': data_agend, 'pendencias': pendencias,
                 'endereco': endereco, 'resp': resp_cliente, 'tel': tel_cliente,
-                'maps': link_maps, 'waze': link_waze
+                'emedcar': link_emedcar
             })
 
         tag_class = "corretiva" if "corretiva" in status.lower() else ("urgente" if alerta_ativo else "preventiva")
@@ -134,8 +139,7 @@ def gerar_mural():
             texto_msg += f"👤 Responsável: {i['resp']} ({i['tel']})\n"
             texto_msg += f"⚙️ Equipamento: {i['equipamento']}\n"
             texto_msg += f"📅 Data Agendada: {d_str}\n"
-            texto_msg += f"🗺️ Google Maps: {i['maps']}\n"
-            texto_msg += f"🚗 Waze: {i['waze']}\n"
+            texto_msg += f"🚗 *@eMEDcar GPS:* {i['emedcar']}\n"
             os_id_link = i.get('id', '')
             texto_msg += f"👉 🚗 *Atender / Iniciar Rota:* https://emed-app-6ofv.onrender.com/?acao=atender&os={os_id_link}\n"
             if i['pendencias'] and i['pendencias'].lower() != "nan":
@@ -156,8 +160,7 @@ def gerar_mural():
             d_str = i['data'].strftime('%d/%m/%Y') if pd.notna(i['data']) else "-"
             despachos_tecnicos += f"""<li><b>{d_str}</b> — {i['cliente']} ({i['cidade']}) [{i['equipamento']}]<br>
                 <small>📍 {i['endereco']}<br>👤 Resp: {i['resp']} ({i['tel']}) | 
-                <a href="{i['maps']}" target="_blank">🗺️ Maps</a> | 
-                <a href="{i['waze']}" target="_blank">🚗 Waze</a></small>
+                <a href="{i['emedcar']}" target="_blank" style="color:#0284c7; font-weight:bold;">🚗 <strong>@eMEDcar GPS</strong></a></small>
             </li><br>"""
         despachos_tecnicos += f"""
             </ul>
