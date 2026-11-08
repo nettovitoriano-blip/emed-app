@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v58-5dias-tela';
+const CACHE_NAME = 'emed-pwa-v60-checkin-hora-real';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

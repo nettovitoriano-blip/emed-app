@@ -1392,7 +1392,7 @@ async def handle_index(request: web.Request) -> web.Response:
     caminho_html = os.path.join(STATIC_DIR, "index.html")
     with open(caminho_html, "r", encoding="utf-8") as f:
         conteudo = f.read()
-    return web.Response(text=conteudo, content_type="text/html", headers={"Cache-Control": "no-cache"})
+    return web.Response(text=conteudo, content_type="text/html", headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"})
 
 
 
@@ -3937,18 +3937,26 @@ async def api_checkin(request: web.Request) -> web.Response:
     if os_alvo is None:
         return web.json_response({"ok": False, "msg": f"OS #{os_id} não encontrada."}, status=404)
 
-    agora_brasil_dt = datetime.now()
+    agora_brasil_dt = obter_agora_brasil().replace(tzinfo=None)
     hoje_brasil_str = agora_brasil_dt.strftime("%d/%m/%Y")
-    agora_sistema_str = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+    agora_sistema_str = agora_brasil_dt.strftime("%d/%m/%Y %H:%M")
 
-    # Horário informado (pode ser manual/ajustado ou automático)
-    hora_informada = str(body.get("hora_ajustada") or body.get("hora_local") or "").strip()
+    # Horário informado (prioriza hora_ajustada digitada pelo técnico, ex: 13:30)
+    hora_ajustada_raw = str(body.get("hora_ajustada", "")).strip()
+    hora_local_raw = str(body.get("hora_local", "")).strip()
 
-    if hora_informada:
-        if len(hora_informada) == 5 and ":" in hora_informada:
-            hora_efetiva = f"{hoje_brasil_str} {hora_informada}"
-        elif len(hora_informada) >= 16 and "/" in hora_informada and ":" in hora_informada:
-            hora_efetiva = hora_informada[:16]
+    if hora_ajustada_raw:
+        if len(hora_ajustada_raw) == 5 and ":" in hora_ajustada_raw:
+            hora_efetiva = f"{hoje_brasil_str} {hora_ajustada_raw}"
+        elif len(hora_ajustada_raw) >= 16 and "/" in hora_ajustada_raw and ":" in hora_ajustada_raw:
+            hora_efetiva = hora_ajustada_raw[:16]
+        else:
+            hora_efetiva = agora_sistema_str
+    elif hora_local_raw:
+        if len(hora_local_raw) >= 16 and "/" in hora_local_raw and ":" in hora_local_raw:
+            hora_efetiva = hora_local_raw[:16]
+        elif len(hora_local_raw) == 5 and ":" in hora_local_raw:
+            hora_efetiva = f"{hoje_brasil_str} {hora_local_raw}"
         else:
             hora_efetiva = agora_sistema_str
     else:
@@ -3960,7 +3968,7 @@ async def api_checkin(request: web.Request) -> web.Response:
         if dt_checkin > agora_brasil_dt + timedelta(minutes=5):
             return web.json_response({
                 "ok": False,
-                "msg": f"Horário inválido: {dt_checkin.strftime('%H:%M')} está no futuro. O horário de chegada deve ser anterior ou igual ao momento atual."
+                "msg": f"Horário inválido: {dt_checkin.strftime('%H:%M')} está no futuro. O horário de chegada deve ser anterior ou igual ao momento atual ({agora_brasil_dt.strftime('%H:%M')})."
             }, status=400)
     except Exception as e:
         dt_checkin = agora_brasil_dt
@@ -3996,6 +4004,7 @@ async def api_checkin(request: web.Request) -> web.Response:
     df.at[idx_alvo, "checkin_hora"] = hora_efetiva
     df.at[idx_alvo, "confirmado"] = "SIM"
     _salvar_df_direto(df)
+    invalidar_cache_bootstrap()
 
     # 4. Atualizar GPS do equipamento se fornecido
     lat = body.get("latitude")
@@ -4061,69 +4070,7 @@ async def api_checkin(request: web.Request) -> web.Response:
 
 
 
-async def api_checkin(request: web.Request) -> web.Response:
 
-
-
-    body = await request.json()
-
-
-
-    os_id = str(body.get("os_id", "")).strip()
-
-
-
-    df = _carregar_df_direto()
-
-
-
-    # Prioriza o horário local do celular/dispositivo do técnico (UTC-3 Brasil)
-
-    hora_cliente = str(body.get("hora_local", "")).strip()
-
-    if hora_cliente and len(hora_cliente) >= 16 and "/" in hora_cliente and ":" in hora_cliente:
-
-        agora_str = hora_cliente
-
-    else:
-
-        agora_str = obter_agora_brasil_str("%d/%m/%Y %H:%M")
-
-
-
-
-
-
-
-    for idx, row in df.iterrows():
-
-
-
-        if str(obter_id_os(idx, row)) == os_id:
-
-
-
-            df.at[idx, "checkin_hora"] = agora_str
-
-
-
-            df.at[idx, "confirmado"] = "SIM"
-
-
-
-            _salvar_df_direto(df)
-
-
-
-            return web.json_response({"ok": True, "checkin_hora": agora_str, "msg": f"📍 Check-in registrado na OS #{os_id} às {agora_str}!"})
-
-
-
-
-
-
-
-    return web.json_response({"ok": False, "msg": f"OS #{os_id} não encontrada."}, status=404)
 
 
 

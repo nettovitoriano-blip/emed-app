@@ -110472,29 +110472,37 @@ function fecharModalInsumosViagem() {
 
         <!-- CARD INTERATIVO DE CHECK-IN COM HORARIO EDITAVEL -->
         ${(() => {
-          const chk = (os.checkin_hora || '').trim();
-          const isPend = !chk || chk.toLowerCase().includes('pend') || chk === '-';
-          const horaPadrao = (new Date()).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          const chkRaw = (val('checkin_hora') || os.checkin_hora || '').toString().trim();
+          const isPend = !chkRaw || chkRaw.toLowerCase().includes('pend') || chkRaw === '-' || chkRaw.toLowerCase() === 'nan' || chkRaw.toLowerCase() === 'null' || chkRaw.toLowerCase() === 'none';
+          
+          let horaPadrao = (new Date()).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          if (!isPend && chkRaw) {
+            const partes = chkRaw.split(' ');
+            const horaSo = partes.length > 1 ? partes[1] : partes[0];
+            if (horaSo && horaSo.length >= 5 && horaSo.includes(':')) {
+              horaPadrao = horaSo.substring(0, 5);
+            }
+          }
           return `
-            <div id="cardCheckinAtendimento" style="background:${isPend ? '#f0fdf4' : '#f8fafc'}; border:1.5px solid ${isPend ? '#16a34a' : '#cbd5e1'}; border-radius:10px; padding:12px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div id="cardCheckinAtendimento" style="background:${isPend ? '#eff6ff' : '#f0fdf4'}; border:1.5px solid ${isPend ? '#3b82f6' : '#16a34a'}; border-radius:10px; padding:12px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
               <div style="display:flex; align-items:center; gap:10px;">
-                <div style="width:36px; height:36px; border-radius:50%; background:${isPend ? '#dcfce7' : '#e2e8f0'}; display:flex; align-items:center; justify-content:center; font-size:18px;">
+                <div style="width:38px; height:38px; border-radius:50%; background:${isPend ? '#dbeafe' : '#dcfce7'}; display:flex; align-items:center; justify-content:center; font-size:18px;">
                   📍
                 </div>
                 <div>
-                  <div style="font-weight:800; font-size:13px; color:#0f172a;">Horário de Chegada ao Cliente (Check-in)</div>
+                  <div style="font-weight:800; font-size:13.5px; color:#0f172a;">Horário Real de Chegada (Check-in no Cliente)</div>
                   <div style="font-size:12px; margin-top:2px;">
-                    Status: <span id="lblStatusCheckinBadge" style="font-weight:800; padding:2px 8px; border-radius:12px; font-size:11.5px; ${isPend ? 'background:#fee2e2;color:#b91c1c;' : 'background:#dcfce7;color:#15803d;'}">
-                      ${esc(chk || 'Pendente')}
+                    Status: <span id="lblStatusCheckinBadge" style="font-weight:800; padding:2px 10px; border-radius:12px; font-size:12px; ${isPend ? 'background:#fee2e2;color:#b91c1c;' : 'background:#dcfce7;color:#15803d;'}">
+                      ${esc(isPend ? 'Pendente' : chkRaw + ' (Confirmado)')}
                     </span>
                   </div>
                 </div>
               </div>
 
               <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <label style="font-size:12px; font-weight:700; color:#334155;">Horário Real:</label>
-                <input type="time" id="inputCheckinHoraReal" value="${horaPadrao}" class="form-control" style="font-size:15px; font-weight:800; padding:6px 10px; border:2px solid #94a3b8; border-radius:8px; width:110px; text-align:center; background:#ffffff;">
-                <button type="button" class="btn btn-sm" onclick="executarCheckinHoraDireto('${esc(os.id)}')" style="background:#16a34a; color:#ffffff; font-weight:800; padding:7px 14px; border-radius:8px; border:none; cursor:pointer;" id="btnSalvarCheckinDireto">
+                <label style="font-size:12.5px; font-weight:800; color:#334155;">Horário Real:</label>
+                <input type="time" id="inputCheckinHoraReal" value="${horaPadrao}" class="form-control" style="font-size:15px; font-weight:800; padding:6px 10px; border:2px solid #94a3b8; border-radius:8px; width:115px; text-align:center; background:#ffffff;">
+                <button type="button" class="btn btn-sm" onclick="executarCheckinHoraDireto('${esc(os.id)}')" style="background:${isPend ? '#2563eb' : '#16a34a'}; color:#ffffff; font-weight:800; padding:8px 16px; border-radius:8px; border:none; cursor:pointer;" id="btnSalvarCheckinDireto">
                   📍 ${isPend ? 'Confirmar Check-in' : 'Atualizar Horário'}
                 </button>
               </div>
@@ -123445,7 +123453,7 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
           return;
         }
 
-        const horaSalva = (res && res.checkin_hora) ? res.checkin_hora : (horaVal || horaDisp);
+        const horaSalva = (res && res.checkin_hora) ? res.checkin_hora : (horaVal ? `08/11/2026 ${horaVal}` : horaDisp);
 
         // Atualizar badges visuais na tela imediatamente
         const badge = document.getElementById("lblStatusCheckinBadge");
@@ -123460,7 +123468,13 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
           lblHeader.innerText = horaSalva;
         }
 
-        // Atualizar estado em memoria
+        const cardBox = document.getElementById("cardCheckinAtendimento");
+        if (cardBox) {
+          cardBox.style.background = "#f0fdf4";
+          cardBox.style.borderColor = "#16a34a";
+        }
+
+        // Atualizar estado em memoria e no cofre de rascunho
         const ordens = STATE.data?.ordens || [];
         const osObj = ordens.find(o => String(o.id) === String(osId));
         if (osObj) {
@@ -123471,11 +123485,18 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
           STATE.osAberta.checkin_hora = horaSalva;
           STATE.osAberta.confirmado = "SIM";
         }
+        try {
+          const rKey = `emed_draft_${osId}`;
+          const dr = JSON.parse(localStorage.getItem(rKey) || '{}');
+          dr.checkin_hora = horaSalva;
+          dr.confirmado = "SIM";
+          localStorage.setItem(rKey, JSON.stringify(dr));
+        } catch(e){}
 
         if (btn) {
           btn.disabled = false;
           btn.innerText = "✓ Atualizar Horário";
-          btn.style.background = "#059669";
+          btn.style.background = "#16a34a";
         }
 
         toastSucesso(`📍 Check-in confirmado com sucesso às ${horaSalva}!`);
