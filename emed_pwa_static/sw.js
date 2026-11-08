@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v63-autosave-icon';
+const CACHE_NAME = 'emed-pwa-v64-modalidades-dinamicas';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

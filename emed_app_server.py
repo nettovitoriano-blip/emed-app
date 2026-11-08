@@ -4689,6 +4689,8 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
     tipo_srv = limpar_texto(body.get("tipo_servico"), limpar_texto(row_os.get("tipo_servico"), "CORRETIVA")).upper()
+    if "CALIB" in tipo_srv:
+        tipo_srv = "AFERIÇÃO"
 
 
 
@@ -11498,7 +11500,8 @@ def criar_app() -> web.Application:
 
 
 
-    app.router.add_get("/api/logo-circle", "/api/icone-autosave", handle_logo_circle)
+    app.router.add_get("/api/logo-circle", handle_logo_circle)
+    app.router.add_get("/api/icone-autosave", handle_icone_autosave)
 
 
 

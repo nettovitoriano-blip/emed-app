@@ -70741,7 +70741,7 @@ function renderizarNavegacao() {
 
 
 
-                <option value="CALIBRACAO">CALIBRAÇÃO / TESTE DE SEGURANÇA</option>
+                <option value="AFERICAO">AFERIÇÃO TÉCNICA & AJUSTE OPERACIONAL</option>
 
 
 
@@ -111029,70 +111029,11 @@ function fecharModalInsumosViagem() {
 
 
 
-            <select id="osTipoSrv" class="select" onchange="carregarChecklistModal();autoSalvarRascunho();">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              ${["PREVENTIVA","CORRETIVA","CALIBRAÇÃO","INSTALAÇÃO","TREINAMENTO"].map(tp => `<option value="${tp}" ${tipoSrvAtual.includes(tp)?'selected':''}>${tp}</option>`).join("")}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+            <select id="osTipoSrv" class="select" onchange="aoMudarModalidadeServico(this.value);autoSalvarRascunho();">
+              ${["PREVENTIVA","CORRETIVA","AFERIÇÃO","INSTALAÇÃO","TREINAMENTO"].map(tp => {
+                const sel = (tipoSrvAtual.toUpperCase() === tp) || (tp === 'AFERIÇÃO' && tipoSrvAtual.toUpperCase().includes('CALIB'));
+                return `<option value="${tp}" ${sel ? 'selected' : ''}>${tp}</option>`;
+              }).join("")}
             </select>
 
 
@@ -111525,7 +111466,7 @@ function fecharModalInsumosViagem() {
 
 
 
-              <span class="badge ativo">Preventiva Escalonada</span>
+              <span class="badge ativo" id="badgeModalidadeChecklist">Preventiva Escalonada</span>
 
 
 
@@ -111558,10 +111499,7 @@ function fecharModalInsumosViagem() {
 
 
           <!-- SELETOR DE MÓDULOS DA PREVENTIVA -->
-
-
-
-          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;background:#f1f5f9;padding:4px;border-radius:8px;">
+          <div id="containerModulosPreventiva" style="display:none;gap:4px;flex-wrap:wrap;margin-bottom:10px;background:#f1f5f9;padding:4px;border-radius:8px;">
 
 
 
@@ -117307,114 +117245,202 @@ function fecharModalInsumosViagem() {
 
 
 
-    function carregarChecklistModal() {
-
-
-
+        function carregarChecklistModal() {
       if (!STATE.osAberta) return;
-
-
-
       const os = STATE.osAberta;
-
-
-
-      const tipoSrv = (document.getElementById("osTipoSrv")?.value || os.tipo_servico || "PREVENTIVA").toUpperCase();
-
-
+      let tipoSrv = (document.getElementById("osTipoSrv")?.value || os.tipo_servico || "PREVENTIVA").toUpperCase().trim();
+      if (tipoSrv.includes("CALIB")) tipoSrv = "AFERIÇÃO";
 
       const box = document.getElementById("boxChecklistSugestoes");
-
-
-
       if (!box) return;
 
-
-
-
-
-
-
       const eq = (os.equipamento || "").toUpperCase();
+      const isTomo = eq.includes("TOMO") || eq.includes("BRIGHT") || eq.includes("BRIVO") || eq.includes("CT") || eq.includes("OPTIMA") || eq.includes("SOMATOM");
+      const isRx = eq.includes("RX") || eq.includes("RAIO") || eq.includes("LOTUS") || eq.includes("ALTUS") || eq.includes("VMI") || eq.includes("SHIMADZU") || eq.includes("SIEMENS");
+      const isMamo = eq.includes("MAMO") || eq.includes("MM") || eq.includes("CRYSTAL") || eq.includes("SENOGRAPHE") || eq.includes("HOLOGIC");
 
-
-
-
-
-
-
-      // SE FOR PREVENTIVA: CARREGA ESTRUTURA MODULAR
-
-
-
-      if (tipoSrv.includes("PREVENTIVA")) {
-
-
-
-        if (typeof atualizarEstilosBotoesModulosPrev === "function") atualizarEstilosBotoesModulosPrev();
-
-
-
-        const modDef = BANCO_PREVENTIVA_MODULAR[STATE_MODULO_PREV] || BANCO_PREVENTIVA_MODULAR.MODULO_1;
-
-
-
-        ITENS_PREV_EDITAVEIS = modDef.itens.map(txt => ({ texto: txt.toUpperCase(), checked: true }));
-
-
-
-        renderizarItensChecklistEditaveis();
-
-
-
-        return;
-
-
-
+      // 1. Atualizar Badge Visual da Modalidade
+      const badge = document.getElementById("badgeModalidadeChecklist");
+      if (badge) {
+        if (tipoSrv.includes("TREIN")) {
+          badge.innerText = "🎓 Treinamento Operacional";
+          badge.style.background = "#eff6ff";
+          badge.style.color = "#1d4ed8";
+        } else if (tipoSrv.includes("CORRET")) {
+          badge.innerText = "🛠️ Manutenção Corretiva";
+          badge.style.background = "#fef2f2";
+          badge.style.color = "#b91c1c";
+        } else if (tipoSrv.includes("AFERI") || tipoSrv.includes("CALIB")) {
+          badge.innerText = "📐 Aferição & Ajuste Técnico";
+          badge.style.background = "#fefce8";
+          badge.style.color = "#854d0e";
+        } else if (tipoSrv.includes("INSTAL")) {
+          badge.innerText = "🏗️ Instalação & Comissionamento";
+          badge.style.background = "#f0fdf4";
+          badge.style.color = "#15803d";
+        } else {
+          badge.innerText = isTomo ? "🛡️ Preventiva Escalonada" : "🛡️ Preventiva Periódica";
+          badge.style.background = "#f0fdf4";
+          badge.style.color = "#166534";
+        }
       }
 
+      // 2. Controlar abas de Módulos (Gantry/Console/QDF) - Apenas se for Tomógrafo + Preventiva
+      const containerModulos = document.getElementById("containerModulosPreventiva");
+      if (containerModulos) {
+        if (tipoSrv.includes("PREVENTIVA") && isTomo) {
+          containerModulos.style.display = "flex";
+        } else {
+          containerModulos.style.display = "none";
+        }
+      }
 
-
-
-
-
-
-      // OUTROS TIPOS (CORRETIVA, CALIBRAÇÃO):
-
-
-
-      let chave = "PADRAO";
-
-
-
-      if (eq.includes("RX") || eq.includes("RAIO") || eq.includes("LOTUS") || eq.includes("ALTUS") || eq.includes("VMI")) chave = "RX";
-
-
-
-      else if (eq.includes("TOMO") || eq.includes("BRIGHT") || eq.includes("BRIVO") || eq.includes("CT")) chave = "TOMO";
-
-
-
-      else if (eq.includes("MAMO") || eq.includes("MM")) chave = "MAMO";
-
-
-
-
-
-
-
-      const itens = BANCO_CHECKLIST_IMEDIATO[chave] || BANCO_CHECKLIST_IMEDIATO.PADRAO;
-
-
-
-      ITENS_PREV_EDITAVEIS = itens.map((item, idx) => ({ texto: item.toUpperCase(), checked: idx < 3 }));
-
-
+      // 3. Carregar Checklist Técnico Especializado por Modalidade
+      if (tipoSrv.includes("TREIN")) {
+        const itens = [
+          "Instrução operacional de liga/desliga seguro e rotina de warm-up do tubo",
+          "Treinamento no console de comando: seleção de técnicas (kV, mA, tempo/mAs)",
+          "Procedimentos de radioproteção: uso de EPIs plumbíferos e intertravamentos de porta",
+          "Orientações de colimação e posicionamento correto para redução de dose",
+          "Rotinas de higienização, cuidados com o receptor/painel e conservação mecânica",
+          "Simulação prática de exames e esclarecimento de dúvidas da equipe técnica"
+        ];
+        ITENS_PREV_EDITAVEIS = itens.map(t => ({ texto: t.toUpperCase(), checked: true }));
+      } else if (tipoSrv.includes("CORRET")) {
+        const itens = [
+          "Reprodução e confirmação da anomalia / código de erro relatado pelo cliente",
+          "Inspeção técnica e medição de tensões de alimentação, fontes e barramentos",
+          "Isolamento da falha: teste de placas, circuitos de comando, acionadores e cabos",
+          "Substituição / reparo do componente defeituoso e reaperto de conexões",
+          "Teste funcional de carga com simulação de exposição radiográfica",
+          "Verificação de estabilidade térmica, ruído, calibração pós-reparo e liberação"
+        ];
+        ITENS_PREV_EDITAVEIS = itens.map(t => ({ texto: t.toUpperCase(), checked: true }));
+      } else if (tipoSrv.includes("AFERI") || tipoSrv.includes("CALIB")) {
+        const itens = [
+          "Aferição da exatidão e reprodutibilidade da tensão de pico (kVp)",
+          "Aferição da exatidão do tempo de exposição (ms / s)",
+          "Aferição do produto corrente-tempo e linearidade de rendimento (mA / mAs)",
+          "Teste de repetibilidade da taxa de kerma no ar e camada semirredutora (HVL)",
+          "Alinhamento e coincidência do campo de luz do colimador com feixe de raios-X",
+          "Verificação do aterramento e fuga de carcaça conforme normas de radioproteção",
+          "Ajuste fino de calibração eletrônica e emissão de relatório de aferição técnica"
+        ];
+        ITENS_PREV_EDITAVEIS = itens.map(t => ({ texto: t.toUpperCase(), checked: true }));
+      } else if (tipoSrv.includes("INSTAL")) {
+        const itens = [
+          "Inspeção das condições da sala: infraestrutura elétrica, refrigeração e baritação",
+          "Desembalagem, conferência física de peças e integridade dos componentes",
+          "Ancoragem mecânica da estativa, trilhos, mesa de exames e coluna porta-tubo",
+          "Passagem de cabeamento e interligação com aterramento hospitalar exclusivo",
+          "Conexão do gerador de alta tensão, PDU e console de comando",
+          "Ajustes de nivelamento, alinhamento óptico do colimador e balanceamento",
+          "Primeiro aquecimento do tubo (degas/warm-up), disparos de teste e comissionamento",
+          "Entrega técnica formal e assinatura do termo de aceite de instalação"
+        ];
+        ITENS_PREV_EDITAVEIS = itens.map(t => ({ texto: t.toUpperCase(), checked: true }));
+      } else {
+        // PREVENTIVA
+        if (isTomo) {
+          if (typeof atualizarEstilosBotoesModulosPrev === "function") atualizarEstilosBotoesModulosPrev();
+          const modDef = BANCO_PREVENTIVA_MODULAR[STATE_MODULO_PREV] || BANCO_PREVENTIVA_MODULAR.MODULO_1;
+          ITENS_PREV_EDITAVEIS = modDef.itens.map(txt => ({ texto: txt.toUpperCase(), checked: true }));
+        } else if (isRx) {
+          const itens = [
+            "Inspeção geral da estativa, mesa de exames e cabeçote monobloco",
+            "Checagem do estado dos cabos de alta tensão e aterramento de carcaça",
+            "Revisão dos freios mecânicos/eletromagnéticos e contra-pesos de elevação",
+            "Verificação da lâmpada, espelho, trilhos e diafragma do colimador luminoso",
+            "Limpeza interna de poeira e resíduos com aspirador ESD antiestático",
+            "Disparos de teste operacionais em diversas técnicas e liberação clínica"
+          ];
+          ITENS_PREV_EDITAVEIS = itens.map(t => ({ texto: t.toUpperCase(), checked: true }));
+        } else if (isMamo) {
+          const itens = [
+            "Inspeção mecânica do braço C (movimentos angulares, freios e travas)",
+            "Verificação do sistema de compressão automática e descompressão de emergência",
+            "Inspeção das pás de compressão (sem trincas, folgas ou deformações)",
+            "Checagem de cabos de alta tensão, aterramento e filtros de feixe (Mo/Rh/Ag)",
+            "Limpeza técnica, higienização dos detectores e testes de disparo",
+            "Equipamento aprovado e liberado para uso mamográfico normal"
+          ];
+          ITENS_PREV_EDITAVEIS = itens.map(t => ({ texto: t.toUpperCase(), checked: true }));
+        } else {
+          const itens = [
+            "Inspeção física e integridade estrutural do chassi, estativa e suportes",
+            "Checagem da integridade dos cabos de alimentação e aterramento de proteção",
+            "Limpeza técnica interna e externa com remoção de poeira e resíduos",
+            "Reaperto de parafusos, bornes elétricos e conectores de sinal",
+            "Testes de funcionalidade geral, comandos do painel e intertravamentos",
+            "Equipamento testado, aprovado e liberado para operação clínica"
+          ];
+          ITENS_PREV_EDITAVEIS = itens.map(t => ({ texto: t.toUpperCase(), checked: true }));
+        }
+      }
 
       renderizarItensChecklistEditaveis();
+    }
 
+    function aoMudarModalidadeServico(novaMod) {
+      if (!novaMod) novaMod = document.getElementById("osTipoSrv")?.value || "";
+      let modUpper = String(novaMod).toUpperCase().trim();
+      if (modUpper.includes("CALIB")) modUpper = "AFERIÇÃO";
 
+      // 1. Atualizar o checklist e badges visuais
+      carregarChecklistModal();
 
+      // 2. Atualizar textos sugeridos nos campos técnicos se forem padrão ou estiverem vazios
+      const elDefeito = document.getElementById("osDefeito");
+      const elDiag = document.getElementById("osDiagnostico");
+      const elServ = document.getElementById("osServicos");
+
+      const defVal = (elDefeito?.value || "").trim().toUpperCase();
+      const diagVal = (elDiag?.value || "").trim().toUpperCase();
+      const servVal = (elServ?.value || "").trim().toUpperCase();
+
+      const ehTextoPadraoOuVazio = (txt) => {
+        if (!txt) return true;
+        return txt.startsWith("SUGESTÃO:") || 
+               txt.startsWith("MANUTENÇÃO PREVENTIVA") ||
+               txt.startsWith("TREINAMENTO OPERACIONAL") ||
+               txt.startsWith("AFERIÇÃO E AJUSTE") ||
+               txt.startsWith("INSTALAÇÃO TÉCNICA") ||
+               txt.startsWith("INSPEÇÃO PREVENTIVA") ||
+               txt.startsWith("CAPACITAÇÃO TÉCNICA") ||
+               txt.startsWith("AVALIAÇÃO DE PARÂMETROS") ||
+               txt.startsWith("MONTAGEM MECÂNICA") ||
+               txt.startsWith("MINISTRADO TREINAMENTO") ||
+               txt.startsWith("REALIZADA AFERIÇÃO") ||
+               txt.startsWith("REALIZADA MONTAGEM") ||
+               txt.startsWith("REALIZADA MANUTENÇÃO PREVENTIVA") ||
+               txt.startsWith("LIMPEZA TÉCNICA, TESTE FUNCIONAL") ||
+               txt.startsWith("DESCREVA AQUI");
+      };
+
+      if (modUpper.includes("TREIN")) {
+        if (elDefeito && ehTextoPadraoOuVazio(defVal)) elDefeito.value = "TREINAMENTO OPERACIONAL E CAPACITAÇÃO DA EQUIPE CLÍNICA";
+        if (elDiag && ehTextoPadraoOuVazio(diagVal)) elDiag.value = "CAPACITAÇÃO TÉCNICA E OPERACIONAL DOS USUÁRIOS DO EQUIPAMENTO.";
+        if (elServ && ehTextoPadraoOuVazio(servVal)) elServ.value = "MINISTRADO TREINAMENTO OPERACIONAL COMPLETO PARA A EQUIPE TÉCNICA/OPERADORES: ROTINAS DE LIGA/DESLIGA, WARM-UP DO TUBO, SELEÇÃO DE TÉCNICAS RADIOLÓGICAS, NORMAS DE SEGURANÇA E PROTOCOLOS DE OPERAÇÃO DO EQUIPAMENTO.";
+      } else if (modUpper.includes("CORRET")) {
+        if (elDefeito && ehTextoPadraoOuVazio(defVal)) elDefeito.value = "";
+        if (elDiag && ehTextoPadraoOuVazio(diagVal)) elDiag.value = "DIAGNÓSTICO TÉCNICO: DETECTADA ANOMALIA EM CIRCUITO / COMPONENTE DURANTE AVALIAÇÃO EM CAMPO.";
+        if (elServ && ehTextoPadraoOuVazio(servVal)) elServ.value = "DESMONTAGEM TÉCNICA, LOCALIZAÇÃO DA CAUSA RAIZ, SUBSTITUIÇÃO / REPARO DO COMPONENTE, TESTES DE CARGA E LIBERAÇÃO PARA USO NORMAL.";
+      } else if (modUpper.includes("AFERI") || modUpper.includes("CALIB")) {
+        if (elDefeito && ehTextoPadraoOuVazio(defVal)) elDefeito.value = "AFERIÇÃO E AJUSTE PERIÓDICO DE PARÂMETROS RADIOLÓGICOS / TÉCNICOS";
+        if (elDiag && ehTextoPadraoOuVazio(diagVal)) elDiag.value = "AVALIAÇÃO DE PARÂMETROS OPERACIONAIS: AFERIÇÃO DE EXATIDÃO E REPETIBILIDADE.";
+        if (elServ && ehTextoPadraoOuVazio(servVal)) elServ.value = "REALIZADA AFERIÇÃO TÉCNICA E AJUSTES DE PARÂMETROS OPERACIONAIS (kV, mA, TEMPO DE EXPOSIÇÃO E COLIMAÇÃO) COM INSTRUMENTOS PADRÃO. PARÂMETROS AJUSTADOS E DENTRO DAS NORMAS TÉCNICAS.";
+      } else if (modUpper.includes("INSTAL")) {
+        if (elDefeito && ehTextoPadraoOuVazio(defVal)) elDefeito.value = "INSTALAÇÃO TÉCNICA, MONTAGEM E COMISSIONAMENTO DE EQUIPAMENTO";
+        if (elDiag && ehTextoPadraoOuVazio(diagVal)) elDiag.value = "MONTAGEM MECÂNICA, INTERLIGAÇÃO ELÉTRICA E COMISSIONAMENTO INICIAL.";
+        if (elServ && ehTextoPadraoOuVazio(servVal)) elServ.value = "REALIZADA MONTAGEM MECÂNICA, FIXAÇÃO DE ESTATIVA/MESA, PASSAGEM DE CABOS, CONEXÃO DE ATERRAMENTO, TESTES DE ISOLAMENTO, CONFIGURAÇÃO DE PARÂMETROS E ENTREGA TÉCNICA AO CLIENTE.";
+      } else {
+        // PREVENTIVA
+        if (elDefeito && ehTextoPadraoOuVazio(defVal)) elDefeito.value = "MANUTENÇÃO PREVENTIVA PERIÓDICA PROGRAMADA";
+        if (elDiag && ehTextoPadraoOuVazio(diagVal)) elDiag.value = "INSPEÇÃO PREVENTIVA: EQUIPAMENTO OPERACIONAL, SEM FALHAS CRÍTICAS DETECTADAS.";
+        if (elServ && ehTextoPadraoOuVazio(servVal)) elServ.value = "LIMPEZA TÉCNICA, LUBRIFICAÇÃO, REAPERTO MECÂNICO, TESTES ELÉTRICOS, CHECAGEM DE ATERRAMENTO E VERIFICAÇÃO DE SEGURANÇA OPERACIONAL CONFORME PROTOCOLO.";
+      }
+
+      if (typeof autoSalvarRascunho === "function") autoSalvarRascunho();
     }
 
 

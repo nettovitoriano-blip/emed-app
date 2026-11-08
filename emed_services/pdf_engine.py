@@ -526,7 +526,7 @@ def vincular_it_ao_equipamento(equipamento_nome: str, tipo_servico: str = "", ba
         # SHIMADZU MOBILDART
         (
             ["SHIMADZU", "MOBILEDART", "MX8", "MX9"],
-            "IT_RXM_SHIM_006_Protocolo_Geral_Calibracao_FVR_Baterias_Colimador_FPD_MX8_MX9.md" if "CALIBRA" in srv_upper else "IT_RXM_SHIM_004_Roteiro_Mestre_Instalacao_Comissionamento_31_Passos_MX8_MX9.md",
+            "IT_RXM_SHIM_006_Protocolo_Geral_Calibracao_FVR_Baterias_Colimador_FPD_MX8_MX9.md" if ("CALIBRA" in srv_upper or "AFERI" in srv_upper) else "IT_RXM_SHIM_004_Roteiro_Mestre_Instalacao_Comissionamento_31_Passos_MX8_MX9.md",
             "Video_IT_RXM_SHIM002_Calibracao_Manopla_Sensor_Braco_MX8.mp4"
         ),
         # LOTUS HF500M
