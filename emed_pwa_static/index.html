@@ -73062,8 +73062,11 @@ function renderizarNavegacao() {
               </div>
             </div>
 
-            <!-- AÇÕES RÁPIDAS WHATSAPP -->
+            <!-- AÇÕES RÁPIDAS WHATSAPP & AUDITORIA DE CONTRATOS -->
             <div style="border-top:1px solid #1e293b;padding-top:10px;display:flex;flex-direction:column;gap:6px;margin-top:auto;">
+              <button class="btn btn-sm" onclick="abrirPainelRentabilidadeContratos()" style="background:linear-gradient(90deg, #1e3a8a, #0369a1);color:#fff;border:1px solid #38bdf8;font-weight:800;font-size:11px;padding:7px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:6px;cursor:pointer;">
+                📊 Rentabilidade Contratos (LogAudit)
+              </button>
               <button class="btn btn-sm" onclick="interativaDispararWhatsAppTecnico()" style="background:#22c55e;color:#fff;border:none;font-weight:800;font-size:11px;padding:7px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:6px;">
                 📲 Zap Técnico
               </button>
@@ -123808,6 +123811,33 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
         mostrarToast(`📍 Check-in confirmado com sucesso às ${horaSalva}!`);
       } catch(err) {
+        console.warn("Falha de rede no check-in, acionando Modo Viagem:", err);
+        if (typeof EmedModoViagem !== 'undefined') {
+          const horaSalvaOffline = horaVal ? `08/11/2026 ${horaVal}` : (typeof obterHoraLocalDispositivo === 'function' ? obterHoraLocalDispositivo() : 'Horário Gravado');
+          await EmedModoViagem.salvarAcao('CHECKIN', '/api/checkin', {
+            os_id: osId,
+            hora_local: typeof obterHoraLocalDispositivo === 'function' ? obterHoraLocalDispositivo() : '',
+            hora_ajustada: horaVal,
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            precisao_gps: coords.precisao_gps
+          }, `Check-in OS #${osId} (${horaVal || 'agora'})`);
+
+          const badge = document.getElementById("lblStatusCheckinBadge");
+          if (badge) {
+            badge.innerText = `${horaSalvaOffline} (Modo Viagem Blindado)`;
+            badge.style.background = "#fef3c7";
+            badge.style.color = "#b45309";
+          }
+          const lblHeader = document.getElementById("lblCheckinHora");
+          if (lblHeader) lblHeader.innerText = horaSalvaOffline;
+          if (btn) {
+            btn.disabled = false;
+            btn.innerText = "✓ Salvo Offline (Modo Viagem)";
+            btn.style.background = "#0284c7";
+          }
+          return;
+        }
         alert("Erro na conexão do check-in: " + err.message);
         if (btn) {
           btn.disabled = false;

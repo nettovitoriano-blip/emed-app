@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v65-whatsapp-preinstalacao';
+const CACHE_NAME = 'emed-pwa-v66-credenciamento-portaria-e-telemetria-tubo';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
