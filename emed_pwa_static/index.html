@@ -111206,80 +111206,9 @@ function fecharModalInsumosViagem() {
 
 
 
-              <button class="btn btn-primary btn-sm" onclick="registrarCheckinOS('${esc(os.id)}')">📍 Check-in Manual</button>
-
-
-
-              <button class="btn btn-outline btn-sm" onclick="iniciarRotaTecnico('${esc(os.id)}')" style="border-color:#2563eb;color:#2563eb;font-weight:600;" title="Iniciar rota para este equipamento">🚗 Iniciar Rota</button>
+              <button class="btn btn-primary btn-sm" onclick="abrirModalCheckinInteligente('${esc(os.id)}')" style="font-weight:700;">📍 Check-in / Horário de Chegada</button>
               <button class="btn btn-outline btn-sm" onclick="abrirModalCalculadoraLogistica('${esc(os.id)}')" style="border-color:#059669;color:#059669;font-weight:700;" title="Calculadora Logística de Deslocamento & Precificação de Orçamento">⛽ Logística &amp; Orçamento</button>
-
-
-
               <button class="btn btn-outline btn-sm" onclick="acionarEncerramentoEquipamentoEmUso()" style="border-color:#d97706;color:#b45309;font-weight:600;" title="Encerrar visita: Equipamento em uso clínico">⏳ Equip. em Uso</button>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <button class="btn btn-outline btn-sm" onclick="abrirVisualizadorLaudo('${esc(os.id)}')">📄 Ver PDF</button>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <a class="btn btn-primary btn-sm" href="/api/imprimir/${encodeURIComponent(os.id)}" target="_blank" style="background:#0f766e;border-color:#0f766e;">🖨️ Imprimir A4</a>
 
 
 
@@ -111443,187 +111372,22 @@ function fecharModalInsumosViagem() {
 
 
 
-        <!-- HISTÓRICO DAS ÚLTIMAS 2 INTERVENÇÕES & ALERTA DE PENDÊNCIAS ANTERIORES -->
-
-
-
+        <!-- BANNER INTELIGENTE DE CHECK-IN PENDENTE -->
         ${(() => {
-
-
-
-          const ultimas = obterHistoricoUltimasOS(os);
-
-
-
-          if (!ultimas.length) return '';
-
-
-
-          const temPend = ultimas.some(u => u.pendencia_limpa || (u.status || '').toUpperCase().includes('OBSERV') || (u.status || '').toUpperCase().includes('PECA'));
-
-
-
+          const chk = (os.checkin_hora || '').toLowerCase();
+          const pend = !chk || chk.includes('pend') || chk === '-';
+          if (!pend) return '';
           return `
-
-
-
-            <div style="background:${temPend ? '#fffbeb' : '#f0fdf4'}; border:1.5px solid ${temPend ? '#f59e0b' : '#86efac'}; border-radius:8px; padding:10px 12px; margin-bottom:12px;">
-
-
-
-              <div style="font-weight:900; font-size:12.5px; color:${temPend ? '#b45309' : '#166534'}; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:4px;">
-
-
-
-                <span>${temPend ? '⚠️ ATENÇÃO: PENDÊNCIA ANTERIOR DETECTADA NESTE EQUIPAMENTO' : '📜 Histórico das Últimas 2 Intervenções no Equipamento'}</span>
-
-
-
-                <span style="font-size:11px;font-weight:600;">Equipamento: ${esc(os.equipamento)}</span>
-
-
-
+            <div id="bannerCheckinAviso" style="background:#eff6ff; border:1.5px solid #3b82f6; border-radius:8px; padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+              <div style="font-size:12.5px; color:#1e40af; font-weight:700;">
+                📍 <b>Check-in Pendente:</b> Você já está no cliente/hospital? Deseja confirmar seu horário de chegada?
               </div>
-
-
-
-              <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px;">
-
-
-
-                ${ultimas.map(u => `
-
-
-
-                  <div style="background:#ffffff; border:1px solid ${temPend ? '#fde68a' : '#bbf7d0'}; border-radius:6px; padding:6px 10px; font-size:11.5px;">
-
-
-
-                    <div style="display:flex; justify-content:space-between; font-weight:700; color:#1e293b;">
-
-
-
-                      <span>OS #${u.id} • ${esc(u.tipo_servico || 'Intervenção')} (${esc(u.data_agendamento || 'Data anterior')})</span>
-
-
-
-                      <span style="color:#64748b;">Técnico: ${esc(u.tecnico_responsavel)}</span>
-
-
-
-                    </div>
-
-
-
-                    ${u.pendencia_limpa ? `
-
-
-
-                      <div style="color:#b45309; font-weight:800; margin-top:2px; background:#fef3c7; padding:3px 6px; border-radius:4px;">
-
-
-
-                        🚨 PENDÊNCIA REGISTRADA: "${esc(u.pendencia_limpa)}" (Validar se foi sanada!)
-
-
-
-                      </div>
-
-
-
-                    ` : `
-
-
-
-                      <div style="color:#15803d; font-size:11px; margin-top:1px;">
-
-
-
-                        ✅ Concluída sem pendências em aberto.
-
-
-
-                      </div>
-
-
-
-                    `}
-
-
-
-                  </div>
-
-
-
-                `).join('')}
-
-
-
-              </div>
-
-
-
+              <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalCheckinInteligente('${esc(os.id)}')" style="background:#2563eb; border-color:#2563eb; font-weight:700;">
+                📍 Confirmar Chegada Agora
+              </button>
             </div>
-
-
-
           `;
-
-
-
         })()}
-
-
-
-
-
-
-
-        <!-- REQUISIÇÃO DE KITS / FERRAMENTAS PARA ESTA INTERVENÇÃO -->
-
-
-
-        <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-
-
-
-          <div>
-
-
-
-            <div style="font-weight:800; font-size:12.5px; color:#0f172a;">🧰 Ferramentas & Kits de Intervenção Necessários</div>
-
-
-
-            <div id="statusSeparacaoKit" style="font-size:11px; color:#475569; margin-top:2px;">
-
-
-
-              Kit sugerido: <b>${esc(val('instrumentos_materiais', os.instrumentos_materiais || 'KIT PADRÃO CALIBRAÇÃO / PREVENTIVA'))}</b>
-
-
-
-            </div>
-
-
-
-          </div>
-
-
-
-          <button type="button" class="btn btn-outline btn-sm" onclick="solicitarSeparacaoKitFerramentas('${esc(os.id)}', '${esc(val('instrumentos_materiais', os.instrumentos_materiais || 'KIT CALIBRAÇÃO & MANUTENÇÃO'))}')" style="border-color:#0284c7;color:#0284c7;font-weight:700;">
-
-
-
-            📦 Solicitar Separação ao Almoxarifado
-
-
-
-          </button>
-
-
-
-        </div>
 
 
 
@@ -116268,6 +116032,12 @@ function fecharModalInsumosViagem() {
 
 
           </button>
+          <button type="button" class="btn btn-outline" onclick="abrirVisualizadorLaudo('${esc(os.id)}')" style="border-color:#64748b;color:#334155;font-weight:700;padding:10px 14px;" title="Visualizar prévia do laudo em PDF">
+            📄 Ver PDF
+          </button>
+          <a class="btn btn-outline" href="/api/imprimir/${encodeURIComponent(os.id)}" target="_blank" style="border-color:#0f766e;color:#0f766e;font-weight:700;padding:10px 14px;display:inline-flex;align-items:center;text-decoration:none;" title="Imprimir laudo em formato A4">
+            🖨️ Imprimir A4
+          </a>
 
 
 
@@ -124480,7 +124250,90 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
-    async function registrarCheckinOS(osId, isAuto = false) {
+    function abrirModalCheckinInteligente(osId) {
+      const ordens = STATE.data?.ordens || [];
+      const os = ordens.find(o => String(o.id) === String(osId)) || {};
+      const horaAtual = (new Date()).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      
+      const modalId = "modalCheckinInteligenteEMED";
+      let el = document.getElementById(modalId);
+      if (!el) {
+        el = document.createElement("div");
+        el.id = modalId;
+        el.className = "modal";
+        document.body.appendChild(el);
+      }
+      
+      el.innerHTML = `
+        <div class="modal-box" style="max-width:440px; padding:22px; border-radius:12px; border:2px solid #3b82f6; background:#ffffff;">
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:10px; margin-bottom:14px;">
+            <div style="font-weight:900; font-size:16px; color:#1e3a8a; display:flex; align-items:center; gap:6px;">
+              📍 Confirmação de Chegada / Check-in
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('${modalId}').classList.remove('modal-open')" style="font-size:16px;">✕</button>
+          </div>
+          
+          <div style="font-size:12.5px; color:#334155; margin-bottom:14px; background:#f8fafc; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+            <div><b>OS:</b> #${esc(os.id || osId)}</div>
+            <div><b>Cliente / Hospital:</b> ${esc(os.cliente || 'Hospital')}</div>
+            <div><b>Equipamento:</b> ${esc(os.equipamento || 'Aparelho')}</div>
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <label style="font-size:12.5px; font-weight:800; color:#0f172a; display:block; margin-bottom:6px;">
+              ⏰ A que horas você chegou ao cliente?
+            </label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="time" id="inputHoraChegadaReal" value="${horaAtual}" class="form-control" style="font-size:17px; font-weight:800; padding:8px 12px; border:2px solid #cbd5e1; border-radius:8px; width:140px; text-align:center;">
+              <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('inputHoraChegadaReal').value = '${horaAtual}'" style="font-size:11.5px; font-weight:700;">
+                ⏱️ Agora (${horaAtual})
+              </button>
+            </div>
+            <div style="font-size:11px; color:#64748b; margin-top:6px; line-height:1.4;">
+              💡 <i>Edite o horário caso já esteja no cliente há mais tempo (ex: chegou às 13:30). O sistema audita os horários para fins fiscais e trabalhistas.</i>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-top:18px;">
+            <button type="button" class="btn btn-outline" onclick="document.getElementById('${modalId}').classList.remove('modal-open')" style="flex:1;">
+              Cancelar
+            </button>
+            <button type="button" id="btnConfirmarCheckinExec" class="btn btn-primary" onclick="confirmarCheckinComHora('${esc(os.id || osId)}')" style="flex:2; background:#2563eb; border-color:#2563eb; font-weight:800; padding:10px;">
+              📍 Confirmar Check-in
+            </button>
+          </div>
+        </div>
+      `;
+      el.classList.add("modal-open");
+    }
+
+    async function confirmarCheckinComHora(osId) {
+      const inputHora = document.getElementById("inputHoraChegadaReal");
+      const horaVal = inputHora ? inputHora.value.trim() : "";
+      
+      const btn = document.getElementById("btnConfirmarCheckinExec");
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = "Registrando com GPS...";
+      }
+      
+      try {
+        await registrarCheckinOS(osId, false, horaVal);
+        const modal = document.getElementById("modalCheckinInteligenteEMED");
+        if (modal) modal.classList.remove("modal-open");
+        const aviso = document.getElementById("bannerCheckinAviso");
+        if (aviso) aviso.style.display = "none";
+      } catch(err) {
+        alert("Erro no Check-in: " + err.message);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = "📍 Confirmar Check-in";
+        }
+      }
+    }
+
+    async function registrarCheckinOS(osId, isAuto = false, horaAjustada = null) {
       const horaDisp = obterHoraLocalDispositivo();
       let coords = { latitude: null, longitude: null, precisao_gps: null };
 
@@ -124509,6 +124362,7 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
       const res = await apiPost("/api/checkin", {
         os_id: osId,
         hora_local: horaDisp,
+        hora_ajustada: horaAjustada,
         latitude: coords.latitude,
         longitude: coords.longitude,
         precisao_gps: coords.precisao_gps,
@@ -124521,6 +124375,13 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
+      if (res && res.ok === false) {
+        alert(res.msg || "Erro ao registrar check-in.");
+        return;
+      }
+      if (res && res.msg) {
+        toastSucesso(res.msg);
+      }
       const horaSalva = (res && res.checkin_hora) ? res.checkin_hora : horaDisp;
 
 

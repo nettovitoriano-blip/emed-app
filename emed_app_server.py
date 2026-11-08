@@ -3888,6 +3888,152 @@ async def api_iniciar_rota(request: web.Request) -> web.Response:
 
 
 async def api_checkin(request: web.Request) -> web.Response:
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
+
+    os_id = str(body.get("os_id", "")).strip()
+    if not os_id:
+        return web.json_response({"ok": False, "msg": "ID da OS não informado."}, status=400)
+
+    df = _carregar_df_direto()
+    os_alvo = None
+    idx_alvo = None
+    for idx, row in df.iterrows():
+        if str(obter_id_os(idx, row)) == os_id:
+            os_alvo = row
+            idx_alvo = idx
+            break
+
+    if os_alvo is None:
+        return web.json_response({"ok": False, "msg": f"OS #{os_id} não encontrada."}, status=404)
+
+    agora_brasil_dt = datetime.now()
+    hoje_brasil_str = agora_brasil_dt.strftime("%d/%m/%Y")
+    agora_sistema_str = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+
+    # Horário informado (pode ser manual/ajustado ou automático)
+    hora_informada = str(body.get("hora_ajustada") or body.get("hora_local") or "").strip()
+
+    if hora_informada:
+        if len(hora_informada) == 5 and ":" in hora_informada:
+            hora_efetiva = f"{hoje_brasil_str} {hora_informada}"
+        elif len(hora_informada) >= 16 and "/" in hora_informada and ":" in hora_informada:
+            hora_efetiva = hora_informada[:16]
+        else:
+            hora_efetiva = agora_sistema_str
+    else:
+        hora_efetiva = agora_sistema_str
+
+    # 1. Validação de Não-Futuro
+    try:
+        dt_checkin = datetime.strptime(hora_efetiva, "%d/%m/%Y %H:%M")
+        if dt_checkin > agora_brasil_dt + timedelta(minutes=5):
+            return web.json_response({
+                "ok": False,
+                "msg": f"Horário inválido: {dt_checkin.strftime('%H:%M')} está no futuro. O horário de chegada deve ser anterior ou igual ao momento atual."
+            }, status=400)
+    except Exception as e:
+        dt_checkin = agora_brasil_dt
+        hora_efetiva = agora_sistema_str
+
+    tecnico_alvo = str(os_alvo.get("tecnico_responsavel", "")).strip().upper()
+    cliente_alvo = str(os_alvo.get("cliente", "")).strip()
+
+    # 2. Validação Anti-Ubiquidade (Técnico não pode estar em dois locais ao mesmo tempo)
+    if tecnico_alvo:
+        for idx_outra, row_outra in df.iterrows():
+            if str(obter_id_os(idx_outra, row_outra)) == os_id:
+                continue
+            tec_outra = str(row_outra.get("tecnico_responsavel", "")).strip().upper()
+            if tec_outra == tecnico_alvo:
+                chk_outra = str(row_outra.get("checkin_hora", "")).strip()
+                if chk_outra and chk_outra.lower() != "pendente" and len(chk_outra) >= 16:
+                    try:
+                        dt_outra = datetime.strptime(chk_outra[:16], "%d/%m/%Y %H:%M")
+                        if dt_outra.date() == dt_checkin.date():
+                            dif_minutos = abs((dt_checkin - dt_outra).total_seconds()) / 60.0
+                            if dif_minutos < 15:
+                                cliente_outro = str(row_outra.get("cliente", "Outro Atendimento")).strip()
+                                id_outro = str(obter_id_os(idx_outra, row_outra))
+                                return web.json_response({
+                                    "ok": False,
+                                    "msg": f"⚠️ Conflito de Horário / Duplicação: O técnico {tecnico_alvo} já registrou check-in às {dt_outra.strftime('%H:%M')} na OS #{id_outro} ({cliente_outro}). Para compliance fiscal e trabalhista, o técnico não pode estar em dois hospitais ao mesmo tempo."
+                                }, status=400)
+                    except Exception:
+                        pass
+
+    # 3. Atualizar no DataFrame
+    df.at[idx_alvo, "checkin_hora"] = hora_efetiva
+    df.at[idx_alvo, "confirmado"] = "SIM"
+    _salvar_df_direto(df)
+
+    # 4. Atualizar GPS do equipamento se fornecido
+    lat = body.get("latitude")
+    lon = body.get("longitude")
+    if lat is not None and lon is not None:
+        try:
+            with get_db_connection(DB_NAME) as conn_sq:
+                cur = conn_sq.cursor()
+                equip_nome = str(os_alvo.get("equipamento", "")).strip()
+                if equip_nome and cliente_alvo:
+                    cur.execute("""
+                        UPDATE clientes_equipamentos
+                        SET latitude = ?, longitude = ?
+                        WHERE UPPER(cliente) = ? AND UPPER(equipamento) = ?
+                    """, (float(lat), float(lon), cliente_alvo.upper(), equip_nome.upper()))
+                    conn_sq.commit()
+        except Exception:
+            pass
+
+    # 5. Auditoria Fiscal & Governança (Rastreabilidade de Horário)
+    try:
+        from emed_services.auditoria_fiscal import registrar_evento_auditoria_fiscal
+        dif_retroativa = int(abs((agora_brasil_dt - dt_checkin).total_seconds()) / 60.0)
+        status_conf = "CONFORME" if dif_retroativa <= 120 else "ALERTA"
+        score_conf = 100 if dif_retroativa <= 60 else (90 if dif_retroativa <= 120 else 75)
+        
+        dados_ant = {"hora_sistema_registro": agora_sistema_str}
+        dados_nov = {
+            "hora_checkin_declarada": hora_efetiva,
+            "minutos_retroativos": dif_retroativa,
+            "gps_latitude": lat,
+            "gps_longitude": lon,
+            "cliente": cliente_alvo,
+            "equipamento": str(os_alvo.get("equipamento", ""))
+        }
+        
+        motivo = f"Check-in realizado pelo técnico {tecnico_alvo}. Chegada informada: {hora_efetiva}."
+        if dif_retroativa > 15:
+            motivo += f" (Horário ajustado pelo técnico: chegada real há {dif_retroativa} min antes do registro no app)."
+
+        registrar_evento_auditoria_fiscal(
+            tipo_evento="CHECKIN_ATENDIMENTO",
+            numero_nf=f"OS-{os_id}",
+            usuario=tecnico_alvo or "TECNICO",
+            dados_anteriores=dados_ant,
+            dados_novos=dados_nov,
+            status_conformidade=status_conf,
+            score_conformidade=score_conf,
+            motivo_observacao=motivo,
+            os_id=os_id,
+            db_path=DB_NAME
+        )
+    except Exception:
+        pass
+
+    return web.json_response({
+        "ok": True,
+        "checkin_hora": hora_efetiva,
+        "msg": f"📍 Check-in confirmado na OS #{os_id} às {hora_efetiva}!"
+    })
+
+
+
+
+
+async def api_checkin(request: web.Request) -> web.Response:
 
 
 
