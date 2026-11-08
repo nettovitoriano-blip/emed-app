@@ -7,11 +7,16 @@ Responsável por:
 - Gerar histórico estruturado (Diff Antes vs Depois) para compliance e governança.
 """
 
+import os
 import json
 import sqlite3
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
-from emed_services.repositories import DB_NAME, get_db_connection
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_NAME = os.path.join(_BASE_DIR, "emed.db")
+
+def get_db_connection(db_path=None):
+    return sqlite3.connect(db_path or DB_NAME, timeout=10.0)
 
 
 def avaliar_conformidade_fiscal(
