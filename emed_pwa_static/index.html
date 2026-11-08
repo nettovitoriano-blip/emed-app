@@ -19648,37 +19648,24 @@
 
     .tv-kpi .num { font-size: 28px; font-weight: 900; }
 
-    /* EMED INTERATIVA - CALENDÁRIO & TRELLO (5 DIAS EXATOS NA TELA) */
-    .tv-kpi .num { font-size: 20px; font-weight: 900; }
-    .tv-kpi { padding: 8px 10px; }
+    /* DASHBOARD OPERACIONAL & CRONOGRAMA INTERATIVO */
+    .tv-kpi .num { font-size: 18px; font-weight: 900; }
+    .tv-kpi { padding: 6px 10px; }
 
-    .interativa-layout-container {
+    .interativa-top-panel {
+      background: #0b1120;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 12px 18px;
+      max-width: 1100px;
+      width: 100%;
+      margin: 0 auto 12px auto;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
       display: flex;
-      gap: 12px;
-      align-items: stretch;
-      min-height: calc(100vh - 120px);
+      flex-direction: column;
+      gap: 10px;
     }
-    @media (max-width: 900px) {
-      .interativa-layout-container {
-        flex-direction: column;
-      }
-      .interativa-sidebar {
-        width: 100% !important;
-        max-width: 100% !important;
-      }
-    }
-    .interativa-sidebar-kpi {
-      cursor: pointer;
-      padding: 8px 10px;
-      border-radius: 8px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      transition: all 0.15s ease;
-    }
-    .interativa-sidebar-kpi:hover {
-      transform: translateX(2px);
-    }
+
     .interativa-kanban-board {
       display: flex;
       gap: 8px;
@@ -19687,23 +19674,37 @@
       align-items: flex-start;
       scrollbar-width: thin;
       scrollbar-color: #38bdf8 #0f172a;
-      flex: 1;
-      height: 100%;
     }
-    .interativa-kanban-board::-webkit-scrollbar {
-      height: 6px;
+    .interativa-kanban-board.modo-todas {
+      flex-wrap: wrap;
+      overflow-x: hidden;
+      overflow-y: auto;
+      justify-content: flex-start;
+      gap: 8px;
+      scrollbar-color: #38bdf8 #0f172a;
     }
-    .interativa-kanban-board::-webkit-scrollbar-track {
-      background: #0f172a;
-      border-radius: 4px;
+    .interativa-kanban-board.modo-todas .interativa-col {
+      flex: 0 0 calc((100% - 32px) / 5);
+      min-width: 180px;
+      max-width: 260px;
+      margin-bottom: 8px;
     }
-    .interativa-kanban-board::-webkit-scrollbar-thumb {
-      background: #334155;
-      border-radius: 4px;
+    @media (max-width: 1100px) {
+      .interativa-kanban-board.modo-todas .interativa-col {
+        flex: 0 0 calc((100% - 24px) / 4);
+      }
     }
-    .interativa-kanban-board::-webkit-scrollbar-thumb:hover {
-      background: #38bdf8;
+    @media (max-width: 860px) {
+      .interativa-kanban-board.modo-todas .interativa-col {
+        flex: 0 0 calc((100% - 16px) / 2);
+      }
     }
+    @media (max-width: 550px) {
+      .interativa-kanban-board.modo-todas .interativa-col {
+        flex: 0 0 100%;
+      }
+    }
+
     .interativa-col {
       flex: 0 0 calc((100% - 32px) / 5);
       min-width: 185px;
@@ -19712,7 +19713,7 @@
       border: 1px solid #1e293b;
       display: flex;
       flex-direction: column;
-      max-height: calc(100vh - 125px);
+      max-height: calc(100vh - 220px);
       box-shadow: 0 4px 14px rgba(0,0,0,0.3);
     }
     @media (max-width: 1080px) {
@@ -19758,6 +19759,9 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.25);
       transition: all 0.15s ease;
       cursor: pointer;
+    }
+    .interativa-card.card-compacto {
+      padding: 6px 8px;
     }
     .interativa-card:hover {
       border-color: #38bdf8;
@@ -72769,7 +72773,7 @@ function renderizarNavegacao() {
       return dtStr;
     }
 
-    function renderCardInterativo(o, pendentes, listaTecnicos) {
+    function renderCardInterativo(o, pendentes, listaTecnicos, ehModoTodas = false) {
       const st = (o.status || "").toUpperCase();
       let corBorda = "#38bdf8";
       let badgeCor = "#0284c7";
@@ -72787,7 +72791,8 @@ function renderizarNavegacao() {
       const pendencia = o.pendencia_limpa || o.defeito_relatado || o.servico_executado || "";
       let pendenciaCurta = "";
       if (pendencia) {
-        pendenciaCurta = esc(pendencia.length > 130 ? pendencia.slice(0, 126) + "..." : pendencia);
+        const maxLen = ehModoTodas ? 85 : 130;
+        pendenciaCurta = esc(pendencia.length > maxLen ? pendencia.slice(0, maxLen - 3) + "..." : pendencia);
       }
 
       // Sugestão de Rota Unificada em cidades do interior no raio até 180 km
@@ -72798,52 +72803,52 @@ function renderizarNavegacao() {
       const tecsOpts = listaTecnicos || [];
 
       return `
-        <div class="interativa-card" style="border-left: 3px solid ${corBorda};" onclick="abrirModalOS('${esc(o.id)}')">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <span style="font-weight:900;color:#38bdf8;font-size:11.5px;">OS #${esc(o.id)}</span>
-            <span style="background:${badgeCor};color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;">${badgeTxt}</span>
-          </div>
-          <div style="font-weight:800;font-size:11.5px;color:#f8fafc;line-height:1.2;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(o.cliente || '')}">${esc(o.cliente || "CLIENTE NÃO INFORMADO")}</div>
-          <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:3px;">
-            <span style="background:#0f172a;border:1px solid #334155;color:#38bdf8;font-size:9.5px;font-weight:700;padding:1px 4px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">🔬 ${esc(o.equipamento || "N/A")}</span>
-            <span style="font-size:9.5px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">📍 ${esc(o.cidade || "CE")}</span>
+        <div class="interativa-card ${ehModoTodas ? 'card-compacto' : ''}" style="border-left: 4px solid ${corBorda};" onclick="abrirModalOS('${esc(o.id)}')">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+            <span style="font-weight:900;color:#38bdf8;font-size:${ehModoTodas ? '11px' : '11.5px'};">OS #${esc(o.id)}</span>
+            ${ehModoTodas ? `
+              <span style="font-size:9px;color:${corBorda};font-weight:800;letter-spacing:0.3px;">● ${badgeTxt.replace(/^[🔴🔵🟠]\s*/, '')}</span>
+            ` : `
+              <span style="background:${badgeCor};color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;">${badgeTxt}</span>
+            `}
           </div>
 
-          <!-- SELEÇÃO RÁPIDA DE TÉCNICO PARA DEFINIÇÃO EM REUNIÃO -->
-          <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;" onclick="event.stopPropagation();">
-            <span style="font-size:9.5px;font-weight:800;color:#94a3b8;">👤 Téc:</span>
-            <select class="form-control" style="background:#0f172a;color:#67e8f9;border:1px solid #334155;font-weight:800;font-size:10px;padding:2px 4px;height:auto;border-radius:4px;flex:1;min-width:0;" onchange="interativaAtribuirTecnicoOS('${esc(o.id)}', this.value)">
+          <div style="font-weight:800;font-size:${ehModoTodas ? '11px' : '11.5px'};color:#f8fafc;line-height:1.2;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(o.cliente || '')}">${esc(o.cliente || "CLIENTE NÃO INFORMADO")}</div>
+
+          <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:3px;">
+            <span style="background:#0f172a;border:1px solid #334155;color:#38bdf8;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">🔬 ${esc(o.equipamento || "N/A")}</span>
+            <span style="font-size:9px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">📍 ${esc(o.cidade || "CE")}</span>
+          </div>
+
+          <!-- SELEÇÃO RÁPIDA DE TÉCNICO -->
+          <div style="display:flex;align-items:center;gap:3px;margin-bottom:3px;" onclick="event.stopPropagation();">
+            <span style="font-size:9px;font-weight:800;color:#94a3b8;">👤 Téc:</span>
+            <select class="form-control" style="background:#0f172a;color:#67e8f9;border:1px solid #334155;font-weight:800;font-size:9.5px;padding:2px 3px;height:auto;border-radius:4px;flex:1;min-width:0;" onchange="interativaAtribuirTecnicoOS('${esc(o.id)}', this.value)">
               <option value="A DEFINIR" ${!o.tecnico_responsavel || o.tecnico_responsavel === 'A DEFINIR' ? 'selected' : ''}>A DEFINIR</option>
               ${tecsOpts.map(t => `<option value="${t}" ${(o.tecnico_responsavel||'').toUpperCase() === t ? 'selected' : ''}>${t}</option>`).join("")}
             </select>
-            <span style="font-size:9.5px;color:#cbd5e1;flex-shrink:0;">${dataAg}</span>
+            <span style="font-size:9px;color:#cbd5e1;flex-shrink:0;">${dataAg}</span>
           </div>
 
-          ${clienteExigeCredenciamentoPortaria(o.cliente) ? `
-            <div style="background:${o.credenciamento_enviado === 'SIM' ? 'rgba(22, 101, 52, 0.35)' : 'rgba(180, 83, 9, 0.35)'};border:1px solid ${o.credenciamento_enviado === 'SIM' ? '#16a34a' : '#f59e0b'};border-radius:4px;padding:2px 5px;font-size:9px;color:${o.credenciamento_enviado === 'SIM' ? '#86efac' : '#fde047'};margin-bottom:3px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="event.stopPropagation();interativaAbrirModalCredenciamentoPortaria('${esc(o.id)}', '${esc(o.tecnico_responsavel)}')">
-              <span>🛡️ Portaria: ${o.credenciamento_enviado === 'SIM' ? '✅ Credenciado' : '⚠️ Enviar Doc'}</span>
-              <span style="text-decoration:underline;font-size:8.5px;">${o.credenciamento_enviado === 'SIM' ? 'Ver' : 'Liberar'}</span>
-            </div>
-          ` : ''}
-
           ${temRotaSugerida ? `
-            <div style="background:linear-gradient(90deg, #1e1b4b, #312e81);border:1px solid #6366f1;border-radius:4px;padding:3px 6px;margin-bottom:3px;font-size:9.5px;display:flex;align-items:center;gap:4px;cursor:pointer;" onclick="event.stopPropagation();abrirModalRotaUnificada('${esc(o.id)}', '${esc(sugRota.os.id)}')" title="Aproveitar viagem e unificar atendimento">
+            <div style="background:linear-gradient(90deg, #1e1b4b, #312e81);border:1px solid #6366f1;border-radius:4px;padding:2px 5px;margin-bottom:3px;font-size:9px;display:flex;align-items:center;gap:3px;cursor:pointer;" onclick="event.stopPropagation();abrirModalRotaUnificada('${esc(o.id)}', '${esc(sugRota.os.id)}')" title="Aproveitar viagem e unificar atendimento">
               <span style="font-weight:700;color:#fde047;">💡 Rota (~${sugRota.distanciaKm}km):</span>
-              <span style="color:#a5f3fc;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">${esc(sugRota.os.cliente)} (OS #${sugRota.os.id})</span>
+              <span style="color:#a5f3fc;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;">${esc(sugRota.os.cliente)}</span>
             </div>
           ` : ''}
 
           ${pendenciaCurta ? `
-            <div style="background:#0b1120;border:1px dashed #334155;border-radius:4px;padding:3px 5px;font-size:9.5px;color:#fde047;line-height:1.25;margin-bottom:3px;">
+            <div style="background:#0b1120;border:1px dashed #334155;border-radius:4px;padding:3px 5px;font-size:9px;color:#fde047;line-height:1.25;margin-bottom:3px;">
               ⚠️ ${pendenciaCurta}
             </div>
           ` : ''}
 
+          <!-- BOTÕES DE AÇÃO DO CARD -->
           <div style="display:flex;gap:3px;margin-top:4px;" onclick="event.stopPropagation();">
-            <button class="btn btn-primary btn-xs" style="flex:1;padding:3px 4px;font-size:9px;border-radius:3px;white-space:nowrap;font-weight:700;" onclick="abrirModalOS('${esc(o.id)}')" title="Abrir e Executar OS">⚡ Executar</button>
-            <button class="btn btn-outline btn-xs" style="border-color:#0284c7;color:#38bdf8;padding:3px 5px;font-size:9px;border-radius:3px;white-space:nowrap;font-weight:700;" onclick="abrirVisualizadorLaudo('${esc(o.id)}')" title="Ver Laudo / Relatório em PDF">📄 Relatório</button>
-            <button class="btn btn-outline btn-xs" style="border-color:#38bdf8;color:#38bdf8;padding:3px 4px;font-size:9px;border-radius:3px;white-space:nowrap;font-weight:700;" onclick="iniciarRotaTecnico('${esc(o.id)}')" title="Traçar rota no mapa">🗺️ Rota</button>
-            <button class="btn btn-xs" style="background:#22c55e;color:#fff;border:none;padding:3px 5px;font-size:9px;border-radius:3px;white-space:nowrap;font-weight:800;" onclick="interativaDispararZapOS('${esc(o.id)}')" title="Enviar Relatório no WhatsApp">💬 Zap</button>
+            <button class="btn btn-primary btn-xs" style="flex:1;padding:${ehModoTodas ? '2px 3px;font-size:8.5px;' : '3px 4px;font-size:9px;'}border-radius:3px;white-space:nowrap;font-weight:700;" onclick="abrirModalOS('${esc(o.id)}')" title="Abrir e Executar OS">⚡ Exec</button>
+            <button class="btn btn-outline btn-xs" style="border-color:#0284c7;color:#38bdf8;padding:${ehModoTodas ? '2px 4px;font-size:8.5px;' : '3px 5px;font-size:9px;'}border-radius:3px;white-space:nowrap;font-weight:700;" onclick="abrirVisualizadorLaudo('${esc(o.id)}')" title="Ver Laudo / Relatório em PDF">📄 PDF</button>
+            <button class="btn btn-outline btn-xs" style="border-color:#38bdf8;color:#38bdf8;padding:${ehModoTodas ? '2px 3px;font-size:8.5px;' : '3px 4px;font-size:9px;'}border-radius:3px;white-space:nowrap;font-weight:700;" onclick="iniciarRotaTecnico('${esc(o.id)}')" title="Traçar rota no mapa">🗺️</button>
+            <button class="btn btn-xs" style="background:#22c55e;color:#fff;border:none;padding:${ehModoTodas ? '2px 4px;font-size:8.5px;' : '3px 5px;font-size:9px;'}border-radius:3px;white-space:nowrap;font-weight:800;" onclick="interativaDispararZapOS('${esc(o.id)}')" title="Enviar Relatório no WhatsApp">💬</button>
           </div>
         </div>
       `;
@@ -72855,6 +72860,8 @@ function renderizarNavegacao() {
       if (!STATE.interativaVisao) STATE.interativaVisao = "CALENDARIO"; // 'CALENDARIO' ou 'TRELLO_TECNICOS'
       if (!STATE.filtroTV) STATE.filtroTV = "TODAS";
       if (!STATE.interativaFiltroDias) STATE.interativaFiltroDias = "SEG_A_SEX"; // 'SEG_A_SEX' ou 'TODOS'
+
+      const ehModoTodas = STATE.interativaFiltroDias === "TODOS";
 
       const pendentes = (d.ordens || []).filter(o => {
         const st = (o.status || "").toUpperCase();
@@ -72889,10 +72896,10 @@ function renderizarNavegacao() {
       let kanbanHtml = "";
       if (filtradas.length === 0) {
         kanbanHtml = `
-          <div style="background:#0b1120;border:1px solid #1e293b;border-radius:12px;padding:36px;text-align:center;color:#94a3b8;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <div style="background:#0b1120;border:1px solid #1e293b;border-radius:12px;padding:36px;text-align:center;color:#94a3b8;margin:20px auto;max-width:500px;">
             <div style="font-size:36px;margin-bottom:8px;">✅</div>
             <div style="font-size:16px;font-weight:700;color:#f8fafc;">Nenhum chamado encontrado para este filtro</div>
-            <div style="font-size:13px;color:#64748b;margin-top:4px;">Altere o técnico selecionado ou o status na barra lateral para visualizar outros chamados.</div>
+            <div style="font-size:13px;color:#64748b;margin-top:4px;">Altere o técnico selecionado ou o status no painel superior para visualizar outros chamados.</div>
           </div>
         `;
       } else if (STATE.interativaVisao === "CALENDARIO") {
@@ -72921,7 +72928,7 @@ function renderizarNavegacao() {
           }
         }
 
-        kanbanHtml = `<div class="interativa-kanban-board">`;
+        kanbanHtml = `<div class="interativa-kanban-board ${ehModoTodas ? 'modo-todas' : ''}">`;
         datasOrdenadas.forEach(dt => {
           const chamadosDia = gruposData[dt];
           chamadosDia.sort((a, b) => {
@@ -72941,12 +72948,12 @@ function renderizarNavegacao() {
                   </div>
                   <div style="font-size:9.5px;color:#94a3b8;margin-top:1px;">${chamadosDia.length} chamado(s) alocado(s)</div>
                 </div>
-                <button class="btn btn-xs" onclick="interativaDispararWhatsAppDia('${dt}')" title="Disparar escala deste dia no WhatsApp" style="background:#22c55e;color:#fff;border:none;padding:2px 5px;font-size:9.5px;border-radius:3px;font-weight:700;">
-                  📲 Zap Dia
+                <button class="btn btn-xs" onclick="interativaDispararWhatsAppDia('${dt}')" title="Disparar escala deste dia no WhatsApp" style="background:#22c55e;color:#fff;border:none;padding:2px 5px;font-size:9px;border-radius:3px;font-weight:700;">
+                  📲 Zap
                 </button>
               </div>
               <div class="interativa-col-body">
-                ${chamadosDia.map(o => renderCardInterativo(o, pendentes, listaTecnicos)).join("")}
+                ${chamadosDia.map(o => renderCardInterativo(o, pendentes, listaTecnicos, ehModoTodas)).join("")}
               </div>
             </div>
           `;
@@ -72962,7 +72969,7 @@ function renderizarNavegacao() {
 
         const tecsOrdenados = Object.keys(gruposTec).sort();
 
-        kanbanHtml = `<div class="interativa-kanban-board">`;
+        kanbanHtml = `<div class="interativa-kanban-board ${ehModoTodas ? 'modo-todas' : ''}">`;
         tecsOrdenados.forEach(tKey => {
           const chamadosTec = gruposTec[tKey];
           chamadosTec.sort((a, b) => String(a.data_agendamento || "").localeCompare(String(b.data_agendamento || "")));
@@ -72976,12 +72983,12 @@ function renderizarNavegacao() {
                   </div>
                   <div style="font-size:9.5px;color:#94a3b8;margin-top:1px;">${chamadosTec.length} chamado(s) atribuído(s)</div>
                 </div>
-                <button class="btn btn-xs" onclick="interativaDispararWhatsAppTecnico('${tKey}')" title="Disparar escala deste técnico no WhatsApp" style="background:#22c55e;color:#fff;border:none;padding:2px 5px;font-size:9.5px;border-radius:3px;font-weight:700;">
-                  📲 Zap Escala
+                <button class="btn btn-xs" onclick="interativaDispararWhatsAppTecnico('${tKey}')" title="Disparar escala deste técnico no WhatsApp" style="background:#22c55e;color:#fff;border:none;padding:2px 5px;font-size:9px;border-radius:3px;font-weight:700;">
+                  📲 Zap
                 </button>
               </div>
               <div class="interativa-col-body">
-                ${chamadosTec.map(o => renderCardInterativo(o, pendentes, listaTecnicos)).join("")}
+                ${chamadosTec.map(o => renderCardInterativo(o, pendentes, listaTecnicos, ehModoTodas)).join("")}
               </div>
             </div>
           `;
@@ -72990,13 +72997,14 @@ function renderizarNavegacao() {
       }
 
       box.innerHTML = `
-        <div class="interativa-layout-container">
-          <!-- BARRA VERTICAL NA LATERAL ESQUERDA -->
-          <aside class="interativa-sidebar" style="width:250px;min-width:230px;max-width:265px;background:#0b1120;border:1px solid #1e293b;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,0.35);">
+        <div style="display:flex;flex-direction:column;gap:12px;padding:4px 0;">
+          
+          <!-- PAINEL SUPERIOR CENTRALIZADO -->
+          <div class="interativa-top-panel">
             
-            <!-- TÍTULO DO PAINEL -->
-            <div>
-              <div style="font-size:15px;font-weight:900;color:#38bdf8;display:flex;align-items:center;gap:6px;">
+            <!-- TÍTULO CENTRALIZADO -->
+            <div style="text-align:center;">
+              <div style="font-size:16px;font-weight:900;color:#38bdf8;display:inline-flex;align-items:center;gap:6px;">
                 📊 PAINEL OPERACIONAL
               </div>
               <div style="font-size:11px;color:#94a3b8;margin-top:2px;">
@@ -73004,83 +73012,81 @@ function renderizarNavegacao() {
               </div>
             </div>
 
-            <!-- KPIS DE STATUS VERTICAIS -->
-            <div style="display:flex;flex-direction:column;gap:6px;">
-              <div class="interativa-sidebar-kpi" onclick="STATE.filtroTV='TODAS';renderMenuGesTV(document.getElementById('mainContainer'))" style="background:${STATE.filtroTV==='TODAS'?'#1e293b':'#0f172a'};border:1px solid ${STATE.filtroTV==='TODAS'?'#38bdf8':'#1e293b'};">
-                <span style="font-size:11px;color:#94a3b8;font-weight:700;">TOTAL EM ABERTO</span>
+            <!-- 4 KPIS HORIZONTAIS CENTRALIZADOS -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:8px;max-width:920px;width:100%;margin:0 auto;">
+              <div class="interativa-kpi-pill" onclick="STATE.filtroTV='TODAS';renderMenuGesTV(document.getElementById('mainContainer'))" style="cursor:pointer;padding:7px 12px;border-radius:8px;background:${STATE.filtroTV==='TODAS'?'#1e293b':'#0f172a'};border:1px solid ${STATE.filtroTV==='TODAS'?'#38bdf8':'#1e293b'};display:flex;justify-content:space-between;align-items:center;transition:all 0.15s ease;">
+                <span style="font-size:10px;color:#94a3b8;font-weight:700;">TOTAL EM ABERTO</span>
                 <span style="color:#fff;font-size:16px;font-weight:900;">${pendentes.length}</span>
               </div>
-              <div class="interativa-sidebar-kpi" onclick="STATE.filtroTV='CRITICA';renderMenuGesTV(document.getElementById('mainContainer'))" style="background:${STATE.filtroTV==='CRITICA'?'#2e1015':'#0f172a'};border:1px solid ${STATE.filtroTV==='CRITICA'?'#ef4444':'#1e293b'};">
-                <span style="font-size:11px;color:#fca5a5;font-weight:700;">🔴 CRÍTICAS / PARADO</span>
+              <div class="interativa-kpi-pill" onclick="STATE.filtroTV='CRITICA';renderMenuGesTV(document.getElementById('mainContainer'))" style="cursor:pointer;padding:7px 12px;border-radius:8px;background:${STATE.filtroTV==='CRITICA'?'#2e1015':'#0f172a'};border:1px solid ${STATE.filtroTV==='CRITICA'?'#ef4444':'#1e293b'};display:flex;justify-content:space-between;align-items:center;transition:all 0.15s ease;">
+                <span style="font-size:10px;color:#fca5a5;font-weight:700;">🔴 CRÍTICAS / PARADO</span>
                 <span style="color:#f87171;font-size:16px;font-weight:900;">${qtdCriticas}</span>
               </div>
-              <div class="interativa-sidebar-kpi" onclick="STATE.filtroTV='PECA_ORCAMENTO';renderMenuGesTV(document.getElementById('mainContainer'))" style="background:${STATE.filtroTV==='PECA_ORCAMENTO'?'#2d1b06':'#0f172a'};border:1px solid ${STATE.filtroTV==='PECA_ORCAMENTO'?'#f59e0b':'#1e293b'};">
-                <span style="font-size:11px;color:#fde68a;font-weight:700;">🟠 AGUARDA PEÇA</span>
+              <div class="interativa-kpi-pill" onclick="STATE.filtroTV='PECA_ORCAMENTO';renderMenuGesTV(document.getElementById('mainContainer'))" style="cursor:pointer;padding:7px 12px;border-radius:8px;background:${STATE.filtroTV==='PECA_ORCAMENTO'?'#2d1b06':'#0f172a'};border:1px solid ${STATE.filtroTV==='PECA_ORCAMENTO'?'#f59e0b':'#1e293b'};display:flex;justify-content:space-between;align-items:center;transition:all 0.15s ease;">
+                <span style="font-size:10px;color:#fde68a;font-weight:700;">🟠 AGUARDA PEÇA</span>
                 <span style="color:#fbbf24;font-size:16px;font-weight:900;">${qtdPeca}</span>
               </div>
-              <div class="interativa-sidebar-kpi" onclick="STATE.filtroTV='PROGRAMADA';renderMenuGesTV(document.getElementById('mainContainer'))" style="background:${STATE.filtroTV==='PROGRAMADA'?'#0c2a4d':'#0f172a'};border:1px solid ${STATE.filtroTV==='PROGRAMADA'?'#38bdf8':'#1e293b'};">
-                <span style="font-size:11px;color:#bae6fd;font-weight:700;">🔵 PROGRAMADAS</span>
+              <div class="interativa-kpi-pill" onclick="STATE.filtroTV='PROGRAMADA';renderMenuGesTV(document.getElementById('mainContainer'))" style="cursor:pointer;padding:7px 12px;border-radius:8px;background:${STATE.filtroTV==='PROGRAMADA'?'#0c2a4d':'#0f172a'};border:1px solid ${STATE.filtroTV==='PROGRAMADA'?'#38bdf8':'#1e293b'};display:flex;justify-content:space-between;align-items:center;transition:all 0.15s ease;">
+                <span style="font-size:10px;color:#bae6fd;font-weight:700;">🔵 PROGRAMADAS</span>
                 <span style="color:#38bdf8;font-size:16px;font-weight:900;">${qtdProgramadas}</span>
               </div>
             </div>
 
-            <!-- FILTRO DE TÉCNICO -->
-            <div style="border-top:1px solid #1e293b;padding-top:10px;">
-              <label style="font-size:10px;font-weight:800;color:#94a3b8;display:block;margin-bottom:4px;">FILTRAR TÉCNICO:</label>
-              <select id="tvFiltroTecnico" class="form-control" style="width:100%;background:#1e293b;color:#f8fafc;border:1px solid #334155;font-size:11px;padding:6px;border-radius:6px;font-weight:700;" onchange="STATE.interativaTecnico=this.value;renderMenuGesTV(document.getElementById('mainContainer'))">
-                <option value="TODOS" ${STATE.interativaTecnico==='TODOS'?'selected':''}>👥 Todos os Técnicos (${pendentes.length})</option>
-                ${listaTecnicos.map(t => {
-                  const qtd = pendentes.filter(o => (o.tecnico_responsavel || '').toUpperCase() === t).length;
-                  return `<option value="${t}" ${STATE.interativaTecnico===t?'selected':''}>👤 ${t} (${qtd} OS)</option>`;
-                }).join("")}
-              </select>
-            </div>
+            <!-- BARRA DE FILTROS & AÇÕES CENTRALIZADA -->
+            <div style="display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid #1e293b;padding-top:10px;">
+              
+              <!-- FILTRO DE TÉCNICO -->
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:10px;font-weight:800;color:#94a3b8;">TÉCNICO:</span>
+                <select id="tvFiltroTecnico" class="form-control" style="background:#1e293b;color:#f8fafc;border:1px solid #334155;font-size:11px;padding:4px 8px;border-radius:6px;font-weight:700;height:auto;" onchange="STATE.interativaTecnico=this.value;renderMenuGesTV(document.getElementById('mainContainer'))">
+                  <option value="TODOS" ${STATE.interativaTecnico==='TODOS'?'selected':''}>👥 Todos (${pendentes.length})</option>
+                  ${listaTecnicos.map(t => {
+                    const qtd = pendentes.filter(o => (o.tecnico_responsavel || '').toUpperCase() === t).length;
+                    return `<option value="${t}" ${STATE.interativaTecnico===t?'selected':''}>👤 ${t} (${qtd})</option>`;
+                  }).join("")}
+                </select>
+              </div>
 
-            <!-- FILTRO DE DIAS -->
-            <div>
-              <label style="font-size:10px;font-weight:800;color:#94a3b8;display:block;margin-bottom:4px;">DIAS EXIBIDOS:</label>
-              <div style="display:flex;gap:4px;">
-                <button class="btn btn-xs ${STATE.interativaFiltroDias==='SEG_A_SEX'?'btn-primary':'btn-outline'}" style="flex:1;font-size:10px;padding:5px;" onclick="STATE.interativaFiltroDias='SEG_A_SEX';renderMenuGesTV(document.getElementById('mainContainer'))">
+              <!-- FILTRO DE DIAS -->
+              <div style="display:flex;align-items:center;gap:4px;">
+                <span style="font-size:10px;font-weight:800;color:#94a3b8;margin-left:4px;">DIAS:</span>
+                <button class="btn btn-xs ${STATE.interativaFiltroDias==='SEG_A_SEX'?'btn-primary':'btn-outline'}" style="font-size:10px;padding:4px 8px;font-weight:700;" onclick="STATE.interativaFiltroDias='SEG_A_SEX';renderMenuGesTV(document.getElementById('mainContainer'))">
                   🗓️ Seg a Sex
                 </button>
-                <button class="btn btn-xs ${STATE.interativaFiltroDias==='TODOS'?'btn-primary':'btn-outline'}" style="flex:1;font-size:10px;padding:5px;" onclick="STATE.interativaFiltroDias='TODOS';renderMenuGesTV(document.getElementById('mainContainer'))">
+                <button class="btn btn-xs ${STATE.interativaFiltroDias==='TODOS'?'btn-primary':'btn-outline'}" style="font-size:10px;padding:4px 8px;font-weight:700;" onclick="STATE.interativaFiltroDias='TODOS';renderMenuGesTV(document.getElementById('mainContainer'))">
                   📅 Todas
                 </button>
               </div>
-            </div>
 
-            <!-- MODO DE VISÃO -->
-            <div>
-              <label style="font-size:10px;font-weight:800;color:#94a3b8;display:block;margin-bottom:4px;">MODO DE VISÃO:</label>
-              <div style="display:flex;gap:4px;">
-                <button class="btn btn-xs ${STATE.interativaVisao==='CALENDARIO'?'btn-primary':'btn-outline'}" style="flex:1;font-size:10px;padding:5px;" onclick="STATE.interativaVisao='CALENDARIO';renderMenuGesTV(document.getElementById('mainContainer'))">
+              <!-- MODO DE VISÃO -->
+              <div style="display:flex;align-items:center;gap:4px;">
+                <span style="font-size:10px;font-weight:800;color:#94a3b8;margin-left:4px;">VISÃO:</span>
+                <button class="btn btn-xs ${STATE.interativaVisao==='CALENDARIO'?'btn-primary':'btn-outline'}" style="font-size:10px;padding:4px 8px;font-weight:700;" onclick="STATE.interativaVisao='CALENDARIO';renderMenuGesTV(document.getElementById('mainContainer'))">
                   📅 Calendário
                 </button>
-                <button class="btn btn-xs ${STATE.interativaVisao==='TRELLO_TECNICOS'?'btn-primary':'btn-outline'}" style="flex:1;font-size:10px;padding:5px;" onclick="STATE.interativaVisao='TRELLO_TECNICOS';renderMenuGesTV(document.getElementById('mainContainer'))">
+                <button class="btn btn-xs ${STATE.interativaVisao==='TRELLO_TECNICOS'?'btn-primary':'btn-outline'}" style="font-size:10px;padding:4px 8px;font-weight:700;" onclick="STATE.interativaVisao='TRELLO_TECNICOS';renderMenuGesTV(document.getElementById('mainContainer'))">
                   👥 Por Técnico
                 </button>
               </div>
+
+              <!-- AÇÕES WHATSAPP -->
+              <div style="display:flex;align-items:center;gap:6px;margin-left:6px;">
+                <button class="btn btn-sm" onclick="interativaDispararWhatsAppTecnico()" style="background:#22c55e;color:#fff;border:none;font-weight:800;font-size:10.5px;padding:5px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;">
+                  📲 Zap Técnico
+                </button>
+                <button class="btn btn-sm" onclick="interativaDispararWhatsAppGrupo()" style="background:#16a34a;color:#fff;border:none;font-weight:800;font-size:10.5px;padding:5px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;">
+                  👥 Zap Grupo EMED
+                </button>
+              </div>
+
             </div>
 
-            <!-- AÇÕES RÁPIDAS WHATSAPP & AUDITORIA DE CONTRATOS -->
-            <div style="border-top:1px solid #1e293b;padding-top:10px;display:flex;flex-direction:column;gap:6px;margin-top:auto;">
-              <button class="btn btn-sm" onclick="abrirPainelRentabilidadeContratos()" style="background:linear-gradient(90deg, #1e3a8a, #0369a1);color:#fff;border:1px solid #38bdf8;font-weight:800;font-size:11px;padding:7px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:6px;cursor:pointer;">
-                📊 Rentabilidade Contratos (LogAudit)
-              </button>
-              <button class="btn btn-sm" onclick="interativaDispararWhatsAppTecnico()" style="background:#22c55e;color:#fff;border:none;font-weight:800;font-size:11px;padding:7px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:6px;">
-                📲 Zap Técnico
-              </button>
-              <button class="btn btn-sm" onclick="interativaDispararWhatsAppGrupo()" style="background:#16a34a;color:#fff;border:none;font-weight:800;font-size:11px;padding:7px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:6px;">
-                👥 Zap Grupo EMED
-              </button>
-            </div>
+          </div>
 
-          </aside>
-
-          <!-- ÁREA PRINCIPAL DOS DIAS SEQUENCIAIS / QUADRO -->
-          <main class="interativa-main" style="flex:1;min-width:0;overflow:hidden;display:flex;flex-direction:column;">
+          <!-- ÁREA DOS DIAS SEQUENCIAIS / QUADRO -->
+          <div style="width:100%;${ehModoTodas ? 'overflow-y:auto;max-height:calc(100vh - 230px);' : ''}">
             ${kanbanHtml}
-          </main>
+          </div>
         </div>
       `;
     }
@@ -73205,6 +73211,7 @@ function renderizarNavegacao() {
       const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
       window.open(url, "_blank");
     }
+
 
 
 
