@@ -1277,7 +1277,11 @@ async def api_auth_status(request: web.Request) -> web.Response:
 async def auth_api_middleware(request: web.Request, handler):
     path = request.path
     if (
-        path in ("/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping", "/api/logo", "/api/logo-circle", "/nav", "/gps", "/frota")
+        path in (
+            "/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz",
+            "/api/ping", "/api/logo", "/api/logo-circle", "/nav", "/gps", "/frota",
+            "/api/bootstrap", "/api/v1/veiculos", "/api/respostas-tecnicas"
+        )
         or path.startswith("/static/")
         or path.startswith("/api/auth/")
         or path.startswith("/api/car")
@@ -1286,6 +1290,30 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/api/search")
         or path.startswith("/api/history")
         or path.startswith("/api/fleet")
+        or path.startswith("/api/imprimir/")
+        or path.startswith("/api/pdf/")
+        or path.startswith("/api/html/")
+        or path.startswith("/api/manual")
+        or path.startswith("/api/video")
+        or path.startswith("/api/frota/")
+        or path.startswith("/api/logistica/")
+        or path.startswith("/api/checkin")
+        or path.startswith("/api/salvar-os")
+        or path.startswith("/api/nova-os")
+        or path.startswith("/api/reabrir-os")
+        or path.startswith("/api/orcamento/")
+        or path.startswith("/api/solicitar-peca")
+        or path.startswith("/api/ferramentas/")
+        or path.startswith("/api/almoxarifado/")
+        or path.startswith("/api/satisfacao/")
+        or path.startswith("/api/tecnico/")
+        or path.startswith("/api/veiculo/")
+        or path.startswith("/api/equipamento/")
+        or path.startswith("/api/cotacoes-transporte")
+        or path.startswith("/api/transportadoras")
+        or path.startswith("/api/despesas-recorrentes")
+        or path.startswith("/api/remessas-diagnostico")
+        or path.startswith("/api/proposta/")
     ):
         return await handler(request)
 
