@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v57-emed-interativa';
+const CACHE_NAME = 'emed-pwa-v58-5dias-tela';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
