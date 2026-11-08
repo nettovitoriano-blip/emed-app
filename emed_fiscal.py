@@ -49,7 +49,7 @@ CONFIGURACOES_FILIAIS_PADRAO: Dict[str, Dict[str, Any]] = {
         "telefone": "(61) 3234-3647 / (61) 99658-5392",
         "email": "brasilia@emed.med.br",
         "serie_padrao": "DF-1",
-        "aliquota_iss_padrao": 2.0,
+        "aliquota_iss_padrao": 5.0,
         "codigo_servico_padrao": "14.01",
         "cnae": "3313-9/99 - Manutenção e reparação de aparelhos eletromédicos",
         "natureza_operacao_padrao": "TRIBUTAÇÃO NO DISTRITO FEDERAL",
@@ -72,7 +72,7 @@ CONFIGURACOES_FILIAIS_PADRAO: Dict[str, Dict[str, Any]] = {
         "telefone": "(85) 3254-2929",
         "email": "financeiro@emed.med.br",
         "serie_padrao": "1",
-        "aliquota_iss_padrao": 2.0,
+        "aliquota_iss_padrao": 5.0,
         "codigo_servico_padrao": "14.01",
         "cnae": "3313-9/99 - Manutenção e reparação de aparelhos eletromédicos",
         "natureza_operacao_padrao": "TRIBUTAÇÃO NO MUNICÍPIO",
@@ -161,7 +161,7 @@ class MultiFilialFiscalProvider(FiscalProvider):
         v_serv = float(payload.get("valor_servicos") or 0.0)
         v_pec = float(payload.get("valor_pecas") or 0.0)
         v_total = v_serv + v_pec
-        aliq_iss = float(payload.get("aliquota_iss") or 2.0)
+        aliq_iss = float(payload.get("aliquota_iss") or 5.0)
         v_iss = v_serv * (aliq_iss / 100.0)
 
         p_cnpj = "".join([c for c in str(payload.get("prestador_cnpj", "")) if c.isdigit()]) or "03611974000280"
@@ -338,7 +338,7 @@ class FiscalManager:
             valor_servicos REAL NOT NULL,
             valor_pecas REAL NOT NULL,
             valor_desconto REAL DEFAULT 0,
-            aliquota_iss REAL DEFAULT 2.0,
+            aliquota_iss REAL DEFAULT 5.0,
             valor_iss REAL DEFAULT 0.0,
             retencoes_federais TEXT,
             valor_liquido REAL,
@@ -467,7 +467,7 @@ class FiscalManager:
             "prestador_email": cfg_filial.get("email", ""),
             "orgao_fiscal": cfg_filial.get("orgao_fiscal", "SEFAZ-DF"),
             "serie": cfg_filial.get("serie_padrao", "DF-1"),
-            "aliquota_iss": float(cfg_filial.get("aliquota_iss_padrao", 2.0)),
+            "aliquota_iss": float(cfg_filial.get("aliquota_iss_padrao", 5.0)),
             "codigo_servico": cfg_filial.get("codigo_servico_padrao", "14.01"),
             "natureza_operacao": cfg_filial.get("natureza_operacao_padrao", "TRIBUTAÇÃO NO DISTRITO FEDERAL"),
             "tipo_nota": "100% NOTA DE SERVIÇO (NFS-e)",
@@ -548,7 +548,7 @@ class FiscalManager:
         v_serv = float(payload.get("valor_servicos") or 0.0)
         v_pec = float(payload.get("valor_pecas") or 0.0)
         v_desc = float(payload.get("valor_desconto") or 0.0)
-        aliq = float(payload.get("aliquota_iss") or 2.0)
+        aliq = float(payload.get("aliquota_iss") or 5.0)
         v_iss = v_serv * (aliq / 100.0)
         v_liq = (v_serv + v_pec) - v_desc
         payload["valor_iss"] = v_iss
@@ -709,7 +709,7 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
             novo_end = st.text_input("Endereço Completo:", value=cfg_ativa.get("endereco", ""), key=f"inp_end_{codigo_filial}")
         with c_conf2:
             nova_serie = st.text_input("Série da Nota Fiscal:", value=cfg_ativa.get("serie_padrao", "DF-1"), key=f"inp_ser_{codigo_filial}")
-            nova_aliq = st.number_input("Alíquota ISS Padrão (%):", value=float(cfg_ativa.get("aliquota_iss_padrao", 2.0)), min_value=0.0, max_value=10.0, step=0.1, key=f"inp_aliq_{codigo_filial}")
+            nova_aliq = st.number_input("Alíquota ISS Padrão (%):", value=float(cfg_ativa.get("aliquota_iss_padrao", 5.0)), min_value=0.0, max_value=10.0, step=0.1, key=f"inp_aliq_{codigo_filial}")
             novo_fone = st.text_input("Telefone da Unidade:", value=cfg_ativa.get("telefone", ""), key=f"inp_fone_{codigo_filial}")
             novo_email = st.text_input("E-mail Financeiro:", value=cfg_ativa.get("email", ""), key=f"inp_mail_{codigo_filial}")
 
@@ -869,7 +869,7 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
         with c_val2:
             f_val_pec = st.number_input("Valor Peças / Produtos (R$):", value=float(dados_pre.get("valor_pecas", 0.0)), min_value=0.0, step=50.0)
         with c_val3:
-            f_aliq_iss = st.number_input("Alíquota ISS DF (%):", value=float(dados_pre.get("aliquota_iss", 2.0)), min_value=0.0, max_value=10.0, step=0.5)
+            f_aliq_iss = st.number_input("Alíquota ISS DF (%):", value=float(dados_pre.get("aliquota_iss", 5.0)), min_value=0.0, max_value=10.0, step=0.5)
         with c_val4:
             f_desconto = st.number_input("Desconto Concedido (R$):", value=float(dados_pre.get("valor_desconto", 0.0)), min_value=0.0, step=10.0)
 
