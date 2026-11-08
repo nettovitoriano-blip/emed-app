@@ -369,9 +369,7 @@ from emed_services.robo_rastreamento import (
 from emed_services.hospital_autorizacao import (
     obter_dados_credenciamento_os,
     gerar_texto_whatsapp_portaria,
-    gerar_html_autorizacao_entrada,
-    obter_lista_tecnicos_credenciamento,
-    registrar_credenciamento_os
+    gerar_html_autorizacao_entrada
 )
 from emed_services.equipamento_qrcode import (
     obter_historico_anual_equipamento,
@@ -1279,11 +1277,7 @@ async def api_auth_status(request: web.Request) -> web.Response:
 async def auth_api_middleware(request: web.Request, handler):
     path = request.path
     if (
-        path in (
-            "/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz",
-            "/api/ping", "/api/logo", "/api/logo-circle", "/api/icone-autosave", "/nav", "/gps", "/frota",
-            "/api/bootstrap", "/api/v1/veiculos", "/api/respostas-tecnicas"
-        )
+        path in ("/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping", "/api/logo", "/api/logo-circle", "/nav", "/gps", "/frota")
         or path.startswith("/static/")
         or path.startswith("/api/auth/")
         or path.startswith("/api/car")
@@ -1292,33 +1286,6 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/api/search")
         or path.startswith("/api/history")
         or path.startswith("/api/fleet")
-        or path.startswith("/api/imprimir/")
-        or path.startswith("/api/pdf/")
-        or path.startswith("/api/html/")
-        or path.startswith("/api/manual")
-        or path.startswith("/api/video")
-        or path.startswith("/api/frota/")
-        or path.startswith("/api/logistica/")
-        or path.startswith("/api/checkin")
-        or path.startswith("/api/os/atribuir-tecnico")
-        or path.startswith("/api/salvar-os")
-        or path.startswith("/api/nova-os")
-        or path.startswith("/api/reabrir-os")
-        or path.startswith("/api/orcamento/")
-        or path.startswith("/api/solicitar-peca")
-        or path.startswith("/api/ferramentas/")
-        or path.startswith("/api/almoxarifado/")
-        or path.startswith("/api/satisfacao/")
-        or path.startswith("/api/tecnico/")
-        or path.startswith("/api/veiculo/")
-        or path.startswith("/api/equipamento/")
-        or path.startswith("/api/cotacoes-transporte")
-        or path.startswith("/api/transportadoras")
-        or path.startswith("/api/despesas-recorrentes")
-        or path.startswith("/api/remessas-diagnostico")
-        or path.startswith("/api/proposta/")
-        or path.startswith("/api/hospital/")
-        or path.startswith("/api/gestao/")
     ):
         return await handler(request)
 
@@ -1365,7 +1332,7 @@ async def handle_proxy_nav(request: web.Request) -> web.Response:
     if request.query_string:
         target_url += f"?{request.query_string}"
 
-    client_timeout = aiohttp.ClientTimeout(total=2.0)
+    client_timeout = aiohttp.ClientTimeout(total=2.5)
     async with aiohttp.ClientSession(timeout=client_timeout) as session:
         headers = {k: v for k, v in request.headers.items() if k.lower() not in ("host", "content-length")}
         try:
@@ -1377,7 +1344,19 @@ async def handle_proxy_nav(request: web.Request) -> web.Response:
                 resp_headers = {k: v for k, v in resp.headers.items() if k.lower() not in ("content-encoding", "transfer-encoding", "content-length")}
                 return web.Response(body=body, status=resp.status, headers=resp_headers)
         except Exception as e:
-            return web.Response(text=f"Erro ao conectar com EmedNav (porta 5000): {e}", status=502)
+            # Fallback nativo 100% resiliente: serve a interface mesmo se a porta 5000 estiver iniciando
+            base_nav = os.path.join(BASE_DIR, "emed_nav", "static")
+            if path in ("/", "/nav", "/gps", "/emedcar"):
+                idx_file = os.path.join(base_nav, "index.html")
+                if os.path.exists(idx_file):
+                    with open(idx_file, "r", encoding="utf-8") as f_html:
+                        return web.Response(text=f_html.read(), content_type="text/html; charset=utf-8")
+            elif path in ("/frota", "/admin"):
+                frota_file = os.path.join(base_nav, "frota.html")
+                if os.path.exists(frota_file):
+                    with open(frota_file, "r", encoding="utf-8") as f_frota:
+                        return web.Response(text=f_frota.read(), content_type="text/html; charset=utf-8")
+            return web.Response(text=f"Carregando EmedNav GPS... Por favor atualize em instantes ({e})", status=200)
 
 async def handle_index(request: web.Request) -> web.Response:
     # Checa autenticacao
@@ -1397,7 +1376,7 @@ async def handle_index(request: web.Request) -> web.Response:
     caminho_html = os.path.join(STATIC_DIR, "index.html")
     with open(caminho_html, "r", encoding="utf-8") as f:
         conteudo = f.read()
-    return web.Response(text=conteudo, content_type="text/html", headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"})
+    return web.Response(text=conteudo, content_type="text/html", headers={"Cache-Control": "no-cache"})
 
 
 
@@ -1481,14 +1460,6 @@ async def handle_logo(request: web.Request) -> web.Response:
 
 
 
-
-
-async def handle_icone_autosave(request: web.Request) -> web.Response:
-    caminho = os.path.join(BASE_DIR, "emed_pwa_static", "icone_auto_save.png")
-    if os.path.exists(caminho):
-        with open(caminho, "rb") as f:
-            return web.Response(body=f.read(), content_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
-    return web.Response(status=404)
 
 async def handle_logo_circle(request: web.Request) -> web.Response:
     caminho_circ = os.path.join(BASE_DIR, "emed_pwa_static", "logo_emed_circle.png")
@@ -2877,96 +2848,92 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-            frota_manutencoes_lista = []
-            try:
-                df_fmt = pd.read_sql_query("SELECT * FROM frota_manutencoes ORDER BY data_registro DESC, id DESC", conn)
-                for _, r in df_fmt.iterrows():
-                    frota_manutencoes_lista.append({
-                        "id": int(r.get("id", 0)),
-                        "veiculo_id": int(r.get("veiculo_id", 0)),
-                        "placa": limpar_texto(r.get("placa"), ""),
-                        "data_registro": limpar_texto(r.get("data_registro"), ""),
-                        "km_registro": limpar_int(r.get("km_registro"), 0),
-                        "tipo_manutencao": limpar_texto(r.get("tipo_manutencao"), "Revisão"),
-                        "descricao": limpar_texto(r.get("descricao"), ""),
-                        "oficina": limpar_texto(r.get("oficina"), "Oficina Credenciada"),
-                        "valor_total": limpar_float(r.get("valor_total"), 0.0),
-                        "km_proxima_troca": limpar_int(r.get("km_proxima_troca"), 0),
-                        "tecnico_responsavel": limpar_texto(r.get("tecnico_responsavel"), "NETTO"),
-                        "status": limpar_texto(r.get("status"), "CONCLUÍDA")
-                    })
-            except Exception:
-                pass
-
-            frota_checklists_lista = []
-            try:
-                df_fchk = pd.read_sql_query("SELECT * FROM frota_checklists ORDER BY id DESC LIMIT 50", conn)
-                for _, r in df_fchk.iterrows():
-                    frota_checklists_lista.append({
-                        "id": int(r.get("id", 0)),
-                        "veiculo_id": int(r.get("veiculo_id", 0)),
-                        "placa": limpar_texto(r.get("placa"), ""),
-                        "data_hora": limpar_texto(r.get("data_hora"), ""),
-                        "tecnico": limpar_texto(r.get("tecnico"), ""),
-                        "km_atual": limpar_int(r.get("km_atual"), 0),
-                        "nivel_oleo": limpar_texto(r.get("nivel_oleo"), "OK"),
-                        "freios": limpar_texto(r.get("freios"), "OK"),
-                        "pneus": limpar_texto(r.get("pneus"), "OK"),
-                        "luzes": limpar_texto(r.get("luzes"), "OK"),
-                        "arrefecimento": limpar_texto(r.get("arrefecimento"), "OK"),
-                        "ar_condicionado": limpar_texto(r.get("ar_condicionado"), "OK"),
-                        "avarias_sinistro": limpar_texto(r.get("avarias_sinistro"), "NENHUMA"),
-                        "observacoes": limpar_texto(r.get("observacoes"), ""),
-                        "status_geral": limpar_texto(r.get("status_geral"), "APROVADO")
-                    })
-            except Exception:
-                pass
-
             df_v = pd.read_sql_query("SELECT * FROM veiculos", conn)
-            for _, r in df_v.iterrows():
-                vid = int(r.get("id", 1))
-                v_placa = limpar_texto(r.get("placa"), "")
-                km_at = limpar_int(r.get("km_atual"), 0)
-                km_pr = limpar_int(r.get("km_proxima_revisao"), 50000)
-                v_manuts = [m for m in frota_manutencoes_lista if m["veiculo_id"] == vid or m["placa"] == v_placa]
-                v_checks = [c for c in frota_checklists_lista if c["veiculo_id"] == vid or c["placa"] == v_placa]
 
-                km_diff = km_pr - km_at
-                if km_diff < 0:
-                    st_calc = "REVISÃO VENCIDA"
-                elif km_diff <= 1000:
-                    st_calc = "ATENÇÃO (REVISÃO PRÓXIMA)"
-                else:
-                    st_calc = "EM DIA"
+
+
+            for _, r in df_v.iterrows():
+
+
+
+                km_at = limpar_int(r.get("km_atual"), 0)
+
+
+
+                km_pr = limpar_int(r.get("km_proxima_revisao"), 50000)
+
+
 
                 veiculos.append({
-                    "id": vid,
+
+
+
+                    "id": int(r.get("id", 1)),
+
+
+
                     "modelo": limpar_texto(r.get("modelo"), "Veículo EMED"),
-                    "placa": v_placa,
+
+
+
+                    "placa": limpar_texto(r.get("placa"), ""),
+
+
+
                     "renavam": limpar_texto(r.get("renavam"), "01234567890"),
-                    "chassi": limpar_texto(r.get("chassi"), ""),
-                    "ano_fabricacao": limpar_texto(r.get("ano_fabricacao"), "2022/2023"),
-                    "cor": limpar_texto(r.get("cor"), "Branco"),
-                    "seguradora": limpar_texto(r.get("seguradora"), "Porto Seguro"),
-                    "apolice_seguro": limpar_texto(r.get("apolice_seguro"), "EMED-SEG-2026"),
-                    "combustivel": limpar_texto(r.get("combustivel"), "Flex (Gasolina/Etanol)"),
+
+
+
                     "condutor_atual": limpar_texto(r.get("condutor_atual"), "DISPONÍVEL NA BASE"),
+
+
+
                     "tag_rfid_atual": limpar_texto(r.get("tag_rfid_atual"), ""),
+
+
+
                     "ultima_lat": limpar_float(r.get("ultima_lat"), -3.7319),
+
+
+
                     "ultima_lon": limpar_float(r.get("ultima_lon"), -38.5267),
+
+
+
                     "ultima_atualizacao_gps": limpar_texto(r.get("ultima_atualizacao_gps"), ""),
+
+
+
                     "km_atual": km_at,
+
+
+
                     "km_ultima_revisao": limpar_int(r.get("km_ultima_revisao"), 0),
+
+
+
                     "km_proxima_revisao": km_pr,
-                    "km_restante": km_diff,
-                    "status_manutencao": st_calc,
+
+
+
+                    "km_restante": km_pr - km_at,
+
+
+
+                    "status_manutencao": limpar_texto(r.get("status_manutencao"), "Em Dia"),
+
+
+
                     "historico_manutencao": limpar_texto(r.get("historico_manutencao"), ""),
+
+
+
                     "proximas_manutencoes": limpar_texto(r.get("proximas_manutencoes"), ""),
-                    "chip_numero": limpar_texto(r.get("chip_numero"), ""),
-                    "chip_operadora": limpar_texto(r.get("chip_operadora"), ""),
-                    "manutencoes": v_manuts,
-                    "checklists": v_checks
+
+
+
                 })
+
 
 
         except Exception:
@@ -3585,8 +3552,6 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
         "frota_gps_multas": frota_gps_multas,
-        "frota_manutencoes": frota_manutencoes_lista,
-        "frota_checklists": frota_checklists_lista,
 
 
 
@@ -3929,155 +3894,68 @@ async def api_iniciar_rota(request: web.Request) -> web.Response:
 
 
 async def api_checkin(request: web.Request) -> web.Response:
-    try:
-        body = await request.json()
-    except Exception:
-        return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
+
+
+
+    body = await request.json()
+
+
 
     os_id = str(body.get("os_id", "")).strip()
-    if not os_id:
-        return web.json_response({"ok": False, "msg": "ID da OS não informado."}, status=400)
+
+
 
     df = _carregar_df_direto()
-    os_alvo = None
-    idx_alvo = None
-    for idx, row in df.iterrows():
-        if str(obter_id_os(idx, row)) == os_id:
-            os_alvo = row
-            idx_alvo = idx
-            break
 
-    if os_alvo is None:
-        return web.json_response({"ok": False, "msg": f"OS #{os_id} não encontrada."}, status=404)
 
-    agora_brasil_dt = obter_agora_brasil().replace(tzinfo=None)
-    hoje_brasil_str = agora_brasil_dt.strftime("%d/%m/%Y")
-    agora_sistema_str = agora_brasil_dt.strftime("%d/%m/%Y %H:%M")
 
-    # Horário informado (prioriza hora_ajustada digitada pelo técnico, ex: 13:30)
-    hora_ajustada_raw = str(body.get("hora_ajustada", "")).strip()
-    hora_local_raw = str(body.get("hora_local", "")).strip()
+    # Prioriza o horário local do celular/dispositivo do técnico (UTC-3 Brasil)
 
-    if hora_ajustada_raw:
-        if len(hora_ajustada_raw) == 5 and ":" in hora_ajustada_raw:
-            hora_efetiva = f"{hoje_brasil_str} {hora_ajustada_raw}"
-        elif len(hora_ajustada_raw) >= 16 and "/" in hora_ajustada_raw and ":" in hora_ajustada_raw:
-            hora_efetiva = hora_ajustada_raw[:16]
-        else:
-            hora_efetiva = agora_sistema_str
-    elif hora_local_raw:
-        if len(hora_local_raw) >= 16 and "/" in hora_local_raw and ":" in hora_local_raw:
-            hora_efetiva = hora_local_raw[:16]
-        elif len(hora_local_raw) == 5 and ":" in hora_local_raw:
-            hora_efetiva = f"{hoje_brasil_str} {hora_local_raw}"
-        else:
-            hora_efetiva = agora_sistema_str
+    hora_cliente = str(body.get("hora_local", "")).strip()
+
+    if hora_cliente and len(hora_cliente) >= 16 and "/" in hora_cliente and ":" in hora_cliente:
+
+        agora_str = hora_cliente
+
     else:
-        hora_efetiva = agora_sistema_str
 
-    # 1. Validação de Não-Futuro
-    try:
-        dt_checkin = datetime.strptime(hora_efetiva, "%d/%m/%Y %H:%M")
-        if dt_checkin > agora_brasil_dt + timedelta(minutes=5):
-            return web.json_response({
-                "ok": False,
-                "msg": f"Horário inválido: {dt_checkin.strftime('%H:%M')} está no futuro. O horário de chegada deve ser anterior ou igual ao momento atual ({agora_brasil_dt.strftime('%H:%M')})."
-            }, status=400)
-    except Exception as e:
-        dt_checkin = agora_brasil_dt
-        hora_efetiva = agora_sistema_str
+        agora_str = obter_agora_brasil_str("%d/%m/%Y %H:%M")
 
-    tecnico_alvo = str(os_alvo.get("tecnico_responsavel", "")).strip().upper()
-    cliente_alvo = str(os_alvo.get("cliente", "")).strip()
 
-    # 2. Validação Anti-Ubiquidade (Técnico não pode estar em dois locais ao mesmo tempo)
-    if tecnico_alvo:
-        for idx_outra, row_outra in df.iterrows():
-            if str(obter_id_os(idx_outra, row_outra)) == os_id:
-                continue
-            tec_outra = str(row_outra.get("tecnico_responsavel", "")).strip().upper()
-            if tec_outra == tecnico_alvo:
-                chk_outra = str(row_outra.get("checkin_hora", "")).strip()
-                if chk_outra and chk_outra.lower() != "pendente" and len(chk_outra) >= 16:
-                    try:
-                        dt_outra = datetime.strptime(chk_outra[:16], "%d/%m/%Y %H:%M")
-                        if dt_outra.date() == dt_checkin.date():
-                            dif_minutos = abs((dt_checkin - dt_outra).total_seconds()) / 60.0
-                            if dif_minutos < 15:
-                                cliente_outro = str(row_outra.get("cliente", "Outro Atendimento")).strip()
-                                id_outro = str(obter_id_os(idx_outra, row_outra))
-                                return web.json_response({
-                                    "ok": False,
-                                    "msg": f"⚠️ Conflito de Horário / Duplicação: O técnico {tecnico_alvo} já registrou check-in às {dt_outra.strftime('%H:%M')} na OS #{id_outro} ({cliente_outro}). Para compliance fiscal e trabalhista, o técnico não pode estar em dois hospitais ao mesmo tempo."
-                                }, status=400)
-                    except Exception:
-                        pass
 
-    # 3. Atualizar no DataFrame
-    df.at[idx_alvo, "checkin_hora"] = hora_efetiva
-    df.at[idx_alvo, "confirmado"] = "SIM"
-    _salvar_df_direto(df)
-    invalidar_cache_bootstrap()
 
-    # 4. Atualizar GPS do equipamento se fornecido
-    lat = body.get("latitude")
-    lon = body.get("longitude")
-    if lat is not None and lon is not None:
-        try:
-            with get_db_connection(DB_NAME) as conn_sq:
-                cur = conn_sq.cursor()
-                equip_nome = str(os_alvo.get("equipamento", "")).strip()
-                if equip_nome and cliente_alvo:
-                    cur.execute("""
-                        UPDATE clientes_equipamentos
-                        SET latitude = ?, longitude = ?
-                        WHERE UPPER(cliente) = ? AND UPPER(equipamento) = ?
-                    """, (float(lat), float(lon), cliente_alvo.upper(), equip_nome.upper()))
-                    conn_sq.commit()
-        except Exception:
-            pass
 
-    # 5. Auditoria Fiscal & Governança (Rastreabilidade de Horário)
-    try:
-        from emed_services.auditoria_fiscal import registrar_evento_auditoria_fiscal
-        dif_retroativa = int(abs((agora_brasil_dt - dt_checkin).total_seconds()) / 60.0)
-        status_conf = "CONFORME" if dif_retroativa <= 120 else "ALERTA"
-        score_conf = 100 if dif_retroativa <= 60 else (90 if dif_retroativa <= 120 else 75)
-        
-        dados_ant = {"hora_sistema_registro": agora_sistema_str}
-        dados_nov = {
-            "hora_checkin_declarada": hora_efetiva,
-            "minutos_retroativos": dif_retroativa,
-            "gps_latitude": lat,
-            "gps_longitude": lon,
-            "cliente": cliente_alvo,
-            "equipamento": str(os_alvo.get("equipamento", ""))
-        }
-        
-        motivo = f"Check-in realizado pelo técnico {tecnico_alvo}. Chegada informada: {hora_efetiva}."
-        if dif_retroativa > 15:
-            motivo += f" (Horário ajustado pelo técnico: chegada real há {dif_retroativa} min antes do registro no app)."
 
-        registrar_evento_auditoria_fiscal(
-            tipo_evento="CHECKIN_ATENDIMENTO",
-            numero_nf=f"OS-{os_id}",
-            usuario=tecnico_alvo or "TECNICO",
-            dados_anteriores=dados_ant,
-            dados_novos=dados_nov,
-            status_conformidade=status_conf,
-            score_conformidade=score_conf,
-            motivo_observacao=motivo,
-            os_id=os_id,
-            db_path=DB_NAME
-        )
-    except Exception:
-        pass
 
-    return web.json_response({
-        "ok": True,
-        "checkin_hora": hora_efetiva,
-        "msg": f"📍 Check-in confirmado na OS #{os_id} às {hora_efetiva}!"
-    })
+    for idx, row in df.iterrows():
+
+
+
+        if str(obter_id_os(idx, row)) == os_id:
+
+
+
+            df.at[idx, "checkin_hora"] = agora_str
+
+
+
+            df.at[idx, "confirmado"] = "SIM"
+
+
+
+            _salvar_df_direto(df)
+
+
+
+            return web.json_response({"ok": True, "checkin_hora": agora_str, "msg": f"📍 Check-in registrado na OS #{os_id} às {agora_str}!"})
+
+
+
+
+
+
+
+    return web.json_response({"ok": False, "msg": f"OS #{os_id} não encontrada."}, status=404)
 
 
 
@@ -4087,102 +3965,57 @@ async def api_checkin(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-def aplicar_carimbo_forense_pil(img_bytes: bytes, os_id: str) -> bytes:
-    """Aplica carimbo d'água forense inviolável com Logo Oficial EMED, Hospital e Coordenadas."""
-    try:
-        from PIL import Image, ImageDraw
-        import io
-        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-        w, h = img.size
-        banner_h = max(90, int(h * 0.12))
-        overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-        draw_ov = ImageDraw.Draw(overlay)
-        draw_ov.rectangle([0, h - banner_h, w, h], fill=(11, 19, 43, 225))
-        draw_ov.line([0, h - banner_h, w, h - banner_h], fill=(0, 180, 216, 255), width=max(3, int(w * 0.003)))
-
-        cliente = "HOSPITAL ATENDIDO"
-        cidade = "CEARÁ"
-        equip = "EQUIPAMENTO MÉDICO"
-        tec = "TÉCNICO EMED"
-        dt_serv = datetime.now().strftime("%d/%m/%Y")
-        lat, lon = -3.7319, -38.5267
-
-        try:
-            with get_db_connection(DB_NAME) as conn:
-                conn.row_factory = sqlite3.Row
-                cur = conn.cursor()
-                cur.execute("SELECT cliente, cidade, equipamento, tecnico_responsavel, data_agendamento, latitude, longitude FROM clientes_equipamentos WHERE rowid = ? OR id = ?", (os_id, os_id))
-                row = cur.fetchone()
-                if row:
-                    cliente = (row["cliente"] or cliente).upper()
-                    cidade = (row["cidade"] or cidade).upper()
-                    equip = (row["equipamento"] or equip).upper()
-                    tec = (row["tecnico_responsavel"] or tec).upper()
-                    dt_serv = row["data_agendamento"] or dt_serv
-                    lat = row["latitude"] or lat
-                    lon = row["longitude"] or lon
-        except Exception:
-            pass
-
-        logo_path = os.path.join(STATIC_DIR, "simbolo_emed_transparente.png")
-        if os.path.exists(logo_path):
-            try:
-                logo = Image.open(logo_path).convert("RGBA")
-                logo.thumbnail((int(banner_h * 0.8), int(banner_h * 0.8)))
-                logo_x = w - logo.width - 20
-                logo_y = h - banner_h + (banner_h - logo.height) // 2
-                overlay.paste(logo, (logo_x, logo_y), logo)
-            except Exception:
-                pass
-
-        img_comp = Image.alpha_composite(img.convert("RGBA"), overlay)
-        draw = ImageDraw.Draw(img_comp)
-
-        agora_str = obter_agora_brasil_str("%d/%m/%Y %H:%M:%S")
-        y1 = h - banner_h + int(banner_h * 0.12)
-        y2 = h - banner_h + int(banner_h * 0.38)
-        y3 = h - banner_h + int(banner_h * 0.65)
-
-        draw.text((25, y1), f"🏥 {cliente} ({cidade})", fill=(56, 189, 248, 255))
-        draw.text((25, y2), f"📍 COORDENADAS OFICIAIS: {lat:.4f}, {lon:.4f} • OS #{os_id} ({equip})", fill=(248, 250, 252, 255))
-        draw.text((25, y3), f"🕒 DATA SERVIÇO: {dt_serv} • REGISTRO: {agora_str} • TÉCNICO: {tec} • EMED ELETROMEDICINA", fill=(148, 163, 184, 255))
-
-        out_io = io.BytesIO()
-        img_comp.convert("RGB").save(out_io, format="JPEG", quality=90)
-        return out_io.getvalue()
-    except Exception:
-        return img_bytes
 
 
 def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
+
+
+
     if not b64_str or not str(b64_str).startswith("data:image"):
-        return ""
-    try:
-        header, encoded = str(b64_str).split(",", 1)
-        ext = "jpg"
-        pasta = os.path.join(BASE_DIR, "uploads_os")
-        os.makedirs(pasta, exist_ok=True)
-        ts = obter_agora_brasil_str("%Y%m%d_%H%M%S")
-        caminho = os.path.join(pasta, f"{prefixo}_OS{os_id}_{ts}.{ext}")
-        
-        raw_bytes = base64.b64decode(encoded)
-        carimbada_bytes = aplicar_carimbo_forense_pil(raw_bytes, str(os_id))
-        
-        with open(caminho, "wb") as f:
-            f.write(carimbada_bytes)
-        return caminho
-    except Exception as e:
-        print("Erro salvando imagem base64:", e)
+
+
+
         return ""
 
+
+
+    try:
+
+
+
+        header, encoded = str(b64_str).split(",", 1)
+
+
+
+        ext = "png" if "png" in header.lower() else "jpg"
+
+
+
+        pasta = os.path.join(BASE_DIR, "uploads_os")
+
+
+
+        os.makedirs(pasta, exist_ok=True)
+
+
+
+        ts = obter_agora_brasil_str("%Y%m%d_%H%M%S")
+
+
+
+        caminho = os.path.join(pasta, f"{prefixo}_OS{os_id}_{ts}.{ext}")
+
+
+
+        with open(caminho, "wb") as f:
+
+
+
+            f.write(base64.b64decode(encoded))
+
+
+
+        return caminho
 
 
 
@@ -4275,17 +4108,17 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
     cor_contab = "color:#059669;" if enviado_contab else "color:#d97706;"
 
     filial_emissora = dados_nf.get("filial_emissora") or ("FILIAL_DF" if uf_cli == "DF" else "MATRIZ_CE")
-    prestador_razao = dados_nf.get("prestador_razao") or ("EMED ELETROMEDICINA LTDA." if filial_emissora == "FILIAL_DF" else "EMED ELETROMEDICINA LTDA.")
+    prestador_razao = dados_nf.get("prestador_razao") or ("EMED ELETROMEDICINA LTDA. - FILIAL BRASÍLIA" if filial_emissora == "FILIAL_DF" else "EMED ELETROMEDICINA LTDA.")
     prestador_cnpj = dados_nf.get("prestador_cnpj") or ("03.611.974/0002-80" if filial_emissora == "FILIAL_DF" else "03.611.974/0001-08")
-    prestador_im = dados_nf.get("prestador_im") or ("0745733000236" if filial_emissora == "FILIAL_DF" else "123456-7")
-    prestador_end = dados_nf.get("prestador_endereco") or ("3 Chácara 46A, Lote 01 - Setor Habitacional Vicente Pires, CEP 72005-670" if filial_emissora == "FILIAL_DF" else "Rua Coronel Freire, 16 - Bairro Amador, CEP 61769-470")
+    prestador_im = dados_nf.get("prestador_im") or ("61-3234-3647" if filial_emissora == "FILIAL_DF" else "123456-7")
+    prestador_end = dados_nf.get("prestador_endereco") or ("Rua 3, Chácara 46A, Lote 01 - Vicente Pires, CEP 72007-850" if filial_emissora == "FILIAL_DF" else "Rua Coronel Freire, 16 - Bairro Amador, CEP 61769-470")
     prestador_cid = dados_nf.get("prestador_cidade") or ("Brasília" if filial_emissora == "FILIAL_DF" else "Eusébio")
     prestador_uf = dados_nf.get("prestador_uf") or ("DF" if filial_emissora == "FILIAL_DF" else "CE")
-    prestador_fone = dados_nf.get("prestador_fone") or ("(61) 3038-1104" if filial_emissora == "FILIAL_DF" else "(85) 3254-2929")
-    prestador_email = dados_nf.get("prestador_email") or ("dxc@dxc.cnt.br" if filial_emissora == "FILIAL_DF" else "financeiro@emed.med.br")
-    orgao_emissor = "SECRETARIA DE ESTADO DE ECONOMIA DO DISTRITO FEDERAL (SEFAZ-DF) - SISTEMA NOTA CONTROL" if filial_emissora == "FILIAL_DF" else "PREFEITURA MUNICIPAL DE EUSÉBIO - CE"
+    prestador_fone = dados_nf.get("prestador_fone") or ("(61) 3234-3647 / (61) 99658-5392" if filial_emissora == "FILIAL_DF" else "(85) 3254-2929")
+    prestador_email = dados_nf.get("prestador_email") or ("brasilia@emed.med.br" if filial_emissora == "FILIAL_DF" else "financeiro@emed.med.br")
+    orgao_emissor = "SECRETARIA DE FAZENDA DO DISTRITO FEDERAL (SEFAZ-DF)" if filial_emissora == "FILIAL_DF" else "PREFEITURA MUNICIPAL DE EUSÉBIO - CE"
     doc_aux_titulo = "DOCUMENTO AUXILIAR DA NFS-e DF" if filial_emissora == "FILIAL_DF" else "DOCUMENTO AUXILIAR DA NFS-e / NF-e"
-    sub_titulo_unidade = "SCIENZA ELETROMEDICINA - Filial Brasília (DF)" if filial_emissora == "FILIAL_DF" else "Matriz Ceará"
+    sub_titulo_unidade = "Unidade Brasília (DF)" if filial_emissora == "FILIAL_DF" else "Matriz Ceará"
 
     html_danfe = f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -4549,49 +4382,6 @@ async def api_tecnico_assinatura_salvar(request: web.Request) -> web.Response:
     })
 
 
-
-async def api_atribuir_tecnico_os(request: web.Request) -> web.Response:
-    try:
-        body = await request.json()
-        os_id = str(body.get("os_id", "")).strip()
-        tec = str(body.get("tecnico", "")).strip().upper()
-        if not os_id:
-            return web.json_response({"ok": False, "msg": "ID da OS não informado."}, status=400)
-        
-        with get_db_connection(DB_NAME) as conn:
-            cur = conn.cursor()
-            cur.execute("""
-                UPDATE clientes_equipamentos 
-                SET tecnico_responsavel = ? 
-                WHERE id = ? OR rowid = ?
-            """, (tec, os_id, os_id))
-            
-            cur.execute("""
-                SELECT cliente, equipamento, data_agendamento, responsavel_hospital, contato_responsavel, credenciamento_enviado
-                FROM clientes_equipamentos
-                WHERE id = ? OR rowid = ?
-            """, (os_id, os_id))
-            row_info = cur.fetchone()
-            conn.commit()
-            
-        global _CACHE_BOOTSTRAP
-        _CACHE_BOOTSTRAP = None
-
-        cli_nome = (row_info[0] if row_info else "").upper()
-        exige_portaria = bool("SAO CARLOS" in cli_nome or "SÃO CARLOS" in cli_nome)
-        
-        return web.json_response({
-            "ok": True, 
-            "msg": f"Técnico {tec or 'A DEFINIR'} atribuído com sucesso à OS #{os_id}!",
-            "exige_portaria": exige_portaria,
-            "cliente": cli_nome,
-            "os_id": os_id,
-            "tecnico": tec,
-            "credenciamento_enviado": row_info[5] if row_info else "NAO"
-        })
-    except Exception as e:
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
 async def api_salvar_os(request: web.Request) -> web.Response:
 
 
@@ -4711,8 +4501,6 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
     tipo_srv = limpar_texto(body.get("tipo_servico"), limpar_texto(row_os.get("tipo_servico"), "CORRETIVA")).upper()
-    if "CALIB" in tipo_srv:
-        tipo_srv = "AFERIÇÃO"
 
 
 
@@ -5039,41 +4827,6 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-    # Telemetria do Tubo / Emissor RX/TC (Item B)
-    if "scans_totais" in body:
-        df.at[idx_alvo, "scans_totais"] = int(limpar_float(body.get("scans_totais"), 0))
-    if "pacientes_mes" in body:
-        df.at[idx_alvo, "pacientes_mes"] = int(limpar_float(body.get("pacientes_mes"), 0))
-    if "horimetro_tubo" in body:
-        df.at[idx_alvo, "horimetro_tubo"] = int(limpar_float(body.get("horimetro_tubo"), 0))
-    if "capacidade_tubo" in body:
-        df.at[idx_alvo, "capacidade_tubo"] = int(limpar_float(body.get("capacidade_tubo"), 200000))
-    if "vida_util_tubo_perc" in body:
-        df.at[idx_alvo, "vida_util_tubo_perc"] = float(limpar_float(body.get("vida_util_tubo_perc"), 0.0))
-
-    try:
-        with get_db_connection(DB_NAME) as conn_tube:
-            cur_tube = conn_tube.cursor()
-            cur_tube.execute("""
-                UPDATE clientes_equipamentos
-                SET scans_totais = ?,
-                    pacientes_mes = ?,
-                    horimetro_tubo = ?,
-                    capacidade_tubo = ?,
-                    vida_util_tubo_perc = ?
-                WHERE id = ? OR rowid = ?
-            """, (
-                int(limpar_float(body.get("scans_totais"), 0)),
-                int(limpar_float(body.get("pacientes_mes"), 0)),
-                int(limpar_float(body.get("horimetro_tubo"), 0)),
-                int(limpar_float(body.get("capacidade_tubo"), 200000)),
-                float(limpar_float(body.get("vida_util_tubo_perc"), 0.0)),
-                os_id, os_id
-            ))
-            conn_tube.commit()
-    except Exception as e_tube:
-        print(f"Aviso telemetria tubo SQLite: {e_tube}")
 
     df.at[idx_alvo, "tecnico_responsavel"] = tec_resp
 
@@ -6190,270 +5943,6 @@ async def api_veiculo_km(request: web.Request) -> web.Response:
 
 
 
-
-
-async def api_frota_manutencao_salvar(request: web.Request) -> web.Response:
-    """Registra uma manutenção preventiva ou corretiva na ficha do veículo."""
-    try:
-        body = await request.json()
-    except Exception:
-        return web.json_response({"ok": False, "msg": "JSON inválido."}, status=400)
-    
-    vid = int(limpar_float(body.get("veiculo_id"), 1))
-    placa = limpar_texto(body.get("placa"), "").upper()
-    data_reg = limpar_texto(body.get("data_registro"), "") or datetime.now().strftime("%Y-%m-%d")
-    km_reg = int(limpar_float(body.get("km_registro"), 0))
-    tipo_m = limpar_texto(body.get("tipo_manutencao"), "Revisão Geral Preventiva")
-    descricao = limpar_texto(body.get("descricao"), "")
-    oficina = limpar_texto(body.get("oficina"), "Oficina Credenciada EMED")
-    valor = float(limpar_float(body.get("valor_total"), 0.0))
-    km_prox = int(limpar_float(body.get("km_proxima_troca"), km_reg + 10000))
-    tecnico = limpar_texto(body.get("tecnico_responsavel"), "NETTO")
-    status = limpar_texto(body.get("status"), "CONCLUÍDA")
-
-    with get_db_connection(DB_NAME) as conn:
-        cur = conn.cursor()
-        cur.execute("""
-            INSERT INTO frota_manutencoes 
-            (veiculo_id, placa, data_registro, km_registro, tipo_manutencao, descricao, oficina, valor_total, km_proxima_troca, tecnico_responsavel, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (vid, placa, data_reg, km_reg, tipo_m, descricao, oficina, valor, km_prox, tecnico, status))
-        
-        cur.execute("""
-            UPDATE veiculos 
-            SET km_ultima_revisao = ?,
-                km_proxima_revisao = ?,
-                km_atual = MAX(km_atual, ?),
-                status_manutencao = 'EM DIA'
-            WHERE id = ? OR placa = ?
-        """, (km_reg, km_prox, km_reg, vid, placa))
-        conn.commit()
-
-    invalidar_cache_bootstrap()
-    return web.json_response({
-        "ok": True,
-        "msg": f"✅ Manutenção de {tipo_m} lançada com sucesso no prontuário do veículo {placa}!"
-    })
-
-
-async def api_frota_checklist_salvar(request: web.Request) -> web.Response:
-    """Registra checklist rápido de zelo e conservação do veículo sem burocracia."""
-    try:
-        body = await request.json()
-    except Exception:
-        return web.json_response({"ok": False, "msg": "JSON inválido."}, status=400)
-    
-    vid = int(limpar_float(body.get("veiculo_id"), 1))
-    placa = limpar_texto(body.get("placa"), "").upper()
-    data_hora = limpar_texto(body.get("data_hora"), "") or datetime.now().strftime("%d/%m/%Y %H:%M")
-    tecnico = limpar_texto(body.get("tecnico"), "NETTO")
-    km_atual = int(limpar_float(body.get("km_atual"), 0))
-    oleo = limpar_texto(body.get("nivel_oleo"), "OK")
-    freios = limpar_texto(body.get("freios"), "OK")
-    pneus = limpar_texto(body.get("pneus"), "OK")
-    luzes = limpar_texto(body.get("luzes"), "OK")
-    arrefecimento = limpar_texto(body.get("arrefecimento"), "OK")
-    ar_cond = limpar_texto(body.get("ar_condicionado"), "OK")
-    sinistro = limpar_texto(body.get("avarias_sinistro"), "NENHUMA")
-    obs = limpar_texto(body.get("observacoes"), "")
-    
-    status_geral = "ALERTA" if any(v not in ["OK", "NENHUMA", "BOM"] for v in [oleo, freios, pneus, luzes, arrefecimento, sinistro]) else "APROVADO"
-
-    with get_db_connection(DB_NAME) as conn:
-        cur = conn.cursor()
-        cur.execute("""
-            INSERT INTO frota_checklists
-            (veiculo_id, placa, data_hora, tecnico, km_atual, nivel_oleo, freios, pneus, luzes, arrefecimento, ar_condicionado, avarias_sinistro, observacoes, status_geral)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (vid, placa, data_hora, tecnico, km_atual, oleo, freios, pneus, luzes, arrefecimento, ar_cond, sinistro, obs, status_geral))
-        
-        if km_atual > 0:
-            cur.execute("UPDATE veiculos SET km_atual = MAX(km_atual, ?) WHERE id = ? OR placa = ?", (km_atual, vid, placa))
-        conn.commit()
-
-    invalidar_cache_bootstrap()
-    return web.json_response({
-        "ok": True,
-        "msg": f"✅ Checklist de zelo registrado com sucesso ({status_geral})!"
-    })
-
-
-async def api_frota_imprimir_ficha(request: web.Request) -> web.Response:
-    """Gera Documento A4 Oficial: Ficha de Registro & Prontuário de Manutenção do Veículo."""
-    vid_str = request.match_info.get("id", "1")
-    vid = int(limpar_float(vid_str, 1))
-
-    with get_db_connection(DB_NAME) as conn:
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM veiculos WHERE id = ? OR placa = ?", (vid, str(vid_str).upper()))
-        v = cur.fetchone()
-        if not v:
-            return web.Response(text="<h3>Veículo não encontrado na base de dados.</h3>", content_type="text/html", status=404)
-
-        cur.execute("SELECT * FROM frota_manutencoes WHERE veiculo_id = ? OR placa = ? ORDER BY data_registro DESC", (v["id"], v["placa"]))
-        manuts = cur.fetchall()
-
-        cur.execute("SELECT * FROM frota_checklists WHERE veiculo_id = ? OR placa = ? ORDER BY id DESC LIMIT 1", (v["id"], v["placa"]))
-        ultimo_chk = cur.fetchone()
-
-    km_at = int(v["km_atual"] or 0)
-    km_pr = int(v["km_proxima_revisao"] or 50000)
-    km_ult = int(v["km_ultima_revisao"] or 0)
-    km_rest = km_pr - km_at
-    status_cor = "#15803d" if km_rest > 1000 else ("#b45309" if km_rest >= 0 else "#dc2626")
-    status_txt = "EM DIA" if km_rest > 1000 else ("ATENÇÃO: REVISÃO PRÓXIMA" if km_rest >= 0 else "REVISÃO VENCIDA")
-
-    linhas_manut_html = ""
-    if manuts:
-        for m in manuts:
-            linhas_manut_html += f"""
-            <tr>
-              <td><strong>{m['data_registro']}</strong></td>
-              <td>{m['km_registro']:,} KM</td>
-              <td><strong>{m['tipo_manutencao']}</strong></td>
-              <td>{m['oficina']}</td>
-              <td>{m['descricao']}</td>
-              <td>R$ {float(m['valor_total'] or 0.0):,.2f}</td>
-              <td>{m['km_proxima_troca']:,} KM</td>
-            </tr>
-            """.replace(",", ".")
-    else:
-        linhas_manut_html = "<tr><td colspan='7' style='text-align:center;color:#64748b;'>Nenhuma manutenção registrada neste prontuário até o momento.</td></tr>"
-
-    chk_html = "Sem checklist registrado"
-    if ultimo_chk:
-        chk_html = f"Realizado em <strong>{ultimo_chk['data_hora']}</strong> por <strong>{ultimo_chk['tecnico']}</strong> (KM: {ultimo_chk['km_atual']:,} KM) • Status: <span style='color:#15803d;font-weight:bold;'>{ultimo_chk['status_geral']}</span>".replace(",", ".")
-
-    html = f"""<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <title>Ficha de Registro & Prontuário do Veículo — {v['modelo']} ({v['placa']})</title>
-  <style>
-    @page {{ size: A4 portrait; margin: 10mm; }}
-    * {{ box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
-    body {{ background: #f8fafc; margin: 0; padding: 20px; color: #0f172a; font-size: 11.5px; }}
-    .doc-box {{ max-width: 820px; margin: 0 auto; background: #fff; border: 2px solid #002b54; border-radius: 8px; padding: 20px; }}
-    .no-print {{ background: #002b54; color: #fff; padding: 10px 16px; margin: -20px -20px 20px -20px; border-radius: 6px 6px 0 0; display: flex; justify-content: space-between; align-items: center; }}
-    .btn-print {{ background: #0077b6; color: #fff; border: none; padding: 8px 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
-    .header-tbl {{ width: 100%; border-bottom: 2px solid #002b54; padding-bottom: 10px; margin-bottom: 12px; }}
-    .title-doc {{ font-size: 15px; font-weight: 900; color: #002b54; text-transform: uppercase; }}
-    .badge-status {{ background: {status_cor}; color: #fff; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 11px; }}
-    .sec-title {{ background: #002b54; color: #fff; font-size: 11px; font-weight: 800; padding: 4px 8px; margin: 12px 0 4px 0; border-radius: 4px; text-transform: uppercase; }}
-    .data-tbl {{ width: 100%; border-collapse: collapse; margin-bottom: 8px; }}
-    .data-tbl td, .data-tbl th {{ border: 1px solid #cbd5e1; padding: 5px 8px; text-align: left; }}
-    .data-tbl th {{ background: #f1f5f9; font-weight: 700; color: #334155; }}
-    @media print {{
-      body {{ background: #fff; padding: 0; }}
-      .doc-box {{ border: 1px solid #000; max-width: 100%; padding: 10px; }}
-      .no-print {{ display: none !important; }}
-    }}
-  </style>
-</head>
-<body>
-  <div class="doc-box">
-    <div class="no-print">
-      <div><strong>EMED SISTEMA DE GESTÃO DE FROTA & MANUTENÇÃO</strong></div>
-      <button class="btn-print" onclick="window.print()">🖨️ Imprimir Ficha A4 (PDF)</button>
-    </div>
-
-    <table class="header-tbl">
-      <tr>
-        <td style="width: 70%;">
-          <div class="title-doc">PRONTUÁRIO & FICHA TÉCNICA DO VEÍCULO</div>
-          <div style="color: #64748b; font-size: 11px; margin-top: 3px;">
-            EMED Eletromedicina LTDA. • Gestão de Frotas & Telemetria GPS
-          </div>
-        </td>
-        <td style="text-align: right;">
-          <span class="badge-status">{status_txt}</span>
-          <div style="font-size: 10.5px; color: #64748b; margin-top: 5px;">Emissão: {datetime.now().strftime("%d/%m/%Y %H:%M")}</div>
-        </td>
-      </tr>
-    </table>
-
-    <div class="sec-title">1. Dados Cadastrais do Veículo</div>
-    <table class="data-tbl">
-      <tr>
-        <th>Modelo / Fabricante</th><td><strong>{v['modelo']}</strong></td>
-        <th>Placa Oficial</th><td><strong style="font-size: 13px; color: #002b54;">{v['placa']}</strong></td>
-        <th>Ano / Modelo</th><td>{v['ano_fabricacao'] or '2022/2023'}</td>
-      </tr>
-      <tr>
-        <th>Chassi</th><td>{v['chassi'] or '93YCAPTUR2026EMED'}</td>
-        <th>Renavam</th><td>{v['renavam'] or '01234567890'}</td>
-        <th>Cor</th><td>{v['cor'] or 'Branco'}</td>
-      </tr>
-      <tr>
-        <th>Combustível</th><td>{v['combustivel'] or 'Flex'}</td>
-        <th>Condutor Habitual</th><td><strong>{v['condutor_atual']}</strong></td>
-        <th>Rastreador GPS</th><td>J16 4G (IMEI: {v['imei'] or '869890080097193'})</td>
-      </tr>
-    </table>
-
-    <div class="sec-title">2. Telemetria, Odômetro & Plano de Revisão</div>
-    <table class="data-tbl">
-      <tr>
-        <th>Odômetro Atual</th>
-        <td><strong style="font-size: 14px; color: #0284c7;">{km_at:,} KM</strong></td>
-        <th>Última Revisão Realizada</th>
-        <td>{km_ult:,} KM</td>
-        <th>Próxima Revisão Programada</th>
-        <td><strong style="font-size: 13px; color: #b45309;">{km_pr:,} KM</strong></td>
-        <th>Margem Restante p/ Oficina</th>
-        <td><strong style="color: {status_cor};">{km_rest:,} KM</strong></td>
-      </tr>
-    </table>
-
-    <div class="sec-title">3. Seguro & Assistência 24 Horas</div>
-    <table class="data-tbl">
-      <tr>
-        <th>Seguradora Credenciada</th><td>{v['seguradora'] or 'Porto Seguro'}</td>
-        <th>Número da Apólice</th><td>{v['apolice_seguro'] or 'EMED-SEG-2026'}</td>
-        <th>Central de Emergência</th><td>0800 727 0800 / WhatsApp Seguradora</td>
-      </tr>
-    </table>
-
-    <div class="sec-title">4. Histórico de Manutenções & Revisões Executadas</div>
-    <table class="data-tbl">
-      <thead>
-        <tr>
-          <th>Data</th>
-          <th>KM</th>
-          <th>Tipo do Serviço</th>
-          <th>Oficina / Fornecedor</th>
-          <th>Descrição dos Serviços & Peças</th>
-          <th>Valor</th>
-          <th>Próx. Troca</th>
-        </tr>
-      </thead>
-      <tbody>
-        {linhas_manut_html}
-      </tbody>
-    </table>
-
-    <div class="sec-title">5. Último Checklist Rápido de Zelo</div>
-    <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px 12px; margin-bottom: 12px;">
-      {chk_html}
-    </div>
-
-    <table style="width: 100%; margin-top: 30px;">
-      <tr>
-        <td style="width: 50%; text-align: center; border-top: 1px solid #94a3b8; padding-top: 6px;">
-          <strong>{v['condutor_atual']}</strong><br>
-          <span style="color: #64748b; font-size: 10.5px;">Condutor Responsável</span>
-        </td>
-        <td style="width: 50%; text-align: center; border-top: 1px solid #94a3b8; padding-top: 6px;">
-          <strong>VALFREDO NETTO</strong><br>
-          <span style="color: #64748b; font-size: 10.5px;">Gestão Operacional de Frota — EMED</span>
-        </td>
-      </tr>
-    </table>
-  </div>
-</body>
-</html>"""
-    return web.Response(text=html, content_type="text/html")
 
 
 async def api_tecnico_salvar(request: web.Request) -> web.Response:
@@ -10313,52 +9802,6 @@ async def api_fiscal_auditoria_avaliar_avulso(request: web.Request) -> web.Respo
     return web.json_response({"ok": True, "avaliacao": avaliacao})
 
 
-async def api_telemetria_painel(request: web.Request) -> web.Response:
-    """Retorna o painel consolidado de telemetria de aterramento e detecção de arco elétrico."""
-    try:
-        from emed_services.telemetria_arcos import obter_painel_telemetria
-        dados = obter_painel_telemetria()
-        return web.json_response({"ok": True, "dados": dados})
-    except Exception as e:
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
-async def api_telemetria_registrar(request: web.Request) -> web.Response:
-    """Registra uma nova medição de telemetria de aterramento / arco / rigidez dielétrica TLF."""
-    try:
-        body = await request.json()
-    except Exception:
-        return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
-
-    try:
-        from emed_services.telemetria_arcos import avaliar_risco_eletrico
-        equipamento_nome = str(body.get("equipamento_nome", "Equipamento Não Informado")).strip()
-        hospital_cliente = str(body.get("hospital_cliente", "Hospital Não Informado")).strip()
-        resistencia_terra = float(body.get("resistencia_terra_ohms", 0.5))
-        microarcos = int(body.get("microarcos_por_hora", 0))
-        rigidez = float(body.get("rigidez_dieletrica_kv", 35.0))
-        pico = float(body.get("pico_transiente_arco_v", 0.0))
-        temp = float(body.get("temperatura_oleo_c", 40.0))
-        sala = str(body.get("sala_setor", "Sala de Exames")).strip()
-        eq_id = body.get("equipamento_id")
-
-        resultado = avaliar_risco_eletrico(
-            equipamento_nome=equipamento_nome,
-            hospital_cliente=hospital_cliente,
-            resistencia_terra_ohms=resistencia_terra,
-            microarcos_por_hora=microarcos,
-            rigidez_dieletrica_kv=rigidez,
-            pico_transiente_arco_v=pico,
-            temperatura_oleo_c=temp,
-            equipamento_id=eq_id,
-            sala_setor=sala
-        )
-        return web.json_response(resultado)
-    except Exception as e:
-        return web.json_response({"ok": False, "msg": f"Erro na análise de telemetria: {str(e)}"}, status=500)
-
-
-
 async def api_fiscal_cancelar_nota(request: web.Request) -> web.Response:
     """Cancela uma Nota Fiscal com registro formal de justificativa e histórico no banco de dados."""
     try:
@@ -10826,113 +10269,6 @@ async def api_cotacoes_transporte_salvar(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "msg": msg})
 
 
-
-
-async def api_logistica_deslocamento_salvar(request: web.Request) -> web.Response:
-    """Registra uma referência de deslocamento e logística auditada (combustível estrada/cidade até 7,39, hotel alta/baixa, refeição 100 e desgaste 0,31)."""
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-
-    os_id = str(body.get("os_id", "")).strip()
-    cliente = limpar_texto(body.get("cliente"), "CLIENTE NÃO INFORMADO")
-    cidade = limpar_texto(body.get("cidade"), "FORTALEZA / CE")
-    enquadramento = limpar_texto(body.get("enquadramento_contrato"), "EM_APURACAO")
-    km_ida = float(limpar_float(body.get("km_estimado_ida"), 0.0))
-    km_estrada = float(limpar_float(body.get("km_estrada"), km_ida * 2))
-    km_local = float(limpar_float(body.get("km_rodagem_local"), 30.0))
-    km_total = float(limpar_float(body.get("km_estimado_total"), km_estrada + km_local))
-    tipo_rota = limpar_texto(body.get("tipo_rota"), "EXCLUSIVA")
-    consumo_estrada_kml = float(limpar_float(body.get("consumo_estrada_kml"), 11.5))
-    consumo_cidade_kml = float(limpar_float(body.get("consumo_cidade_kml"), 8.8))
-    preco_comb = float(limpar_float(body.get("preco_combustivel"), 6.89))
-    custo_comb = float(limpar_float(body.get("custo_combustivel"), 0.0))
-    temporada_hotel = limpar_texto(body.get("temporada_hotel"), "PADRAO")
-    pernoites = int(limpar_float(body.get("qtd_pernoites"), 0))
-    custo_hotel = float(limpar_float(body.get("custo_hospedagem"), 0.0))
-    dias_refeicao = int(limpar_float(body.get("qtd_dias_refeicao"), 1))
-    custo_refeicao = float(limpar_float(body.get("custo_alimentacao"), 0.0))
-    taxa_desgaste_km = float(limpar_float(body.get("taxa_desgaste_km"), 0.31))
-    custo_desgaste = float(limpar_float(body.get("custo_desgaste"), 0.0))
-    custo_total = float(limpar_float(body.get("custo_total_operacional"), 0.0))
-    valor_faturar = float(limpar_float(body.get("valor_faturar_cliente"), 0.0))
-    obs = limpar_texto(body.get("observacoes"), "")
-    criado_por = limpar_texto(body.get("criado_por"), "SISTEMA")
-
-    with get_db_connection(DB_NAME) as conn:
-        cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS logistica_orcamentos_deslocamento (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                os_id TEXT,
-                cliente TEXT,
-                cidade TEXT,
-                enquadramento_contrato TEXT DEFAULT 'EM_APURACAO',
-                km_estimado_ida REAL,
-                km_rodagem_local REAL DEFAULT 30.0,
-                km_estimado_total REAL,
-                tipo_rota TEXT,
-                consumo_medio_kml REAL DEFAULT 11.5,
-                preco_combustivel REAL DEFAULT 6.89,
-                custo_combustivel REAL,
-                qtd_pernoites INTEGER DEFAULT 0,
-                custo_hospedagem REAL DEFAULT 0.0,
-                qtd_dias_refeicao INTEGER DEFAULT 1,
-                custo_alimentacao REAL DEFAULT 0.0,
-                custo_desgaste REAL,
-                custo_total_operacional REAL,
-                valor_faturar_cliente REAL,
-                observacoes TEXT,
-                criado_por TEXT,
-                data_calculo TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        for col_def in [
-            ("consumo_cidade_kml", "REAL DEFAULT 8.8"),
-            ("taxa_desgaste_km", "REAL DEFAULT 0.31"),
-            ("temporada_hotel", "TEXT DEFAULT 'PADRAO'")
-        ]:
-            try:
-                cur.execute(f"ALTER TABLE logistica_orcamentos_deslocamento ADD COLUMN {col_def[0]} {col_def[1]}")
-            except Exception:
-                pass
-
-        cur.execute("""
-            INSERT INTO logistica_orcamentos_deslocamento (
-                os_id, cliente, cidade, enquadramento_contrato, km_estimado_ida, km_rodagem_local,
-                km_estimado_total, tipo_rota, consumo_medio_kml, preco_combustivel, custo_combustivel,
-                qtd_pernoites, custo_hospedagem, qtd_dias_refeicao, custo_alimentacao,
-                custo_desgaste, custo_total_operacional, valor_faturar_cliente, observacoes, criado_por
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            os_id, cliente, cidade, enquadramento, km_ida, km_local,
-            km_total, tipo_rota, consumo_estrada_kml, preco_comb, custo_comb,
-            pernoites, custo_hotel, dias_refeicao, custo_refeicao,
-            custo_desgaste, custo_total, valor_faturar, obs, criado_por
-        ))
-        conn.commit()
-
-    return web.json_response({
-        "ok": True,
-        "msg": f"Auditoria logística calibrada para {cidade} gravada com sucesso!"
-    })
-
-async def api_logistica_deslocamento_historico(request: web.Request) -> web.Response:
-    """Retorna os últimos cálculos e referências de deslocamento para orçamentos da EMED."""
-    with get_db_connection(DB_NAME) as conn:
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        try:
-            rows = cur.execute("""
-                SELECT * FROM logistica_orcamentos_deslocamento ORDER BY id DESC LIMIT 50
-            """).fetchall()
-            dados = [dict(r) for r in rows]
-        except Exception:
-            dados = []
-    return web.json_response({"ok": True, "historico": dados})
-
-
 async def api_despesas_recorrentes_salvar(request: web.Request) -> web.Response:
     """Salva ou atualiza uma despesa operacional recorrente da empresa."""
     body = await request.json()
@@ -11147,48 +10483,15 @@ async def handle_simbolo_emed(request: web.Request) -> web.Response:
     return web.Response(status=404)
 
 
-async def api_hospital_tecnicos_credenciamento(request: web.Request) -> web.Response:
-    """Retorna a lista de técnicos cadastrados da EMED com CPF, RG, CFT, ASO e Placa."""
-    tecs = obter_lista_tecnicos_credenciamento(DB_NAME)
-    return web.json_response({"ok": True, "tecnicos": tecs})
-
-
 async def api_hospital_autorizacao(request: web.Request) -> web.Response:
     """Retorna dados do credenciamento e texto formatado para WhatsApp da portaria."""
     os_id = int(request.match_info.get("id", 0))
     dados = obter_dados_credenciamento_os(DB_NAME, os_id)
     if not dados.get("ok"):
         return web.json_response(dados, status=404)
-    
-    tecs_param = request.query.get("tecs", "")
-    lista_tecs = []
-    if tecs_param:
-        nomes_req = [n.strip().upper() for n in tecs_param.split(",") if n.strip()]
-        todos_tecs = obter_lista_tecnicos_credenciamento(DB_NAME)
-        lista_tecs = [t for t in todos_tecs if t["nome"].upper() in nomes_req]
-    elif dados.get("credenciamento_tecnicos"):
-        nomes_salvos = [n.strip().upper() for n in dados["credenciamento_tecnicos"].split(",") if n.strip()]
-        todos_tecs = obter_lista_tecnicos_credenciamento(DB_NAME)
-        lista_tecs = [t for t in todos_tecs if t["nome"].upper() in nomes_salvos]
-
-    texto_wa = gerar_texto_whatsapp_portaria(dados, lista_tecs)
+    texto_wa = gerar_texto_whatsapp_portaria(dados)
     dados["texto_whatsapp"] = texto_wa
     return web.json_response(dados)
-
-
-async def api_hospital_autorizacao_confirmar(request: web.Request) -> web.Response:
-    """Registra formalmente a expedição da autorização de entrada na OS."""
-    try:
-        body = await request.json()
-        os_id = int(body.get("os_id", 0))
-        tecnicos = body.get("tecnicos", [])
-        if not os_id:
-            return web.json_response({"ok": False, "msg": "ID da OS obrigatório."}, status=400)
-        
-        ok = registrar_credenciamento_os(DB_NAME, os_id, tecnicos)
-        return web.json_response({"ok": ok, "msg": f"Credenciamento da OS #{os_id} registrado com sucesso!"})
-    except Exception as e:
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
 
 
 async def api_hospital_autorizacao_imprimir(request: web.Request) -> web.Response:
@@ -11197,117 +10500,8 @@ async def api_hospital_autorizacao_imprimir(request: web.Request) -> web.Respons
     dados = obter_dados_credenciamento_os(DB_NAME, os_id)
     if not dados.get("ok"):
         return web.Response(text="Ordem de serviço não encontrada.", status=404)
-    
-    tecs_param = request.query.get("tecs", "")
-    lista_tecs = []
-    if tecs_param:
-        nomes_req = [n.strip().upper() for n in tecs_param.split(",") if n.strip()]
-        todos_tecs = obter_lista_tecnicos_credenciamento(DB_NAME)
-        lista_tecs = [t for t in todos_tecs if t["nome"].upper() in nomes_req]
-    elif dados.get("credenciamento_tecnicos"):
-        nomes_salvos = [n.strip().upper() for n in dados["credenciamento_tecnicos"].split(",") if n.strip()]
-        todos_tecs = obter_lista_tecnicos_credenciamento(DB_NAME)
-        lista_tecs = [t for t in todos_tecs if t["nome"].upper() in nomes_salvos]
-
-    html = gerar_html_autorizacao_entrada(dados, lista_tecs)
+    html = gerar_html_autorizacao_entrada(dados)
     return web.Response(text=html, content_type="text/html", charset="utf-8")
-
-
-async def api_gestao_rentabilidade_contratos(request: web.Request) -> web.Response:
-    """Calcula a rentabilidade real líquida dos contratos hospitalares cruzando receita com LogAudit."""
-    try:
-        with get_db_connection(DB_NAME) as conn:
-            cur = conn.cursor()
-            cur.execute("""
-                SELECT id, nome, cidade, tipo_contrato, segmento, telefone, email
-                FROM clientes
-                WHERE tipo_contrato = 'CONTRATO' OR segmento LIKE '%CONTRATO%'
-                ORDER BY nome ASC
-            """)
-            clientes_rows = cur.fetchall()
-
-        relatorio = []
-        contratos_receita_base = {
-            "CLÍNICA SÃO CARLOS DIAGNOSTICO POR IMAGEM LTDA - FILIAL - HOSPITAL": 6500.0,
-            "CLÍNICA SÃO CARLOS DIAGNOSTICO POR IMAGEM LTDA - MATRIZ - ANEXO": 5800.0,
-            "HOSPITAL SAO CARLOS": 6500.0,
-            "HOSPITAL SÃO CARLOS": 6500.0,
-            "HOSPITAL SÃO CARLOS GOIANÉSIA": 8200.0,
-            "IMEDIATA CLÍNICA DE SAUDE E IMAGEM": 4800.0,
-            "CLINICA IMEDIATA": 4800.0,
-            "CDI PETROLINA": 7200.0,
-            "HOSPITAL UNICLINIC": 5500.0,
-            "JOÃO DA LUZ": 6000.0
-        }
-
-        distancias_ida_volta = {
-            "FORTALEZA": 40,
-            "EUSEBIO": 20,
-            "SOBRAL": 480,
-            "ARARIPINA": 1360,
-            "PETROLINA": 1450,
-            "JUAZEIRO DO NORTE": 1020,
-            "TAUA": 720,
-            "GOIANESIA": 4200
-        }
-
-        for c in clientes_rows:
-            nome = c[1]
-            cidade = (c[2] or "FORTALEZA").upper()
-            receita_mensal = contratos_receita_base.get(nome, 4500.0)
-            km_mes = distancias_ida_volta.get(cidade, 80)
-            custo_desgaste_km = round(km_mes * 0.31, 2)
-            
-            rendimento = 11.5 if km_mes > 100 else 8.8
-            litros = km_mes / rendimento
-            preco_gasolina = 7.39 if ("ARARIPINA" in cidade or "PETROLINA" in cidade or "JUAZEIRO" in cidade) else 6.89
-            custo_combustivel = round(litros * preco_gasolina, 2)
-            
-            diarias_dias = 3 if km_mes > 1000 else (2 if km_mes > 400 else (1 if km_mes > 100 else 0))
-            custo_refeicao = diarias_dias * 100.0
-            pernoites = max(0, diarias_dias - 1)
-            tarifa_hotel = 200.0
-            custo_hospedagem = pernoites * tarifa_hotel
-            custo_pecas_mes = 350.0
-            
-            custo_logistico_total = round(custo_desgaste_km + custo_combustivel + custo_refeicao + custo_hospedagem, 2)
-            custo_total_operacao = round(custo_logistico_total + custo_pecas_mes, 2)
-            
-            margem_liquida = round(receita_mensal - custo_total_operacao, 2)
-            margem_perc = round((margem_liquida / receita_mensal) * 100.0, 1) if receita_mensal > 0 else 0.0
-            
-            classificacao = "ALTA_RENTABILIDADE" if margem_perc >= 65 else ("SAUDAVEL" if margem_perc >= 45 else ("ATENCAO" if margem_perc >= 20 else "DEFICITARIO"))
-
-            relatorio.append({
-                "cliente": nome,
-                "cidade": cidade,
-                "tipo_contrato": "CONTRATO",
-                "receita_mensal": receita_mensal,
-                "km_mes": km_mes,
-                "custo_desgaste_km": custo_desgaste_km,
-                "custo_combustivel": custo_combustivel,
-                "custo_refeicao": custo_refeicao,
-                "custo_hospedagem": custo_hospedagem,
-                "custo_logistico_total": custo_logistico_total,
-                "custo_pecas_mes": custo_pecas_mes,
-                "custo_total_operacao": custo_total_operacao,
-                "margem_liquida": margem_liquida,
-                "margem_perc": margem_perc,
-                "classificacao": classificacao
-            })
-
-        return web.json_response({
-            "ok": True,
-            "resumo": {
-                "total_contratos": len(relatorio),
-                "receita_global": sum(r["receita_mensal"] for r in relatorio),
-                "custo_global": sum(r["custo_total_operacao"] for r in relatorio),
-                "lucro_liquido_global": sum(r["margem_liquida"] for r in relatorio)
-            },
-            "contratos": relatorio
-        })
-    except Exception as e:
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
 
 
 async def api_equipamento_historico(request: web.Request) -> web.Response:
@@ -11631,7 +10825,26 @@ async def api_fazer_backup_onedrive(request: web.Request) -> web.Response:
     })
 
 
+def _iniciar_emed_nav_background():
+    """Inicia automaticamente o servidor de GPS EmedNav (porta 5000) caso ainda não esteja rodando."""
+    try:
+        import urllib.request, subprocess, sys
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:5000/api/car", timeout=0.6) as r:
+                if r.status == 200:
+                    return
+        except Exception:
+            pass
+        nav_script = os.path.join(BASE_DIR, "emed_nav", "emed_nav_server.py")
+        if os.path.exists(nav_script):
+            subprocess.Popen([sys.executable, nav_script, "5000"], cwd=BASE_DIR)
+            print("🚀 [EMED-NAV] Servidor dedicado de navegação e GPS iniciado automaticamente na porta 5000!")
+    except Exception as e:
+        print(f"⚠️ [EMED-NAV] Falha ao iniciar servidor de GPS em segundo plano: {e}")
+
+
 def criar_app() -> web.Application:
+    _iniciar_emed_nav_background()
     garantir_schema_rastreio_completo(DB_NAME)
     garantir_schema_fiscal_contabil(DB_NAME)
     garantir_schema_medicina_trabalho(DB_NAME)
@@ -11651,9 +10864,6 @@ def criar_app() -> web.Application:
     app.router.add_get("/api/simbolo-emed", handle_simbolo_emed)
     app.router.add_get("/api/hospital/autorizacao-entrada/{id}", api_hospital_autorizacao)
     app.router.add_get("/api/hospital/autorizacao-entrada/{id}/imprimir", api_hospital_autorizacao_imprimir)
-    app.router.add_get("/api/hospital/tecnicos-credenciamento", api_hospital_tecnicos_credenciamento)
-    app.router.add_post("/api/hospital/autorizacao-entrada/confirmar", api_hospital_autorizacao_confirmar)
-    app.router.add_get("/api/gestao/rentabilidade-contratos", api_gestao_rentabilidade_contratos)
     app.router.add_get("/api/equipamento/{id}/historico-anual", api_equipamento_historico)
     app.router.add_get("/qrcode/equipamento/{id}", handle_qrcode_equipamento)
     app.router.add_get("/qrcode/equipamento/{id}/etiqueta", handle_qrcode_equipamento_etiqueta)
@@ -11703,7 +10913,6 @@ def criar_app() -> web.Application:
 
 
     app.router.add_get("/api/logo-circle", handle_logo_circle)
-    app.router.add_get("/api/icone-autosave", handle_icone_autosave)
 
 
 
@@ -11744,7 +10953,6 @@ def criar_app() -> web.Application:
 
 
     app.router.add_post("/api/salvar-os", api_salvar_os)
-    app.router.add_post("/api/os/atribuir-tecnico", api_atribuir_tecnico_os)
 
 
 
@@ -11788,9 +10996,6 @@ def criar_app() -> web.Application:
 
 
     app.router.add_post("/api/veiculo/km", api_veiculo_km)
-    app.router.add_post("/api/frota/manutencao/salvar", api_frota_manutencao_salvar)
-    app.router.add_post("/api/frota/checklist/salvar", api_frota_checklist_salvar)
-    app.router.add_get("/api/frota/veiculo/{id}/imprimir-ficha", api_frota_imprimir_ficha)
 
 
 
@@ -11920,8 +11125,6 @@ def criar_app() -> web.Application:
     app.router.add_get("/api/fiscal/auditoria/detalhe/{id}", api_fiscal_auditoria_detalhe)
     app.router.add_get("/api/fiscal/avaliacao/dashboard", api_fiscal_avaliacao_dashboard)
     app.router.add_post("/api/fiscal/auditoria/avaliar-avulso", api_fiscal_auditoria_avaliar_avulso)
-    app.router.add_get("/api/telemetria/painel", api_telemetria_painel)
-    app.router.add_post("/api/telemetria/registrar", api_telemetria_registrar)
 
     app.router.add_get("/api/financeiro/relatorio-contabil", api_financeiro_relatorio_contabil)
     app.router.add_get("/api/financeiro/relatorio-contabil/imprimir", api_financeiro_relatorio_contabil_imprimir)
@@ -11929,8 +11132,6 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/transportadoras/salvar", api_transportadoras_salvar)
     app.router.add_get("/api/cotacoes-transporte", api_cotacoes_transporte_listar)
     app.router.add_post("/api/cotacoes-transporte/salvar", api_cotacoes_transporte_salvar)
-    app.router.add_post("/api/logistica/deslocamento/salvar", api_logistica_deslocamento_salvar)
-    app.router.add_get("/api/logistica/deslocamento/historico", api_logistica_deslocamento_historico)
     app.router.add_post("/api/despesas-recorrentes/salvar", api_despesas_recorrentes_salvar)
     app.router.add_get("/api/remessas-diagnostico", api_remessas_diagnostico_listar)
     app.router.add_post("/api/remessas-diagnostico/salvar", api_remessas_diagnostico_salvar)

@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>EmedNav - GPS, Waze & Radares</title>
+  
+  <!-- Configurações PWA Mobile Standalone -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="EmedNav">
+  <meta name="theme-color" content="#0a0e17">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="/static/icon-192.png">
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #080d1a; color: #f8fafc;
+      user-select: none;
+    }
+
+    #app-container {
+      display: flex; flex-direction: column; width: 100%; height: 100%; position: relative;
+    }
+
+    /* BARRA SUPERIOR DE TELEMETRIA (HUD) */
+    #hud-topbar {
+      background: linear-gradient(180deg, rgba(10, 14, 23, 0.98) 0%, rgba(15, 23, 42, 0.94) 100%);
+      backdrop-filter: blur(10px);
+      border-bottom: 1.5px solid rgba(56, 189, 248, 0.4);
+      padding: 10px 14px;
+      display: flex; align-items: center; justify-content: space-between;
+      z-index: 1000;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    }
+
+    .hud-vehicle-info {
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .hud-plate {
+      font-size: 15px; font-weight: 900; color: #38bdf8; letter-spacing: 0.5px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .hud-status-badge {
+      font-size: 10px; background: rgba(34, 197, 94, 0.2); color: #4ade80;
+      padding: 2px 6px; border-radius: 4px; font-weight: 700; border: 1px solid rgba(34, 197, 94, 0.5);
+    }
+    .hud-sub {
+      font-size: 11px; color: #94a3b8;
+    }
+
+    /* VELOCÍMETRO DIGITAL */
+    .speedo-box {
+      text-align: center;
+      background: rgba(15, 23, 42, 0.85);
+      border: 2px solid #22c55e;
+      border-radius: 12px;
+      padding: 4px 14px;
+      min-width: 88px;
+      transition: border-color 0.3s;
+    }
+    .speedo-val {
+      font-size: 32px; font-weight: 900; line-height: 1; color: #22c55e;
+    }
+    .speedo-unit {
+      font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase;
+    }
+
+    .hud-actions {
+      display: flex; gap: 6px; align-items: center;
+    }
+    .btn-hud-icon {
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid #334155;
+      color: #f8fafc;
+      border-radius: 8px;
+      width: 38px; height: 38px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; cursor: pointer;
+    }
+    .btn-hud-icon.active {
+      border-color: #38bdf8; background: rgba(56, 189, 248, 0.2); color: #38bdf8;
+    }
+
+    /* ALERTA IMINENTE DE RADAR (RADARDROID) */
+    #radar-alert-card {
+      position: absolute; top: 68px; left: 12px; right: 12px;
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border: 2px solid #ef4444;
+      border-radius: 14px;
+      padding: 12px 16px;
+      z-index: 1500;
+      box-shadow: 0 10px 30px rgba(239, 68, 68, 0.35);
+      display: none;
+      animation: alertPulse 1.2s infinite alternate;
+    }
+    @keyframes alertPulse {
+      0% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); transform: scale(1); }
+      100% { box-shadow: 0 0 25px rgba(239, 68, 68, 0.85); transform: scale(1.01); }
+    }
+    .radar-alert-content {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .radar-badge-limit {
+      background: #dc2626; color: white; border-radius: 50%;
+      width: 50px; height: 50px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .radar-limit-num { font-size: 18px; font-weight: 900; line-height: 1; }
+    .radar-limit-label { font-size: 7px; font-weight: 800; }
+    .radar-info-text { flex: 1; margin: 0 12px; }
+    .radar-alert-title { font-size: 13px; font-weight: 900; color: #f87171; letter-spacing: 0.5px; }
+    .radar-alert-road { font-size: 13px; font-weight: 700; color: #ffffff; }
+    .radar-alert-dist { font-size: 24px; font-weight: 900; color: #f8fafc; text-align: right; }
+
+    /* TOAST DE FEEDBACK RÁPIDO */
+    #toast-msg {
+      position: absolute; top: 76px; left: 50%; transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.95); border: 1.5px solid #38bdf8;
+      color: #38bdf8; font-weight: 800; font-size: 13px;
+      padding: 8px 18px; border-radius: 20px; z-index: 2000;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.7);
+      display: none; text-align: center; white-space: nowrap;
+    }
+
+    /* MAPA LEAFLET */
+    #map-wrapper {
+      flex: 1; width: 100%; position: relative; z-index: 1;
+    }
+    #map { width: 100%; height: 100%; }
+
+    /* BOTÕES FLUTUANTES NO MAPA */
+    .map-fab-stack {
+      position: absolute; right: 14px; top: 14px; z-index: 800;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .map-fab {
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(8px);
+      border: 1.5px solid rgba(56, 189, 248, 0.5);
+      color: #f8fafc;
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; cursor: pointer;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+    }
+    .map-fab:active { transform: scale(0.92); }
+
+    /* PAINEL INFERIOR DE DESTINOS & NAVEGAÇÃO RÁPIDA (BOTTOM SHEET) */
+    #bottom-sheet {
+      background: linear-gradient(0deg, #0a0e17 0%, #0f172a 100%);
+      border-top: 2px solid #38bdf8;
+      border-radius: 20px 20px 0 0;
+      padding: 12px 14px 18px 14px;
+      z-index: 1000;
+      box-shadow: 0 -8px 30px rgba(0,0,0,0.7);
+      display: flex; flex-direction: column; gap: 8px;
+      position: relative;
+    }
+
+    .search-wrapper {
+      position: relative; width: 100%;
+    }
+    .destination-row {
+      display: flex; gap: 8px; align-items: center; width: 100%;
+    }
+    .dest-input {
+      flex: 1; background: #1e293b; color: #ffffff;
+      border: 1.5px solid #334155; border-radius: 10px;
+      padding: 12px 14px; font-size: 14px; font-weight: 600;
+      outline: none;
+    }
+    .dest-input:focus { border-color: #38bdf8; }
+
+    /* BOTÃO FOGUETE COM DESTAQUE */
+    .btn-rocket-go {
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      border: 2px solid #38bdf8;
+      color: white; font-weight: 900; font-size: 15px;
+      padding: 0 16px; height: 46px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      cursor: pointer; box-shadow: 0 4px 15px rgba(2, 132, 199, 0.4);
+      flex-shrink: 0;
+    }
+    .btn-rocket-go:active { transform: scale(0.95); }
+
+    /* LISTA FLUTUANTE DE AUTOCOMPLETE */
+    #search-suggestions {
+      position: absolute; bottom: 56px; left: 0; right: 0;
+      background: #1e293b; border: 2px solid #38bdf8;
+      border-radius: 14px; max-height: 240px; overflow-y: auto;
+      z-index: 2500; box-shadow: 0 -8px 30px rgba(0,0,0,0.85);
+      display: none;
+    }
+    .suggestion-item {
+      padding: 12px 16px; font-size: 14px; font-weight: 600; color: #f8fafc;
+      border-bottom: 1px solid #334155; cursor: pointer;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .suggestion-item:last-child { border-bottom: none; }
+    .suggestion-item:active, .suggestion-item:hover {
+      background: #0284c7; color: white;
+    }
+
+    /* CHIPS DE ATALHOS RÁPIDOS */
+    .quick-chips {
+      display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .quick-chips::-webkit-scrollbar { display: none; }
+    .chip {
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid #475569;
+      color: #e2e8f0;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .chip.active, .chip:active {
+      background: #0284c7; border-color: #38bdf8; color: #ffffff;
+    }
+
+    /* RESUMO DA ROTA TRAÇADA */
+    #route-summary-bar {
+      display: none; align-items: center; justify-content: space-between;
+      background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 8px; padding: 7px 12px; font-size: 12.5px; color: #cbd5e1;
+    }
+    .route-stat { font-weight: 900; color: #38bdf8; font-size: 14px; }
+
+    /* BOTÕES DUPLOS DE NAVEGAÇÃO 1-TOQUE */
+    .nav-buttons-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .btn-nav {
+      border: none; border-radius: 12px; padding: 13px 8px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      font-size: 14px; font-weight: 900; color: white; cursor: pointer;
+      text-decoration: none; text-align: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    }
+    .btn-nav:active { transform: scale(0.97); }
+    .btn-waze {
+      background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%);
+      border: 1.5px solid #48cae4;
+    }
+    .btn-maps {
+      background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+      border: 1.5px solid #4ade80;
+    }
+
+    .hint-tap-map {
+      font-size: 11px; color: #94a3b8; text-align: center; margin-top: -3px;
+    }
+
+    /* MODAL DE NAVEGAÇÃO IMEDIATA (WAZE / MAPS) */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.82);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 99999;
+      display: none; align-items: flex-end; justify-content: center;
+      padding: 16px;
+    }
+    .modal-card {
+      background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+      border: 2px solid #38bdf8;
+      border-radius: 20px;
+      width: 100%; max-width: 480px;
+      padding: 20px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.9);
+      animation: slideUp 0.25s ease-out;
+      margin-bottom: env(safe-area-inset-bottom, 10px);
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .modal-header {
+      display: flex; align-items: center; gap: 12px; position: relative;
+    }
+    .modal-title {
+      font-size: 17px; font-weight: 900; color: #38bdf8;
+    }
+    .modal-subtitle {
+      font-size: 13px; color: #f8fafc; font-weight: 700; margin-top: 2px;
+    }
+    .btn-close-modal {
+      position: absolute; right: 0; top: 0;
+      background: rgba(255,255,255,0.1); border: none; color: #94a3b8;
+      width: 32px; height: 32px; border-radius: 50%;
+      font-size: 16px; font-weight: bold; cursor: pointer;
+    }
+    .modal-stats {
+      display: flex; gap: 8px; margin: 14px 0 8px 0;
+    }
+    .stat-pill {
+      background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #38bdf8; font-size: 12px; font-weight: 800; padding: 5px 10px; border-radius: 8px;
+    }
+    .modal-buttons {
+      display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px;
+    }
+    .btn-modal {
+      width: 100%; border: none; cursor: pointer;
+      border-radius: 14px; padding: 14px 16px;
+      display: flex; align-items: center; gap: 14px;
+      color: white; text-decoration: none; box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+      outline: none;
+    }
+    .btn-modal:active { transform: scale(0.98); }
+    .btn-modal-cancel {
+      width: 100%; background: transparent; border: 1.5px solid #475569;
+      color: #cbd5e1; border-radius: 12px; padding: 12px; font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+
+    /* POPUP LEAFLET */
+    .leaflet-popup-content-wrapper {
+      background: #1e293b !important; color: #f8fafc !important;
+      border: 1.5px solid #00b4d8 !important; border-radius: 10px !important;
+    }
+    .leaflet-popup-tip { background: #1e293b !important; }
+  </style>
+</head>
+<body>
+  <div id="app-container">
+    <!-- BARRA SUPERIOR (HUD) -->
+    <header id="hud-topbar">
+      <div class="hud-vehicle-info">
+        <div class="hud-plate">
+          🚗 Captur EMD-2026
+          <span id="badge-gps-status" class="hud-status-badge">4G J16 ONLINE</span>
+        </div>
+        <div id="hud-gps-coords" class="hud-sub">Sincronizando coordenadas...</div>
+      </div>
+
+      <!-- VELOCÍMETRO DIGITAL -->
+      <div id="speedo-indicator" class="speedo-box">
+        <div id="speedo-number" class="speedo-val">0</div>
+        <div class="speedo-unit">km/h</div>
+      </div>
+
+      <!-- AÇÕES HUD -->
+      <div class="hud-actions">
+        <button id="btn-audio-toggle" class="btn-hud-icon active" title="Alternar Alerta Sonoro">🔊</button>
+        <button id="btn-gps-source" class="btn-hud-icon" title="Alternar Fonte GPS (Carro / Celular)">🚗</button>
+      </div>
+    </header>
+
+    <!-- ALERTA IMINENTE DE RADAR (RADARDROID HUD) -->
+    <div id="radar-alert-card">
+      <div class="radar-alert-content">
+        <div class="radar-badge-limit">
+          <span id="alert-radar-limit" class="radar-limit-num">60</span>
+          <span class="radar-limit-label">KM/H</span>
+        </div>
+        <div class="radar-info-text">
+          <div class="radar-alert-title">⚠️ RADAR DETECTADO NA VIA</div>
+          <div id="alert-radar-road" class="radar-alert-road">BR-304 km 45</div>
+        </div>
+        <div id="alert-radar-dist" class="radar-alert-dist">420m</div>
+      </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast-msg">🏁 Rota traçada com sucesso!</div>
+
+    <!-- MAPA LEAFLET -->
+    <div id="map-wrapper">
+      <div id="map"></div>
+
+      <!-- BOTÕES FLUTUANTES NO MAPA -->
+      <div class="map-fab-stack">
+        <button id="btn-center-car" class="map-fab" title="Centralizar no Carro">🎯</button>
+        <button id="btn-toggle-layers" class="map-fab" title="Alternar Mapa (Satélite / Vias)">🛰️</button>
+        <button id="btn-clear-route" class="map-fab" title="Limpar Rota Ativa" style="display:none; color:#ef4444; border-color:#ef4444;">❌</button>
+        <button id="btn-fit-route" class="map-fab" title="Ver Rota Completa">🗺️</button>
+      </div>
+    </div>
+
+    <!-- PAINEL INFERIOR DE DESTINOS & NAVEGAÇÃO RÁPIDA -->
+    <footer id="bottom-sheet">
+      <!-- ATALHOS REGIONAIS 1-TOQUE -->
+      <div class="quick-chips">
+        <div class="chip" data-dest="Hospital Wilson Rosado, Mossoró, RN" data-lat="-5.1884" data-lon="-37.3486">🏥 Wilson Rosado</div>
+        <div class="chip" data-dest="Hospital Regional Tarcísio Maia, Mossoró, RN" data-lat="-5.1963" data-lon="-37.3619">🏥 Tarcísio Maia</div>
+        <div class="chip" data-dest="Hospital de Olhos de Mossoró, RN" data-lat="-5.1842" data-lon="-37.3491">🏥 Hosp. Olhos</div>
+        <div class="chip" data-dest="Hospital Maternidade Almeida Castro, Mossoró, RN" data-lat="-5.1873" data-lon="-37.3421">🏥 Almeida Castro</div>
+        <div class="chip" data-dest="Hospital São Camilo, Apodi, RN" data-lat="-5.6601" data-lon="-37.7974">🏥 Apodi</div>
+        <div class="chip" data-dest="Praia de Tibau, Tibau, RN" data-lat="-4.8391" data-lon="-37.2531">🏖️ Tibau</div>
+        <div class="chip" data-dest="Hospital Regional Nelson Inácio dos Santos, Assú, RN" data-lat="-5.5768" data-lon="-36.9102">🏥 Assú</div>
+        <div class="chip" data-dest="Hospital Regional Dr. Cleodon Carlos, Pau dos Ferros, RN" data-lat="-6.1132" data-lon="-38.2045">🏥 Pau dos Ferros</div>
+        <div class="chip" data-dest="Hospital Walfredo Gurgel, Natal, RN" data-lat="-5.8115" data-lon="-35.2082">🏥 Natal (HRWG)</div>
+        <div class="chip" data-dest="Sede EMED, Eusébio, CE" data-lat="-3.8856" data-lon="-38.4614">🏢 Sede EMED</div>
+      </div>
+
+      <!-- SELEÇÃO / DIGITAÇÃO DE DESTINO COM AUTOCOMPLETE -->
+      <div class="search-wrapper">
+        <div id="search-suggestions"></div>
+        <div class="destination-row">
+          <input type="text" id="input-destination" class="dest-input" placeholder="Buscar destino, hospital ou cidade..." autocomplete="off" />
+          <button id="btn-calc-route" class="btn-rocket-go" title="Iniciar Navegação">
+            <span>IR</span> 🚀
+          </button>
+        </div>
+      </div>
+
+      <div class="hint-tap-map">👆 <strong>Dica:</strong> Toque em qualquer ponto do mapa para traçar rota até lá!</div>
+
+      <!-- RESUMO DA ROTA -->
+      <div id="route-summary-bar">
+        <span>Distância: <strong id="lbl-route-km" class="route-stat">-- km</strong></span>
+        <span>Tempo: <strong id="lbl-route-min" class="route-stat">-- min</strong></span>
+        <button id="btn-clear-inline" style="background:transparent; border:none; color:#ef4444; font-size:12px; font-weight:bold; cursor:pointer;">Limpar ✖</button>
+      </div>
+
+      <!-- BOTÕES NAVEGAR NO WAZE E GOOGLE MAPS -->
+      <div class="nav-buttons-grid">
+        <button id="btn-launch-waze" class="btn-nav btn-waze" type="button">
+          <span>🚀</span> NAVEGAR NO WAZE
+        </button>
+        <button id="btn-launch-maps" class="btn-nav btn-maps" type="button">
+          <span>🧭</span> NAVEGAR NO MAPS
+        </button>
+      </div>
+    </footer>
+
+    <!-- MODAL DE NAVEGAÇÃO IMEDIATA (WAZE / MAPS) -->
+    <div id="nav-action-modal" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div style="font-size: 28px;">🎯</div>
+          <div style="flex:1;">
+            <div class="modal-title">Destino Localizado!</div>
+            <div id="modal-dest-name" class="modal-subtitle">Hospital Regional Tarcísio Maia</div>
+          </div>
+          <button id="btn-close-modal" class="btn-close-modal" type="button">✕</button>
+        </div>
+
+        <div class="modal-stats">
+          <div class="stat-pill">🛣️ <span id="modal-km">-- km</span></div>
+          <div class="stat-pill">⏱️ <span id="modal-time">-- min</span></div>
+          <div class="stat-pill">🚗 Captur EMD-2026</div>
+        </div>
+
+        <div style="font-size: 13px; color: #94a3b8; margin: 10px 0 14px 0; font-weight: 600;">
+          Iniciar navegação curva a curva com o GPS do veículo:
+        </div>
+
+        <div class="modal-buttons">
+          <button id="modal-btn-waze" class="btn-modal btn-waze" type="button">
+            <span style="font-size: 28px;">🚀</span>
+            <div style="text-align: left;">
+              <div style="font-size: 16px; font-weight: 900; letter-spacing: 0.3px;">ABRIR NO WAZE AGORA</div>
+              <div style="font-size: 11px; opacity: 0.95;">Alertas de radares, velocidade e trânsito ao vivo</div>
+            </div>
+          </button>
+
+          <button id="modal-btn-maps" class="btn-modal btn-maps" type="button">
+            <span style="font-size: 28px;">🧭</span>
+            <div style="text-align: left;">
+              <div style="font-size: 16px; font-weight: 900; letter-spacing: 0.3px;">ABRIR NO GOOGLE MAPS</div>
+              <div style="font-size: 11px; opacity: 0.95;">Navegação com satélite e mapas offline</div>
+            </div>
+          </button>
+        </div>
+
+        <button id="btn-modal-stay" class="btn-modal-cancel" type="button">🗺️ Ver Rota no Mapa do EmedNav</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ESTADO DA APLICAÇÃO
+    const state = {
+      carLat: -5.186871,
+      carLon: -37.372066,
+      carSpeed: 0,
+      carHeading: 0,
+      source: 'CAR', // 'CAR' ou 'PHONE'
+      audioEnabled: true,
+      lastSpokenRadarId: null,
+      destLat: null,
+      destLon: null,
+      destName: '',
+      radars: [],
+      routePolyline: null,
+      routeBackGlow: null,
+      destMarker: null,
+      carMarker: null,
+      mapMode: 'ROADS', // 'ROADS', 'SAT', 'OSM'
+      searchTimer: null
+    };
+
+    // INICIALIZAÇÃO DO MAPA LEAFLET
+    const map = L.map('map', {
+      zoomControl: false,
+      attributionControl: false
+    }).setView([state.carLat, state.carLon], 15);
+
+    // CAMADAS DE TILES (ZERO MARCA D'ÁGUA)
+    const tileGoogleRoads = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+    });
+
+    const tileGoogleHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+      maxZoom: 20,
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+    });
+
+    const tileOSM = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19
+    });
+
+    tileGoogleRoads.addTo(map);
+
+    // ÍCONE DO VEÍCULO (CAPTUR EMD-2026)
+    const carIconHtml = `
+      <div style="position: relative; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center;">
+        <div style="position: absolute; width: 46px; height: 46px; border-radius: 50%; background: rgba(56, 189, 248, 0.4); animation: pulseRadar 1.8s infinite;"></div>
+        <div style="background: #0284c7; border: 2.5px solid #ffffff; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,0.8); font-size: 18px;">
+          🚗
+        </div>
+      </div>
+      <style>
+        @keyframes pulseRadar {
+          0% { transform: scale(0.6); opacity: 1; }
+          100% { transform: scale(1.6); opacity: 0; }
+        }
+      </style>
+    `;
+    const carIcon = L.divIcon({ html: carIconHtml, className: 'car-marker-icon', iconSize: [46, 46], iconAnchor: [23, 23] });
+    state.carMarker = L.marker([state.carLat, state.carLon], { icon: carIcon }).addTo(map)
+      .bindPopup(`<strong>🚗 Renault Captur EMD-2026</strong><br>Posição GPS em Tempo Real`);
+
+    // ÍCONE DE DESTINO
+    function setDestMarker(lat, lon, nome) {
+      if (state.destMarker) map.removeLayer(state.destMarker);
+      const destHtml = `
+        <div style="background: #dc2626; color: white; border: 2.5px solid white; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,0.8); font-size: 20px;">
+          🏁
+        </div>
+      `;
+      const destIcon = L.divIcon({ html: destHtml, className: 'dest-marker-icon', iconSize: [38, 38], iconAnchor: [19, 19] });
+      state.destMarker = L.marker([lat, lon], { icon: destIcon }).addTo(map)
+        .bindPopup(`<strong>🏁 Destino:</strong><br>${nome}`).openPopup();
+    }
+
+    // TOAST NOTIFICATION
+    function showToast(msg) {
+      const t = document.getElementById('toast-msg');
+      t.innerText = msg;
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 3200);
+    }
+
+    // ÍCONE DE RADAR
+    function getRadarIcon(vel) {
+      return L.divIcon({
+        html: `<div style="background: #dc2626; color: white; border: 2px solid white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; box-shadow: 0 3px 8px rgba(0,0,0,0.6);">${vel}</div>`,
+        className: 'radar-pin',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      });
+    }
+
+    // HAVERSINE
+    function calcDistanceMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    // ALERTA SONORO
+    function triggerAudioAlert(radar, distM) {
+      if (!state.audioEnabled) return;
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+      } catch (e) {}
+
+      if ('speechSynthesis' in window && state.lastSpokenRadarId !== radar.via + radar.vel) {
+        state.lastSpokenRadarId = radar.via + radar.vel;
+        const msg = new SpeechSynthesisUtterance(`Atenção, radar de ${radar.vel} quilômetros por hora a ${Math.round(distM)} metros.`);
+        msg.lang = 'pt-BR';
+        msg.rate = 1.1;
+        window.speechSynthesis.speak(msg);
+      }
+    }
+
+    // VERIFICADOR DE RADARES
+    function checkRadarProximity() {
+      let closestRadar = null;
+      let minDistance = Infinity;
+
+      for (const r of state.radars) {
+        const dist = calcDistanceMeters(state.carLat, state.carLon, r.lat, r.lon);
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestRadar = r;
+        }
+      }
+
+      const alertBox = document.getElementById('radar-alert-card');
+      if (closestRadar && minDistance <= 1200) {
+        alertBox.style.display = 'block';
+        document.getElementById('alert-radar-limit').innerText = closestRadar.vel;
+        document.getElementById('alert-radar-road').innerText = `${closestRadar.via} (${closestRadar.municipio})`;
+        document.getElementById('alert-radar-dist').innerText = minDistance < 1000 ? `${Math.round(minDistance)}m` : `${(minDistance/1000).toFixed(1)}km`;
+
+        if (state.carSpeed > closestRadar.vel) {
+          alertBox.style.borderColor = '#ef4444';
+          alertBox.style.background = 'linear-gradient(135deg, #450a0a 0%, #1e1b4b 100%)';
+        } else {
+          alertBox.style.borderColor = '#f59e0b';
+          alertBox.style.background = 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)';
+        }
+
+        if (minDistance <= 600) {
+          triggerAudioAlert(closestRadar, minDistance);
+        }
+      } else {
+        alertBox.style.display = 'none';
+        state.lastSpokenRadarId = null;
+      }
+    }
+
+    function updateNavLinks() {
+      // Função mantida para sincronia com telemetria
+    }
+
+    // MODAL DE AÇÃO DE NAVEGAÇÃO
+    function openNavModal() {
+      document.getElementById('modal-dest-name').innerText = state.destName || 'Destino Selecionado';
+      document.getElementById('nav-action-modal').style.display = 'flex';
+    }
+
+    function closeNavModal() {
+      document.getElementById('nav-action-modal').style.display = 'none';
+    }
+
+    document.getElementById('btn-close-modal').addEventListener('click', closeNavModal);
+    document.getElementById('btn-modal-stay').addEventListener('click', closeNavModal);
+
+    // DEEP LINKING NATIVO: WAZE & GOOGLE MAPS COM GPS DO CARRO
+    function launchWaze(lat, lon, destName) {
+      const dLat = lat || state.destLat;
+      const dLon = lon || state.destLon;
+      const name = destName || state.destName || document.getElementById('input-destination').value.trim();
+
+      if (!dLat || !dLon) {
+        if (name) {
+          showToast('🚀 Abrindo Waze pelo endereço...');
+          window.location.href = `waze://?q=${encodeURIComponent(name)}&navigate=yes`;
+          setTimeout(() => {
+            window.open(`https://waze.com/ul?q=${encodeURIComponent(name)}&navigate=yes`, '_system');
+          }, 700);
+          return;
+        }
+        showToast('⚠️ Escolha um destino ou digite o endereço!');
+        return;
+      }
+
+      showToast('🚀 Abrindo Waze com o GPS do carro...');
+      window.location.href = `waze://?ll=${dLat},${dLon}&navigate=yes`;
+      setTimeout(() => {
+        window.open(`https://waze.com/ul?ll=${dLat},${dLon}&navigate=yes`, '_system');
+      }, 700);
+    }
+
+    function launchGoogleMaps(lat, lon, destName) {
+      const oLat = state.carLat;
+      const oLon = state.carLon;
+      const dLat = lat || state.destLat;
+      const dLon = lon || state.destLon;
+      const name = destName || state.destName || document.getElementById('input-destination').value.trim();
+
+      if (!dLat || !dLon) {
+        if (name) {
+          showToast('🧭 Abrindo Google Maps pelo endereço...');
+          window.location.href = `google.navigation:q=${encodeURIComponent(name)}&mode=d`;
+          setTimeout(() => {
+            window.open(`https://www.google.com/maps/dir/?api=1&origin=${oLat},${oLon}&destination=${encodeURIComponent(name)}&travelmode=driving`, '_system');
+          }, 700);
+          return;
+        }
+        showToast('⚠️ Escolha um destino ou digite o endereço!');
+        return;
+      }
+
+      showToast('🧭 Abrindo Google Maps Navegação...');
+      window.location.href = `google.navigation:q=${dLat},${dLon}&mode=d`;
+      setTimeout(() => {
+        window.open(`https://www.google.com/maps/dir/?api=1&origin=${oLat},${oLon}&destination=${dLat},${dLon}&travelmode=driving`, '_system');
+      }, 700);
+    }
+
+    // TRAÇADOR E FIXADOR DE DESTINO INSTANTÂNEO (0ms DE DELAY)
+    function setDestination(lat, lon, nome, autoOpenModal = true) {
+      state.destLat = lat;
+      state.destLon = lon;
+      state.destName = nome;
+      document.getElementById('input-destination').value = nome;
+
+      setDestMarker(lat, lon, nome);
+
+      // Traço provisório instantâneo no mapa
+      if (state.routeBackGlow) map.removeLayer(state.routeBackGlow);
+      if (state.routePolyline) map.removeLayer(state.routePolyline);
+
+      state.routePolyline = L.polyline([[state.carLat, state.carLon], [lat, lon]], {
+        color: '#00b4d8',
+        weight: 4,
+        dashArray: '8, 8',
+        opacity: 0.95
+      }).addTo(map);
+
+      map.fitBounds([[state.carLat, state.carLon], [lat, lon]], { padding: [50, 50] });
+
+      const distEstKm = ((calcDistanceMeters(state.carLat, state.carLon, lat, lon) / 1000) * 1.25).toFixed(1);
+      const timeEstMin = Math.max(2, Math.round((distEstKm / 45) * 60));
+
+      document.getElementById('lbl-route-km').innerText = `${distEstKm} km`;
+      document.getElementById('lbl-route-min').innerText = `${timeEstMin} min`;
+      document.getElementById('modal-km').innerText = `${distEstKm} km`;
+      document.getElementById('modal-time').innerText = `${timeEstMin} min`;
+      document.getElementById('modal-dest-name').innerText = nome;
+      document.getElementById('route-summary-bar').style.display = 'flex';
+      document.getElementById('btn-clear-route').style.display = 'flex';
+
+      if (autoOpenModal) {
+        openNavModal();
+      }
+
+      // Busca traçado real pelas rodovias em background (sem travar nada na interface)
+      fetch(`/api/route?origin_lat=${state.carLat}&origin_lon=${state.carLon}&dest_lat=${lat}&dest_lon=${lon}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.coordinates && state.destLat === lat) {
+            if (state.routeBackGlow) map.removeLayer(state.routeBackGlow);
+            if (state.routePolyline) map.removeLayer(state.routePolyline);
+
+            state.routeBackGlow = L.polyline(data.coordinates, {
+              color: '#1e3a8a',
+              weight: 9,
+              opacity: 0.85,
+              lineJoin: 'round'
+            }).addTo(map);
+
+            state.routePolyline = L.polyline(data.coordinates, {
+              color: '#00b4d8',
+              weight: 5,
+              opacity: 1.0,
+              lineJoin: 'round'
+            }).addTo(map);
+
+            document.getElementById('lbl-route-km').innerText = `${data.distance_km} km`;
+            document.getElementById('lbl-route-min').innerText = `${data.duration_min} min`;
+            document.getElementById('modal-km').innerText = `${data.distance_km} km`;
+            document.getElementById('modal-time').innerText = `${data.duration_min} min`;
+            map.fitBounds(state.routePolyline.getBounds(), { padding: [50, 50] });
+          }
+        })
+        .catch(() => {});
+    }
+
+    // LIMPAR ROTA ATIVA
+    function clearRoute() {
+      if (state.routeBackGlow) map.removeLayer(state.routeBackGlow);
+      if (state.routePolyline) map.removeLayer(state.routePolyline);
+      if (state.destMarker) map.removeLayer(state.destMarker);
+      state.routeBackGlow = null;
+      state.routePolyline = null;
+      state.destMarker = null;
+      state.destLat = null;
+      state.destLon = null;
+      state.destName = '';
+      document.getElementById('input-destination').value = '';
+      document.getElementById('route-summary-bar').style.display = 'none';
+      document.getElementById('btn-clear-route').style.display = 'none';
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      closeNavModal();
+      map.setView([state.carLat, state.carLon], 15);
+      showToast('❌ Rota cancelada. Modo livre.');
+    }
+
+    // 🎯 RECURSO CHAVE: TOQUE NO MAPA PARA TRAÇAR ROTA ATÉ LÁ!
+    map.on('click', async (e) => {
+      const lat = e.latlng.lat;
+      const lon = e.latlng.lng;
+      let labelPonto = `Ponto no Mapa (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      setDestination(lat, lon, labelPonto, true);
+
+      try {
+        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+        const geoData = await geoRes.json();
+        if (geoData && geoData.display_name) {
+          const parts = geoData.display_name.split(',').slice(0, 2).join(', ');
+          state.destName = parts;
+          document.getElementById('input-destination').value = parts;
+          document.getElementById('modal-dest-name').innerText = parts;
+          if (state.destMarker) state.destMarker.bindPopup(`<strong>🏁 Destino:</strong><br>${parts}`).openPopup();
+        }
+      } catch (err) {}
+    });
+
+    // AUTOCOMPLETE INTELIGENTE NO CAMPO DE BUSCA
+    const inputDest = document.getElementById('input-destination');
+    const suggBox = document.getElementById('search-suggestions');
+
+    inputDest.addEventListener('input', () => {
+      clearTimeout(state.searchTimer);
+      const q = inputDest.value.trim().replace(/^[^a-zA-Z0-9]+/, '');
+      if (q.length < 2) {
+        suggBox.style.display = 'none';
+        return;
+      }
+
+      state.searchTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+          const data = await res.json();
+          if (data.success && data.results.length > 0) {
+            suggBox.innerHTML = '';
+            data.results.forEach(item => {
+              const div = document.createElement('div');
+              div.className = 'suggestion-item';
+              div.innerText = item.label;
+              
+              div.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                suggBox.style.display = 'none';
+                inputDest.blur();
+                document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+                const cleanName = item.label.replace(/^[^a-zA-Z0-9]+/, '');
+                setDestination(item.lat, item.lon, cleanName, true);
+              });
+
+              suggBox.appendChild(div);
+            });
+            suggBox.style.display = 'block';
+          } else {
+            suggBox.style.display = 'none';
+          }
+        } catch (e) {
+          suggBox.style.display = 'none';
+        }
+      }, 250);
+    });
+
+    // FECHA SUGESTÕES AO CLICAR FORA
+    document.addEventListener('click', (e) => {
+      if (!inputDest.contains(e.target) && !suggBox.contains(e.target)) {
+        suggBox.style.display = 'none';
+      }
+    });
+
+    // BOTÃO FOGUETE "IR 🚀" (DISPARA NAVEGAÇÃO E TRAÇADO)
+    async function triggerRocketAction(e) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      const q = inputDest.value.trim();
+      if (!q) {
+        showToast('⚠️ Digite o endereço ou toque no mapa!');
+        return;
+      }
+      suggBox.style.display = 'none';
+      inputDest.blur();
+
+      // Se já temos a coordenada deste destino ativo, abre o modal de navegação instantaneamente
+      if (state.destLat && state.destLon && state.destName) {
+        openNavModal();
+        return;
+      }
+
+      // Se é um novo texto digitado, busca rápido
+      const btnRocket = document.getElementById('btn-calc-route');
+      btnRocket.innerHTML = '<span>...</span> ⏳';
+
+      const cleanQ = q.replace(/^[^a-zA-Z0-9]+/, '');
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(cleanQ)}`);
+        const data = await res.json();
+        if (data.success && data.results && data.results.length > 0) {
+          const top = data.results[0];
+          const cleanName = top.label.replace(/^[^a-zA-Z0-9]+/, '');
+          setDestination(top.lat, top.lon, cleanName, true);
+        } else {
+          // Fallback geocode
+          const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=br&limit=1&q=${encodeURIComponent(cleanQ)}`);
+          const geoData = await geoRes.json();
+          if (geoData.length > 0) {
+            setDestination(parseFloat(geoData[0].lat), parseFloat(geoData[0].lon), cleanQ, true);
+          } else {
+            state.destName = cleanQ;
+            state.destLat = null;
+            state.destLon = null;
+            openNavModal();
+          }
+        }
+      } catch (err) {
+        state.destName = cleanQ;
+        openNavModal();
+      } finally {
+        btnRocket.innerHTML = '<span>IR</span> 🚀';
+      }
+    }
+
+    const btnCalc = document.getElementById('btn-calc-route');
+    btnCalc.addEventListener('click', triggerRocketAction);
+
+    inputDest.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        triggerRocketAction(e);
+      }
+    });
+
+    // BOTÕES DE AÇÃO DO MODAL E DO PAINEL PRINCIPAL
+    document.getElementById('modal-btn-waze').addEventListener('click', () => {
+      closeNavModal();
+      launchWaze();
+    });
+
+    document.getElementById('modal-btn-maps').addEventListener('click', () => {
+      closeNavModal();
+      launchGoogleMaps();
+    });
+
+    document.getElementById('btn-launch-waze').addEventListener('click', () => {
+      if (state.destLat && state.destLon) {
+        launchWaze();
+      } else {
+        triggerRocketAction();
+      }
+    });
+
+    document.getElementById('btn-launch-maps').addEventListener('click', () => {
+      if (state.destLat && state.destLon) {
+        launchGoogleMaps();
+      } else {
+        triggerRocketAction();
+      }
+    });
+
+    // TELEMETRIA
+    async function fetchCarTelemetry() {
+      if (state.source !== 'CAR') return;
+      try {
+        const res = await fetch('/api/car');
+        const data = await res.json();
+        if (data.success) {
+          state.carLat = data.lat;
+          state.carLon = data.lon;
+          state.carSpeed = data.speed || 0;
+
+          state.carMarker.setLatLng([state.carLat, state.carLon]);
+
+          const speedEl = document.getElementById('speedo-number');
+          const boxEl = document.getElementById('speedo-indicator');
+          speedEl.innerText = Math.round(state.carSpeed);
+          
+          if (state.carSpeed > 85) {
+            speedEl.style.color = '#ef4444'; boxEl.style.borderColor = '#ef4444';
+          } else if (state.carSpeed > 60) {
+            speedEl.style.color = '#f59e0b'; boxEl.style.borderColor = '#f59e0b';
+          } else {
+            speedEl.style.color = '#22c55e'; boxEl.style.borderColor = '#22c55e';
+          }
+
+          document.getElementById('hud-gps-coords').innerText = `${data.lat.toFixed(5)}, ${data.lon.toFixed(5)} • ${data.updated_at}`;
+          document.getElementById('badge-gps-status').innerText = data.speed > 5 ? 'EM MOVIMENTO' : '4G J16 ONLINE';
+
+          checkRadarProximity();
+          updateNavLinks();
+        }
+      } catch (e) {
+        console.error('Erro telemetria:', e);
+      }
+    }
+
+    // CARREGAR BANCO DE RADARES
+    async function loadRadars() {
+      try {
+        const res = await fetch('/api/radars');
+        const data = await res.json();
+        if (data.success) {
+          state.radars = data.radars;
+          data.radars.forEach(r => {
+            L.marker([r.lat, r.lon], { icon: getRadarIcon(r.vel) })
+              .addTo(map)
+              .bindPopup(`<strong>⚡ Radar ${r.vel} km/h</strong><br>${r.via}<br>${r.municipio}/${r.uf}`);
+          });
+        }
+      } catch (e) {}
+    }
+
+    // EVENTOS DOS BOTÕES
+    document.getElementById('btn-center-car').addEventListener('click', () => {
+      map.flyTo([state.carLat, state.carLon], 16);
+    });
+
+    document.getElementById('btn-fit-route').addEventListener('click', () => {
+      if (state.routePolyline) {
+        map.fitBounds(state.routePolyline.getBounds(), { padding: [50, 50] });
+      } else {
+        map.setView([state.carLat, state.carLon], 15);
+      }
+    });
+
+    document.getElementById('btn-clear-route').addEventListener('click', clearRoute);
+    document.getElementById('btn-clear-inline').addEventListener('click', clearRoute);
+
+    // ALTERNADOR DE MAPA: GOOGLE RUAS ➔ GOOGLE SATÉLITE ➔ OSM
+    document.getElementById('btn-toggle-layers').addEventListener('click', () => {
+      if (state.mapMode === 'ROADS') {
+        map.removeLayer(tileGoogleRoads);
+        tileGoogleHybrid.addTo(map);
+        state.mapMode = 'SAT';
+        document.getElementById('btn-toggle-layers').innerText = '🗺️';
+        showToast('🛰️ Mapa alterado para Satélite Google');
+      } else if (state.mapMode === 'SAT') {
+        map.removeLayer(tileGoogleHybrid);
+        tileOSM.addTo(map);
+        state.mapMode = 'OSM';
+        document.getElementById('btn-toggle-layers').innerText = '🌐';
+        showToast('🌐 Mapa alterado para OpenStreetMap');
+      } else {
+        map.removeLayer(tileOSM);
+        tileGoogleRoads.addTo(map);
+        state.mapMode = 'ROADS';
+        document.getElementById('btn-toggle-layers').innerText = '🛰️';
+        showToast('🗺️ Mapa alterado para Google Ruas Oficial');
+      }
+    });
+
+    document.getElementById('btn-audio-toggle').addEventListener('click', () => {
+      state.audioEnabled = !state.audioEnabled;
+      const btn = document.getElementById('btn-audio-toggle');
+      if (state.audioEnabled) {
+        btn.classList.add('active'); btn.innerText = '🔊';
+        showToast('🔊 Alerta sonoro de radares ativado');
+      } else {
+        btn.classList.remove('active'); btn.innerText = '🔇';
+        showToast('🔇 Alerta sonoro de radares silenciado');
+      }
+    });
+
+    document.getElementById('btn-gps-source').addEventListener('click', () => {
+      const btn = document.getElementById('btn-gps-source');
+      if (state.source === 'CAR') {
+        state.source = 'PHONE';
+        btn.innerText = '📱';
+        document.getElementById('badge-gps-status').innerText = 'GPS DO CELULAR';
+        showToast('📱 Usando sensor GPS do Celular');
+        if (navigator.geolocation) {
+          navigator.geolocation.watchPosition((pos) => {
+            state.carLat = pos.coords.latitude;
+            state.carLon = pos.coords.longitude;
+            state.carSpeed = (pos.coords.speed || 0) * 3.6;
+            state.carMarker.setLatLng([state.carLat, state.carLon]);
+            document.getElementById('speedo-number').innerText = Math.round(state.carSpeed);
+            checkRadarProximity();
+            updateNavLinks();
+          }, null, { enableHighAccuracy: true });
+        }
+      } else {
+        state.source = 'CAR';
+        btn.innerText = '🚗';
+        document.getElementById('badge-gps-status').innerText = '4G J16 ONLINE';
+        showToast('🚗 Usando rastreador J16 da Captur');
+      }
+    });
+
+    // CHIPS DE SELEÇÃO RÁPIDA
+    document.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        const destName = chip.dataset.dest;
+        const lat = parseFloat(chip.dataset.lat);
+        const lon = parseFloat(chip.dataset.lon);
+        setDestination(lat, lon, destName, true);
+      });
+    });
+
+    // REGISTRO DE SERVICE WORKER
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+    }
+
+    // INICIALIZAÇÃO
+    loadRadars();
+    fetchCarTelemetry();
+    setInterval(fetchCarTelemetry, 2500);
+  </script>
+</body>
+</html>
