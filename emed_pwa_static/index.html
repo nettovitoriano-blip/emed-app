@@ -80858,6 +80858,255 @@ function renderizarNavegacao() {
 
 
 
+
+    function fecharModalFichaVeiculo() {
+      const m = document.getElementById("modalFichaVeiculo");
+      if (m) m.style.display = "none";
+    }
+
+    function fecharModalLancarManutencao() {
+      const m = document.getElementById("modalLancarManutencao");
+      if (m) m.style.display = "none";
+    }
+
+    function fecharModalChecklistVeiculo() {
+      const m = document.getElementById("modalChecklistVeiculo");
+      if (m) m.style.display = "none";
+    }
+
+    function abrirFichaVeiculo(vid) {
+      const veiculos = STATE.data?.veiculos || [];
+      const v = veiculos.find(x => x.id === vid) || veiculos[0];
+      if (!v) return;
+
+      const m = document.getElementById("modalFichaVeiculo");
+      const b = document.getElementById("modalFichaVeiculoBody");
+      if (!m || !b) return;
+
+      const manuts = v.manutencoes || [];
+      const checks = v.checklists || [];
+      const kmRest = (v.km_proxima_revisao || 50000) - (v.km_atual || 0);
+      const stCor = kmRest > 1000 ? "#15803d" : (kmRest >= 0 ? "#b45309" : "#dc2626");
+      const stTxt = kmRest > 1000 ? "EM DIA" : (kmRest >= 0 ? "ATENÇÃO: REVISÃO PRÓXIMA" : "REVISÃO VENCIDA");
+
+      let manutsHtml = "";
+      if (manuts.length) {
+        manutsHtml = manuts.map(man => `
+          <tr>
+            <td><strong>${esc(man.data_registro)}</strong></td>
+            <td>${(man.km_registro||0).toLocaleString('pt-BR')} KM</td>
+            <td><strong>${esc(man.tipo_manutencao)}</strong></td>
+            <td>${esc(man.oficina)}</td>
+            <td>${esc(man.descricao)}</td>
+            <td style="color:#15803d;font-weight:bold;">R$ ${(man.valor_total||0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+            <td>${(man.km_proxima_troca||0).toLocaleString('pt-BR')} KM</td>
+          </tr>
+        `).join("");
+      } else {
+        manutsHtml = `<tr><td colspan="7" style="text-align:center;color:#64748b;padding:15px;">Nenhuma manutenção registrada neste prontuário até o momento.</td></tr>`;
+      }
+
+      let chkHtml = "";
+      if (checks.length) {
+        chkHtml = checks.slice(0, 5).map(c => `
+          <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:10px;margin-bottom:8px;font-size:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div><strong>📅 ${esc(c.data_hora)}</strong> • Resp: <b>${esc(c.tecnico)}</b> (${(c.km_atual||0).toLocaleString('pt-BR')} KM)</div>
+              <span class="badge ${c.status_geral === 'APROVADO' ? 'concluido' : 'critica'}">${esc(c.status_geral)}</span>
+            </div>
+            <div style="margin-top:6px;color:#475569;display:flex;gap:12px;flex-wrap:wrap;">
+              <span>Óleo: <b>${esc(c.nivel_oleo)}</b></span>
+              <span>Freios: <b>${esc(c.freios)}</b></span>
+              <span>Pneus: <b>${esc(c.pneus)}</b></span>
+              <span>Luzes: <b>${esc(c.luzes)}</b></span>
+              <span>Arrefecimento: <b>${esc(c.arrefecimento)}</b></span>
+              <span>Avarias/Sinistro: <b style="color:${c.avarias_sinistro !== 'NENHUMA' ? '#dc2626' : '#15803d'};">${esc(c.avarias_sinistro)}</b></span>
+            </div>
+            ${c.observacoes ? `<div style="margin-top:4px;color:#64748b;">Obs: ${esc(c.observacoes)}</div>` : ''}
+          </div>
+        `).join("");
+      } else {
+        chkHtml = `<div style="text-align:center;color:#64748b;padding:15px;">Nenhum checklist registrado para este carro.</div>`;
+      }
+
+      b.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;border-bottom:1px solid #e2e8f0;padding-bottom:12px;margin-bottom:12px;">
+          <div>
+            <div style="font-size:18px;font-weight:900;color:#002b54;">🚘 ${esc(v.modelo)} • <span style="color:#0284c7;">${esc(v.placa)}</span></div>
+            <div style="font-size:12px;color:#64748b;">Condutor Habitual: <b>${esc(v.condutor_atual||'Base')}</b> • Seguro: <b>${esc(v.seguradora||'Porto Seguro')}</b></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="abrirModalLancarManutencao(${v.id})">🔧 + Lançar Manutenção</button>
+            <button class="btn btn-outline btn-sm" style="border-color:#16a34a;color:#16a34a;" onclick="abrirModalChecklistVeiculo(${v.id})">⚡ Checklist Rápido</button>
+            <a class="btn btn-secondary btn-sm" href="/api/frota/veiculo/${v.id}/imprimir-ficha" target="_blank">🖨️ Imprimir Ficha A4</a>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;">
+          <div style="background:#f1f5f9;border-radius:8px;padding:10px;text-align:center;">
+            <div style="font-size:11px;color:#64748b;font-weight:bold;">ODÔMETRO ATUAL</div>
+            <div style="font-size:18px;font-weight:900;color:#0284c7;">${(v.km_atual||0).toLocaleString('pt-BR')} KM</div>
+          </div>
+          <div style="background:#f1f5f9;border-radius:8px;padding:10px;text-align:center;">
+            <div style="font-size:11px;color:#64748b;font-weight:bold;">ÚLTIMA REVISÃO</div>
+            <div style="font-size:18px;font-weight:900;color:#475569;">${(v.km_ultima_revisao||0).toLocaleString('pt-BR')} KM</div>
+          </div>
+          <div style="background:#f1f5f9;border-radius:8px;padding:10px;text-align:center;">
+            <div style="font-size:11px;color:#64748b;font-weight:bold;">PRÓXIMA REVISÃO</div>
+            <div style="font-size:18px;font-weight:900;color:#b45309;">${(v.km_proxima_revisao||50000).toLocaleString('pt-BR')} KM</div>
+          </div>
+          <div style="background:#f1f5f9;border-radius:8px;padding:10px;text-align:center;border-left:4px solid ${stCor};">
+            <div style="font-size:11px;color:#64748b;font-weight:bold;">SITUAÇÃO</div>
+            <div style="font-size:13px;font-weight:900;color:${stCor};margin-top:4px;">${stTxt}</div>
+          </div>
+        </div>
+
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#334155;">
+          <div style="font-weight:bold;color:#002b54;margin-bottom:6px;">📄 Ficha Cadastral & Segurança</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
+            <div><b>Renavam:</b> ${esc(v.renavam||'01234567890')}</div>
+            <div><b>Chassi:</b> ${esc(v.chassi||'93YCAPTUR2026EMED')}</div>
+            <div><b>Ano/Modelo:</b> ${esc(v.ano_fabricacao||'2022/2023')}</div>
+            <div><b>Cor:</b> ${esc(v.cor||'Branco')}</div>
+            <div><b>Combustível:</b> ${esc(v.combustivel||'Flex')}</div>
+            <div><b>Apólice Seguro:</b> ${esc(v.apolice_seguro||'EMED-SEG-2026')}</div>
+            <div><b>Rastreador GPS:</b> J16 4G (IMEI: ${esc(v.imei||'869890080097193')})</div>
+          </div>
+        </div>
+
+        <div style="font-weight:bold;color:#002b54;font-size:14px;margin-bottom:8px;">🔧 Prontuário de Manutenções & Peças Trocadas</div>
+        <div style="max-height:220px;overflow-y:auto;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:16px;">
+          <table class="data-table" style="width:100%;font-size:11.5px;">
+            <thead>
+              <tr style="background:#f1f5f9;">
+                <th>Data</th>
+                <th>KM</th>
+                <th>Serviço</th>
+                <th>Oficina</th>
+                <th>Descrição</th>
+                <th>Valor</th>
+                <th>Próx. Troca</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${manutsHtml}
+            </tbody>
+          </table>
+        </div>
+
+        <div style="font-weight:bold;color:#002b54;font-size:14px;margin-bottom:8px;">⚡ Histórico de Checklists de Zelo & Conservação</div>
+        <div style="max-height:160px;overflow-y:auto;">
+          ${chkHtml}
+        </div>
+      `;
+
+      m.style.display = "flex";
+    }
+
+    function abrirModalLancarManutencao(vid) {
+      const veiculos = STATE.data?.veiculos || [];
+      const v = veiculos.find(x => x.id === vid) || veiculos[0];
+      if (!v) return;
+
+      document.getElementById("manut_veiculo_id").value = v.id;
+      document.getElementById("manut_placa").value = v.placa;
+      document.getElementById("manut_placa_lbl").innerText = `${v.modelo} (${v.placa})`;
+      document.getElementById("manut_data").value = new Date().toISOString().split("T")[0];
+      document.getElementById("manut_km").value = v.km_atual || 0;
+      document.getElementById("manut_prox_km").value = (v.km_atual || 0) + 10000;
+      document.getElementById("manut_valor").value = "450.00";
+      document.getElementById("manut_oficina").value = "Oficina Credenciada EMED";
+      document.getElementById("manut_desc").value = "Troca de óleo sintético 5W30, filtro de óleo e filtro de ar.";
+
+      const m = document.getElementById("modalLancarManutencao");
+      if (m) m.style.display = "flex";
+    }
+
+    async function salvarNovaManutencao() {
+      const vid = parseInt(document.getElementById("manut_veiculo_id").value, 10);
+      const placa = document.getElementById("manut_placa").value;
+      const data_reg = document.getElementById("manut_data").value;
+      const km_reg = parseInt(document.getElementById("manut_km").value, 10);
+      const tipo_m = document.getElementById("manut_tipo").value;
+      const oficina = document.getElementById("manut_oficina").value;
+      const valor = parseFloat(document.getElementById("manut_valor").value || 0);
+      const km_prox = parseInt(document.getElementById("manut_prox_km").value, 10);
+      const desc = document.getElementById("manut_desc").value;
+      const tec = (STATE.usuarioAtual?.nome || "NETTO").toUpperCase();
+
+      mostrarToast("⏳ Gravando manutenção no prontuário do veículo...");
+      const res = await apiPost("/api/frota/manutencao/salvar", {
+        veiculo_id: vid,
+        placa,
+        data_registro: data_reg,
+        km_registro: km_reg,
+        tipo_manutencao: tipo_m,
+        oficina,
+        descricao: desc,
+        valor_total: valor,
+        km_proxima_troca: km_prox,
+        tecnico_responsavel: tec,
+        status: "CONCLUÍDA"
+      });
+
+      mostrarToast(res.msg);
+      fecharModalLancarManutencao();
+      await sincronizarTudo(false);
+      abrirFichaVeiculo(vid);
+    }
+
+    function abrirModalChecklistVeiculo(vid) {
+      const veiculos = STATE.data?.veiculos || [];
+      const v = veiculos.find(x => x.id === vid) || veiculos[0];
+      if (!v) return;
+
+      document.getElementById("chk_veiculo_id").value = v.id;
+      document.getElementById("chk_placa").value = v.placa;
+      document.getElementById("chk_placa_lbl").innerText = `${v.modelo} (${v.placa})`;
+      document.getElementById("chk_km").value = v.km_atual || 0;
+      document.getElementById("chk_oleo").value = "OK";
+      document.getElementById("chk_freios").value = "OK";
+      document.getElementById("chk_pneus").value = "OK";
+      document.getElementById("chk_luzes").value = "OK";
+      document.getElementById("chk_arref").value = "OK";
+      document.getElementById("chk_ar").value = "OK";
+      document.getElementById("chk_sinistro").value = "NENHUMA";
+      document.getElementById("chk_obs").value = "";
+
+      const m = document.getElementById("modalChecklistVeiculo");
+      if (m) m.style.display = "flex";
+    }
+
+    async function salvarChecklistRapido() {
+      const vid = parseInt(document.getElementById("chk_veiculo_id").value, 10);
+      const placa = document.getElementById("chk_placa").value;
+      const km = parseInt(document.getElementById("chk_km").value, 10);
+      const tec = (STATE.usuarioAtual?.nome || "NETTO").toUpperCase();
+      const agora = new Date().toLocaleDateString('pt-BR') + " " + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+
+      const res = await apiPost("/api/frota/checklist/salvar", {
+        veiculo_id: vid,
+        placa,
+        data_hora: agora,
+        tecnico: tec,
+        km_atual: km,
+        nivel_oleo: document.getElementById("chk_oleo").value,
+        freios: document.getElementById("chk_freios").value,
+        pneus: document.getElementById("chk_pneus").value,
+        luzes: document.getElementById("chk_luzes").value,
+        arrefecimento: document.getElementById("chk_arref").value,
+        ar_condicionado: document.getElementById("chk_ar").value,
+        avarias_sinistro: document.getElementById("chk_sinistro").value,
+        observacoes: document.getElementById("chk_obs").value
+      });
+
+      mostrarToast(res.msg);
+      fecharModalChecklistVeiculo();
+      await sincronizarTudo(false);
+      abrirFichaVeiculo(vid);
+    }
+
+
     function fecharModalKardex() {
 
 
@@ -144034,6 +144283,157 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
+
+  <!-- MODAL FICHA TÉCNICA E PRONTUÁRIO DO VEÍCULO -->
+  <div id="modalFichaVeiculo" class="modal-overlay" style="display:none; z-index:99999;">
+    <div class="modal-box" style="max-width:850px;width:95%;max-height:90vh;overflow-y:auto;">
+      <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;background:#002b54;color:#fff;padding:12px 18px;border-radius:8px 8px 0 0;position:sticky;top:0;z-index:10;">
+        <div style="font-weight:900;font-size:15px;">🚘 Ficha de Registro & Prontuário do Veículo</div>
+        <button type="button" class="btn btn-xs" onclick="fecharModalFichaVeiculo()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;cursor:pointer;font-size:16px;">✕</button>
+      </div>
+      <div class="modal-body" id="modalFichaVeiculoBody" style="padding:18px;">
+        <!-- Preenchido dinamicamente via abrirFichaVeiculo(vid) -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL LANÇAR MANUTENÇÃO NO PRONTUÁRIO -->
+  <div id="modalLancarManutencao" class="modal-overlay" style="display:none; z-index:999999;">
+    <div class="modal-box" style="max-width:620px;width:95%;">
+      <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;background:#0284c7;color:#fff;padding:12px 16px;border-radius:8px 8px 0 0;">
+        <div style="font-weight:900;font-size:14px;">🔧 Registrar Manutenção / Revisão: <span id="manut_placa_lbl"></span></div>
+        <button type="button" class="btn btn-xs" onclick="fecharModalLancarManutencao()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;cursor:pointer;font-size:16px;">✕</button>
+      </div>
+      <div class="modal-body" style="padding:16px;">
+        <input type="hidden" id="manut_veiculo_id">
+        <input type="hidden" id="manut_placa">
+        <div class="form-grid">
+          <div class="field">
+            <label class="field-label">Tipo de Manutenção</label>
+            <select class="field-input" id="manut_tipo">
+              <option value="Troca de Óleo e Filtros">🛢️ Troca de Óleo e Filtros</option>
+              <option value="Freios (Pastilhas/Discos)">🛑 Freios (Pastilhas / Discos / Fluido)</option>
+              <option value="Pneus / Alinhamento / Balanceamento">🛞 Pneus, Alinhamento & Balanceamento</option>
+              <option value="Arrefecimento & Radiador">❄️ Arrefecimento & Radiador</option>
+              <option value="Revisão Periódica Completa">🛠️ Revisão Periódica Completa (Oficina)</option>
+              <option value="Suspensão / Amortecedores">🔩 Suspensão & Amortecedores</option>
+              <option value="Bateria / Elétrica">🔋 Bateria & Sistema Elétrico</option>
+              <option value="Funilaria / Reparo">🔨 Funilaria / Sinistro Leve</option>
+              <option value="Outro">⚙️ Outro Serviço Mecânico</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">Data da Realização</label>
+            <input type="date" class="field-input" id="manut_data">
+          </div>
+          <div class="field">
+            <label class="field-label">Quilometragem (KM no momento)</label>
+            <input type="number" class="field-input" id="manut_km">
+          </div>
+          <div class="field">
+            <label class="field-label">Próxima Troca Prevista (KM)</label>
+            <input type="number" class="field-input" id="manut_prox_km">
+          </div>
+          <div class="field">
+            <label class="field-label">Oficina / Mecânica Prestadora</label>
+            <input type="text" class="field-input" id="manut_oficina" placeholder="Ex: Oficina Mecânica Central">
+          </div>
+          <div class="field">
+            <label class="field-label">Valor Total Pago (R$)</label>
+            <input type="number" step="0.01" class="field-input" id="manut_valor" placeholder="0.00">
+          </div>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label class="field-label">Descrição Detalhada dos Serviços e Peças Substituídas</label>
+          <textarea class="field-input" id="manut_desc" rows="3" placeholder="Ex: Substituição do óleo 5W30 sintético, filtro de óleo Mahle e filtro de combustível..."></textarea>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+          <button class="btn btn-outline btn-sm" onclick="fecharModalLancarManutencao()">Cancelar</button>
+          <button class="btn btn-primary btn-sm" onclick="salvarNovaManutencao()">💾 Gravar Manutenção no Prontuário</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CHECKLIST RÁPIDO DE ZELO (SEM BUROCRACIA) -->
+  <div id="modalChecklistVeiculo" class="modal-overlay" style="display:none; z-index:999999;">
+    <div class="modal-box" style="max-width:580px;width:95%;">
+      <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;background:#15803d;color:#fff;padding:12px 16px;border-radius:8px 8px 0 0;">
+        <div style="font-weight:900;font-size:14px;">⚡ Checklist Rápido de Zelo (Sem Burocracia) — <span id="chk_placa_lbl"></span></div>
+        <button type="button" class="btn btn-xs" onclick="fecharModalChecklistVeiculo()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;cursor:pointer;font-size:16px;">✕</button>
+      </div>
+      <div class="modal-body" style="padding:16px;">
+        <input type="hidden" id="chk_veiculo_id">
+        <input type="hidden" id="chk_placa">
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#166534;">
+          ✨ <b>Agilidade:</b> Todos os itens já vêm pré-marcados como <b>OK</b> por padrão. Toque apenas se houver algo fora do normal.
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label class="field-label">Quilometragem do Painel (KM)</label>
+            <input type="number" class="field-input" id="chk_km">
+          </div>
+          <div class="field">
+            <label class="field-label">Nível de Óleo do Motor</label>
+            <select class="field-input" id="chk_oleo">
+              <option value="OK">🟢 OK (Nível Normal)</option>
+              <option value="BAIXO">🟡 BAIXO (Completar)</option>
+              <option value="TROCAR">🔴 TROCAR URGENTE</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">Freios & Pastilhas</label>
+            <select class="field-input" id="chk_freios">
+              <option value="OK">🟢 OK (Firme e Seguro)</option>
+              <option value="DESGASTADO">🟡 PASTILHA GASTA</option>
+              <option value="RUÍDO">🔴 RUÍDO METÁLICO</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">Pneus & Calibragem</label>
+            <select class="field-input" id="chk_pneus">
+              <option value="OK">🟢 OK (Calibrado / Bom estado)</option>
+              <option value="CALIBRAR">🟡 CALIBRAR NO POSTO</option>
+              <option value="DESGASTADO">🔴 GASTO / TROCAR</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">Faróis, Setas & Luzes de Freio</label>
+            <select class="field-input" id="chk_luzes">
+              <option value="OK">🟢 OK (Todas funcionando)</option>
+              <option value="LÂMPADA QUEIMADA">🟡 LÂMPADA QUEIMADA</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">Água do Radiador / Arrefecimento</label>
+            <select class="field-input" id="chk_arref">
+              <option value="OK">🟢 OK (Nível Correto)</option>
+              <option value="COMPLETAR">🟡 COMPLETAR ÁGUA</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">Ar Condicionado</label>
+            <select class="field-input" id="chk_ar">
+              <option value="OK">🟢 OK (Gelando perfeitamente)</option>
+              <option value="REVISAR">🟡 FRACO / REVISAR GÁS</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">Sinistro / Avarias na Lataria</label>
+            <input type="text" class="field-input" id="chk_sinistro" value="NENHUMA">
+          </div>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label class="field-label">Observações Adicionais (Opcional)</label>
+          <input type="text" class="field-input" id="chk_obs" placeholder="Ex: Carro limpo e abastecido para viagem.">
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+          <button class="btn btn-outline btn-sm" onclick="fecharModalChecklistVeiculo()">Cancelar</button>
+          <button class="btn btn-primary btn-sm" style="background:#15803d;border-color:#15803d;" onclick="salvarChecklistRapido()">✅ Confirmar Checklist Rápido (5 seg)</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL KARDEX MOVIMENTAÇÕES -->
 

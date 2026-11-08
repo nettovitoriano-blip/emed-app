@@ -874,45 +874,164 @@ def render_emed_car(ctx: AppContext):
 
     # ABA 4: ODÔMETRO & GESTÃO DA CAPTUR
     with tab_manut:
-        st.markdown("### 🔧 Odômetro, Calibração & Manutenção Preventiva")
-        
-        c_m1, c_m2, c_m3 = st.columns(3)
-        km_rev = veiculo.get("km_proxima_revisao", 70000)
-        km_restante = max(0, km_rev - v_km)
+        st.markdown("### 🚘 Gestão da Frota, Ficha do Veículo & Manutenções")
+        st.caption("Acompanhamento técnico preventivo, prontuário histórico e checklist de conservação.")
 
+        veiculos_frota = []
+        with sqlite3.connect(db_name) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM veiculos ORDER BY id ASC")
+            veiculos_frota = [dict(r) for r in cur.fetchall()]
+
+        if not veiculos_frota:
+            st.warning("Nenhum veículo encontrado no cadastro da frota.")
+            veiculos_frota = [veiculo]
+
+        opcoes_veiculos = {f"{v['modelo']} ({v['placa']})": v for v in veiculos_frota}
+        v_sel_nome = st.selectbox("Selecione o Veículo da Frota:", list(opcoes_veiculos.keys()))
+        v_sel = opcoes_veiculos[v_sel_nome]
+
+        v_sel_km = int(v_sel.get("km_atual") or 0)
+        v_sel_rev = int(v_sel.get("km_proxima_revisao") or 50000)
+        v_sel_ult = int(v_sel.get("km_ultima_revisao") or 0)
+        v_sel_rest = v_sel_rev - v_sel_km
+
+        c_m1, c_m2, c_m3, c_m4 = st.columns(4)
         with c_m1:
-            st.metric("🚗 Odômetro Atual", f"{v_km:,} KM".replace(",", "."))
+            st.metric("🚗 Odômetro Atual", f"{v_sel_km:,} KM".replace(",", "."))
         with c_m2:
-            st.metric("🛠️ Próxima Revisão", f"{km_rev:,} KM".replace(",", "."))
+            st.metric("🛠️ Última Revisão", f"{v_sel_ult:,} KM".replace(",", "."))
         with c_m3:
-            st.metric("⏳ Restante p/ Oficina", f"{km_restante:,} KM".replace(",", "."), "Seguro")
+            st.metric("🎯 Próxima Revisão", f"{v_sel_rev:,} KM".replace(",", "."))
+        with c_m4:
+            st_color = "normal" if v_sel_rest > 1000 else "off"
+            st.metric("⏳ Restante p/ Oficina", f"{v_sel_rest:,} KM".replace(",", "."), delta=f"{v_sel_rest} KM", delta_color=st_color)
 
-        st.markdown("---")
-        st.markdown("#### 🎯 Calibração Rápida do Odômetro com o Painel do Carro")
-        st.caption("Ajuste a quilometragem oficial para coincidir com o número exato do painel da Captur.")
+        url_base_ativa = obter_url_base_sistema()
+        url_imprimir_ficha = f"{url_base_ativa}/api/frota/veiculo/{v_sel['id']}/imprimir-ficha"
 
-        with st.form("form_calibrar_odometro"):
-            c_cal1, c_cal2 = st.columns([2, 1])
-            with c_cal1:
-                novo_km_painel = st.number_input(
-                    "Quilometragem Exata do Painel (KM):",
-                    min_value=1000,
-                    max_value=300000,
-                    value=v_km,
-                    step=1,
-                )
-            with c_cal2:
-                st.write("")
-                st.write("")
-                sub_cal = st.form_submit_button("💾 Salvar Calibração Oficial", type="primary", use_container_width=True)
+        st.markdown(f"""
+            <div style="background: rgba(15, 23, 42, 0.85); border: 1.5px solid #00b4d8; border-radius: 12px; padding: 16px 20px; margin: 15px 0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <span style="font-size:18px; font-weight:900; color:#38bdf8;">🚘 {v_sel['modelo']}</span>
+                        <span style="background:#0284c7; color:#fff; padding:3px 8px; border-radius:4px; font-weight:bold; margin-left:8px;">{v_sel['placa']}</span>
+                    </div>
+                    <a href="{url_imprimir_ficha}" target="_blank" style="background:#0284c7; color:#fff; text-decoration:none; padding:6px 14px; border-radius:6px; font-weight:bold; font-size:13px;">
+                        🖨️ Imprimir Ficha A4 (PDF)
+                    </a>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-top:14px; font-size:12.5px; color:#cbd5e1;">
+                    <div><b>📄 Renavam:</b> {v_sel.get('renavam', '01234567890')}</div>
+                    <div><b>🔢 Chassi:</b> {v_sel.get('chassi', '93YCAPTUR2026EMED')}</div>
+                    <div><b>📅 Ano/Modelo:</b> {v_sel.get('ano_fabricacao', '2022/2023')}</div>
+                    <div><b>🎨 Cor:</b> {v_sel.get('cor', 'Branco')}</div>
+                    <div><b>⛽ Combustível:</b> {v_sel.get('combustivel', 'Flex')}</div>
+                    <div><b>🛡️ Seguro:</b> {v_sel.get('seguradora', 'Porto Seguro')} ({v_sel.get('apolice_seguro', 'EMED-SEG-2026')})</div>
+                    <div><b>👷 Condutor Habitual:</b> {v_sel.get('condutor_atual', 'NETTO')}</div>
+                    <div><b>🛰️ Rastreador GPS:</b> J16 4G (IMEI: {v_sel.get('imei', '869890080097193')})</div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
-            if sub_cal:
-                with sqlite3.connect(db_name) as conn:
-                    cur = conn.cursor()
-                    cur.execute(
-                        "UPDATE veiculos SET km_atual = ?, ultima_atualizacao_gps = ? WHERE REPLACE(UPPER(placa), '-', '') = 'EMD2026'",
-                        (int(novo_km_painel), datetime.datetime.now().strftime("%d/%m/%Y %H:%M")),
-                    )
-                    conn.commit()
-                st.success(f"✅ Odômetro da Captur calibrado com sucesso para {novo_km_painel:,} KM!".replace(",", "."))
-                st.rerun()
+        t_hist, t_lancar, t_chk = st.tabs([
+            "📋 Histórico de Manutenções",
+            "🔧 + Lançar Manutenção Realizada",
+            "⚡ Checklist Rápido de Zelo (Sem Burocracia)"
+        ])
+
+        with t_hist:
+            with sqlite3.connect(db_name) as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    SELECT data_registro, km_registro, tipo_manutencao, oficina, descricao, valor_total, km_proxima_troca, tecnico_responsavel
+                    FROM frota_manutencoes
+                    WHERE veiculo_id = ? OR placa = ?
+                    ORDER BY data_registro DESC, id DESC
+                """, (v_sel['id'], v_sel['placa']))
+                manuts_rows = cur.fetchall()
+
+            if manuts_rows:
+                df_manut = pd.DataFrame(manuts_rows, columns=[
+                    "Data", "KM Registro", "Tipo de Manutenção", "Oficina", "Descrição dos Serviços", "Valor Total (R$)", "Próx. Troca KM", "Responsável"
+                ])
+                st.dataframe(df_manut, use_container_width=True, hide_index=True)
+            else:
+                st.info("Nenhuma manutenção registrada neste prontuário até o momento.")
+
+        with t_lancar:
+            with st.form(f"form_manut_{v_sel['id']}"):
+                c_f1, c_f2 = st.columns(2)
+                with c_f1:
+                    f_tipo = st.selectbox("Tipo de Manutenção:", [
+                        "Troca de Óleo e Filtros",
+                        "Freios (Pastilhas/Discos)",
+                        "Pneus / Alinhamento / Balanceamento",
+                        "Arrefecimento & Radiador",
+                        "Revisão Periódica Completa",
+                        "Suspensão / Amortecedores",
+                        "Bateria / Elétrica",
+                        "Funilaria / Reparo",
+                        "Outro"
+                    ])
+                    f_data = st.date_input("Data da Manutenção:", datetime.date.today())
+                    f_km = st.number_input("Quilometragem (KM no momento):", min_value=1000, max_value=300000, value=v_sel_km)
+                    f_oficina = st.text_input("Oficina / Prestador:", value="Oficina Especializada")
+                with c_f2:
+                    f_valor = st.number_input("Valor Total (R$):", min_value=0.0, max_value=50000.0, value=450.0, step=50.0)
+                    f_prox_km = st.number_input("Próxima Troca Prevista (KM):", min_value=1000, max_value=300000, value=v_sel_km + 10000)
+                    f_tec = st.selectbox("Técnico / Condutor Responsável:", ["NETTO", "ANTONIO", "GABRIEL", "SÉRGIO", "FELIPE", "TONY", "JAIR", "MARCOS", "PAULO", "LEONARDO"])
+                    f_desc = st.text_area("Descrição Detalhada do Serviço & Peças Trocadas:", "Troca de óleo sintético 5W30, filtro de óleo, filtro de combustível e filtro de ar do motor.")
+
+                btn_salvar_m = st.form_submit_button("💾 Salvar Manutenção no Prontuário Oficial", type="primary", use_container_width=True)
+                if btn_salvar_m:
+                    with sqlite3.connect(db_name) as conn:
+                        cur = conn.cursor()
+                        cur.execute("""
+                            INSERT INTO frota_manutencoes
+                            (veiculo_id, placa, data_registro, km_registro, tipo_manutencao, descricao, oficina, valor_total, km_proxima_troca, tecnico_responsavel, status)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CONCLUÍDA')
+                        """, (v_sel['id'], v_sel['placa'], f_data.strftime("%Y-%m-%d"), int(f_km), f_tipo, f_desc, f_oficina, float(f_valor), int(f_prox_km), f_tec))
+
+                        cur.execute("""
+                            UPDATE veiculos
+                            SET km_ultima_revisao = ?,
+                                km_proxima_revisao = ?,
+                                km_atual = MAX(km_atual, ?),
+                                status_manutencao = 'EM DIA'
+                            WHERE id = ?
+                        """, (int(f_km), int(f_prox_km), int(f_km), v_sel['id']))
+                        conn.commit()
+                    st.success(f"✅ Manutenção de {f_tipo} lançada com sucesso no veículo {v_sel['placa']}!")
+                    st.rerun()
+
+        with t_chk:
+            st.info("💡 **Sem Burocracia:** Todos os itens já estão pré-aprovados como OK. Altere apenas caso haja alguma observação.")
+            with st.form(f"form_chk_{v_sel['id']}"):
+                c_c1, c_c2 = st.columns(2)
+                with c_c1:
+                    chk_oleo = st.selectbox("Óleo de Motor:", ["OK", "BAIXO", "TROCAR"])
+                    chk_freios = st.selectbox("Freios (Pastilhas/Ruídos):", ["OK", "DESGASTADO", "RUÍDO"])
+                    chk_pneus = st.selectbox("Pneus & Calibragem:", ["OK", "CALIBRAR", "DESGASTADO"])
+                    chk_luzes = st.selectbox("Faróis & Lanternas:", ["OK", "LÂMPADA QUEIMADA"])
+                with c_c2:
+                    chk_arref = st.selectbox("Líquido de Arrefecimento:", ["OK", "COMPLETAR"])
+                    chk_ar = st.selectbox("Ar Condicionado:", ["OK", "REVISAR"])
+                    chk_sinistro = st.text_input("Avarias / Sinistro na Lataria:", value="NENHUMA")
+                    chk_obs = st.text_input("Observações Adicionais:", value="")
+
+                btn_chk = st.form_submit_button("✅ Confirmar Checklist Rápido de Zelo", type="primary", use_container_width=True)
+                if btn_chk:
+                    data_hora_agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+                    with sqlite3.connect(db_name) as conn:
+                        cur = conn.cursor()
+                        cur.execute("""
+                            INSERT INTO frota_checklists
+                            (veiculo_id, placa, data_hora, tecnico, km_atual, nivel_oleo, freios, pneus, luzes, arrefecimento, ar_condicionado, avarias_sinistro, observacoes, status_geral)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APROVADO')
+                        """, (v_sel['id'], v_sel['placa'], data_hora_agora, v_sel.get('condutor_atual', 'NETTO'), v_sel_km, chk_oleo, chk_freios, chk_pneus, chk_luzes, chk_arref, chk_ar, chk_sinistro, chk_obs))
+                        conn.commit()
+                    st.success(f"✅ Checklist registrado com sucesso para o veículo {v_sel['placa']} em {data_hora_agora}!")
+                    st.rerun()
+

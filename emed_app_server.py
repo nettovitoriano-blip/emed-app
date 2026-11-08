@@ -2836,92 +2836,96 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
+            frota_manutencoes_lista = []
+            try:
+                df_fmt = pd.read_sql_query("SELECT * FROM frota_manutencoes ORDER BY data_registro DESC, id DESC", conn)
+                for _, r in df_fmt.iterrows():
+                    frota_manutencoes_lista.append({
+                        "id": int(r.get("id", 0)),
+                        "veiculo_id": int(r.get("veiculo_id", 0)),
+                        "placa": limpar_texto(r.get("placa"), ""),
+                        "data_registro": limpar_texto(r.get("data_registro"), ""),
+                        "km_registro": limpar_int(r.get("km_registro"), 0),
+                        "tipo_manutencao": limpar_texto(r.get("tipo_manutencao"), "Revisão"),
+                        "descricao": limpar_texto(r.get("descricao"), ""),
+                        "oficina": limpar_texto(r.get("oficina"), "Oficina Credenciada"),
+                        "valor_total": limpar_float(r.get("valor_total"), 0.0),
+                        "km_proxima_troca": limpar_int(r.get("km_proxima_troca"), 0),
+                        "tecnico_responsavel": limpar_texto(r.get("tecnico_responsavel"), "NETTO"),
+                        "status": limpar_texto(r.get("status"), "CONCLUÍDA")
+                    })
+            except Exception:
+                pass
+
+            frota_checklists_lista = []
+            try:
+                df_fchk = pd.read_sql_query("SELECT * FROM frota_checklists ORDER BY id DESC LIMIT 50", conn)
+                for _, r in df_fchk.iterrows():
+                    frota_checklists_lista.append({
+                        "id": int(r.get("id", 0)),
+                        "veiculo_id": int(r.get("veiculo_id", 0)),
+                        "placa": limpar_texto(r.get("placa"), ""),
+                        "data_hora": limpar_texto(r.get("data_hora"), ""),
+                        "tecnico": limpar_texto(r.get("tecnico"), ""),
+                        "km_atual": limpar_int(r.get("km_atual"), 0),
+                        "nivel_oleo": limpar_texto(r.get("nivel_oleo"), "OK"),
+                        "freios": limpar_texto(r.get("freios"), "OK"),
+                        "pneus": limpar_texto(r.get("pneus"), "OK"),
+                        "luzes": limpar_texto(r.get("luzes"), "OK"),
+                        "arrefecimento": limpar_texto(r.get("arrefecimento"), "OK"),
+                        "ar_condicionado": limpar_texto(r.get("ar_condicionado"), "OK"),
+                        "avarias_sinistro": limpar_texto(r.get("avarias_sinistro"), "NENHUMA"),
+                        "observacoes": limpar_texto(r.get("observacoes"), ""),
+                        "status_geral": limpar_texto(r.get("status_geral"), "APROVADO")
+                    })
+            except Exception:
+                pass
+
             df_v = pd.read_sql_query("SELECT * FROM veiculos", conn)
-
-
-
             for _, r in df_v.iterrows():
-
-
-
+                vid = int(r.get("id", 1))
+                v_placa = limpar_texto(r.get("placa"), "")
                 km_at = limpar_int(r.get("km_atual"), 0)
-
-
-
                 km_pr = limpar_int(r.get("km_proxima_revisao"), 50000)
+                v_manuts = [m for m in frota_manutencoes_lista if m["veiculo_id"] == vid or m["placa"] == v_placa]
+                v_checks = [c for c in frota_checklists_lista if c["veiculo_id"] == vid or c["placa"] == v_placa]
 
-
+                km_diff = km_pr - km_at
+                if km_diff < 0:
+                    st_calc = "REVISÃO VENCIDA"
+                elif km_diff <= 1000:
+                    st_calc = "ATENÇÃO (REVISÃO PRÓXIMA)"
+                else:
+                    st_calc = "EM DIA"
 
                 veiculos.append({
-
-
-
-                    "id": int(r.get("id", 1)),
-
-
-
+                    "id": vid,
                     "modelo": limpar_texto(r.get("modelo"), "Veículo EMED"),
-
-
-
-                    "placa": limpar_texto(r.get("placa"), ""),
-
-
-
+                    "placa": v_placa,
                     "renavam": limpar_texto(r.get("renavam"), "01234567890"),
-
-
-
+                    "chassi": limpar_texto(r.get("chassi"), ""),
+                    "ano_fabricacao": limpar_texto(r.get("ano_fabricacao"), "2022/2023"),
+                    "cor": limpar_texto(r.get("cor"), "Branco"),
+                    "seguradora": limpar_texto(r.get("seguradora"), "Porto Seguro"),
+                    "apolice_seguro": limpar_texto(r.get("apolice_seguro"), "EMED-SEG-2026"),
+                    "combustivel": limpar_texto(r.get("combustivel"), "Flex (Gasolina/Etanol)"),
                     "condutor_atual": limpar_texto(r.get("condutor_atual"), "DISPONÍVEL NA BASE"),
-
-
-
                     "tag_rfid_atual": limpar_texto(r.get("tag_rfid_atual"), ""),
-
-
-
                     "ultima_lat": limpar_float(r.get("ultima_lat"), -3.7319),
-
-
-
                     "ultima_lon": limpar_float(r.get("ultima_lon"), -38.5267),
-
-
-
                     "ultima_atualizacao_gps": limpar_texto(r.get("ultima_atualizacao_gps"), ""),
-
-
-
                     "km_atual": km_at,
-
-
-
                     "km_ultima_revisao": limpar_int(r.get("km_ultima_revisao"), 0),
-
-
-
                     "km_proxima_revisao": km_pr,
-
-
-
-                    "km_restante": km_pr - km_at,
-
-
-
-                    "status_manutencao": limpar_texto(r.get("status_manutencao"), "Em Dia"),
-
-
-
+                    "km_restante": km_diff,
+                    "status_manutencao": st_calc,
                     "historico_manutencao": limpar_texto(r.get("historico_manutencao"), ""),
-
-
-
                     "proximas_manutencoes": limpar_texto(r.get("proximas_manutencoes"), ""),
-
-
-
+                    "chip_numero": limpar_texto(r.get("chip_numero"), ""),
+                    "chip_operadora": limpar_texto(r.get("chip_operadora"), ""),
+                    "manutencoes": v_manuts,
+                    "checklists": v_checks
                 })
-
 
 
         except Exception:
@@ -3540,6 +3544,8 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
         "frota_gps_multas": frota_gps_multas,
+        "frota_manutencoes": frota_manutencoes_lista,
+        "frota_checklists": frota_checklists_lista,
 
 
 
@@ -5931,6 +5937,270 @@ async def api_veiculo_km(request: web.Request) -> web.Response:
 
 
 
+
+
+async def api_frota_manutencao_salvar(request: web.Request) -> web.Response:
+    """Registra uma manutenção preventiva ou corretiva na ficha do veículo."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "msg": "JSON inválido."}, status=400)
+    
+    vid = int(limpar_float(body.get("veiculo_id"), 1))
+    placa = limpar_texto(body.get("placa"), "").upper()
+    data_reg = limpar_texto(body.get("data_registro"), "") or datetime.now().strftime("%Y-%m-%d")
+    km_reg = int(limpar_float(body.get("km_registro"), 0))
+    tipo_m = limpar_texto(body.get("tipo_manutencao"), "Revisão Geral Preventiva")
+    descricao = limpar_texto(body.get("descricao"), "")
+    oficina = limpar_texto(body.get("oficina"), "Oficina Credenciada EMED")
+    valor = float(limpar_float(body.get("valor_total"), 0.0))
+    km_prox = int(limpar_float(body.get("km_proxima_troca"), km_reg + 10000))
+    tecnico = limpar_texto(body.get("tecnico_responsavel"), "NETTO")
+    status = limpar_texto(body.get("status"), "CONCLUÍDA")
+
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO frota_manutencoes 
+            (veiculo_id, placa, data_registro, km_registro, tipo_manutencao, descricao, oficina, valor_total, km_proxima_troca, tecnico_responsavel, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (vid, placa, data_reg, km_reg, tipo_m, descricao, oficina, valor, km_prox, tecnico, status))
+        
+        cur.execute("""
+            UPDATE veiculos 
+            SET km_ultima_revisao = ?,
+                km_proxima_revisao = ?,
+                km_atual = MAX(km_atual, ?),
+                status_manutencao = 'EM DIA'
+            WHERE id = ? OR placa = ?
+        """, (km_reg, km_prox, km_reg, vid, placa))
+        conn.commit()
+
+    invalidar_cache_bootstrap()
+    return web.json_response({
+        "ok": True,
+        "msg": f"✅ Manutenção de {tipo_m} lançada com sucesso no prontuário do veículo {placa}!"
+    })
+
+
+async def api_frota_checklist_salvar(request: web.Request) -> web.Response:
+    """Registra checklist rápido de zelo e conservação do veículo sem burocracia."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "msg": "JSON inválido."}, status=400)
+    
+    vid = int(limpar_float(body.get("veiculo_id"), 1))
+    placa = limpar_texto(body.get("placa"), "").upper()
+    data_hora = limpar_texto(body.get("data_hora"), "") or datetime.now().strftime("%d/%m/%Y %H:%M")
+    tecnico = limpar_texto(body.get("tecnico"), "NETTO")
+    km_atual = int(limpar_float(body.get("km_atual"), 0))
+    oleo = limpar_texto(body.get("nivel_oleo"), "OK")
+    freios = limpar_texto(body.get("freios"), "OK")
+    pneus = limpar_texto(body.get("pneus"), "OK")
+    luzes = limpar_texto(body.get("luzes"), "OK")
+    arrefecimento = limpar_texto(body.get("arrefecimento"), "OK")
+    ar_cond = limpar_texto(body.get("ar_condicionado"), "OK")
+    sinistro = limpar_texto(body.get("avarias_sinistro"), "NENHUMA")
+    obs = limpar_texto(body.get("observacoes"), "")
+    
+    status_geral = "ALERTA" if any(v not in ["OK", "NENHUMA", "BOM"] for v in [oleo, freios, pneus, luzes, arrefecimento, sinistro]) else "APROVADO"
+
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO frota_checklists
+            (veiculo_id, placa, data_hora, tecnico, km_atual, nivel_oleo, freios, pneus, luzes, arrefecimento, ar_condicionado, avarias_sinistro, observacoes, status_geral)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (vid, placa, data_hora, tecnico, km_atual, oleo, freios, pneus, luzes, arrefecimento, ar_cond, sinistro, obs, status_geral))
+        
+        if km_atual > 0:
+            cur.execute("UPDATE veiculos SET km_atual = MAX(km_atual, ?) WHERE id = ? OR placa = ?", (km_atual, vid, placa))
+        conn.commit()
+
+    invalidar_cache_bootstrap()
+    return web.json_response({
+        "ok": True,
+        "msg": f"✅ Checklist de zelo registrado com sucesso ({status_geral})!"
+    })
+
+
+async def api_frota_imprimir_ficha(request: web.Request) -> web.Response:
+    """Gera Documento A4 Oficial: Ficha de Registro & Prontuário de Manutenção do Veículo."""
+    vid_str = request.match_info.get("id", "1")
+    vid = int(limpar_float(vid_str, 1))
+
+    with get_db_connection(DB_NAME) as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM veiculos WHERE id = ? OR placa = ?", (vid, str(vid_str).upper()))
+        v = cur.fetchone()
+        if not v:
+            return web.Response(text="<h3>Veículo não encontrado na base de dados.</h3>", content_type="text/html", status=404)
+
+        cur.execute("SELECT * FROM frota_manutencoes WHERE veiculo_id = ? OR placa = ? ORDER BY data_registro DESC", (v["id"], v["placa"]))
+        manuts = cur.fetchall()
+
+        cur.execute("SELECT * FROM frota_checklists WHERE veiculo_id = ? OR placa = ? ORDER BY id DESC LIMIT 1", (v["id"], v["placa"]))
+        ultimo_chk = cur.fetchone()
+
+    km_at = int(v["km_atual"] or 0)
+    km_pr = int(v["km_proxima_revisao"] or 50000)
+    km_ult = int(v["km_ultima_revisao"] or 0)
+    km_rest = km_pr - km_at
+    status_cor = "#15803d" if km_rest > 1000 else ("#b45309" if km_rest >= 0 else "#dc2626")
+    status_txt = "EM DIA" if km_rest > 1000 else ("ATENÇÃO: REVISÃO PRÓXIMA" if km_rest >= 0 else "REVISÃO VENCIDA")
+
+    linhas_manut_html = ""
+    if manuts:
+        for m in manuts:
+            linhas_manut_html += f"""
+            <tr>
+              <td><strong>{m['data_registro']}</strong></td>
+              <td>{m['km_registro']:,} KM</td>
+              <td><strong>{m['tipo_manutencao']}</strong></td>
+              <td>{m['oficina']}</td>
+              <td>{m['descricao']}</td>
+              <td>R$ {float(m['valor_total'] or 0.0):,.2f}</td>
+              <td>{m['km_proxima_troca']:,} KM</td>
+            </tr>
+            """.replace(",", ".")
+    else:
+        linhas_manut_html = "<tr><td colspan='7' style='text-align:center;color:#64748b;'>Nenhuma manutenção registrada neste prontuário até o momento.</td></tr>"
+
+    chk_html = "Sem checklist registrado"
+    if ultimo_chk:
+        chk_html = f"Realizado em <strong>{ultimo_chk['data_hora']}</strong> por <strong>{ultimo_chk['tecnico']}</strong> (KM: {ultimo_chk['km_atual']:,} KM) • Status: <span style='color:#15803d;font-weight:bold;'>{ultimo_chk['status_geral']}</span>".replace(",", ".")
+
+    html = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Ficha de Registro & Prontuário do Veículo — {v['modelo']} ({v['placa']})</title>
+  <style>
+    @page {{ size: A4 portrait; margin: 10mm; }}
+    * {{ box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
+    body {{ background: #f8fafc; margin: 0; padding: 20px; color: #0f172a; font-size: 11.5px; }}
+    .doc-box {{ max-width: 820px; margin: 0 auto; background: #fff; border: 2px solid #002b54; border-radius: 8px; padding: 20px; }}
+    .no-print {{ background: #002b54; color: #fff; padding: 10px 16px; margin: -20px -20px 20px -20px; border-radius: 6px 6px 0 0; display: flex; justify-content: space-between; align-items: center; }}
+    .btn-print {{ background: #0077b6; color: #fff; border: none; padding: 8px 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
+    .header-tbl {{ width: 100%; border-bottom: 2px solid #002b54; padding-bottom: 10px; margin-bottom: 12px; }}
+    .title-doc {{ font-size: 15px; font-weight: 900; color: #002b54; text-transform: uppercase; }}
+    .badge-status {{ background: {status_cor}; color: #fff; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 11px; }}
+    .sec-title {{ background: #002b54; color: #fff; font-size: 11px; font-weight: 800; padding: 4px 8px; margin: 12px 0 4px 0; border-radius: 4px; text-transform: uppercase; }}
+    .data-tbl {{ width: 100%; border-collapse: collapse; margin-bottom: 8px; }}
+    .data-tbl td, .data-tbl th {{ border: 1px solid #cbd5e1; padding: 5px 8px; text-align: left; }}
+    .data-tbl th {{ background: #f1f5f9; font-weight: 700; color: #334155; }}
+    @media print {{
+      body {{ background: #fff; padding: 0; }}
+      .doc-box {{ border: 1px solid #000; max-width: 100%; padding: 10px; }}
+      .no-print {{ display: none !important; }}
+    }}
+  </style>
+</head>
+<body>
+  <div class="doc-box">
+    <div class="no-print">
+      <div><strong>EMED SISTEMA DE GESTÃO DE FROTA & MANUTENÇÃO</strong></div>
+      <button class="btn-print" onclick="window.print()">🖨️ Imprimir Ficha A4 (PDF)</button>
+    </div>
+
+    <table class="header-tbl">
+      <tr>
+        <td style="width: 70%;">
+          <div class="title-doc">PRONTUÁRIO & FICHA TÉCNICA DO VEÍCULO</div>
+          <div style="color: #64748b; font-size: 11px; margin-top: 3px;">
+            EMED Eletromedicina LTDA. • Gestão de Frotas & Telemetria GPS
+          </div>
+        </td>
+        <td style="text-align: right;">
+          <span class="badge-status">{status_txt}</span>
+          <div style="font-size: 10.5px; color: #64748b; margin-top: 5px;">Emissão: {datetime.now().strftime("%d/%m/%Y %H:%M")}</div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="sec-title">1. Dados Cadastrais do Veículo</div>
+    <table class="data-tbl">
+      <tr>
+        <th>Modelo / Fabricante</th><td><strong>{v['modelo']}</strong></td>
+        <th>Placa Oficial</th><td><strong style="font-size: 13px; color: #002b54;">{v['placa']}</strong></td>
+        <th>Ano / Modelo</th><td>{v['ano_fabricacao'] or '2022/2023'}</td>
+      </tr>
+      <tr>
+        <th>Chassi</th><td>{v['chassi'] or '93YCAPTUR2026EMED'}</td>
+        <th>Renavam</th><td>{v['renavam'] or '01234567890'}</td>
+        <th>Cor</th><td>{v['cor'] or 'Branco'}</td>
+      </tr>
+      <tr>
+        <th>Combustível</th><td>{v['combustivel'] or 'Flex'}</td>
+        <th>Condutor Habitual</th><td><strong>{v['condutor_atual']}</strong></td>
+        <th>Rastreador GPS</th><td>J16 4G (IMEI: {v['imei'] or '869890080097193'})</td>
+      </tr>
+    </table>
+
+    <div class="sec-title">2. Telemetria, Odômetro & Plano de Revisão</div>
+    <table class="data-tbl">
+      <tr>
+        <th>Odômetro Atual</th>
+        <td><strong style="font-size: 14px; color: #0284c7;">{km_at:,} KM</strong></td>
+        <th>Última Revisão Realizada</th>
+        <td>{km_ult:,} KM</td>
+        <th>Próxima Revisão Programada</th>
+        <td><strong style="font-size: 13px; color: #b45309;">{km_pr:,} KM</strong></td>
+        <th>Margem Restante p/ Oficina</th>
+        <td><strong style="color: {status_cor};">{km_rest:,} KM</strong></td>
+      </tr>
+    </table>
+
+    <div class="sec-title">3. Seguro & Assistência 24 Horas</div>
+    <table class="data-tbl">
+      <tr>
+        <th>Seguradora Credenciada</th><td>{v['seguradora'] or 'Porto Seguro'}</td>
+        <th>Número da Apólice</th><td>{v['apolice_seguro'] or 'EMED-SEG-2026'}</td>
+        <th>Central de Emergência</th><td>0800 727 0800 / WhatsApp Seguradora</td>
+      </tr>
+    </table>
+
+    <div class="sec-title">4. Histórico de Manutenções & Revisões Executadas</div>
+    <table class="data-tbl">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>KM</th>
+          <th>Tipo do Serviço</th>
+          <th>Oficina / Fornecedor</th>
+          <th>Descrição dos Serviços & Peças</th>
+          <th>Valor</th>
+          <th>Próx. Troca</th>
+        </tr>
+      </thead>
+      <tbody>
+        {linhas_manut_html}
+      </tbody>
+    </table>
+
+    <div class="sec-title">5. Último Checklist Rápido de Zelo</div>
+    <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px 12px; margin-bottom: 12px;">
+      {chk_html}
+    </div>
+
+    <table style="width: 100%; margin-top: 30px;">
+      <tr>
+        <td style="width: 50%; text-align: center; border-top: 1px solid #94a3b8; padding-top: 6px;">
+          <strong>{v['condutor_atual']}</strong><br>
+          <span style="color: #64748b; font-size: 10.5px;">Condutor Responsável</span>
+        </td>
+        <td style="width: 50%; text-align: center; border-top: 1px solid #94a3b8; padding-top: 6px;">
+          <strong>VALFREDO NETTO</strong><br>
+          <span style="color: #64748b; font-size: 10.5px;">Gestão Operacional de Frota — EMED</span>
+        </td>
+      </tr>
+    </table>
+  </div>
+</body>
+</html>"""
+    return web.Response(text=html, content_type="text/html")
 
 
 async def api_tecnico_salvar(request: web.Request) -> web.Response:
@@ -9790,6 +10060,52 @@ async def api_fiscal_auditoria_avaliar_avulso(request: web.Request) -> web.Respo
     return web.json_response({"ok": True, "avaliacao": avaliacao})
 
 
+async def api_telemetria_painel(request: web.Request) -> web.Response:
+    """Retorna o painel consolidado de telemetria de aterramento e detecção de arco elétrico."""
+    try:
+        from emed_services.telemetria_arcos import obter_painel_telemetria
+        dados = obter_painel_telemetria()
+        return web.json_response({"ok": True, "dados": dados})
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_telemetria_registrar(request: web.Request) -> web.Response:
+    """Registra uma nova medição de telemetria de aterramento / arco / rigidez dielétrica TLF."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
+
+    try:
+        from emed_services.telemetria_arcos import avaliar_risco_eletrico
+        equipamento_nome = str(body.get("equipamento_nome", "Equipamento Não Informado")).strip()
+        hospital_cliente = str(body.get("hospital_cliente", "Hospital Não Informado")).strip()
+        resistencia_terra = float(body.get("resistencia_terra_ohms", 0.5))
+        microarcos = int(body.get("microarcos_por_hora", 0))
+        rigidez = float(body.get("rigidez_dieletrica_kv", 35.0))
+        pico = float(body.get("pico_transiente_arco_v", 0.0))
+        temp = float(body.get("temperatura_oleo_c", 40.0))
+        sala = str(body.get("sala_setor", "Sala de Exames")).strip()
+        eq_id = body.get("equipamento_id")
+
+        resultado = avaliar_risco_eletrico(
+            equipamento_nome=equipamento_nome,
+            hospital_cliente=hospital_cliente,
+            resistencia_terra_ohms=resistencia_terra,
+            microarcos_por_hora=microarcos,
+            rigidez_dieletrica_kv=rigidez,
+            pico_transiente_arco_v=pico,
+            temperatura_oleo_c=temp,
+            equipamento_id=eq_id,
+            sala_setor=sala
+        )
+        return web.json_response(resultado)
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": f"Erro na análise de telemetria: {str(e)}"}, status=500)
+
+
+
 async def api_fiscal_cancelar_nota(request: web.Request) -> web.Response:
     """Cancela uma Nota Fiscal com registro formal de justificativa e histórico no banco de dados."""
     try:
@@ -10965,6 +11281,9 @@ def criar_app() -> web.Application:
 
 
     app.router.add_post("/api/veiculo/km", api_veiculo_km)
+    app.router.add_post("/api/frota/manutencao/salvar", api_frota_manutencao_salvar)
+    app.router.add_post("/api/frota/checklist/salvar", api_frota_checklist_salvar)
+    app.router.add_get("/api/frota/veiculo/{id}/imprimir-ficha", api_frota_imprimir_ficha)
 
 
 
@@ -11094,6 +11413,8 @@ def criar_app() -> web.Application:
     app.router.add_get("/api/fiscal/auditoria/detalhe/{id}", api_fiscal_auditoria_detalhe)
     app.router.add_get("/api/fiscal/avaliacao/dashboard", api_fiscal_avaliacao_dashboard)
     app.router.add_post("/api/fiscal/auditoria/avaliar-avulso", api_fiscal_auditoria_avaliar_avulso)
+    app.router.add_get("/api/telemetria/painel", api_telemetria_painel)
+    app.router.add_post("/api/telemetria/registrar", api_telemetria_registrar)
 
     app.router.add_get("/api/financeiro/relatorio-contabil", api_financeiro_relatorio_contabil)
     app.router.add_get("/api/financeiro/relatorio-contabil/imprimir", api_financeiro_relatorio_contabil_imprimir)

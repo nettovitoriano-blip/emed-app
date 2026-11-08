@@ -72,13 +72,57 @@ def init_db(db_name: str = DB_NAME, caminho_excel: str = CAMINHO_EXCEL):
         colunas_extras_veiculos = [
             ("foto_carro", "TEXT DEFAULT ''"),
             ("historico_manutencao", "TEXT DEFAULT ''"),
-            ("proximas_manutencoes", "TEXT DEFAULT ''")
+            ("proximas_manutencoes", "TEXT DEFAULT ''"),
+            ("ano_fabricacao", "TEXT DEFAULT '2022/2023'"),
+            ("cor", "TEXT DEFAULT 'Branco'"),
+            ("seguradora", "TEXT DEFAULT 'Porto Seguro'"),
+            ("apolice_seguro", "TEXT DEFAULT 'EMED-SEG-2026'"),
+            ("combustivel", "TEXT DEFAULT 'Flex (Gasolina/Etanol)'")
         ]
         for col_n, col_t in colunas_extras_veiculos:
             try:
                 cur.execute(f"ALTER TABLE veiculos ADD COLUMN {col_n} {col_t}")
             except Exception:
                 pass
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS frota_manutencoes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                veiculo_id INTEGER NOT NULL,
+                placa TEXT NOT NULL,
+                data_registro TEXT NOT NULL,
+                km_registro INTEGER NOT NULL,
+                tipo_manutencao TEXT NOT NULL,
+                descricao TEXT NOT NULL,
+                oficina TEXT DEFAULT 'Auto Mecânica Especializada',
+                valor_total REAL DEFAULT 0.0,
+                km_proxima_troca INTEGER,
+                tecnico_responsavel TEXT DEFAULT 'NETTO',
+                comprovante_anexo TEXT DEFAULT '',
+                status TEXT DEFAULT 'CONCLUÍDA',
+                data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS frota_checklists (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                veiculo_id INTEGER NOT NULL,
+                placa TEXT NOT NULL,
+                data_hora TEXT NOT NULL,
+                tecnico TEXT NOT NULL,
+                km_atual INTEGER NOT NULL,
+                nivel_oleo TEXT DEFAULT 'OK',
+                freios TEXT DEFAULT 'OK',
+                pneus TEXT DEFAULT 'OK',
+                luzes TEXT DEFAULT 'OK',
+                arrefecimento TEXT DEFAULT 'OK',
+                ar_condicionado TEXT DEFAULT 'OK',
+                avarias_sinistro TEXT DEFAULT 'NENHUMA',
+                observacoes TEXT DEFAULT '',
+                status_geral TEXT DEFAULT 'APROVADO',
+                data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
 
         colunas_extras_estoque = [
             ("margem_contrato", "REAL DEFAULT 30.0"),
