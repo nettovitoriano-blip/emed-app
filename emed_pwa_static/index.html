@@ -19652,15 +19652,43 @@
     .tv-kpi .num { font-size: 20px; font-weight: 900; }
     .tv-kpi { padding: 8px 10px; }
 
+    .interativa-layout-container {
+      display: flex;
+      gap: 12px;
+      align-items: stretch;
+      min-height: calc(100vh - 120px);
+    }
+    @media (max-width: 900px) {
+      .interativa-layout-container {
+        flex-direction: column;
+      }
+      .interativa-sidebar {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+    }
+    .interativa-sidebar-kpi {
+      cursor: pointer;
+      padding: 8px 10px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.15s ease;
+    }
+    .interativa-sidebar-kpi:hover {
+      transform: translateX(2px);
+    }
     .interativa-kanban-board {
       display: flex;
       gap: 8px;
       overflow-x: auto;
       padding-bottom: 8px;
-      margin-top: 10px;
       align-items: flex-start;
       scrollbar-width: thin;
       scrollbar-color: #38bdf8 #0f172a;
+      flex: 1;
+      height: 100%;
     }
     .interativa-kanban-board::-webkit-scrollbar {
       height: 6px;
@@ -19684,7 +19712,7 @@
       border: 1px solid #1e293b;
       display: flex;
       flex-direction: column;
-      max-height: calc(100vh - 210px);
+      max-height: calc(100vh - 125px);
       box-shadow: 0 4px 14px rgba(0,0,0,0.3);
     }
     @media (max-width: 1080px) {
@@ -40288,7 +40316,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-        { id: "GES_TV", icone: "📺", titulo: "Emed Interativa", desc: "Escala Diária no Calendário, Kanban Trello e Disparo WhatsApp" },
+        { id: "GES_TV", icone: "📺", titulo: "Dashboard", desc: "Escala Diária no Calendário, Painel Operacional e Disparo WhatsApp" },
 
 
 
@@ -40698,7 +40726,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-        { id: "GES_TV", icone: "📺", titulo: "Emed Interativa", desc: "Escala Diária no Calendário, Kanban Trello e Disparo WhatsApp" },
+        { id: "GES_TV", icone: "📺", titulo: "Dashboard", desc: "Escala Diária no Calendário, Painel Operacional e Disparo WhatsApp" },
 
 
 
@@ -49805,7 +49833,7 @@ function renderizarNavegacao() {
 
             { id: "TEC_OS", icone: "⚡", titulo: "Minhas OS de Campo", desc: "Execução, Check-in, Checklist POP e Assinatura" },
 
-            { id: "GES_TV", icone: "📺", titulo: "Emed Interativa", desc: "Escala Diária no Calendário, Kanban Trello e Disparo WhatsApp" },
+            { id: "GES_TV", icone: "📺", titulo: "Dashboard", desc: "Escala Diária no Calendário, Painel Operacional e Disparo WhatsApp" },
 
             { id: "TEC_MANUAIS", icone: "📚", titulo: "Manuais Técnicos, POPs & Vídeos", desc: "Acervo de ITs e Treinamento Offline" },
 
@@ -72588,6 +72616,11 @@ function renderizarNavegacao() {
         if (res && res.ok) {
           mostrarToast(`✅ OS #${osId} atribuída a ${novoTecnico || 'A DEFINIR'}!`, 2500);
           renderMenuGesTV(document.getElementById("conteudoPrincipal"));
+
+          // GATILHO ITEM A: Credenciamento Hospitalar (Hospital São Carlos)
+          if (res.exige_portaria || clienteExigeCredenciamentoPortaria(o?.cliente)) {
+            interativaAbrirModalCredenciamentoPortaria(osId, novoTecnico);
+          }
         } else {
           mostrarToast(`⚠️ Não foi possível salvar: ${res?.msg || "Erro desconhecido"}`);
         }
@@ -72752,7 +72785,10 @@ function renderizarNavegacao() {
       }
       const dataAg = o.data_agendamento ? String(o.data_agendamento).slice(0, 10).split("-").reverse().join("/") : "--/--";
       const pendencia = o.pendencia_limpa || o.defeito_relatado || o.servico_executado || "";
-      const pendenciaCurta = pendencia ? esc(pendencia.slice(0, 65)) : "";
+      let pendenciaCurta = "";
+      if (pendencia) {
+        pendenciaCurta = esc(pendencia.length > 130 ? pendencia.slice(0, 126) + "..." : pendencia);
+      }
 
       // Sugestão de Rota Unificada em cidades do interior no raio até 180 km
       const sugestoesRota = obterSugestoesRotaUnificada(o, pendentes);
@@ -72769,36 +72805,45 @@ function renderizarNavegacao() {
           </div>
           <div style="font-weight:800;font-size:11.5px;color:#f8fafc;line-height:1.2;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(o.cliente || '')}">${esc(o.cliente || "CLIENTE NÃO INFORMADO")}</div>
           <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:3px;">
-            <span style="background:#0f172a;border:1px solid #334155;color:#38bdf8;font-size:9.5px;font-weight:700;padding:1px 4px;border-radius:3px;max-width:115px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(o.equipamento || '')}">🔬 ${esc(o.equipamento || "EQUIP.")}</span>
-            <span style="font-size:9.5px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:85px;">📍 ${esc(o.cidade || "FORTALEZA")}</span>
+            <span style="background:#0f172a;border:1px solid #334155;color:#38bdf8;font-size:9.5px;font-weight:700;padding:1px 4px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">🔬 ${esc(o.equipamento || "N/A")}</span>
+            <span style="font-size:9.5px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">📍 ${esc(o.cidade || "CE")}</span>
           </div>
-          
+
           <!-- SELEÇÃO RÁPIDA DE TÉCNICO PARA DEFINIÇÃO EM REUNIÃO -->
           <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;" onclick="event.stopPropagation();">
             <span style="font-size:9.5px;font-weight:800;color:#94a3b8;">👤 Téc:</span>
-            <select class="form-control" style="background:#0f172a;color:#67e8f9;border:1px solid #334155;font-weight:800;font-size:9.5px;padding:1px 4px;border-radius:4px;height:22px;flex:1;cursor:pointer;" onchange="interativaAtribuirTecnico('${esc(o.id)}', this.value)">
-              <option value="A DEFINIR" ${!o.tecnico_responsavel || o.tecnico_responsavel === 'A DEFINIR' ? 'selected' : ''}>❓ A Definir</option>
-              ${tecsOpts.map(t => `<option value="${t}" ${(o.tecnico_responsavel||'').toUpperCase() === t ? 'selected' : ''}>${t}</option>`).join('')}
+            <select class="form-control" style="background:#0f172a;color:#67e8f9;border:1px solid #334155;font-weight:800;font-size:10px;padding:2px 4px;height:auto;border-radius:4px;flex:1;min-width:0;" onchange="interativaAtribuirTecnicoOS('${esc(o.id)}', this.value)">
+              <option value="A DEFINIR" ${!o.tecnico_responsavel || o.tecnico_responsavel === 'A DEFINIR' ? 'selected' : ''}>A DEFINIR</option>
+              ${tecsOpts.map(t => `<option value="${t}" ${(o.tecnico_responsavel||'').toUpperCase() === t ? 'selected' : ''}>${t}</option>`).join("")}
             </select>
             <span style="font-size:9.5px;color:#cbd5e1;flex-shrink:0;">${dataAg}</span>
           </div>
 
+          ${clienteExigeCredenciamentoPortaria(o.cliente) ? `
+            <div style="background:${o.credenciamento_enviado === 'SIM' ? 'rgba(22, 101, 52, 0.35)' : 'rgba(180, 83, 9, 0.35)'};border:1px solid ${o.credenciamento_enviado === 'SIM' ? '#16a34a' : '#f59e0b'};border-radius:4px;padding:2px 5px;font-size:9px;color:${o.credenciamento_enviado === 'SIM' ? '#86efac' : '#fde047'};margin-bottom:3px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="event.stopPropagation();interativaAbrirModalCredenciamentoPortaria('${esc(o.id)}', '${esc(o.tecnico_responsavel)}')">
+              <span>🛡️ Portaria: ${o.credenciamento_enviado === 'SIM' ? '✅ Credenciado' : '⚠️ Enviar Doc'}</span>
+              <span style="text-decoration:underline;font-size:8.5px;">${o.credenciamento_enviado === 'SIM' ? 'Ver' : 'Liberar'}</span>
+            </div>
+          ` : ''}
+
           ${temRotaSugerida ? `
-            <div style="background:linear-gradient(90deg, #1e1b4b, #312e81);border:1px solid #6366f1;border-radius:4px;padding:2px 5px;font-size:9px;color:#c7d2fe;margin-bottom:3px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:4px;" onclick="event.stopPropagation();interativaExibirModalRotaUnificada('${esc(o.id)}')" title="Aproveitamento de viagem: ${esc(sugRota.os.cliente)} em ${esc(sugRota.cidade)} (~${sugRota.distanciaKm}km)">
+            <div style="background:linear-gradient(90deg, #1e1b4b, #312e81);border:1px solid #6366f1;border-radius:4px;padding:3px 6px;margin-bottom:3px;font-size:9.5px;display:flex;align-items:center;gap:4px;cursor:pointer;" onclick="event.stopPropagation();abrirModalRotaUnificada('${esc(o.id)}', '${esc(sugRota.os.id)}')" title="Aproveitar viagem e unificar atendimento">
               <span style="font-weight:700;color:#fde047;">💡 Rota (~${sugRota.distanciaKm}km):</span>
-              <span style="color:#a5f3fc;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:115px;">${esc(sugRota.cidade)} (OS #${sugRota.os.id})</span>
+              <span style="color:#a5f3fc;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">${esc(sugRota.os.cliente)} (OS #${sugRota.os.id})</span>
             </div>
           ` : ''}
 
           ${pendenciaCurta ? `
-            <div style="background:#0b1120;border:1px dashed #334155;border-radius:4px;padding:3px 5px;font-size:9.5px;color:#fde047;margin-bottom:5px;line-height:1.2;max-height:36px;overflow:hidden;text-overflow:ellipsis;" title="${esc(pendencia)}">
+            <div style="background:#0b1120;border:1px dashed #334155;border-radius:4px;padding:3px 5px;font-size:9.5px;color:#fde047;line-height:1.25;margin-bottom:3px;">
               ⚠️ ${pendenciaCurta}
             </div>
           ` : ''}
-          <div style="display:flex;gap:4px;margin-top:3px;" onclick="event.stopPropagation();">
-            <button class="btn btn-primary btn-xs" style="flex:1;padding:2px 4px;font-size:9.5px;border-radius:3px;white-space:nowrap;" onclick="abrirModalOS('${esc(o.id)}')">⚡ Executar</button>
-            <button class="btn btn-outline btn-xs" style="border-color:#38bdf8;color:#38bdf8;padding:2px 4px;font-size:9.5px;border-radius:3px;white-space:nowrap;" onclick="iniciarRotaTecnico('${esc(o.id)}')">🗺️ Rota</button>
-            <button class="btn btn-xs" style="background:#25d366;color:#fff;border:none;padding:2px 4px;font-size:9.5px;border-radius:3px;white-space:nowrap;" onclick="interativaDispararZapOS('${esc(o.id)}')">💬 Zap</button>
+
+          <div style="display:flex;gap:3px;margin-top:4px;" onclick="event.stopPropagation();">
+            <button class="btn btn-primary btn-xs" style="flex:1;padding:3px 4px;font-size:9px;border-radius:3px;white-space:nowrap;font-weight:700;" onclick="abrirModalOS('${esc(o.id)}')" title="Abrir e Executar OS">⚡ Executar</button>
+            <button class="btn btn-outline btn-xs" style="border-color:#0284c7;color:#38bdf8;padding:3px 5px;font-size:9px;border-radius:3px;white-space:nowrap;font-weight:700;" onclick="abrirVisualizadorLaudo('${esc(o.id)}')" title="Ver Laudo / Relatório em PDF">📄 Relatório</button>
+            <button class="btn btn-outline btn-xs" style="border-color:#38bdf8;color:#38bdf8;padding:3px 4px;font-size:9px;border-radius:3px;white-space:nowrap;font-weight:700;" onclick="iniciarRotaTecnico('${esc(o.id)}')" title="Traçar rota no mapa">🗺️ Rota</button>
+            <button class="btn btn-xs" style="background:#22c55e;color:#fff;border:none;padding:3px 5px;font-size:9px;border-radius:3px;white-space:nowrap;font-weight:800;" onclick="interativaDispararZapOS('${esc(o.id)}')" title="Enviar Relatório no WhatsApp">💬 Zap</button>
           </div>
         </div>
       `;
@@ -72840,60 +72885,63 @@ function renderizarNavegacao() {
         return true;
       });
 
-      // Montagem do Kanban
+      // Montagem do Quadro / Cronograma
       let kanbanHtml = "";
       if (filtradas.length === 0) {
         kanbanHtml = `
-          <div style="background:#1e293b;border-radius:12px;padding:36px;text-align:center;color:#94a3b8;margin-top:20px;border:1px dashed #334155;">
+          <div style="background:#0b1120;border:1px solid #1e293b;border-radius:12px;padding:36px;text-align:center;color:#94a3b8;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">
             <div style="font-size:36px;margin-bottom:8px;">✅</div>
             <div style="font-size:16px;font-weight:700;color:#f8fafc;">Nenhum chamado encontrado para este filtro</div>
-            <div style="font-size:13px;color:#64748b;margin-top:4px;">Altere o técnico selecionado ou o status para visualizar outras escalas.</div>
+            <div style="font-size:13px;color:#64748b;margin-top:4px;">Altere o técnico selecionado ou o status na barra lateral para visualizar outros chamados.</div>
           </div>
         `;
       } else if (STATE.interativaVisao === "CALENDARIO") {
         const gruposData = {};
         filtradas.forEach(o => {
-          const dKey = o.data_agendamento ? String(o.data_agendamento).slice(0, 10) : "SEM_DATA";
-          if (!gruposData[dKey]) gruposData[dKey] = [];
-          gruposData[dKey].push(o);
+          const dt = o.data_agendamento ? String(o.data_agendamento).slice(0, 10) : "SEM_DATA";
+          if (!gruposData[dt]) gruposData[dt] = [];
+          gruposData[dt].push(o);
         });
 
-        let chavesOrdenadas = Object.keys(gruposData).sort((a, b) => {
-          if (a === "SEM_DATA") return 1;
-          if (b === "SEM_DATA") return -1;
-          return a.localeCompare(b);
-        });
+        let datasOrdenadas = Object.keys(gruposData).sort();
 
-        // Se filtro for SEG_A_SEX, prioriza Segunda a Sexta e mantém finais de semana apenas se tiverem chamados (exceções)
         if (STATE.interativaFiltroDias === "SEG_A_SEX") {
-          chavesOrdenadas = chavesOrdenadas.filter(dKey => {
-            if (dKey === "SEM_DATA") return true;
+          const diasValidos = datasOrdenadas.filter(dt => {
+            if (dt === "SEM_DATA") return false;
             try {
-              const p = dKey.split("-");
-              const dObj = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
-              const dw = dObj.getDay();
-              if (dw >= 1 && dw <= 5) return true;
-              return gruposData[dKey] && gruposData[dKey].length > 0;
-            } catch(e) {
-              return true;
-            }
+              const [y, m, d] = dt.split("-").map(Number);
+              const day = new Date(y, m-1, d).getDay();
+              return day >= 1 && day <= 5;
+            } catch(e) { return true; }
           });
+          if (diasValidos.length > 0) {
+            datasOrdenadas = diasValidos.slice(0, 5);
+          } else {
+            datasOrdenadas = datasOrdenadas.slice(0, 5);
+          }
         }
 
         kanbanHtml = `<div class="interativa-kanban-board">`;
-        chavesOrdenadas.forEach(dKey => {
-          const chamadosDia = gruposData[dKey];
-          const labelDia = formatarDataInterativa(dKey);
+        datasOrdenadas.forEach(dt => {
+          const chamadosDia = gruposData[dt];
+          chamadosDia.sort((a, b) => {
+            if (a.categoria_tv === "CRITICA" && b.categoria_tv !== "CRITICA") return -1;
+            if (b.categoria_tv === "CRITICA" && a.categoria_tv !== "CRITICA") return 1;
+            return String(a.cliente || "").localeCompare(String(b.cliente || ""));
+          });
+
+          const labelData = formatarDataInterativa(dt);
+
           kanbanHtml += `
             <div class="interativa-col">
               <div class="interativa-col-header">
                 <div style="min-width:0;flex:1;">
-                  <div style="font-size:11.5px;font-weight:800;color:#f8fafc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${labelDia}">
-                    ${labelDia}
+                  <div style="font-size:11px;font-weight:800;color:#f8fafc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                    ${labelData}
                   </div>
                   <div style="font-size:9.5px;color:#94a3b8;margin-top:1px;">${chamadosDia.length} chamado(s) alocado(s)</div>
                 </div>
-                <button class="btn btn-xs" onclick="interativaDispararWhatsAppDia('${dKey}')" title="Disparar escala deste dia no WhatsApp" style="background:#22c55e;color:#fff;border:none;border-radius:4px;padding:2px 6px;font-size:9.5px;display:flex;align-items:center;gap:2px;cursor:pointer;flex-shrink:0;">
+                <button class="btn btn-xs" onclick="interativaDispararWhatsAppDia('${dt}')" title="Disparar escala deste dia no WhatsApp" style="background:#22c55e;color:#fff;border:none;padding:2px 5px;font-size:9.5px;border-radius:3px;font-weight:700;">
                   📲 Zap Dia
                 </button>
               </div>
@@ -72918,16 +72966,17 @@ function renderizarNavegacao() {
         tecsOrdenados.forEach(tKey => {
           const chamadosTec = gruposTec[tKey];
           chamadosTec.sort((a, b) => String(a.data_agendamento || "").localeCompare(String(b.data_agendamento || "")));
+
           kanbanHtml += `
             <div class="interativa-col">
               <div class="interativa-col-header">
                 <div style="min-width:0;flex:1;">
-                  <div style="font-size:11.5px;font-weight:800;color:#f8fafc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${tKey}">
+                  <div style="font-size:11.5px;font-weight:800;color:#f8fafc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                     👤 ${tKey}
                   </div>
                   <div style="font-size:9.5px;color:#94a3b8;margin-top:1px;">${chamadosTec.length} chamado(s) atribuído(s)</div>
                 </div>
-                <button class="btn btn-xs" onclick="interativaDispararWhatsAppTecnico('${tKey}')" title="Disparar escala deste técnico no WhatsApp" style="background:#22c55e;color:#fff;border:none;border-radius:4px;padding:2px 6px;font-size:9.5px;display:flex;align-items:center;gap:2px;cursor:pointer;flex-shrink:0;">
+                <button class="btn btn-xs" onclick="interativaDispararWhatsAppTecnico('${tKey}')" title="Disparar escala deste técnico no WhatsApp" style="background:#22c55e;color:#fff;border:none;padding:2px 5px;font-size:9.5px;border-radius:3px;font-weight:700;">
                   📲 Zap Escala
                 </button>
               </div>
@@ -72941,311 +72990,219 @@ function renderizarNavegacao() {
       }
 
       box.innerHTML = `
-        <div class="tv-panel" id="tvFullscreenBox">
-          <!-- CABEÇALHO EMED INTERATIVA -->
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <div class="interativa-layout-container">
+          <!-- BARRA VERTICAL NA LATERAL ESQUERDA -->
+          <aside class="interativa-sidebar" style="width:250px;min-width:230px;max-width:265px;background:#0b1120;border:1px solid #1e293b;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,0.35);">
+            
+            <!-- TÍTULO DO PAINEL -->
             <div>
-              <div style="font-size:18px;font-weight:900;color:#38bdf8;display:flex;align-items:center;gap:6px;">
-                📺 EMED INTERATIVA
+              <div style="font-size:15px;font-weight:900;color:#38bdf8;display:flex;align-items:center;gap:6px;">
+                📊 PAINEL OPERACIONAL
               </div>
-              <div style="font-size:11.5px;color:#94a3b8;">Escala Diária no Calendário (Segunda a Sexta) & Trello da Equipe</div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:2px;">
+                Escala Diária & Distribuição da Equipe
+              </div>
             </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <button class="btn btn-sm" onclick="interativaDispararWhatsAppTecnico()" style="background:#22c55e;color:#fff;border:none;display:inline-flex;align-items:center;gap:4px;font-weight:700;cursor:pointer;padding:4px 9px;font-size:11.5px;">
-                📲 Zap Técnico
-              </button>
-              <button class="btn btn-sm" onclick="interativaDispararWhatsAppGrupo()" style="background:#16a34a;color:#fff;border:none;display:inline-flex;align-items:center;gap:4px;font-weight:700;cursor:pointer;padding:4px 9px;font-size:11.5px;">
-                👥 Zap Grupo EMED
-              </button>
-              <button class="btn btn-amber btn-sm" onclick="alternarTelaCheiaTV()" style="padding:4px 9px;font-size:11.5px;">
-                🖥️ Modo TV
-              </button>
-            </div>
-          </div>
 
-          <!-- BARRA DE CONTROLE: SELETOR DE TÉCNICO & FILTRO DE DIAS & MODO DE VISÃO -->
-          <div style="background:#111827;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;border:1px solid #1e293b;">
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <span style="font-size:11px;font-weight:800;color:#94a3b8;">FILTRAR TÉCNICO:</span>
-              <select id="tvFiltroTecnico" class="form-control" style="background:#1e293b;color:#f8fafc;border-color:#334155;font-weight:700;border-radius:6px;padding:3px 8px;font-size:11.5px;" onchange="STATE.interativaTecnico=this.value;renderMenuGesTV(document.getElementById('conteudoPrincipal'));">
-                <option value="TODOS" ${STATE.interativaTecnico==='TODOS'?'selected':''}>👥 Todos os Técnicos (${pendentes.length} OS)</option>
+            <!-- KPIS DE STATUS VERTICAIS -->
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div class="interativa-sidebar-kpi" onclick="STATE.filtroTV='TODAS';renderMenuGesTV(document.getElementById('mainContainer'))" style="background:${STATE.filtroTV==='TODAS'?'#1e293b':'#0f172a'};border:1px solid ${STATE.filtroTV==='TODAS'?'#38bdf8':'#1e293b'};">
+                <span style="font-size:11px;color:#94a3b8;font-weight:700;">TOTAL EM ABERTO</span>
+                <span style="color:#fff;font-size:16px;font-weight:900;">${pendentes.length}</span>
+              </div>
+              <div class="interativa-sidebar-kpi" onclick="STATE.filtroTV='CRITICA';renderMenuGesTV(document.getElementById('mainContainer'))" style="background:${STATE.filtroTV==='CRITICA'?'#2e1015':'#0f172a'};border:1px solid ${STATE.filtroTV==='CRITICA'?'#ef4444':'#1e293b'};">
+                <span style="font-size:11px;color:#fca5a5;font-weight:700;">🔴 CRÍTICAS / PARADO</span>
+                <span style="color:#f87171;font-size:16px;font-weight:900;">${qtdCriticas}</span>
+              </div>
+              <div class="interativa-sidebar-kpi" onclick="STATE.filtroTV='PECA_ORCAMENTO';renderMenuGesTV(document.getElementById('mainContainer'))" style="background:${STATE.filtroTV==='PECA_ORCAMENTO'?'#2d1b06':'#0f172a'};border:1px solid ${STATE.filtroTV==='PECA_ORCAMENTO'?'#f59e0b':'#1e293b'};">
+                <span style="font-size:11px;color:#fde68a;font-weight:700;">🟠 AGUARDA PEÇA</span>
+                <span style="color:#fbbf24;font-size:16px;font-weight:900;">${qtdPeca}</span>
+              </div>
+              <div class="interativa-sidebar-kpi" onclick="STATE.filtroTV='PROGRAMADA';renderMenuGesTV(document.getElementById('mainContainer'))" style="background:${STATE.filtroTV==='PROGRAMADA'?'#0c2a4d':'#0f172a'};border:1px solid ${STATE.filtroTV==='PROGRAMADA'?'#38bdf8':'#1e293b'};">
+                <span style="font-size:11px;color:#bae6fd;font-weight:700;">🔵 PROGRAMADAS</span>
+                <span style="color:#38bdf8;font-size:16px;font-weight:900;">${qtdProgramadas}</span>
+              </div>
+            </div>
+
+            <!-- FILTRO DE TÉCNICO -->
+            <div style="border-top:1px solid #1e293b;padding-top:10px;">
+              <label style="font-size:10px;font-weight:800;color:#94a3b8;display:block;margin-bottom:4px;">FILTRAR TÉCNICO:</label>
+              <select id="tvFiltroTecnico" class="form-control" style="width:100%;background:#1e293b;color:#f8fafc;border:1px solid #334155;font-size:11px;padding:6px;border-radius:6px;font-weight:700;" onchange="STATE.interativaTecnico=this.value;renderMenuGesTV(document.getElementById('mainContainer'))">
+                <option value="TODOS" ${STATE.interativaTecnico==='TODOS'?'selected':''}>👥 Todos os Técnicos (${pendentes.length})</option>
                 ${listaTecnicos.map(t => {
                   const qtd = pendentes.filter(o => (o.tecnico_responsavel || '').toUpperCase() === t).length;
                   return `<option value="${t}" ${STATE.interativaTecnico===t?'selected':''}>👤 ${t} (${qtd} OS)</option>`;
                 }).join("")}
               </select>
-
-              <span style="font-size:11px;font-weight:800;color:#94a3b8;margin-left:8px;">DIAS:</span>
-              <button class="btn btn-xs ${STATE.interativaFiltroDias==='SEG_A_SEX'?'btn-primary':'btn-outline'}" style="font-size:11px;padding:3px 8px;border-radius:4px;" onclick="STATE.interativaFiltroDias='SEG_A_SEX';renderMenuGesTV(document.getElementById('conteudoPrincipal'));" title="Exibe os 5 dias de trabalho da semana (Segunda a Sexta), mantendo fins de semana apenas se houver atendimento">
-                🗓️ Seg a Sex (5 Dias)
-              </button>
-              <button class="btn btn-xs ${STATE.interativaFiltroDias==='TODOS'?'btn-primary':'btn-outline'}" style="font-size:11px;padding:3px 8px;border-radius:4px;" onclick="STATE.interativaFiltroDias='TODOS';renderMenuGesTV(document.getElementById('conteudoPrincipal'));">
-                📅 Todas as Datas
-              </button>
             </div>
 
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span style="font-size:11px;font-weight:800;color:#94a3b8;">VISÃO:</span>
-              <button class="btn btn-xs ${STATE.interativaVisao==='CALENDARIO'?'btn-primary':'btn-outline'}" style="font-size:11px;padding:3px 8px;border-radius:4px;" onclick="STATE.interativaVisao='CALENDARIO';renderMenuGesTV(document.getElementById('conteudoPrincipal'));">
-                📅 Calendário
-              </button>
-              <button class="btn btn-xs ${STATE.interativaVisao==='TRELLO_TECNICOS'?'btn-primary':'btn-outline'}" style="font-size:11px;padding:3px 8px;border-radius:4px;" onclick="STATE.interativaVisao='TRELLO_TECNICOS';renderMenuGesTV(document.getElementById('conteudoPrincipal'));">
-                📋 Trello Técnicos
-              </button>
+            <!-- FILTRO DE DIAS -->
+            <div>
+              <label style="font-size:10px;font-weight:800;color:#94a3b8;display:block;margin-bottom:4px;">DIAS EXIBIDOS:</label>
+              <div style="display:flex;gap:4px;">
+                <button class="btn btn-xs ${STATE.interativaFiltroDias==='SEG_A_SEX'?'btn-primary':'btn-outline'}" style="flex:1;font-size:10px;padding:5px;" onclick="STATE.interativaFiltroDias='SEG_A_SEX';renderMenuGesTV(document.getElementById('mainContainer'))">
+                  🗓️ Seg a Sex
+                </button>
+                <button class="btn btn-xs ${STATE.interativaFiltroDias==='TODOS'?'btn-primary':'btn-outline'}" style="flex:1;font-size:10px;padding:5px;" onclick="STATE.interativaFiltroDias='TODOS';renderMenuGesTV(document.getElementById('mainContainer'))">
+                  📅 Todas
+                </button>
+              </div>
             </div>
-          </div>
 
-          <!-- KPIS DE STATUS (FILTROS) -->
-          <div class="tv-kpi-grid">
-            <div class="tv-kpi" onclick="STATE.filtroTV='TODAS';renderMenuGesTV(document.getElementById('conteudoPrincipal'));" style="cursor:pointer;${STATE.filtroTV==='TODAS'?'border-color:#38bdf8;box-shadow:0 0 10px rgba(56,189,248,0.3);':''}">
-              <div style="font-size:10px;color:#94a3b8;">TOTAL EM ABERTO</div>
-              <div class="num" style="color:#fff;">${pendentes.length}</div>
+            <!-- MODO DE VISÃO -->
+            <div>
+              <label style="font-size:10px;font-weight:800;color:#94a3b8;display:block;margin-bottom:4px;">MODO DE VISÃO:</label>
+              <div style="display:flex;gap:4px;">
+                <button class="btn btn-xs ${STATE.interativaVisao==='CALENDARIO'?'btn-primary':'btn-outline'}" style="flex:1;font-size:10px;padding:5px;" onclick="STATE.interativaVisao='CALENDARIO';renderMenuGesTV(document.getElementById('mainContainer'))">
+                  📅 Calendário
+                </button>
+                <button class="btn btn-xs ${STATE.interativaVisao==='TRELLO_TECNICOS'?'btn-primary':'btn-outline'}" style="flex:1;font-size:10px;padding:5px;" onclick="STATE.interativaVisao='TRELLO_TECNICOS';renderMenuGesTV(document.getElementById('mainContainer'))">
+                  👥 Por Técnico
+                </button>
+              </div>
             </div>
-            <div class="tv-kpi" onclick="STATE.filtroTV='CRITICA';renderMenuGesTV(document.getElementById('conteudoPrincipal'));" style="cursor:pointer;border-color:#ef4444;${STATE.filtroTV==='CRITICA'?'box-shadow:0 0 10px rgba(239,68,68,0.4);':''}">
-              <div style="font-size:10px;color:#fca5a5;">🔴 CRÍTICAS / PARADO</div>
-              <div class="num" style="color:#f87171;">${qtdCriticas}</div>
-            </div>
-            <div class="tv-kpi" onclick="STATE.filtroTV='PECA_ORCAMENTO';renderMenuGesTV(document.getElementById('conteudoPrincipal'));" style="cursor:pointer;border-color:#f59e0b;${STATE.filtroTV==='PECA_ORCAMENTO'?'box-shadow:0 0 10px rgba(245,158,11,0.4);':''}">
-              <div style="font-size:10px;color:#fde68a;">🟠 AGUARDA PEÇA</div>
-              <div class="num" style="color:#fbbf24;">${qtdPeca}</div>
-            </div>
-            <div class="tv-kpi" onclick="STATE.filtroTV='PROGRAMADA';renderMenuGesTV(document.getElementById('conteudoPrincipal'));" style="cursor:pointer;border-color:#38bdf8;${STATE.filtroTV==='PROGRAMADA'?'box-shadow:0 0 10px rgba(56,189,248,0.4);':''}">
-              <div style="font-size:10px;color:#bae6fd;">🔵 PROGRAMADAS</div>
-              <div class="num" style="color:#38bdf8;">${qtdProgramadas}</div>
-            </div>
-          </div>
 
-          <!-- KANBAN CALENDÁRIO / TRELLO -->
-          ${kanbanHtml}
+            <!-- AÇÕES RÁPIDAS WHATSAPP -->
+            <div style="border-top:1px solid #1e293b;padding-top:10px;display:flex;flex-direction:column;gap:6px;margin-top:auto;">
+              <button class="btn btn-sm" onclick="interativaDispararWhatsAppTecnico()" style="background:#22c55e;color:#fff;border:none;font-weight:800;font-size:11px;padding:7px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:6px;">
+                📲 Zap Técnico
+              </button>
+              <button class="btn btn-sm" onclick="interativaDispararWhatsAppGrupo()" style="background:#16a34a;color:#fff;border:none;font-weight:800;font-size:11px;padding:7px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:6px;">
+                👥 Zap Grupo EMED
+              </button>
+            </div>
+
+          </aside>
+
+          <!-- ÁREA PRINCIPAL DOS DIAS SEQUENCIAIS / QUADRO -->
+          <main class="interativa-main" style="flex:1;min-width:0;overflow:hidden;display:flex;flex-direction:column;">
+            ${kanbanHtml}
+          </main>
         </div>
       `;
     }
 
-    function alternarTelaCheiaTV() {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      const el = document.getElementById("tvFullscreenBox");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      if (!document.fullscreenElement && el.requestFullscreen) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        el.requestFullscreen().catch(() => {});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      } else if (document.exitFullscreen) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        document.exitFullscreen().catch(() => {});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    function interativaDispararZapOS(osId) {
+      const ordens = STATE.data?.ordens || [];
+      const o = ordens.find(x => String(x.id) === String(osId));
+      if (!o) return alert("OS #" + osId + " não encontrada!");
+
+      const tec = o.tecnico_responsavel || "Técnico EMED";
+      const cli = o.cliente || "Hospital / Cliente";
+      const cid = o.cidade || "Fortaleza - CE";
+      const eq = o.equipamento || "Equipamento Médico";
+      const st = o.status || "Pendente";
+      const dataRef = o.data_br || o.data_agendamento || "Hoje";
+      const desc = o.servico_executado || o.pendencia_limpa || o.problemas_encontrados || o.defeito_relatado || "Atendimento agendado.";
+
+      let msg = `🏥 *EMED ELETROMEDICINA — RELATÓRIO DE ATENDIMENTO*\n`;
+      msg += `📋 *OS #${o.id}* • *${cli}*\n`;
+      msg += `🔬 *Equipamento:* ${eq}\n`;
+      msg += `📍 *Local:* ${cid}\n`;
+      msg += `👤 *Técnico Responsável:* ${tec}\n`;
+      msg += `📅 *Data:* ${dataRef}\n`;
+      msg += `⚙️ *Status Operacional:* ${st}\n\n`;
+      msg += `📝 *Parecer Técnico / Ocorrência:*\n${desc}\n\n`;
+      msg += `📄 *Acesse o Relatório / Laudo Oficial em PDF:*\nhttps://emedservice.med.br/api/pdf/${o.id}\n\n`;
+      msg += `Atenciosamente,\n*Equipe de Engenharia Clínica & Atendimento EMED*`;
+
+      let tel = (o.whatsapp || o.contato_responsavel || o.telefone_tecnico || "").replace(/\D/g, "");
+      if (tel && !tel.startsWith("55") && tel.length >= 10) tel = "55" + tel;
+
+      const url = tel ? `https://api.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(msg)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+      window.open(url, "_blank");
+    }
+
+    function interativaDispararWhatsAppDia(dtStr) {
+      const ordens = (STATE.data?.ordens || []).filter(o => {
+        const dt = o.data_agendamento ? String(o.data_agendamento).slice(0, 10) : "SEM_DATA";
+        return dt === dtStr;
+      });
+      if (ordens.length === 0) return alert("Nenhum chamado agendado para " + dtStr);
+
+      let msg = `📅 *EMED — ESCALA DE ATENDIMENTOS (${dtStr})*\n`;
+      msg += `Total de chamados alocados: ${ordens.length}\n`;
+      msg += `------------------------------------\n`;
+      ordens.forEach((o, i) => {
+        msg += `*${i+1}. OS #${o.id}* — ${o.cliente}\n`;
+        msg += `📍 ${o.cidade} • 🔬 ${o.equipamento}\n`;
+        msg += `👤 Téc: ${o.tecnico_responsavel || 'A DEFINIR'}\n`;
+        if (o.pendencia_limpa) msg += `⚠️ ${o.pendencia_limpa.slice(0, 75)}\n`;
+        msg += `------------------------------------\n`;
+      });
+      const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+      window.open(url, "_blank");
+    }
+
+    function interativaDispararWhatsAppTecnico(tecnicoNome) {
+      const ordens = (STATE.data?.ordens || []).filter(o => {
+        const st = (o.status || "").toUpperCase();
+        return !st.includes("CONCLU") && !st.includes("FINALIZ");
+      });
+
+      const tecAlvo = tecnicoNome || (STATE.interativaTecnico !== "TODOS" ? STATE.interativaTecnico : null);
+      if (!tecAlvo) {
+        const tecs = Array.from(new Set(ordens.map(o => (o.tecnico_responsavel || "").toUpperCase()).filter(Boolean))).sort();
+        const escolhido = prompt("Selecione o técnico para enviar a escala:\n" + tecs.join(", "), tecs[0] || "");
+        if (!escolhido) return;
+        return interativaDispararWhatsAppTecnico(escolhido.toUpperCase().trim());
       }
 
+      const ordensTec = ordens.filter(o => (o.tecnico_responsavel || "").toUpperCase() === tecAlvo.toUpperCase());
+      if (ordensTec.length === 0) return alert(`Nenhum chamado pendente encontrado para ${tecAlvo}!`);
 
+      let msg = `👨‍🔧 *EMED — ESCALA DE ATENDIMENTO DE ${tecAlvo}*\n`;
+      msg += `📅 *Total de Chamados:* ${ordensTec.length}\n`;
+      msg += `------------------------------------\n`;
+      ordensTec.forEach((o, i) => {
+        msg += `*${i+1}. OS #${o.id}* — ${o.cliente}\n`;
+        msg += `📍 ${o.cidade} • 🔬 ${o.equipamento}\n`;
+        msg += `📅 Data: ${o.data_br || o.data_agendamento || 'A Definir'}\n`;
+        if (o.pendencia_limpa) msg += `⚠️ ${o.pendencia_limpa.slice(0, 80)}\n`;
+        msg += `------------------------------------\n`;
+      });
+      msg += `🚀 Bom atendimento e bom trabalho!`;
 
+      const tecObj = (STATE.data?.tecnicos || []).find(t => (t.nome || "").toUpperCase() === tecAlvo.toUpperCase());
+      let tel = (tecObj?.telefone || "").replace(/\D/g, "");
+      if (tel && !tel.startsWith("55") && tel.length >= 10) tel = "55" + tel;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      const url = tel ? `https://api.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(msg)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+      window.open(url, "_blank");
     }
+
+    function interativaDispararWhatsAppGrupo() {
+      const ordens = (STATE.data?.ordens || []).filter(o => {
+        const st = (o.status || "").toUpperCase();
+        return !st.includes("CONCLU") && !st.includes("FINALIZ");
+      });
+
+      const criticas = ordens.filter(o => o.categoria_tv === "CRITICA");
+      let msg = `🏥 *EMED ELETROMEDICINA — RESUMO OPERACIONAL DO DIA*\n`;
+      msg += `📊 *Total em Aberto:* ${ordens.length} | 🔴 *Críticas:* ${criticas.length}\n`;
+      msg += `------------------------------------\n`;
+
+      const porTec = {};
+      ordens.forEach(o => {
+        const t = o.tecnico_responsavel || "A DEFINIR";
+        if (!porTec[t]) porTec[t] = [];
+        porTec[t].push(o);
+      });
+
+      Object.keys(porTec).sort().forEach(t => {
+        msg += `👤 *${t} (${porTec[t].length} OS):*\n`;
+        porTec[t].slice(0, 3).forEach(o => {
+          msg += `  • OS #${o.id} - ${o.cliente} (${o.cidade})\n`;
+        });
+        if (porTec[t].length > 3) msg += `  • ... e mais ${porTec[t].length - 3} chamados\n`;
+        msg += `\n`;
+      });
+
+      msg += `🔗 *Painel Online:* https://emedservice.med.br\n`;
+      const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+      window.open(url, "_blank");
+    }
+
 
 
 
@@ -110412,6 +110369,22 @@ function fecharModalInsumosViagem() {
 
 
                 📍 ${esc(os.endereco)} (${esc(os.cidade)}) • Check-in: <b id="lblCheckinHora">${esc(os.checkin_hora || 'Pendente')}</b>
+              ${clienteExigeCredenciamentoPortaria(os.cliente) ? `
+                <div style="background:#082f49;border:1px solid #38bdf8;border-radius:8px;padding:8px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                  <div>
+                    <div style="font-weight:900;color:#e0f2fe;font-size:12px;display:flex;align-items:center;gap:6px;">
+                      🛡️ PROTOCOLO DE PORTARIA HOSPITALAR (SÃO CARLOS)
+                    </div>
+                    <div style="font-size:11px;color:#bae6fd;margin-top:2px;">
+                      Status: <b>${os.credenciamento_enviado === 'SIM' ? '✅ Credenciamento Formal Expedido' : '⚠️ Pendente de Liberação de Portaria'}</b>
+                      ${os.credenciamento_data ? ` • Emitido em: ${os.credenciamento_data}` : ''}
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-sm" onclick="interativaAbrirModalCredenciamentoPortaria('${esc(os.id)}', document.getElementById('osTecResp')?.value || '${esc(os.tecnico_responsavel)}')" style="background:#0284c7;color:#fff;font-weight:800;border:none;padding:5px 12px;border-radius:6px;font-size:11.5px;cursor:pointer;">
+                    🛡️ ${os.credenciamento_enviado === 'SIM' ? 'Reemitir / Visualizar Carta' : '⚡ Expedir Autorização Portaria'}
+                  </button>
+                </div>
+              ` : ''}
 
 
 
@@ -110839,7 +110812,7 @@ function fecharModalInsumosViagem() {
 
 
 
-            <select id="osTecResp" class="select" onchange="autoSalvarRascunho()">
+            <select id="osTecResp" class="select" onchange="if(clienteExigeCredenciamentoPortaria(STATE.osAberta?.cliente)){interativaAbrirModalCredenciamentoPortaria(STATE.osAberta?.id, this.value);}autoSalvarRascunho()">
 
 
 
@@ -111418,6 +111391,56 @@ function fecharModalInsumosViagem() {
 
 
 
+
+
+        
+        <!-- ITEM B: MONITORAMENTO DE VIDA ÚTIL DO EMISSOR / AMPOLA DE RX & TC -->
+        <div class="section-box" style="background:#0b1329;border:1px solid #1e3a8a;border-radius:10px;padding:14px;margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;border-bottom:1px solid #1e293b;padding-bottom:8px;">
+            <div style="font-weight:900;color:#38bdf8;font-size:13px;display:flex;align-items:center;gap:6px;">
+              🔬 TELEMETRIA DO EMISSOR / AMPOLA DE RX & TC (INDICADOR DE VIDA ÚTIL)
+            </div>
+            <button type="button" class="btn btn-outline btn-xs" onclick="inserirTelemetriaTuboNoLaudo()" style="border-color:#38bdf8;color:#38bdf8;padding:3px 8px;font-size:10px;border-radius:4px;cursor:pointer;">
+              📋 Inserir Telemetria no Laudo
+            </button>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px;margin-bottom:12px;">
+            <div>
+              <label class="field-label" style="font-size:10px;color:#94a3b8;">📊 Scans / Disparos Acumulados</label>
+              <input type="number" id="inputScansTotais" value="${esc(os.scans_totais || 0)}" class="form-control" style="font-size:12px;font-weight:800;background:#0f172a;color:#f8fafc;border-color:#334155;" oninput="calcularTelemetriaTuboEmissor();if(typeof autoSalvarRascunho==='function')autoSalvarRascunho()">
+            </div>
+            <div>
+              <label class="field-label" style="font-size:10px;color:#94a3b8;">🎯 Limite Nominal do Tubo</label>
+              <input type="number" id="inputCapacidadeTubo" value="${esc(os.capacidade_tubo || 200000)}" class="form-control" style="font-size:12px;font-weight:800;background:#0f172a;color:#f8fafc;border-color:#334155;" oninput="calcularTelemetriaTuboEmissor();if(typeof autoSalvarRascunho==='function')autoSalvarRascunho()">
+            </div>
+            <div>
+              <label class="field-label" style="font-size:10px;color:#94a3b8;">⏱️ Horímetro de Operação (h)</label>
+              <input type="number" id="inputHorimetroTubo" value="${esc(os.horimetro_tubo || 0)}" class="form-control" style="font-size:12px;font-weight:800;background:#0f172a;color:#f8fafc;border-color:#334155;" oninput="if(typeof autoSalvarRascunho==='function')autoSalvarRascunho()">
+            </div>
+            <div>
+              <label class="field-label" style="font-size:10px;color:#94a3b8;">👥 Volume Pacientes / Mês</label>
+              <input type="number" id="inputPacientesMes" value="${esc(os.pacientes_mes || 0)}" class="form-control" style="font-size:12px;font-weight:800;background:#0f172a;color:#f8fafc;border-color:#334155;" oninput="calcularTelemetriaTuboEmissor();if(typeof autoSalvarRascunho==='function')autoSalvarRascunho()">
+            </div>
+          </div>
+
+          <input type="hidden" id="inputVidaUtilPerc" value="${esc(os.vida_util_tubo_perc || 0)}">
+
+          <!-- Barra de Desgaste Dinâmica -->
+          <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px 12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:6px;">
+              <span style="color:#cbd5e1;font-weight:700;">Desgaste Acumulado da Ampola:</span>
+              <span id="lblDesgasteTuboPerc" style="font-weight:900;color:#38bdf8;">0%</span>
+              <span id="badgeDesgasteTuboStatus" style="font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:12px;color:#fff;background:#16a34a;">🟢 Vida Útil Plena</span>
+            </div>
+            <div style="background:#1e293b;border-radius:6px;height:12px;width:100%;overflow:hidden;border:1px solid #334155;">
+              <div id="barraDesgasteTubo" style="width:0%;height:100%;background:#16a34a;transition:width 0.4s ease, background 0.4s ease;"></div>
+            </div>
+            <div id="boxProjecaoTuboRestante" style="font-size:11.5px;color:#cbd5e1;margin-top:8px;line-height:1.4;">
+              Informe os disparos e a média de pacientes para visualizar a projeção em meses.
+            </div>
+          </div>
+        </div>
 
 
         <!-- CHECKLIST DE SUGESTÕES TÉCNICAS (CARREGAMENTO INSTANTÂNEO 0MS) -->
@@ -115398,6 +115421,7 @@ function fecharModalInsumosViagem() {
 
 
       document.getElementById("modalOS").classList.add("open");
+      if (typeof calcularTelemetriaTuboEmissor === "function") calcularTelemetriaTuboEmissor();
 
 
 
@@ -120588,6 +120612,7 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
     function abrirVisualizadorLaudo(osId) {
+      window._osVisualizadorAtual = osId;
 
 
 
@@ -121708,6 +121733,11 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
         tecnico_responsavel: document.getElementById("osTecResp")?.value || "",
+        scans_totais: parseInt(document.getElementById("inputScansTotais")?.value || 0),
+        capacidade_tubo: parseInt(document.getElementById("inputCapacidadeTubo")?.value || 200000),
+        horimetro_tubo: parseInt(document.getElementById("inputHorimetroTubo")?.value || 0),
+        pacientes_mes: parseInt(document.getElementById("inputPacientesMes")?.value || 0),
+        vida_util_tubo_perc: parseFloat(document.getElementById("inputVidaUtilPerc")?.value || 0),
 
 
 
@@ -137234,6 +137264,7 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
           <a id="btnBaixarPDFVisualizador" class="btn btn-outline btn-sm" href="#" target="_blank">📥 Baixar PDF</a>
+          <button id="btnZapVisualizador" class="btn btn-sm" onclick="interativaDispararZapOS(window._osVisualizadorAtual)" style="background:#22c55e;color:#fff;border:none;font-weight:800;display:inline-flex;align-items:center;gap:4px;" title="Enviar Relatório Oficial no WhatsApp">📲 Enviar Relatório no WhatsApp</button>
 
 
 
@@ -146477,6 +146508,684 @@ async function efetuarLogout() {
       const urlWa = `https://api.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(texto)}`;
       window.open(urlWa, "_blank");
     }
+
+
+
+
+    // =========================================================================
+    // ITEM A: GATILHO & MODAL DE CREDENCIAMENTO DE PORTARIA (HOSPITAL SÃO CARLOS)
+    // =========================================================================
+    function clienteExigeCredenciamentoPortaria(cliNome) {
+      if (!cliNome) return false;
+      const n = String(cliNome).toUpperCase();
+      return n.includes("SAO CARLOS") || n.includes("SÃO CARLOS");
+    }
+    window.clienteExigeCredenciamentoPortaria = clienteExigeCredenciamentoPortaria;
+
+    let _modalCredenciamentoTecnicos = [];
+    let _modalCredenciamentoOS = null;
+
+    async function interativaAbrirModalCredenciamentoPortaria(osId, tecnicoSugerido) {
+      mostrarToast(`🛡️ Carregando dados de portaria para OS #${osId}...`, 1800);
+      try {
+        const [resOS, resTecs] = await Promise.all([
+          apiGet(`/api/hospital/autorizacao-entrada/${osId}`),
+          apiGet('/api/hospital/tecnicos-credenciamento')
+        ]);
+
+        if (!resOS || !resOS.ok) {
+          alert(resOS?.msg || "Não foi possível carregar os dados da OS.");
+          return;
+        }
+
+        _modalCredenciamentoOS = resOS;
+        _modalCredenciamentoTecnicos = resTecs?.tecnicos || [];
+
+        const tecPrincipal = tecnicoSugerido || resOS.tecnico || "ANTONIO";
+
+        // Remove modal antigo se existir
+        document.getElementById("modalCredenciamentoBox")?.remove();
+
+        const modalDiv = document.createElement("div");
+        modalDiv.id = "modalCredenciamentoBox";
+        modalDiv.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(2,6,23,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;backdrop-filter:blur(4px);";
+
+        let htmlTecs = "";
+        _modalCredenciamentoTecnicos.forEach((t, idx) => {
+          const isSelected = (t.nome.toUpperCase() === tecPrincipal.toUpperCase());
+          htmlTecs += `
+            <label style="display:flex;align-items:flex-start;gap:8px;background:${isSelected ? '#0c4a6e' : '#1e293b'};border:1px solid ${isSelected ? '#38bdf8' : '#334155'};border-radius:8px;padding:8px;cursor:pointer;transition:all 0.2s ease;">
+              <input type="checkbox" class="chk-cred-tec" value="${esc(t.nome)}" ${isSelected ? 'checked' : ''} onchange="atualizarPreviewCredenciamentoPortaria()" style="margin-top:3px;transform:scale(1.2);">
+              <div style="flex:1;font-size:11px;">
+                <div style="font-weight:900;color:${isSelected ? '#bae6fd' : '#f8fafc'};display:flex;align-items:center;justify-content:space-between;">
+                  <span>👤 ${esc(t.nome)}</span>
+                  <span style="font-size:9.5px;color:#38bdf8;">${esc(t.registro_conselho)}</span>
+                </div>
+                <div style="color:#94a3b8;font-size:10px;margin-top:2px;">
+                  CPF: ${esc(t.cpf)} • RG: ${esc(t.rg)}
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap;">
+                  <span style="background:#14532d;color:#86efac;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;">ASO: ${esc(t.data_vencimento_aso)} (${esc(t.parecer_aptidao)})</span>
+                  <span style="background:#1e1b4b;color:#c7d2fe;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;">🚗 ${esc(t.veiculo_placa)}</span>
+                </div>
+              </div>
+            </label>
+          `;
+        });
+
+        modalDiv.innerHTML = `
+          <div style="background:#090d16;color:#f8fafc;width:100%;max-width:650px;max-height:92vh;overflow-y:auto;border-radius:14px;border:1px solid #0284c7;box-shadow:0 20px 40px rgba(0,0,0,0.8);display:flex;flex-direction:column;">
+            <!-- Header Modal -->
+            <div style="background:linear-gradient(90deg, #0369a1, #0f172a);padding:14px 18px;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center;border-top-left-radius:13px;border-top-right-radius:13px;">
+              <div>
+                <div style="font-size:15px;font-weight:900;color:#e0f2fe;display:flex;align-items:center;gap:8px;">
+                  🛡️ PROTOCOLO DE PORTARIA — ${esc(resOS.hospital)}
+                </div>
+                <div style="font-size:11px;color:#bae6fd;margin-top:2px;">
+                  OS #${esc(resOS.os_id)} • ${esc(resOS.equipamento)} (Data Prevista: ${esc(resOS.data_agendamento || 'Hoje')})
+                </div>
+              </div>
+              <button onclick="document.getElementById('modalCredenciamentoBox')?.remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;padding:4px 8px;">✕</button>
+            </div>
+
+            <!-- Body Modal -->
+            <div style="padding:16px 18px;display:flex;flex-direction:column;gap:14px;">
+              <!-- Alerta Protocolo Rigoroso -->
+              <div style="background:#082f49;border-left:4px solid #38bdf8;padding:10px 14px;border-radius:6px;font-size:12px;color:#bae6fd;line-height:1.4;">
+                <b style="color:#ffffff;">⚠️ Liberação Prévia Exigida:</b> O Hospital São Carlos exige envio da lista formal dos técnicos autorizados com CPF, RG, CFT, ASO em dia e placa do veículo antes da chegada ao hospital para evitar espera na portaria.
+              </div>
+
+              <!-- Seleção de Técnicos -->
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <span style="font-size:12.5px;font-weight:900;color:#f8fafc;">👥 Equipe Técnica Designada (Selecione 1 ou mais):</span>
+                  <span style="font-size:10px;color:#94a3b8;">Pré-selecionado: <b style="color:#38bdf8;">${esc(tecPrincipal)}</b></span>
+                </div>
+                <div id="boxListaTecsCredenciamento" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:8px;max-height:210px;overflow-y:auto;padding-right:4px;">
+                  ${htmlTecs}
+                </div>
+              </div>
+
+              <!-- Dados de Contato Portaria -->
+              <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:11.5px;">
+                <div>
+                  <span style="color:#94a3b8;">Portaria / Destinatário:</span>
+                  <b style="color:#f8fafc;margin-left:4px;">${esc(resOS.responsavel_hospital || 'Sra. Damares / William')}</b>
+                </div>
+                <div style="display:flex;gap:12px;">
+                  <span>📞 <b style="color:#38bdf8;">${esc(resOS.contato_responsavel || '85 99189-7379')}</b></span>
+                  <span>✉️ <b style="color:#38bdf8;">${esc(resOS.email_hospital || 'manutencao@saocarlosimagem.com.br')}</b></span>
+                </div>
+              </div>
+
+              <!-- Live Preview do Texto -->
+              <div>
+                <div style="font-size:11px;font-weight:800;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;">
+                  📝 Prévia da Comunicação de Acesso:
+                </div>
+                <textarea id="txtPreviewCredenciamento" rows="5" class="form-control" style="background:#020617;color:#67e8f9;border:1px solid #334155;font-size:11px;font-family:monospace;width:100%;box-sizing:border-box;border-radius:6px;resize:vertical;" readonly></textarea>
+              </div>
+            </div>
+
+            <!-- Footer / Botões de Ação Rápida -->
+            <div style="background:#0f172a;padding:12px 18px;border-top:1px solid #1e293b;display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center;border-bottom-left-radius:13px;border-bottom-right-radius:13px;">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn btn-sm" onclick="dispararZapCredenciamentoPortaria()" style="background:#25d366;color:#ffffff;font-weight:900;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                  📲 WhatsApp Portaria
+                </button>
+                <button type="button" class="btn btn-sm" onclick="dispararEmailCredenciamentoPortaria()" style="background:#0284c7;color:#ffffff;font-weight:900;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                  ✉️ E-mail Portaria
+                </button>
+                <button type="button" class="btn btn-sm" onclick="dispararZapCredenciamentoTecnico()" style="background:#1e293b;color:#38bdf8;border:1px solid #38bdf8;font-weight:800;padding:7px 12px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                  📱 Zap Técnico
+                </button>
+                <button type="button" class="btn btn-sm" onclick="imprimirTermoCredenciamentoPortaria()" style="background:#334155;color:#e2e8f0;border:none;font-weight:800;padding:7px 12px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                  📄 Termo A4
+                </button>
+              </div>
+
+              <button type="button" class="btn btn-sm" onclick="confirmarCredenciamentoPortaria()" style="background:#16a34a;color:#ffffff;font-weight:900;border:none;padding:8px 18px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                ✅ Confirmar Liberação
+              </button>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(modalDiv);
+        atualizarPreviewCredenciamentoPortaria();
+
+      } catch (err) {
+        console.error(err);
+        mostrarToast("Erro ao abrir credenciamento de portaria: " + err.message);
+      }
+    }
+    window.interativaAbrirModalCredenciamentoPortaria = interativaAbrirModalCredenciamentoPortaria;
+
+    function obterTecnicosSelecionadosCredenciamento() {
+      const chks = document.querySelectorAll(".chk-cred-tec:checked");
+      const nomes = Array.from(chks).map(c => c.value);
+      return _modalCredenciamentoTecnicos.filter(t => nomes.includes(t.nome));
+    }
+
+    function atualizarPreviewCredenciamentoPortaria() {
+      const tecsSel = obterTecnicosSelecionadosCredenciamento();
+      const os = _modalCredenciamentoOS;
+      if (!os) return;
+
+      let linhasTecs = "";
+      if (tecsSel.length > 0) {
+        linhasTecs = tecsSel.map(t => 
+          `• *${t.nome}* (CPF: ${t.cpf} | RG: ${t.rg})
+  Registro: ${t.registro_conselho} | ASO: ${t.data_vencimento_aso} | Veículo: ${t.veiculo_placa}`
+        ).join("\n\n");
+      } else {
+        linhasTecs = `• *${os.tecnico}* (Técnico Biomédico Credenciado EMED)`;
+      }
+
+      const txt = 
+`🏥 *COMUNICADO DE AUTORIZAÇÃO DE ENTRADA & ACESSO TÉCNICO*
+Empresa: *EMED Eletromedicina Ltda.* (CNPJ: 07.283.365/0001-10)
+
+À Portaria, Recepção e Engenharia Clínica do *${os.hospital}*
+A/C: *${os.responsavel_hospital || 'Sra. Damares / William'}*
+
+Informamos que a equipe técnica credenciada da EMED comparecerá para atendimento na *OS #${os.os_id}*:
+
+🔧 *Equipamento:* ${os.equipamento}
+📅 *Data Prevista:* ${os.data_agendamento || 'Hoje'}
+
+👤 *PROFISSIONAL(IS) DESIGNADO(S):*
+${linhasTecs}
+
+🛡️ *Conformidade Regulatória:*
+- Atestado de Saúde Ocupacional (ASO) vigente com parecer APTO;
+- Treinamentos NR-10 (Segurança em Eletricidade) e NR-32 (Hospitalar) em dia;
+- Munidos de crachá, EPIs e ferramentas calibradas.
+
+Solicitamos a autorização de entrada na guarita predial.
+📞 *Plantão Operacional EMED:* (85) 99915-0273 / (85) 99619-7923`;
+
+      const txtArea = document.getElementById("txtPreviewCredenciamento");
+      if (txtArea) txtArea.value = txt;
+    }
+    window.atualizarPreviewCredenciamentoPortaria = atualizarPreviewCredenciamentoPortaria;
+
+    function dispararZapCredenciamentoPortaria() {
+      const os = _modalCredenciamentoOS;
+      const txtArea = document.getElementById("txtPreviewCredenciamento");
+      if (!os || !txtArea) return;
+
+      let tel = (os.contato_responsavel || "85991897379").replace(/\D/g, "");
+      if (tel.length === 10 || tel.length === 11) tel = "55" + tel;
+      const url = `https://api.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(txtArea.value)}`;
+      window.open(url, "_blank");
+      mostrarToast("📲 WhatsApp da portaria aberto com a autorização pronta!", 2500);
+    }
+    window.dispararZapCredenciamentoPortaria = dispararZapCredenciamentoPortaria;
+
+    function dispararEmailCredenciamentoPortaria() {
+      const os = _modalCredenciamentoOS;
+      const txtArea = document.getElementById("txtPreviewCredenciamento");
+      if (!os || !txtArea) return;
+
+      const email = os.email_hospital || "manutencao@saocarlosimagem.com.br";
+      const assunto = `AUTORIZAÇÃO DE ENTRADA TÉCNICA - EMED ELETROMEDICINA - OS #${os.os_id} (${os.equipamento})`;
+      const corpo = txtArea.value;
+      const url = `mailto:${email}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+      window.open(url, "_blank");
+      mostrarToast("✉️ Cliente de e-mail aberto para a portaria!", 2500);
+    }
+    window.dispararEmailCredenciamentoPortaria = dispararEmailCredenciamentoPortaria;
+
+    function dispararZapCredenciamentoTecnico() {
+      const tecsSel = obterTecnicosSelecionadosCredenciamento();
+      const txtArea = document.getElementById("txtPreviewCredenciamento");
+      if (!txtArea || tecsSel.length === 0) {
+        mostrarToast("Selecione ao menos um técnico para enviar comprovante.");
+        return;
+      }
+      const primTec = tecsSel[0];
+      let tel = (primTec.telefone || "85999150273").replace(/\D/g, "");
+      if (tel.length === 10 || tel.length === 11) tel = "55" + tel;
+      const msgTec = `📋 *SEU COMPROVANTE DE AUTORIZAÇÃO DE ENTRADA HOSPITALAR*\n\nApresente na portaria do hospital se solicitado:\n\n` + txtArea.value;
+      const url = `https://api.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(msgTec)}`;
+      window.open(url, "_blank");
+      mostrarToast(`📲 Autorização enviada ao WhatsApp de ${primTec.nome}!`, 2500);
+    }
+    window.dispararZapCredenciamentoTecnico = dispararZapCredenciamentoTecnico;
+
+    function imprimirTermoCredenciamentoPortaria() {
+      const os = _modalCredenciamentoOS;
+      if (!os) return;
+      const tecsSel = obterTecnicosSelecionadosCredenciamento();
+      const paramTecs = tecsSel.map(t => t.nome).join(",");
+      window.open(`/api/hospital/autorizacao-entrada/${os.os_id}/imprimir?tecs=${encodeURIComponent(paramTecs)}`, "_blank");
+    }
+    window.imprimirTermoCredenciamentoPortaria = imprimirTermoCredenciamentoPortaria;
+
+    async function confirmarCredenciamentoPortaria() {
+      const os = _modalCredenciamentoOS;
+      if (!os) return;
+      const tecsSel = obterTecnicosSelecionadosCredenciamento();
+      const nomes = tecsSel.map(t => t.nome);
+
+      mostrarToast(`💾 Registrando liberação de portaria na OS #${os.os_id}...`, 1800);
+      try {
+        const res = await apiPost('/api/hospital/autorizacao-entrada/confirmar', {
+          os_id: os.os_id,
+          tecnicos: nomes
+        });
+        if (res && res.ok) {
+          mostrarToast(`✅ Credenciamento confirmado! Técnico liberado para acesso sem espera na portaria.`, 3500);
+          
+          // Atualiza dados no STATE local
+          const ordens = STATE.data?.ordens || [];
+          const oLocal = ordens.find(x => String(x.id) === String(os.os_id));
+          if (oLocal) {
+            oLocal.credenciamento_enviado = 'SIM';
+            oLocal.credenciamento_tecnicos = nomes.join(', ');
+          }
+
+          document.getElementById('modalCredenciamentoBox')?.remove();
+
+          // Re-renderiza Emed Interativa se estiver visível
+          if (document.getElementById("tabelaTVLaboratorio")) {
+            renderMenuGesTV(document.getElementById("conteudoPrincipal"));
+          }
+        } else {
+          mostrarToast(`⚠️ Não foi possível confirmar: ${res?.msg || "Erro desconhecido"}`);
+        }
+      } catch (err) {
+        console.error(err);
+        mostrarToast("Erro ao confirmar credenciamento: " + err.message);
+      }
+    }
+    window.confirmarCredenciamentoPortaria = confirmarCredenciamentoPortaria;
+
+
+    // =========================================================================
+    // ITEM B: MONITORAMENTO DE VIDA ÚTIL DO TUBOR / HORÍMETRO / SCANS & PACIENTES
+    // =========================================================================
+    function calcularTelemetriaTuboEmissor() {
+      const scans = parseInt(document.getElementById("inputScansTotais")?.value || 0);
+      const cap = parseInt(document.getElementById("inputCapacidadeTubo")?.value || 200000);
+      const pacMes = parseInt(document.getElementById("inputPacientesMes")?.value || 0);
+      const horimetro = parseInt(document.getElementById("inputHorimetroTubo")?.value || 0);
+
+      const perc = cap > 0 ? Math.min(100, Math.round((scans / cap) * 100)) : 0;
+      const inpPerc = document.getElementById("inputVidaUtilPerc");
+      if (inpPerc) inpPerc.value = perc;
+
+      const barra = document.getElementById("barraDesgasteTubo");
+      const lblPerc = document.getElementById("lblDesgasteTuboPerc");
+      const badgeStatus = document.getElementById("badgeDesgasteTuboStatus");
+      const boxProj = document.getElementById("boxProjecaoTuboRestante");
+
+      let cor = "#16a34a"; // Verde
+      let txtStatus = "🟢 Vida Útil Plena (< 60%)";
+      let msgAlerta = "Equipamento operando com margem de segurança. Tubo em plena capacidade operacional.";
+
+      if (perc >= 80) {
+        cor = "#dc2626"; // Vermelho
+        txtStatus = "🔴 Nível Crítico (> 80%) — Risco Iminente";
+        msgAlerta = "⚠️ ALERTA HOSPITALAR CRÍTICO: Ampola próxima do esgotamento mecânico/térmico. Programar substituição ou revitalização preventiva urgente com a EMED para evitar paralisação súbita do setor.";
+      } else if (perc >= 60) {
+        cor = "#d97706"; // Amarelo
+        txtStatus = "🟡 Atenção Preventiva (60% - 80%)";
+        msgAlerta = "Ampola em fase avançada de ciclo. Recomendado solicitar cotação prévia à EMED para inclusão no planejamento de compras/revitalização.";
+      }
+
+      if (barra) {
+        barra.style.width = perc + "%";
+        barra.style.background = cor;
+      }
+      if (lblPerc) lblPerc.innerText = perc + "% (" + scans.toLocaleString('pt-BR') + " de " + cap.toLocaleString('pt-BR') + " disparos)";
+      if (badgeStatus) {
+        badgeStatus.innerText = txtStatus;
+        badgeStatus.style.background = cor;
+      }
+
+      // Projeção em meses
+      if (boxProj) {
+        const disparosRestantes = Math.max(0, cap - scans);
+        let textoProjecao = "";
+        if (pacMes > 0) {
+          // Estimativa de ~2 a 3 disparos por paciente
+          const disparosMes = pacMes * 2.5;
+          const mesesRestantes = Math.round(disparosRestantes / disparosMes);
+          textoProjecao = `<b>⏱️ Projeção de Vida Restante:</b> Com ${pacMes} pacientes/mês (~${Math.round(disparosMes)} disparos/mês), a vida útil restante estimada é de aproximadamente <b>${mesesRestantes} meses</b> (${disparosRestantes.toLocaleString('pt-BR')} disparos restantes).<br><span style="font-size:11px;color:#94a3b8;">${msgAlerta}</span>`;
+        } else {
+          textoProjecao = `<b>⏱️ Projeção de Vida Restante:</b> Restam <b>${disparosRestantes.toLocaleString('pt-BR')} disparos nominais</b>. Informe a média mensal de pacientes para calcular os meses estimados.<br><span style="font-size:11px;color:#94a3b8;">${msgAlerta}</span>`;
+        }
+        boxProj.innerHTML = textoProjecao;
+      }
+    }
+    window.calcularTelemetriaTuboEmissor = calcularTelemetriaTuboEmissor;
+
+    function inserirTelemetriaTuboNoLaudo() {
+      const scans = parseInt(document.getElementById("inputScansTotais")?.value || 0);
+      const cap = parseInt(document.getElementById("inputCapacidadeTubo")?.value || 200000);
+      const pacMes = parseInt(document.getElementById("inputPacientesMes")?.value || 0);
+      const horimetro = parseInt(document.getElementById("inputHorimetroTubo")?.value || 0);
+      const perc = cap > 0 ? Math.min(100, Math.round((scans / cap) * 100)) : 0;
+
+      const disparosRestantes = Math.max(0, cap - scans);
+      const disparosMes = pacMes > 0 ? pacMes * 2.5 : 0;
+      const mesesRestantes = disparosMes > 0 ? Math.round(disparosRestantes / disparosMes) : 'N/D';
+
+      const textoLaudo = 
+`\n\n[TELEMETRIA DO EMISSOR / AMPOLA DE RX/TC - AUDITORIA DE VIDA ÚTIL]
+- Contagem Total de Scans / Disparos Acumulados: ${scans.toLocaleString('pt-BR')} disparos
+- Limite Nominal de Fábrica: ${cap.toLocaleString('pt-BR')} disparos (Taxa de Desgaste: ${perc}%)
+- Horímetro de Operação do Sistema: ${horimetro} horas
+- Volume Médio Informado pelo Setor: ${pacMes} pacientes/mês
+- Projeção de Vida Útil Restante: Aprox. ${mesesRestantes} meses (${disparosRestantes.toLocaleString('pt-BR')} disparos restantes)
+- Parecer Técnico EMED: ${perc >= 80 ? 'ALERTA CRÍTICO - PROGRAMAR SUBSTITUIÇÃO ANTECIPADA' : (perc >= 60 ? 'ATENÇÃO - INICIAR PLANEJAMENTO DE COTAÇÃO' : 'CONDICIONAMENTO OPERACIONAL ÓTIMO')}`;
+
+      const fldSrv = document.getElementById("osSrvExec");
+      if (fldSrv) {
+        fldSrv.value = (fldSrv.value || '').trim() + textoLaudo;
+        mostrarToast("📋 Indicador de Telemetria do Tubo inserido no Laudo Técnico com sucesso!", 2500);
+        if (typeof autoSalvarRascunho === "function") autoSalvarRascunho();
+      }
+    }
+    window.inserirTelemetriaTuboNoLaudo = inserirTelemetriaTuboNoLaudo;
+
+
+    // =========================================================================
+    // ITEM C: MODO VIAGEM BLINDADO (INDEXEDDB OFFLINE COMPLETO)
+    // =========================================================================
+    const EmedModoViagem = {
+      dbName: "EmedOfflineModoViagemDB",
+      dbVersion: 2,
+      db: null,
+
+      async init() {
+        if (!window.indexedDB) return;
+        return new Promise((resolve) => {
+          const req = indexedDB.open(this.dbName, this.dbVersion);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains("fila_offline")) {
+              db.createObjectStore("fila_offline", { keyPath: "id", autoIncrement: true });
+            }
+          };
+          req.onsuccess = (e) => {
+            this.db = e.target.result;
+            this.atualizarStatusPill();
+            resolve(this.db);
+          };
+          req.onerror = () => resolve(null);
+        });
+      },
+
+      async salvarAcao(tipo, url, payload, descricao) {
+        if (!this.db) await this.init();
+        if (!this.db) return false;
+
+        return new Promise((resolve) => {
+          try {
+            const tx = this.db.transaction("fila_offline", "readwrite");
+            const store = tx.objectStore("fila_offline");
+            store.add({
+              tipo: tipo,
+              url: url,
+              payload: payload,
+              descricao: descricao || tipo,
+              criado_em: new Date().toISOString(),
+              timestamp: Date.now()
+            });
+            tx.oncomplete = () => {
+              this.atualizarStatusPill();
+              mostrarToast(`📡 MODO VIAGEM BLINDADO: Ação (${descricao || tipo}) gravada no aparelho em segurança!`, 3500);
+              resolve(true);
+            };
+            tx.onerror = () => resolve(false);
+          } catch(e) {
+            resolve(false);
+          }
+        });
+      },
+
+      async obterFila() {
+        if (!this.db) await this.init();
+        if (!this.db) return [];
+        return new Promise((resolve) => {
+          try {
+            const tx = this.db.transaction("fila_offline", "readonly");
+            const store = tx.objectStore("fila_offline");
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => resolve([]);
+          } catch(e) {
+            resolve([]);
+          }
+        });
+      },
+
+      async removerItem(id) {
+        if (!this.db) await this.init();
+        if (!this.db) return;
+        return new Promise((resolve) => {
+          try {
+            const tx = this.db.transaction("fila_offline", "readwrite");
+            const store = tx.objectStore("fila_offline");
+            store.delete(id);
+            tx.oncomplete = () => {
+              this.atualizarStatusPill();
+              resolve(true);
+            };
+            tx.onerror = () => resolve(false);
+          } catch(e) {
+            resolve(false);
+          }
+        });
+      },
+
+      async sincronizarFila() {
+        if (!navigator.onLine) {
+          mostrarToast("⚠️ Sem conexão à internet no momento. Modo Viagem mantendo dados seguros.");
+          return;
+        }
+
+        const fila = await this.obterFila();
+        if (fila.length === 0) {
+          mostrarToast("✅ Modo Viagem: Nenhum registro pendente de sincronização.");
+          return;
+        }
+
+        mostrarToast(`🔄 Sincronizando ${fila.length} ação(ões) do Modo Viagem com a nuvem EMED...`, 2500);
+        let sucessos = 0;
+
+        for (const item of fila) {
+          try {
+            const res = await fetch(item.url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(item.payload)
+            });
+            if (res.ok) {
+              await this.removerItem(item.id);
+              sucessos++;
+            }
+          } catch(err) {
+            console.warn("Falha ao sincronizar item offline:", err);
+          }
+        }
+
+        if (sucessos > 0) {
+          mostrarToast(`✅ SUCESSO: ${sucessos} registro(s) sincronizados com o servidor EMED!`, 3500);
+          this.atualizarStatusPill();
+        }
+      },
+
+      async atualizarStatusPill() {
+        const fila = await this.obterFila();
+        let pill = document.getElementById("pillModoViagemOffline");
+        if (fila.length > 0) {
+          if (!pill) {
+            pill = document.createElement("div");
+            pill.id = "pillModoViagemOffline";
+            pill.style.cssText = "position:fixed;bottom:16px;right:16px;background:linear-gradient(90deg, #1e3a8a, #0369a1);color:#fff;border:1px solid #38bdf8;padding:8px 14px;border-radius:30px;font-size:12px;font-weight:900;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:99998;cursor:pointer;";
+            pill.onclick = () => EmedModoViagem.sincronizarFila();
+            document.body.appendChild(pill);
+          }
+          pill.innerHTML = `🚗 Modo Viagem: <b>${fila.length}</b> pendente(s) • <span style="text-decoration:underline;">Sincronizar</span>`;
+          pill.style.display = "flex";
+        } else if (pill) {
+          pill.style.display = "none";
+        }
+      }
+    };
+    window.EmedModoViagem = EmedModoViagem;
+
+    // Inicializa IndexedDB e auto-sincronização online
+    window.addEventListener("load", () => {
+      EmedModoViagem.init();
+    });
+    window.addEventListener("online", () => {
+      mostrarToast("📶 Sinal de internet detectado! Sincronizando dados pendentes do Modo Viagem...");
+      EmedModoViagem.sincronizarFila();
+    });
+
+
+    // =========================================================================
+    // ITEM E: PAINEL EXECUTIVO DE RENTABILIDADE REAL POR CONTRATO (LOGAUDIT)
+    // =========================================================================
+    async function abrirPainelRentabilidadeContratos() {
+      mostrarToast("📊 Calculando auditoria de rentabilidade real de contratos...", 2000);
+      try {
+        const res = await apiGet("/api/gestao/rentabilidade-contratos");
+        if (!res || !res.ok) {
+          mostrarToast("Não foi possível carregar a rentabilidade de contratos.");
+          return;
+        }
+
+        document.getElementById("modalRentabilidadeContratosBox")?.remove();
+
+        const modalDiv = document.createElement("div");
+        modalDiv.id = "modalRentabilidadeContratosBox";
+        modalDiv.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(2,6,23,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;backdrop-filter:blur(4px);";
+
+        const resumo = res.resumo || {};
+        const contratos = res.contratos || [];
+
+        let rowsHtml = "";
+        contratos.forEach(c => {
+          let badgeCor = "#16a34a";
+          let badgeTxt = "💎 ALTA MARGEM";
+          if (c.classificacao === "DEFICITARIO") {
+            badgeCor = "#dc2626";
+            badgeTxt = "🔴 DÉFICIT / ADITIVO";
+          } else if (c.classificacao === "ATENCAO") {
+            badgeCor = "#d97706";
+            badgeTxt = "🟡 APERTADO";
+          } else if (c.classificacao === "SAUDAVEL") {
+            badgeCor = "#0284c7";
+            badgeTxt = "🟢 SAUDÁVEL";
+          }
+
+          rowsHtml += `
+            <tr style="border-bottom: 1px solid #1e293b; font-size: 11.5px;">
+              <td style="padding: 9px 10px; font-weight: 800; color: #f8fafc;">
+                ${esc(c.cliente)}<br>
+                <small style="color:#94a3b8;font-size:10px;">📍 ${esc(c.cidade)} (~${c.km_mes} km/mês)</small>
+              </td>
+              <td style="padding: 9px 10px; color: #38bdf8; font-weight: 800;">R$ ${c.receita_mensal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+              <td style="padding: 9px 10px; color: #cbd5e1;">R$ ${c.custo_combustivel.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+              <td style="padding: 9px 10px; color: #cbd5e1;">R$ ${c.custo_desgaste_km.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+              <td style="padding: 9px 10px; color: #cbd5e1;">R$ ${(c.custo_refeicao + c.custo_hospedagem).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+              <td style="padding: 9px 10px; color: #f87171; font-weight: 800;">R$ ${c.custo_total_operacao.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+              <td style="padding: 9px 10px; font-weight: 900; color: ${c.margem_liquida >= 0 ? '#4ade80' : '#f87171'};">
+                R$ ${c.margem_liquida.toLocaleString('pt-BR', {minimumFractionDigits: 2})}<br>
+                <small style="font-size:10px;">(${c.margem_perc}%)</small>
+              </td>
+              <td style="padding: 9px 10px; text-align: right;">
+                <span style="background:${badgeCor};color:#fff;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:4px;white-space:nowrap;">
+                  ${badgeTxt}
+                </span>
+              </td>
+            </tr>
+          `;
+        });
+
+        modalDiv.innerHTML = `
+          <div style="background:#090d16;color:#f8fafc;width:100%;max-width:950px;max-height:92vh;overflow-y:auto;border-radius:14px;border:1px solid #1e3a8a;box-shadow:0 20px 40px rgba(0,0,0,0.8);display:flex;flex-direction:column;">
+            <!-- Header Modal -->
+            <div style="background:linear-gradient(90deg, #1e3a8a, #0f172a);padding:14px 20px;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:16px;font-weight:900;color:#e0f2fe;display:flex;align-items:center;gap:8px;">
+                  📊 PAINEL EXECUTIVO DE RENTABILIDADE REAL POR CONTRATO (EMED LOGAUDIT)
+                </div>
+                <div style="font-size:11.5px;color:#93c5fd;margin-top:2px;">
+                  Cruzamento da Receita Contratual com Custo Logístico Real (Combustível Estrada/Urbano, Desgaste R$ 0,31/km, Diárias Romaria & Peças)
+                </div>
+              </div>
+              <button onclick="document.getElementById('modalRentabilidadeContratosBox')?.remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;padding:4px 8px;">✕</button>
+            </div>
+
+            <!-- Body Modal -->
+            <div style="padding:16px 20px;display:flex;flex-direction:column;gap:16px;">
+              <!-- KPI Cards -->
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px;">
+                <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+                  <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;">Receita Mensal de Contratos</div>
+                  <div style="font-size:20px;font-weight:900;color:#38bdf8;margin-top:4px;">R$ ${(resumo.receita_global || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                  <div style="font-size:10px;color:#64748b;margin-top:2px;">${resumo.total_contratos || 0} contratos ativos</div>
+                </div>
+
+                <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+                  <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;">Custo Operacional Total (Auditado)</div>
+                  <div style="font-size:20px;font-weight:900;color:#f87171;margin-top:4px;">R$ ${(resumo.custo_global || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                  <div style="font-size:10px;color:#64748b;margin-top:2px;">Combustível + Diárias + Desgaste + Peças</div>
+                </div>
+
+                <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+                  <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;">Lucro Líquido Real da Carteira</div>
+                  <div style="font-size:20px;font-weight:900;color:#4ade80;margin-top:4px;">R$ ${(resumo.lucro_liquido_global || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                  <div style="font-size:10px;color:#64748b;margin-top:2px;">Margem Média: ${resumo.receita_global ? Math.round(((resumo.lucro_liquido_global || 0) / resumo.receita_global) * 100) : 0}%</div>
+                </div>
+              </div>
+
+              <!-- Tabela Executiva -->
+              <div style="border:1px solid #1e293b;border-radius:8px;overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;text-align:left;">
+                  <thead style="background:#0f172a;border-bottom:2px solid #334155;font-size:10.5px;color:#94a3b8;text-transform:uppercase;">
+                    <tr>
+                      <th style="padding:10px;">Cliente / Cidade</th>
+                      <th style="padding:10px;">Receita</th>
+                      <th style="padding:10px;">Combustível</th>
+                      <th style="padding:10px;">Desgaste (0,31)</th>
+                      <th style="padding:10px;">Diárias/Hotel</th>
+                      <th style="padding:10px;">Custo Real</th>
+                      <th style="padding:10px;">Margem Líquida</th>
+                      <th style="padding:10px;text-align:right;">Status Contratual</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rowsHtml}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Footer Modal -->
+            <div style="background:#0f172a;padding:12px 20px;border-top:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;color:#64748b;">Dados consolidados pelo motor de inteligência logística EMED LogAudit.</span>
+              <button onclick="document.getElementById('modalRentabilidadeContratosBox')?.remove()" style="background:#334155;color:#f8fafc;border:none;padding:6px 16px;border-radius:6px;font-weight:700;cursor:pointer;">Fechar</button>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(modalDiv);
+
+      } catch(err) {
+        console.error(err);
+        mostrarToast("Erro ao abrir rentabilidade de contratos: " + err.message);
+      }
+    }
+    window.abrirPainelRentabilidadeContratos = abrirPainelRentabilidadeContratos;
+
 
 </script>
 
