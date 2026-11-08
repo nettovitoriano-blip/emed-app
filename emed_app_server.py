@@ -10615,7 +10615,7 @@ async def api_cotacoes_transporte_salvar(request: web.Request) -> web.Response:
 
 
 async def api_logistica_deslocamento_salvar(request: web.Request) -> web.Response:
-    """Registra uma referência de deslocamento e logística para inteligência de orçamentos futuros."""
+    """Registra uma referência de deslocamento e logística auditada (combustível, hotel, refeição e contrato)."""
     try:
         body = await request.json()
     except Exception:
@@ -10624,15 +10624,21 @@ async def api_logistica_deslocamento_salvar(request: web.Request) -> web.Respons
     os_id = str(body.get("os_id", "")).strip()
     cliente = limpar_texto(body.get("cliente"), "CLIENTE NÃO INFORMADO")
     cidade = limpar_texto(body.get("cidade"), "FORTALEZA / CE")
+    enquadramento = limpar_texto(body.get("enquadramento_contrato"), "AVULSO")
     km_ida = float(limpar_float(body.get("km_estimado_ida"), 0.0))
-    km_total = float(limpar_float(body.get("km_estimado_total"), km_ida * 2))
+    km_local = float(limpar_float(body.get("km_rodagem_local"), 30.0))
+    km_total = float(limpar_float(body.get("km_estimado_total"), km_ida * 2 + km_local))
     tipo_rota = limpar_texto(body.get("tipo_rota"), "EXCLUSIVA")
-    consumo_kml = float(limpar_float(body.get("consumo_medio_kml"), 13.0))
-    preco_comb = float(limpar_float(body.get("preco_combustivel"), 5.89))
+    consumo_kml = float(limpar_float(body.get("consumo_medio_kml"), 11.5))
+    preco_comb = float(limpar_float(body.get("preco_combustivel"), 5.99))
     custo_comb = float(limpar_float(body.get("custo_combustivel"), 0.0))
+    pernoites = int(limpar_float(body.get("qtd_pernoites"), 0))
+    custo_hotel = float(limpar_float(body.get("custo_hospedagem"), 0.0))
+    dias_refeicao = int(limpar_float(body.get("qtd_dias_refeicao"), 1))
+    custo_refeicao = float(limpar_float(body.get("custo_alimentacao"), 0.0))
     custo_desgaste = float(limpar_float(body.get("custo_desgaste"), 0.0))
     custo_total = float(limpar_float(body.get("custo_total_operacional"), 0.0))
-    valor_sugerido = float(limpar_float(body.get("valor_sugerido_orcamento"), 0.0))
+    valor_faturar = float(limpar_float(body.get("valor_faturar_cliente"), 0.0))
     obs = limpar_texto(body.get("observacoes"), "")
     criado_por = limpar_texto(body.get("criado_por"), "SISTEMA")
 
@@ -10644,36 +10650,59 @@ async def api_logistica_deslocamento_salvar(request: web.Request) -> web.Respons
                 os_id TEXT,
                 cliente TEXT,
                 cidade TEXT,
+                enquadramento_contrato TEXT DEFAULT 'AVULSO',
                 km_estimado_ida REAL,
+                km_rodagem_local REAL DEFAULT 30.0,
                 km_estimado_total REAL,
                 tipo_rota TEXT,
-                consumo_medio_kml REAL DEFAULT 13.0,
-                preco_combustivel REAL DEFAULT 5.89,
+                consumo_medio_kml REAL DEFAULT 11.5,
+                preco_combustivel REAL DEFAULT 5.99,
                 custo_combustivel REAL,
+                qtd_pernoites INTEGER DEFAULT 0,
+                custo_hospedagem REAL DEFAULT 0.0,
+                qtd_dias_refeicao INTEGER DEFAULT 1,
+                custo_alimentacao REAL DEFAULT 0.0,
                 custo_desgaste REAL,
                 custo_total_operacional REAL,
-                valor_sugerido_orcamento REAL,
+                valor_faturar_cliente REAL,
                 observacoes TEXT,
                 criado_por TEXT,
                 data_calculo TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Adicionar colunas caso a tabela já existisse
+        for col_def in [
+            ("enquadramento_contrato", "TEXT DEFAULT 'AVULSO'"),
+            ("km_rodagem_local", "REAL DEFAULT 30.0"),
+            ("qtd_pernoites", "INTEGER DEFAULT 0"),
+            ("custo_hospedagem", "REAL DEFAULT 0.0"),
+            ("qtd_dias_refeicao", "INTEGER DEFAULT 1"),
+            ("custo_alimentacao", "REAL DEFAULT 0.0"),
+            ("valor_faturar_cliente", "REAL DEFAULT 0.0")
+        ]:
+            try:
+                cur.execute(f"ALTER TABLE logistica_orcamentos_deslocamento ADD COLUMN {col_def[0]} {col_def[1]}")
+            except Exception:
+                pass
+
         cur.execute("""
             INSERT INTO logistica_orcamentos_deslocamento (
-                os_id, cliente, cidade, km_estimado_ida, km_estimado_total, tipo_rota,
-                consumo_medio_kml, preco_combustivel, custo_combustivel, custo_desgaste,
-                custo_total_operacional, valor_sugerido_orcamento, observacoes, criado_por
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                os_id, cliente, cidade, enquadramento_contrato, km_estimado_ida, km_rodagem_local,
+                km_estimado_total, tipo_rota, consumo_medio_kml, preco_combustivel, custo_combustivel,
+                qtd_pernoites, custo_hospedagem, qtd_dias_refeicao, custo_alimentacao,
+                custo_desgaste, custo_total_operacional, valor_faturar_cliente, observacoes, criado_por
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            os_id, cliente, cidade, km_ida, km_total, tipo_rota,
-            consumo_kml, preco_comb, custo_comb, custo_desgaste,
-            custo_total, valor_sugerido, obs, criado_por
+            os_id, cliente, cidade, enquadramento, km_ida, km_local,
+            km_total, tipo_rota, consumo_kml, preco_comb, custo_comb,
+            pernoites, custo_hotel, dias_refeicao, custo_refeicao,
+            custo_desgaste, custo_total, valor_faturar, obs, criado_por
         ))
         conn.commit()
 
     return web.json_response({
         "ok": True,
-        "msg": f"Referência logística para {cidade} gravada com sucesso! Base histórica alimentada."
+        "msg": f"Referência logística auditada para {cidade} gravada com sucesso! Base histórica atualizada."
     })
 
 

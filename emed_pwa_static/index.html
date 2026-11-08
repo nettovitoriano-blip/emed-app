@@ -41823,7 +41823,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-      navigator.serviceWorker.register("/sw.js?v=v53").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=v54").then(reg => { if(reg) reg.update(); }).catch(() => {});
 
 
 
@@ -81299,21 +81299,39 @@ function renderizarNavegacao() {
      * INOVAÇÃO 3: CALCULADORA LOGÍSTICA DE DESLOCAMENTO & PRECIFICAÇÃO
      * Coleta de dados com flexibilidade para não sobrecarregar orçamentos
      ********************************************************************/
-    function obterDistanciaReferenciaCidade(cidadeNome) {
+    function obterReferenciaPadraoCidade(cidadeNome) {
       const cid = (cidadeNome || "").toUpperCase();
-      if (cid.includes("JUAZEIRO") || cid.includes("CRATO") || cid.includes("BARBALHA")) return 500;
-      if (cid.includes("SOBRAL") || cid.includes("FORQUILHA")) return 235;
-      if (cid.includes("PETROLINA")) return 620;
-      if (cid.includes("ARARIPINA")) return 660;
-      if (cid.includes("IGUATU")) return 380;
-      if (cid.includes("QUIXADÁ") || cid.includes("QUIXADA")) return 168;
-      if (cid.includes("RUSSAS") || cid.includes("LIMOEIRO")) return 165;
-      if (cid.includes("CRATEÚS") || cid.includes("CRATEUS")) return 350;
-      if (cid.includes("ITAPIPOCA")) return 130;
-      if (cid.includes("TIANGUÁ") || cid.includes("TIANGUA")) return 315;
-      if (cid.includes("CANINDÉ") || cid.includes("CANINDE")) return 120;
-      if (cid.includes("FORTALEZA") || cid.includes("CAUCAIA") || cid.includes("MARACANAÚ") || cid.includes("EUSÉBIO")) return 20;
-      return 50; // Padrão
+      if (cid.includes("JUAZEIRO") || cid.includes("CRATO") || cid.includes("BARBALHA")) {
+        return { kmIda: 500, pernoites: 1, diasRefeicao: 2, kmLocal: 30 };
+      }
+      if (cid.includes("SOBRAL") || cid.includes("FORQUILHA")) {
+        return { kmIda: 235, pernoites: 0, diasRefeicao: 1, kmLocal: 20 };
+      }
+      if (cid.includes("PETROLINA") || cid.includes("ARARIPINA")) {
+        return { kmIda: 620, pernoites: 2, diasRefeicao: 3, kmLocal: 40 };
+      }
+      if (cid.includes("IGUATU")) {
+        return { kmIda: 380, pernoites: 1, diasRefeicao: 2, kmLocal: 20 };
+      }
+      if (cid.includes("CRATEÚS") || cid.includes("CRATEUS")) {
+        return { kmIda: 350, pernoites: 1, diasRefeicao: 2, kmLocal: 20 };
+      }
+      if (cid.includes("QUIXADÁ") || cid.includes("QUIXADA")) {
+        return { kmIda: 168, pernoites: 0, diasRefeicao: 1, kmLocal: 15 };
+      }
+      if (cid.includes("RUSSAS") || cid.includes("LIMOEIRO")) {
+        return { kmIda: 165, pernoites: 0, diasRefeicao: 1, kmLocal: 15 };
+      }
+      if (cid.includes("ITAPIPOCA")) {
+        return { kmIda: 130, pernoites: 0, diasRefeicao: 1, kmLocal: 15 };
+      }
+      if (cid.includes("TIANGUÁ") || cid.includes("TIANGUA")) {
+        return { kmIda: 315, pernoites: 1, diasRefeicao: 2, kmLocal: 20 };
+      }
+      if (cid.includes("FORTALEZA") || cid.includes("CAUCAIA") || cid.includes("MARACANAÚ") || cid.includes("EUSÉBIO")) {
+        return { kmIda: 20, pernoites: 0, diasRefeicao: 1, kmLocal: 10 };
+      }
+      return { kmIda: 50, pernoites: 0, diasRefeicao: 1, kmLocal: 15 };
     }
 
     function abrirModalCalculadoraLogistica(osId) {
@@ -81325,15 +81343,36 @@ function renderizarNavegacao() {
 
       const cliente = os.cliente || "HOSPITAL ATENDIDO";
       const cidade = os.cidade || "FORTALEZA / CE";
-      const distSugerida = obterDistanciaReferenciaCidade(cidade);
+      const ref = obterReferenciaPadraoCidade(cidade);
 
       document.getElementById("calc_os_id").value = os.id || "";
       document.getElementById("calc_cliente").value = cliente;
       document.getElementById("calc_cidade").value = cidade;
       document.getElementById("calc_lbl_cliente_cidade").innerHTML = `🏥 ${esc(cliente)} &bull; 📍 ${esc(cidade)} (OS #${os.id || 'N/A'})`;
-      document.getElementById("calc_km_ida").value = distSugerida;
-      document.getElementById("calc_tipo_rota").value = distSugerida > 200 ? "COMPARTILHADA_2" : "EXCLUSIVA";
+      
+      // Carregar parâmetros iniciais auditados
+      document.getElementById("calc_km_ida").value = ref.kmIda;
+      document.getElementById("calc_km_local").value = ref.kmLocal;
+      document.getElementById("calc_pernoites").value = ref.pernoites;
+      document.getElementById("calc_valor_hotel").value = 170;
+      document.getElementById("calc_dias_refeicao").value = ref.diasRefeicao;
+      document.getElementById("calc_valor_refeicao").value = 75;
+      document.getElementById("calc_consumo").value = 11.5;
+      document.getElementById("calc_preco_litro").value = 5.99;
+      document.getElementById("calc_qtd_rateio").value = ref.kmIda > 200 ? "2" : "1";
       document.getElementById("calc_obs").value = "";
+
+      // Detectar enquadramento inicial inteligente
+      const enqEl = document.getElementById("calc_enquadramento");
+      if (enqEl) {
+        if (os.tipo_servico && os.tipo_servico.toUpperCase().includes("PREVENTIVA")) {
+          enqEl.value = "CONTRATO_INTEGRAL";
+        } else if (ref.kmIda > 200) {
+          enqEl.value = "ROTA_COMPARTILHADA";
+        } else {
+          enqEl.value = "AVULSO";
+        }
+      }
 
       modal.style.display = "flex";
       recalcularLogisticaViagem();
@@ -81346,38 +81385,155 @@ function renderizarNavegacao() {
 
     function recalcularLogisticaViagem() {
       const kmIda = Math.max(0, parseFloat(document.getElementById("calc_km_ida")?.value) || 0);
-      const kmTotal = kmIda * 2;
-      const consumo = Math.max(1, parseFloat(document.getElementById("calc_consumo")?.value) || 13.0);
-      const precoLitro = Math.max(0, parseFloat(document.getElementById("calc_preco_litro")?.value) || 5.89);
-      const tipoRota = document.getElementById("calc_tipo_rota")?.value || "EXCLUSIVA";
+      const kmLocal = Math.max(0, parseFloat(document.getElementById("calc_km_local")?.value) || 0);
+      const kmTotal = (kmIda * 2) + kmLocal;
 
-      // Fator de rateio
-      let fatorRateio = 1.0;
-      if (tipoRota === "COMPARTILHADA_2") fatorRateio = 0.50; // 50% de rateio
-      if (tipoRota === "COMPARTILHADA_3") fatorRateio = 0.33; // 33% de rateio
+      const consumo = Math.max(1, parseFloat(document.getElementById("calc_consumo")?.value) || 11.5);
+      const precoLitro = Math.max(0, parseFloat(document.getElementById("calc_preco_litro")?.value) || 5.99);
 
+      const pernoites = Math.max(0, parseInt(document.getElementById("calc_pernoites")?.value) || 0);
+      const valorHotel = Math.max(0, parseFloat(document.getElementById("calc_valor_hotel")?.value) || 170);
+
+      const diasRefeicao = Math.max(1, parseInt(document.getElementById("calc_dias_refeicao")?.value) || 1);
+      const valorRefeicao = Math.max(0, parseFloat(document.getElementById("calc_valor_refeicao")?.value) || 75);
+
+      const enquadramento = document.getElementById("calc_enquadramento")?.value || "AVULSO";
+      const qtdRateio = Math.max(1, parseInt(document.getElementById("calc_qtd_rateio")?.value) || 1);
+
+      // CÁLCULOS AUDITADOS
       const litrosTotais = (kmTotal / consumo);
-      const custoCombustivelTotal = litrosTotais * precoLitro;
-      const custoDesgasteKm = kmTotal * 0.20; // R$ 0,20 por km para manutenção, óleo e pneus
-      const custoOperacionalIntegral = custoCombustivelTotal + custoDesgasteKm;
+      const custoCombustivel = litrosTotais * precoLitro;
+      const custoHotel = pernoites * valorHotel;
+      const custoRefeicao = diasRefeicao * valorRefeicao;
+      const custoDesgasteKm = kmTotal * 0.25; // R$ 0,25/km desgaste viatura
+      const custoOperacionalIntegral = custoCombustivel + custoHotel + custoRefeicao + custoDesgasteKm;
 
-      // Custo alocado a este orçamento
-      const custoOperacionalCliente = custoOperacionalIntegral * fatorRateio;
-      // Preço sugerido de taxa de deslocamento (Margem justa de 30% sobre o custo direto)
-      const precoSugeridoOrcamento = Math.ceil(custoOperacionalCliente * 1.30);
-
-      // Atualizar DOM
-      const elKm = document.getElementById("res_km_total");
-      if (elKm) elKm.innerText = `${kmTotal} km`;
+      // ATUALIZAR DOM DE COMPOSIÇÃO DE CUSTOS
+      const elDist = document.getElementById("lbl_distancia_total_res");
+      if (elDist) elDist.innerText = `${kmTotal} km totais (${(kmIda*2)} rodovia + ${kmLocal} local)`;
 
       const elComb = document.getElementById("res_combustivel");
-      if (elComb) elComb.innerText = `${(litrosTotais * fatorRateio).toFixed(1)} L (R$ ${(custoCombustivelTotal * fatorRateio).toFixed(2)})`;
+      if (elComb) elComb.innerText = `R$ ${custoCombustivel.toFixed(2)}`;
+      const elCombL = document.getElementById("res_combustivel_litros");
+      if (elCombL) elCombL.innerText = `${litrosTotais.toFixed(1)} L @ R$ ${precoLitro.toFixed(2)}`;
 
-      const elCusto = document.getElementById("res_custo_total");
-      if (elCusto) elCusto.innerText = `R$ ${custoOperacionalCliente.toFixed(2)}`;
+      const elHot = document.getElementById("res_hotel");
+      if (elHot) elHot.innerText = `R$ ${custoHotel.toFixed(2)}`;
+      const elHotD = document.getElementById("res_hotel_diarias");
+      if (elHotD) elHotD.innerText = `${pernoites} noites @ R$ ${valorHotel.toFixed(2)}`;
 
-      const elSug = document.getElementById("res_valor_sugerido");
-      if (elSug) elSug.innerText = `R$ ${precoSugeridoOrcamento.toFixed(2)}`;
+      const elRef = document.getElementById("res_refeicao");
+      if (elRef) elRef.innerText = `R$ ${custoRefeicao.toFixed(2)}`;
+      const elRefD = document.getElementById("res_refeicao_dias");
+      if (elRefD) elRefD.innerText = `${diasRefeicao} dias @ R$ ${valorRefeicao.toFixed(2)}`;
+
+      const elDesg = document.getElementById("res_desgaste");
+      if (elDesg) elDesg.innerText = `R$ ${custoDesgasteKm.toFixed(2)}`;
+
+      const elCustoTotal = document.getElementById("res_custo_total_operacao");
+      if (elCustoTotal) elCustoTotal.innerText = `R$ ${custoOperacionalIntegral.toFixed(2)}`;
+
+      // APLICAR REGRA DE ENQUADRAMENTO COMERCIAL
+      const boxDecisao = document.getElementById("box_decisao_comercial");
+      const lblTit = document.getElementById("lbl_titulo_decisao");
+      const resVal = document.getElementById("res_valor_faturar");
+      const lblSub = document.getElementById("lbl_subtitulo_decisao");
+      const btnCopiar = document.getElementById("btn_copiar_proposta");
+      const descEnq = document.getElementById("desc_enquadramento");
+
+      let valorFaturarCliente = 0;
+
+      if (enquadramento === "CONTRATO_INTEGRAL") {
+        valorFaturarCliente = 0.00;
+        if (boxDecisao) {
+          boxDecisao.style.background = "#eff6ff";
+          boxDecisao.style.border = "2px solid #3b82f6";
+          boxDecisao.style.color = "#1e40af";
+        }
+        if (lblTit) lblTit.innerText = "VALOR A FATURAR AO CLIENTE (EM CONTRATO)";
+        if (resVal) {
+          resVal.innerText = "R$ 0,00";
+          resVal.style.color = "#1d4ed8";
+        }
+        if (lblSub) lblSub.innerText = `Despesa de R$ ${custoOperacionalIntegral.toFixed(2)} absorvida 100% pela EMED. Registrado no Centro de Custo para DRE do contrato.`;
+        if (btnCopiar) {
+          btnCopiar.style.background = "#2563eb";
+          btnCopiar.style.color = "#ffffff";
+        }
+        if (descEnq) {
+          descEnq.style.background = "#eff6ff";
+          descEnq.style.color = "#1e40af";
+          descEnq.innerHTML = `✅ <b>Contrato Integral:</b> O cliente não paga deslocamento adicional. Toda a despesa operacional é coberta pela empresa.`;
+        }
+      } else if (enquadramento === "CONTRATO_REEMBOLSAVEL") {
+        valorFaturarCliente = Math.ceil(custoOperacionalIntegral / qtdRateio);
+        if (boxDecisao) {
+          boxDecisao.style.background = "#f0fdf4";
+          boxDecisao.style.border = "2px solid #16a34a";
+          boxDecisao.style.color = "#166534";
+        }
+        if (lblTit) lblTit.innerText = "REPASSE DIRETO DE CUSTO AUDITADO (REEMBOLSO)";
+        if (resVal) {
+          resVal.innerText = `R$ ${valorFaturarCliente.toFixed(2)}`;
+          resVal.style.color = "#15803d";
+        }
+        if (lblSub) lblSub.innerText = `Repasse direto sem margem comercial abusiva (${qtdRateio > 1 ? `rateado por ${qtdRateio} clientes` : 'viagem exclusiva'}).`;
+        if (btnCopiar) {
+          btnCopiar.style.background = "#16a34a";
+          btnCopiar.style.color = "#ffffff";
+        }
+        if (descEnq) {
+          descEnq.style.background = "#f0fdf4";
+          descEnq.style.color = "#166534";
+          descEnq.innerHTML = `📑 <b>Contrato com Reembolso:</b> O cliente paga o custo direto exato da viagem (combustível + hotel + alimentação).`;
+        }
+      } else if (enquadramento === "ROTA_COMPARTILHADA") {
+        const fator = 1.0 / qtdRateio;
+        valorFaturarCliente = Math.ceil((custoOperacionalIntegral * fator) * 1.25); // rateado com margem justa de 25%
+        if (boxDecisao) {
+          boxDecisao.style.background = "#faf5ff";
+          boxDecisao.style.border = "2px solid #9333ea";
+          boxDecisao.style.color = "#6b21a8";
+        }
+        if (lblTit) lblTit.innerText = `TAXA DE DESLOCAMENTO RATEADA (DIVIDIDO POR ${qtdRateio} CLIENTES)`;
+        if (resVal) {
+          resVal.innerText = `R$ ${valorFaturarCliente.toFixed(2)}`;
+          resVal.style.color = "#7e22ce";
+        }
+        if (lblSub) lblSub.innerText = `Economia de ${(100 - (100/qtdRateio)).toFixed(0)}% para cada cliente fechar o serviço!`;
+        if (btnCopiar) {
+          btnCopiar.style.background = "#9333ea";
+          btnCopiar.style.color = "#ffffff";
+        }
+        if (descEnq) {
+          descEnq.style.background = "#faf5ff";
+          descEnq.style.color = "#6b21a8";
+          descEnq.innerHTML = `🤝 <b>Rota Compartilhada:</b> Viagem com 2 ou 3 clínicas no mesmo polo. O cliente ganha desconto expressivo e a EMED lucra com a viagem única.`;
+        }
+      } else {
+        // AVULSO
+        valorFaturarCliente = Math.ceil(custoOperacionalIntegral * 1.30); // Custo total + margem justa de 30%
+        if (boxDecisao) {
+          boxDecisao.style.background = "#fffbeb";
+          boxDecisao.style.border = "2px solid #d97706";
+          boxDecisao.style.color = "#92400e";
+        }
+        if (lblTit) lblTit.innerText = "TAXA DE DESLOCAMENTO SUGERIDA (CHAMADO AVULSO)";
+        if (resVal) {
+          resVal.innerText = `R$ ${valorFaturarCliente.toFixed(2)}`;
+          resVal.style.color = "#b45309";
+        }
+        if (lblSub) lblSub.innerText = `Custo operacional integral (R$ ${custoOperacionalIntegral.toFixed(2)}) + margem de trânsito técnico e risco de rodovia.`;
+        if (btnCopiar) {
+          btnCopiar.style.background = "#d97706";
+          btnCopiar.style.color = "#ffffff";
+        }
+        if (descEnq) {
+          descEnq.style.background = "#fffbeb";
+          descEnq.style.color = "#92400e";
+          descEnq.innerHTML = `🛠️ <b>Atendimento Avulso:</b> Orçamento comercial completo cobrindo todas as despesas e tempo de deslocamento do especialista.`;
+        }
+      }
 
       // Alerta de Odômetro da Frota
       const veiculos = STATE.data?.veiculos || [];
@@ -81405,37 +81561,49 @@ function renderizarNavegacao() {
       const osId = document.getElementById("calc_os_id")?.value;
       const cliente = document.getElementById("calc_cliente")?.value;
       const cidade = document.getElementById("calc_cidade")?.value;
+      const enquadramento = document.getElementById("calc_enquadramento")?.value || "AVULSO";
       const kmIda = parseFloat(document.getElementById("calc_km_ida")?.value) || 0;
-      const kmTotal = kmIda * 2;
-      const tipoRota = document.getElementById("calc_tipo_rota")?.value || "EXCLUSIVA";
-      const consumo = parseFloat(document.getElementById("calc_consumo")?.value) || 13.0;
-      const precoLitro = parseFloat(document.getElementById("calc_preco_litro")?.value) || 5.89;
+      const kmLocal = parseFloat(document.getElementById("calc_km_local")?.value) || 0;
+      const kmTotal = (kmIda * 2) + kmLocal;
+
+      const consumo = parseFloat(document.getElementById("calc_consumo")?.value) || 11.5;
+      const precoLitro = parseFloat(document.getElementById("calc_preco_litro")?.value) || 5.99;
+      const pernoites = parseInt(document.getElementById("calc_pernoites")?.value) || 0;
+      const valorHotel = parseFloat(document.getElementById("calc_valor_hotel")?.value) || 170;
+      const diasRefeicao = parseInt(document.getElementById("calc_dias_refeicao")?.value) || 1;
+      const valorRefeicao = parseFloat(document.getElementById("calc_valor_refeicao")?.value) || 75;
       const obs = document.getElementById("calc_obs")?.value || "";
 
-      let fatorRateio = 1.0;
-      if (tipoRota === "COMPARTILHADA_2") fatorRateio = 0.50;
-      if (tipoRota === "COMPARTILHADA_3") fatorRateio = 0.33;
-
       const litrosTotais = (kmTotal / consumo);
-      const custoCombustivelTotal = (litrosTotais * precoLitro) * fatorRateio;
-      const custoDesgasteKm = (kmTotal * 0.20) * fatorRateio;
-      const custoOperacionalTotal = custoCombustivelTotal + custoDesgasteKm;
-      const valorSugerido = Math.ceil(custoOperacionalTotal * 1.30);
+      const custoCombustivel = litrosTotais * precoLitro;
+      const custoHotel = pernoites * valorHotel;
+      const custoRefeicao = diasRefeicao * valorRefeicao;
+      const custoDesgasteKm = kmTotal * 0.25;
+      const custoOperacionalIntegral = custoCombustivel + custoHotel + custoRefeicao + custoDesgasteKm;
+
+      const valorTexto = document.getElementById("res_valor_faturar")?.innerText || "R$ 0,00";
+      const valorFaturarCliente = parseFloat(valorTexto.replace("R$", "").replace(".", "").replace(",", ".").trim()) || 0.0;
 
       try {
         const payload = {
           os_id: osId,
           cliente: cliente,
           cidade: cidade,
+          enquadramento_contrato: enquadramento,
           km_estimado_ida: kmIda,
+          km_rodagem_local: kmLocal,
           km_estimado_total: kmTotal,
-          tipo_rota: tipoRota,
+          tipo_rota: enquadramento === "ROTA_COMPARTILHADA" ? "COMPARTILHADA" : "EXCLUSIVA",
           consumo_medio_kml: consumo,
           preco_combustivel: precoLitro,
-          custo_combustivel: custoCombustivelTotal,
+          custo_combustivel: custoCombustivel,
+          qtd_pernoites: pernoites,
+          custo_hospedagem: custoHotel,
+          qtd_dias_refeicao: diasRefeicao,
+          custo_alimentacao: custoRefeicao,
           custo_desgaste: custoDesgasteKm,
-          custo_total_operacional: custoOperacionalTotal,
-          valor_sugerido_orcamento: valorSugerido,
+          custo_total_operacional: custoOperacionalIntegral,
+          valor_faturar_cliente: valorFaturarCliente,
           observacoes: obs,
           criado_por: STATE.usuarioAtual?.nome || "GESTOR"
         };
@@ -81462,31 +81630,44 @@ function renderizarNavegacao() {
       const cliente = document.getElementById("calc_cliente")?.value || "Cliente";
       const cidade = document.getElementById("calc_cidade")?.value || "Interior";
       const kmIda = document.getElementById("calc_km_ida")?.value || "0";
-      const kmTotal = (parseFloat(kmIda) * 2).toFixed(0);
-      const tipoRota = document.getElementById("calc_tipo_rota")?.value;
-      const valorSugerido = document.getElementById("res_valor_sugerido")?.innerText || "R$ 0,00";
+      const kmTotal = (parseFloat(kmIda) * 2 + (parseFloat(document.getElementById("calc_km_local")?.value) || 0)).toFixed(0);
+      const enquadramento = document.getElementById("calc_enquadramento")?.value || "AVULSO";
+      const valorFaturar = document.getElementById("res_valor_faturar")?.innerText || "R$ 0,00";
+      const pernoites = document.getElementById("calc_pernoites")?.value || "0";
 
-      const rotaDesc = (tipoRota === "EXCLUSIVA") ? "Viagem Direta Exclusiva" : "Rota Compartilhada (Custos Otimizados)";
+      let descModalidade = "Atendimento Técnico Especializado em Campo";
+      if (enquadramento === "CONTRATO_INTEGRAL") {
+        descModalidade = "Contrato Mensal de Manutenção (Deslocamento Incluso)";
+      } else if (enquadramento === "ROTA_COMPARTILHADA") {
+        descModalidade = "Rota Compartilhada Otimizada (Rateio entre Estabelecimentos)";
+      } else if (enquadramento === "CONTRATO_REEMBOLSAVEL") {
+        descModalidade = "Contrato de Manutenção (Reembolso Direto de Despesas de Viagem)";
+      }
 
-      const texto = `📍 *TAXA DE DESLOCAMENTO TÉCNICO ESPECIALIZADO — EMED*\n` +
-                    `• *Cliente:* ${cliente}\n` +
-                    `• *Destino:* Fortaleza / CE ➔ ${cidade} (${kmTotal} km ida e volta)\n` +
-                    `• *Modalidade:* ${rotaDesc}\n` +
-                    `• *Valor de Deslocamento:* ${valorSugerido}\n` +
-                    `_(Inclui combustível, logística de equipamentos de calibração e responsabilidade de trânsito técnico)_`;
+      let texto = `📍 *TAXA DE DESLOCAMENTO TÉCNICO ESPECIALIZADO — EMED*\n` +
+                  `• *Cliente:* ${cliente}\n` +
+                  `• *Destino:* Fortaleza / CE ➔ ${cidade} (${kmTotal} km totais)\n` +
+                  `• *Enquadramento:* ${descModalidade}\n`;
+
+      if (enquadramento === "CONTRATO_INTEGRAL") {
+        texto += `• *Valor de Deslocamento:* R$ 0,00 (ISENTO / COBERTO EM CONTRATO)\n` +
+                 `_(Custos de combustível, trânsito e suporte técnico cobertos pela mensalidade contratual)_`;
+      } else {
+        texto += `• *Valor de Deslocamento:* ${valorFaturar}\n` +
+                 `• *Composição Auditada:* Combustível de rodovia, ${pernoites > 0 ? `${pernoites} pernoite(s) de hotel, ` : ''}alimentação e responsabilidade técnica de viagem.`;
+      }
 
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(texto.replace(/\\n/g, '\n')).then(() => {
-          mostrarToast("📋 Texto do orçamento copiado para a área de transferência!");
+          mostrarToast("📋 Texto da proposta copiado para a área de transferência!");
         }).catch(() => {
-          prompt("Copie o texto da proposta de deslocamento:", texto.replace(/\\n/g, '\n'));
+          prompt("Copie a proposta de deslocamento:", texto.replace(/\\n/g, '\n'));
         });
       } else {
-        prompt("Copie o texto da proposta de deslocamento:", texto.replace(/\\n/g, '\n'));
+        prompt("Copie a proposta de deslocamento:", texto.replace(/\\n/g, '\n'));
       }
     }
 
-    // Compatibilidade com a chamada anterior
     function calcularCustosViagemOS(osId) {
       abrirModalCalculadoraLogistica(osId);
     }
@@ -144336,12 +144517,12 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
     </div>
   </div>
 
-  <!-- MODAL CALCULADORA LOGÍSTICA DE DESLOCAMENTO & PRECIFICAÇÃO DE ORÇAMENTO -->
+  <!-- MODAL CALCULADORA LOGÍSTICA DE DESLOCAMENTO & AUDITORIA DE CUSTOS -->
   <div id="modalCalculadoraLogistica" class="modal-overlay" style="display:none; z-index:999999;">
-    <div class="modal-box" style="max-width:680px;width:95%;max-height:92vh;display:flex;flex-direction:column;">
-      <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;background:#059669;color:#fff;padding:14px 18px;border-radius:8px 8px 0 0;">
+    <div class="modal-box" style="max-width:780px;width:95%;max-height:94vh;display:flex;flex-direction:column;">
+      <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;background:#065f46;color:#fff;padding:14px 18px;border-radius:8px 8px 0 0;">
         <div style="font-weight:900;font-size:15px;display:flex;align-items:center;gap:8px;">
-          <span>⛽</span> Calculadora Logística de Deslocamento &amp; Precificação de Orçamento
+          <span>⛽</span> Auditoria Logística de Deslocamento &amp; Custos de Viagem EMED
         </div>
         <button type="button" class="btn btn-xs" onclick="fecharModalCalculadoraLogistica()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;cursor:pointer;font-size:16px;">✕</button>
       </div>
@@ -144350,84 +144531,214 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
         <input type="hidden" id="calc_cliente">
         <input type="hidden" id="calc_cidade">
 
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:14px;">
-          <div style="font-weight:800;font-size:14px;color:#166534;" id="calc_lbl_cliente_cidade">Carregando dados da rota...</div>
-          <div style="font-size:12px;color:#15803d;margin-top:2px;">Referência inteligente para orçamentos justos (sem perdas na operação e sem sobrecusto para o cliente).</div>
+        <!-- Banner com Identificação da OS e Hospital -->
+        <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:12px;margin-bottom:14px;">
+          <div style="font-weight:800;font-size:14.5px;color:#065f46;" id="calc_lbl_cliente_cidade">Carregando dados da rota...</div>
+          <div style="font-size:12px;color:#047857;margin-top:3px;">
+            Auditoria técnica completa: combustível em estrada, pernoites de hotel, alimentação e enquadramento contratual.
+          </div>
         </div>
 
-        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+        <!-- 1. ENQUADRAMENTO CONTRATUAL -->
+        <div style="background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;padding:12px;margin-bottom:14px;">
+          <label class="field-label" style="font-weight:800;color:#0f172a;margin-bottom:4px;display:block;">
+            📋 Enquadramento Contratual do Atendimento (Quem Arca com a Despesa?) *
+          </label>
+          <select id="calc_enquadramento" class="field-input" onchange="recalcularLogisticaViagem()" style="font-size:13px;font-weight:700;border:2px solid #059669;padding:8px 12px;background:#f0fdf4;width:100%;">
+            <option value="CONTRATO_INTEGRAL">📄 CONTRATO MENSAL INTEGRAL (Deslocamento &amp; Diárias 100% EMED - Sem Cobrança ao Cliente)</option>
+            <option value="CONTRATO_REEMBOLSAVEL">📑 CONTRATO COM DESLOCAMENTO COBRADO / REEMBOLSÁVEL (Cliente Paga Custo Direto Auditado)</option>
+            <option value="AVULSO" selected>🛠️ ATENDIMENTO AVULSO / FORA DE CONTRATO (Orçamento Completo: Combustível + Hotel + Refeições)</option>
+            <option value="ROTA_COMPARTILHADA">🤝 ROTA COMPARTILHADA (Rateio de Combustível e Diárias entre 2 ou mais Clientes do Polo)</option>
+          </select>
+          <div id="desc_enquadramento" style="font-size:11.5px;margin-top:6px;padding:6px 10px;border-radius:6px;background:#f8fafc;color:#475569;">
+            <!-- Texto explicativo dinâmico -->
+          </div>
+        </div>
+
+        <!-- 2. AUDITORIA DE PARÂMETROS DE ROTA & KM -->
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
           <div class="field">
-            <label class="field-label" style="font-weight:700;color:#0f172a;">Distância Aproximada (Só Ida em KM) *</label>
-            <input type="number" step="1" id="calc_km_ida" class="field-input" oninput="recalcularLogisticaViagem()" style="font-size:15px;font-weight:700;color:#0369a1;border:2px solid #38bdf8;">
-            <div style="font-size:10.5px;color:#64748b;margin-top:3px;">💡 Ajustável conforme desvios ou zona rural.</div>
+            <label class="field-label" style="font-weight:700;color:#0f172a;">Distância Só Ida (KM) *</label>
+            <input type="number" step="1" id="calc_km_ida" class="field-input" oninput="recalcularLogisticaViagem()" style="font-size:14px;font-weight:700;color:#0369a1;border:2px solid #38bdf8;">
+            <div style="font-size:10.5px;color:#64748b;margin-top:2px;">Sede (Fortaleza) ➔ Destino</div>
           </div>
           <div class="field">
-            <label class="field-label" style="font-weight:700;color:#0f172a;">Tipo de Rota &amp; Rateio de Custos</label>
-            <select id="calc_tipo_rota" class="field-input" onchange="recalcularLogisticaViagem()" style="font-size:13px;font-weight:600;">
-              <option value="EXCLUSIVA">🚗 Viagem Exclusiva (100% de alocação)</option>
-              <option value="COMPARTILHADA_2">🤝 Rota Compartilhada - 2 Clientes (50% de rateio)</option>
-              <option value="COMPARTILHADA_3">🤝 Rota Compartilhada - 3 Clientes (33% de rateio)</option>
+            <label class="field-label" style="font-weight:700;color:#0f172a;">Rodagem Local no Polo (KM)</label>
+            <input type="number" step="1" id="calc_km_local" class="field-input" value="30" oninput="recalcularLogisticaViagem()" style="font-size:14px;font-weight:600;">
+            <div style="font-size:10.5px;color:#64748b;margin-top:2px;">Trânsito urbano / clínicas</div>
+          </div>
+          <div class="field">
+            <label class="field-label" style="font-weight:700;color:#0f172a;">Rateio por Quantos Clientes?</label>
+            <select id="calc_qtd_rateio" class="field-input" onchange="recalcularLogisticaViagem()" style="font-size:13px;font-weight:600;">
+              <option value="1">1 Cliente (Viagem Exclusiva)</option>
+              <option value="2">2 Clientes (50% de rateio cada)</option>
+              <option value="3">3 Clientes (33% de rateio cada)</option>
             </select>
           </div>
         </div>
 
-        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
-          <div class="field">
-            <label class="field-label">Veículo da Frota</label>
-            <input type="text" id="calc_veiculo" class="field-input" value="FIAT ARGO 1.0 FLEX" readonly style="background:#f8fafc;font-size:12px;">
+        <!-- 3. AUDITORIA DE DIÁRIAS (HOTEL + REFEIÇÕES) -->
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:12px;">
+          <div style="font-size:12px;font-weight:800;color:#334155;text-transform:uppercase;margin-bottom:8px;">
+            🏨 Diárias Técnicas de Campo (Pernoites &amp; Alimentação)
           </div>
-          <div class="field">
-            <label class="field-label">Consumo Médio</label>
-            <input type="number" step="0.1" id="calc_consumo" class="field-input" value="13.0" oninput="recalcularLogisticaViagem()" style="font-size:12px;">
-          </div>
-          <div class="field">
-            <label class="field-label">Preço da Gasolina (R$/L)</label>
-            <input type="number" step="0.01" id="calc_preco_litro" class="field-input" value="5.89" oninput="recalcularLogisticaViagem()" style="font-size:12px;">
+          <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;">
+            <div class="field">
+              <label class="field-label">Pernoites (Noites)</label>
+              <input type="number" min="0" max="10" id="calc_pernoites" class="field-input" value="1" oninput="recalcularLogisticaViagem()" style="font-weight:700;">
+            </div>
+            <div class="field">
+              <label class="field-label">Hotel (R$/Diária)</label>
+              <input type="number" step="5" id="calc_valor_hotel" class="field-input" value="170" oninput="recalcularLogisticaViagem()" style="font-weight:600;">
+            </div>
+            <div class="field">
+              <label class="field-label">Dias de Viagem</label>
+              <input type="number" min="1" max="15" id="calc_dias_refeicao" class="field-input" value="2" oninput="recalcularLogisticaViagem()" style="font-weight:700;">
+            </div>
+            <div class="field">
+              <label class="field-label">Refeições (R$/Dia)</label>
+              <input type="number" step="5" id="calc_valor_refeicao" class="field-input" value="75" oninput="recalcularLogisticaViagem()" style="font-weight:600;">
+            </div>
           </div>
         </div>
 
-        <!-- Painel de Resultados Operacionais e Orçamento -->
-        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:14px;margin-bottom:14px;">
-          <div style="font-size:12px;font-weight:800;color:#334155;text-transform:uppercase;margin-bottom:10px;">📊 Balanço Operacional &amp; Sugestão de Orçamento</div>
-          
-          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px;margin-bottom:12px;">
-            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:8px;text-align:center;">
-              <div style="font-size:11px;color:#64748b;">Distância Total (Ida+Volta)</div>
-              <div id="res_km_total" style="font-size:16px;font-weight:900;color:#0f172a;">0 km</div>
+        <!-- 4. CONSUMO REAL DO VEÍCULO COM AR E CARGA -->
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
+          <div class="field">
+            <label class="field-label">Viatura</label>
+            <input type="text" id="calc_veiculo" class="field-input" value="FIAT ARGO 1.0 FLEX" readonly style="background:#f8fafc;font-size:12px;">
+          </div>
+          <div class="field">
+            <label class="field-label">Consumo Real (Carga+Ar)</label>
+            <input type="number" step="0.5" id="calc_consumo" class="field-input" value="11.5" oninput="recalcularLogisticaViagem()" style="font-size:12px;">
+          </div>
+          <div class="field">
+            <label class="field-label">Gasolina no Interior (R$/L)</label>
+            <input type="number" step="0.01" id="calc_preco_litro" class="field-input" value="5.99" oninput="recalcularLogisticaViagem()" style="font-size:12px;">
+          </div>
+        </div>
+
+        <!-- 5. PAINEL DE AUDITORIA DE CUSTOS REAIS -->
+        <div style="background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;padding:14px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          <div style="font-size:12px;font-weight:800;color:#0f172a;text-transform:uppercase;margin-bottom:10px;display:flex;justify-content:space-between;">
+            <span>📊 Composição Real do Custo de Deslocamento</span>
+            <span id="lbl_distancia_total_res" style="color:#0284c7;font-weight:700;">0 km totais</span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));gap:8px;margin-bottom:12px;">
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px;">
+              <div style="font-size:11px;color:#64748b;">⛽ Combustível Auditado</div>
+              <div id="res_combustivel" style="font-size:14px;font-weight:800;color:#0284c7;">R$ 0,00</div>
+              <div id="res_combustivel_litros" style="font-size:10px;color:#64748b;">0 L</div>
             </div>
-            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:8px;text-align:center;">
-              <div style="font-size:11px;color:#64748b;">Combustível Estimado</div>
-              <div id="res_combustivel" style="font-size:16px;font-weight:900;color:#0284c7;">0 L (R$ 0)</div>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px;">
+              <div style="font-size:11px;color:#64748b;">🏨 Hospedagem (Hotel)</div>
+              <div id="res_hotel" style="font-size:14px;font-weight:800;color:#7c3aed;">R$ 0,00</div>
+              <div id="res_hotel_diarias" style="font-size:10px;color:#64748b;">0 diárias</div>
             </div>
-            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:8px;text-align:center;">
-              <div style="font-size:11px;color:#64748b;">Custo Operacional Total</div>
-              <div id="res_custo_total" style="font-size:16px;font-weight:900;color:#dc2626;">R$ 0,00</div>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px;">
+              <div style="font-size:11px;color:#64748b;">🍽️ Alimentação Técnico</div>
+              <div id="res_refeicao" style="font-size:14px;font-weight:800;color:#ea580c;">R$ 0,00</div>
+              <div id="res_refeicao_dias" style="font-size:10px;color:#64748b;">0 dias</div>
+            </div>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px;">
+              <div style="font-size:11px;color:#64748b;">🔧 Desgaste Viatura</div>
+              <div id="res_desgaste" style="font-size:14px;font-weight:800;color:#475569;">R$ 0,00</div>
+              <div style="font-size:10px;color:#64748b;">Pneu / Óleo / Amort.</div>
             </div>
           </div>
 
-          <div style="background:#ecfdf5;border:2px solid #10b981;border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f1f5f9;border-radius:6px;font-size:13px;font-weight:800;color:#0f172a;margin-bottom:12px;">
+            <span>🧾 CUSTO OPERACIONAL TOTAL DA OPERAÇÃO:</span>
+            <span id="res_custo_total_operacao" style="font-size:16px;color:#dc2626;">R$ 0,00</span>
+          </div>
+
+          <!-- QUADRO DE DECISÃO COMERCIAL DINÂMICO -->
+          <div id="box_decisao_comercial" style="border-radius:8px;padding:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
             <div>
-              <div style="font-size:11px;font-weight:800;color:#047857;text-transform:uppercase;">💡 Sugestão de Taxa de Deslocamento para o Orçamento</div>
-              <div id="res_valor_sugerido" style="font-size:22px;font-weight:900;color:#065f46;">R$ 0,00</div>
-              <div style="font-size:11px;color:#047857;">Margem técnica justa (combustível + desgaste + margem de segurança).</div>
+              <div id="lbl_titulo_decisao" style="font-size:11.5px;font-weight:800;text-transform:uppercase;">VALOR A FATURAR AO CLIENTE</div>
+              <div id="res_valor_faturar" style="font-size:24px;font-weight:900;">R$ 0,00</div>
+              <div id="lbl_subtitulo_decisao" style="font-size:11.5px;margin-top:2px;"></div>
             </div>
-            <button type="button" class="btn btn-sm btn-primary" onclick="copiarOrcamentoLogistica()" style="background:#059669;border-color:#059669;padding:8px 14px;font-weight:700;">
+            <button type="button" class="btn btn-sm" id="btn_copiar_proposta" onclick="copiarOrcamentoLogistica()" style="padding:10px 16px;font-weight:800;border:none;border-radius:6px;cursor:pointer;">
               📋 Copiar para Proposta
             </button>
           </div>
         </div>
 
+        <!-- SANFONA: TABELA PADRÃO DE DISTÂNCIAS E POLOS EMED -->
+        <details style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;cursor:pointer;">
+          <summary style="font-weight:800;color:#0369a1;">📖 Ver Tabela de Referência Padrão dos Polos do Ceará &amp; Região</summary>
+          <div style="margin-top:10px;overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:11.5px;text-align:left;">
+              <thead>
+                <tr style="background:#e2e8f0;color:#334155;">
+                  <th style="padding:6px;">Polo / Cidade</th>
+                  <th style="padding:6px;">Distância Só Ida</th>
+                  <th style="padding:6px;">Padrão Pernoites</th>
+                  <th style="padding:6px;">Combustível Estimado</th>
+                  <th style="padding:6px;">Custo Base Médio</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom:1px solid #e2e8f0;">
+                  <td style="padding:6px;font-weight:700;">Juazeiro / Crato / Barbalha</td>
+                  <td style="padding:6px;">500 km</td>
+                  <td style="padding:6px;">1 a 2 noites</td>
+                  <td style="padding:6px;color:#0284c7;font-weight:700;">~R$ 540,00</td>
+                  <td style="padding:6px;font-weight:700;">~R$ 1.050,00</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e2e8f0;">
+                  <td style="padding:6px;font-weight:700;">Sobral / Zona Norte</td>
+                  <td style="padding:6px;">235 km</td>
+                  <td style="padding:6px;">0 a 1 noite</td>
+                  <td style="padding:6px;color:#0284c7;font-weight:700;">~R$ 260,00</td>
+                  <td style="padding:6px;font-weight:700;">~R$ 430,00</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e2e8f0;">
+                  <td style="padding:6px;font-weight:700;">Petrolina (PE) / Araripina</td>
+                  <td style="padding:6px;">620 a 660 km</td>
+                  <td style="padding:6px;">2 noites</td>
+                  <td style="padding:6px;color:#0284c7;font-weight:700;">~R$ 680,00</td>
+                  <td style="padding:6px;font-weight:700;">~R$ 1.480,00</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e2e8f0;">
+                  <td style="padding:6px;font-weight:700;">Iguatu / Centro-Sul</td>
+                  <td style="padding:6px;">380 km</td>
+                  <td style="padding:6px;">1 noite</td>
+                  <td style="padding:6px;color:#0284c7;font-weight:700;">~R$ 410,00</td>
+                  <td style="padding:6px;font-weight:700;">~R$ 880,00</td>
+                </tr>
+                <tr style="border-bottom:1px solid #e2e8f0;">
+                  <td style="padding:6px;font-weight:700;">Crateús / Sertão dos Inhamuns</td>
+                  <td style="padding:6px;">350 km</td>
+                  <td style="padding:6px;">1 noite</td>
+                  <td style="padding:6px;color:#0284c7;font-weight:700;">~R$ 380,00</td>
+                  <td style="padding:6px;font-weight:700;">~R$ 820,00</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px;font-weight:700;">Fortaleza &amp; Região Metropolitana</td>
+                  <td style="padding:6px;">15 a 30 km</td>
+                  <td style="padding:6px;">0 noites (Bate-volta)</td>
+                  <td style="padding:6px;color:#0284c7;font-weight:700;">~R$ 25 a 40</td>
+                  <td style="padding:6px;font-weight:700;">~R$ 50,00</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+
         <div id="res_alerta_revisao" style="font-size:12px;padding:8px 12px;border-radius:6px;margin-bottom:12px;display:none;"></div>
 
         <div class="field">
-          <label class="field-label">Observações / Notas da Rota</label>
-          <input type="text" id="calc_obs" class="field-input" placeholder="Ex: Viagem combinada com preventiva em Juazeiro; cliente aceitou taxa rateada.">
+          <label class="field-label">Observações / Justificativa da Logística</label>
+          <input type="text" id="calc_obs" class="field-input" placeholder="Ex: Viagem compartilhada com preventiva do hospital São Lucas; cliente ciente do rateio de pernoite.">
         </div>
       </div>
       <div class="modal-foot" style="padding:12px 16px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
         <button type="button" class="btn btn-secondary btn-sm" onclick="fecharModalCalculadoraLogistica()">Fechar</button>
-        <button type="button" class="btn btn-primary btn-sm" onclick="salvarReferenciaLogistica()" style="background:#059669;border-color:#059669;font-weight:700;">
-          💾 Salvar Referência Histórica
+        <button type="button" class="btn btn-primary btn-sm" onclick="salvarReferenciaLogistica()" style="background:#065f46;border-color:#065f46;font-weight:700;">
+          💾 Salvar Referência Auditada
         </button>
       </div>
     </div>
