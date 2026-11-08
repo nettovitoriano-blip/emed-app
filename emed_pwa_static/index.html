@@ -28908,7 +28908,13 @@
 
 
 
-          <div id="modalOSSub" style="font-size:11.5px;color:#bae6fd;">Cofre Provisório Anti-Perda Ativo</div>
+          <div id="modalOSSub" style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:#bae6fd;flex-wrap:wrap;margin-top:3px;">
+            <span style="opacity:0.85;">Cofre Anti-Perda Ativo</span>
+            <span id="badgeAutoSaveEmed" style="display:inline-flex;align-items:center;gap:6px;background:rgba(16, 185, 129, 0.18);color:#34d399;border:1px solid #10b981;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:800;letter-spacing:0.3px;transition:all 0.2s ease;">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:#10b981;color:#064e3b;font-weight:900;font-size:10px;box-shadow:0 0 6px #10b981;">e</span>
+              <span id="txtAutoSaveHora">eMED Salvo agora</span>
+            </span>
+          </div>
 
 
 
@@ -115184,71 +115190,7 @@ function fecharModalInsumosViagem() {
 
 
 
-          <button class="btn btn-outline" style="flex:1;" onclick="finalizarOS('SALVAR_ABERTA')">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            💾 Salvar Progresso (Manter Aberta)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          </button>
+          
           <button type="button" class="btn btn-outline" onclick="abrirVisualizadorLaudo('${esc(os.id)}')" style="border-color:#64748b;color:#334155;font-weight:700;padding:10px 14px;" title="Visualizar prévia do laudo em PDF">
             📄 Ver PDF
           </button>
@@ -122392,6 +122334,26 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
       localStorage.setItem(`emed_draft_${STATE.osAberta.id}`, JSON.stringify(dados));
+      try {
+        const elHora = document.getElementById("txtAutoSaveHora");
+        if (elHora) {
+          const agora = (new Date()).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+          elHora.innerText = `eMED Salvo às ${agora}`;
+        }
+        const badge = document.getElementById("badgeAutoSaveEmed");
+        if (badge) {
+          badge.style.transform = "scale(1.08)";
+          badge.style.borderColor = "#4ade80";
+          badge.style.boxShadow = "0 0 10px rgba(74, 222, 128, 0.6)";
+          setTimeout(() => {
+            if (badge) {
+              badge.style.transform = "scale(1)";
+              badge.style.borderColor = "#10b981";
+              badge.style.boxShadow = "none";
+            }
+          }, 250);
+        }
+      } catch(e){}
 
 
 
