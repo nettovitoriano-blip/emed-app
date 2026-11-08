@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v60-checkin-hora-real';
+const CACHE_NAME = 'emed-pwa-v61-remover-copiloto-campos';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
