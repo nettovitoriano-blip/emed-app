@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v64-modalidades-dinamicas';
+const CACHE_NAME = 'emed-pwa-v65-whatsapp-preinstalacao';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

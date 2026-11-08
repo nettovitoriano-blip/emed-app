@@ -111469,6 +111469,9 @@ function fecharModalInsumosViagem() {
 
 
               <span class="badge ativo" id="badgeModalidadeChecklist">Preventiva Escalonada</span>
+              <button type="button" id="btnFichaPreInstalacao" class="btn btn-xs btn-outline" onclick="abrirModalPreInstalacaoSala('${esc(os.id)}')" style="display:none;border-color:#2563eb;color:#1d4ed8;font-weight:800;background:#eff6ff;padding:3px 10px;border-radius:6px;" title="Requisitos de Infraestrutura Elétrica, Blindagem e Sala">
+                📋 Ficha de Pré-Instalação & Adequação
+              </button>
 
 
 
@@ -115264,6 +115267,9 @@ function fecharModalInsumosViagem() {
           <a class="btn btn-outline" href="/api/imprimir/${encodeURIComponent(os.id)}" target="_blank" style="border-color:#0f766e;color:#0f766e;font-weight:700;padding:10px 14px;display:inline-flex;align-items:center;text-decoration:none;" title="Imprimir laudo em formato A4">
             🖨️ Imprimir A4
           </a>
+          <button type="button" class="btn btn-outline" onclick="enviarLaudoWhatsApp('${esc(os.id)}')" style="border-color:#16a34a;color:#16a34a;font-weight:700;padding:10px 14px;display:inline-flex;align-items:center;gap:6px;" title="Enviar laudo técnico digital via WhatsApp ao cliente">
+            📲 WhatsApp
+          </button>
 
 
 
@@ -117288,6 +117294,11 @@ function fecharModalInsumosViagem() {
       }
 
       // 2. Controlar abas de Módulos (Gantry/Console/QDF) - Apenas se for Tomógrafo + Preventiva
+      const btnPre = document.getElementById("btnFichaPreInstalacao");
+      if (btnPre) {
+        btnPre.style.display = tipoSrv.includes("INSTAL") ? "inline-flex" : "none";
+      }
+
       const containerModulos = document.getElementById("containerModulosPreventiva");
       if (containerModulos) {
         if (tipoSrv.includes("PREVENTIVA") && isTomo) {
@@ -146318,6 +146329,154 @@ async function efetuarLogout() {
   }
 
 }
+
+
+    /* ==========================================================================
+     * MODULO: ENVIO DE LAUDO WHATSAPP & FICHA DE PRE-INSTALACAO DE SALA
+     * ========================================================================== */
+    function enviarLaudoWhatsApp(osId) {
+      const ordens = STATE.data?.ordens || [];
+      const os = ordens.find(o => String(o.id) === String(osId)) || STATE.osAberta || {};
+
+      const nomeResp = (document.getElementById("propAssinaturaNome")?.value || os.responsavel_hospital || os.contato_responsavel || "Responsável").trim();
+      const hospital = os.cliente || "Hospital/Clínica";
+      const equip = os.equipamento || "Equipamento Médico";
+      const tec = os.tecnico_responsavel || "Equipe Técnica EMED";
+      const condicao = document.getElementById("osCondicaoFinal")?.value || os.condicao_final || "Liberado para Uso Normal";
+
+      const telRaw = (os.whatsapp || os.telefone || os.telefone_contato || "").replace(/\D/g, "");
+      let tel = prompt("📲 Enviar Laudo Técnico via WhatsApp\nInforme ou confirme o número com DDD (apenas números):", telRaw);
+      if (!tel) return;
+      tel = tel.replace(/\D/g, "");
+      if (tel.length < 10) {
+        alert("Número de telefone inválido. Informe o DDD e o número.");
+        return;
+      }
+      if (!tel.startsWith("55")) tel = "55" + tel;
+
+      const linkPdf = `https://emedservice.med.br/api/imprimir/${encodeURIComponent(osId)}`;
+
+      const texto = `*EMED ELETROMEDICINA — LAUDO TÉCNICO OFICIAL*\n\n` +
+                    `Olá, *${nomeResp}*!\n\n` +
+                    `Informamos que o atendimento técnico referente à *OS #${osId}* do equipamento *${equip}* no *${hospital}* foi concluído pela equipe de engenharia clínica da EMED.\n\n` +
+                    `📋 *Condição Final:* ${condicao}\n` +
+                    `👨‍🔧 *Técnico Responsável:* ${tec}\n\n` +
+                    `📄 *Acesse o Laudo Técnico Digital (PDF A4 com Assinaturas):*\n${linkPdf}\n\n` +
+                    `_Atenciosamente,_\n*EMED Eletromedicina Especializada*\nwww.emedservice.med.br`;
+
+      const urlWa = `https://api.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(texto)}`;
+      window.open(urlWa, "_blank");
+    }
+
+    function abrirModalPreInstalacaoSala(osId) {
+      const ordens = STATE.data?.ordens || [];
+      const os = ordens.find(o => String(o.id) === String(osId)) || STATE.osAberta || {};
+
+      let modal = document.getElementById("modalPreInstalacaoSala");
+      if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "modalPreInstalacaoSala";
+        modal.className = "modal-backdrop";
+        document.body.appendChild(modal);
+      }
+
+      modal.innerHTML = `
+        <div class="modal-card" style="max-width:680px; width:92%; max-height:90vh; overflow-y:auto; border-radius:12px; border:2px solid #2563eb; background:#ffffff; padding:20px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1.5px solid #e2e8f0; padding-bottom:12px; margin-bottom:16px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:22px;">📋</span>
+              <div>
+                <div style="font-weight:900; font-size:16px; color:#1e3a8a;">Ficha de Vistoria de Pré-Instalação & Adequação de Sala</div>
+                <div style="font-size:12px; color:#64748b;">Critérios técnicos de infraestrutura para envio prévio ao cliente</div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('modalPreInstalacaoSala').classList.remove('open')" style="font-size:18px;">✕</button>
+          </div>
+
+          <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px 14px; margin-bottom:16px; font-size:12.5px; color:#1e40af;">
+            <b>Hospital/Cliente:</b> ${esc(os.cliente || 'Hospital Atendido')}<br/>
+            <b>Equipamento a Instalar:</b> ${esc(os.equipamento || 'Equipamento')}<br/>
+            <b>Cidade/UF:</b> ${esc(os.cidade || 'Fortaleza')} - ${esc(os.estado || 'CE')}
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #3b82f6; border-radius:8px; padding:12px;">
+              <div style="font-weight:800; font-size:13px; color:#0f172a; margin-bottom:4px;">⚡ 1. Infraestrutura Elétrica & Aterramento</div>
+              <ul style="font-size:12px; color:#334155; margin:0; padding-left:18px; line-height:1.5;">
+                <li>Rede trifásica dedicada (380V/220V ±5%, 60Hz) com disjuntor termomagnético exclusivo.</li>
+                <li>Malha de aterramento hospitalar exclusivo (SPDA/TN-S) com resistência &le; 5 &Omega; (neutro e terra separados).</li>
+                <li>Quadro de Força e Distribuição (QDF) instalado a no máximo 5 metros do gantry/console.</li>
+              </ul>
+            </div>
+
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #f59e0b; border-radius:8px; padding:12px;">
+              <div style="font-weight:800; font-size:13px; color:#0f172a; margin-bottom:4px;">🛡️ 2. Proteção Radiológica & Alvenaria (Baritação)</div>
+              <ul style="font-size:12px; color:#334155; margin:0; padding-left:18px; line-height:1.5;">
+                <li>Blindagem das paredes e portas com argamassa baritada (mínimo 2 cm) ou lençol de chumbo 1,5 a 2,0 mm Pb.</li>
+                <li>Visor plumbífero para comando técnico com atenuação radiológica compatível.</li>
+                <li>Sinalizador luminoso externo vermelho de advertência "Raios-X em Operação" intertravado à porta.</li>
+              </ul>
+            </div>
+
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #10b981; border-radius:8px; padding:12px;">
+              <div style="font-weight:800; font-size:13px; color:#0f172a; margin-bottom:4px;">❄️ 3. Climatização, Dimensões & Carga de Piso</div>
+              <ul style="font-size:12px; color:#334155; margin:0; padding-left:18px; line-height:1.5;">
+                <li>Climatização contínua dedicada mantendo temperatura entre 18°C e 22°C (umidade entre 30% e 60%).</li>
+                <li>Piso industrial nivelado com capacidade estrutural de carga concentrada &ge; 500 kg.</li>
+                <li>Vão livre de portas e corredores de acesso livre com largura &ge; 1,20 m para transporte dos componentes.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-top:20px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-outline" onclick="document.getElementById('modalPreInstalacaoSala').classList.remove('open')" style="flex:1;">
+              Fechar
+            </button>
+            <button type="button" class="btn btn-primary" onclick="enviarFichaPreInstalacaoWhatsApp('${esc(os.id)}')" style="flex:2; background:#16a34a; border-color:#16a34a; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px;">
+              📲 Enviar Checklist de Sala no WhatsApp do Cliente
+            </button>
+          </div>
+        </div>
+      `;
+
+      modal.classList.add("open");
+    }
+
+    function enviarFichaPreInstalacaoWhatsApp(osId) {
+      const ordens = STATE.data?.ordens || [];
+      const os = ordens.find(o => String(o.id) === String(osId)) || STATE.osAberta || {};
+
+      const nomeResp = (os.responsavel_hospital || os.contato_responsavel || "Engenharia Clínica / Diretoria").trim();
+      const hospital = os.cliente || "Hospital";
+      const equip = os.equipamento || "Equipamento Médico";
+
+      const telRaw = (os.whatsapp || os.telefone || "").replace(/\D/g, "");
+      let tel = prompt("📲 Enviar Ficha de Pré-Instalação via WhatsApp\nInforme ou confirme o WhatsApp do cliente:", telRaw);
+      if (!tel) return;
+      tel = tel.replace(/\D/g, "");
+      if (tel.length < 10) { alert("Telefone inválido."); return; }
+      if (!tel.startsWith("55")) tel = "55" + tel;
+
+      const texto = `*EMED ELETROMEDICINA — VISTORIA & PRÉ-INSTALAÇÃO DE SALA*\n\n` +
+                    `Prezado(a) *${nomeResp}* (${hospital}),\n\n` +
+                    `Para a realização da instalação do equipamento *${equip}*, solicitamos a conferência prévia dos requisitos de infraestrutura e adequação da sala:\n\n` +
+                    `⚡ *1. REDE ELÉTRICA & ATERRAMENTO:*\n` +
+                    `- Tensão trifásica dedicada estável (380V/220V ±5%, 60Hz)\n` +
+                    `- Malha de aterramento exclusiva com resistência &le; 5 Ohms\n` +
+                    `- QDF dedicado com disjuntor próximo ao equipamento\n\n` +
+                    `🛡️ *2. PROTEÇÃO RADIOLÓGICA (BARITAÇÃO):*\n` +
+                    `- Paredes blindadas com argamassa baritada ou chumbo (mín. 1.5mm Pb)\n` +
+                    `- Visor plumbífero instalado no posto de comando\n` +
+                    `- Sinalizador luminoso externo na porta\n\n` +
+                    `❄️ *3. CLIMATIZAÇÃO & ACESSO:*\n` +
+                    `- Ar-condicionado 24h (18°C a 22°C)\n` +
+                    `- Portas e corredores livres (largura mín. 1,20m) para movimentação mecânica\n\n` +
+                    `_Por gentileza, confirme o aceite e prontidão da sala para envio da equipe técnica especializada._\n\n` +
+                    `Atenciosamente,\n*Departamento de Engenharia Clínica — EMED Eletromedicina*`;
+
+      const urlWa = `https://api.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(texto)}`;
+      window.open(urlWa, "_blank");
+    }
 
 </script>
 

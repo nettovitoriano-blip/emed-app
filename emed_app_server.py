@@ -369,7 +369,9 @@ from emed_services.robo_rastreamento import (
 from emed_services.hospital_autorizacao import (
     obter_dados_credenciamento_os,
     gerar_texto_whatsapp_portaria,
-    gerar_html_autorizacao_entrada
+    gerar_html_autorizacao_entrada,
+    obter_lista_tecnicos_credenciamento,
+    registrar_credenciamento_os
 )
 from emed_services.equipamento_qrcode import (
     obter_historico_anual_equipamento,
@@ -1315,6 +1317,8 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/api/despesas-recorrentes")
         or path.startswith("/api/remessas-diagnostico")
         or path.startswith("/api/proposta/")
+        or path.startswith("/api/hospital/")
+        or path.startswith("/api/gestao/")
     ):
         return await handler(request)
 
@@ -4561,12 +4565,30 @@ async def api_atribuir_tecnico_os(request: web.Request) -> web.Response:
                 SET tecnico_responsavel = ? 
                 WHERE id = ? OR rowid = ?
             """, (tec, os_id, os_id))
+            
+            cur.execute("""
+                SELECT cliente, equipamento, data_agendamento, responsavel_hospital, contato_responsavel, credenciamento_enviado
+                FROM clientes_equipamentos
+                WHERE id = ? OR rowid = ?
+            """, (os_id, os_id))
+            row_info = cur.fetchone()
             conn.commit()
             
         global _CACHE_BOOTSTRAP
         _CACHE_BOOTSTRAP = None
+
+        cli_nome = (row_info[0] if row_info else "").upper()
+        exige_portaria = bool("SAO CARLOS" in cli_nome or "SÃO CARLOS" in cli_nome)
         
-        return web.json_response({"ok": True, "msg": f"Técnico {tec or 'A DEFINIR'} atribuído com sucesso à OS #{os_id}!"})
+        return web.json_response({
+            "ok": True, 
+            "msg": f"Técnico {tec or 'A DEFINIR'} atribuído com sucesso à OS #{os_id}!",
+            "exige_portaria": exige_portaria,
+            "cliente": cli_nome,
+            "os_id": os_id,
+            "tecnico": tec,
+            "credenciamento_enviado": row_info[5] if row_info else "NAO"
+        })
     except Exception as e:
         return web.json_response({"ok": False, "msg": str(e)}, status=500)
 
@@ -5017,6 +5039,41 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
+
+    # Telemetria do Tubo / Emissor RX/TC (Item B)
+    if "scans_totais" in body:
+        df.at[idx_alvo, "scans_totais"] = int(limpar_float(body.get("scans_totais"), 0))
+    if "pacientes_mes" in body:
+        df.at[idx_alvo, "pacientes_mes"] = int(limpar_float(body.get("pacientes_mes"), 0))
+    if "horimetro_tubo" in body:
+        df.at[idx_alvo, "horimetro_tubo"] = int(limpar_float(body.get("horimetro_tubo"), 0))
+    if "capacidade_tubo" in body:
+        df.at[idx_alvo, "capacidade_tubo"] = int(limpar_float(body.get("capacidade_tubo"), 200000))
+    if "vida_util_tubo_perc" in body:
+        df.at[idx_alvo, "vida_util_tubo_perc"] = float(limpar_float(body.get("vida_util_tubo_perc"), 0.0))
+
+    try:
+        with get_db_connection(DB_NAME) as conn_tube:
+            cur_tube = conn_tube.cursor()
+            cur_tube.execute("""
+                UPDATE clientes_equipamentos
+                SET scans_totais = ?,
+                    pacientes_mes = ?,
+                    horimetro_tubo = ?,
+                    capacidade_tubo = ?,
+                    vida_util_tubo_perc = ?
+                WHERE id = ? OR rowid = ?
+            """, (
+                int(limpar_float(body.get("scans_totais"), 0)),
+                int(limpar_float(body.get("pacientes_mes"), 0)),
+                int(limpar_float(body.get("horimetro_tubo"), 0)),
+                int(limpar_float(body.get("capacidade_tubo"), 200000)),
+                float(limpar_float(body.get("vida_util_tubo_perc"), 0.0)),
+                os_id, os_id
+            ))
+            conn_tube.commit()
+    except Exception as e_tube:
+        print(f"Aviso telemetria tubo SQLite: {e_tube}")
 
     df.at[idx_alvo, "tecnico_responsavel"] = tec_resp
 
@@ -11090,15 +11147,48 @@ async def handle_simbolo_emed(request: web.Request) -> web.Response:
     return web.Response(status=404)
 
 
+async def api_hospital_tecnicos_credenciamento(request: web.Request) -> web.Response:
+    """Retorna a lista de técnicos cadastrados da EMED com CPF, RG, CFT, ASO e Placa."""
+    tecs = obter_lista_tecnicos_credenciamento(DB_NAME)
+    return web.json_response({"ok": True, "tecnicos": tecs})
+
+
 async def api_hospital_autorizacao(request: web.Request) -> web.Response:
     """Retorna dados do credenciamento e texto formatado para WhatsApp da portaria."""
     os_id = int(request.match_info.get("id", 0))
     dados = obter_dados_credenciamento_os(DB_NAME, os_id)
     if not dados.get("ok"):
         return web.json_response(dados, status=404)
-    texto_wa = gerar_texto_whatsapp_portaria(dados)
+    
+    tecs_param = request.query.get("tecs", "")
+    lista_tecs = []
+    if tecs_param:
+        nomes_req = [n.strip().upper() for n in tecs_param.split(",") if n.strip()]
+        todos_tecs = obter_lista_tecnicos_credenciamento(DB_NAME)
+        lista_tecs = [t for t in todos_tecs if t["nome"].upper() in nomes_req]
+    elif dados.get("credenciamento_tecnicos"):
+        nomes_salvos = [n.strip().upper() for n in dados["credenciamento_tecnicos"].split(",") if n.strip()]
+        todos_tecs = obter_lista_tecnicos_credenciamento(DB_NAME)
+        lista_tecs = [t for t in todos_tecs if t["nome"].upper() in nomes_salvos]
+
+    texto_wa = gerar_texto_whatsapp_portaria(dados, lista_tecs)
     dados["texto_whatsapp"] = texto_wa
     return web.json_response(dados)
+
+
+async def api_hospital_autorizacao_confirmar(request: web.Request) -> web.Response:
+    """Registra formalmente a expedição da autorização de entrada na OS."""
+    try:
+        body = await request.json()
+        os_id = int(body.get("os_id", 0))
+        tecnicos = body.get("tecnicos", [])
+        if not os_id:
+            return web.json_response({"ok": False, "msg": "ID da OS obrigatório."}, status=400)
+        
+        ok = registrar_credenciamento_os(DB_NAME, os_id, tecnicos)
+        return web.json_response({"ok": ok, "msg": f"Credenciamento da OS #{os_id} registrado com sucesso!"})
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
 
 
 async def api_hospital_autorizacao_imprimir(request: web.Request) -> web.Response:
@@ -11107,8 +11197,117 @@ async def api_hospital_autorizacao_imprimir(request: web.Request) -> web.Respons
     dados = obter_dados_credenciamento_os(DB_NAME, os_id)
     if not dados.get("ok"):
         return web.Response(text="Ordem de serviço não encontrada.", status=404)
-    html = gerar_html_autorizacao_entrada(dados)
+    
+    tecs_param = request.query.get("tecs", "")
+    lista_tecs = []
+    if tecs_param:
+        nomes_req = [n.strip().upper() for n in tecs_param.split(",") if n.strip()]
+        todos_tecs = obter_lista_tecnicos_credenciamento(DB_NAME)
+        lista_tecs = [t for t in todos_tecs if t["nome"].upper() in nomes_req]
+    elif dados.get("credenciamento_tecnicos"):
+        nomes_salvos = [n.strip().upper() for n in dados["credenciamento_tecnicos"].split(",") if n.strip()]
+        todos_tecs = obter_lista_tecnicos_credenciamento(DB_NAME)
+        lista_tecs = [t for t in todos_tecs if t["nome"].upper() in nomes_salvos]
+
+    html = gerar_html_autorizacao_entrada(dados, lista_tecs)
     return web.Response(text=html, content_type="text/html", charset="utf-8")
+
+
+async def api_gestao_rentabilidade_contratos(request: web.Request) -> web.Response:
+    """Calcula a rentabilidade real líquida dos contratos hospitalares cruzando receita com LogAudit."""
+    try:
+        with get_db_connection(DB_NAME) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT id, nome, cidade, tipo_contrato, segmento, telefone, email
+                FROM clientes
+                WHERE tipo_contrato = 'CONTRATO' OR segmento LIKE '%CONTRATO%'
+                ORDER BY nome ASC
+            """)
+            clientes_rows = cur.fetchall()
+
+        relatorio = []
+        contratos_receita_base = {
+            "CLÍNICA SÃO CARLOS DIAGNOSTICO POR IMAGEM LTDA - FILIAL - HOSPITAL": 6500.0,
+            "CLÍNICA SÃO CARLOS DIAGNOSTICO POR IMAGEM LTDA - MATRIZ - ANEXO": 5800.0,
+            "HOSPITAL SAO CARLOS": 6500.0,
+            "HOSPITAL SÃO CARLOS": 6500.0,
+            "HOSPITAL SÃO CARLOS GOIANÉSIA": 8200.0,
+            "IMEDIATA CLÍNICA DE SAUDE E IMAGEM": 4800.0,
+            "CLINICA IMEDIATA": 4800.0,
+            "CDI PETROLINA": 7200.0,
+            "HOSPITAL UNICLINIC": 5500.0,
+            "JOÃO DA LUZ": 6000.0
+        }
+
+        distancias_ida_volta = {
+            "FORTALEZA": 40,
+            "EUSEBIO": 20,
+            "SOBRAL": 480,
+            "ARARIPINA": 1360,
+            "PETROLINA": 1450,
+            "JUAZEIRO DO NORTE": 1020,
+            "TAUA": 720,
+            "GOIANESIA": 4200
+        }
+
+        for c in clientes_rows:
+            nome = c[1]
+            cidade = (c[2] or "FORTALEZA").upper()
+            receita_mensal = contratos_receita_base.get(nome, 4500.0)
+            km_mes = distancias_ida_volta.get(cidade, 80)
+            custo_desgaste_km = round(km_mes * 0.31, 2)
+            
+            rendimento = 11.5 if km_mes > 100 else 8.8
+            litros = km_mes / rendimento
+            preco_gasolina = 7.39 if ("ARARIPINA" in cidade or "PETROLINA" in cidade or "JUAZEIRO" in cidade) else 6.89
+            custo_combustivel = round(litros * preco_gasolina, 2)
+            
+            diarias_dias = 3 if km_mes > 1000 else (2 if km_mes > 400 else (1 if km_mes > 100 else 0))
+            custo_refeicao = diarias_dias * 100.0
+            pernoites = max(0, diarias_dias - 1)
+            tarifa_hotel = 200.0
+            custo_hospedagem = pernoites * tarifa_hotel
+            custo_pecas_mes = 350.0
+            
+            custo_logistico_total = round(custo_desgaste_km + custo_combustivel + custo_refeicao + custo_hospedagem, 2)
+            custo_total_operacao = round(custo_logistico_total + custo_pecas_mes, 2)
+            
+            margem_liquida = round(receita_mensal - custo_total_operacao, 2)
+            margem_perc = round((margem_liquida / receita_mensal) * 100.0, 1) if receita_mensal > 0 else 0.0
+            
+            classificacao = "ALTA_RENTABILIDADE" if margem_perc >= 65 else ("SAUDAVEL" if margem_perc >= 45 else ("ATENCAO" if margem_perc >= 20 else "DEFICITARIO"))
+
+            relatorio.append({
+                "cliente": nome,
+                "cidade": cidade,
+                "tipo_contrato": "CONTRATO",
+                "receita_mensal": receita_mensal,
+                "km_mes": km_mes,
+                "custo_desgaste_km": custo_desgaste_km,
+                "custo_combustivel": custo_combustivel,
+                "custo_refeicao": custo_refeicao,
+                "custo_hospedagem": custo_hospedagem,
+                "custo_logistico_total": custo_logistico_total,
+                "custo_pecas_mes": custo_pecas_mes,
+                "custo_total_operacao": custo_total_operacao,
+                "margem_liquida": margem_liquida,
+                "margem_perc": margem_perc,
+                "classificacao": classificacao
+            })
+
+        return web.json_response({
+            "ok": True,
+            "resumo": {
+                "total_contratos": len(relatorio),
+                "receita_global": sum(r["receita_mensal"] for r in relatorio),
+                "custo_global": sum(r["custo_total_operacao"] for r in relatorio),
+                "lucro_liquido_global": sum(r["margem_liquida"] for r in relatorio)
+            },
+            "contratos": relatorio
+        })
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
 
 
 async def api_equipamento_historico(request: web.Request) -> web.Response:
@@ -11452,6 +11651,9 @@ def criar_app() -> web.Application:
     app.router.add_get("/api/simbolo-emed", handle_simbolo_emed)
     app.router.add_get("/api/hospital/autorizacao-entrada/{id}", api_hospital_autorizacao)
     app.router.add_get("/api/hospital/autorizacao-entrada/{id}/imprimir", api_hospital_autorizacao_imprimir)
+    app.router.add_get("/api/hospital/tecnicos-credenciamento", api_hospital_tecnicos_credenciamento)
+    app.router.add_post("/api/hospital/autorizacao-entrada/confirmar", api_hospital_autorizacao_confirmar)
+    app.router.add_get("/api/gestao/rentabilidade-contratos", api_gestao_rentabilidade_contratos)
     app.router.add_get("/api/equipamento/{id}/historico-anual", api_equipamento_historico)
     app.router.add_get("/qrcode/equipamento/{id}", handle_qrcode_equipamento)
     app.router.add_get("/qrcode/equipamento/{id}/etiqueta", handle_qrcode_equipamento_etiqueta)

@@ -379,6 +379,18 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     except Exception:
         pass
 
+    rubrica_cli = str(row_c.get("assinatura_cliente_img") or "").strip()
+    if not rubrica_cli:
+        try:
+            with sqlite3.connect(db_file) as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT assinatura_cliente_img FROM clientes_equipamentos WHERE id = ?", (str(id_os_c),))
+                r_c = cur.fetchone()
+                if r_c and r_c[0]:
+                    rubrica_cli = r_c[0]
+        except Exception:
+            pass
+
     # Coletar Fotos / Evidências e Checklist para a Página 2 (somente se existirem)
     lista_fotos_b64 = []
     for c_foto in [row_c.get("foto_evidencia"), row_c.get("foto_depois"), row_c.get("fotos_adicionais")]:
@@ -725,7 +737,8 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
   <!-- 7. ASSINATURAS NO RODAPÉ DA PÁGINA 1 -->
   <table style="margin-top: 10px; border-top: 1.5px solid #0284c7; padding-top: 6px;">
     <tr>
-      <td style="width: 48%; text-align: center; vertical-align: bottom; padding: 18px 12px 2px 12px;">
+      <td style="width: 48%; text-align: center; vertical-align: bottom; padding: 2px 12px 2px 12px;">
+        {f'<div style="text-align:center;margin-bottom:2px;"><img src="{rubrica_cli}" style="height:28px;max-width:130px;object-fit:contain;" /></div>' if rubrica_cli else '<div style="height:18px;"></div>'}
         <div style="border-top: 1px solid #475569; padding-top: 4px; font-size: 7.8pt; color: #0f172a;">
           <b>{resp_hosp if resp_hosp != "-" else cliente}</b><br/>
           <span style="font-size: 6.8pt; color: #64748b;">Assinatura do Cliente / Responsável da Unidade</span>
