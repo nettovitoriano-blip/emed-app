@@ -1,10 +1,11 @@
-const CACHE_NAME = 'emed-pwa-v61-remover-copiloto-campos';
+const CACHE_NAME = 'emed-pwa-v63-autosave-icon';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
   '/?modo=gestor',
   '/manifest.json',
-  '/api/logo'
+  '/api/logo',
+  '/api/icone-autosave'
 ];
 
 self.addEventListener('install', (event) => {

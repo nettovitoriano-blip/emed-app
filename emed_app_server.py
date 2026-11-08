@@ -1279,7 +1279,7 @@ async def auth_api_middleware(request: web.Request, handler):
     if (
         path in (
             "/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz",
-            "/api/ping", "/api/logo", "/api/logo-circle", "/nav", "/gps", "/frota",
+            "/api/ping", "/api/logo", "/api/logo-circle", "/api/icone-autosave", "/nav", "/gps", "/frota",
             "/api/bootstrap", "/api/v1/veiculos", "/api/respostas-tecnicas"
         )
         or path.startswith("/static/")
@@ -1298,6 +1298,7 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/api/frota/")
         or path.startswith("/api/logistica/")
         or path.startswith("/api/checkin")
+        or path.startswith("/api/os/atribuir-tecnico")
         or path.startswith("/api/salvar-os")
         or path.startswith("/api/nova-os")
         or path.startswith("/api/reabrir-os")
@@ -1476,6 +1477,14 @@ async def handle_logo(request: web.Request) -> web.Response:
 
 
 
+
+
+async def handle_icone_autosave(request: web.Request) -> web.Response:
+    caminho = os.path.join(BASE_DIR, "emed_pwa_static", "icone_auto_save.png")
+    if os.path.exists(caminho):
+        with open(caminho, "rb") as f:
+            return web.Response(body=f.read(), content_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+    return web.Response(status=404)
 
 async def handle_logo_circle(request: web.Request) -> web.Response:
     caminho_circ = os.path.join(BASE_DIR, "emed_pwa_static", "logo_emed_circle.png")
@@ -4535,6 +4544,31 @@ async def api_tecnico_assinatura_salvar(request: web.Request) -> web.Response:
         "msg": f"✍️ Assinatura digital do técnico {nome} cadastrada e homologada com sucesso!"
     })
 
+
+
+async def api_atribuir_tecnico_os(request: web.Request) -> web.Response:
+    try:
+        body = await request.json()
+        os_id = str(body.get("os_id", "")).strip()
+        tec = str(body.get("tecnico", "")).strip().upper()
+        if not os_id:
+            return web.json_response({"ok": False, "msg": "ID da OS não informado."}, status=400)
+        
+        with get_db_connection(DB_NAME) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE clientes_equipamentos 
+                SET tecnico_responsavel = ? 
+                WHERE id = ? OR rowid = ?
+            """, (tec, os_id, os_id))
+            conn.commit()
+            
+        global _CACHE_BOOTSTRAP
+        _CACHE_BOOTSTRAP = None
+        
+        return web.json_response({"ok": True, "msg": f"Técnico {tec or 'A DEFINIR'} atribuído com sucesso à OS #{os_id}!"})
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
 
 async def api_salvar_os(request: web.Request) -> web.Response:
 
@@ -11464,7 +11498,7 @@ def criar_app() -> web.Application:
 
 
 
-    app.router.add_get("/api/logo-circle", handle_logo_circle)
+    app.router.add_get("/api/logo-circle", "/api/icone-autosave", handle_logo_circle)
 
 
 
@@ -11505,6 +11539,7 @@ def criar_app() -> web.Application:
 
 
     app.router.add_post("/api/salvar-os", api_salvar_os)
+    app.router.add_post("/api/os/atribuir-tecnico", api_atribuir_tecnico_os)
 
 
 
