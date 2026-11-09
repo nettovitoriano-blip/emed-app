@@ -1156,10 +1156,17 @@
 
           fb.style.display = 'block';
 
+          const nomeLogado = (res.usuario.nome || '').toUpperCase();
+          const perfilLogado = (res.usuario.perfil || '').toUpperCase();
+          const isGestor1 = (nomeLogado === 'NETTO') && (perfilLogado.includes('GESTOR') || perfilLogado === '');
+
           localStorage.setItem('emed_tecnico_selecionado', res.usuario.nome);
-          localStorage.setItem('emed_perfil_usuario', res.usuario.perfil || (res.usuario.nome === 'NETTO' ? 'Gestor' : 'Técnico'));
+          localStorage.setItem('emed_perfil_usuario', isGestor1 ? 'Gestor' : 'Técnico');
+          localStorage.setItem('emed_perfil', isGestor1 ? 'GESTOR' : 'TECNICO');
+          localStorage.setItem('emed_menu_ativo', isGestor1 ? 'GES_MURAL' : 'TEC_OS');
+          localStorage.setItem('emed_tec_filtro', isGestor1 ? 'TODOS' : res.usuario.nome);
           localStorage.setItem('emed_token', res.token);
-          const isGestor1 = (res.usuario.nome === 'NETTO') || ((res.usuario.perfil || '').toUpperCase().includes('GESTOR'));
+
           setTimeout(() => {
             window.location.href = isGestor1 ? '/?modo=gestor' : '/?modo=tecnico';
           }, 400);
@@ -1448,14 +1455,18 @@
 
 
 
-          const nomeUsr2 = res.usuario?.nome || usuario;
-          const perfilUsr2 = res.usuario?.perfil || (nomeUsr2.toUpperCase() === 'NETTO' ? 'Gestor' : 'Técnico');
+          const nomeUsr2 = (res.usuario?.nome || usuario).toUpperCase();
+          const perfilUsr2 = (res.usuario?.perfil || '').toUpperCase();
+          const isGestor2 = (nomeUsr2 === 'NETTO') && (perfilUsr2.includes('GESTOR') || perfilUsr2 === '');
+
           if (res.token) {
             localStorage.setItem('emed_token', res.token);
-            localStorage.setItem('emed_tecnico_selecionado', nomeUsr2);
-            localStorage.setItem('emed_perfil_usuario', perfilUsr2);
+            localStorage.setItem('emed_tecnico_selecionado', res.usuario?.nome || usuario);
+            localStorage.setItem('emed_perfil_usuario', isGestor2 ? 'Gestor' : 'Técnico');
+            localStorage.setItem('emed_perfil', isGestor2 ? 'GESTOR' : 'TECNICO');
+            localStorage.setItem('emed_menu_ativo', isGestor2 ? 'GES_MURAL' : 'TEC_OS');
+            localStorage.setItem('emed_tec_filtro', isGestor2 ? 'TODOS' : (res.usuario?.nome || usuario));
           }
-          const isGestor2 = (nomeUsr2.toUpperCase() === 'NETTO') || (perfilUsr2.toUpperCase().includes('GESTOR'));
 
           setTimeout(() => {
             if (gUltimaTentativa && !res.token) {

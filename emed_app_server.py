@@ -22731,6 +22731,16 @@ def _iniciar_emed_nav_background():
 
 
 
+async def api_pmp_grade_anual(request: web.Request) -> web.Response:
+    """Retorna o Plano de Manutenção Preventiva Anual (3 Etapas por Contrato)."""
+    try:
+        ano = request.query.get("ano")
+        ano_int = int(ano) if ano and ano.isdigit() else None
+        res = obter_grade_pmp_anual(ano_int)
+        return web.json_response(res)
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
 def criar_app() -> web.Application:
 
     garantir_schema_dispositivos(DB_NAME)
@@ -23846,13 +23856,3 @@ if __name__ == "__main__":
 
 
 
-
-async def api_pmp_grade_anual(request: web.Request) -> web.Response:
-    """Retorna o Plano de Manutenção Preventiva Anual (3 Etapas por Contrato)."""
-    try:
-        ano = request.query.get("ano")
-        ano_int = int(ano) if ano and ano.isdigit() else None
-        res = obter_grade_pmp_anual(ano_int)
-        return web.json_response(res)
-    except Exception as e:
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
