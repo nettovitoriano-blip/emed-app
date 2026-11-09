@@ -793,6 +793,12 @@
 
         <!-- LISTA DE PARADAS ATIVAS -->
         <div id="waypoints-list" style="display:none; flex-direction:column; gap:4px; max-height:120px; overflow-y:auto;"></div>
+
+        <!-- OBSERVAÇÃO INTELIGENTE DE MÚLTIPLAS PARADAS -->
+        <div id="waypoints-maps-tip" style="display:none; font-size:11.5px; background:rgba(30, 58, 138, 0.45); border:1px solid #38bdf8; color:#93c5fd; padding:7px 10px; border-radius:8px; align-items:center; gap:8px; margin-top:4px;">
+          <span style="font-size:16px; flex-shrink:0;">🧭</span>
+          <span><strong>Observação:</strong> Para mais de 1 parada, <strong>utilize o Maps</strong> (traça todas as etapas juntas a partir do GPS do carro). O Waze só aceita 1 parada por vez.</span>
+        </div>
       </div>
 
       <div class="hint-tap-map" id="hint-tap-text">👆 <strong>Dica:</strong> Clique em <strong>📍</strong> no topo direito para marcar um ponto no mapa sem toques acidentais.</div>
@@ -831,6 +837,14 @@
           <div class="stat-pill">🛣️ <span id="modal-km">-- km</span></div>
           <div class="stat-pill">⏱️ <span id="modal-time">-- min</span></div>
           <div class="stat-pill">🚗 Captur EMD-2026</div>
+        </div>
+
+        <!-- OBSERVAÇÃO DE MÚLTIPLAS PARADAS NO MODAL -->
+        <div id="modal-multistop-notice" style="display:none; background:rgba(15, 23, 42, 0.9); border:1px solid #38bdf8; border-radius:8px; padding:9px 12px; margin:10px 0 6px 0; color:#e2e8f0; font-size:12px; text-align:left; line-height:1.45;">
+          <div style="font-weight:800; color:#38bdf8; display:flex; align-items:center; gap:6px; margin-bottom:3px;">
+            <span style="font-size:15px;">🧭</span> Observação: Para mais de 1 parada, utilize o Maps!
+          </div>
+          <div>O <strong>Google Maps</strong> traça todas as paradas em sequência com o GPS do carro como início. O Waze só suporta 1 parada por vez (navegue etapa por etapa).</div>
         </div>
 
         <div style="font-size: 13px; color: #94a3b8; margin: 10px 0 14px 0; font-weight: 600;">
@@ -1547,6 +1561,11 @@
         destTitle = `${state.waypoints.length} Parada(s): Final em ${state.waypoints[state.waypoints.length - 1].name}`;
       }
       document.getElementById('modal-dest-name').innerText = destTitle || 'Destino Selecionado';
+
+      const multiNotice = document.getElementById('modal-multistop-notice');
+      if (multiNotice) {
+        multiNotice.style.display = hasWaypoints ? 'block' : 'none';
+      }
 
       const wazeBtnText = document.getElementById('modal-waze-title');
       const wazeBtnSub = document.getElementById('modal-waze-sub');
@@ -2491,7 +2510,7 @@
 
     // REGISTRO DE SERVICE WORKER
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/static/sw.js?v=11').catch(() => {});
+      navigator.serviceWorker.register('/static/sw.js?v=12').catch(() => {});
     }
 
     // IDENTIFICAÇÃO AUTOMÁTICA DE VEÍCULO POR PROXIMIDADE / NFC + ASSUMIR O VOLANTE
@@ -2784,12 +2803,16 @@
       const listEl = document.getElementById('waypoints-list');
       const summaryEl = document.getElementById('lbl-stops-summary');
 
+      const tipEl = document.getElementById('waypoints-maps-tip');
       if (!state.waypoints || state.waypoints.length === 0) {
         listEl.style.display = 'none';
         listEl.innerHTML = '';
         summaryEl.style.display = 'none';
+        if (tipEl) tipEl.style.display = 'none';
         return;
       }
+
+      if (tipEl) tipEl.style.display = 'flex';
 
       summaryEl.style.display = 'inline';
       summaryEl.innerText = `${state.waypoints.length} parada(s)`;
