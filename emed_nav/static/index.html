@@ -838,19 +838,19 @@
         </div>
 
         <div class="modal-buttons">
-          <button id="modal-btn-waze" class="btn-modal btn-waze" type="button">
-            <span style="font-size: 28px;">🚀</span>
-            <div style="text-align: left;">
-              <div style="font-size: 16px; font-weight: 900; letter-spacing: 0.3px;">ABRIR NO WAZE AGORA</div>
-              <div style="font-size: 11px; opacity: 0.95;">Alertas de radares, velocidade e trânsito ao vivo</div>
-            </div>
-          </button>
-
           <button id="modal-btn-maps" class="btn-modal btn-maps" type="button">
             <span style="font-size: 28px;">🧭</span>
             <div style="text-align: left;">
-              <div style="font-size: 16px; font-weight: 900; letter-spacing: 0.3px;">ABRIR NO GOOGLE MAPS</div>
-              <div style="font-size: 11px; opacity: 0.95;">Navegação com satélite e mapas offline</div>
+              <div id="modal-maps-title" style="font-size: 15px; font-weight: 900; letter-spacing: 0.3px;">ABRIR NO GOOGLE MAPS</div>
+              <div id="modal-maps-sub" style="font-size: 11px; opacity: 0.95;">Rota completa saindo do GPS do carro com todas as paradas</div>
+            </div>
+          </button>
+
+          <button id="modal-btn-waze" class="btn-modal btn-waze" type="button">
+            <span style="font-size: 28px;">🚀</span>
+            <div style="text-align: left;">
+              <div id="modal-waze-title" style="font-size: 15px; font-weight: 900; letter-spacing: 0.3px;">ABRIR NO WAZE AGORA</div>
+              <div id="modal-waze-sub" style="font-size: 11px; opacity: 0.95;">Navegação da próxima parada com alertas ao vivo</div>
             </div>
           </button>
         </div>
@@ -1541,11 +1541,32 @@
 
     // MODAL DE AÇÃO DE NAVEGAÇÃO
     function openNavModal() {
+      const hasWaypoints = state.waypoints && state.waypoints.length > 0;
       let destTitle = state.destName;
-      if (!destTitle && state.waypoints && state.waypoints.length > 0) {
+      if (!destTitle && hasWaypoints) {
         destTitle = `${state.waypoints.length} Parada(s): Final em ${state.waypoints[state.waypoints.length - 1].name}`;
       }
       document.getElementById('modal-dest-name').innerText = destTitle || 'Destino Selecionado';
+
+      const wazeBtnText = document.getElementById('modal-waze-title');
+      const wazeBtnSub = document.getElementById('modal-waze-sub');
+      const mapsBtnText = document.getElementById('modal-maps-title');
+      const mapsBtnSub = document.getElementById('modal-maps-sub');
+
+      if (hasWaypoints) {
+        const firstWp = state.waypoints[0];
+        const shortName = firstWp.name.length > 20 ? firstWp.name.substring(0, 20) + '...' : firstWp.name;
+        if (mapsBtnText) mapsBtnText.innerText = `GOOGLE MAPS: TODAS AS ${state.waypoints.length} PARADAS`;
+        if (mapsBtnSub) mapsBtnSub.innerText = `Inicia no GPS do carro e passa por todas as paradas em sequência`;
+        if (wazeBtnText) wazeBtnText.innerText = `WAZE: IR PARA PARADA 1 (${shortName})`;
+        if (wazeBtnSub) wazeBtnSub.innerText = `O Waze navega 1 etapa por vez (roteando para a 1ª parada)`;
+      } else {
+        if (mapsBtnText) mapsBtnText.innerText = `ABRIR NO GOOGLE MAPS`;
+        if (mapsBtnSub) mapsBtnSub.innerText = `Navegação saindo do GPS do veículo`;
+        if (wazeBtnText) wazeBtnText.innerText = `ABRIR NO WAZE AGORA`;
+        if (wazeBtnSub) wazeBtnSub.innerText = `Alertas de radares, velocidade e trânsito ao vivo`;
+      }
+
       document.getElementById('nav-action-modal').style.display = 'flex';
     }
 
@@ -1558,18 +1579,19 @@
 
     // DEEP LINKING NATIVO: WAZE & GOOGLE MAPS COM GPS DO CARRO
     function launchWaze(lat, lon, destName) {
-      // Se houver paradas intermediárias, Waze navega para a 1ª parada primeiro!
       let targetLat = lat || state.destLat;
       let targetLon = lon || state.destLon;
       let targetName = destName || state.destName || document.getElementById('input-destination').value.trim();
 
+      // O Waze NÃO aceita múltiplas paradas nem origem customizada via URL (limitação oficial do Waze).
+      // Por isso, quando há múltiplas paradas, o Waze guia inteligente etapa por etapa, começando pela Parada 1!
       if (state.waypoints && state.waypoints.length > 0 && !lat) {
         targetLat = state.waypoints[0].lat;
         targetLon = state.waypoints[0].lon;
         targetName = state.waypoints[0].name;
-        showToast(`🚀 Roteando no Waze para Parada 1: ${targetName}...`);
+        showToast(`🚀 Waze (Etapa 1 de ${state.waypoints.length}): Roteando para ${targetName}...`);
       } else {
-        showToast('🚀 Abrindo Waze com o GPS do carro...');
+        showToast('🚀 Abrindo Waze com alertas ao vivo...');
       }
 
       if (!targetLat || !targetLon) {
@@ -1590,50 +1612,75 @@
       }, 700);
     }
 
+    function launchWazeSingle(lat, lon, nome) {
+      showToast(`🚀 Abrindo Waze para: ${nome}...`);
+      window.location.href = `waze://?ll=${lat},${lon}&navigate=yes`;
+      setTimeout(() => {
+        window.open(`https://waze.com/ul?ll=${lat},${lon}&navigate=yes`, '_system');
+      }, 700);
+    }
+
     function launchGoogleMaps(lat, lon, destName) {
+      // Ponto de partida SEMPRE é a posição real do GPS do veículo
       const oLat = state.carLat;
       const oLon = state.carLon;
       let dLat = lat || state.destLat;
       let dLon = lon || state.destLon;
       let name = destName || state.destName || document.getElementById('input-destination').value.trim();
 
-      // Monta lista de waypoints para o Google Maps se existirem
-      let waypointsParam = '';
+      // Monta lista de waypoints em ordem
+      let waypointsList = [];
       if (state.waypoints && state.waypoints.length > 0) {
         if (dLat && dLon) {
-          // Destino final já explícito no input/chip, waypoints são as paradas
-          waypointsParam = '&waypoints=' + encodeURIComponent(state.waypoints.map(w => `${w.lat},${w.lon}`).join('|'));
+          // Destino já explícito no input ou chip, todos os waypoints são paradas intermediárias
+          waypointsList = state.waypoints.map(w => `${w.lat},${w.lon}`);
         } else {
-          // Destino não explícito: a última parada é o destino, as anteriores são waypoints
+          // Destino não explícito: última parada é o destino, as anteriores são waypoints
           const last = state.waypoints[state.waypoints.length - 1];
           dLat = last.lat;
           dLon = last.lon;
           name = last.name;
-          const inter = state.waypoints.slice(0, -1);
-          if (inter.length > 0) {
-            waypointsParam = '&waypoints=' + encodeURIComponent(inter.map(w => `${w.lat},${w.lon}`).join('|'));
-          }
+          waypointsList = state.waypoints.slice(0, -1).map(w => `${w.lat},${w.lon}`);
         }
       }
 
       if (!dLat || !dLon) {
         if (name) {
           showToast('🧭 Abrindo Google Maps pelo endereço...');
-          window.location.href = `google.navigation:q=${encodeURIComponent(name)}&mode=d`;
-          setTimeout(() => {
-            window.open(`https://www.google.com/maps/dir/?api=1&origin=${oLat},${oLon}&destination=${encodeURIComponent(name)}${waypointsParam}&travelmode=driving`, '_system');
-          }, 700);
+          const gUrl = `https://www.google.com/maps/dir/?api=1&origin=${oLat},${oLon}&destination=${encodeURIComponent(name)}${waypointsList.length > 0 ? `&waypoints=${encodeURIComponent(waypointsList.join('|'))}` : ''}&travelmode=driving`;
+          const win = window.open(gUrl, '_system');
+          if (!win) window.location.href = gUrl;
           return;
         }
         showToast('⚠️ Escolha um destino ou adicione paradas!');
         return;
       }
 
-      showToast('🧭 Abrindo Google Maps com paradas...');
-      window.location.href = `google.navigation:q=${dLat},${dLon}&mode=d`;
-      setTimeout(() => {
-        window.open(`https://www.google.com/maps/dir/?api=1&origin=${oLat},${oLon}&destination=${dLat},${dLon}${waypointsParam}&travelmode=driving`, '_system');
-      }, 700);
+      // Constrói URL oficial do Google Maps Directions API que respeita a ORIGEM no GPS do carro e TODAS as paradas!
+      const hasWaypoints = waypointsList.length > 0;
+      const waypointsParam = hasWaypoints ? `&waypoints=${encodeURIComponent(waypointsList.join('|'))}` : '';
+      const gUrl = `https://www.google.com/maps/dir/?api=1&origin=${oLat},${oLon}&destination=${dLat},${dLon}${waypointsParam}&travelmode=driving`;
+
+      if (hasWaypoints) {
+        showToast(`🧭 Google Maps: Traçando ${state.waypoints.length} paradas a partir do GPS do carro...`);
+      } else {
+        showToast('🧭 Google Maps: Traçando rota a partir do GPS do veículo...');
+      }
+
+      // Abre rota completa no Google Maps (NÃO usa google.navigation:q pois ele descarta os waypoints e a origem)
+      const win = window.open(gUrl, '_system');
+      if (!win) {
+        window.location.href = gUrl;
+      }
+    }
+
+    function launchGoogleMapsSingle(lat, lon, nome) {
+      const oLat = state.carLat;
+      const oLon = state.carLon;
+      showToast(`🧭 Google Maps para: ${nome}...`);
+      const gUrl = `https://www.google.com/maps/dir/?api=1&origin=${oLat},${oLon}&destination=${lat},${lon}&travelmode=driving`;
+      const win = window.open(gUrl, '_system');
+      if (!win) window.location.href = gUrl;
     }
 
     // TRAÇADOR E FIXADOR DE DESTINO INSTANTÂNEO (0ms DE DELAY)
@@ -2444,7 +2491,7 @@
 
     // REGISTRO DE SERVICE WORKER
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/static/sw.js?v=10').catch(() => {});
+      navigator.serviceWorker.register('/static/sw.js?v=11').catch(() => {});
     }
 
     // IDENTIFICAÇÃO AUTOMÁTICA DE VEÍCULO POR PROXIMIDADE / NFC + ASSUMIR O VOLANTE
@@ -2749,11 +2796,14 @@
       listEl.style.display = 'flex';
       listEl.innerHTML = state.waypoints.map((wp, idx) => `
         <div class="waypoint-item">
-          <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
+          <div style="display:flex; align-items:center; gap:8px; overflow:hidden; flex:1;">
             <span class="waypoint-badge">${idx + 1}</span>
-            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${wp.name}</span>
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px;">${wp.name}</span>
           </div>
-          <button class="btn-remove-stop" onclick="removeWaypoint(${idx})" title="Remover parada">✕</button>
+          <div style="display:flex; align-items:center; gap:5px; flex-shrink:0;">
+            <button class="btn-stop-nav" onclick="launchWazeSingle(${wp.lat}, ${wp.lon}, '${wp.name.replace(/'/g, "\\'")}')" title="Navegar no Waze para esta parada" style="background:rgba(0,180,216,0.2); border:1px solid #00b4d8; color:#38bdf8; border-radius:5px; padding:3px 7px; font-size:10.5px; font-weight:800; cursor:pointer;">Waze</button>
+            <button class="btn-remove-stop" onclick="removeWaypoint(${idx})" title="Remover parada">✕</button>
+          </div>
         </div>
       `).join('');
     }
