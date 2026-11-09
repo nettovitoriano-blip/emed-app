@@ -54544,90 +54544,24 @@
 
 
 
-    <div style="padding:16px;border-top:1px solid rgba(255,255,255,0.1);">
-
-
-
-      <button onclick="efetuarLogout()" style="width:100%;padding:11px;background:rgba(239,68,68,0.18);color:#fca5a5;border:1px solid rgba(239,68,68,0.4);border-radius:12px;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
-
-
-
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-
-
-
-        Sair / Trocar Usuário
-
-
-
-      </button>
-
-
-
-    </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    <div style="padding:14px;border-top:1px solid rgba(255,255,255,0.1);">
+        <div id="drawerUserBadge" style="background:rgba(15,23,42,0.85); border:1px solid rgba(56,189,248,0.3); border-radius:10px; padding:10px 12px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px;">👤</span>
+            <div>
+              <div style="font-size:9.5px; color:#94a3b8; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">Conectado como</div>
+              <div id="drawerUserName" style="font-size:13px; font-weight:800; color:#38bdf8;">VALFREDO NETTO</div>
+            </div>
+          </div>
+          <span id="drawerUserRoleBadge" style="background:#0284c7; color:#fff; font-size:10px; font-weight:800; padding:3px 8px; border-radius:5px; text-transform:uppercase;">
+            Técnico
+          </span>
+        </div>
+        <button onclick="efetuarLogout()" style="width:100%;background:rgba(239,68,68,0.15);color:#fca5a5;border:1px solid rgba(239,68,68,0.3);border-radius:10px;font-weight:700;font-size:12.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;transition:0.2s;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          Sair / Trocar Usuário
+        </button>
+      </div>
   </aside>
 
 
@@ -55453,6 +55387,8 @@
 
 
       <div class="topbar-right">
+        <div id="headerUserChip" style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.12);padding:4px 10px;border-radius:20px;border:1px solid rgba(255,255,255,0.2);margin-right:6px;"></div>
+
 
 
 
@@ -80854,457 +80790,13 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
       TECNICO: [
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        { id: "TEC_OS", icone: "🎫", titulo: "Minhas OS & Coletor Offline", desc: "Execução em campo, Check-in, Checklist POP, Fotos, Assinatura e PDF 1 Página" },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        { id: "TEC_PEND", icone: "📋", titulo: "Minhas Pendências", desc: "Retornos técnicos e pendências atribuídas ao meu nome" },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        { id: "TEC_PECAS", icone: "📦", titulo: "Solicitar Peças, Kits & Consumíveis", desc: "Pedir peça/kit ao Almoxarifado ou dar baixa em insumo" },
-
-
-
-        { id: "TEC_FERRAMENTAS", icone: "🧰", titulo: "Minhas Ferramentas em Uso", desc: "Instrumentos e ferramentas em minha posse (com lembretes de bateria)" },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        { id: "TEC_MANUAIS", icone: "📚", titulo: "Manuais Técnicos, POPs & Vídeos", desc: "Catálogo de ITs homologadas em PDF e vídeos MP4 de treinamento" },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        { id: "TEC_KM", icone: "🛰️", titulo: "Frota GPS, Condutor & Odômetro", desc: "Rastreamento GPS do celular, identificação do condutor e odômetro automático" }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        { id: "TEC_OS", icone: "🎫", titulo: "Chamados & Minhas OS", desc: "Execução em campo, Check-in, Checklist POP, Fotos, Assinatura e Laudo 1 Página" },
+        { id: "TEC_ROTAS", icone: "🗺️", titulo: "Minhas Rotas & Mapa", desc: "Apenas os hospitais e clientes com chamados sob sua responsabilidade" },
+        { id: "TEC_PEND", icone: "📋", titulo: "Minhas Pendências", desc: "Retornos técnicos e pendências atribuídas ao seu nome" },
+        { id: "TEC_PERFIL", icone: "✍️", titulo: "Cadastro & Assinatura", desc: "Seu cadastro pessoal, CFT e rubrica digital touch para emissão de laudos" },
+        { id: "TEC_PECAS", icone: "📦", titulo: "Solicitar Peças ao Almox", desc: "Requisitar peças ao estoque central sem ver preços/custos" },
+        { id: "TEC_MANUAIS", icone: "📚", titulo: "Manuais & ITs Técnicos", desc: "Manuais de serviço e POPs homologados para consulta offline" }
       ],
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       GESTOR: [
 
 
@@ -97268,43 +96760,48 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 function renderizarNavegacao() {
       const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase();
       const usuarioPerfil = (localStorage.getItem("emed_perfil_usuario") || "").toUpperCase();
-      const isGestor = (usuarioNome === "NETTO") || usuarioPerfil.includes("GESTOR") || usuarioPerfil.includes("MASTER") || (usuarioNome === "");
+      // STRICT CHECK: ONLY exact 'NETTO' with Gestor is Gestor!
+      const isGestor = (usuarioNome === "NETTO") && (!usuarioPerfil || usuarioPerfil.includes("GESTOR"));
 
-      const btnFull = document.getElementById("tabModeFull");
-      const btnTec = document.getElementById("tabModeTecnico");
-      const btnGestor = document.getElementById("tabModeGestor");
-      const btnTriagem = document.getElementById("tabModeTriagem");
-
-      if (!isGestor && usuarioNome) {
-        // TÉCNICO DE CAMPO: Oculta Master, Gestor e Triagem
-        if (btnFull) btnFull.style.display = "none";
-        if (btnGestor) btnGestor.style.display = "none";
-        if (btnTriagem) btnTriagem.style.display = "none";
-        if (btnTec) {
-          btnTec.style.display = "inline-flex";
-          btnTec.className = "mode-btn active";
-          btnTec.innerHTML = `👷 Técnico: ${esc(usuarioNome)}`;
-        }
+      const modeSwitchBox = document.querySelector(".mode-switch");
+      if (!isGestor) {
+        // TÉCNICO: Não precisa dos menus acima (Master, Técnico, Gestor, Triagem)
+        if (modeSwitchBox) modeSwitchBox.style.display = "none";
         STATE.perfil = "TECNICO";
       } else {
-        // GESTOR / MASTER: Exibe os seletores de perfil
-        if (btnFull) {
-          btnFull.style.display = "inline-flex";
-          btnFull.className = "mode-btn" + (STATE.perfil === "FULL" ? " active" : "");
-        }
+        // GESTOR: Exibe os seletores de perfil
+        if (modeSwitchBox) modeSwitchBox.style.display = "flex";
+        const btnFull = document.getElementById("tabModeFull");
+        const btnTec = document.getElementById("tabModeTecnico");
+        const btnGestor = document.getElementById("tabModeGestor");
+        const btnTriagem = document.getElementById("tabModeTriagem");
+        if (btnFull) btnFull.className = "mode-btn" + (STATE.perfil === "FULL" ? " active" : "");
         if (btnTec) {
-          btnTec.style.display = "inline-flex";
           btnTec.className = "mode-btn" + (STATE.perfil === "TECNICO" ? " active" : "");
           btnTec.innerHTML = `👷 Técnico`;
         }
-        if (btnGestor) {
-          btnGestor.style.display = "inline-flex";
-          btnGestor.className = "mode-btn" + (STATE.perfil === "GESTOR" ? " active" : "");
-        }
-        if (btnTriagem) {
-          btnTriagem.style.display = "inline-flex";
-          btnTriagem.className = "mode-btn" + (STATE.perfil === "CLIENTE" ? " active" : "");
-        }
+        if (btnGestor) btnGestor.className = "mode-btn" + (STATE.perfil === "GESTOR" ? " active" : "");
+        if (btnTriagem) btnTriagem.className = "mode-btn" + (STATE.perfil === "CLIENTE" ? " active" : "");
+      }
+
+      // Atualiza identificação do usuário conectado no Topo e no Menu Lateral
+      const headerUserChip = document.getElementById("headerUserChip");
+      if (headerUserChip) {
+        headerUserChip.innerHTML = `
+          <span style="font-size:12px;">👤</span>
+          <span style="font-size:12px;font-weight:800;color:#f8fafc;">${esc(usuarioNome || "Usuário")}</span>
+          <span style="font-size:9.5px;background:${isGestor ? '#eab308' : '#0284c7'};color:#fff;padding:1px 6px;border-radius:10px;font-weight:800;">
+            ${isGestor ? 'GESTOR' : 'TÉCNICO'}
+          </span>
+          <button onclick="efetuarLogout()" title="Sair / Trocar Usuário" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:12px;margin-left:2px;padding:0;">🚪</button>
+        `;
+      }
+      const drawerUserName = document.getElementById("drawerUserName");
+      const drawerUserRoleBadge = document.getElementById("drawerUserRoleBadge");
+      if (drawerUserName) drawerUserName.innerText = usuarioNome || "Usuário";
+      if (drawerUserRoleBadge) {
+        drawerUserRoleBadge.innerText = isGestor ? "Gestor" : "Técnico";
+        drawerUserRoleBadge.style.background = isGestor ? "#eab308" : "#0284c7";
       }
 
       // Barra horizontal de pílulas do perfil atual
@@ -97346,7 +96843,7 @@ function renderizarNavegacao() {
           bannerSim.innerHTML = `
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
               <span style="background:#0284c7;color:#fff;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:800;letter-spacing:0.5px;">👁️ MODO SIMULAÇÃO DO TÉCNICO</span>
-              <span style="color:#cbd5e1;font-size:13px;">Você está visualizando a tela restrita de campo dos Técnicos (apenas os 6 menus operacionais liberados, sem acesso financeiro ou administrativo).</span>
+              <span style="color:#cbd5e1;font-size:13px;">Você está visualizando a tela restrita de campo dos Técnicos (apenas suas demandas e ferramentas liberadas).</span>
             </div>
             <button onclick="mudarPerfil('GESTOR', 'GES_MURAL')" style="background:#38bdf8;color:#0f172a;border:none;padding:7px 16px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(56,189,248,0.3);white-space:nowrap;">
               👑 Voltar para Painel do Gestor
@@ -97359,8 +96856,8 @@ function renderizarNavegacao() {
 
       // Drawer categorizado
       let htmlDrawer = "";
-      if (!isGestor && usuarioNome) {
-        htmlDrawer += `<div class="drawer-group-title" style="color:#38bdf8;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;margin-top:14px;margin-bottom:6px;">🛠️ Ferramentas do Técnico (${esc(usuarioNome)})</div>`;
+      if (!isGestor) {
+        htmlDrawer += `<div class="drawer-group-title" style="color:#38bdf8;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;margin-top:14px;margin-bottom:6px;">🛠️ Minhas Ferramentas de Campo (${esc(usuarioNome)})</div>`;
         const menusTecDrawer = MENUS_POR_PERFIL.TECNICO;
         for (const m of menusTecDrawer) {
           const cnt = obterContadorMenu(m.id);
@@ -98418,6 +97915,8 @@ function renderizarNavegacao() {
 
 
 
+        case "TEC_ROTAS": return renderMenuTecRotas(box);
+        case "TEC_PERFIL": return renderMenuTecPerfil(box);
         case "TEC_OS": return renderMenuTecOS(box);
 
 
@@ -110885,6 +110384,160 @@ function renderizarNavegacao() {
 
 
 
+
+    
+    /* ==========================================================================
+     * MODULO TECNICO: MINHAS ROTAS & MAPA (APENAS SUAS DEMANDAS)
+     * ========================================================================== */
+    function renderMenuTecRotas(box) {
+      const d = STATE.data || {};
+      const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase();
+      const ordens = (d.ordens || []).filter(o => o.tecnico_responsavel === usuarioNome && !(o.status || "").toUpperCase().includes("CONCLU"));
+
+      const mapaRotas = {};
+      for (const os of ordens) {
+        const key = (os.cliente || "Cliente") + " - " + (os.cidade || "Local");
+        if (!mapaRotas[key]) {
+          mapaRotas[key] = { cliente: os.cliente, cidade: os.cidade, estado: os.estado, endereco: os.endereco || "", ordens: [] };
+        }
+        mapaRotas[key].ordens.push(os);
+      }
+      const listaDemandas = Object.values(mapaRotas);
+
+      box.innerHTML = `
+        <div class="kpi-grid" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; margin-bottom:14px;">
+          <div class="kpi-card" style="text-align:center; padding:12px;">
+            <div class="kpi-label" style="font-size:11px; font-weight:800;">🏥 Hospitais com Suas Demandas</div>
+            <div class="kpi-val" style="font-size:24px; font-weight:900; color:#38bdf8;">${listaDemandas.length}</div>
+          </div>
+          <div class="kpi-card green" style="text-align:center; padding:12px;">
+            <div class="kpi-label" style="font-size:11px; font-weight:800;">🎫 Total de Suas OS em Rota</div>
+            <div class="kpi-val" style="font-size:24px; font-weight:900; color:#10b981;">${ordens.length}</div>
+          </div>
+        </div>
+
+        <div class="section-box">
+          <div class="section-title">🗺️ Minhas Rotas & Paradas Agrupadas (${esc(usuarioNome)})</div>
+          <div style="font-size:12px; color:#94a3b8; margin-bottom:14px;">
+            Abaixo estão exclusivamente as suas paradas de atendimento de hoje, agrupadas por cliente para otimizar seu deslocamento:
+          </div>
+
+          ${listaDemandas.length === 0 ? `
+            <div style="text-align:center; padding:40px 20px; color:#64748b;">
+              <div style="font-size:36px; margin-bottom:8px;">🏖️</div>
+              <div style="font-weight:700; font-size:14px; color:#94a3b8;">Nenhuma rota ativa pendente para você no momento.</div>
+              <div style="font-size:12px; margin-top:4px;">Todas as suas ordens de serviço foram concluídas!</div>
+            </div>
+          ` : `
+            <div class="os-grid">
+              ${listaDemandas.map((r, idx) => `
+                <div class="os-card" style="border-left:4px solid #38bdf8;">
+                  <div class="os-card-head" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span class="os-num" style="font-size:13px; font-weight:800;">📍 Parada #${idx + 1}: ${esc(r.cidade || "CE")}</span>
+                    <span class="badge ativo" style="font-weight:800;">${r.ordens.length} OS no local</span>
+                  </div>
+                  <div class="os-card-body" style="padding:12px;">
+                    <div class="os-cli" style="font-size:15px; font-weight:800; color:#f8fafc; margin-bottom:6px;">
+                      🏥 ${esc(r.cliente)}
+                    </div>
+                    ${r.endereco ? `<div style="font-size:11.5px; color:#94a3b8; margin-bottom:8px;">📍 ${esc(r.endereco)}</div>` : ""}
+
+                    <div style="background:rgba(255,255,255,0.03); border-radius:6px; padding:8px; margin-top:8px;">
+                      ${r.ordens.map(os => `
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:12px;">
+                          <div>
+                            <strong style="color:#38bdf8;">OS #${os.id}</strong> — ${esc(os.equipamento || "Equipamento")}
+                          </div>
+                          <span class="badge ${os.status?.includes('CONCLU') ? 'concluido' : 'obs'}" style="font-size:10px;">${esc(os.status)}</span>
+                        </div>
+                      `).join("")}
+                    </div>
+
+                    <div style="display:flex; gap:8px; margin-top:12px;">
+                      <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.cliente + ' ' + (r.cidade || ''))}" target="_blank" style="flex:1; background:#0284c7; color:#fff; text-decoration:none; padding:8px; border-radius:6px; font-weight:700; font-size:11.5px; text-align:center; display:flex; align-items:center; justify-content:center; gap:6px;">
+                        🗺️ Google Maps
+                      </a>
+                      <a href="https://waze.com/ul?q=${encodeURIComponent(r.cliente + ' ' + (r.cidade || ''))}" target="_blank" style="flex:1; background:#059669; color:#fff; text-decoration:none; padding:8px; border-radius:6px; font-weight:700; font-size:11.5px; text-align:center; display:flex; align-items:center; justify-content:center; gap:6px;">
+                        🚗 Abrir no Waze
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    /* ==========================================================================
+     * MODULO TECNICO: MEU CADASTRO PESSOAL & MINHA ASSINATURA DIGITAL TOUCH
+     * ========================================================================== */
+    function renderMenuTecPerfil(box) {
+      const d = STATE.data || {};
+      const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase();
+      const tec = (d.tecnicos || []).find(t => t.nome?.toUpperCase() === usuarioNome) || { nome: usuarioNome, perfil: "Técnico", telefone: "" };
+
+      box.innerHTML = `
+        <div class="section-box" style="max-width:700px; margin:0 auto;">
+          <div class="section-title">✍️ Meu Cadastro Pessoal & Assinatura Digital Touch</div>
+          <div style="font-size:12px; color:#94a3b8; margin-bottom:16px;">
+            Suas credenciais profissionais que identificam seus atendimentos e saem nos laudos técnicos em PDF:
+          </div>
+
+          <div style="background:rgba(15,23,42,0.6); border:1px solid rgba(56,189,248,0.25); border-radius:10px; padding:16px; margin-bottom:20px;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:14px;">
+              <div style="width:48px; height:48px; border-radius:50%; background:#0284c7; display:flex; align-items:center; justify-content:center; font-size:22px; color:#fff;">
+                👷
+              </div>
+              <div>
+                <div style="font-size:16px; font-weight:900; color:#f8fafc;">${esc(tec.nome)}</div>
+                <div style="font-size:12px; color:#38bdf8; font-weight:700;">${esc(tec.perfil || 'Técnico de Campo Especialista')}</div>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:13px;">
+              <div>
+                <div style="font-size:11px; color:#94a3b8; font-weight:700;">WHATSAPP / TELEFONE:</div>
+                <div style="font-weight:800; color:#e2e8f0;">📱 ${esc(tec.telefone || "Não cadastrado")}</div>
+              </div>
+              <div>
+                <div style="font-size:11px; color:#94a3b8; font-weight:700;">REGISTRO CFT / ASSINATURA:</div>
+                <div style="font-weight:800; color:#e2e8f0;">📜 ${esc(tec.assinatura_padrao || tec.nome + ' - CFT')}</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:18px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <div style="font-weight:800; font-size:13.5px; color:#f8fafc;">🖋️ Sua Rubrica / Assinatura Digital Touch</div>
+              <button onclick="abrirModalAssinaturaTecnico('${esc(usuarioNome)}')" style="background:#38bdf8; color:#0f172a; border:none; padding:7px 16px; border-radius:6px; font-weight:800; font-size:12px; cursor:pointer;">
+                ✏️ Coletar / Atualizar Assinatura
+              </button>
+            </div>
+            <div style="font-size:11.5px; color:#94a3b8; margin-bottom:12px;">
+              Esta assinatura é gravada com precisão touch e inserida automaticamente no rodapé dos laudos PDF de 1 página que você emite ao finalizar os chamados.
+            </div>
+            <div style="background:#fff; border-radius:8px; padding:16px; min-height:90px; display:flex; align-items:center; justify-content:center;">
+              ${tec.rubrica_img ? `
+                <img src="${tec.rubrica_img}" alt="Sua Assinatura" style="max-height:80px; max-width:100%; object-fit:contain;" />
+              ` : `
+                <div style="color:#64748b; font-size:12px; font-weight:700; text-align:center;">
+                  Nenhuma assinatura touch gravada ainda.<br/>
+                  <span style="color:#0284c7; cursor:pointer;" onclick="abrirModalAssinaturaTecnico('${esc(usuarioNome)}')">Toque aqui para assinar na tela com seu dedo</span>
+                </div>
+              `}
+            </div>
+          </div>
+
+          <div style="margin-top:20px; text-align:center;">
+            <button onclick="efetuarLogout()" style="background:rgba(239,68,68,0.15); color:#fca5a5; border:1px solid rgba(239,68,68,0.3); padding:10px 24px; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer;">
+              🚪 Sair e Desconectar Usuário (${esc(usuarioNome)})
+            </button>
+          </div>
+        </div>
+      `;
+    }
 
     function renderMenuTecPecas(box) {
 
@@ -290011,22 +289664,173 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 <script>
+    /* ==========================================================================
+     * MODULO TECNICO: MINHAS ROTAS & MAPA (APENAS SUAS DEMANDAS)
+     * ========================================================================== */
+    function renderMenuTecRotas(box) {
+      const d = STATE.data || {};
+      const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase();
+      const ordens = (d.ordens || []).filter(o => o.tecnico_responsavel === usuarioNome && !(o.status || "").toUpperCase().includes("CONCLU"));
 
+      const mapaRotas = {};
+      for (const os of ordens) {
+        const key = (os.cliente || "Cliente") + " - " + (os.cidade || "Local");
+        if (!mapaRotas[key]) {
+          mapaRotas[key] = { cliente: os.cliente, cidade: os.cidade, estado: os.estado, endereco: os.endereco || "", ordens: [] };
+        }
+        mapaRotas[key].ordens.push(os);
+      }
+      const listaDemandas = Object.values(mapaRotas);
 
+      box.innerHTML = `
+        <div class="kpi-grid" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; margin-bottom:14px;">
+          <div class="kpi-card" style="text-align:center; padding:12px;">
+            <div class="kpi-label" style="font-size:11px; font-weight:800;">🏥 Hospitais com Suas Demandas</div>
+            <div class="kpi-val" style="font-size:24px; font-weight:900; color:#38bdf8;">${listaDemandas.length}</div>
+          </div>
+          <div class="kpi-card green" style="text-align:center; padding:12px;">
+            <div class="kpi-label" style="font-size:11px; font-weight:800;">🎫 Total de Suas OS em Rota</div>
+            <div class="kpi-val" style="font-size:24px; font-weight:900; color:#10b981;">${ordens.length}</div>
+          </div>
+        </div>
 
-async function efetuarLogout() {
+        <div class="section-box">
+          <div class="section-title">🗺️ Minhas Rotas & Paradas Agrupadas (${esc(usuarioNome)})</div>
+          <div style="font-size:12px; color:#94a3b8; margin-bottom:14px;">
+            Abaixo estão exclusivamente as suas paradas de atendimento de hoje, agrupadas por cliente para otimizar seu deslocamento:
+          </div>
 
+          ${listaDemandas.length === 0 ? `
+            <div style="text-align:center; padding:40px 20px; color:#64748b;">
+              <div style="font-size:36px; margin-bottom:8px;">🏖️</div>
+              <div style="font-weight:700; font-size:14px; color:#94a3b8;">Nenhuma rota ativa pendente para você no momento.</div>
+              <div style="font-size:12px; margin-top:4px;">Todas as suas ordens de serviço foram concluídas!</div>
+            </div>
+          ` : `
+            <div class="os-grid">
+              ${listaDemandas.map((r, idx) => `
+                <div class="os-card" style="border-left:4px solid #38bdf8;">
+                  <div class="os-card-head" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span class="os-num" style="font-size:13px; font-weight:800;">📍 Parada #${idx + 1}: ${esc(r.cidade || "CE")}</span>
+                    <span class="badge ativo" style="font-weight:800;">${r.ordens.length} OS no local</span>
+                  </div>
+                  <div class="os-card-body" style="padding:12px;">
+                    <div class="os-cli" style="font-size:15px; font-weight:800; color:#f8fafc; margin-bottom:6px;">
+                      🏥 ${esc(r.cliente)}
+                    </div>
+                    ${r.endereco ? `<div style="font-size:11.5px; color:#94a3b8; margin-bottom:8px;">📍 ${esc(r.endereco)}</div>` : ""}
 
+                    <div style="background:rgba(255,255,255,0.03); border-radius:6px; padding:8px; margin-top:8px;">
+                      ${r.ordens.map(os => `
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:12px;">
+                          <div>
+                            <strong style="color:#38bdf8;">OS #${os.id}</strong> — ${esc(os.equipamento || "Equipamento")}
+                          </div>
+                          <span class="badge ${os.status?.includes('CONCLU') ? 'concluido' : 'obs'}" style="font-size:10px;">${esc(os.status)}</span>
+                        </div>
+                      `).join("")}
+                    </div>
 
-  if (confirm("Deseja realmente sair e desconectar do Sistema eMED?")) {
+                    <div style="display:flex; gap:8px; margin-top:12px;">
+                      <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.cliente + ' ' + (r.cidade || ''))}" target="_blank" style="flex:1; background:#0284c7; color:#fff; text-decoration:none; padding:8px; border-radius:6px; font-weight:700; font-size:11.5px; text-align:center; display:flex; align-items:center; justify-content:center; gap:6px;">
+                        🗺️ Google Maps
+                      </a>
+                      <a href="https://waze.com/ul?q=${encodeURIComponent(r.cliente + ' ' + (r.cidade || ''))}" target="_blank" style="flex:1; background:#059669; color:#fff; text-decoration:none; padding:8px; border-radius:6px; font-weight:700; font-size:11.5px; text-align:center; display:flex; align-items:center; justify-content:center; gap:6px;">
+                        🚗 Abrir no Waze
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          `}
+        </div>
+      `;
+    }
 
+    /* ==========================================================================
+     * MODULO TECNICO: MEU CADASTRO PESSOAL & MINHA ASSINATURA DIGITAL TOUCH
+     * ========================================================================== */
+    function renderMenuTecPerfil(box) {
+      const d = STATE.data || {};
+      const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase();
+      const tec = (d.tecnicos || []).find(t => t.nome?.toUpperCase() === usuarioNome) || { nome: usuarioNome, perfil: "Técnico", telefone: "" };
 
+      box.innerHTML = `
+        <div class="section-box" style="max-width:700px; margin:0 auto;">
+          <div class="section-title">✍️ Meu Cadastro Pessoal & Assinatura Digital Touch</div>
+          <div style="font-size:12px; color:#94a3b8; margin-bottom:16px;">
+            Suas credenciais profissionais que identificam seus atendimentos e saem nos laudos técnicos em PDF:
+          </div>
 
-    try {
+          <div style="background:rgba(15,23,42,0.6); border:1px solid rgba(56,189,248,0.25); border-radius:10px; padding:16px; margin-bottom:20px;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:14px;">
+              <div style="width:48px; height:48px; border-radius:50%; background:#0284c7; display:flex; align-items:center; justify-content:center; font-size:22px; color:#fff;">
+                👷
+              </div>
+              <div>
+                <div style="font-size:16px; font-weight:900; color:#f8fafc;">${esc(tec.nome)}</div>
+                <div style="font-size:12px; color:#38bdf8; font-weight:700;">${esc(tec.perfil || 'Técnico de Campo Especialista')}</div>
+              </div>
+            </div>
 
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:13px;">
+              <div>
+                <div style="font-size:11px; color:#94a3b8; font-weight:700;">WHATSAPP / TELEFONE:</div>
+                <div style="font-weight:800; color:#e2e8f0;">📱 ${esc(tec.telefone || "Não cadastrado")}</div>
+              </div>
+              <div>
+                <div style="font-size:11px; color:#94a3b8; font-weight:700;">REGISTRO CFT / ASSINATURA:</div>
+                <div style="font-weight:800; color:#e2e8f0;">📜 ${esc(tec.assinatura_padrao || tec.nome + ' - CFT')}</div>
+              </div>
+            </div>
+          </div>
 
+          <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:18px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <div style="font-weight:800; font-size:13.5px; color:#f8fafc;">🖋️ Sua Rubrica / Assinatura Digital Touch</div>
+              <button onclick="abrirModalAssinaturaTecnico('${esc(usuarioNome)}')" style="background:#38bdf8; color:#0f172a; border:none; padding:7px 16px; border-radius:6px; font-weight:800; font-size:12px; cursor:pointer;">
+                ✏️ Coletar / Atualizar Assinatura
+              </button>
+            </div>
+            <div style="font-size:11.5px; color:#94a3b8; margin-bottom:12px;">
+              Esta assinatura é gravada com precisão touch e inserida automaticamente no rodapé dos laudos PDF de 1 página que você emite ao finalizar os chamados.
+            </div>
+            <div style="background:#fff; border-radius:8px; padding:16px; min-height:90px; display:flex; align-items:center; justify-content:center;">
+              ${tec.rubrica_img ? `
+                <img src="${tec.rubrica_img}" alt="Sua Assinatura" style="max-height:80px; max-width:100%; object-fit:contain;" />
+              ` : `
+                <div style="color:#64748b; font-size:12px; font-weight:700; text-align:center;">
+                  Nenhuma assinatura touch gravada ainda.<br/>
+                  <span style="color:#0284c7; cursor:pointer;" onclick="abrirModalAssinaturaTecnico('${esc(usuarioNome)}')">Toque aqui para assinar na tela com seu dedo</span>
+                </div>
+              `}
+            </div>
+          </div>
 
-      await fetch('/api/auth/logout', { method: 'POST' });
+          <div style="margin-top:20px; text-align:center;">
+            <button onclick="efetuarLogout()" style="background:rgba(239,68,68,0.15); color:#fca5a5; border:1px solid rgba(239,68,68,0.3); padding:10px 24px; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer;">
+              🚪 Sair e Desconectar Usuário (${esc(usuarioNome)})
+            </button>
+          </div>
+        </div>
+      `;
+    }
+function efetuarLogout() {
+      const usuarioNome = localStorage.getItem("emed_tecnico_selecionado") || "";
+      if (confirm(`Deseja realmente sair e desconectar do Sistema eMED${usuarioNome ? ' (' + usuarioNome + ')' : ''}?`)) {
+        try {
+          fetch('/api/auth/logout', { method: 'POST' });
+        } catch(e) {}
+        localStorage.removeItem('emed_token');
+        localStorage.removeItem('emed_perfil');
+        localStorage.removeItem('emed_menu_ativo');
+        localStorage.removeItem('emed_perfil_usuario');
+        localStorage.removeItem('emed_tecnico_selecionado');
+        localStorage.removeItem('emed_tec_filtro');
+        window.location.href = '/login.html';
+      }
+    });
 
 
 
