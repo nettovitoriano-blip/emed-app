@@ -3117,7 +3117,7 @@ async def api_dispositivos_codigo_ativo(request: web.Request) -> web.Response:
 
                 expira = expira_dt.strftime("%Y-%m-%d %H:%M:%S")
 
-                url_aut = f"{proto}://{host}/login.html?codigo={cod_num}&auto=1"
+                url_aut = f"{proto}://{host}/login?codigo={cod_num}&auto=1"
 
                 qr_b64 = f"data:image/png;base64,{gerar_qrcode_base64(url_aut)}"
 
@@ -3173,11 +3173,11 @@ async def api_dispositivos_codigo_ativo(request: web.Request) -> web.Response:
 
                 if tec_nome:
 
-                    url_aut = f"{proto}://{host}/login.html?usuario={urllib.parse.quote(tec_nome)}&codigo={cod_str}&auto=1"
+                    url_aut = f"{proto}://{host}/login?usuario={urllib.parse.quote(tec_nome)}&codigo={cod_str}&auto=1"
 
                 else:
 
-                    url_aut = f"{proto}://{host}/login.html?codigo={cod_str}&auto=1"
+                    url_aut = f"{proto}://{host}/login?codigo={cod_str}&auto=1"
 
 
 
@@ -3267,11 +3267,11 @@ async def api_dispositivos_codigo_gerar(request: web.Request) -> web.Response:
 
                 tec_enc = urllib.parse.quote(tecnico_selecionado)
 
-                url_autorizacao = f"{proto}://{host}/login.html?usuario={tec_enc}&codigo={cod_num}&auto=1"
+                url_autorizacao = f"{proto}://{host}/login?usuario={tec_enc}&codigo={cod_num}&auto=1"
 
             else:
 
-                url_autorizacao = f"{proto}://{host}/login.html?codigo={cod_num}&auto=1"
+                url_autorizacao = f"{proto}://{host}/login?codigo={cod_num}&auto=1"
 
 
 
@@ -22852,6 +22852,8 @@ def criar_app() -> web.Application:
     app.router.add_route("*", "/api/fleet/{tail:.*}", handle_proxy_nav)
 
     app.router.add_get("/", handle_index)
+    app.router.add_get("/login", handle_index)
+    app.router.add_get("/login.html", handle_index)
 
 
 
