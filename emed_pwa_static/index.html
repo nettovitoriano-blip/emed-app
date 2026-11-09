@@ -208550,18 +208550,38 @@ let G_DISPOSITIVOS_BUSCA = '';
 
 
 
-async function postJSON(url, data) {
-  const token = localStorage.getItem("emed_token");
-  const headers = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers,
-    credentials: "include",
-    body: JSON.stringify(data)
-  });
-  return await res.json();
-}
+window.postJSON = async function(url, data) {
+  try {
+    const token = localStorage.getItem("emed_token");
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body: JSON.stringify(data || {})
+    });
+    return await res.json();
+  } catch(e) {
+    console.error("Erro em postJSON:", e);
+    return { ok: false, msg: e.message };
+  }
+};
+var postJSON = window.postJSON;
+
+window.apiGet = async function(url) {
+  try {
+    const token = localStorage.getItem("emed_token");
+    const headers = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const resp = await fetch(url, { method: "GET", headers, credentials: "include" });
+    return await resp.json();
+  } catch (err) {
+    console.error("Erro em apiGet:", err);
+    return { ok: false, msg: err.message };
+  }
+};
+var apiGet = window.apiGet;
 
 async function carregarListaDispositivosGestor() {
 
@@ -208817,10 +208837,11 @@ function popularSeletorTecnicosLiberacao() {
   const listaOrdenada = Array.from(todosTecnicos).sort();
 
   let html = `<option value="TODOS" ${tecAtual === 'TODOS' ? 'selected' : ''}>👥 TODOS OS TÉCNICOS (Código Geral)</option>`;
+  html += `<option value="NETTO" ${tecAtual === 'NETTO' ? 'selected' : ''} style="font-weight:900;color:#38bdf8;">⭐ NETTO (Gestor Master / Meu Aparelho)</option>`;
 
   // Pendentes no topo
   pendentesNomes.forEach(nm => {
-    if (nm) {
+    if (nm && nm !== 'NETTO') {
       html += `<option value="${nm}" ${tecAtual === nm ? 'selected' : ''} style="font-weight:800;color:#f59e0b;">⚠️ ${nm} (Aguardando Liberação)</option>`;
     }
   });
@@ -208884,11 +208905,11 @@ async function carregarCodigoGestorAtivo() {
 }
 
 async function gerarNovoCodigoLiberacaoGestor(tecnicoForcado) {
+  const disp = document.getElementById('displayCodigoGestorAtivo');
   try {
     const sel = document.getElementById('selTecnicoLiberacaoQr');
     const tec = tecnicoForcado !== undefined ? tecnicoForcado : (sel ? sel.value : (G_TECNICO_AUTORIZACAO_ATUAL || 'TODOS'));
     
-    const disp = document.getElementById('displayCodigoGestorAtivo');
     if (disp) disp.textContent = "GERANDO...";
 
     const res = await postJSON('/api/dispositivos/codigo/gerar', {
@@ -208899,12 +208920,15 @@ async function gerarNovoCodigoLiberacaoGestor(tecnicoForcado) {
       aplicarDadosCodigoLiberacao(res);
       popularSeletorTecnicosLiberacao();
       if (typeof mostrarToast === 'function') {
-        mostrarToast(`✅ Código ${res.codigo_formatado} e QR Code gerados!`, 'sucesso');
+        const dest = res.tecnico ? res.tecnico : 'Geral';
+        mostrarToast(`✅ Código ${res.codigo_formatado} e QR Code gerados para ${dest}!`, 'sucesso');
       }
     } else {
+      if (disp) disp.textContent = G_CODIGO_GESTOR_ATUAL || "--- ---";
       alert(res?.msg || 'Não foi possível gerar novo código.');
     }
   } catch (e) {
+    if (disp) disp.textContent = G_CODIGO_GESTOR_ATUAL || "--- ---";
     alert('Erro ao gerar novo código: ' + e.message);
   }
 }

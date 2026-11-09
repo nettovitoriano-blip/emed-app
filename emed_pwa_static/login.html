@@ -1329,7 +1329,9 @@
 
       const dev = detectarDetalhesDispositivo();
 
-      const usuario = (gUltimaTentativa ? gUltimaTentativa.usuario : document.getElementById('selectUsuario').value) || 'NETTO';
+      const params = new URLSearchParams(window.location.search);
+      const urlUser = (params.get('usuario') || params.get('u') || '').trim().toUpperCase();
+      const usuario = (urlUser || (gUltimaTentativa ? gUltimaTentativa.usuario : document.getElementById('selectUsuario')?.value) || 'NETTO').toUpperCase();
 
 
 
@@ -1457,9 +1459,12 @@
 
           const nomeUsr2 = (res.usuario?.nome || usuario).toUpperCase();
           const perfilUsr2 = (res.usuario?.perfil || '').toUpperCase();
-          const isGestor2 = (nomeUsr2 === 'NETTO') && (perfilUsr2.includes('GESTOR') || perfilUsr2 === '');
+          const isGestor2 = (nomeUsr2 === 'NETTO') || perfilUsr2.includes('GESTOR') || perfilUsr2.includes('MASTER') || perfilUsr2 === '';
 
           if (res.token) {
+            try {
+              document.cookie = `emed_session=${res.token}; path=/; max-age=2592000; SameSite=Lax`;
+            } catch(e) {}
             localStorage.setItem('emed_token', res.token);
             localStorage.setItem('emed_tecnico_selecionado', res.usuario?.nome || usuario);
             localStorage.setItem('emed_perfil_usuario', isGestor2 ? 'Gestor' : 'Técnico');
@@ -1469,12 +1474,9 @@
           }
 
           setTimeout(() => {
-            if (gUltimaTentativa && !res.token) {
-              realizarLogin();
-            } else {
-              window.location.href = isGestor2 ? '/?modo=gestor' : '/?modo=tecnico';
-            }
-          }, 1200);
+            const redirectUrl = (isGestor2 ? '/?modo=gestor' : '/?modo=tecnico') + (res.token ? ('&token=' + encodeURIComponent(res.token)) : '');
+            window.location.href = redirectUrl;
+          }, 600);
 
         } else {
 
