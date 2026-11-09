@@ -1690,7 +1690,7 @@ async def api_auth_status(request: web.Request) -> web.Response:
 async def auth_api_middleware(request: web.Request, handler):
     path = request.path
     if (
-        path in ("/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping", "/api/logo", "/api/logo-circle", "/nav", "/gps", "/frota")
+        path in ("/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping", "/api/logo", "/api/logo-circle", "/nav", "/gps", "/frota", "/api/bootstrap", "/api/v1/veiculos", "/api/respostas-tecnicas")
         or path.startswith("/static/")
         or path.startswith("/api/auth/")
         or path.startswith("/api/dispositivos/")

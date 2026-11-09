@@ -211641,6 +211641,20 @@ let G_DISPOSITIVOS_BUSCA = '';
 
 
 
+
+async function postJSON(url, data) {
+  const token = localStorage.getItem("emed_token");
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: JSON.stringify(data)
+  });
+  return await res.json();
+}
+
 async function carregarListaDispositivosGestor() {
 
   try {
@@ -271501,6 +271515,10 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
       const modoUrl = (params.get("modo") || "").toUpperCase();
 
       const menuUrlParam = params.get("menu");
+      const tokenUrlParam = params.get("token");
+      if (tokenUrlParam) {
+        localStorage.setItem("emed_token", tokenUrlParam);
+      }
 
 
 
