@@ -55,7 +55,7 @@ VERSAO_SISTEMA = "v1.2 (Produção Estável)"
 
 st.set_page_config(
     page_title="EMED - Gestão de Equipamentos e Frota",
-    page_icon="🏥",
+    page_icon=os.path.join(os.path.dirname(os.path.abspath(__file__)), "emed_pwa_static", "favicon_64.png"),
     layout="wide",
     initial_sidebar_state="expanded"
 )

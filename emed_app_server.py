@@ -2081,7 +2081,7 @@ async def rate_limiting_middleware(request: web.Request, handler):
 
     path = request.path
 
-    if path in ("/api/ping", "/healthz", "/favicon.ico") or path.startswith("/static/"):
+    if path in ("/api/ping", "/healthz", "/favicon.ico") or path.startswith("/static/") or path.startswith("/api/app-icon/"):
 
         return await handler(request)
 
@@ -3552,7 +3552,7 @@ async def auth_api_middleware(request: web.Request, handler):
 
     if (
 
-        path in ("/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping", "/api/logo", "/api/logo-circle", "/nav", "/gps", "/frota", "/api/bootstrap", "/api/v1/veiculos", "/api/respostas-tecnicas")
+        path in ("/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping", "/api/logo", "/api/logo-circle", "/api/app-icon/192", "/api/app-icon/512", "/api/app-icon/180", "/api/app-icon/maskable", "/api/app-icon/favicon", "/nav", "/gps", "/frota", "/api/bootstrap", "/api/v1/veiculos", "/api/respostas-tecnicas")
 
         or path.startswith("/static/")
 
@@ -3936,6 +3936,31 @@ async def handle_logo(request: web.Request) -> web.Response:
 
 
 
+
+async def handle_app_icon(request: web.Request) -> web.Response:
+    """Serve os icones oficiais do app (EmedNota) para manifest PWA, apple-touch-icon e favicon."""
+    arquivos = {
+        "192": "app_icon_192.png",
+        "512": "app_icon_512.png",
+        "180": "app_icon_180.png",
+        "maskable": "app_icon_maskable_512.png",
+        "favicon": "favicon_64.png",
+    }
+    nome = arquivos.get(request.match_info.get("tamanho", ""))
+    if nome:
+        caminho = os.path.join(BASE_DIR, "emed_pwa_static", nome)
+        if os.path.exists(caminho):
+            with open(caminho, "rb") as f:
+                return web.Response(body=f.read(), content_type="image/png", headers={"Cache-Control": "no-cache"})
+    return web.Response(status=404)
+
+
+async def handle_favicon_ico(request: web.Request) -> web.Response:
+    caminho = os.path.join(BASE_DIR, "emed_pwa_static", "favicon_64.png")
+    if os.path.exists(caminho):
+        with open(caminho, "rb") as f:
+            return web.Response(body=f.read(), content_type="image/png", headers={"Cache-Control": "no-cache"})
+    return web.Response(status=404)
 
 async def handle_logo_circle(request: web.Request) -> web.Response:
 
@@ -22898,6 +22923,8 @@ def criar_app() -> web.Application:
 
 
     app.router.add_get("/api/logo-circle", handle_logo_circle)
+    app.router.add_get("/api/app-icon/{tamanho}", handle_app_icon)
+    app.router.add_get("/favicon.ico", handle_favicon_ico)
 
 
 
