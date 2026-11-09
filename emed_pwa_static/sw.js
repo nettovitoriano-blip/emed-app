@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v67-triagem-frota-copiloto-cautela';
+const CACHE_NAME = 'emed-pwa-v68-phantom-official';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

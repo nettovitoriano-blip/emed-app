@@ -177,7 +177,7 @@ CHECKLISTS_ESPECIALIZADOS = {
             {"item": "Verificação da articulação e mecanismo pneumático de elevação/rotação do monitor", "grupo": "Monitor & Braço"},
             {"item": "Limpeza e desobstrução dos filtros de ar e ventiladores de refrigeração da fonte de alimentação", "grupo": "Refrigeração & Fonte"},
             {"item": "Verificação dos freios das rodas e sistema de trava direcional do equipamento", "grupo": "Mecânica & Rodízios"},
-            {"item": "Teste com fantoma de ultrassom para avaliação de sensibilidade, resolução axial e lateral", "grupo": "Controle de Qualidade"},
+            {"item": "Teste com phantom de ultrassom para avaliação de sensibilidade, resolução axial e lateral", "grupo": "Controle de Qualidade"},
             {"item": "Backup das configurações do equipamento, presets médicos e biblioteca de medidas", "grupo": "Backup & Software"},
             {"item": "Limpeza externa, higienização dos suportes de transdutores e compartimento do gel", "grupo": "Finalização & Higienização"}
         ]
