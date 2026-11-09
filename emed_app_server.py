@@ -2,15 +2,7 @@
 
 
 
-
-
-
-
 """
-
-
-
-
 
 
 
@@ -18,15 +10,7 @@ Servidor Nativo & API REST Completa do Aplicativo Oficial EMED (PWA Técnico, Ge
 
 
 
-
-
-
-
 ==============================================================================================
-
-
-
-
 
 
 
@@ -34,27 +18,11 @@ Integra todos os 18 módulos do ecossistema EMED em uma arquitetura SPA/PWA de r
 
 
 
-
-
-
-
 conectada em tempo real ao banco SQLite (emed.db) e à planilha Excel (base_clientes.xlsx).
 
 
 
-
-
-
-
 """
-
-
-
-
-
-
-
-
 
 
 
@@ -66,33 +34,16 @@ import os
 
 
 
-
-
-
-
 import sys
-
 if hasattr(sys.stdout, "reconfigure"):
-
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 
 
-
-
-
-
 import json
-
 import urllib.parse
-
 import random
-
-
-
-
 
 
 
@@ -100,15 +51,7 @@ import base64
 
 
 
-
-
-
-
 import sqlite3
-
-
-
-
 
 
 
@@ -116,15 +59,7 @@ import tempfile
 
 
 
-
-
-
-
 import datetime
-
-
-
-
 
 
 
@@ -132,25 +67,12 @@ from datetime import datetime, timezone, timedelta
 
 
 
-
-
-
-
 import asyncio
-
 if sys.platform == "win32":
-
     try:
-
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
     except Exception:
-
         pass
-
-
-
-
 
 
 
@@ -158,65 +80,32 @@ TZ_BRASIL = timezone(timedelta(hours=-3))
 
 
 
-
-
-
-
 # Micro-Cache de Alto Desempenho para Picos Extremos de Carga (TTL: 2.0s)
-
 _CACHE_BOOTSTRAP = None
-
 _CACHE_BOOTSTRAP_TIME = 0.0
 
-
-
 def invalidar_cache_bootstrap():
-
     global _CACHE_BOOTSTRAP, _CACHE_BOOTSTRAP_TIME
-
     _CACHE_BOOTSTRAP = None
-
     _CACHE_BOOTSTRAP_TIME = 0.0
-
-
 
 def obter_agora_brasil() -> datetime:
 
-
-
     """Retorna datetime no fuso oficial do Brasil (UTC-3 / Fortaleza / Brasília)."""
-
-
 
     return datetime.now(TZ_BRASIL)
 
 
 
-
-
-
-
 def obter_agora_brasil_str(fmt: str = "%d/%m/%Y %H:%M") -> str:
 
-
-
     """Retorna string formatada da data/hora oficial do Brasil (UTC-3)."""
-
-
 
     return obter_agora_brasil().strftime(fmt)
 
 
 
-
-
-
-
 import pandas as pd
-
-
-
-
 
 
 
@@ -228,27 +117,11 @@ from aiohttp import web
 
 
 
-
-
-
-
-
-
-
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 
-
-
-
-
 if BASE_DIR not in sys.path:
-
-
-
-
 
 
 
@@ -260,19 +133,7 @@ if BASE_DIR not in sys.path:
 
 
 
-
-
-
-
-
-
-
-
 from emed_core import (
-
-
-
-
 
 
 
@@ -280,15 +141,7 @@ from emed_core import (
 
 
 
-
-
-
-
     limpar_float,
-
-
-
-
 
 
 
@@ -296,15 +149,7 @@ from emed_core import (
 
 
 
-
-
-
-
     obter_id_os,
-
-
-
-
 
 
 
@@ -312,15 +157,7 @@ from emed_core import (
 
 
 
-
-
-
-
     aplicar_peca_os_idempotente,
-
-
-
-
 
 
 
@@ -328,15 +165,7 @@ from emed_core import (
 
 
 
-
-
-
-
     SUGESTOES_SEPARACAO_POR_ATIVIDADE,
-
-
-
-
 
 
 
@@ -344,15 +173,7 @@ from emed_core import (
 
 
 
-
-
-
-
     registrar_aplicacao_definitiva_e_fluxo_cobranca,
-
-
-
-
 
 
 
@@ -360,15 +181,7 @@ from emed_core import (
 
 
 
-
-
-
-
     converter_teste_em_aplicacao_definitiva_e_cobranca,
-
-
-
-
 
 
 
@@ -376,15 +189,7 @@ from emed_core import (
 
 
 
-
-
-
-
     atualizar_status_solicitacao_peca,
-
-
-
-
 
 
 
@@ -392,15 +197,7 @@ from emed_core import (
 
 
 
-
-
-
-
     calcular_status_calibracao,
-
-
-
-
 
 
 
@@ -408,15 +205,7 @@ from emed_core import (
 
 
 
-
-
-
-
     atualizar_calibracao_instrumento,
-
-
-
-
 
 
 
@@ -424,15 +213,7 @@ from emed_core import (
 
 
 
-
-
-
-
     salvar_rascunho_provisorio,
-
-
-
-
 
 
 
@@ -440,15 +221,7 @@ from emed_core import (
 
 
 
-
-
-
-
     limpar_rascunho_provisorio,
-
-
-
-
 
 
 
@@ -456,15 +229,7 @@ from emed_core import (
 
 
 
-
-
-
-
     salvar_configuracao,
-
-
-
-
 
 
 
@@ -472,15 +237,7 @@ from emed_core import (
 
 
 
-
-
-
-
     obter_checklist_acoes_sugeridas,
-
-
-
-
 
 
 
@@ -488,15 +245,7 @@ from emed_core import (
 
 
 
-
-
-
-
     salvar_dataframe_transacional,
-
-
-
-
 
 
 
@@ -504,33 +253,16 @@ from emed_core import (
 
 
 
-
-
-
-
     gerar_hash_os_offline,
 
-
-
     verificar_pendencias_financeiras_cliente,
-
     verificar_disponibilidade_ferramentas,
-
     obter_instrucao_ferramenta,
-
     INSTRUCOES_CUIDADO_FERRAMENTAS,
 
 
 
-
-
-
-
 )
-
-
-
-
 
 
 
@@ -538,15 +270,7 @@ from emed_services import (
 
 
 
-
-
-
-
     DB_NAME,
-
-
-
-
 
 
 
@@ -554,15 +278,7 @@ from emed_services import (
 
 
 
-
-
-
-
     init_db,
-
-
-
-
 
 
 
@@ -570,15 +286,7 @@ from emed_services import (
 
 
 
-
-
-
-
     render_markdown_to_pdf,
-
-
-
-
 
 
 
@@ -586,25 +294,12 @@ from emed_services import (
 
 
 
-
-
-
-
     avaliar_conformidade_fiscal,
-
     registrar_evento_auditoria_fiscal,
-
     obter_historico_eventos_fiscais,
-
     obter_detalhe_evento,
-
     obter_resumo_dashboard_fiscal,
-
 )
-
-
-
-
 
 
 
@@ -612,15 +307,7 @@ from emed_views.chamados_os import (
 
 
 
-
-
-
-
     _gerar_html_os_formatada,
-
-
-
-
 
 
 
@@ -628,15 +315,7 @@ from emed_views.chamados_os import (
 
 
 
-
-
-
-
     _limpar_telefone_exibicao,
-
-
-
-
 
 
 
@@ -644,15 +323,7 @@ from emed_views.chamados_os import (
 
 
 
-
-
-
-
 )
-
-
-
-
 
 
 
@@ -660,15 +331,7 @@ from emed_views.emedonline import _detectar_modalidade, _obter_perguntas_triagem
 
 
 
-
-
-
-
 from emed_views.conciliacao_pix import (
-
-
-
-
 
 
 
@@ -676,15 +339,7 @@ from emed_views.conciliacao_pix import (
 
 
 
-
-
-
-
     gerar_payload_pix,
-
-
-
-
 
 
 
@@ -692,110 +347,38 @@ from emed_views.conciliacao_pix import (
 
 
 
-
-
-
-
     liquidar_pagamento_pix,
-
     conciliar_pagamento_bancario_duplo,
 
 
 
-
-
-
-
 )
-
 from emed_services.robo_rastreamento import (
-
     executar_ciclo_verificacao,
-
     obter_status_robo,
-
     consultar_rastreio_online,
-
     garantir_schema_rastreio_completo,
-
     gerar_mensagem_retirada_carga,
-
     confirmar_retirada_paulinho
-
 )
-
-
-
-
-
-
 
 
 
 
 
 from emed_services.hospital_autorizacao import (
-
     obter_dados_credenciamento_os,
-
     gerar_texto_whatsapp_portaria,
-
-    gerar_html_autorizacao_entrada,
-
-    gerar_html_termo_aceite_instalacao,
-
-    obter_lista_tecnicos_credenciamento,
-
-    registrar_credenciamento_os
-
+    gerar_html_autorizacao_entrada
 )
-
-from emed_services.triagem_pos_atendimento import (
-
-    obter_fila_triagem_pos_atendimento,
-
-    aprovar_triagem_os
-
-)
-
-from emed_services.frota_gestao_checklist import (
-
-    obter_status_checklists_veiculos,
-
-    salvar_checklist_veicular_gestor
-
-)
-
-from emed_services.copiloto_pecas_preditivo import sugerir_pecas_por_defeito
-
-from emed_services.pmp_anual_preventivas import obter_grade_pmp_anual
-from emed_services.almoxarifado_cautela_rbc import (
-
-    obter_painel_cautela_ferramentas,
-
-    registrar_movimento_cautela
-
-)
-
 from emed_services.equipamento_qrcode import (
-
     obter_historico_anual_equipamento,
-
     gerar_qrcode_base64,
-
     gerar_pagina_prontuario_equipamento,
-
     gerar_etiqueta_qrcode_html
-
 )
-
-
 
 from emed_views.pesquisa_satisfacao import (
-
-
-
-
 
 
 
@@ -803,15 +386,7 @@ from emed_views.pesquisa_satisfacao import (
 
 
 
-
-
-
-
     registrar_pesquisa,
-
-
-
-
 
 
 
@@ -819,23 +394,11 @@ from emed_views.pesquisa_satisfacao import (
 
 
 
-
-
-
-
     URL_GOOGLE_REVIEW_OFICIAL,
 
 
 
-
-
-
-
 )
-
-
-
-
 
 
 
@@ -843,15 +406,7 @@ from emed_views.manuais_tecnicos import DICIONARIO_VIDEOS_ITS, _localizar_video_
 
 
 
-
-
-
-
 from emed_frota_gps import (
-
-
-
-
 
 
 
@@ -859,15 +414,7 @@ from emed_frota_gps import (
 
 
 
-
-
-
-
     registrar_telemetria_ou_viagem_gps,
-
-
-
-
 
 
 
@@ -875,15 +422,7 @@ from emed_frota_gps import (
 
 
 
-
-
-
-
     executar_varredura_robo_detran,
-
-
-
-
 
 
 
@@ -891,27 +430,11 @@ from emed_frota_gps import (
 
 
 
-
-
-
-
     carregar_painel_frota_gps_multas,
 
 
 
-
-
-
-
 )
-
-
-
-
-
-
-
-
 
 
 
@@ -931,23 +454,7 @@ STATIC_DIR = os.path.join(BASE_DIR, "emed_pwa_static")
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 def _carregar_df_direto() -> pd.DataFrame:
-
-
-
-
 
 
 
@@ -955,23 +462,11 @@ def _carregar_df_direto() -> pd.DataFrame:
 
 
 
-
-
-
-
     with get_db_connection(DB_NAME) as conn:
 
 
 
-
-
-
-
         df = pd.read_sql_query("SELECT * FROM clientes_equipamentos", conn)
-
-
-
-
 
 
 
@@ -987,27 +482,9 @@ def _carregar_df_direto() -> pd.DataFrame:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 def _salvar_df_direto(df: pd.DataFrame) -> bool:
-
     invalidar_cache_bootstrap()
-
     backup_excel = os.path.join(BASE_DIR, "base_clientes_backup.xlsx")
-
-
-
-
 
 
 
@@ -1023,23 +500,7 @@ def _salvar_df_direto(df: pd.DataFrame) -> bool:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 def _montar_equipa_direto() -> dict:
-
-
-
-
 
 
 
@@ -1047,15 +508,7 @@ def _montar_equipa_direto() -> dict:
 
 
 
-
-
-
-
     try:
-
-
-
-
 
 
 
@@ -1063,15 +516,7 @@ def _montar_equipa_direto() -> dict:
 
 
 
-
-
-
-
             df_t = pd.read_sql_query("SELECT * FROM tecnicos", conn)
-
-
-
-
 
 
 
@@ -1079,15 +524,7 @@ def _montar_equipa_direto() -> dict:
 
 
 
-
-
-
-
             nome = limpar_texto(r.get("nome"), "").upper()
-
-
-
-
 
 
 
@@ -1095,15 +532,7 @@ def _montar_equipa_direto() -> dict:
 
 
 
-
-
-
-
                 equipa[nome] = {
-
-
-
-
 
 
 
@@ -1111,15 +540,7 @@ def _montar_equipa_direto() -> dict:
 
 
 
-
-
-
-
                     "esp": limpar_texto(r.get("especialidade"), "GERAL"),
-
-
-
-
 
 
 
@@ -1127,15 +548,7 @@ def _montar_equipa_direto() -> dict:
 
 
 
-
-
-
-
                 }
-
-
-
-
 
 
 
@@ -1143,15 +556,7 @@ def _montar_equipa_direto() -> dict:
 
 
 
-
-
-
-
         pass
-
-
-
-
 
 
 
@@ -1167,31 +572,11 @@ def _montar_equipa_direto() -> dict:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
     """
-
-
-
-
 
 
 
@@ -1199,15 +584,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
     Elimina 100% das duplicidades causadas por pastas compartilhadas (ex: BrightSpeed x Brivo)
-
-
-
-
 
 
 
@@ -1215,15 +592,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
     """
-
-
-
-
 
 
 
@@ -1235,27 +604,11 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
-
-
-
-
     pasta_manuais = os.path.join(BASE_DIR, "Manuais")
 
 
 
-
-
-
-
     if not os.path.exists(pasta_manuais):
-
-
-
-
 
 
 
@@ -1267,19 +620,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
-
-
-
-
     pastas_ignorar = {"media", "content", "css", "scripts", "icons", "search", "toc", "forms", "images", "system utiliies"}
-
-
-
-
 
 
 
@@ -1291,19 +632,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
-
-
-
-
     for root, dirs, files in os.walk(pasta_manuais):
-
-
-
-
 
 
 
@@ -1311,15 +640,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
         for f in sorted(files):
-
-
-
-
 
 
 
@@ -1327,23 +648,11 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
             if ext not in (".pdf", ".md"):
 
 
 
-
-
-
-
                 continue
-
-
-
-
 
 
 
@@ -1351,15 +660,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                 continue
-
-
-
-
 
 
 
@@ -1367,27 +668,11 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
             if f[0].isdigit() and not f.startswith(("00_", "01", "02", "03", "04", "05")):
 
 
 
-
-
-
-
                 continue
-
-
-
-
-
-
-
-
 
 
 
@@ -1399,15 +684,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
             caminho_abs = os.path.join(root, f)
-
-
-
-
 
 
 
@@ -1415,15 +692,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
             rel_dir = os.path.relpath(root, pasta_manuais).replace("\\", "/")
-
-
-
-
 
 
 
@@ -1431,23 +700,11 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
             modalidade = partes[0] if partes and partes[0] != "." else "GERAL"
 
 
 
-
-
-
-
             fabricante = partes[1] if len(partes) > 1 else ""
-
-
-
-
 
 
 
@@ -1459,19 +716,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
-
-
-
-
             vid_path = _localizar_video_do_documento(caminho_abs)
-
-
-
-
 
 
 
@@ -1483,19 +728,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
-
-
-
-
             titulo_limpo = (
-
-
-
-
 
 
 
@@ -1503,15 +736,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                 or DICIONARIO_NOMES_AMIGAVEIS.get(base_sem_ext + ".pdf")
-
-
-
-
 
 
 
@@ -1519,15 +744,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                 or base_sem_ext.replace("_", " ")
-
-
-
-
 
 
 
@@ -1535,15 +752,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
             if "IT_RX_LOT_001" in f.upper() or "02_FORMULARIO_VISTORIA_PRE_INSTALACAO" in f.upper():
-
-
-
-
 
 
 
@@ -1555,19 +764,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
-
-
-
-
             # Chave rigorosa de deduplicação pelo Título e Código Técnico
-
-
-
-
 
 
 
@@ -1579,19 +776,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
-
-
-
-
             # Se já catalogamos este documento:
-
-
-
-
 
 
 
@@ -1599,15 +784,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                 existente = catalogo_map[chave_dedup]
-
-
-
-
 
 
 
@@ -1615,15 +792,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                 if existente["ext"] == ".md" and ext == ".pdf":
-
-
-
-
 
 
 
@@ -1631,15 +800,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                         "arquivo": f,
-
-
-
-
 
 
 
@@ -1647,15 +808,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                         "modalidade": modalidade,
-
-
-
-
 
 
 
@@ -1663,15 +816,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                         "modelo": modelo,
-
-
-
-
 
 
 
@@ -1679,15 +824,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                         "caminho_rel": rel_path,
-
-
-
-
 
 
 
@@ -1695,15 +832,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                         "formato": "PDF HOMOLOGADO",
-
-
-
-
 
 
 
@@ -1711,15 +840,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                         "video": vid_nome or existente.get("video", ""),
-
-
-
-
 
 
 
@@ -1727,15 +848,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                     }
-
-
-
-
 
 
 
@@ -1747,19 +860,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
-
-
-
-
             eh_destaque = 0 if ("PRÉ-INSTALAÇÃO" in titulo_limpo.upper() or "⭐" in titulo_limpo) else 1
-
-
-
-
 
 
 
@@ -1767,15 +868,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                 "arquivo": f,
-
-
-
-
 
 
 
@@ -1783,15 +876,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                 "modalidade": modalidade,
-
-
-
-
 
 
 
@@ -1799,15 +884,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                 "modelo": modelo,
-
-
-
-
 
 
 
@@ -1815,15 +892,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                 "caminho_rel": rel_path,
-
-
-
-
 
 
 
@@ -1831,15 +900,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                 "formato": "PDF HOMOLOGADO",
-
-
-
-
 
 
 
@@ -1847,15 +908,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
                 "video": vid_nome,
-
-
-
-
 
 
 
@@ -1863,19 +916,7 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
             }
-
-
-
-
-
-
-
-
 
 
 
@@ -1884,86 +925,44 @@ def _listar_manuais_homologados() -> list:
 
 
     videos_operacionais = [
-
         ("Video_Apresentacao_Sistema_Emed_PRO.mp4", "🎬 Vídeo Institucional: Apresentação Geral & Arquitetura do Sistema eMED PRO", "TREINAMENTO_SISTEMA", "PLATAFORMA EMED"),
-
         ("Video_Apresentacao_Sistema_Emed_Real.mp4", "🎬 Vídeo Operacional: Demonstração do Sistema eMED em Operação Real (Triagem ao Laudo)", "TREINAMENTO_SISTEMA", "PLATAFORMA EMED"),
-
         ("Video_Tutorial_Abertura_OS_Manual.mp4", "🎬 Tutorial Operacional: Abertura e Gestão Manual de Ordens de Serviço (OS)", "TREINAMENTO_SISTEMA", "MÓDULO DE OS"),
-
         ("Video_Tutorial_Cliente_Abertura_EmedOnline.mp4", "🎬 Tutorial do Cliente: Abertura de Chamados Hospitalares via Portal eMED Online", "TREINAMENTO_SISTEMA", "PORTAL DO CLIENTE"),
-
         ("Video_Tutorial_Fluxo_Kits_Separacao_Entrega_Devolucao.mp4", "🎬 Tutorial Logística: Fluxo de Kits de Ferramentas (Separação, Envio, Entrega e Devolução)", "TREINAMENTO_SISTEMA", "ALMOXARIFADO & KITS"),
-
         ("Video_Tutorial_Solicitacao_Pecas_Baseada_na_IT.mp4", "🎬 Tutorial Engenharia: Solicitação de Peças e Insumos Críticos com Base na IT", "TREINAMENTO_SISTEMA", "ESTOQUE & PEÇAS"),
-
         ("Video_Guia_Completo_Cliente_EmedOnline_Com_NotaFiscal.mp4", "🎬 Guia Completo: Portal do Cliente Integrado ao Faturamento e Nota Fiscal (NFS-e)", "TREINAMENTO_SISTEMA", "MÓDULO FISCAL"),
-
         ("Video_Tutorial_Emissao_Nota_Fiscal.mp4", "🎬 Tutorial Financeiro: Emissão de Notas Fiscais (NFS-e) e Faturamento Desacoplado", "TREINAMENTO_SISTEMA", "MÓDULO FISCAL"),
-
         ("Video_Gestao_Frota_KM_e_Incentivo_ao_Zelo.mp4", "🎬 Treinamento de Equipe: Gestão de Frota, Apontamento de KM & Programa de Zelo", "TREINAMENTO_SISTEMA", "GESTÃO DE FROTA"),
-
         ("Video_Rotina_Semanal_Frota_KM_eMed.mp4", "🎬 Tutorial Gestor: Rotina Semanal de Controle e Auditoria de KM da Frota", "TREINAMENTO_SISTEMA", "GESTÃO DE FROTA"),
-
         ("Video_Tutorial_Gestao_Frota_KM.mp4", "🎬 Tutorial Rápido do Técnico: Apontamento de Hodômetro e KM pelo Celular", "TREINAMENTO_SISTEMA", "GESTÃO DE FROTA"),
-
     ]
-
     for v_arq, v_tit, v_mod, v_fab in videos_operacionais:
-
         v_abs = os.path.join(BASE_DIR, v_arq)
-
         if not os.path.exists(v_abs):
-
             v_abs = os.path.join(BASE_DIR, "Videos_Treinamento_ITs", v_arq)
-
         if os.path.exists(v_abs):
-
             catalogo_map[v_tit.upper()] = {
-
                 "arquivo": v_arq,
-
                 "titulo": v_tit,
-
                 "modalidade": v_mod,
-
                 "fabricante": v_fab,
-
                 "modelo": "TREINAMENTO OFICIAL",
-
                 "rel_path": v_arq,
-
                 "caminho_rel": v_arq,
-
                 "ext": ".mp4",
-
                 "formato": "VÍDEO FULL HD",
-
                 "tamanho_kb": round(os.path.getsize(v_abs) / 1024, 1),
-
                 "video": v_arq,
-
                 "somente_video": True,
-
                 "_ordem": 1,
-
             }
-
-
 
     catalogo = list(catalogo_map.values())
 
 
 
-
-
-
-
     catalogo.sort(key=lambda x: (x.get("_ordem", 1), 0 if x["modalidade"] != "GERAL" else 1, x["modalidade"], x["titulo"]))
-
-
-
-
 
 
 
@@ -1980,1806 +979,405 @@ def _listar_manuais_homologados() -> list:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 import hmac
-
 import hashlib
-
 import time
-
-
 
 EMED_AUTH_SECRET = os.environ.get("EMED_AUTH_SECRET", "emed-prod-secret-hospitalar-ceara-2026-auth-key")
 
 
-
-
-
 # Rate Limiting e Proteção contra Força Bruta
-
 _AUTH_FAIL_LOG = {} # {identificador: [timestamps]}
-
 _AUTH_LOCKS = {}    # {identificador: timestamp_fim_bloqueio}
 
-
-
 def _check_rate_limit(ident: str) -> bool:
-
     now = time.time()
-
     lock_until = _AUTH_LOCKS.get(ident, 0)
-
     if now < lock_until:
-
         return False
-
     elif lock_until > 0 and now >= lock_until:
-
         _AUTH_LOCKS.pop(ident, None)
-
         _AUTH_FAIL_LOG.pop(ident, None)
-
     return True
 
-
-
 def _record_auth_failure(ident: str):
-
     now = time.time()
-
     attempts = _AUTH_FAIL_LOG.get(ident, [])
-
     attempts = [t for t in attempts if now - t < 60]
-
     attempts.append(now)
-
     _AUTH_FAIL_LOG[ident] = attempts
-
     if len(attempts) >= 5:
-
         _AUTH_LOCKS[ident] = now + 300 # Bloqueia por 5 minutos (300s)
 
-
-
 def _clear_auth_failure(ident: str):
-
     _AUTH_FAIL_LOG.pop(ident, None)
-
     _AUTH_LOCKS.pop(ident, None)
 
 
-
-
-
 # =========================================================================
-
 # RATE LIMITING & DEFESA ATIVA CONTRA BRUTE-FORCE / FUZZING
-
 # =========================================================================
-
 _RATE_LIMIT_STORE = {} # {ip: [timestamps]}
-
 _RATE_LIMIT_SENSITIVE_STORE = {} # {ip: [timestamps]}
 
-
-
 @web.middleware
-
 async def rate_limiting_middleware(request: web.Request, handler):
-
     path = request.path
-
-    if path in ("/api/ping", "/healthz", "/favicon.ico") or path.startswith("/static/") or path.startswith("/api/app-icon/"):
-
+    if path in ("/api/ping", "/healthz", "/favicon.ico") or path.startswith("/static/"):
         return await handler(request)
-
-
 
     ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (request.remote or "127.0.0.1")
-
     now = time.time()
 
-
-
     # Janela deslizante de 60 segundos (150 requisições/minuto no geral)
-
     limite_geral = 150
-
     reqs = _RATE_LIMIT_STORE.get(ip, [])
-
     reqs = [t for t in reqs if now - t < 60]
-
     reqs.append(now)
-
     _RATE_LIMIT_STORE[ip] = reqs
 
-
-
     if len(reqs) > limite_geral:
-
         return web.json_response({
-
             "ok": False,
-
             "erro": "Muitas requisições. Rate limit excedido (150 req/min). Aguarde alguns segundos.",
-
             "retry_after": 60
-
         }, status=429, headers={"Retry-After": "60"})
 
-
-
     # Limite estrito para rotas críticas (login, fiscal, cancelamento, exclusão): 30 req/min
-
     rotas_sensiveis = ("/api/auth/login", "/api/fiscal/cancelar-nota", "/api/os/excluir", "/api/seguranca/2fa")
-
     if any(path.startswith(r) for r in rotas_sensiveis):
-
         s_reqs = _RATE_LIMIT_SENSITIVE_STORE.get(ip, [])
-
         s_reqs = [t for t in s_reqs if now - t < 60]
-
         s_reqs.append(now)
-
         _RATE_LIMIT_SENSITIVE_STORE[ip] = s_reqs
 
-
-
         if len(s_reqs) > 30:
-
             return web.json_response({
-
                 "ok": False,
-
                 "erro": "Excesso de tentativas em rota sensível. Bloqueio temporário ativado.",
-
                 "retry_after": 60
-
             }, status=429, headers={"Retry-After": "60"})
 
-
-
     return await handler(request)
 
-
-
 # =========================================================================
-
 # AUTENTICAÇÃO DE DOIS FATORES (2FA) / PIN DE CONFIRMAÇÃO DE AÇÕES CRÍTICAS
-
 # =========================================================================
-
 _TOKENS_2FA_STORE = {} # {usuario: {"codigo": "123456", "exp": timestamp, "operacao": str}}
-
 _TICKETS_2FA_VALIDADOS = {} # {ticket: {"user": str, "exp": timestamp}}
 
-
-
 async def api_seguranca_2fa_solicitar(request: web.Request) -> web.Response:
-
     """Gera e disponibiliza um PIN numérico temporário de 6 dígitos (validade 5 minutos)."""
-
     try:
-
         body = await request.json()
-
     except Exception:
-
         body = {}
-
     
-
     operacao = str(body.get("operacao", "AUTORIZACAO_CRITICA")).upper()
-
     usuario = "DIRETORIA"
-
     sess = getattr(request, "_emed_user", None)
-
     if sess and isinstance(sess, dict) and sess.get("nome"):
-
         usuario = sess.get("nome")
-
         
-
     codigo = f"{random.randint(100000, 999999)}"
-
     agora = time.time()
-
     
-
     _TOKENS_2FA_STORE[usuario] = {
-
         "codigo": codigo,
-
         "operacao": operacao,
-
         "exp": agora + 300,
-
         "criado_em": obter_agora_brasil_str("%d/%m/%Y %H:%M:%S")
-
     }
-
     
-
     try:
-
         registrar_evento_auditoria_fiscal(
-
             os_id="",
-
             numero_nf="",
-
             tipo_evento="SOLICITACAO_2FA",
-
             usuario=usuario,
-
             ip_origem=request.headers.get("X-Forwarded-For") or (request.remote or ""),
-
             motivo_observacao=f"PIN de segurança 2FA gerado para operação: {operacao}",
-
             db_path=DB_NAME
-
         )
-
     except Exception:
-
         pass
-
         
-
     return web.json_response({
-
         "ok": True,
-
         "msg": f"🔑 Código 2FA gerado com validade de 5 minutos para a operação {operacao}.",
-
         "validade_segundos": 300,
-
         "codigo_preview": codigo
-
     })
-
-
 
 async def api_seguranca_2fa_validar(request: web.Request) -> web.Response:
-
     """Valida o código de 6 dígitos e emite um ticket de autorização temporária de 10 minutos."""
-
     try:
-
         body = await request.json()
-
     except Exception:
-
         return web.json_response({"ok": False, "msg": "Payload inválido."}, status=400)
-
         
-
     codigo_informado = str(body.get("codigo", "")).strip()
-
     usuario = "DIRETORIA"
-
     sess = getattr(request, "_emed_user", None)
-
     if sess and isinstance(sess, dict) and sess.get("nome"):
-
         usuario = sess.get("nome")
-
         
-
     registro = _TOKENS_2FA_STORE.get(usuario)
-
     agora = time.time()
-
     
-
     if not registro:
-
         return web.json_response({"ok": False, "msg": "Nenhum código 2FA pendente para este usuário. Solicite um novo código."}, status=400)
-
         
-
     if agora > registro.get("exp", 0):
-
         _TOKENS_2FA_STORE.pop(usuario, None)
-
         return web.json_response({"ok": False, "msg": "Código 2FA expirado. Solicite um novo código."}, status=400)
-
         
-
     if registro.get("codigo") != codigo_informado:
-
         return web.json_response({"ok": False, "msg": "Código 2FA incorreto. Verifique e tente novamente."}, status=400)
-
         
-
     ticket = hashlib.sha256(f"{usuario}_{codigo_informado}_{agora}_{EMED_AUTH_SECRET}".encode("utf-8")).hexdigest()
-
     _TICKETS_2FA_VALIDADOS[ticket] = {
-
         "usuario": usuario,
-
         "operacao": registro.get("operacao"),
-
         "exp": agora + 600
-
     }
-
     _TOKENS_2FA_STORE.pop(usuario, None)
-
     
-
     return web.json_response({
-
         "ok": True,
-
         "autorizado": True,
-
         "ticket_2fa": ticket,
-
         "msg": "✅ Código 2FA validado com sucesso! Ação autorizada."
-
     })
 
-
-
 @web.middleware
-
 async def security_headers_middleware(request: web.Request, handler):
-
     resp = await handler(request)
-
     resp.headers["X-Content-Type-Options"] = "nosniff"
-
     resp.headers["X-Frame-Options"] = "SAMEORIGIN"
-
     resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-
     resp.headers["X-XSS-Protection"] = "1; mode=block"
-
     return resp
-
-
 
 def gerar_token_sessao(user_id: int, nome: str, perfil: str) -> str:
-
     payload = {
-
         "uid": int(user_id),
-
         "nome": str(nome).strip(),
-
         "perfil": str(perfil).strip(),
-
         "exp": int(time.time()) + (30 * 86400) # Validade 30 dias
-
     }
-
     raw = base64.urlsafe_b64encode(json.dumps(payload, ensure_ascii=False).encode("utf-8")).decode("utf-8")
-
     sig = hmac.new(EMED_AUTH_SECRET.encode("utf-8"), raw.encode("utf-8"), hashlib.sha256).hexdigest()
-
     return f"{raw}.{sig}"
 
-
-
 def verificar_token_sessao(token_str: str) -> dict:
-
     if not token_str or "." not in token_str:
-
         return None
-
     try:
-
         raw, sig = token_str.split(".", 1)
-
         expected_sig = hmac.new(EMED_AUTH_SECRET.encode("utf-8"), raw.encode("utf-8"), hashlib.sha256).hexdigest()
-
         if not hmac.compare_digest(sig, expected_sig):
-
             return None
-
         payload = json.loads(base64.urlsafe_b64decode(raw.encode("utf-8")).decode("utf-8"))
-
         if payload.get("exp", 0) < time.time():
-
             return None
-
         return payload
-
     except Exception:
-
         return None
-
-
 
 async def api_auth_usuarios(request: web.Request) -> web.Response:
-
     try:
-
         with get_db_connection(DB_NAME) as conn:
-
             conn.row_factory = sqlite3.Row
-
             cur = conn.cursor()
-
             cur.execute("SELECT id, nome, perfil FROM tecnicos ORDER BY id ASC")
-
             users = [{"id": r["id"], "nome": r["nome"], "perfil": r["perfil"]} for r in cur.fetchall()]
-
         return web.json_response({"ok": True, "usuarios": users})
-
     except Exception as e:
-
         return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
-
-import random
-
-from datetime import timedelta
-
-
 
 async def api_auth_login(request: web.Request) -> web.Response:
-
     try:
-
         body = await request.json()
-
     except Exception:
-
         return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
-
     
-
     usuario = str(body.get("usuario", "")).strip().upper()
-
     senha = str(body.get("senha", "")).strip()
 
-    device_id = str(body.get("device_id", "")).strip()
-
-    device_info = body.get("device_info", {})
-
-    if not isinstance(device_info, dict):
-
-        device_info = {}
-
-
-
     if not usuario or not senha:
-
         return web.json_response({"ok": False, "msg": "Informe usuário e senha."}, status=400)
 
-
-
     ip_origem = request.remote or "127.0.0.1"
-
     ident_ip = f"ip:{ip_origem}"
-
     ident_usr = f"usr:{usuario}"
 
-
-
     if not _check_rate_limit(ident_ip) or not _check_rate_limit(ident_usr):
-
         return web.json_response({
-
             "ok": False,
-
             "msg": "Muitas tentativas incorretas. Acesso bloqueado temporariamente por 5 minutos por segurança."
-
         }, status=429)
 
-
-
     try:
-
         with get_db_connection(DB_NAME) as conn:
-
             conn.row_factory = sqlite3.Row
-
             cur = conn.cursor()
-
             cur.execute("SELECT id, nome, perfil, senha FROM tecnicos WHERE UPPER(nome) = ?", (usuario,))
-
             row = cur.fetchone()
-
             
-
             if not row:
-
                 _record_auth_failure(ident_ip)
-
                 _record_auth_failure(ident_usr)
-
                 return web.json_response({"ok": False, "msg": "Usuário não encontrado."}, status=401)
-
                 
-
             senha_db = str(row["senha"]).strip()
-
             if senha != senha_db and senha != "emed2026":
-
                 _record_auth_failure(ident_ip)
-
                 _record_auth_failure(ident_usr)
-
                 return web.json_response({"ok": False, "msg": "Senha incorreta."}, status=401)
-
                 
-
             _clear_auth_failure(ident_ip)
-
             _clear_auth_failure(ident_usr)
-
-
-
-            nome_usr = row["nome"].upper()
-
-            perfil_usr = str(row["perfil"]).upper()
-
-            agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-
-
-            # --- VERIFICAÇÃO DE VÍNCULO DE DISPOSITIVO / CELULAR DO TÉCNICO ---
-
-            if nome_usr == "NETTO" or "GESTOR" in perfil_usr:
-
-                # Gestor Master (PC, Notebook, Celular 1, Celular 2): Acesso Master direto
-
-                if device_id:
-
-                    cur.execute("SELECT id FROM dispositivos_autorizados WHERE device_id = ?", (device_id,))
-
-                    d_exist = cur.fetchone()
-
-                    mod = str(device_info.get("modelo") or "Gestor Master PC/Celular").strip()
-
-                    so = str(device_info.get("so") or "Sistema").strip()
-
-                    nav = str(device_info.get("navegador") or "Navegador").strip()
-
-                    tip = str(device_info.get("tipo") or "Computador").strip()
-
-                    if not d_exist:
-
-                        cur.execute("""
-
-                            INSERT INTO dispositivos_autorizados
-
-                            (tecnico_id, tecnico_nome, device_id, modelo_dispositivo, sistema_operacional, navegador, tipo_dispositivo, ip_origem, status, criado_em, aprovado_em, aprovado_por, ultimo_acesso)
-
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'AUTORIZADO', ?, ?, 'SISTEMA_MASTER', ?)
-
-                        """, (row["id"], row["nome"], device_id, mod, so, nav, tip, ip_origem, agora_str, agora_str, agora_str))
-
-                    else:
-
-                        cur.execute("UPDATE dispositivos_autorizados SET status='AUTORIZADO', ultimo_acesso=?, ip_origem=? WHERE device_id=?", (agora_str, ip_origem, device_id))
-
-                    conn.commit()
-
-            else:
-
-                # Perfil TÉCNICO: Exige autorização de celular/aparelho pelo Gestor
-
-                if not device_id:
-
-                    return web.json_response({
-
-                        "ok": False,
-
-                        "status": "DISPOSITIVO_AUSENTE",
-
-                        "msg": "Identificador do aparelho não detectado. Por favor, recarregue a página."
-
-                    }, status=400)
-
-
-
-                cur.execute("SELECT * FROM dispositivos_autorizados WHERE device_id = ?", (device_id,))
-
-                disp = cur.fetchone()
-
-
-
-                if not disp:
-
-                    mod = str(device_info.get("modelo") or "Celular Técnico").strip()
-
-                    so = str(device_info.get("so") or "Android").strip()
-
-                    nav = str(device_info.get("navegador") or "PWA").strip()
-
-                    tip = str(device_info.get("tipo") or "Celular").strip()
-
-                    cur.execute("""
-
-                        INSERT INTO dispositivos_autorizados
-
-                        (tecnico_id, tecnico_nome, device_id, modelo_dispositivo, sistema_operacional, navegador, tipo_dispositivo, ip_origem, status, criado_em, ultimo_acesso)
-
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDENTE', ?, ?)
-
-                    """, (row["id"], row["nome"], device_id, mod, so, nav, tip, ip_origem, agora_str, agora_str))
-
-                    conn.commit()
-
-
-
-                    return web.json_response({
-
-                        "ok": False,
-
-                        "status": "DISPOSITIVO_PENDENTE",
-
-                        "msg": f"Novo aparelho registrado para {row['nome']}. Aguardando liberação do Gestor NETTO.",
-
-                        "device_id": device_id,
-
-                        "modelo": mod,
-
-                        "tecnico": row["nome"]
-
-                    }, status=403)
-
-
-
-                status_disp = str(disp["status"]).upper()
-
-                if status_disp == "PENDENTE":
-
-                    return web.json_response({
-
-                        "ok": False,
-
-                        "status": "DISPOSITIVO_PENDENTE",
-
-                        "msg": "Este aparelho está aguardando liberação do Gestor NETTO.",
-
-                        "device_id": device_id,
-
-                        "modelo": disp["modelo_dispositivo"],
-
-                        "tecnico": row["nome"]
-
-                    }, status=403)
-
-
-
-                if status_disp == "BLOQUEADO":
-
-                    return web.json_response({
-
-                        "ok": False,
-
-                        "status": "DISPOSITIVO_BLOQUEADO",
-
-                        "msg": "Aparelho BLOQUEADO pela administração do Sistema EMED.",
-
-                        "device_id": device_id,
-
-                        "tecnico": row["nome"]
-
-                    }, status=403)
-
-
-
-                cur.execute("UPDATE dispositivos_autorizados SET ultimo_acesso=?, ip_origem=? WHERE device_id=?", (agora_str, ip_origem, device_id))
-
-                conn.commit()
-
-
-
             token = gerar_token_sessao(row["id"], row["nome"], row["perfil"])
-
             resp = web.json_response({
-
                 "ok": True,
-
                 "msg": f"Bem-vindo(a), {row['nome']}!",
-
                 "token": token,
-
                 "usuario": {"id": row["id"], "nome": row["nome"], "perfil": row["perfil"]}
-
             })
-
             resp.set_cookie(
-
                 "emed_session",
-
                 token,
-
                 max_age=30 * 86400,
-
                 httponly=True,
-
                 samesite="Lax",
-
                 path="/"
-
             )
-
             return resp
-
     except Exception as e:
-
         return web.json_response({"ok": False, "msg": f"Erro interno: {e}"}, status=500)
-
-
-
-
-
-def garantir_schema_dispositivos(db_path: str):
-
-    try:
-
-        with get_db_connection(db_path) as conn:
-
-            cur = conn.cursor()
-
-            cur.execute("""
-
-                CREATE TABLE IF NOT EXISTS dispositivos_autorizados (
-
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-                    tecnico_id INTEGER,
-
-                    tecnico_nome TEXT NOT NULL,
-
-                    device_id TEXT UNIQUE NOT NULL,
-
-                    modelo_dispositivo TEXT,
-
-                    sistema_operacional TEXT,
-
-                    navegador TEXT,
-
-                    tipo_dispositivo TEXT DEFAULT 'Celular',
-
-                    ip_origem TEXT,
-
-                    status TEXT DEFAULT 'PENDENTE',
-
-                    criado_em TEXT,
-
-                    aprovado_em TEXT,
-
-                    aprovado_por TEXT,
-
-                    ultimo_acesso TEXT,
-
-                    observacoes TEXT
-
-                )
-
-            """)
-
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_disp_device_id ON dispositivos_autorizados(device_id)")
-
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_disp_tecnico ON dispositivos_autorizados(tecnico_nome)")
-
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_disp_status ON dispositivos_autorizados(status)")
-
-
-
-            cur.execute("""
-
-                CREATE TABLE IF NOT EXISTS codigos_autorizacao_dispositivos (
-
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-                    codigo TEXT NOT NULL,
-
-                    tipo TEXT DEFAULT 'TEMPORARIO',
-
-                    criado_por TEXT DEFAULT 'NETTO',
-
-                    criado_em TEXT,
-
-                    expira_em TEXT,
-
-                    usado INTEGER DEFAULT 0,
-
-                    usado_por TEXT,
-
-                    usado_em TEXT,
-
-                    device_id_vinculado TEXT
-
-                )
-
-            """)
-
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_cod_disp ON codigos_autorizacao_dispositivos(codigo)")
-            try:
-                cur.execute("ALTER TABLE codigos_autorizacao_dispositivos ADD COLUMN tecnico_nome TEXT")
-            except Exception:
-                pass
-            try:
-                cur.execute("ALTER TABLE codigos_autorizacao_dispositivos ADD COLUMN url_autorizacao TEXT")
-            except Exception:
-                pass
-            conn.commit()
-
-    except Exception as e:
-
-        print("Aviso garantir_schema_dispositivos:", e)
-
-
-
-
-
-async def api_dispositivos_status(request: web.Request) -> web.Response:
-
-    device_id = request.query.get("device_id", "").strip()
-
-    if not device_id:
-
-        return web.json_response({"ok": False, "msg": "device_id obrigatório"}, status=400)
-
-    
-
-    try:
-
-        with get_db_connection(DB_NAME) as conn:
-
-            conn.row_factory = sqlite3.Row
-
-            cur = conn.cursor()
-
-            cur.execute("SELECT id, tecnico_nome, modelo_dispositivo, status, aprovado_em, aprovado_por FROM dispositivos_autorizados WHERE device_id = ?", (device_id,))
-
-            row = cur.fetchone()
-
-            if not row:
-
-                return web.json_response({"ok": False, "status": "NAO_ENCONTRADO"})
-
-            return web.json_response({
-
-                "ok": True,
-
-                "status": row["status"],
-
-                "tecnico": row["tecnico_nome"],
-
-                "modelo": row["modelo_dispositivo"],
-
-                "aprovado_em": row["aprovado_em"],
-
-                "aprovado_por": row["aprovado_por"]
-
-            })
-
-    except Exception as e:
-
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
-
-
-
-async def api_dispositivos_listar(request: web.Request) -> web.Response:
-
-    try:
-
-        with get_db_connection(DB_NAME) as conn:
-
-            conn.row_factory = sqlite3.Row
-
-            cur = conn.cursor()
-
-            cur.execute("SELECT * FROM dispositivos_autorizados ORDER BY CASE WHEN status='PENDENTE' THEN 0 WHEN status='AUTORIZADO' THEN 1 ELSE 2 END, id DESC")
-
-            rows = [dict(r) for r in cur.fetchall()]
-
-            
-
-            resumo = {
-
-                "total": len(rows),
-
-                "pendentes": sum(1 for r in rows if r["status"] == "PENDENTE"),
-
-                "autorizados": sum(1 for r in rows if r["status"] == "AUTORIZADO"),
-
-                "bloqueados": sum(1 for r in rows if r["status"] == "BLOQUEADO")
-
-            }
-
-            return web.json_response({"ok": True, "dispositivos": rows, "resumo": resumo})
-
-    except Exception as e:
-
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
-
-
-
-async def api_dispositivos_acao(request: web.Request) -> web.Response:
-
-    try:
-
-        body = await request.json()
-
-    except Exception:
-
-        return web.json_response({"ok": False, "msg": "JSON inválido"}, status=400)
-
-        
-
-    device_id = str(body.get("device_id", "")).strip()
-
-    disp_id = body.get("id")
-
-    acao = str(body.get("acao", "")).strip().upper()
-
-    obs = str(body.get("observacoes", "")).strip()
-
-    aprovador = str(body.get("aprovado_por", "NETTO")).strip()
-
-    
-
-    if not acao:
-
-        return web.json_response({"ok": False, "msg": "Ação obrigatória"}, status=400)
-
-        
-
-    try:
-
-        with get_db_connection(DB_NAME) as conn:
-
-            cur = conn.cursor()
-
-            agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            if acao == "AUTORIZAR":
-
-                if disp_id:
-
-                    cur.execute("UPDATE dispositivos_autorizados SET status='AUTORIZADO', aprovado_em=?, aprovado_por=?, observacoes=? WHERE id=?", (agora_str, aprovador, obs, disp_id))
-
-                else:
-
-                    cur.execute("UPDATE dispositivos_autorizados SET status='AUTORIZADO', aprovado_em=?, aprovado_por=?, observacoes=? WHERE device_id=?", (agora_str, aprovador, obs, device_id))
-
-            elif acao == "BLOQUEAR":
-
-                if disp_id:
-
-                    cur.execute("UPDATE dispositivos_autorizados SET status='BLOQUEADO', observacoes=? WHERE id=?", (obs, disp_id))
-
-                else:
-
-                    cur.execute("UPDATE dispositivos_autorizados SET status='BLOQUEADO', observacoes=? WHERE device_id=?", (obs, device_id))
-
-            elif acao == "EXCLUIR":
-
-                if disp_id:
-
-                    cur.execute("DELETE FROM dispositivos_autorizados WHERE id=?", (disp_id,))
-
-                else:
-
-                    cur.execute("DELETE FROM dispositivos_autorizados WHERE device_id=?", (device_id,))
-
-            else:
-
-                return web.json_response({"ok": False, "msg": f"Ação inválida: {acao}"}, status=400)
-
-            conn.commit()
-
-            return web.json_response({"ok": True, "msg": f"Dispositivo atualizado para {acao} com sucesso!"})
-
-    except Exception as e:
-
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
-
-
-
-async def api_dispositivos_registrar(request: web.Request) -> web.Response:
-
-    try:
-
-        body = await request.json()
-
-    except Exception:
-
-        return web.json_response({"ok": False, "msg": "JSON inválido"}, status=400)
-
-    
-
-    tecnico_nome = str(body.get("tecnico_nome", "")).strip().upper()
-
-    device_id = str(body.get("device_id", "")).strip()
-
-    modelo = str(body.get("modelo", "Celular")).strip()
-
-    so = str(body.get("so", "Desconhecido")).strip()
-
-    nav = str(body.get("navegador", "Desconhecido")).strip()
-
-    tipo = str(body.get("tipo", "Celular")).strip()
-
-    ip_origem = request.remote or "127.0.0.1"
-
-    
-
-    if not tecnico_nome or not device_id:
-
-        return web.json_response({"ok": False, "msg": "Técnico e Device ID são obrigatórios"}, status=400)
-
-        
-
-    try:
-
-        with get_db_connection(DB_NAME) as conn:
-
-            cur = conn.cursor()
-
-            cur.execute("SELECT id FROM tecnicos WHERE UPPER(nome)=?", (tecnico_nome,))
-
-            tec = cur.fetchone()
-
-            tec_id = tec[0] if tec else None
-
-            
-
-            cur.execute("SELECT id, status FROM dispositivos_autorizados WHERE device_id=?", (device_id,))
-
-            existente = cur.fetchone()
-
-            agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            if existente:
-
-                return web.json_response({"ok": True, "status": existente[1], "msg": "Dispositivo já cadastrado"})
-
-                
-
-            cur.execute("""
-
-                INSERT INTO dispositivos_autorizados
-
-                (tecnico_id, tecnico_nome, device_id, modelo_dispositivo, sistema_operacional, navegador, tipo_dispositivo, ip_origem, status, criado_em, ultimo_acesso)
-
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDENTE', ?, ?)
-
-            """, (tec_id, tecnico_nome, device_id, modelo, so, nav, tipo, ip_origem, agora_str, agora_str))
-
-            conn.commit()
-
-            return web.json_response({"ok": True, "status": "PENDENTE", "msg": "Dispositivo registrado para aprovação"})
-
-    except Exception as e:
-
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
-
-
-
-async def api_dispositivos_codigo_ativo(request: web.Request) -> web.Response:
-
-    try:
-
-        with get_db_connection(DB_NAME) as conn:
-
-            conn.row_factory = sqlite3.Row
-
-            cur = conn.cursor()
-
-            agora_dt = datetime.now()
-
-            agora_str = agora_dt.strftime("%Y-%m-%d %H:%M:%S")
-
-            cur.execute("SELECT * FROM codigos_autorizacao_dispositivos WHERE expira_em > ? ORDER BY id DESC LIMIT 1", (agora_str,))
-
-            row = cur.fetchone()
-
-            
-
-            proto = "https" if request.headers.get("X-Forwarded-Proto") == "https" else request.scheme
-
-            host = request.headers.get("X-Forwarded-Host") or request.host
-
-            from emed_services.equipamento_qrcode import gerar_qrcode_base64
-
-            import urllib.parse
-
-
-
-            if not row:
-
-                cod_num = f"{random.randint(100000, 999999)}"
-
-                expira_dt = agora_dt + timedelta(minutes=60)
-
-                expira = expira_dt.strftime("%Y-%m-%d %H:%M:%S")
-
-                url_aut = f"{proto}://{host}/login?codigo={cod_num}&auto=1"
-
-                qr_b64 = f"data:image/png;base64,{gerar_qrcode_base64(url_aut)}"
-
-
-
-                cur.execute("INSERT INTO codigos_autorizacao_dispositivos (codigo, criado_por, criado_em, expira_em, url_autorizacao) VALUES (?, 'NETTO', ?, ?, ?)", (cod_num, agora_str, expira, url_aut))
-
-                conn.commit()
-
-                cod_fmt = f"{cod_num[:3]} {cod_num[3:]}"
-
-                return web.json_response({
-
-                    "ok": True,
-
-                    "codigo": cod_num,
-
-                    "codigo_formatado": cod_fmt,
-
-                    "tecnico": None,
-
-                    "expira_em": expira,
-
-                    "minutos_restantes": 60,
-
-                    "url_autorizacao": url_aut,
-
-                    "qr_base64": qr_b64
-
-                })
-
-            
-
-            cod_str = str(row["codigo"]).replace(" ", "")
-
-            cod_fmt = f"{cod_str[:3]} {cod_str[3:]}" if len(cod_str) == 6 else cod_str
-
-            exp_dt = datetime.strptime(row["expira_em"], "%Y-%m-%d %H:%M:%S")
-
-            mins = max(1, int((exp_dt - agora_dt).total_seconds() / 60))
-
-            
-
-            row_keys = row.keys() if hasattr(row, 'keys') else []
-
-            tec_nome = row["tecnico_nome"] if "tecnico_nome" in row_keys and row["tecnico_nome"] else None
-
-            url_aut = row["url_autorizacao"] if "url_autorizacao" in row_keys and row["url_autorizacao"] else None
-
-            
-
-            if not url_aut:
-
-                if tec_nome:
-
-                    url_aut = f"{proto}://{host}/login?usuario={urllib.parse.quote(tec_nome)}&codigo={cod_str}&auto=1"
-
-                else:
-
-                    url_aut = f"{proto}://{host}/login?codigo={cod_str}&auto=1"
-
-
-
-            qr_b64 = f"data:image/png;base64,{gerar_qrcode_base64(url_aut)}"
-
-
-
-            return web.json_response({
-
-                "ok": True,
-
-                "codigo": cod_str,
-
-                "codigo_formatado": cod_fmt,
-
-                "tecnico": tec_nome,
-
-                "expira_em": row["expira_em"],
-
-                "minutos_restantes": mins,
-
-                "url_autorizacao": url_aut,
-
-                "qr_base64": qr_b64
-
-            })
-
-    except Exception as e:
-
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
-
-
-
-async def api_dispositivos_codigo_gerar(request: web.Request) -> web.Response:
-
-    try:
-
-        body = {}
-
-        try:
-
-            body = await request.json()
-
-        except Exception:
-
-            body = {}
-
-        
-
-        tecnico_selecionado = (body.get("tecnico") or "").strip().upper()
-
-        if not tecnico_selecionado or tecnico_selecionado in ("TODOS", "QUALQUER", "GERAL"):
-
-            tecnico_selecionado = None
-
-
-
-        with get_db_connection(DB_NAME) as conn:
-
-            cur = conn.cursor()
-
-            agora_dt = datetime.now()
-
-            agora_str = agora_dt.strftime("%Y-%m-%d %H:%M:%S")
-
-            cod_num = f"{random.randint(100000, 999999)}"
-
-            expira_dt = agora_dt + timedelta(minutes=60)
-
-            expira = expira_dt.strftime("%Y-%m-%d %H:%M:%S")
-
-
-
-            proto = "https" if request.headers.get("X-Forwarded-Proto") == "https" else request.scheme
-
-            host = request.headers.get("X-Forwarded-Host") or request.host
-
-            import urllib.parse
-
-            from emed_services.equipamento_qrcode import gerar_qrcode_base64
-
-
-
-            if tecnico_selecionado:
-
-                tec_enc = urllib.parse.quote(tecnico_selecionado)
-
-                url_autorizacao = f"{proto}://{host}/login?usuario={tec_enc}&codigo={cod_num}&auto=1"
-
-            else:
-
-                url_autorizacao = f"{proto}://{host}/login?codigo={cod_num}&auto=1"
-
-
-
-            qr_b64 = f"data:image/png;base64,{gerar_qrcode_base64(url_autorizacao)}"
-
-
-
-            cur.execute("""
-
-                INSERT INTO codigos_autorizacao_dispositivos 
-
-                (codigo, criado_por, criado_em, expira_em, tecnico_nome, url_autorizacao) 
-
-                VALUES (?, 'NETTO', ?, ?, ?, ?)
-
-            """, (cod_num, agora_str, expira, tecnico_selecionado, url_autorizacao))
-
-            conn.commit()
-
-
-
-            cod_fmt = f"{cod_num[:3]} {cod_num[3:]}"
-
-            return web.json_response({
-
-                "ok": True,
-
-                "codigo": cod_num,
-
-                "codigo_formatado": cod_fmt,
-
-                "tecnico": tecnico_selecionado,
-
-                "expira_em": expira,
-
-                "minutos_restantes": 60,
-
-                "url_autorizacao": url_autorizacao,
-
-                "qr_base64": qr_b64
-
-            })
-
-    except Exception as e:
-
-        import traceback
-
-        traceback.print_exc()
-
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
-
-
-
-async def api_dispositivos_liberar_com_codigo(request: web.Request) -> web.Response:
-
-    try:
-
-        body = await request.json()
-
-    except Exception:
-
-        return web.json_response({"ok": False, "msg": "Payload inválido"}, status=400)
-
-    
-
-    codigo_digitado = str(body.get("codigo", "")).strip().replace(" ", "").replace("-", "")
-
-    device_id = str(body.get("device_id", "")).strip()
-
-    usuario = str(body.get("usuario", "")).strip().upper()
-
-    apelido = str(body.get("apelido_dispositivo", "")).strip()
-
-    device_info = body.get("device_info", {}) or {}
-
-    ip_origem = request.remote or "127.0.0.1"
-
-
-
-    if not codigo_digitado:
-
-        return web.json_response({"ok": False, "msg": "Informe o código de 6 dígitos gerado pelo Gestor."}, status=400)
-
-
-
-    if not device_id:
-
-        return web.json_response({"ok": False, "msg": "Identificador do aparelho ausente."}, status=400)
-
-
-
-    try:
-
-        with get_db_connection(DB_NAME) as conn:
-
-            conn.row_factory = sqlite3.Row
-
-            cur = conn.cursor()
-
-            agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            
-
-            valido = False
-
-            if codigo_digitado in ("2026", "emed2026"):
-
-                valido = True
-
-            else:
-
-                cur.execute("SELECT id, codigo, expira_em FROM codigos_autorizacao_dispositivos WHERE REPLACE(codigo, ' ', '') = ? AND expira_em > ?", (codigo_digitado, agora_str))
-
-                cod_row = cur.fetchone()
-
-                if cod_row:
-
-                    valido = True
-
-                    cur.execute("UPDATE codigos_autorizacao_dispositivos SET usado = usado + 1, usado_por = ?, usado_em = ?, device_id_vinculado = ? WHERE id = ?", (usuario or 'DESCONHECIDO', agora_str, device_id, cod_row["id"]))
-
-
-
-            if not valido:
-
-                return web.json_response({"ok": False, "msg": "Código incorreto ou expirado. Gere ou solicite um novo código de 6 dígitos."}, status=401)
-
-
-
-            tec_id = None
-
-            tec_nome = usuario or "TÉCNICO / GESTOR"
-
-            perfil = "Técnico"
-
-            if usuario:
-
-                cur.execute("SELECT id, nome, perfil FROM tecnicos WHERE UPPER(nome) = ?", (usuario,))
-
-                tec_r = cur.fetchone()
-
-                if tec_r:
-
-                    tec_id = tec_r["id"]
-
-                    tec_nome = tec_r["nome"]
-
-                    perfil = tec_r["perfil"]
-
-
-
-            mod = apelido or str(device_info.get("modelo") or "Celular / Dispositivo").strip()
-
-            so = str(device_info.get("so") or "Android").strip()
-
-            nav = str(device_info.get("navegador") or "Navegador PWA").strip()
-
-            tip = str(device_info.get("tipo") or "Celular").strip()
-
-
-
-            cur.execute("SELECT id FROM dispositivos_autorizados WHERE device_id = ?", (device_id,))
-
-            d_exist = cur.fetchone()
-
-            if d_exist:
-
-                cur.execute("""
-
-                    UPDATE dispositivos_autorizados 
-
-                    SET status = 'AUTORIZADO', aprovado_em = ?, aprovado_por = ?, ultimo_acesso = ?, modelo_dispositivo = CASE WHEN ? != '' THEN ? ELSE modelo_dispositivo END, observacoes = ?
-
-                    WHERE device_id = ?
-
-                """, (agora_str, f"CÓDIGO GESTOR ({codigo_digitado})", agora_str, mod, mod, "Liberado via Código Gestor", device_id))
-
-            else:
-
-                cur.execute("""
-
-                    INSERT INTO dispositivos_autorizados
-
-                    (tecnico_id, tecnico_nome, device_id, modelo_dispositivo, sistema_operacional, navegador, tipo_dispositivo, ip_origem, status, criado_em, aprovado_em, aprovado_por, ultimo_acesso, observacoes)
-
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'AUTORIZADO', ?, ?, ?, ?, 'Liberado via Código Gestor')
-
-                """, (tec_id, tec_nome, device_id, mod, so, nav, tip, ip_origem, agora_str, agora_str, f"CÓDIGO GESTOR ({codigo_digitado})", agora_str))
-
-            conn.commit()
-
-
-
-            token = gerar_token_sessao(tec_id or 1, tec_nome, perfil)
-
-            resp = web.json_response({
-
-                "ok": True,
-
-                "status": "AUTORIZADO",
-
-                "msg": f"Aparelho liberado com sucesso para {tec_nome}!",
-
-                "device_id": device_id,
-
-                "modelo": mod,
-
-                "token": token,
-
-                "usuario": {"id": tec_id, "nome": tec_nome, "perfil": perfil}
-
-            })
-
-            resp.set_cookie(
-
-                "emed_session",
-
-                token,
-
-                max_age=30 * 86400,
-
-                httponly=True,
-
-                samesite="Lax",
-
-                path="/"
-
-            )
-
-            return resp
-
-    except Exception as e:
-
-        return web.json_response({"ok": False, "msg": f"Erro interno: {e}"}, status=500)
-
-
 
 async def api_auth_logout(request: web.Request) -> web.Response:
-
     resp = web.json_response({"ok": True, "msg": "Logout efetuado com sucesso."})
-
     resp.del_cookie("emed_session", path="/")
-
     return resp
 
-
-
 async def api_auth_status(request: web.Request) -> web.Response:
-
-    token = request.query.get("token") or request.cookies.get("emed_session")
-
+    token = request.cookies.get("emed_session")
     if not token:
-
         auth_h = request.headers.get("Authorization", "")
-
         if auth_h.startswith("Bearer "):
-
             token = auth_h[7:].strip()
-
     user = verificar_token_sessao(token)
-
     if user:
-
         return web.json_response({"ok": True, "autenticado": True, "usuario": user})
-
     return web.json_response({"ok": True, "autenticado": False})
 
-
-
 @web.middleware
-
 async def auth_api_middleware(request: web.Request, handler):
-
     path = request.path
-
     if (
-
-        path in ("/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping", "/api/logo", "/api/logo-circle", "/api/app-icon/192", "/api/app-icon/512", "/api/app-icon/180", "/api/app-icon/maskable", "/api/app-icon/favicon", "/nav", "/gps", "/frota", "/api/bootstrap", "/api/v1/veiculos", "/api/respostas-tecnicas", "/api/iniciar-rota", "/api/checkin", "/api/checkout", "/api/frota/assumir-veiculo", "/api/frota/troca-condutores-historico")
-
+        path in ("/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping", "/api/logo", "/api/logo-circle", "/nav", "/gps", "/frota")
         or path.startswith("/static/")
-
         or path.startswith("/api/auth/")
-
-        or path.startswith("/api/dispositivos/")
-
         or path.startswith("/api/car")
-
         or path.startswith("/api/radars")
-
         or path.startswith("/api/route")
-
         or path.startswith("/api/search")
-
         or path.startswith("/api/history")
-
         or path.startswith("/api/fleet")
-
-        or path.startswith("/api/instalacao/")
-
-        or path.startswith("/api/imprimir/")
-
-        or path.startswith("/api/triagem/")
-
-        or path.startswith("/api/frota/")
-
-        or path.startswith("/api/almoxarifado/")
-        or path.startswith("/api/pmp/")
-
-        or path.startswith("/api/hospital/")
-
-        or path.startswith("/api/gestao/")
-
+        or path.startswith("/api/clients")
     ):
-
         return await handler(request)
-
-
 
     # Token oficial de telemetria GPS
-
     auth_h = request.headers.get("Authorization", "")
-
     api_k = request.headers.get("X-API-Key", "") or request.query.get("api_key", "")
-
     if auth_h.startswith("Bearer ") and auth_h[7:].strip() in (TOKEN_OFICIAL_GPS, "EMED-2026-PILOTO"):
-
         return await handler(request)
-
     if api_k in (TOKEN_OFICIAL_GPS, "EMED-2026-PILOTO"):
-
         return await handler(request)
-
-
 
     # Checa sessão de usuário
-
-    token = request.query.get("token") or request.cookies.get("emed_session")
-
+    token = request.cookies.get("emed_session")
     if not token and auth_h.startswith("Bearer "):
-
         token = auth_h[7:].strip()
-
     
-
     user = verificar_token_sessao(token)
-
     if user:
-
         request["_emed_user"] = user
-
         return await handler(request)
 
-
-
     if path.startswith("/api/"):
-
         return web.json_response({
-
             "ok": False,
-
             "erro": "Sessão não autenticada. Efetue login no sistema eMED.",
-
             "requer_login": True
-
         }, status=401)
 
-
-
     return await handler(request)
-
-
-
 
 
 NAV_SERVER_URL = "http://127.0.0.1:5000"
 
-
-
 async def handle_proxy_nav(request: web.Request) -> web.Response:
-
     """Faz proxy reverso transparente para o servidor EmedNav GPS (porta 5000)."""
-
     import aiohttp
-
     path = request.path
-
     if path in ("/nav", "/gps"):
-
         target_path = "/"
-
     else:
-
         target_path = path
 
-
-
     target_url = f"{NAV_SERVER_URL}{target_path}"
-
     if request.query_string:
-
         target_url += f"?{request.query_string}"
 
-
-
     client_timeout = aiohttp.ClientTimeout(total=2.5)
-
     async with aiohttp.ClientSession(timeout=client_timeout) as session:
-
         headers = {k: v for k, v in request.headers.items() if k.lower() not in ("host", "content-length")}
-
         try:
-
             data = None
-
             if request.can_read_body:
-
                 data = await request.read()
-
             async with session.request(request.method, target_url, headers=headers, data=data, allow_redirects=False) as resp:
-
                 body = await resp.read()
-
                 resp_headers = {k: v for k, v in resp.headers.items() if k.lower() not in ("content-encoding", "transfer-encoding", "content-length")}
-
                 return web.Response(body=body, status=resp.status, headers=resp_headers)
-
         except Exception as e:
-
             # Fallback nativo 100% resiliente: serve a interface mesmo se a porta 5000 estiver iniciando
-
             base_nav = os.path.join(BASE_DIR, "emed_nav", "static")
-
             if path in ("/", "/nav", "/gps", "/emedcar"):
-
                 idx_file = os.path.join(base_nav, "index.html")
-
                 if os.path.exists(idx_file):
-
                     with open(idx_file, "r", encoding="utf-8") as f_html:
-
                         return web.Response(text=f_html.read(), content_type="text/html; charset=utf-8")
-
             elif path in ("/frota", "/admin"):
-
                 frota_file = os.path.join(base_nav, "frota.html")
-
                 if os.path.exists(frota_file):
-
                     with open(frota_file, "r", encoding="utf-8") as f_frota:
-
                         return web.Response(text=f_frota.read(), content_type="text/html; charset=utf-8")
-
             return web.Response(text=f"Carregando EmedNav GPS... Por favor atualize em instantes ({e})", status=200)
 
-
-
 async def handle_index(request: web.Request) -> web.Response:
-
     # Checa autenticacao
-
-    token = request.query.get("token") or request.cookies.get("emed_session")
-
+    token = request.cookies.get("emed_session")
     if not token:
-
         auth_h = request.headers.get("Authorization", "")
-
         if auth_h.startswith("Bearer "):
-
             token = auth_h[7:].strip()
-
     
-
     user = verificar_token_sessao(token)
-
     if not user:
-
         caminho_login = os.path.join(STATIC_DIR, "login.html")
-
         if os.path.exists(caminho_login):
-
             with open(caminho_login, "r", encoding="utf-8") as f:
-
                 return web.Response(text=f.read(), content_type="text/html", headers={"Cache-Control": "no-cache"})
 
-
-
     caminho_html = os.path.join(STATIC_DIR, "index.html")
-
     with open(caminho_html, "r", encoding="utf-8") as f:
-
         conteudo = f.read()
-
     return web.Response(text=conteudo, content_type="text/html", headers={"Cache-Control": "no-cache"})
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -3795,15 +1393,7 @@ async def handle_manifest(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     caminho = os.path.join(STATIC_DIR, "manifest.json")
-
-
-
-
 
 
 
@@ -3811,15 +1401,7 @@ async def handle_manifest(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         conteudo = f.read()
-
-
-
-
 
 
 
@@ -3835,23 +1417,7 @@ async def handle_manifest(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def handle_sw(request: web.Request) -> web.Response:
-
-
-
-
 
 
 
@@ -3859,23 +1425,11 @@ async def handle_sw(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     with open(caminho, "r", encoding="utf-8") as f:
 
 
 
-
-
-
-
         conteudo = f.read()
-
-
-
-
 
 
 
@@ -3891,100 +1445,45 @@ async def handle_sw(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def handle_logo(request: web.Request) -> web.Response:
-
     caminho_arroba = os.path.join(BASE_DIR, "emed_pwa_static", "logo_emed_arroba.png")
-
     if os.path.exists(caminho_arroba):
-
         with open(caminho_arroba, "rb") as f:
-
-            return web.Response(body=f.read(), content_type="image/png", headers={"Cache-Control": "no-cache"})
-
-    return web.Response(status=404)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-async def handle_app_icon(request: web.Request) -> web.Response:
-    """Serve os icones oficiais do app (EmedNota) para manifest PWA, apple-touch-icon e favicon."""
-    arquivos = {
-        "192": "app_icon_192.png",
-        "512": "app_icon_512.png",
-        "180": "app_icon_180.png",
-        "maskable": "app_icon_maskable_512.png",
-        "favicon": "favicon_64.png",
-    }
-    nome = arquivos.get(request.match_info.get("tamanho", ""))
-    if nome:
-        caminho = os.path.join(BASE_DIR, "emed_pwa_static", nome)
-        if os.path.exists(caminho):
-            with open(caminho, "rb") as f:
-                return web.Response(body=f.read(), content_type="image/png", headers={"Cache-Control": "no-cache"})
-    return web.Response(status=404)
-
-
-async def handle_favicon_ico(request: web.Request) -> web.Response:
-    caminho = os.path.join(BASE_DIR, "emed_pwa_static", "favicon_64.png")
-    if os.path.exists(caminho):
-        with open(caminho, "rb") as f:
             return web.Response(body=f.read(), content_type="image/png", headers={"Cache-Control": "no-cache"})
     return web.Response(status=404)
+
+
+
+
+
+
+
+
+
+
+
+async def handle_static_file(request: web.Request) -> web.Response:
+    """Serve arquivos estáticos das pastas emed_nav/static e emed_pwa_static com suporte a SVG e imagens."""
+    filename = request.match_info.get("filename", "")
+    p1 = os.path.join(BASE_DIR, "emed_nav", "static", filename)
+    if os.path.exists(p1) and os.path.isfile(p1):
+        ct = "image/svg+xml" if filename.endswith(".svg") else ("image/png" if filename.endswith(".png") else "application/octet-stream")
+        with open(p1, "rb") as f:
+            return web.Response(body=f.read(), content_type=ct, headers={"Cache-Control": "public, max-age=86400"})
+    p2 = os.path.join(STATIC_DIR, filename)
+    if os.path.exists(p2) and os.path.isfile(p2):
+        ct = "image/svg+xml" if filename.endswith(".svg") else ("image/png" if filename.endswith(".png") else "application/octet-stream")
+        with open(p2, "rb") as f:
+            return web.Response(body=f.read(), content_type=ct, headers={"Cache-Control": "public, max-age=86400"})
+    return web.Response(status=404)
+
 
 async def handle_logo_circle(request: web.Request) -> web.Response:
-
     caminho_circ = os.path.join(BASE_DIR, "emed_pwa_static", "logo_emed_circle.png")
-
     if os.path.exists(caminho_circ):
-
         with open(caminho_circ, "rb") as f:
-
             return web.Response(body=f.read(), content_type="image/png", headers={"Cache-Control": "no-cache"})
-
     return web.Response(status=404)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -4000,15 +1499,7 @@ async def api_ping(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     """Endpoint ultraleve de Keep-Alive / Heartbeat Anti-Standby para Render e Uptime Monitors."""
-
-
-
-
 
 
 
@@ -4016,15 +1507,7 @@ async def api_ping(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "status": "ok",
-
-
-
-
 
 
 
@@ -4032,15 +1515,7 @@ async def api_ping(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "timestamp": obter_agora_brasil().isoformat(),
-
-
-
-
 
 
 
@@ -4048,15 +1523,7 @@ async def api_ping(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "anti_standby": "100% Ativo"
-
-
-
-
 
 
 
@@ -4072,110 +1539,12 @@ async def api_ping(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-def obter_oportunidades_comerciais(db_name: str):
-    try:
-        with sqlite3.connect(db_name) as conn:
-            cur = conn.cursor()
-            cur.execute("""
-                SELECT id, os_id, cliente, equipamento, tipo_oportunidade, 
-                       categoria, valor_estimado, probabilidade, tecnico_responsavel, 
-                       contato_decisor, telefone_decisor, descricao, status, data_criacao
-                FROM oportunidades_comerciais
-                ORDER BY id DESC
-            """)
-            rows = cur.fetchall()
-            cols = ["id", "os_id", "cliente", "equipamento", "tipo_oportunidade", 
-                    "categoria", "valor_estimado", "probabilidade", "tecnico_responsavel", 
-                    "contato_decisor", "telefone_decisor", "descricao", "status", "data_criacao"]
-            return [dict(zip(cols, r)) for r in rows]
-    except Exception as e:
-        print(f"Erro ao obter oportunidades: {e}")
-        return []
-
-async def api_comercial_oportunidades(request: web.Request) -> web.Response:
-    """Retorna a lista de oportunidades comerciais e tubos estratégicos em bancada."""
-    ops = obter_oportunidades_comerciais(DB_NAME)
-    return web.json_response({"ok": True, "oportunidades": ops})
-
-async def api_comercial_oportunidade_salvar(request: web.Request) -> web.Response:
-    """Salva ou atualiza uma oportunidade comercial detectada em campo ou bancada."""
-    try:
-        body = await request.json()
-        os_id = str(body.get("os_id", "")).strip()
-        cliente = str(body.get("cliente", "")).strip().upper()
-        equipamento = str(body.get("equipamento", "")).strip().upper()
-        tipo_op = str(body.get("tipo_oportunidade", "OPORTUNIDADE COMERCIAL")).strip().upper()
-        categoria = str(body.get("categoria", "GERAL")).strip().upper()
-        valor_est = float(body.get("valor_estimado", 0.0) or 0.0)
-        prob = str(body.get("probabilidade", "MÉDIA")).strip().upper()
-        tecnico = str(body.get("tecnico_responsavel", "EQUIPE EMED")).strip().upper()
-        contato = str(body.get("contato_decisor", "")).strip()
-        telefone = str(body.get("telefone_decisor", "")).strip()
-        descricao = str(body.get("descricao", "")).strip()
-        status = str(body.get("status", "ABERTA")).strip().upper()
-        hoje = datetime.datetime.now().strftime("%d/%m/%Y")
-
-        with sqlite3.connect(DB_NAME) as conn:
-            cur = conn.cursor()
-            cur.execute("""
-                INSERT INTO oportunidades_comerciais 
-                (os_id, cliente, equipamento, tipo_oportunidade, categoria, valor_estimado, probabilidade, tecnico_responsavel, contato_decisor, telefone_decisor, descricao, status, data_criacao)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (os_id, cliente, equipamento, tipo_op, categoria, valor_est, prob, tecnico, contato, telefone, descricao, status, hoje))
-            conn.commit()
-
-        global _CACHE_BOOTSTRAP
-        _CACHE_BOOTSTRAP = None
-
-        return web.json_response({"ok": True, "msg": "Oportunidade registrada no radar comercial com sucesso!"})
-    except Exception as e:
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-async def api_comercial_oportunidade_status(request: web.Request) -> web.Response:
-    """Atualiza o status de uma oportunidade (GANHA, PERDIDA, EM_NEGOCIACAO)."""
-    try:
-        body = await request.json()
-        op_id = int(body.get("id", 0))
-        novo_status = str(body.get("status", "ABERTA")).strip().upper()
-        with sqlite3.connect(DB_NAME) as conn:
-            cur = conn.cursor()
-            cur.execute("UPDATE oportunidades_comerciais SET status = ? WHERE id = ?", (novo_status, op_id))
-            conn.commit()
-        global _CACHE_BOOTSTRAP
-        _CACHE_BOOTSTRAP = None
-        return web.json_response({"ok": True, "msg": f"Status atualizado para {novo_status}"})
-    except Exception as e:
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
 async def api_bootstrap(request: web.Request) -> web.Response:
-
     """Retorna o estado completo de todos os 18 menus do Sistema EMED."""
-
     global _CACHE_BOOTSTRAP, _CACHE_BOOTSTRAP_TIME
-
     agora_ts = time.time()
-
     if _CACHE_BOOTSTRAP is not None and (agora_ts - _CACHE_BOOTSTRAP_TIME) < 2.0:
-
         return web.json_response(_CACHE_BOOTSTRAP)
-
-
-
-
 
 
 
@@ -4183,23 +1552,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     inicializar_tabela_satisfacao(DB_NAME)
 
 
 
-
-
-
-
     df = _carregar_df_direto()
-
-
-
-
 
 
 
@@ -4211,19 +1568,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     ordens = []
-
-
-
-
 
 
 
@@ -4231,15 +1576,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     qtd_concluidas = 0
-
-
-
-
 
 
 
@@ -4247,23 +1584,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     qtd_pend_urg = 0
 
 
 
-
-
-
-
     qtd_pend_prog = 0
-
-
-
-
 
 
 
@@ -4275,19 +1600,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     # Contadores de BI
-
-
-
-
 
 
 
@@ -4295,15 +1608,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     bi_tecnico = {}
-
-
-
-
 
 
 
@@ -4311,15 +1616,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     bi_servico = {}
-
-
-
-
 
 
 
@@ -4331,19 +1628,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     for idx, row in df.iterrows():
-
-
-
-
 
 
 
@@ -4351,15 +1636,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         st_os = limpar_texto(row.get("status"), "ATIVO").upper()
-
-
-
-
 
 
 
@@ -4367,15 +1644,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         cid = limpar_texto(row.get("cidade"), "FORTALEZA").upper()
-
-
-
-
 
 
 
@@ -4383,15 +1652,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         tp_srv = limpar_texto(row.get("tipo_servico"), "MANUTENÇÃO").upper()
-
-
-
-
 
 
 
@@ -4403,19 +1664,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         bi_status[st_os] = bi_status.get(st_os, 0) + 1
-
-
-
-
 
 
 
@@ -4423,15 +1672,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         bi_cidade[cid] = bi_cidade.get(cid, 0) + 1
-
-
-
-
 
 
 
@@ -4443,19 +1684,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         if st_os == "CONCLUÍDO":
-
-
-
-
 
 
 
@@ -4463,15 +1692,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         elif "OBSERVA" in st_os:
-
-
-
-
 
 
 
@@ -4479,15 +1700,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         else:
-
-
-
-
 
 
 
@@ -4499,27 +1712,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         val_os = limpar_float(row.get("valor_os"), 0.0)
 
 
 
-
-
-
-
         if st_os == "CONCLUÍDO":
-
-
-
-
 
 
 
@@ -4531,19 +1728,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         pend_limpa = _extrair_pendencia_limpa(row)
-
-
-
-
 
 
 
@@ -4551,23 +1736,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         inst_nec = limpar_texto(row.get("instrumento_necessario"), "").upper()
 
 
 
-
-
-
-
         cond_ini = limpar_texto(row.get("condicao_inicial"), "OPERACIONAL").upper()
-
-
-
-
 
 
 
@@ -4579,19 +1752,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         tem_pend_real = (
-
-
-
-
 
 
 
@@ -4599,15 +1760,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             and pend_limpa.strip() != ""
-
-
-
-
 
 
 
@@ -4615,15 +1768,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         )
-
-
-
-
 
 
 
@@ -4631,15 +1776,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         if tem_pend_real:
-
-
-
-
 
 
 
@@ -4647,15 +1784,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 prioridade_pend = "URGENTE"
-
-
-
-
 
 
 
@@ -4663,23 +1792,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             else:
 
 
 
-
-
-
-
                 prioridade_pend = "PROGRAMADA"
-
-
-
-
 
 
 
@@ -4691,19 +1808,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         # Categoria TV do Laboratório
-
-
-
-
 
 
 
@@ -4711,15 +1816,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             cat_tv = "CRITICA"
-
-
-
-
 
 
 
@@ -4727,15 +1824,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             cat_tv = "PECA_ORCAMENTO"
-
-
-
-
 
 
 
@@ -4743,23 +1832,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             cat_tv = "PROGRAMADA"
 
 
 
-
-
-
-
         else:
-
-
-
-
 
 
 
@@ -4771,19 +1848,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         # Orçamento pendente (>15 dias ou aguardando aprovação)
-
-
-
-
 
 
 
@@ -4791,15 +1856,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             st_os == "ATIVO"
-
-
-
-
 
 
 
@@ -4807,23 +1864,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             and "ORÇAMENTO APROVADO" not in raw_pend
 
 
 
-
-
-
-
         )
-
-
-
-
 
 
 
@@ -4835,19 +1880,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         # Calibração do equipamento do cliente
-
-
-
-
 
 
 
@@ -4859,19 +1892,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         # Agrupamento de rotas para chamados ativos
-
-
-
-
 
 
 
@@ -4879,15 +1900,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             ch_rota = f"{cli} ({cid})"
-
-
-
-
 
 
 
@@ -4895,15 +1908,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 grupos_rotas[ch_rota] = {
-
-
-
-
 
 
 
@@ -4911,15 +1916,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "cidade": cid,
-
-
-
-
 
 
 
@@ -4927,15 +1924,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "os_ids": [],
-
-
-
-
 
 
 
@@ -4943,15 +1932,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "tecnicos": set(),
-
-
-
-
 
 
 
@@ -4959,23 +1940,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             grupos_rotas[ch_rota]["os_ids"].append(os_id)
 
 
 
-
-
-
-
             grupos_rotas[ch_rota]["equipamentos"].append(eq)
-
-
-
-
 
 
 
@@ -4987,19 +1956,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         f_ant = limpar_texto(row.get("foto_evidencia"), "")
-
-
-
-
 
 
 
@@ -5007,15 +1964,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         rascunho_salvo, dt_rasc = obter_rascunho_provisorio(DB_NAME, os_id)
-
-
-
-
 
 
 
@@ -5027,19 +1976,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         ordens.append({
-
-
-
-
 
 
 
@@ -5047,15 +1984,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "idx": int(idx),
-
-
-
-
 
 
 
@@ -5063,15 +1992,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "cnpj": limpar_texto(row.get("cnpj"), "N/D"),
-
-
-
-
 
 
 
@@ -5079,15 +2000,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "cidade": cid,
-
-
-
-
 
 
 
@@ -5095,15 +2008,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "email": limpar_texto(row.get("email"), ""),
-
-
-
-
 
 
 
@@ -5111,15 +2016,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "contato_responsavel": _limpar_telefone_exibicao(row.get("contato_responsavel") or row.get("whatsapp")),
-
-
-
-
 
 
 
@@ -5127,15 +2024,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "equipamento": eq,
-
-
-
-
 
 
 
@@ -5143,15 +2032,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "tipo_servico": tp_srv,
-
-
-
-
 
 
 
@@ -5159,15 +2040,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "tecnico_responsavel": tec,
-
-
-
-
 
 
 
@@ -5175,15 +2048,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "telefone_tecnico": limpar_texto(row.get("telefone_tecnico"), ""),
-
-
-
-
 
 
 
@@ -5191,15 +2056,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "data_br": _formatar_data_br(row.get("data_agendamento")),
-
-
-
-
 
 
 
@@ -5207,15 +2064,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "checkin_hora": limpar_texto(row.get("checkin_hora"), ""),
-
-
-
-
 
 
 
@@ -5223,15 +2072,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "tempo_atendimento": limpar_texto(row.get("tempo_atendimento"), ""),
-
-
-
-
 
 
 
@@ -5239,15 +2080,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "problemas_encontrados": limpar_texto(row.get("problemas_encontrados"), ""),
-
-
-
-
 
 
 
@@ -5255,15 +2088,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "servico_executado": limpar_texto(row.get("servico_executado"), ""),
-
-
-
-
 
 
 
@@ -5271,15 +2096,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "parametros_medidos": limpar_texto(row.get("parametros_medidos"), ""),
-
-
-
-
 
 
 
@@ -5287,15 +2104,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "pendencias_raw": limpar_texto(row.get("pendencias"), ""),
-
-
-
-
 
 
 
@@ -5303,15 +2112,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "pendencia_limpa": pend_limpa,
-
-
-
-
 
 
 
@@ -5319,15 +2120,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "prioridade_pendencia": prioridade_pend,
-
-
-
-
 
 
 
@@ -5335,15 +2128,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "eh_orcamento_pendente": eh_orcamento_pendente,
-
-
-
-
 
 
 
@@ -5351,15 +2136,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "instrumento_necessario": limpar_texto(row.get("instrumento_necessario"), ""),
-
-
-
-
 
 
 
@@ -5367,15 +2144,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "condicao_final": cond_fim,
-
-
-
-
 
 
 
@@ -5383,15 +2152,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "valor_os": val_os,
-
-
-
-
 
 
 
@@ -5399,15 +2160,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "assinatura_tecnico": limpar_texto(row.get("assinatura_tecnico"), ""),
-
-
-
-
 
 
 
@@ -5415,15 +2168,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "data_ultima_calibracao": limpar_texto(row.get("data_ultima_calibracao"), ""),
-
-
-
-
 
 
 
@@ -5431,15 +2176,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "certificado_calibracao": limpar_texto(row.get("certificado_calibracao"), ""),
-
-
-
-
 
 
 
@@ -5447,15 +2184,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "cal_badge_cor": cal_eq["badge_cor"],
-
-
-
-
 
 
 
@@ -5463,15 +2192,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "tem_foto_depois": bool(f_dep and os.path.exists(f_dep)),
-
-
-
-
 
 
 
@@ -5479,38 +2200,15 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "tem_rascunho_servidor": bool(rascunho_salvo),
 
 
 
-
-
-
-
             "data_rascunho_servidor": dt_rasc,
-            "latitude": limpar_float(row.get("latitude"), 0.0),
-            "longitude": limpar_float(row.get("longitude"), 0.0),
-            "deslocamento_inicio_hora": limpar_texto(row.get("deslocamento_inicio_hora"), ""),
-
-
-
-
 
 
 
         })
-
-
-
-
-
-
-
-
 
 
 
@@ -5522,15 +2220,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     viagens_economizadas = 0
-
-
-
-
 
 
 
@@ -5538,15 +2228,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         qtd_ch = len(gr["os_ids"])
-
-
-
-
 
 
 
@@ -5554,15 +2236,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             viagens_economizadas += (qtd_ch - 1)
-
-
-
-
 
 
 
@@ -5570,15 +2244,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         rotas_lista.append({
-
-
-
-
 
 
 
@@ -5586,15 +2252,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "cidade": gr["cidade"],
-
-
-
-
 
 
 
@@ -5602,15 +2260,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "qtd_chamados": qtd_ch,
-
-
-
-
 
 
 
@@ -5618,15 +2268,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "equipamentos": gr["equipamentos"],
-
-
-
-
 
 
 
@@ -5634,23 +2276,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "tecnicos_atuais": tecs_list,
 
 
 
-
-
-
-
         })
-
-
-
-
 
 
 
@@ -5662,19 +2292,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     tecnicos = []
-
-
-
-
 
 
 
@@ -5682,15 +2300,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     solicitacoes = []
-
-
-
-
 
 
 
@@ -5698,15 +2308,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     notas = []
-
-
-
-
 
 
 
@@ -5714,15 +2316,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     pesquisas = []
-
-
-
-
 
 
 
@@ -5734,19 +2328,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     with get_db_connection(DB_NAME) as conn:
-
-
-
-
 
 
 
@@ -5754,107 +2336,53 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             df_tec = pd.read_sql_query("SELECT * FROM tecnicos", conn)
-
             hoje_data = obter_agora_brasil().date()
-
             for _, r in df_tec.iterrows():
-
                 ass_p = limpar_texto(r.get("assinatura_padrao"), "CFT")
-
                 d_venc_raw = limpar_texto(r.get("data_vencimento_aso"), "")
-
                 st_med = "PENDENTE"
-
                 dias_rest = 0
-
                 if d_venc_raw:
-
                     try:
-
                         if "/" in d_venc_raw:
-
                             dt_v = datetime.strptime(d_venc_raw[:10], "%d/%m/%Y").date()
-
                         else:
-
                             dt_v = datetime.strptime(d_venc_raw[:10], "%Y-%m-%d").date()
-
                         dias_rest = (dt_v - hoje_data).days
-
                         if dias_rest < 0:
-
                             st_med = "VENCIDO"
-
                         elif dias_rest <= 30:
-
                             st_med = "ALERTA"
-
                         else:
-
                             st_med = "EM_DIA"
-
                     except Exception:
-
                         st_med = "EM_DIA"
 
-
-
                 tecnicos.append({
-
                     "id": int(r.get("id") or 0),
-
                     "nome": limpar_texto(r.get("nome"), "").upper(),
-
                     "telefone": _limpar_telefone_exibicao(r.get("telefone")),
-
                     "partida": limpar_texto(r.get("partida"), "FORTALEZA"),
-
                     "sede": limpar_texto(r.get("sede"), "FORTALEZA"),
-
                     "perfil": limpar_texto(r.get("perfil"), "Técnico"),
-
                     "assinatura_padrao": ass_p,
-
                     "assinatura": ass_p,
-
                     "data_ultimo_aso": limpar_texto(r.get("data_ultimo_aso"), ""),
-
                     "data_vencimento_aso": d_venc_raw,
-
                     "periodicidade_meses": int(r.get("periodicidade_meses") or 12),
-
                     "medico_examinador": limpar_texto(r.get("medico_examinador"), ""),
-
                     "clinica_medicina_trabalho": limpar_texto(r.get("clinica_medicina_trabalho"), ""),
-
                     "tipo_exame_aso": limpar_texto(r.get("tipo_exame_aso"), "PERIÓDICO"),
-
                     "parecer_aptidao": limpar_texto(r.get("parecer_aptidao"), "APTO"),
-
                     "observacoes_medicas": limpar_texto(r.get("observacoes_medicas"), ""),
-
                     "status_medico": st_med,
-
                     "dias_para_vencer": dias_rest,
-
                 })
 
 
 
-
-
-
-
         except Exception:
-
-
-
-
 
 
 
@@ -5866,129 +2394,63 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         try:
-
-
 
             df_est = pd.read_sql_query("SELECT * FROM estoque_pecas ORDER BY quantidade DESC, nome_peca ASC", conn)
 
-
-
             for _, r in df_est.iterrows():
-
-
 
                 st_cal = calcular_status_calibracao(limpar_texto(r.get("data_validade_calibracao"), ""))
 
-
-
                 qtd_val = round(limpar_float(r.get("quantidade"), 0.0), 2)
-
-
 
                 p_unit = limpar_float(r.get("preco_unitario") or r.get("preco_custo"), 0.0)
 
-
-
                 v_tot = limpar_float(r.get("valor_total"), qtd_val * p_unit)
-
-
 
                 estoque.append({
 
-
-
                     "codigo": limpar_texto(r.get("codigo"), ""),
-
-
 
                     "nome_peca": limpar_texto(r.get("nome_peca"), ""),
 
-
-
                     "categoria": limpar_texto(r.get("categoria"), "PEÇA DE REPOSIÇÃO"),
-
-
 
                     "tipo_item": limpar_texto(r.get("tipo_item"), "GERAL"),
 
-
-
                     "grupo_item": limpar_texto(r.get("grupo_item"), ""),
-
-
 
                     "unidade": limpar_texto(r.get("unidade"), "UND"),
 
-
-
                     "quantidade": qtd_val,
-
-
 
                     "estoque_minimo": round(limpar_float(r.get("estoque_minimo"), 1.0), 1),
 
-
-
                     "preco_unitario": p_unit,
-
-
 
                     "preco_custo": p_unit,
 
-
-
                     "valor_total": v_tot,
-
-
 
                     "localizacao": limpar_texto(r.get("localizacao"), "ALMOXARIFADO CENTRAL - FORTALEZA"),
 
-
-
                     "ultima_calibracao": limpar_texto(r.get("data_ultima_calibracao"), ""),
-
-
 
                     "validade_calibracao": limpar_texto(r.get("data_validade_calibracao"), ""),
 
-
-
                     "certificado_calibracao": limpar_texto(r.get("certificado_calibracao"), ""),
-
-
 
                     "saldo_creditos": limpar_texto(r.get("saldo_creditos"), ""),
 
-
-
                     "badge_calibracao": st_cal["badge_txt"],
-
-
 
                     "cor_calibracao": st_cal["badge_cor"],
 
-
-
                     "status_cal": st_cal["status"],
-
-
 
                 })
 
-
-
         except Exception as e:
-
-
 
             print("Erro ao carregar estoque_pecas:", e)
 
@@ -5998,19 +2460,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         try:
-
-
-
-
 
 
 
@@ -6024,21 +2474,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
             for _, r in df_sol.iterrows():
-
-
-
-
 
 
 
@@ -6046,15 +2482,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "id": int(r.get("id", 0)),
-
-
-
-
 
 
 
@@ -6062,15 +2490,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "destino_cliente": limpar_texto(r.get("destino_cliente"), ""),
-
-
-
-
 
 
 
@@ -6078,15 +2498,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "instrumentos_solicitados": limpar_texto(r.get("instrumentos_solicitados"), ""),
-
-
-
-
 
 
 
@@ -6094,15 +2506,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "data_pedido": limpar_texto(r.get("data_pedido"), ""),
-
-
-
-
 
 
 
@@ -6110,15 +2514,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "previsao_entrega": limpar_texto(r.get("previsao_entrega"), ""),
-
-
-
-
 
 
 
@@ -6126,41 +2522,20 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "codigo_peca": limpar_texto(r.get("codigo_peca"), ""),
-
-
 
                     "tipo_origem_peca": limpar_texto(r.get("tipo_origem_peca"), "NOVA_COM_NF"),
 
-
-
                     "os_id": str(r.get("os_id") or ""),
-
                     "motivo_recusa": limpar_texto(r.get("motivo_recusa"), ""),
-
                     "confirmado_em": limpar_texto(r.get("confirmado_em"), ""),
-
                     "recusado_em": limpar_texto(r.get("recusado_em"), ""),
-
                     "codigo_rastreio": limpar_texto(r.get("codigo_rastreio"), ""),
-
                     "transportadora": limpar_texto(r.get("transportadora"), ""),
 
 
 
-
-
-
-
                 })
-
-
-
-
 
 
 
@@ -6168,97 +2543,49 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             pass
-
-
-
-
 
 
 
         ferramentas = []
 
-
-
         try:
-
-
 
             df_fer = pd.read_sql_query("SELECT * FROM ferramentas_cautela ORDER BY id ASC", conn)
 
-
-
             for _, r in df_fer.iterrows():
-
-
 
                 ferramentas.append({
 
-
-
                     "id": int(r.get("id", 0)),
-
-
 
                     "codigo": limpar_texto(r.get("codigo_ferramenta"), ""),
 
-
-
                     "nome": limpar_texto(r.get("nome_ferramenta"), ""),
-
-
 
                     "status": limpar_texto(r.get("status"), "DISPONIVEL").upper(),
 
-
-
                     "tecnico": limpar_texto(r.get("tecnico_responsavel"), "").upper(),
-
-
 
                     "cliente": limpar_texto(r.get("destino_cliente"), "").upper(),
 
-
-
                     "os_id": limpar_texto(r.get("os_id"), ""),
-
-
 
                     "data_saida": limpar_texto(r.get("data_saida"), ""),
 
-
-
                     "numero_serie": limpar_texto(r.get("numero_serie"), ""),
-
-
 
                     "localizacao": limpar_texto(r.get("localizacao"), "ALMOXARIFADO CENTRAL"),
 
-
-
                     "validade_calibracao": limpar_texto(r.get("data_validade_calibracao"), ""),
-
-
 
                     "certificado": limpar_texto(r.get("certificado_calibracao"), ""),
 
-
-
                     "observacao": limpar_texto(r.get("observacao"), "")
-
-
 
                 })
 
-
-
         except Exception as e_fer:
-
-
 
             print("Aviso ao carregar ferramentas_cautela:", e_fer)
 
@@ -6268,19 +2595,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         try:
-
-
-
-
 
 
 
@@ -6288,15 +2603,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             for _, r in df_bx.iterrows():
-
-
-
-
 
 
 
@@ -6304,23 +2611,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "id": int(r.get("id", 0)),
 
 
 
-
-
-
-
                     "tecnico": limpar_texto(r.get("tecnico"), ""),
-
-
-
-
 
 
 
@@ -6328,15 +2623,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "quantidade": int(limpar_float(r.get("quantidade"), 1)),
-
-
-
-
 
 
 
@@ -6344,15 +2631,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "data_baixa": limpar_texto(r.get("data_baixa"), ""),
-
-
-
-
 
 
 
@@ -6360,15 +2639,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         except Exception:
-
-
-
-
 
 
 
@@ -6380,19 +2651,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         try:
-
-
-
-
 
 
 
@@ -6400,15 +2659,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             for _, r in df_nf.iterrows():
-
-
-
-
 
 
 
@@ -6416,43 +2667,21 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 st_f = limpar_texto(r.get("status_fiscal"), "PENDENTE")
-
-
-
-
 
 
 
                 num_nf = limpar_texto(r.get("numero_nf"), "") or f"NFS-{nid:04d}"
 
-
-
                 val_tot = limpar_float(r.get("valor_total"), 0.0)
-
-
 
                 val_srv = limpar_float(r.get("valor_servicos"), 0.0)
 
-
-
                 val_pec = limpar_float(r.get("valor_pecas"), 0.0)
-
-
 
                 if val_tot <= 0 and (val_srv > 0 or val_pec > 0):
 
-
-
                     val_tot = val_srv + val_pec
-
-
-
-
 
 
 
@@ -6460,15 +2689,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "id": nid,
-
-
-
-
 
 
 
@@ -6476,23 +2697,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "os_id": limpar_texto(r.get("os_id"), ""),
 
 
 
-
-
-
-
                     "cliente": limpar_texto(r.get("cliente"), ""),
-
-
-
-
 
 
 
@@ -6500,43 +2709,21 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "descricao": limpar_texto(r.get("descricao"), ""),
-
-
-
-
 
 
 
                     "valor_total": val_tot,
 
-
-
                     "valor_servicos": val_srv,
-
-
 
                     "valor_pecas": val_pec,
 
-
-
                     "regra_fiscal": limpar_texto(r.get("regra_fiscal"), "SERVICO_TOTAL"),
-
-
 
                     "chave_acesso": limpar_texto(r.get("chave_acesso"), ""),
 
-
-
                     "discriminacao_servico": limpar_texto(r.get("discriminacao_servico"), ""),
-
-
-
-
 
 
 
@@ -6544,246 +2731,124 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                                         "status_pagamento": st_f,
-
                     "data_emissao": limpar_texto(r.get("data_emissao"), ""),
-
                     "data_liberacao_fiscal": limpar_texto(r.get("data_liberacao_fiscal"), ""),
-
                     "status_quarentena": limpar_texto(r.get("status_quarentena"), "LIBERADO"),
-
                     "feedback_cliente_status": limpar_texto(r.get("feedback_cliente_status"), ""),
-
                     "motivo_cancelamento": limpar_texto(r.get("motivo_cancelamento"), ""),
-
                     "data_cancelamento": limpar_texto(r.get("data_cancelamento"), ""),
-
                     "aliquota_iss": float(r.get("aliquota_iss", 5.0) or 5.0),
-
                     "cnpj_tomador": limpar_texto(r.get("cnpj_tomador"), ""),
-
                     "natureza_operacao": limpar_texto(r.get("natureza_operacao"), "PRESTAÇÃO DE SERVIÇOS TÉCNICOS HOSPITALARES"),
-
                     "cfop": limpar_texto(r.get("cfop"), "5.933"),
-
                 })
 
-
-
         except Exception:
-
             pass
-
-
 
         remessas_lista = []
-
         try:
-
             df_rem = pd.read_sql_query("SELECT * FROM remessas_diagnostico ORDER BY id DESC LIMIT 60", conn)
-
             for _, r in df_rem.iterrows():
-
                 remessas_lista.append({
-
                     "id": int(r.get("id", 0)),
-
                     "numero_remessa": limpar_texto(r.get("numero_remessa"), ""),
-
                     "os_id": limpar_texto(r.get("os_id"), ""),
-
                     "cliente_origem": limpar_texto(r.get("cliente_origem"), ""),
-
                     "cidade_origem": limpar_texto(r.get("cidade_origem"), ""),
-
                     "uf_origem": limpar_texto(r.get("uf_origem"), "CE"),
-
                     "cnpj_origem": limpar_texto(r.get("cnpj_origem"), ""),
-
                     "destinatario_nome": limpar_texto(r.get("destinatario_nome"), ""),
-
                     "destinatario_cnpj": limpar_texto(r.get("destinatario_cnpj"), ""),
-
                     "cidade_destino": limpar_texto(r.get("cidade_destino"), ""),
-
                     "uf_destino": limpar_texto(r.get("uf_destino"), "SP"),
-
                     "cfop": limpar_texto(r.get("cfop"), "6.915"),
-
                     "descricao_peca": limpar_texto(r.get("descricao_peca"), ""),
-
                     "numero_serie": limpar_texto(r.get("numero_serie"), ""),
-
                     "quantidade": int(r.get("quantidade", 1)),
-
                     "valor_declarado": float(r.get("valor_declarado", 0.0)),
-
                     "motivo_diagnostico": limpar_texto(r.get("motivo_diagnostico"), ""),
-
                     "modalidade_transporte": limpar_texto(r.get("modalidade_transporte"), "TRANSPORTADORA"),
-
                     "transportadora": limpar_texto(r.get("transportadora"), ""),
-
                     "codigo_rastreio": limpar_texto(r.get("codigo_rastreio"), ""),
-
                     "tecnico_portador": limpar_texto(r.get("tecnico_portador"), ""),
-
                     "status_remessa": limpar_texto(r.get("status_remessa"), "EM_TRANSITO"),
-
                     "data_envio": limpar_texto(r.get("data_envio"), ""),
-
                     "data_retorno_prevista": limpar_texto(r.get("data_retorno_prevista"), ""),
-
                     "data_retorno_real": limpar_texto(r.get("data_retorno_real"), ""),
-
                     "observacoes": limpar_texto(r.get("observacoes"), ""),
-
                 })
-
         except Exception:
-
             pass
-
-
 
         despesas_lista = []
-
         try:
-
             df_desp = pd.read_sql_query("SELECT * FROM despesas_recorrentes ORDER BY dia_vencimento ASC", conn)
-
             for _, r in df_desp.iterrows():
-
                 despesas_lista.append({
-
                     "id": int(r.get("id", 0)),
-
                     "categoria": limpar_texto(r.get("categoria"), "OUTROS"),
-
                     "descricao": limpar_texto(r.get("descricao"), ""),
-
                     "fornecedor": limpar_texto(r.get("fornecedor"), ""),
-
                     "valor_mensal_estimado": float(r.get("valor_mensal_estimado", 0.0) or 0.0),
-
                     "dia_vencimento": int(r.get("dia_vencimento", 10) or 10),
-
                     "forma_pagamento": limpar_texto(r.get("forma_pagamento"), "BOLETO"),
-
                     "status": limpar_texto(r.get("status"), "ATIVO"),
-
                     "observacoes": limpar_texto(r.get("observacoes"), ""),
-
                 })
-
         except Exception:
-
             pass
-
-
 
         transportadoras_lista = []
-
         try:
-
             df_transp = pd.read_sql_query("SELECT * FROM transportadoras_parceiras ORDER BY possui_seguro_carga DESC, avaliacao_estrelas DESC, id ASC", conn)
-
             for _, r in df_transp.iterrows():
-
                 transportadoras_lista.append({
-
                     "id": int(r.get("id", 0)),
-
                     "nome": limpar_texto(r.get("nome"), ""),
-
                     "cnpj": limpar_texto(r.get("cnpj"), ""),
-
                     "telefone": limpar_texto(r.get("telefone"), ""),
-
                     "whatsapp": limpar_texto(r.get("whatsapp"), ""),
-
                     "contato_responsavel": limpar_texto(r.get("contato_responsavel"), ""),
-
                     "cidades_atendidas": limpar_texto(r.get("cidades_atendidas"), ""),
-
                     "tipos_veiculo": limpar_texto(r.get("tipos_veiculo"), ""),
-
                     "possui_seguro_carga": int(r.get("possui_seguro_carga", 1) or 0),
-
                     "valor_cobertura_seguro": float(r.get("valor_cobertura_seguro", 0.0) or 0.0),
-
                     "avaliacao_estrelas": int(r.get("avaliacao_estrelas", 5) or 5),
-
                     "status": limpar_texto(r.get("status"), "ATIVO"),
-
                     "observacoes": limpar_texto(r.get("observacoes"), ""),
-
                 })
-
         except Exception:
-
             pass
-
-
 
         cotacoes_lista = []
-
         try:
-
             df_cot = pd.read_sql_query("SELECT * FROM cotacoes_transporte ORDER BY id DESC LIMIT 100", conn)
-
             for _, r in df_cot.iterrows():
-
                 cotacoes_lista.append({
-
                     "id": int(r.get("id", 0)),
-
                     "numero_cotacao": limpar_texto(r.get("numero_cotacao"), ""),
-
                     "os_id": limpar_texto(r.get("os_id"), ""),
-
                     "cliente": limpar_texto(r.get("cliente"), ""),
-
                     "carga_descricao": limpar_texto(r.get("carga_descricao"), ""),
-
                     "origem_cidade": limpar_texto(r.get("origem_cidade"), "FORTALEZA"),
-
                     "origem_uf": limpar_texto(r.get("origem_uf"), "CE"),
-
                     "destino_cidade": limpar_texto(r.get("destino_cidade"), ""),
-
                     "destino_uf": limpar_texto(r.get("destino_uf"), "CE"),
-
                     "tipo_veiculo": limpar_texto(r.get("tipo_veiculo"), "Caminhão Munck"),
-
                     "peso_kg": float(r.get("peso_kg", 0.0) or 0.0),
-
                     "dimensoes": limpar_texto(r.get("dimensoes"), ""),
-
                     "valor_declarado_carga": float(r.get("valor_declarado_carga", 0.0) or 0.0),
-
                     "exige_seguro": int(r.get("exige_seguro", 1) or 0),
-
                     "transportadora_escolhida": limpar_texto(r.get("transportadora_escolhida"), ""),
-
                     "valor_fechado": float(r.get("valor_fechado", 0.0) or 0.0),
-
                     "status_cotacao": limpar_texto(r.get("status_cotacao"), "EM COTAÇÃO"),
-
                     "data_cotacao": limpar_texto(r.get("data_cotacao"), ""),
-
                     "data_prevista_transporte": limpar_texto(r.get("data_prevista_transporte"), ""),
-
                     "observacoes": limpar_texto(r.get("observacoes"), ""),
-
                 })
-
         except Exception:
-
             pass
 
 
@@ -6792,19 +2857,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         try:
-
-
-
-
 
 
 
@@ -6812,15 +2865,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             df_v = pd.read_sql_query("SELECT * FROM veiculos", conn)
-
-
-
-
 
 
 
@@ -6828,15 +2873,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 km_at = limpar_int(r.get("km_atual"), 0)
-
-
-
-
 
 
 
@@ -6844,15 +2881,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 veiculos.append({
-
-
-
-
 
 
 
@@ -6860,15 +2889,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "modelo": limpar_texto(r.get("modelo"), "Veículo EMED"),
-
-
-
-
 
 
 
@@ -6876,15 +2897,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "renavam": limpar_texto(r.get("renavam"), "01234567890"),
-
-
-
-
 
 
 
@@ -6892,15 +2905,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "tag_rfid_atual": limpar_texto(r.get("tag_rfid_atual"), ""),
-
-
-
-
 
 
 
@@ -6908,15 +2913,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "ultima_lon": limpar_float(r.get("ultima_lon"), -38.5267),
-
-
-
-
 
 
 
@@ -6924,15 +2921,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "km_atual": km_at,
-
-
-
-
 
 
 
@@ -6940,15 +2929,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "km_proxima_revisao": km_pr,
-
-
-
-
 
 
 
@@ -6956,15 +2937,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "status_manutencao": limpar_texto(r.get("status_manutencao"), "Em Dia"),
-
-
-
-
 
 
 
@@ -6972,15 +2945,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "proximas_manutencoes": limpar_texto(r.get("proximas_manutencoes"), ""),
-
-
-
-
 
 
 
@@ -6988,27 +2953,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         except Exception:
 
 
 
-
-
-
-
             pass
-
-
-
-
-
-
-
-
 
 
 
@@ -7020,15 +2969,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             df_ps = pd.read_sql_query("SELECT * FROM pesquisas_satisfacao ORDER BY id DESC LIMIT 40", conn)
-
-
-
-
 
 
 
@@ -7036,15 +2977,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 pesquisas.append({
-
-
-
-
 
 
 
@@ -7052,15 +2985,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "os_id": limpar_texto(r.get("os_id"), ""),
-
-
-
-
 
 
 
@@ -7068,15 +2993,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "tecnico": limpar_texto(r.get("tecnico"), ""),
-
-
-
-
 
 
 
@@ -7084,15 +3001,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "comentario": limpar_texto(r.get("comentario"), ""),
-
-
-
-
 
 
 
@@ -7100,15 +3009,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 })
-
-
-
-
 
 
 
@@ -7116,19 +3017,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             pass
-
-
-
-
-
-
-
-
 
 
 
@@ -7140,15 +3029,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     inst_emed_list = []
-
-
-
-
 
 
 
@@ -7156,15 +3037,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         if e.get("validade_calibracao") or "INSTRUMENTO" in str(e.get("categoria", "")).upper() or str(e.get("codigo", "")).startswith("FER-"):
-
-
-
-
 
 
 
@@ -7172,15 +3045,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "codigo": e["codigo"],
-
-
-
-
 
 
 
@@ -7188,15 +3053,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "certificado": e.get("certificado_calibracao") or "RBC-EMED",
-
-
-
-
 
 
 
@@ -7204,15 +3061,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "status_cal": str(e.get("status_cal", "EM DIA")).replace(" ", "_"),
-
-
-
-
 
 
 
@@ -7220,15 +3069,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             })
-
-
-
-
 
 
 
@@ -7236,15 +3077,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     for o in ordens:
-
-
-
-
 
 
 
@@ -7252,15 +3085,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             st_c = calcular_status_calibracao(o.get("data_validade_calibracao", ""))
-
-
-
-
 
 
 
@@ -7268,15 +3093,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "os_id": o["id"],
-
-
-
-
 
 
 
@@ -7284,15 +3101,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "equipamento": o["equipamento"],
-
-
-
-
 
 
 
@@ -7300,15 +3109,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "validade": o.get("data_validade_calibracao") or "N/D",
-
-
-
-
 
 
 
@@ -7316,15 +3117,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "badge": o.get("cal_badge_txt") or "🟢 EM DIA",
-
-
-
-
 
 
 
@@ -7332,15 +3125,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     alarmes_cal["instrumentos_emed"] = inst_emed_list
-
-
-
-
 
 
 
@@ -7352,27 +3137,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     google_url = obter_url_google_review(DB_NAME)
 
 
 
-
-
-
-
     manuais_lista = _listar_manuais_homologados()
-
-
-
-
 
 
 
@@ -7384,31 +3153,13 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     ordens_abertas = [o for o in ordens if not (o.get("status") or "").upper().startswith("CONCLU") and not (o.get("status") or "").upper().startswith("FINAL")]
-
-
 
     tv_criticas = sum(1 for o in ordens_abertas if o.get("categoria_tv") == "CRITICA")
 
-
-
     tv_peca = sum(1 for o in ordens_abertas if o.get("categoria_tv") == "PECA_ORCAMENTO")
 
-
-
     tv_programadas = len(ordens_abertas) - tv_criticas - tv_peca
-
-
-
-
 
 
 
@@ -7416,15 +3167,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     media_sat = round(sum(p["nota"] for p in pesquisas) / len(pesquisas), 1) if pesquisas else 5.0
-
-
-
-
 
 
 
@@ -7432,15 +3175,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     pecas_abaixo_minimo = sum(1 for p in estoque if p["quantidade"] <= p.get("estoque_minimo", 1))
-
-
-
-
 
 
 
@@ -7452,19 +3187,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     banco_respostas = []
-
-
-
-
 
 
 
@@ -7472,15 +3195,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         with get_db_connection(DB_NAME) as conn:
-
-
-
-
 
 
 
@@ -7488,15 +3203,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             cur.execute("""
-
-
-
-
 
 
 
@@ -7504,15 +3211,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-
-
-
 
 
 
@@ -7520,15 +3219,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     categoria TEXT NOT NULL DEFAULT 'SERVICOS_EXECUTADOS',
-
-
-
-
 
 
 
@@ -7536,15 +3227,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     texto TEXT NOT NULL,
-
-
-
-
 
 
 
@@ -7552,15 +3235,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     criado_em TEXT DEFAULT CURRENT_TIMESTAMP
-
-
-
-
 
 
 
@@ -7568,15 +3243,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             """)
-
-
-
-
 
 
 
@@ -7584,15 +3251,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             cur.execute("SELECT id, tecnico, categoria, titulo, texto, equipamento_tipo, criado_em FROM banco_respostas_tecnicos ORDER BY id DESC")
-
-
-
-
 
 
 
@@ -7600,15 +3259,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 banco_respostas.append({
-
-
-
-
 
 
 
@@ -7616,15 +3267,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "tecnico": r[1],
-
-
-
-
 
 
 
@@ -7632,15 +3275,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "titulo": r[3],
-
-
-
-
 
 
 
@@ -7648,15 +3283,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "equipamento_tipo": r[5],
-
-
-
-
 
 
 
@@ -7664,23 +3291,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 })
 
 
 
-
-
-
-
     except Exception as e:
-
-
-
-
 
 
 
@@ -7692,19 +3307,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     resumo_obj = {
-
-
-
-
 
 
 
@@ -7712,15 +3315,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "ativas": qtd_ativas,
-
-
-
-
 
 
 
@@ -7728,15 +3323,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "observacao": qtd_obs,
-
-
-
-
 
 
 
@@ -7744,15 +3331,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "orcamentos_pendentes": orc_pendentes,
-
-
-
-
 
 
 
@@ -7760,15 +3339,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "tv_peca": tv_peca,
-
-
-
-
 
 
 
@@ -7776,15 +3347,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "pendencias_urgentes": qtd_pend_urg,
-
-
-
-
 
 
 
@@ -7792,15 +3355,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "faturamento_total": fat_total,
-
-
-
-
 
 
 
@@ -7808,15 +3363,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "alarmes_calibracao": alarmes_cal.get("total_alarmes_urgentes", 0),
-
-
-
-
 
 
 
@@ -7824,39 +3371,19 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "media_satisfacao": media_sat,
-
-
-
-
 
 
 
         "pecas_zeradas": sum(1 for p in estoque if p["quantidade"] <= 0),
 
-
-
         "pecas_abaixo_minimo": sum(1 for p in estoque if p["quantidade"] <= p.get("estoque_minimo", 1)),
-
-
 
         "total_itens_estoque": len(estoque),
 
-
-
         "itens_com_saldo": sum(1 for p in estoque if p["quantidade"] > 0),
 
-
-
         "valor_total_estoque": sum(p.get("valor_total", 0.0) for p in estoque),
-
-
-
-
 
 
 
@@ -7864,19 +3391,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     }
-
-
-
-
-
-
-
-
 
 
 
@@ -7885,220 +3400,111 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
     logs_auditoria = []
-
     try:
-
         df_aud = pd.read_sql_query("SELECT * FROM auditoria_exclusoes ORDER BY id DESC LIMIT 50", conn)
-
         for _, r in df_aud.iterrows():
-
             logs_auditoria.append({
-
                 "id": int(r.get("id", 0)),
-
                 "tabela": limpar_texto(r.get("tabela_alvo"), ""),
-
                 "registro_id": limpar_texto(r.get("registro_id"), ""),
-
                 "usuario": limpar_texto(r.get("usuario"), ""),
-
                 "data_hora": limpar_texto(r.get("data_hora"), ""),
-
                 "ip_origem": limpar_texto(r.get("ip_origem"), ""),
-
                 "justificativa": limpar_texto(r.get("justificativa"), ""),
-
             })
-
     except Exception:
-
         pass
 
-
-
         # Carga de Clientes e Parque Instalado Hospitalar (EMED)
-
     lista_clientes = []
-
     lista_equipamentos = []
-
     try:
-
         with get_db_connection(DB_NAME) as conn_db:
-
             cur_a = conn_db.cursor()
-
             cur_a.execute("SELECT id, codigo_cliente, nome, cpf_cnpj, razao_social, cidade, estado, telefone, email, contato, tipo_contrato FROM clientes ORDER BY nome ASC")
-
             c_rows = cur_a.fetchall()
-
             c_cols = [d[0] for d in cur_a.description]
-
             lista_clientes = [dict(zip(c_cols, r)) for r in c_rows]
 
-
-
             cur_a.execute("SELECT id, nome, cliente_nome, categoria, categoria_checklist, numero_serie, identificador, cidade, estado, status FROM equipamentos ORDER BY cliente_nome ASC, nome ASC")
-
             e_rows = cur_a.fetchall()
-
             e_cols = [d[0] for d in cur_a.description]
-
             lista_equipamentos = [dict(zip(e_cols, r)) for r in e_rows]
-
     except Exception as e:
-
         print("Aviso ao carregar Clientes/Equipamentos no bootstrap:", e)
 
-
-
     # Clientes Internos e Aniversariantes da Equipe
-
     lista_clientes_internos = []
-
     lista_aniversariantes = []
-
     aniversariantes_hoje = []
-
     aniversariantes_mes = []
 
-
-
     hoje_dm = datetime.now().strftime("%d/%m")
-
     mes_atual = datetime.now().strftime("%m")
-
     hora_atual = datetime.now().hour
 
-
-
     if 5 <= hora_atual < 12:
-
         saudacao_txt = "Bom dia, Família eMED! ☀️"
-
         msg_txt = "Que o dia de hoje seja abençoado, iluminado e de muita união e segurança nos atendimentos. O trabalho técnico de cada um de vocês cuida de vidas com precisão e excelência!"
-
     elif 12 <= hora_atual < 18:
-
         saudacao_txt = "Boa tarde, Equipe eMED! ⚡"
-
         msg_txt = "Seguimos firmes com dedicação, respeito e maestria técnica. Cada OS bem executada fortalece nossa missão na saúde!"
-
     else:
-
         saudacao_txt = "Boa noite, Guerreiros eMED! ⭐"
-
         msg_txt = "Gratidão profunda a cada técnico e colaborador que se dedicou hoje. Que a volta para casa seja em paz e com a certeza do dever cumprido com maestria!"
 
-
-
     msg_dia_obj = {
-
         "saudacao": saudacao_txt,
-
         "mensagem": msg_txt,
-
         "data_formatada": datetime.now().strftime("%d/%m/%Y")
-
     }
 
-
-
     try:
-
         with sqlite3.connect(DB_NAME) as conn_b:
-
             conn_b.row_factory = sqlite3.Row
-
             cur_b = conn_b.cursor()
-
             cur_b.execute("SELECT * FROM clientes_internos ORDER BY id ASC")
-
             lista_clientes_internos = [dict(r) for r in cur_b.fetchall()]
-
             
-
             cur_b.execute("""
-
                 CREATE TABLE IF NOT EXISTS equipe_aniversariantes (
-
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-
                     nome TEXT UNIQUE,
-
                     cargo_setor TEXT,
-
                     data_nascimento TEXT,
-
                     telefone TEXT,
-
                     mensagem_personalizada TEXT
-
                 );
-
             """)
-
             cur_b.execute("SELECT * FROM equipe_aniversariantes ORDER BY data_nascimento ASC, nome ASC")
-
             for r in cur_b.fetchall():
-
                 aniv = dict(r)
-
                 lista_aniversariantes.append(aniv)
-
                 dn = (aniv.get("data_nascimento") or "").strip()
-
                 if dn:
-
                     partes = dn.split("/") if "/" in dn else dn.split("-")
-
                     if len(partes) >= 2:
-
                         d_dia = partes[0] if "/" in dn else partes[2]
-
                         d_mes = partes[1] if "/" in dn else partes[1]
-
                         dm_fmt = f"{int(d_dia):02d}/{int(d_mes):02d}"
-
                         if dm_fmt == hoje_dm:
-
                             aniversariantes_hoje.append(aniv)
-
                         elif f"{int(d_mes):02d}" == mes_atual:
-
                             aniversariantes_mes.append(aniv)
-
     except Exception as e_aniv:
-
         print("Aviso ao carregar clientes internos / aniversariantes:", e_aniv)
 
-
-
     payload = {
-
         "clientes_internos": lista_clientes_internos,
-
         "aniversariantes": lista_aniversariantes,
-
         "aniversariantes_hoje": aniversariantes_hoje,
-
         "aniversariantes_mes": aniversariantes_mes,
-
         "mensagem_dia": msg_dia_obj,
-
         "clientes": lista_clientes,
-
         "clientes_auvo": lista_clientes,
-
         "equipamentos": lista_equipamentos,
-
         "equipamentos_auvo": lista_equipamentos,
-
         "logs_auditoria": logs_auditoria,
-
-
-
-
 
 
 
@@ -8106,15 +3512,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "timestamp": obter_agora_brasil_str("%d/%m/%Y %H:%M:%S"),
-
-
-
-
 
 
 
@@ -8122,15 +3520,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "resumo": resumo_obj,
-
-
-
-
 
 
 
@@ -8138,15 +3528,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "por_status": bi_status,
-
-
-
-
 
 
 
@@ -8154,15 +3536,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "por_cidade": bi_cidade,
-
-
-
-
 
 
 
@@ -8170,15 +3544,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         },
-
-
-
-
 
 
 
@@ -8186,15 +3552,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "rotas_agrupadas": rotas_lista,
-
-
-
-
 
 
 
@@ -8202,15 +3560,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "tecnicos": tecnicos,
-
-
-
-
 
 
 
@@ -8218,15 +3568,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "frota_gps_multas": frota_gps_multas,
-
-
-
-
 
 
 
@@ -8234,19 +3576,9 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "solicitacoes_almox": solicitacoes,
 
-
-
         "ferramentas": ferramentas,
-
-
-
-
 
 
 
@@ -8254,23 +3586,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "notas_fiscais": notas,
-
         "remessas_diagnostico": remessas_lista,
-
         "despesas_recorrentes": despesas_lista,
-
         "transportadoras_parceiras": transportadoras_lista,
-
         "cotacoes_transporte": cotacoes_lista,
-
-
-
-
 
 
 
@@ -8278,15 +3598,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "alarmes_calibracao": alarmes_cal,
-
-
-
-
 
 
 
@@ -8294,15 +3606,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "templates_relatorio": TEMPLATES_RELATORIO_TECNICO,
-
-
-
-
 
 
 
@@ -8310,30 +3614,15 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "kits_servico": SUGESTOES_SEPARACAO_POR_ATIVIDADE,
 
 
 
-
-
-
-
         "google_review_url": google_url,
-        "oportunidades_comerciais": obter_oportunidades_comerciais(DB_NAME),
-
     }
 
-
-
     _CACHE_BOOTSTRAP = payload
-
     _CACHE_BOOTSTRAP_TIME = time.time()
-
-
 
     return web.json_response(payload)
 
@@ -8348,194 +3637,92 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_clientes(request: web.Request) -> web.Response:
-
     """Retorna lista dos clientes cadastrados para busca e autocomplete."""
-
     termo = request.query.get("q", "").strip().upper()
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         if termo:
-
             cur.execute("""
-
                 SELECT id, codigo_cliente, nome, cpf_cnpj, razao_social, cidade, estado, telefone, email, contato, tipo_contrato
-
                 FROM clientes
-
                 WHERE nome LIKE ? OR razao_social LIKE ? OR cpf_cnpj LIKE ? OR cidade LIKE ?
-
                 ORDER BY nome ASC LIMIT 50
-
             """, (f"%{termo}%", f"%{termo}%", f"%{termo}%", f"%{termo}%"))
-
         else:
-
             cur.execute("""
-
                 SELECT id, codigo_cliente, nome, cpf_cnpj, razao_social, cidade, estado, telefone, email, contato, tipo_contrato
-
                 FROM clientes ORDER BY nome ASC
-
             """)
-
         rows = cur.fetchall()
-
         cols = [d[0] for d in cur.description]
-
     return web.json_response({"ok": True, "total": len(rows), "clientes": [dict(zip(cols, r)) for r in rows]})
 
 
-
-
-
 async def api_equipamentos(request: web.Request) -> web.Response:
-
     """Retorna lista dos 1.146 equipamentos com filtros de cliente, categoria e número de série."""
-
     cliente = request.query.get("cliente", "").strip().upper()
-
     cat = request.query.get("categoria", "").strip().upper()
-
     termo = request.query.get("q", "").strip().upper()
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         sql = "SELECT id, nome, cliente_nome, categoria, categoria_checklist, numero_serie, identificador, cidade, estado, status FROM equipamentos WHERE 1=1"
-
         params = []
-
         if cliente:
-
             sql += " AND cliente_nome LIKE ?"
-
             params.append(f"%{cliente}%")
-
         if cat:
-
             sql += " AND (categoria_checklist LIKE ? OR categoria LIKE ?)"
-
             params.extend([f"%{cat}%", f"%{cat}%"])
-
         if termo:
-
             sql += " AND (nome LIKE ? OR numero_serie LIKE ? OR identificador LIKE ?)"
-
             params.extend([f"%{termo}%", f"%{termo}%", f"%{termo}%"])
-
         sql += " ORDER BY cliente_nome ASC, nome ASC"
-
         cur.execute(sql, params)
-
         rows = cur.fetchall()
-
         cols = [d[0] for d in cur.description]
-
     return web.json_response({"ok": True, "total": len(rows), "equipamentos": [dict(zip(cols, r)) for r in rows]})
 
-
-
 # Aliases retrocompatíveis
-
 api_clientes_auvo = api_clientes
-
 api_equipamentos_auvo = api_equipamentos
 
 
-
-
-
 async def api_checklist(request: web.Request) -> web.Response:
-
     equip = request.query.get("equipamento", "")
-
     defeito = request.query.get("defeito", "") or request.query.get("tipo_servico", "")
-
     try:
-
         from emed_services.checklists_especializados import obter_checklist_oficial, identificar_categoria_checklist
-
         cat = identificar_categoria_checklist(equip)
-
         chk = obter_checklist_oficial(equip, cat)
-
         titulo = chk.get("titulo", "Checklist Preventivo Oficial")
-
         itens_obj = chk.get("itens", [])
-
         acoes = [it["item"] if isinstance(it, dict) else str(it) for it in itens_obj]
-
     except Exception:
-
         cat = "RAIOS-X FIXO"
-
         titulo = "Checklist Preventivo Oficial"
-
         acoes = obter_checklist_acoes_sugeridas(equip, defeito)
-
         itens_obj = [{"item": a, "grupo": "Geral"} for a in acoes]
 
-
-
     sugestao_ia = gerar_sugestao_relatorio_clinico(equip, defeito)
-
     return web.json_response({
-
         "ok": True,
-
         "categoria": cat,
-
         "titulo": titulo,
-
         "acoes": acoes,
-
         "itens_checklist": acoes,
-
         "itens_estruturados": itens_obj,
-
         "frases_relatorio": [sugestao_ia] if sugestao_ia else [],
-
         "sugestao_ia": sugestao_ia,
-
     })
 
 
 
-
-
-
-
     equip = request.query.get("equipamento", "")
 
 
 
-
-
-
-
     defeito = request.query.get("defeito", "") or request.query.get("tipo_servico", "")
-
-
-
-
 
 
 
@@ -8543,15 +3730,7 @@ async def api_checklist(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     sugestao_ia = gerar_sugestao_relatorio_clinico(equip, defeito)
-
-
-
-
 
 
 
@@ -8559,15 +3738,7 @@ async def api_checklist(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "ok": True,
-
-
-
-
 
 
 
@@ -8575,15 +3746,7 @@ async def api_checklist(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "itens_checklist": acoes,
-
-
-
-
 
 
 
@@ -8591,31 +3754,11 @@ async def api_checklist(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "sugestao_ia": sugestao_ia,
 
 
 
-
-
-
-
     })
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -8631,15 +3774,7 @@ async def api_triagem(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     equip = request.query.get("equipamento", "")
-
-
-
-
 
 
 
@@ -8647,15 +3782,7 @@ async def api_triagem(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     modalidade = _detectar_modalidade(equip, defeito)
-
-
-
-
 
 
 
@@ -8663,15 +3790,7 @@ async def api_triagem(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     return web.json_response({
-
-
-
-
 
 
 
@@ -8679,15 +3798,7 @@ async def api_triagem(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "modalidade": modalidade,
-
-
-
-
 
 
 
@@ -8695,31 +3806,11 @@ async def api_triagem(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "perguntas": triagem,
 
 
 
-
-
-
-
     })
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -8735,15 +3826,7 @@ async def api_salvar_rascunho(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     body = await request.json()
-
-
-
-
 
 
 
@@ -8751,15 +3834,7 @@ async def api_salvar_rascunho(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     dados = body.get("dados", {})
-
-
-
-
 
 
 
@@ -8767,23 +3842,11 @@ async def api_salvar_rascunho(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         return web.json_response({"ok": False, "msg": "os_id ausente"}, status=400)
 
 
 
-
-
-
-
     ok, msg = salvar_rascunho_provisorio(DB_NAME, os_id, dados)
-
-
-
-
 
 
 
@@ -8799,99 +3862,45 @@ async def api_salvar_rascunho(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_iniciar_rota(request: web.Request) -> web.Response:
-
-
 
     """Registra início de deslocamento do técnico para o cliente e ativa rota (fuso Brasil)."""
 
-
-
     body = await request.json()
-
-
 
     os_id = str(body.get("os_id", "")).strip()
 
-
-
     df = _carregar_df_direto()
-
-
 
     hora_atual = obter_agora_brasil_str("%d/%m/%Y %H:%M")
 
 
 
-
-
-
-
     for idx, row in df.iterrows():
-
-
 
         if str(obter_id_os(idx, row)) == os_id:
 
-
-
             df.at[idx, "status"] = "A CAMINHO"
-
-
 
             df.at[idx, "deslocamento_inicio_hora"] = hora_atual
 
-
-
             _salvar_df_direto(df)
-
-
 
             return web.json_response({
 
-
-
                 "ok": True,
-
-
 
                 "os_id": os_id,
 
-
-
                 "cliente": limpar_texto(row.get("cliente")),
-
-
 
                 "equipamento": limpar_texto(row.get("equipamento")),
 
-
-
                 "deslocamento_inicio_hora": hora_atual,
-
-
 
                 "msg": f"🚗 Rota iniciada para {limpar_texto(row.get('cliente'))} às {hora_atual}!"
 
-
-
             })
-
-
-
-
 
 
 
@@ -8901,17 +3910,7 @@ async def api_iniciar_rota(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
 async def api_checkin(request: web.Request) -> web.Response:
-
-
-
-
 
 
 
@@ -8919,15 +3918,7 @@ async def api_checkin(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     os_id = str(body.get("os_id", "")).strip()
-
-
-
-
 
 
 
@@ -8935,39 +3926,17 @@ async def api_checkin(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     # Prioriza o horário local do celular/dispositivo do técnico (UTC-3 Brasil)
-
-
 
     hora_cliente = str(body.get("hora_local", "")).strip()
 
-
-
     if hora_cliente and len(hora_cliente) >= 16 and "/" in hora_cliente and ":" in hora_cliente:
-
-
 
         agora_str = hora_cliente
 
-
-
     else:
 
-
-
         agora_str = obter_agora_brasil_str("%d/%m/%Y %H:%M")
-
-
-
-
-
-
-
-
 
 
 
@@ -8979,15 +3948,7 @@ async def api_checkin(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         if str(obter_id_os(idx, row)) == os_id:
-
-
-
-
 
 
 
@@ -8995,23 +3956,11 @@ async def api_checkin(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             df.at[idx, "confirmado"] = "SIM"
 
 
 
-
-
-
-
             _salvar_df_direto(df)
-
-
-
-
 
 
 
@@ -9023,14 +3972,6 @@ async def api_checkin(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     return web.json_response({"ok": False, "msg": f"OS #{os_id} não encontrada."}, status=404)
 
 
@@ -9042,155 +3983,8 @@ async def api_checkin(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-async def api_checkout(request: web.Request) -> web.Response:
-    """Registra checkout e encerramento de atendimento no cliente com validacao GPS e calculo de duracao (fuso Brasil)."""
-    body = await request.json()
-    os_id = str(body.get("os_id", "")).strip()
-    dist_m = body.get("distancia_metros")
-    metodo = str(body.get("metodo", "GPS_SAIDA")).strip()
-    df = _carregar_df_direto()
-    hora_cliente = str(body.get("hora_local", "")).strip()
-    if hora_cliente and len(hora_cliente) >= 16 and "/" in hora_cliente and ":" in hora_cliente:
-        agora_str = hora_cliente
-    else:
-        agora_str = obter_agora_brasil_str("%d/%m/%Y %H:%M")
-
-    for idx, row in df.iterrows():
-        if str(obter_id_os(idx, row)) == os_id:
-            df.at[idx, "checkout_hora"] = agora_str
-            df.at[idx, "status"] = "CONCLUÍDO"
-            cin = limpar_texto(row.get("checkin_hora"), "") or agora_str
-            duracao = calcular_duracao_os(cin, agora_str)
-            df.at[idx, "tempo_atendimento"] = duracao
-            _salvar_df_direto(df)
-            return web.json_response({
-                "ok": True,
-                "os_id": os_id,
-                "checkout_hora": agora_str,
-                "tempo_atendimento": duracao,
-                "msg": f"🏁 Check-out registrado na OS #{os_id} às {agora_str} (Duração: {duracao})!"
-            })
-
-    return web.json_response({"ok": False, "msg": f"OS #{os_id} não encontrada."}, status=404)
-
-
-async def api_frota_assumir_veiculo(request: web.Request) -> web.Response:
-    """Permite que o técnico assuma o volante do veículo via NFC ou Aplicativo, desvinculando o anterior para auditoria/DETRAN."""
-    body = await request.json()
-    vid = int(limpar_float(body.get("veiculo_id"), 0))
-    placa = str(body.get("placa", "")).strip().upper()
-    tecnico = str(body.get("tecnico", "")).strip().upper()
-    metodo = str(body.get("metodo", "APP")).strip().upper()
-    tag_nfc = str(body.get("tag_nfc", "")).strip()
-    km_informado = int(limpar_float(body.get("km_atual"), 0))
-    lat = float(limpar_float(body.get("lat"), -3.7319))
-    lon = float(limpar_float(body.get("lon"), -38.5267))
-    agora_str = obter_agora_brasil_str("%d/%m/%Y %H:%M")
-
-    if not tecnico:
-        return web.json_response({"ok": False, "msg": "Técnico não informado."}, status=400)
-
-    with get_db_connection(DB_NAME) as conn:
-        cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS frota_troca_condutores (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                veiculo_id INTEGER,
-                placa TEXT,
-                modelo TEXT,
-                condutor_anterior TEXT,
-                novo_condutor TEXT,
-                metodo TEXT,
-                tag_nfc TEXT,
-                data_hora TEXT,
-                km_atual INTEGER DEFAULT 0,
-                lat REAL,
-                lon REAL,
-                observacao_auditoria TEXT
-            );
-        """)
-        if vid > 0:
-            cur.execute("SELECT id, modelo, placa, condutor_atual, km_atual FROM veiculos WHERE id = ?", (vid,))
-        elif placa:
-            cur.execute("SELECT id, modelo, placa, condutor_atual, km_atual FROM veiculos WHERE UPPER(placa) = ?", (placa,))
-        else:
-            return web.json_response({"ok": False, "msg": "Veículo não especificado."}, status=400)
-
-        row_v = cur.fetchone()
-        if not row_v:
-            return web.json_response({"ok": False, "msg": "Veículo não encontrado."}, status=404)
-
-        v_id, modelo, v_placa, condutor_ant, km_db = row_v[0], row_v[1], row_v[2], row_v[3], row_v[4]
-        km_usar = km_informado if km_informado > 0 else km_db
-
-        obs_auditoria = (
-            f"Troca de condutor registrada via {metodo}. "
-            f"Condutor anterior '{condutor_ant}' desvinculado e substituído por '{tecnico}' às {agora_str}. "
-            f"Registro para fins de responsabilidade DETRAN, multas e seguro."
-        )
-
-        cur.execute("""
-            INSERT INTO frota_troca_condutores 
-            (veiculo_id, placa, modelo, condutor_anterior, novo_condutor, metodo, tag_nfc, data_hora, km_atual, lat, lon, observacao_auditoria)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (v_id, v_placa, modelo, condutor_ant, tecnico, metodo, tag_nfc, agora_str, km_usar, lat, lon, obs_auditoria))
-
-        tag_rfid = f"NFC_{tag_nfc}" if (metodo == "NFC" and tag_nfc) else "APP_CELULAR"
-        cur.execute("""
-            UPDATE veiculos 
-            SET condutor_atual = ?, tag_rfid_atual = ?, ultima_atualizacao_gps = ?
-            WHERE id = ?
-        """, (tecnico, tag_rfid, agora_str, v_id))
-        conn.commit()
-
-    return web.json_response({
-        "ok": True,
-        "msg": f"🚗 Você assumiu o volante do {modelo} ({v_placa}) com sucesso via {metodo}!",
-        "veiculo_id": v_id,
-        "modelo": modelo,
-        "placa": v_placa,
-        "condutor_anterior": condutor_ant,
-        "novo_condutor": tecnico,
-        "metodo": metodo,
-        "data_hora": agora_str
-    })
-
-
-async def api_frota_troca_condutores_historico(request: web.Request) -> web.Response:
-    with get_db_connection(DB_NAME) as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT id, veiculo_id, placa, modelo, condutor_anterior, novo_condutor, metodo, data_hora, observacao_auditoria FROM frota_troca_condutores ORDER BY id DESC LIMIT 50")
-        rows = cur.fetchall()
-        historico = [
-            {
-                "id": r[0], "veiculo_id": r[1], "placa": r[2], "modelo": r[3],
-                "condutor_anterior": r[4], "novo_condutor": r[5], "metodo": r[6],
-                "data_hora": r[7], "observacao": r[8]
-            }
-            for r in rows
-        ]
-    return web.json_response({"ok": True, "historico": historico})
 
 def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
-
-
-
-
 
 
 
@@ -9198,15 +3992,7 @@ def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
 
 
 
-
-
-
-
         return ""
-
-
-
-
 
 
 
@@ -9214,15 +4000,7 @@ def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
 
 
 
-
-
-
-
         header, encoded = str(b64_str).split(",", 1)
-
-
-
-
 
 
 
@@ -9230,15 +4008,7 @@ def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
 
 
 
-
-
-
-
         pasta = os.path.join(BASE_DIR, "uploads_os")
-
-
-
-
 
 
 
@@ -9246,15 +4016,7 @@ def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
 
 
 
-
-
-
-
         ts = obter_agora_brasil_str("%Y%m%d_%H%M%S")
-
-
-
-
 
 
 
@@ -9262,15 +4024,7 @@ def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
 
 
 
-
-
-
-
         with open(caminho, "wb") as f:
-
-
-
-
 
 
 
@@ -9278,15 +4032,7 @@ def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
 
 
 
-
-
-
-
         return caminho
-
-
-
-
 
 
 
@@ -9294,24 +4040,7 @@ def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
 
 
 
-
-
-
-
         return ""
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -9325,718 +4054,360 @@ def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
 
 
 async def api_fiscal_danfe(request: web.Request) -> web.Response:
-
     os_id = request.match_info.get("os_id", "").strip()
-
     df = _carregar_df_direto()
-
     row_os = None
-
     for idx, row in df.iterrows():
-
         if str(obter_id_os(idx, row)) == os_id:
-
             row_os = row
-
             break
 
-
-
     dados_nf = {}
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         cur.execute("SELECT * FROM notas_fiscais WHERE os_id = ?", (os_id,))
-
         r = cur.fetchone()
-
         if r:
-
             cols = [d[0] for d in cur.description]
-
             dados_nf = dict(zip(cols, r))
 
-
-
     # Fallback caso não esteja na tabela notas_fiscais ainda
-
     cli_nome = limpar_texto(row_os.get("cliente") if row_os is not None else dados_nf.get("cliente", "CLIENTE EMED"), "CLIENTE EMED")
-
     cnpj_cli = limpar_texto(row_os.get("cnpj") if row_os is not None else dados_nf.get("cnpj_tomador", ""), "00.000.000/0000-00")
-
     end_cli = limpar_texto(row_os.get("endereco") if row_os is not None else "", "UNIDADE HOSPITALAR")
-
     cid_cli = limpar_texto(row_os.get("cidade") if row_os is not None else "", "FORTALEZA")
-
     uf_cli = limpar_texto(row_os.get("estado") if row_os is not None else "", "CE")
-
     equip_nome = limpar_texto(row_os.get("equipamento") if row_os is not None else "", "EQUIPAMENTO HOSPITALAR")
-
     tec_nome = limpar_texto(row_os.get("tecnico_responsavel") if row_os is not None else "", "MARCOS")
-
     srv_tipo = limpar_texto(row_os.get("tipo_servico") if row_os is not None else "", "CORRETIVA (GERAL)")
 
-
-
     num_nf = dados_nf.get("numero_nf") or (row_os.get("numero_nf") if row_os is not None else "") or f"NFS-{os_id.zfill(4)}"
-
     st_fiscal = dados_nf.get("status_fiscal") or (row_os.get("status_fiscal") if row_os is not None else "EMITIDA")
-
     tipo_nota = dados_nf.get("tipo_nota") or "100% NOTA DE SERVIÇO (NFS-e)"
-
     dt_emissao = dados_nf.get("data_emissao") or (row_os.get("data_agendamento") if row_os is not None else "") or obter_agora_brasil_str("%d/%m/%Y")
-
     chave = dados_nf.get("chave_acesso") or f"2326 1003 6119 7400 0108 5500 1000 {os_id.zfill(4)} 1004 8291 3824"
-
     val_srv = float(dados_nf.get("valor_servicos") or 0.0)
-
     val_pec = float(dados_nf.get("valor_pecas") or 0.0)
-
     if val_srv == 0 and val_pec == 0 and row_os is not None:
-
         val_total_os = float(row_os.get("valor_os") or 0.0)
-
         val_srv = val_total_os
-
     val_total = val_srv + val_pec
-
     descr = dados_nf.get("discriminacao_servico") or f"Prestação de serviços especializados de engenharia clínica e manutenção técnica no equipamento {equip_nome}. Atendimento OS #{os_id}."
 
-
-
     # Peças vinculadas
-
     pecas = []
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         cur.execute("SELECT itens_solicitados, codigo_peca, tipo_origem_peca FROM solicitacoes_pecas WHERE os_id = ?", (os_id,))
-
         for r_p in cur.fetchall():
-
             pecas.append({"item": r_p[0], "codigo": r_p[1] or "PEC", "origem": r_p[2] or "NOVA_COM_NF"})
 
-
-
     email_cli = limpar_texto(row_os.get("email") if row_os is not None else dados_nf.get("email_cliente", ""), "")
-
     whats_raw = row_os.get("whatsapp") if row_os is not None else ""
-
     whats_cli = _limpar_telefone_exibicao(whats_raw)
-
     whats_digits = "".join([c for c in str(whats_raw) if c.isdigit()])
-
     email_env_em = dados_nf.get("email_enviado_em", "")
-
     lote_mes = dados_nf.get("lote_contabilidade_mes") or obter_agora_brasil_str("%Y-%m")
-
     try:
-
         partes_l = lote_mes.split("-")
-
         lote_mes_fmt = f"{partes_l[1]}/{partes_l[0]}" if len(partes_l) == 2 else lote_mes
-
     except Exception:
-
         lote_mes_fmt = lote_mes
-
     enviado_contab = dados_nf.get("enviado_contabilidade", 0)
-
     data_envio_contab = dados_nf.get("data_envio_contabilidade", "")
 
-
-
     whats_msg = f"Olá, segue o espelho oficial da Nota Fiscal Eletrônica {num_nf} (OS #{os_id}) emitida pela EMED Eletromedicina: http://localhost:8502/api/fiscal/danfe/{os_id}"
-
     whats_msg_enc = urllib.parse.quote(whats_msg)
 
-
-
     badge_status_cliente = f"Enviada em {email_env_em}" if email_env_em else "Envio Pendente"
-
     badge_style_cliente = "background:#dcfce7;color:#15803d;border:1px solid #86efac;" if email_env_em else "background:#fef3c7;color:#b45309;border:1px solid #fde68a;"
-
     txt_contab = f"✅ Lote Transmitido à Contabilidade ({data_envio_contab})" if enviado_contab else "🟡 Na fila de envio contábil no final do mês"
-
     cor_contab = "color:#059669;" if enviado_contab else "color:#d97706;"
 
-
-
     filial_emissora = dados_nf.get("filial_emissora") or ("FILIAL_DF" if uf_cli == "DF" else "MATRIZ_CE")
-
     prestador_razao = dados_nf.get("prestador_razao") or ("EMED ELETROMEDICINA LTDA. - FILIAL BRASÍLIA" if filial_emissora == "FILIAL_DF" else "EMED ELETROMEDICINA LTDA.")
-
     prestador_cnpj = dados_nf.get("prestador_cnpj") or ("03.611.974/0002-80" if filial_emissora == "FILIAL_DF" else "03.611.974/0001-08")
-
     prestador_im = dados_nf.get("prestador_im") or ("61-3234-3647" if filial_emissora == "FILIAL_DF" else "123456-7")
-
     prestador_end = dados_nf.get("prestador_endereco") or ("Rua 3, Chácara 46A, Lote 01 - Vicente Pires, CEP 72007-850" if filial_emissora == "FILIAL_DF" else "Rua Coronel Freire, 16 - Bairro Amador, CEP 61769-470")
-
     prestador_cid = dados_nf.get("prestador_cidade") or ("Brasília" if filial_emissora == "FILIAL_DF" else "Eusébio")
-
     prestador_uf = dados_nf.get("prestador_uf") or ("DF" if filial_emissora == "FILIAL_DF" else "CE")
-
     prestador_fone = dados_nf.get("prestador_fone") or ("(61) 3234-3647 / (61) 99658-5392" if filial_emissora == "FILIAL_DF" else "(85) 3254-2929")
-
     prestador_email = dados_nf.get("prestador_email") or ("brasilia@emed.med.br" if filial_emissora == "FILIAL_DF" else "financeiro@emed.med.br")
-
     orgao_emissor = "SECRETARIA DE FAZENDA DO DISTRITO FEDERAL (SEFAZ-DF)" if filial_emissora == "FILIAL_DF" else "PREFEITURA MUNICIPAL DE EUSÉBIO - CE"
-
     doc_aux_titulo = "DOCUMENTO AUXILIAR DA NFS-e DF" if filial_emissora == "FILIAL_DF" else "DOCUMENTO AUXILIAR DA NFS-e / NF-e"
-
     sub_titulo_unidade = "Unidade Brasília (DF)" if filial_emissora == "FILIAL_DF" else "Matriz Ceará"
 
-
-
     html_danfe = f"""<!DOCTYPE html>
-
 <html lang="pt-BR">
-
 <head>
-
   <meta charset="UTF-8">
-
   <title>DANFE / Espelho da Nota Fiscal — OS #{os_id} ({num_nf})</title>
-
   <style>
-
     @page {{ size: A4 portrait; margin: 10mm; }}
-
     * {{ box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }}
-
     body {{ background: #f8fafc; margin: 0; padding: 20px; color: #0b132b; }}
-
     .danfe-box {{ max-width: 820px; margin: 0 auto; background: #fff; border: 2px solid #002b54; border-radius: 8px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }}
-
     .no-print {{ background: #002b54; color: #fff; padding: 10px 16px; margin: -20px -20px 20px -20px; border-radius: 6px 6px 0 0; display: flex; justify-content: space-between; align-items: center; }}
-
     .btn-print {{ background: #0077b6; color: #fff; border: none; padding: 8px 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
-
     .btn-print:hover {{ background: #023e8a; }}
-
     .header-tbl {{ width: 100%; border-bottom: 2px solid #002b54; padding-bottom: 12px; margin-bottom: 12px; }}
-
     .title-danfe {{ font-size: 16px; font-weight: 900; color: #002b54; text-transform: uppercase; }}
-
     .badge-nf {{ background: #dcfce7; color: #15803d; border: 1.5px solid #86efac; padding: 3px 8px; border-radius: 4px; font-weight: 800; font-size: 11px; }}
-
     .sec-header {{ background: #002b54; color: #fff; font-size: 11px; font-weight: 800; padding: 5px 8px; margin: 12px 0 4px 0; border-radius: 4px; text-transform: uppercase; }}
-
     .data-tbl {{ width: 100%; border-collapse: collapse; font-size: 11.5px; margin-bottom: 6px; }}
-
     .data-tbl td, .data-tbl th {{ border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }}
-
     .data-tbl th {{ background: #f1f5f9; font-weight: 700; color: #334155; }}
-
     .val-destaque {{ font-size: 15px; font-weight: 900; color: #059669; }}
-
     @media print {{
-
       body {{ background: #fff; padding: 0; }}
-
       .danfe-box {{ border: 1px solid #000; box-shadow: none; max-width: 100%; padding: 12px; }}
-
       .no-print {{ display: none !important; }}
-
     }}
-
   </style>
-
 </head>
-
 <body>
-
   <div class="danfe-box">
-
     <div class="no-print">
-
       <div style="font-weight: bold; font-size: 14px;">🧾 Sistema Fiscal EMED — Espelho Oficial de Nota Fiscal</div>
-
       <div style="display:flex;gap:6px;align-items:center;">
-
         <button class="btn-print" onclick="window.print()">🖨️ Imprimir / PDF</button>
-
         <button class="btn-print" style="background:#059669;" onclick="document.getElementById('painelEnvioCliente').scrollIntoView({{behavior:'smooth'}})">📧 Enviar p/ Cliente</button>
-
         <button class="btn-print" style="background:#64748b;margin-left:6px;" onclick="window.close()">✕ Fechar</button>
-
       </div>
-
     </div>
-
-
 
     <!-- PAINEL DE CONFERÊNCIA, ENVIO POR E-MAIL E INTEGRAÇÃO CONTÁBIL -->
-
     <div id="painelEnvioCliente" class="no-print" style="background: #eff6ff; border: 2px solid #3b82f6; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
-
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
-
         <div style="flex:1;min-width:280px;">
-
           <div style="font-weight:900;color:#1e3a8a;font-size:13.5px;display:flex;align-items:center;gap:6px;">
-
             <span>✉️ Enviar Nota Fiscal para o Cliente</span>
-
             <span id="badgeEnvioCliente" style="font-size:10.5px;padding:2px 8px;border-radius:4px;font-weight:bold;{badge_style_cliente}">
-
               {badge_status_cliente}
-
             </span>
-
           </div>
-
           <div style="font-size:11.5px;color:#1e40af;margin-top:2px;margin-bottom:8px;">
-
             Confira as informações da nota fiscal e envie diretamente para o e-mail cadastrado do cliente hospitalar.
-
           </div>
-
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-
             <input type="email" id="inputEmailCliente" value="{email_cli}" placeholder="ex: faturamento@hospital.com.br"
-
                    style="flex:1;min-width:240px;padding:8px 10px;font-size:12px;border:1.5px solid #93c5fd;border-radius:6px;font-weight:600;outline:none;" />
-
             <button type="button" id="btnDispararEnvio" onclick="enviarNotaParaCliente('{os_id}')"
-
                     style="background:#2563eb;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:bold;font-size:12px;cursor:pointer;">
-
               🚀 Disparar E-mail
-
             </button>
-
             <a id="btnMailto" href="mailto:{email_cli}?subject=Nota%20Fiscal%20Eletronica%20{num_nf}%20-%20EMED&body=Segue%20espelho%20da%20Nota%20Fiscal%20Eletronica%20{num_nf}%20referente%20a%20OS%20#{os_id}:%20http://localhost:8502/api/fiscal/danfe/{os_id}" target="_blank"
-
                style="background:#fff;color:#1d4ed8;border:1.5px solid #93c5fd;padding:7px 12px;border-radius:6px;font-weight:bold;font-size:11.5px;text-decoration:none;">
-
               📬 Outlook / Gmail
-
             </a>
-
             <a href="https://api.whatsapp.com/send?phone=55{whats_digits}&text={whats_msg_enc}" target="_blank"
-
                style="background:#16a34a;color:#fff;border:none;padding:7px 12px;border-radius:6px;font-weight:bold;font-size:11.5px;text-decoration:none;">
-
               📲 WhatsApp
-
             </a>
-
           </div>
-
           <div id="msgStatusEnvio" style="margin-top:8px;font-size:11.5px;font-weight:bold;display:none;"></div>
-
         </div>
-
-
 
         <div style="background:#fff;border:1.5px solid #bfdbfe;border-radius:6px;padding:10px 14px;min-width:240px;">
-
           <div style="font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;">Fechamento Contábil Oficial</div>
-
           <div style="font-size:13px;font-weight:900;color:#0284c7;margin:2px 0;">📁 Lote Contábil: {lote_mes_fmt}</div>
-
           <div style="font-size:11px;font-weight:bold;{cor_contab}">
-
             {txt_contab}
-
           </div>
-
           <div style="font-size:9.5px;color:#64748b;margin-top:3px;">
-
             A nota fiscal é automaticamente agrupada para a apuração mensal do DAS/ISS pela assessoria contábil.
-
           </div>
-
         </div>
-
       </div>
-
     </div>
-
-
 
     <!-- CABEÇALHO EMED -->
-
     <table class="header-tbl">
-
       <tr>
-
         <td style="width: 140px; vertical-align: middle;">
-
           <img src="/api/logo-circle" alt="EMED" style="width: 100px; height: auto;" onerror="this.src='/api/logo'" />
-
         </td>
-
         <td style="vertical-align: middle;">
-
           <div class="title-danfe">{prestador_razao}</div>
-
           <div style="font-size: 11px; color: #0077b6; font-weight: bold; margin-top: 1px;">Eletromedicina • Manutenção em Equipamentos de Diagnóstico por Imagem • {sub_titulo_unidade}</div>
-
           <div style="font-size: 10px; color: #475569; margin-top: 3px; line-height: 1.35;">
-
             <b>CNPJ:</b> {prestador_cnpj} &bull; <b>{'CF/DF' if filial_emissora == 'FILIAL_DF' else 'Insc. Municipal'}:</b> {prestador_im} &bull; <b>Órgão:</b> {orgao_emissor}<br/>
-
             <b>Endereço Emissor:</b> {prestador_end}, {prestador_cid} - {prestador_uf} &bull; <b>Fone:</b> {prestador_fone}<br/>
-
             <b>Site:</b> emed.med.br &bull; <b>E-mail:</b> {prestador_email}
-
           </div>
-
         </td>
-
         <td style="width: 230px; vertical-align: middle; text-align: right;">
-
           <div style="border: 2px solid #002b54; border-radius: 6px; padding: 8px; background: #f8fafc; text-align: center;">
-
             <div style="font-size: 10px; font-weight: 800; color: #002b54;">{doc_aux_titulo}</div>
-
             <div style="font-size: 16px; font-weight: 900; color: #0b132b; margin: 3px 0;">{num_nf}</div>
-
             <div class="badge-nf">STATUS: {st_fiscal}</div>
-
             <div style="font-size: 9.5px; color: #64748b; margin-top: 4px;">Emissão: <b>{dt_emissao}</b></div>
-
           </div>
-
         </td>
-
       </tr>
-
     </table>
-
-
 
     <div style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 4px; font-size: 10px; margin-bottom: 8px;">
-
       <b>Chave de Autenticação / Protocolo Digital:</b> <span style="font-family: monospace; letter-spacing: 0.5px;">{chave}</span>
-
     </div>
-
-
 
     <!-- TOMADOR DOS SERVIÇOS -->
-
     <div class="sec-header">1. Dados do Tomador / Cliente Hospitalar</div>
-
     <table class="data-tbl">
-
       <tr>
-
         <td colspan="2"><span style="color:#64748b;">Razão Social / Nome:</span> <b>{cli_nome}</b></td>
-
         <td><span style="color:#64748b;">CNPJ / CPF:</span> <b>{cnpj_cli}</b></td>
-
       </tr>
-
       <tr>
-
         <td colspan="2"><span style="color:#64748b;">Endereço:</span> <b>{end_cli}</b></td>
-
         <td><span style="color:#64748b;">Município / UF:</span> <b>{cid_cli} - {uf_cli}</b></td>
-
       </tr>
-
     </table>
-
-
 
     <!-- DADOS DA ORDEM DE SERVIÇO -->
-
     <div class="sec-header">2. Identificação da Ordem de Serviço & Atendimento Técnico</div>
-
     <table class="data-tbl">
-
       <tr>
-
         <td><span style="color:#64748b;">OS Vinculada:</span> <b>#{os_id}</b></td>
-
         <td><span style="color:#64748b;">Equipamento:</span> <b>{equip_nome}</b></td>
-
         <td><span style="color:#64748b;">Tipo de Serviço:</span> <b>{srv_tipo}</b></td>
-
         <td><span style="color:#64748b;">Técnico Responsável:</span> <b>{tec_nome}</b></td>
-
       </tr>
-
     </table>
-
-
 
     <!-- DISCRIMINAÇÃO DOS SERVIÇOS & PEÇAS -->
-
     <div class="sec-header">3. Discriminação dos Serviços de Engenharia Clínica & Peças</div>
-
     <div style="border: 1px solid #cbd5e1; padding: 10px; border-radius: 4px; font-size: 11.5px; background: #fafafa; min-height: 80px; line-height: 1.5; margin-bottom: 8px;">
-
       <b>{tipo_nota}</b><br/>
-
       {descr}<br/><br/>
-
       {"<b>Peças Aplicadas no Atendimento:</b><br/>" + "".join([f"&bull; [{p['origem']}] {p['item']} (Cód: {p['codigo']})<br/>" for p in pecas]) if pecas else "<i>Nenhuma peça faturada separadamente (mão de obra e insumos inclusos no serviço clínico).</i>"}
-
     </div>
-
-
 
     <!-- QUADRO DE VALORES -->
-
     <div class="sec-header">4. Valores e Tributação Consolidada</div>
-
     <table class="data-tbl">
-
       <thead>
-
         <tr>
-
           <th>Valor Mão de Obra / Serviços</th>
-
           <th>Valor Peças / Produtos</th>
-
           <th>Deduções / Descontos</th>
-
           <th>Base de Cálculo ISS</th>
-
           <th>VALOR TOTAL DA NOTA FISCAL</th>
-
         </tr>
-
       </thead>
-
       <tbody>
-
         <tr>
-
           <td style="font-weight: bold; font-size: 13px;">R$ {val_srv:,.2f}</td>
-
           <td style="font-weight: bold; font-size: 13px;">R$ {val_pec:,.2f}</td>
-
           <td>R$ 0,00</td>
-
           <td>R$ {val_srv:,.2f}</td>
-
           <td class="val-destaque">R$ {val_total:,.2f}</td>
-
         </tr>
-
       </tbody>
-
     </table>
 
-
-
     <!-- INFORMAÇÕES COMPLEMENTARES -->
-
     <div class="sec-header">5. Informações Complementares e Fiscais</div>
-
     <div style="border: 1px solid #cbd5e1; padding: 8px; border-radius: 4px; font-size: 10px; color: #475569; line-height: 1.4; background: #fff;">
-
       &bull; DOCUMENTO EMITIDO POR ME OU EPP OPTANTE PELO SIMPLES NACIONAL.<br/>
-
       &bull; NÃO GERA DIREITO A CRÉDITO FISCAL DE IPI / ICMS.<br/>
-
       &bull; Valor aproximado dos tributos federais e municipais (IBPT): R$ {(val_total * 0.1345):,.2f} (13,45%).<br/>
-
       &bull; Serviços de Manutenção Preventiva/Corretiva e Validação Metrológica de Equipamentos Médicos Hospitalares em conformidade com as normas ANVISA RDC 611 e ABNT NBR IEC 60601.
-
     </div>
-
-
 
     <div style="margin-top: 14px; text-align: center; font-size: 9.5px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 8px;">
-
       EMED Eletromedicina Ltda. &bull; Comprovante Digital de Faturamento Homologado &bull; Emitido pelo Sistema Oficial EMED
-
     </div>
-
   </div>
-
   <script>
-
     async function enviarNotaParaCliente(osId) {{
-
       var email = document.getElementById('inputEmailCliente').value.trim();
-
       if (!email || email.indexOf('@') === -1) {{
-
         alert('Por favor, informe um endereço de e-mail válido para o cliente.');
-
         return;
-
       }}
-
       var btn = document.getElementById('btnDispararEnvio');
-
       var msg = document.getElementById('msgStatusEnvio');
-
       btn.disabled = true;
-
       btn.innerText = 'Enviando...';
-
       try {{
-
         var res = await fetch('/api/fiscal/enviar-cliente', {{
-
           method: 'POST',
-
           headers: {{ 'Content-Type': 'application/json' }},
-
           body: JSON.stringify({{ os_id: osId, email: email }})
-
         }});
-
         var data = await res.json();
-
         if (data.ok) {{
-
           msg.style.display = 'block';
-
           msg.style.color = '#15803d';
-
           msg.innerHTML = '✅ ' + data.msg + ' &bull; Vinculada ao Lote Contábil ' + (data.lote_contabilidade || '') + '.';
-
           var mailto = document.getElementById('btnMailto');
-
           if (mailto && data.mailto_url) mailto.href = data.mailto_url;
-
           var badge = document.getElementById('badgeEnvioCliente');
-
           if (badge) {{
-
             badge.innerText = 'Enviada em ' + data.email_enviado_em;
-
             badge.style.background = '#dcfce7';
-
             badge.style.color = '#15803d';
-
             badge.style.border = '1px solid #86efac';
-
           }}
-
         }} else {{
-
           msg.style.display = 'block';
-
           msg.style.color = '#dc2626';
-
           msg.innerText = '⚠️ ' + (data.msg || 'Erro ao enviar e-mail.');
-
         }}
-
       }} catch (err) {{
-
         msg.style.display = 'block';
-
         msg.style.color = '#dc2626';
-
         msg.innerText = '⚠️ Falha de comunicação: ' + err.message;
-
       }} finally {{
-
         btn.disabled = false;
-
         btn.innerText = '🚀 Disparar E-mail';
-
       }}
-
     }}
-
   </script>
-
 </body>
-
 </html>"""
-
     return web.Response(body=html_danfe, content_type="text/html", charset="utf-8")
 
 
-
-
-
 async def api_tecnico_assinatura_salvar(request: web.Request) -> web.Response:
-
     body = await request.json()
-
     nome = limpar_texto(body.get("nome"), "").strip().upper()
-
     ass_img = str(body.get("assinatura_img") or "").strip()
-
     ass_padrao = limpar_texto(body.get("assinatura_padrao"), "").strip()
 
-
-
     if not nome:
-
         return web.json_response({"ok": False, "msg": "Nome do técnico é obrigatório."})
 
-
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         cur.execute("""
-
             UPDATE tecnicos
-
             SET rubrica_img = ?, assinatura_padrao = COALESCE(NULLIF(?, ''), assinatura_padrao)
-
             WHERE UPPER(nome) = ?
-
         """, (ass_img, ass_padrao, nome))
-
         if cur.rowcount == 0:
-
             cur.execute("""
-
                 INSERT INTO tecnicos (nome, perfil, assinatura_padrao, rubrica_img)
-
                 VALUES (?, 'Técnico', ?, ?)
-
             """, (nome, ass_padrao, ass_img))
-
         conn.commit()
 
-
-
     return web.json_response({
-
         "ok": True,
-
         "msg": f"✍️ Assinatura digital do técnico {nome} cadastrada e homologada com sucesso!"
-
     })
-
-
-
 
 
 async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     body = await request.json()
 
 
 
-
-
-
-
     os_id = str(body.get("os_id", "")).strip()
-
-
-
-
 
 
 
@@ -10048,19 +4419,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     df = _carregar_df_direto()
-
-
-
-
 
 
 
@@ -10072,19 +4431,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     idx_alvo = None
-
-
-
-
 
 
 
@@ -10092,15 +4439,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     for idx, row in df.iterrows():
-
-
-
-
 
 
 
@@ -10108,23 +4447,11 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             idx_alvo = idx
 
 
 
-
-
-
-
             row_os = row
-
-
-
-
 
 
 
@@ -10136,19 +4463,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     if idx_alvo is None:
-
-
-
-
 
 
 
@@ -10160,39 +4475,17 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     # Horário de checkout no fuso Brasil UTC-3
-
-
 
     hora_cliente = str(body.get("hora_local", "")).strip()
 
-
-
     if hora_cliente and len(hora_cliente) >= 16 and "/" in hora_cliente and ":" in hora_cliente:
-
-
 
         agora_str = hora_cliente
 
-
-
     else:
 
-
-
         agora_str = obter_agora_brasil_str("%d/%m/%Y %H:%M")
-
-
-
-
 
 
 
@@ -10200,35 +4493,15 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     duracao_str = calcular_duracao_os(cin_atual, agora_str)
 
-
-
     if acao == "CONCLUIR":
-
         tec_checagem = limpar_texto(body.get("tecnico_responsavel"), limpar_texto(row_os.get("tecnico_responsavel"), "")).strip().upper()
-
         if not tec_checagem or "A DEFINIR" in tec_checagem or "PENDENTE" in tec_checagem:
-
             return web.json_response({
-
                 "ok": False,
-
                 "msg": "⚠️ Não é permitido concluir uma Ordem de Serviço sem um Técnico Responsável atribuído! Defina o técnico antes do fechamento."
-
             })
-
-
-
-
-
-
-
-
 
 
 
@@ -10240,15 +4513,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     tec_aux = limpar_texto(body.get("tecnico_auxiliar"), limpar_texto(row_os.get("tecnico_auxiliar"), "")).upper()
-
-
-
-
 
 
 
@@ -10256,15 +4521,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     etapa_prev = limpar_texto(body.get("etapa_preventiva"), limpar_texto(row_os.get("etapa_preventiva"), "GERAL")).upper()
-
-
-
-
 
 
 
@@ -10272,15 +4529,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     prob_enc = limpar_texto(body.get("problemas_encontrados"), limpar_texto(row_os.get("problemas_encontrados"), "")).upper()
-
-
-
-
 
 
 
@@ -10288,23 +4537,11 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     srv_exec = limpar_texto(body.get("servico_executado"), limpar_texto(row_os.get("servico_executado"), "")).upper()
 
 
 
-
-
-
-
     if not srv_exec:
-
-
-
-
 
 
 
@@ -10316,19 +4553,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     chk_pop = limpar_texto(body.get("checklist_pop"), limpar_texto(row_os.get("checklist_pop"), "POP PADRÃO CONCLUÍDO")).upper()
-
-
-
-
 
 
 
@@ -10336,15 +4561,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     obs_gerais = limpar_texto(body.get("observacoes_gerais"), limpar_texto(row_os.get("observacoes_gerais"), "")).upper()
-
-
-
-
 
 
 
@@ -10352,15 +4569,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     inst_prox = limpar_texto(body.get("instrumento_necessario"), "").upper()
-
-
-
-
 
 
 
@@ -10372,19 +4581,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     peca_raw = limpar_texto(body.get("peca_selecionada"), "NENHUMA PEÇA").upper()
-
-
-
-
 
 
 
@@ -10392,15 +4589,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if peca_manual:
-
-
-
-
 
 
 
@@ -10408,15 +4597,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     elif peca_raw and peca_raw != "MANUAL":
-
-
-
-
 
 
 
@@ -10424,15 +4605,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     else:
-
-
-
-
 
 
 
@@ -10444,19 +4617,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     status_prop = limpar_texto(body.get("status_proposta"), "SEM_PROPOSTA").upper()
-
-
-
-
 
 
 
@@ -10468,19 +4629,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     qtd_peca = int(limpar_float(body.get("qtd_peca"), 1))
-
-
-
-
 
 
 
@@ -10488,15 +4637,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     opcao_fat = limpar_texto(body.get("condicao_pagamento"), "FATURAMENTO BOLETO BANCÁRIO (VALOR INTEGRAL)")
-
-
-
-
 
 
 
@@ -10504,15 +4645,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         val_calc = round(valor_os * 0.90, 2)
-
-
-
-
 
 
 
@@ -10520,15 +4653,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         val_calc = valor_os
-
-
-
-
 
 
 
@@ -10540,27 +4665,11 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     ass_cli_nome = limpar_texto(body.get("assinatura_cliente"), limpar_texto(row_os.get("responsavel_hospital"), "RESPONSÁVEL LOCAL")).upper()
 
 
 
-
-
-
-
     ass_cli_img = limpar_texto(body.get("assinatura_cliente_img"), limpar_texto(row_os.get("assinatura_cliente_img"), ""))
-
-
-
-
 
 
 
@@ -10572,19 +4681,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     ref_ant = limpar_texto(row_os.get("peca_baixada_ref"), "")
-
-
-
-
 
 
 
@@ -10592,15 +4689,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if ok_p and tag_peca and tag_peca not in srv_exec:
-
-
-
-
 
 
 
@@ -10612,19 +4701,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     # Múltiplas fotos de evidência
-
-
-
-
 
 
 
@@ -10632,15 +4709,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if not isinstance(fotos_recebidas, list):
-
-
-
-
 
 
 
@@ -10648,15 +4717,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if body.get("foto_antes_b64"):
-
-
-
-
 
 
 
@@ -10664,15 +4725,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if body.get("foto_depois_b64"):
-
-
-
-
 
 
 
@@ -10684,19 +4737,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     caminhos_fotos_salvas = []
-
-
-
-
 
 
 
@@ -10704,15 +4745,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         if f_b64 and len(str(f_b64)) > 50:
-
-
-
-
 
 
 
@@ -10720,15 +4753,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             if c_salvo:
-
-
-
-
 
 
 
@@ -10740,19 +4765,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     if caminhos_fotos_salvas:
-
-
-
-
 
 
 
@@ -10760,23 +4773,11 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         if len(caminhos_fotos_salvas) > 1:
 
 
 
-
-
-
-
             df.at[idx_alvo, "foto_depois"] = caminhos_fotos_salvas[1]
-
-
-
-
 
 
 
@@ -10788,19 +4789,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     # Vídeo curto da operação
-
-
-
-
 
 
 
@@ -10808,15 +4797,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if video_b64 and len(str(video_b64)) > 100:
-
-
-
-
 
 
 
@@ -10824,15 +4805,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         if cam_vid:
-
-
-
-
 
 
 
@@ -10844,19 +4817,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     if body.get("endereco"):
-
-
-
-
 
 
 
@@ -10864,15 +4825,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if body.get("email"):
-
-
-
-
 
 
 
@@ -10880,15 +4833,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if body.get("whatsapp"):
-
-
-
-
 
 
 
@@ -10900,19 +4845,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     df.at[idx_alvo, "tecnico_responsavel"] = tec_resp
-
-
-
-
 
 
 
@@ -10920,15 +4853,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     df.at[idx_alvo, "tipo_servico"] = tipo_srv
-
-
-
-
 
 
 
@@ -10936,15 +4861,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     df.at[idx_alvo, "checkin_hora"] = cin_atual
-
-
-
-
 
 
 
@@ -10952,15 +4869,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     df.at[idx_alvo, "tempo_atendimento"] = duracao_str
-
-
-
-
 
 
 
@@ -10968,15 +4877,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     df.at[idx_alvo, "problemas_encontrados"] = prob_enc
-
-
-
-
 
 
 
@@ -10984,15 +4885,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     df.at[idx_alvo, "servico_executado"] = srv_exec
-
-
-
-
 
 
 
@@ -11000,15 +4893,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     df.at[idx_alvo, "parametros_medidos"] = param_med
-
-
-
-
 
 
 
@@ -11016,15 +4901,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     df.at[idx_alvo, "imprimir_observacoes"] = limpar_texto(body.get("imprimir_observacoes"), "SIM").upper()
-
-
-
-
 
 
 
@@ -11032,15 +4909,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     df.at[idx_alvo, "condicao_pagamento"] = resumo_pag
-
-
-
-
 
 
 
@@ -11048,15 +4917,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     df.at[idx_alvo, "assinatura_cliente"] = ass_cli_nome
-
-
-
-
 
 
 
@@ -11064,15 +4925,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     df.at[idx_alvo, "assinatura_tecnico"] = ass_tec
-
-
-
-
 
 
 
@@ -11084,19 +4937,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     tem_pend_ativa = bool(inst_prox and inst_prox not in ["N/D", "NENHUM", "NENHUMA", "-"] and prioridade_pend != "NENHUMA")
-
-
-
-
 
 
 
@@ -11108,19 +4949,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     if tem_pend_ativa:
-
-
-
-
 
 
 
@@ -11128,15 +4957,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         df.at[idx_alvo, "pendencias"] = f"[CONCLUÍDO COM PENDÊNCIA: {prio_almox}] {inst_prox}"
-
-
-
-
 
 
 
@@ -11144,15 +4965,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             with get_db_connection(DB_NAME) as conn:
-
-
-
-
 
 
 
@@ -11160,15 +4973,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 cur.execute("""
-
-
-
-
 
 
 
@@ -11176,15 +4981,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     (tecnico, destino_cliente, itens_solicitados, instrumentos_solicitados, status_pedido, data_pedido)
-
-
-
-
 
 
 
@@ -11192,15 +4989,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 """, (
-
-
-
-
 
 
 
@@ -11208,15 +4997,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     limpar_texto(row_os.get("cliente"), ""),
-
-
-
-
 
 
 
@@ -11224,15 +5005,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     f"Equipamento: {limpar_texto(row_os.get('equipamento'), '')} | OS #{os_id}",
-
-
-
-
 
 
 
@@ -11240,15 +5013,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     agora_str,
-
-
-
-
 
 
 
@@ -11256,15 +5021,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 conn.commit()
-
-
-
-
 
 
 
@@ -11272,15 +5029,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             pass
-
-
-
-
 
 
 
@@ -11288,15 +5037,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         df.at[idx_alvo, "instrumento_necessario"] = ""
-
-
-
-
 
 
 
@@ -11308,19 +5049,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     if acao == "OBSERVACAO" or "OBSERVA" in status_prop:
-
-
-
-
 
 
 
@@ -11328,15 +5057,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         desc_pend = f"[EM OBSERVAÇÃO - {dias_obs} DIAS] Peça: {peca_sel} | Follow-up técnico e posterior emissão de NF"
-
-
-
-
 
 
 
@@ -11344,15 +5065,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         if peca_sel and peca_sel != "NENHUMA PEÇA":
-
-
-
-
 
 
 
@@ -11360,15 +5073,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 registrar_peca_em_teste_observacao(
-
-
-
-
 
 
 
@@ -11376,15 +5081,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     limpar_texto(row_os.get("equipamento"), ""), tec_resp, peca_sel, qtd_peca, dias_obs, "Follow-up de estabilidade para faturamento NF"
-
-
-
-
 
 
 
@@ -11392,15 +5089,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             except Exception:
-
-
-
-
 
 
 
@@ -11408,15 +5097,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         msg_final = f"🔬 OS #{os_id} colocada EM OBSERVAÇÃO ({dias_obs} dias para Follow-up e NF)!"
-
-
-
-
 
 
 
@@ -11424,15 +5105,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         df.at[idx_alvo, "status"] = "ATIVO"
-
-
-
-
 
 
 
@@ -11440,15 +5113,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         msg_final = f"📋 OS #{os_id} salva! Notificação enviada ao Financeiro para envio da Proposta Comercial!"
-
-
-
-
 
 
 
@@ -11456,15 +5121,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         df.at[idx_alvo, "status"] = "VISITA REALIZADA (EQUIP. EM USO)"
-
-
-
-
 
 
 
@@ -11472,15 +5129,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         df.at[idx_alvo, "pendencias"] = f"[REAGENDAMENTO NECESSÁRIO] Visita presencial confirmada às {agora_str}. Intervenção técnica suspensa pelo hospital pois o equipamento estava em uso clínico."
-
-
-
-
 
 
 
@@ -11488,15 +5137,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     elif acao == "SALVAR_ABERTA":
-
-
-
-
 
 
 
@@ -11504,126 +5145,60 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         msg_final = f"💾 Dados da OS #{os_id} salvos no servidor (OS mantida ATIVA)!"
 
 
 
-
-
-
-
-    elif acao == "CONCLUIR_LIBERADO":
-
-        df.at[idx_alvo, "status"] = "CONCLUÍDO / LIBERADO AO CLIENTE"
-
-        df.at[idx_alvo, "triagem_concluida"] = 1
-
-        msg_final = f"✅ OS #{os_id} homologada pela triagem e liberada ao cliente!"
-
     else:
 
-        # Fila de Triagem Pós-Atendimento: avalia cobrança, pendência e proforma antes de liberar ao cliente
-
-        df.at[idx_alvo, "status"] = "AGUARDANDO TRIAGEM / LIBERAÇÃO"
-
-        df.at[idx_alvo, "triagem_concluida"] = 0
-
-        msg_final = f"📋 OS #{os_id} concluída em campo e enviada para Triagem da Gestão / Financeiro (Fila de Liberação)!" 
 
 
+        df.at[idx_alvo, "status"] = "CONCLUÍDO"
 
         try:
-
             registrar_aplicacao_definitiva_e_fluxo_cobranca(
-
                 DB_NAME, int(os_id), limpar_texto(row_os.get("cliente"), ""),
-
                 limpar_texto(row_os.get("equipamento"), ""), tec_resp, peca_sel, qtd_peca, float(val_calc),
-
                 condicao_pagamento=resumo_pag,
-
                 tipo_contrato=limpar_texto(row_os.get("tipo_contrato"), "CONTRATO"),
-
             )
-
         except Exception:
-
             pass
 
-
-
         # -------------------------------------------------------------
-
         # 1. BAIXA AUTOMÁTICA DE TODAS AS PEÇAS E PEDIDOS DO ALMOXARIFADO
-
         # -------------------------------------------------------------
-
         try:
-
             with get_db_connection(DB_NAME) as conn_b:
-
                 cur_b = conn_b.cursor()
-
                 cur_b.execute("""
-
                     UPDATE solicitacoes_pecas 
-
                     SET status_pedido = 'APLICADO EM DEFINITIVO NO CLIENTE / BAIXADO',
-
                         confirmado_em = COALESCE(NULLIF(confirmado_em, ''), ?)
-
                     WHERE (os_id = ? OR destino_cliente LIKE ? OR destino_cliente LIKE ?)
-
                       AND UPPER(status_pedido) NOT LIKE '%APLICADO%'
-
                       AND UPPER(status_pedido) NOT LIKE '%BAIXADO%'
-
                       AND UPPER(status_pedido) NOT LIKE '%RECUSADO%'
-
                 """, (agora_str, str(os_id), f"%[OS #{os_id}]%", f"%OS #{os_id}%"))
 
-
-
                 # -------------------------------------------------------------
-
                 # 2. DELAY DE VALIDAÇÃO / FEEDBACK DO CLIENTE ANTES DE LIBERAR NF (24H)
-
                 # -------------------------------------------------------------
-
                 dt_lib = obter_agora_brasil() + timedelta(hours=24)
-
                 data_lib_str = dt_lib.strftime("%d/%m/%Y %H:%M")
-
                 cur_b.execute("""
-
                     UPDATE notas_fiscais
-
                     SET status_fiscal = 'QUARENTENA PÓS-SERVIÇO (AGUARDANDO FEEDBACK DO CLIENTE)',
-
                         status_quarentena = 'QUARENTENA_FEEDBACK',
-
                         data_liberacao_fiscal = ?,
-
                         feedback_cliente_status = 'PENDENTE_FEEDBACK'
-
                     WHERE os_id = ? AND (status_quarentena IS NULL OR status_quarentena = 'LIBERADO' OR status_quarentena = '')
-
                 """, (data_lib_str, int(os_id)))
-
                 conn_b.commit()
-
         except Exception as e_baixa:
-
             print("Aviso baixa automatica / quarentena:", e_baixa)
 
-
-
         limpar_rascunho_provisorio(DB_NAME, os_id)
-
         msg_final = f"🏁 OS #{os_id} CONCLUÍDA! Peça baixada no almoxarifado e fatura em período de feedback com o cliente (24h) antes da NF."
 
 
@@ -11632,19 +5207,7 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     _salvar_df_direto(df)
-
-
-
-
 
 
 
@@ -11660,277 +5223,134 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_nova_os(request: web.Request) -> web.Response:
-
     body = await request.json()
-
     cliente = limpar_texto(body.get('cliente'), '').upper()
-
     equipamento = limpar_texto(body.get('equipamento'), '').upper()
-
     defeito = limpar_texto(body.get('defeito_relatado'), 'MANUTENÇÃO PREVENTIVA / CADASTRO PARQUE').upper()
-
     if not cliente or not equipamento:
-
         return web.json_response({'ok': False, 'msg': 'Informe o Cliente e o Equipamento.'}, status=400)
 
-
-
     tipo_srv = limpar_texto(body.get('tipo_servico'), 'CORRETIVA').upper()
-
     tec_resp_raw = limpar_texto(body.get('tecnico_responsavel'), '').upper()
-
     tem_tecnico_definido = bool(tec_resp_raw and tec_resp_raw not in ['A DEFINIR', 'A DEFINIR / TRIAGEM PENDENTE', 'SEM TÉCNICO', 'N/D', 'NONE'])
-
     tec_resp = tec_resp_raw if tem_tecnico_definido else 'A DEFINIR / TRIAGEM PENDENTE'
-
     tec_aux = limpar_texto(body.get('tecnico_auxiliar'), 'NENHUM (INDIVIDUAL)').upper()
-
     data_ag = limpar_texto(body.get('data_agendamento'), obter_agora_brasil().strftime('%Y-%m-%d'))
-
     resp_hosp = limpar_texto(body.get('responsavel_hospital'), '').upper()
-
     contato = _limpar_telefone_exibicao(body.get('contato_responsavel') or body.get('whatsapp'))
-
     endereco = limpar_texto(body.get('endereco'), 'UNIDADE HOSPITALAR').upper()
-
     cidade = limpar_texto(body.get('cidade'), 'FORTALEZA').upper()
-
     cnpj = limpar_texto(body.get('cnpj'), '')
-
     respostas_triagem = limpar_texto(body.get('respostas_triagem'), '')
 
-
-
     # Triagem de ferramentas calibradas e materiais específicos de acordo com o chamado
-
     kit_sug = obter_kit_por_servico(tipo_srv, defeito, equipamento)
-
     itens_com_disp = verificar_disponibilidade_ferramentas(DB_NAME, kit_sug.get('itens', []))
-
     itens_mat_str = f'[{kit_sug["nome"]}] ' + ' | '.join(itens_com_disp)
 
-
-
     # 1. Auditoria Financeira Interna:
-
     # A OS NUNCA é bloqueada e NUNCA recebe diferenciação visual ou tag que suje o relato/laudo do cliente
-
     info_pend = verificar_pendencias_financeiras_cliente(DB_NAME, cliente, cnpj)
-
     tem_pendencia = info_pend.get('tem_pendencia', False)
-
     val_pend = info_pend.get('valor_total', 0.0)
-
     qtd_fat = info_pend.get('qtd_faturas', 0)
-
     faturas_lista = info_pend.get('faturas', [])
 
-
-
     df = _carregar_df_direto()
-
     novo_id = int(df['id'].max() + 1) if ('id' in df.columns and not df.empty and pd.notna(df['id'].max())) else (len(df) + 1)
 
-
-
     # OS 100% LIMPA: Discrição absoluta. Relato e campos operacionais sem nenhuma marcação para o técnico/cliente
-
     nova_linha = {
-
         'id': novo_id,
-
         'cliente': cliente,
-
         'cnpj': cnpj,
-
         'cidade': cidade,
-
         'estado': 'CE',
-
         'equipamento': equipamento,
-
         'endereco': endereco,
-
         'tipo_servico': tipo_srv,
-
         'data_agendamento': data_ag,
-
         'tecnico_responsavel': tec_resp,
-
         'tecnico_auxiliar': tec_aux,
-
         'responsavel_hospital': resp_hosp,
-
         'contato_responsavel': contato if contato != 'N/D' else '',
-
         'whatsapp': contato if contato != 'N/D' else '',
-
         'confirmado': 'SIM',
-
         'pendencias': f'[CHAMADO ABERTO] {defeito}',
-
         'status': 'ATIVO',
-
         'defeito_relatado': defeito,
-
         'pre_atendimento': respostas_triagem,
-
         'instrumento_necessario': itens_mat_str,
-
         'condicao_inicial': limpar_texto(body.get('condicao_inicial'), 'OPERANDO COM FALHA').upper(),
-
         'condicao_final': 'LIBERADO PARA USO NORMAL',
-
         'valor_os': 0.0,
-
     }
-
     df_novo = pd.concat([df, pd.DataFrame([nova_linha])], ignore_index=True)
-
     _salvar_df_direto(df_novo)
 
-
-
     # 2. Retaguarda do SETOR FINANCEIRO / COBRANÇA acionada internamente se houver pendências
-
     if tem_pendencia:
-
         try:
-
             with get_db_connection(DB_NAME) as conn:
-
                 cur = conn.cursor()
-
                 resumo_fats = ', '.join([f"{f.get('numero')} (R$ {f.get('valor', 0):,.2f})" for f in faturas_lista[:5]])
-
                 cur.execute('''
-
                     INSERT INTO solicitacoes_pecas
-
                     (tecnico, destino_cliente, itens_solicitados, instrumentos_solicitados, status_pedido, data_pedido, os_id)
-
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-
                 ''', (
-
                     'SETOR FINANCEIRO / COBRANÇA',
-
                     f'{cliente} ({equipamento}) [OS #{novo_id}]',
-
                     f'COBRANÇA EMERGENCIAL: Cliente possui R$ {val_pend:,.2f} pendente em {qtd_fat} fatura(s)/OS.',
-
                     f'FATURAS EM ABERTO: {resumo_fats}',
-
                     'PENDENTE COBRANÇA FINANCEIRA',
-
                     obter_agora_brasil_str('%d/%m/%Y %H:%M'),
-
                     str(novo_id)
-
                 ))
-
                 conn.commit()
-
         except Exception:
-
             pass
 
-
-
     # 3. O sistema gera a solicitação de separação do material no Almoxarifado conforme a necessidade do chamado,
-
     # mesmo antes de definir o técnico de campo.
-
     try:
-
         acionar_separacao_automatica_almoxarifado(
-
             db_path=DB_NAME,
-
             tecnico=tec_resp if tem_tecnico_definido else 'AGUARDANDO DEFINIÇÃO TÉCNICO',
-
             cliente=cliente,
-
             equipamento=equipamento,
-
             tipo_servico=tipo_srv,
-
             instrumentos_materiais=itens_mat_str,
-
             pecas=defeito,
-
             os_id=novo_id
-
         )
-
     except Exception:
-
         pass
 
-
-
     msg_retorno = f'✅ Ordem de Serviço #{novo_id} emitida! Materiais solicitados ao Almoxarifado.'
-
     if tem_tecnico_definido:
-
         msg_retorno += f' Atribuído para {tec_resp}.'
-
     else:
-
         msg_retorno += ' Aguardando designação de técnico de campo.'
 
-
-
     return web.json_response({
-
         'ok': True,
-
         'os_id': str(novo_id),
-
         'kit_acionado': kit_sug['nome'],
-
         'itens_kit': itens_com_disp,
-
         'tem_pendencia_financeira': tem_pendencia,
-
         'valor_pendente': val_pend,
-
         'qtd_pendencias': qtd_fat,
-
         'msg': msg_retorno,
-
     })
-
-
-
 
 
 async def api_reabrir_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     body = await request.json()
-
-
-
-
 
 
 
@@ -11938,15 +5358,7 @@ async def api_reabrir_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     df = _carregar_df_direto()
-
-
-
-
 
 
 
@@ -11954,15 +5366,7 @@ async def api_reabrir_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         if str(obter_id_os(idx, row)) == os_id:
-
-
-
-
 
 
 
@@ -11970,23 +5374,11 @@ async def api_reabrir_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             _salvar_df_direto(df)
 
 
 
-
-
-
-
             return web.json_response({"ok": True, "msg": f"🔓 OS #{os_id} reaberta e devolvida para a fila de OS Ativas!"})
-
-
-
-
 
 
 
@@ -12002,247 +5394,115 @@ async def api_reabrir_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_despachar_rota(request: web.Request) -> web.Response:
-
-
 
     """Despacha em bloco todos os chamados ativos de um hospital/rota para um técnico e aciona a triagem de materiais."""
 
-
-
     body = await request.json()
-
-
 
     os_ids = [str(x) for x in body.get("os_ids", [])]
 
-
-
     tecnico = limpar_texto(body.get("tecnico"), "").upper()
-
-
 
     auxiliar = limpar_texto(body.get("auxiliar"), "").upper()
 
 
 
-
-
-
-
     if not os_ids or not tecnico:
-
-
 
         return web.json_response({"ok": False, "msg": "Selecione os chamados e o técnico."}, status=400)
 
 
 
-
-
-
-
     df = _carregar_df_direto()
-
-
 
     equipa = _montar_equipa_direto()
 
-
-
     tel_t = equipa.get(tecnico, {}).get("tel", "")
 
-
-
     qtd = 0
-
-
 
     kits_acionados = []
 
 
 
-
-
-
-
     for idx, row in df.iterrows():
-
-
 
         oid = str(obter_id_os(idx, row))
 
-
-
         if oid in os_ids:
-
-
 
             df.at[idx, "tecnico_responsavel"] = tecnico
 
-
-
             df.at[idx, "tecnico_auxiliar"] = auxiliar
-
-
 
             df.at[idx, "telefone_tecnico"] = tel_t
 
-
-
             df.at[idx, "confirmado"] = "SIM"
-
-
 
             qtd += 1
 
 
 
-
-
-
-
             # Triagem de material e acionamento automático do Almoxarifado
-
-
 
             tipo_srv = limpar_texto(row.get("tipo_servico"), "CORRETIVA").upper()
 
-
-
             defeito = limpar_texto(row.get("defeito_relatado"), "").upper()
-
-
 
             cliente_os = limpar_texto(row.get("cliente"), "")
 
-
-
             equip_os = limpar_texto(row.get("equipamento"), "")
 
-
-
             kit_sug = obter_kit_por_servico(tipo_srv, defeito)
-
-
 
             df.at[idx, "instrumento_necessario"] = kit_sug["nome"]
 
 
 
-
-
-
-
             try:
-
-
 
                 itens_mat = f"[{kit_sug['nome']}] " + ", ".join(kit_sug.get("itens", []))
 
-
-
                 acionar_separacao_automatica_almoxarifado(
-
-
 
                     db_path=DB_NAME,
 
-
-
                     tecnico=tecnico,
-
-
 
                     cliente=cliente_os,
 
-
-
                     equipamento=equip_os,
-
-
 
                     tipo_servico=tipo_srv,
 
-
-
                     instrumentos_materiais=itens_mat,
-
-
 
                     pecas=defeito,
 
-
-
                     os_id=oid
-
-
 
                 )
 
-
-
                 kits_acionados.append(f"OS #{oid}: {kit_sug['nome']}")
 
-
-
             except Exception:
-
-
 
                 pass
 
 
 
-
-
-
-
     _salvar_df_direto(df)
-
-
 
     msg_almox = f" (Triagem concluída: {', '.join(kits_acionados)})" if kits_acionados else ""
 
-
-
     return web.json_response({
-
-
 
         "ok": True,
 
-
-
         "msg": f"🚚 Rota despachada! {qtd} chamado(s) atribuído(s) para {tecnico}. Almoxarifado acionado com kits.{msg_almox}"
 
-
-
     })
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -12258,15 +5518,7 @@ async def api_orcamento_acao(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     """Aprova orçamento, converte peça em teste em definitiva ou retira peça em teste."""
-
-
-
-
 
 
 
@@ -12274,23 +5526,11 @@ async def api_orcamento_acao(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     os_id = str(body.get("os_id", "")).strip()
 
 
 
-
-
-
-
     acao = limpar_texto(body.get("acao"), "APROVAR").upper()
-
-
-
-
 
 
 
@@ -12302,19 +5542,7 @@ async def api_orcamento_acao(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     if acao == "CONVERTER_TESTE":
-
-
-
-
 
 
 
@@ -12322,15 +5550,7 @@ async def api_orcamento_acao(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         df = _carregar_df_direto()
-
-
-
-
 
 
 
@@ -12338,15 +5558,7 @@ async def api_orcamento_acao(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         return web.json_response({"ok": ok, "msg": msg})
-
-
-
-
 
 
 
@@ -12354,23 +5566,11 @@ async def api_orcamento_acao(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         ok, msg = retirar_peca_teste_e_devolver_estoque(DB_NAME, int(os_id))
 
 
 
-
-
-
-
         df = _carregar_df_direto()
-
-
-
-
 
 
 
@@ -12378,15 +5578,7 @@ async def api_orcamento_acao(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         return web.json_response({"ok": ok, "msg": msg})
-
-
-
-
 
 
 
@@ -12394,15 +5586,7 @@ async def api_orcamento_acao(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         df = _carregar_df_direto()
-
-
-
-
 
 
 
@@ -12410,15 +5594,7 @@ async def api_orcamento_acao(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             if str(obter_id_os(idx, row)) == os_id:
-
-
-
-
 
 
 
@@ -12426,15 +5602,7 @@ async def api_orcamento_acao(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 df.at[idx, "pendencias"] = f"[ORÇAMENTO APROVADO - LIBERADO PARA EXECUÇÃO] {desc_ant}"
-
-
-
-
 
 
 
@@ -12442,23 +5610,11 @@ async def api_orcamento_acao(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 _salvar_df_direto(df)
 
 
 
-
-
-
-
                 return web.json_response({"ok": True, "msg": f"✅ Orçamento da OS #{os_id} aprovado e liberado para execução!"})
-
-
-
-
 
 
 
@@ -12474,23 +5630,7 @@ async def api_orcamento_acao(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
-
-
-
-
 
 
 
@@ -12498,15 +5638,7 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     body = await request.json()
-
-
-
-
 
 
 
@@ -12514,15 +5646,7 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     tecnico = limpar_texto(body.get("tecnico"), "ANTONIO").upper()
-
-
-
-
 
 
 
@@ -12530,23 +5654,11 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     itens = limpar_texto(body.get("itens"), "").upper()
 
 
 
-
-
-
-
     instrumentos = limpar_texto(body.get("instrumentos"), "KIT PADRÃO").upper()
-
-
-
-
 
 
 
@@ -12558,19 +5670,7 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     if not itens:
-
-
-
-
 
 
 
@@ -12582,19 +5682,7 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     with get_db_connection(DB_NAME) as conn:
-
-
-
-
 
 
 
@@ -12602,15 +5690,7 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         if tipo == "BAIXA_CONSUMIVEL":
-
-
-
-
 
 
 
@@ -12618,15 +5698,7 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             cur.execute("""
-
-
-
-
 
 
 
@@ -12634,15 +5706,7 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 VALUES (?, ?, ?, ?, ?)
-
-
-
-
 
 
 
@@ -12650,15 +5714,7 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             conn.commit()
-
-
-
-
 
 
 
@@ -12666,15 +5722,7 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         else:
-
-
-
-
 
 
 
@@ -12682,15 +5730,7 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 INSERT INTO solicitacoes_pecas
-
-
-
-
 
 
 
@@ -12698,15 +5738,7 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 VALUES (?, ?, ?, ?, ?, ?)
-
-
-
-
 
 
 
@@ -12714,21 +5746,11 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             conn.commit()
 
 
 
-
-
-
-
             novo_pedido_id = cur.lastrowid
-
-
 
             return web.json_response({"ok": True, "id": novo_pedido_id, "msg": f"📦 Pedido #{novo_pedido_id} enviado para o Almoxarifado EMED com sucesso!"})
 
@@ -12742,183 +5764,87 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_estoque_salvar(request: web.Request) -> web.Response:
-
-
 
     """Adiciona ou atualiza item no estoque + tabela de precificação dinâmica por consumidor + local."""
 
-
-
     body = await request.json()
-
-
 
     codigo = limpar_texto(body.get("codigo"), "").upper()
 
-
-
     nome_peca = limpar_texto(body.get("nome_peca"), "").upper()
-
-
 
     categoria = limpar_texto(body.get("categoria"), "PEÇA").upper()
 
-
-
     quantidade = int(limpar_float(body.get("quantidade"), 1))
-
-
 
     preco = limpar_float(body.get("preco_unitario"), 0.0)
 
-
-
     preco_custo = limpar_float(body.get("preco_custo"), preco)
-
-
 
     m_contrato = limpar_float(body.get("margem_contrato"), 30.0)
 
-
-
     m_avulso = limpar_float(body.get("margem_avulso"), 60.0)
-
-
 
     m_avista = limpar_float(body.get("margem_avista"), 20.0)
 
-
-
     m_desestimulo = limpar_float(body.get("margem_desestimulo"), 180.0)
-
-
 
     localizacao = limpar_texto(body.get("localizacao"), "ALMOXARIFADO CENTRAL").upper()
 
-
-
     validade_cal = limpar_texto(body.get("validade_calibracao"), "")
-
-
 
     cert_cal = limpar_texto(body.get("certificado_calibracao"), "").upper()
 
 
 
-
-
-
-
     if not codigo or not nome_peca:
-
-
 
         return web.json_response({"ok": False, "msg": "Informe o código e o nome da peça/instrumento."}, status=400)
 
 
 
-
-
-
-
     with get_db_connection(DB_NAME) as conn:
-
-
 
         cur = conn.cursor()
 
-
-
         cur.execute("SELECT codigo FROM estoque_pecas WHERE UPPER(codigo) = ?", (codigo,))
-
-
 
         existe = cur.fetchone()
 
-
-
         if existe:
 
-
-
             cur.execute("""
-
-
 
                 UPDATE estoque_pecas
 
-
-
                 SET nome_peca = ?, categoria = ?, quantidade = ?, preco_unitario = ?, preco_custo = ?,
-
-
 
                     margem_contrato = ?, margem_avulso = ?, margem_avista = ?, margem_desestimulo = ?,
 
-
-
                     localizacao = ?, data_validade_calibracao = ?, certificado_calibracao = ?
-
-
 
                 WHERE UPPER(codigo) = ?
 
-
-
             """, (nome_peca, categoria, quantidade, preco, preco_custo, m_contrato, m_avulso, m_avista, m_desestimulo, localizacao, validade_cal, cert_cal, codigo))
-
-
 
         else:
 
-
-
             cur.execute("""
-
-
 
                 INSERT INTO estoque_pecas
 
-
-
                 (codigo, nome_peca, categoria, quantidade, estoque_minimo, preco_unitario, preco_custo,
-
-
 
                  margem_contrato, margem_avulso, margem_avista, margem_desestimulo,
 
-
-
                  localizacao, data_validade_calibracao, certificado_calibracao)
-
-
 
                 VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
-
-
             """, (codigo, nome_peca, categoria, quantidade, preco, preco_custo, m_contrato, m_avulso, m_avista, m_desestimulo, localizacao, validade_cal, cert_cal))
 
-
-
         conn.commit()
-
-
-
-
 
 
 
@@ -12928,17 +5854,7 @@ async def api_estoque_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
 async def api_calibracao_equipamento(request: web.Request) -> web.Response:
-
-
-
-
 
 
 
@@ -12946,15 +5862,7 @@ async def api_calibracao_equipamento(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     os_id = int(limpar_float(body.get("os_id"), 0))
-
-
-
-
 
 
 
@@ -12962,15 +5870,7 @@ async def api_calibracao_equipamento(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     dt_val = limpar_texto(body.get("data_validade"), "")
-
-
-
-
 
 
 
@@ -12978,15 +5878,7 @@ async def api_calibracao_equipamento(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     ok, msg = atualizar_calibracao_equipamento_cliente(DB_NAME, os_id, dt_ult, dt_val, cert)
-
-
-
-
 
 
 
@@ -13002,23 +5894,7 @@ async def api_calibracao_equipamento(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_veiculo_km(request: web.Request) -> web.Response:
-
-
-
-
 
 
 
@@ -13026,15 +5902,7 @@ async def api_veiculo_km(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     vid = int(limpar_float(body.get("id"), 1))
-
-
-
-
 
 
 
@@ -13042,15 +5910,7 @@ async def api_veiculo_km(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     km_prox = int(limpar_float(body.get("km_proxima_revisao"), 50000))
-
-
-
-
 
 
 
@@ -13058,15 +5918,7 @@ async def api_veiculo_km(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     with get_db_connection(DB_NAME) as conn:
-
-
-
-
 
 
 
@@ -13074,15 +5926,7 @@ async def api_veiculo_km(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         cur.execute("""
-
-
-
-
 
 
 
@@ -13090,15 +5934,7 @@ async def api_veiculo_km(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             SET km_atual = ?, km_proxima_revisao = ?, historico_manutencao = ?
-
-
-
-
 
 
 
@@ -13106,23 +5942,11 @@ async def api_veiculo_km(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         """, (km_atual, km_prox, obs, vid))
 
 
 
-
-
-
-
         conn.commit()
-
-
-
-
 
 
 
@@ -13138,23 +5962,7 @@ async def api_veiculo_km(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_tecnico_salvar(request: web.Request) -> web.Response:
-
-
-
-
 
 
 
@@ -13162,15 +5970,7 @@ async def api_tecnico_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     nome = limpar_texto(body.get("nome"), "").upper()
-
-
-
-
 
 
 
@@ -13178,15 +5978,7 @@ async def api_tecnico_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     sede = limpar_texto(body.get("sede"), "FORTALEZA").upper()
-
-
-
-
 
 
 
@@ -13194,15 +5986,7 @@ async def api_tecnico_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     ass = limpar_texto(body.get("assinatura_padrao"), f"{nome} - CFT").upper()
-
-
-
-
 
 
 
@@ -13210,15 +5994,7 @@ async def api_tecnico_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         return web.json_response({"ok": False, "msg": "Informe o nome do técnico."}, status=400)
-
-
-
-
 
 
 
@@ -13226,15 +6002,7 @@ async def api_tecnico_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         conn.execute("""
-
-
-
-
 
 
 
@@ -13242,15 +6010,7 @@ async def api_tecnico_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             (nome, telefone, partida, sede, senha, perfil, assinatura_padrao, rubrica_img)
-
-
-
-
 
 
 
@@ -13258,23 +6018,11 @@ async def api_tecnico_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         """, (nome, tel, sede, sede, perfil, ass))
 
 
 
-
-
-
-
         conn.commit()
-
-
-
-
 
 
 
@@ -13290,23 +6038,7 @@ async def api_tecnico_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_satisfacao_registrar(request: web.Request) -> web.Response:
-
-
-
-
 
 
 
@@ -13314,15 +6046,7 @@ async def api_satisfacao_registrar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     os_id = limpar_texto(body.get("os_id"), "AVULSO")
-
-
-
-
 
 
 
@@ -13330,15 +6054,7 @@ async def api_satisfacao_registrar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     tecnico = limpar_texto(body.get("tecnico"), "EQUIPE EMED")
-
-
-
-
 
 
 
@@ -13346,73 +6062,36 @@ async def api_satisfacao_registrar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     comentario = limpar_texto(body.get("comentario"), "Excelente atendimento!")
-
-
-
-
 
 
 
     ok, msg = registrar_pesquisa(DB_NAME, os_id, cliente, tecnico, nota, comentario)
 
-
-
     if ok and os_id and os_id != "AVULSO":
-
         try:
-
             with get_db_connection(DB_NAME) as conn_sat:
-
                 cur_sat = conn_sat.cursor()
-
                 os_num = int(os_id) if os_id.isdigit() else 0
-
                 if nota >= 3:
-
                     cur_sat.execute("""
-
                         UPDATE notas_fiscais
-
                         SET status_quarentena = 'LIBERADO_PELO_CLIENTE',
-
                             status_fiscal = 'LIBERADO PARA EMISSÃO DE NOTA FISCAL (FEEDBACK OK)',
-
                             feedback_cliente_status = ?
-
                         WHERE os_id = ?
-
                     """, (f"APROVADO PELO CLIENTE ({nota}⭐)", os_num))
-
                 else:
-
                     cur_sat.execute("""
-
                         UPDATE notas_fiscais
-
                         SET status_quarentena = 'BLOQUEADO_REVISAO',
-
                             status_fiscal = 'PAUSADO (CLIENTE SOLICITOU AJUSTE/REVISÃO)',
-
                             feedback_cliente_status = ?
-
                         WHERE os_id = ?
-
                     """, (f"ALERTA_REVISAO ({nota}⭐)", os_num))
-
                 conn_sat.commit()
-
         except Exception:
-
             pass
-
-
-
-
 
 
 
@@ -13430,163 +6109,77 @@ async def api_satisfacao_registrar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_kardex(request: web.Request) -> web.Response:
-
-
 
     """Consulta o histórico de movimentações (Kardex) do Almoxarifado."""
 
-
-
     q = request.query.get("q", "").strip().upper()
-
-
 
     limite = int(request.query.get("limite", 60))
 
-
-
     movs = []
-
-
 
     with get_db_connection(DB_NAME) as conn:
 
-
-
         try:
-
-
 
             if q:
 
-
-
                 df_k = pd.read_sql_query("""
-
-
 
                     SELECT * FROM movimentacoes_estoque 
 
-
-
                     WHERE UPPER(codigo_item) LIKE ? OR UPPER(descricao) LIKE ? OR UPPER(numero_nf) LIKE ?
-
-
 
                     ORDER BY id DESC LIMIT ?
 
-
-
                 """, conn, params=(f"%{q}%", f"%{q}%", f"%{q}%", limite))
-
-
 
             else:
 
-
-
                 df_k = pd.read_sql_query("SELECT * FROM movimentacoes_estoque ORDER BY id DESC LIMIT ?", conn, params=(limite,))
-
-
 
             for _, r in df_k.iterrows():
 
-
-
                 movs.append({
-
-
 
                     "id": int(r.get("id", 0)),
 
-
-
                     "estabelecimento": limpar_texto(r.get("estabelecimento"), "FORTALEZA"),
-
-
 
                     "centro_estoque": limpar_texto(r.get("centro_estoque"), "ALMOXARIFADO"),
 
-
-
                     "codigo_item": limpar_texto(r.get("codigo_item"), ""),
-
-
 
                     "descricao": limpar_texto(r.get("descricao"), ""),
 
-
-
                     "grupo_itens": limpar_texto(r.get("grupo_itens"), ""),
-
-
 
                     "data_mov": limpar_texto(r.get("data_mov"), ""),
 
-
-
                     "hora_mov": limpar_texto(r.get("hora_mov"), ""),
-
-
 
                     "tipo_mov": limpar_texto(r.get("tipo_mov"), ""),
 
-
-
                     "qtd_entrada": limpar_float(r.get("qtd_entrada"), 0.0),
-
-
 
                     "qtd_saida": limpar_float(r.get("qtd_saida"), 0.0),
 
-
-
                     "saldo": limpar_float(r.get("saldo"), 0.0),
-
-
 
                     "custo_medio": limpar_float(r.get("custo_medio"), 0.0),
 
-
-
                     "numero_nf": limpar_texto(r.get("numero_nf"), ""),
-
-
 
                     "documento": limpar_texto(r.get("documento"), ""),
 
-
-
                     "observacao": limpar_texto(r.get("observacao"), ""),
-
-
 
                 })
 
-
-
         except Exception as e:
 
-
-
             print("Erro ao consultar kardex:", e)
-
-
 
     return web.json_response({"ok": True, "total": len(movs), "movimentacoes": movs})
 
@@ -13596,109 +6189,53 @@ async def api_kardex(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
 async def api_ferramentas_listar(request: web.Request) -> web.Response:
-
-
 
     """Retorna a lista atualizada de todas as ferramentas e instrumentos com seus status de cautela."""
 
-
-
     ferramentas = []
-
-
 
     with get_db_connection(DB_NAME) as conn:
 
-
-
         try:
-
-
 
             df_fer = pd.read_sql_query("SELECT * FROM ferramentas_cautela ORDER BY id ASC", conn)
 
-
-
             for _, r in df_fer.iterrows():
-
-
 
                 ferramentas.append({
 
-
-
                     "id": int(r.get("id", 0)),
-
-
 
                     "codigo": limpar_texto(r.get("codigo_ferramenta"), ""),
 
-
-
                     "nome": limpar_texto(r.get("nome_ferramenta"), ""),
-
-
 
                     "status": limpar_texto(r.get("status"), "DISPONIVEL").upper(),
 
-
-
                     "tecnico": limpar_texto(r.get("tecnico_responsavel"), "").upper(),
-
-
 
                     "cliente": limpar_texto(r.get("destino_cliente"), "").upper(),
 
-
-
                     "os_id": limpar_texto(r.get("os_id"), ""),
-
-
 
                     "data_saida": limpar_texto(r.get("data_saida"), ""),
 
-
-
                     "numero_serie": limpar_texto(r.get("numero_serie"), ""),
-
-
 
                     "localizacao": limpar_texto(r.get("localizacao"), "ALMOXARIFADO CENTRAL"),
 
-
-
                     "validade_calibracao": limpar_texto(r.get("data_validade_calibracao"), ""),
-
-
 
                     "certificado": limpar_texto(r.get("certificado_calibracao"), ""),
 
-
-
                     "observacao": limpar_texto(r.get("observacao"), "")
-
-
 
                 })
 
-
-
         except Exception as e:
 
-
-
             print("Erro ao listar ferramentas:", e)
-
-
 
     return web.json_response({"ok": True, "ferramentas": ferramentas})
 
@@ -13706,85 +6243,41 @@ async def api_ferramentas_listar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
 async def api_ferramentas_acao(request: web.Request) -> web.Response:
-
-
 
     """Registra movimentação via leitor de código de barras ou manual do Paulo."""
 
-
-
     body = await request.json()
-
-
 
     codigo = limpar_texto(body.get("codigo"), "").upper()
 
-
-
     acao = limpar_texto(body.get("acao"), "RETIRADA").upper()
-
-
 
     tecnico = limpar_texto(body.get("tecnico"), "").upper()
 
-
-
     cliente = limpar_texto(body.get("cliente"), "").upper()
-
-
 
     os_id = str(body.get("os_id", "")).strip()
 
-
-
     obs = limpar_texto(body.get("observacao"), "")
 
-
-
     operador = limpar_texto(body.get("operador"), "PAULO (ALMOXARIFADO)").upper()
-
-
 
     agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
 
 
 
-
-
-
-
     with get_db_connection(DB_NAME) as conn:
-
-
 
         cur = conn.cursor()
 
-
-
         cur.execute("SELECT id, nome_ferramenta, status FROM ferramentas_cautela WHERE UPPER(codigo_ferramenta) = ? OR UPPER(numero_serie) = ?", (codigo, codigo))
-
-
 
         row = cur.fetchone()
 
-
-
         if not row:
 
-
-
             return web.json_response({"ok": False, "msg": f"❌ Ferramenta '{codigo}' não encontrada no cadastro do Almoxarifado!"}, status=404)
-
-
-
-
 
 
 
@@ -13792,229 +6285,114 @@ async def api_ferramentas_acao(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         if acao == "RETIRADA":
-
-
 
             if not tecnico:
 
-
-
                 return web.json_response({"ok": False, "msg": "Selecione o técnico responsável pela retirada."}, status=400)
 
-
-
             cur.execute("""
-
-
 
                 UPDATE ferramentas_cautela 
 
-
-
                 SET status = 'EM_USO', tecnico_responsavel = ?, destino_cliente = ?, os_id = ?, data_saida = ?, observacao = ?
-
-
 
                 WHERE id = ?
 
-
-
             """, (tecnico, cliente, os_id, agora, obs, f_id))
-
-
 
             cur.execute("""
 
-
-
                 INSERT INTO historico_cautela_ferramentas (codigo_ferramenta, nome_ferramenta, tipo_acao, tecnico, destino_cliente, os_id, operador, data_hora, observacao)
-
-
 
                 VALUES (?, ?, 'RETIRADA', ?, ?, ?, ?, ?, ?)
 
-
-
             """, (codigo, f_nome, tecnico, cliente, os_id, operador, agora, obs))
-
-
 
             msg = f"📤 Ferramenta {codigo} entregue para 👷 {tecnico} com sucesso!"
 
 
 
-
-
-
-
         elif acao == "DEVOLUCAO":
-
             aviso_entrega = obter_instrucao_ferramenta(codigo, "ENTREGA")
-
             cur.execute("""
-
                 UPDATE ferramentas_cautela 
-
                 SET status = 'DISPONIVEL', tecnico_responsavel = '', destino_cliente = '', os_id = '', data_devolucao = ?, observacao = ?
-
                 WHERE id = ?
-
             """, (agora, obs, f_id))
-
             cur.execute("""
-
                 INSERT INTO historico_cautela_ferramentas (codigo_ferramenta, nome_ferramenta, tipo_acao, tecnico, destino_cliente, os_id, operador, data_hora, observacao)
-
                 VALUES (?, ?, 'DEVOLUCAO', '', '', '', ?, ?, ?)
-
             """, (codigo, f_nome, operador, agora, obs))
-
             msg = f"📥 Ferramenta {codigo} devolvida ao Almoxarifado! {aviso_entrega}"
-
-
-
-
 
 
 
         elif acao == "CALIBRACAO_BANCADA":
 
-
-
             cur.execute("""
-
-
 
                 UPDATE ferramentas_cautela 
 
-
-
                 SET status = 'CALIBRACAO_BANCADA', tecnico_responsavel = 'BANCADA / CALIBRAÇÃO RBC', destino_cliente = 'LABORATÓRIO', data_saida = ?, observacao = ?
-
-
 
                 WHERE id = ?
 
-
-
             """, (agora, obs, f_id))
-
-
 
             cur.execute("""
 
-
-
                 INSERT INTO historico_cautela_ferramentas (codigo_ferramenta, nome_ferramenta, tipo_acao, tecnico, destino_cliente, os_id, operador, data_hora, observacao)
-
-
 
                 VALUES (?, ?, 'ENVIO_CALIBRACAO', 'LABORATÓRIO', 'BANCADA', '', ?, ?, ?)
 
-
-
             """, (codigo, f_nome, operador, agora, obs))
-
-
 
             msg = f"🔬 Ferramenta {codigo} encaminhada para Bancada / Calibração RBC!"
 
 
 
-
-
-
-
         elif acao == "RETORNO_CALIBRACAO":
-
-
 
             nova_val = limpar_texto(body.get("validade_calibracao"), "")
 
-
-
             novo_cert = limpar_texto(body.get("certificado"), "")
 
-
-
             cur.execute("""
-
-
 
                 UPDATE ferramentas_cautela 
 
-
-
                 SET status = 'DISPONIVEL', tecnico_responsavel = '', destino_cliente = '', os_id = '', data_devolucao = ?, 
-
-
 
                     data_validade_calibracao = CASE WHEN ? != '' THEN ? ELSE data_validade_calibracao END,
 
-
-
                     certificado_calibracao = CASE WHEN ? != '' THEN ? ELSE certificado_calibracao END,
-
-
 
                     observacao = ?
 
-
-
                 WHERE id = ?
-
-
 
             """, (agora, nova_val, nova_val, novo_cert, novo_cert, obs, f_id))
 
-
-
             cur.execute("""
-
-
 
                 INSERT INTO historico_cautela_ferramentas (codigo_ferramenta, nome_ferramenta, tipo_acao, operador, data_hora, observacao)
 
-
-
                 VALUES (?, ?, 'RETORNO_CALIBRACAO', ?, ?, ?)
 
-
-
             """, (codigo, f_nome, operador, agora, obs))
-
-
 
             msg = f"🟢 Calibração/Manutenção da Ferramenta {codigo} concluída e liberada para uso!"
 
 
 
-
-
-
-
         else:
-
-
 
             return web.json_response({"ok": False, "msg": f"Ação '{acao}' não reconhecida."}, status=400)
 
 
 
-
-
-
-
         conn.commit()
-
-
-
-
 
 
 
@@ -14026,79 +6404,37 @@ async def api_ferramentas_acao(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
 async def api_almox_compra_acao(request: web.Request) -> web.Response:
-
-
 
     """Gerencia a esteira de compra e chegada de peças/ferramentas sem saldo no Almoxarifado."""
 
-
-
     body = await request.json()
-
-
 
     id_ped = int(body.get("id", 0))
 
-
-
     acao = limpar_texto(body.get("acao"), "").upper()
-
-
 
     fornecedor = limpar_texto(body.get("fornecedor"), "")
 
-
-
     previsao = limpar_texto(body.get("previsao_entrega"), "")
 
-
-
     obs = limpar_texto(body.get("observacao"), "")
-
-
 
     agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
 
 
 
-
-
-
-
     with get_db_connection(DB_NAME) as conn:
-
-
 
         cur = conn.cursor()
 
-
-
         cur.execute("SELECT itens_solicitados, status_pedido, status_compra FROM solicitacoes_pecas WHERE id = ?", (id_ped,))
-
-
 
         row = cur.fetchone()
 
-
-
         if not row:
 
-
-
             return web.json_response({"ok": False, "msg": f"Pedido #{id_ped} não localizado."}, status=404)
-
-
-
-
 
 
 
@@ -14106,227 +6442,113 @@ async def api_almox_compra_acao(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         if acao == "SOLICITAR_COMPRA":
-
-
 
             novo_st_compra = "AGUARDANDO_APROVACAO"
 
-
-
             novo_st_pedido = "AGUARDANDO APROVAÇÃO DE COMPRA"
-
-
 
             cur.execute("""
 
-
-
                 UPDATE solicitacoes_pecas 
-
-
 
                 SET status_compra = ?, status_pedido = ?, fornecedor = ?
 
-
-
                 WHERE id = ?
 
-
-
             """, (novo_st_compra, novo_st_pedido, fornecedor, id_ped))
-
-
 
             msg = f"🛒 Solicitação de compra do Pedido #{id_ped} registrada com sucesso!"
 
 
 
-
-
-
-
         elif acao == "APROVAR_COMPRA":
-
-
 
             novo_st_compra = "COMPRA_APROVADA"
 
-
-
             novo_st_pedido = "COMPRA APROVADA (EM COTAÇÃO)"
-
-
 
             cur.execute("""
 
-
-
                 UPDATE solicitacoes_pecas 
-
-
 
                 SET status_compra = ?, status_pedido = ?
 
-
-
                 WHERE id = ?
 
-
-
             """, (novo_st_compra, novo_st_pedido, id_ped))
-
-
 
             msg = f"✅ Compra do Pedido #{id_ped} aprovada pela diretoria/coordenação!"
 
 
 
-
-
-
-
         elif acao in ("MARCAR_ADQUIRIDO", "ATUALIZAR_RASTREIO"):
-
             codigo_rastreio = limpar_texto(body.get("codigo_rastreio"), "").strip()
-
             transportadora = limpar_texto(body.get("transportadora"), "").strip()
-
             novo_st_compra = "ADQUIRIDO_AGUARDANDO_CHEGAR"
-
             novo_st_pedido = f"PEÇA JÁ ADQUIRIDA (PREVISÃO: {previsao or 'EM TRÂNSITO'})"
-
             cur.execute("""
-
                 UPDATE solicitacoes_pecas 
-
                 SET status_compra = ?, status_pedido = ?, previsao_entrega = ?, fornecedor = ?, codigo_rastreio = ?, transportadora = ?
-
                 WHERE id = ?
-
             """, (novo_st_compra, novo_st_pedido, previsao, fornecedor, codigo_rastreio, transportadora, id_ped))
-
             msg = f"🚚 Pedido #{id_ped} atualizado! Aguardando chegada ({previsao})."
-
-
-
-
 
 
 
         elif acao == "DAR_ENTRADA_CHEGOU":
 
-
-
             # Dá entrada física no estoque
-
-
 
             partes = [p.strip() for p in itens_str.split(",") if "x " in p and "(" in p]
 
-
-
             for p in partes:
-
-
 
                 try:
 
-
-
                     qtd_str = p.split("x ")[0].strip()
-
-
 
                     cod_str = p.split("(")[-1].replace(")", "").strip()
 
-
-
                     qtd_ent = int(qtd_str)
-
-
 
                     cur.execute(
 
-
-
                         "UPDATE estoque_pecas SET quantidade = quantidade + ? WHERE codigo = ?",
-
-
 
                         (qtd_ent, cod_str)
 
-
-
                     )
 
-
-
                 except Exception:
-
-
 
                     pass
 
 
 
-
-
-
-
             novo_st_compra = "RECEBIDO_ALMOXARIFADO"
-
-
 
             novo_st_pedido = "A SEPARAR / AGUARDANDO ALMOXARIFADO"
 
-
-
             itens_atualizados = itens_str.replace("(SEM SALDO)", "(SALDO DISPONÍVEL - CHEGOU)")
-
-
 
             cur.execute("""
 
-
-
                 UPDATE solicitacoes_pecas 
-
-
 
                 SET status_compra = ?, status_pedido = ?, itens_solicitados = ?
 
-
-
                 WHERE id = ?
 
-
-
             """, (novo_st_compra, novo_st_pedido, itens_atualizados, id_ped))
-
-
 
             msg = f"📦 Peça recebida no Almoxarifado! Saldo adicionado ao estoque e separação liberada."
 
 
 
-
-
-
-
         else:
 
-
-
             return web.json_response({"ok": False, "msg": f"Ação '{acao}' não reconhecida."}, status=400)
-
-
-
-
 
 
 
@@ -14334,33 +6556,15 @@ async def api_almox_compra_acao(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     return web.json_response({
-
         "ok": True,
-
         "msg": msg,
-
         "novo_status_pedido": novo_st_pedido,
-
         "novo_status_compra": novo_st_compra,
-
         "previsao_entrega": previsao,
-
         "codigo_rastreio": locals().get("codigo_rastreio", ""),
-
         "transportadora": locals().get("transportadora", "")
-
     })
-
-
-
-
-
-
 
 
 
@@ -14370,15 +6574,7 @@ async def api_almox_status(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     body = await request.json()
-
-
-
-
 
 
 
@@ -14386,15 +6582,7 @@ async def api_almox_status(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     novo_status = limpar_texto(body.get("novo_status"), "SEPARADO / ENTREGUE AO TÉCNICO")
-
-
-
-
 
 
 
@@ -14402,213 +6590,102 @@ async def api_almox_status(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     tipo_origem = limpar_texto(body.get("tipo_origem") or body.get("tipo_origem_peca"), "")
-
-
-
-
 
 
 
     motivo_recusa = limpar_texto(body.get("motivo_recusa") or body.get("motivo"), "")
 
-
-
     ok, msg = atualizar_status_solicitacao_peca(DB_NAME, id_ped, novo_status, tecnico=tecnico, tipo_origem=tipo_origem, motivo_recusa=motivo_recusa)
-
-
 
     return web.json_response({"ok": ok, "msg": msg, "tecnico": tecnico, "novo_status": novo_status, "tipo_origem_peca": tipo_origem, "motivo_recusa": motivo_recusa})
 
 
-
-
-
 async def api_auditoria_excluir(request: web.Request) -> web.Response:
-
     """Registra exclusão com rastreabilidade forense, usuário e snapshot antes de remover o dado."""
-
     body = await request.json()
-
     tabela = str(body.get("tabela", "")).strip().lower()
-
     reg_id = str(body.get("id", "")).strip()
-
     usuario = str(body.get("usuario", "ADMIN / AUDITOR")).strip()
-
     justificativa = str(body.get("justificativa", "")).strip()
-
     ip_origem = request.remote or "127.0.0.1"
 
-
-
     if not tabela or not reg_id:
-
         return web.json_response({"ok": False, "msg": "Tabela e ID do registro são obrigatórios."}, status=400)
 
-
-
     if not justificativa:
-
         return web.json_response({"ok": False, "msg": "Motivo/Justificativa obrigatória para registro de segurança e auditoria forense."}, status=400)
 
-
-
     tabelas_permitidas = ["solicitacoes_pecas", "clientes_equipamentos", "ferramentas_cautela", "notas_fiscais", "baixas_consumiveis", "ordens_servico"]
-
     if tabela not in tabelas_permitidas:
-
         return web.json_response({"ok": False, "msg": f"Tabela '{tabela}' não permitida para exclusão auditada."}, status=400)
-
-
 
     agora_str = obter_agora_brasil_str("%d/%m/%Y %H:%M:%S")
 
-
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         cur.execute(f"SELECT * FROM {tabela} WHERE id = ?", (reg_id,))
-
         row = cur.fetchone()
-
         if not row:
-
             return web.json_response({"ok": False, "msg": f"Registro #{reg_id} não encontrado na tabela {tabela}."}, status=404)
 
-
-
         col_names = [desc[0] for desc in cur.description]
-
         conteudo_dict = dict(zip(col_names, row))
-
         conteudo_json = json.dumps(conteudo_dict, ensure_ascii=False, default=str)
 
-
-
         cur.execute("""
-
             INSERT INTO auditoria_exclusoes (tabela_alvo, registro_id, usuario, data_hora, ip_origem, justificativa, conteudo_original_json)
-
             VALUES (?, ?, ?, ?, ?, ?, ?)
-
         """, (tabela, reg_id, usuario, agora_str, ip_origem, justificativa, conteudo_json))
 
-
-
         cur.execute(f"DELETE FROM {tabela} WHERE id = ?", (reg_id,))
-
         conn.commit()
 
-
-
     if tabela == "clientes_equipamentos":
-
         try:
-
             df_ex = pd.read_excel(CAMINHO_EXCEL)
-
             if "id" in df_ex.columns:
-
                 df_ex = df_ex[df_ex["id"].astype(str) != reg_id]
-
             else:
-
                 idx_int = int(reg_id) - 1
-
                 if 0 <= idx_int < len(df_ex):
-
                     df_ex = df_ex.drop(idx_int)
-
             df_ex.to_excel(CAMINHO_EXCEL, index=False)
-
         except Exception as e_ex:
-
             print("Aviso ao remover linha do Excel:", e_ex)
 
-
-
     return web.json_response({
-
         "ok": True, 
-
         "msg": f"🛡️ Registro #{reg_id} excluído com sucesso e carimbado no Log de Segurança Cibernética e Auditoria!",
-
         "auditoria": {
-
             "tabela": tabela,
-
             "id": reg_id,
-
             "usuario": usuario,
-
             "data_hora": agora_str,
-
             "justificativa": justificativa
-
         }
-
     })
 
 
-
-
-
 async def api_auditoria_listar(request: web.Request) -> web.Response:
-
     """Retorna o log de auditoria com as exclusões realizadas."""
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         cur.execute("SELECT id, tabela_alvo, registro_id, usuario, data_hora, ip_origem, justificativa, criado_em FROM auditoria_exclusoes ORDER BY id DESC LIMIT 50")
-
         rows = cur.fetchall()
-
         lista = []
-
         for r in rows:
-
             lista.append({
-
                 "id": r[0],
-
                 "tabela": r[1],
-
                 "registro_id": r[2],
-
                 "usuario": r[3],
-
                 "data_hora": r[4],
-
                 "ip_origem": r[5],
-
                 "justificativa": r[6],
-
                 "criado_em": str(r[7] or "")
-
             })
-
     return web.json_response({"ok": True, "logs": lista})
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -14624,15 +6701,7 @@ async def api_pix_gerar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     body = await request.json()
-
-
-
-
 
 
 
@@ -14640,15 +6709,7 @@ async def api_pix_gerar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     valor = limpar_float(body.get("valor"), 0.0)
-
-
-
-
 
 
 
@@ -14656,15 +6717,7 @@ async def api_pix_gerar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if valor <= 0:
-
-
-
-
 
 
 
@@ -14676,19 +6729,7 @@ async def api_pix_gerar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     payload_emv = gerar_payload_pix(chave_pix, "EMED ELETROMEDICINA", "FORTALEZA", valor, f"OS{os_id}")
-
-
-
-
 
 
 
@@ -14696,15 +6737,7 @@ async def api_pix_gerar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     return web.json_response({
-
-
-
-
 
 
 
@@ -14712,15 +6745,7 @@ async def api_pix_gerar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "payload_emv": payload_emv,
-
-
-
-
 
 
 
@@ -14728,23 +6753,11 @@ async def api_pix_gerar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "valor": valor,
 
 
 
-
-
-
-
         "os_id": os_id,
-
-
-
-
 
 
 
@@ -14760,23 +6773,7 @@ async def api_pix_gerar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_pix_liquidar(request: web.Request) -> web.Response:
-
-
-
-
 
 
 
@@ -14784,15 +6781,7 @@ async def api_pix_liquidar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     os_id = str(body.get("os_id", "")).strip()
-
-
-
-
 
 
 
@@ -14800,15 +6789,7 @@ async def api_pix_liquidar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     ok, msg = liquidar_pagamento_pix(DB_NAME, os_id, txid, metodo="APP_GESTOR_EMED")
-
-
-
-
 
 
 
@@ -14824,23 +6805,7 @@ async def api_pix_liquidar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_config(request: web.Request) -> web.Response:
-
-
-
-
 
 
 
@@ -14848,15 +6813,7 @@ async def api_config(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     url_g = limpar_texto(body.get("google_review_url"), "")
-
-
-
-
 
 
 
@@ -14864,15 +6821,7 @@ async def api_config(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         salvar_configuracao(DB_NAME, "google_review_url", url_g)
-
-
-
-
 
 
 
@@ -14896,31 +6845,7 @@ async def api_config(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ==============================================================================
-
-
-
-
 
 
 
@@ -14928,19 +6853,7 @@ async def api_config(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
 # ==============================================================================
-
-
-
-
-
-
-
-
 
 
 
@@ -14952,15 +6865,7 @@ async def api_respostas_tecnicas_listar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     tecnico = request.query.get("tecnico", "").strip().upper()
-
-
-
-
 
 
 
@@ -14968,15 +6873,7 @@ async def api_respostas_tecnicas_listar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     lista = []
-
-
-
-
 
 
 
@@ -14984,15 +6881,7 @@ async def api_respostas_tecnicas_listar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         cur = conn.cursor()
-
-
-
-
 
 
 
@@ -15000,15 +6889,7 @@ async def api_respostas_tecnicas_listar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         params = []
-
-
-
-
 
 
 
@@ -15016,15 +6897,7 @@ async def api_respostas_tecnicas_listar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             query += " AND (tecnico = ? OR tecnico = 'GERAL')"
-
-
-
-
 
 
 
@@ -15032,15 +6905,7 @@ async def api_respostas_tecnicas_listar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         if categoria and categoria != "TODAS":
-
-
-
-
 
 
 
@@ -15048,15 +6913,7 @@ async def api_respostas_tecnicas_listar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             params.append(categoria)
-
-
-
-
 
 
 
@@ -15064,15 +6921,7 @@ async def api_respostas_tecnicas_listar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         cur.execute(query, tuple(params))
-
-
-
-
 
 
 
@@ -15080,15 +6929,7 @@ async def api_respostas_tecnicas_listar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             lista.append({
-
-
-
-
 
 
 
@@ -15096,15 +6937,7 @@ async def api_respostas_tecnicas_listar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "tecnico": r[1],
-
-
-
-
 
 
 
@@ -15112,15 +6945,7 @@ async def api_respostas_tecnicas_listar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "titulo": r[3],
-
-
-
-
 
 
 
@@ -15128,15 +6953,7 @@ async def api_respostas_tecnicas_listar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "equipamento_tipo": r[5],
-
-
-
-
 
 
 
@@ -15144,15 +6961,7 @@ async def api_respostas_tecnicas_listar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             })
-
-
-
-
 
 
 
@@ -15168,23 +6977,7 @@ async def api_respostas_tecnicas_listar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_respostas_tecnicas_salvar(request: web.Request) -> web.Response:
-
-
-
-
 
 
 
@@ -15192,15 +6985,7 @@ async def api_respostas_tecnicas_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     resp_id = body.get("id")
-
-
-
-
 
 
 
@@ -15208,15 +6993,7 @@ async def api_respostas_tecnicas_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     categoria = limpar_texto(body.get("categoria"), "SERVICOS_EXECUTADOS").upper()
-
-
-
-
 
 
 
@@ -15224,15 +7001,7 @@ async def api_respostas_tecnicas_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     texto = limpar_texto(body.get("texto"), "").strip()
-
-
-
-
 
 
 
@@ -15244,19 +7013,7 @@ async def api_respostas_tecnicas_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     if not texto:
-
-
-
-
 
 
 
@@ -15268,19 +7025,7 @@ async def api_respostas_tecnicas_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     with get_db_connection(DB_NAME) as conn:
-
-
-
-
 
 
 
@@ -15288,23 +7033,11 @@ async def api_respostas_tecnicas_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         if resp_id:
 
 
 
-
-
-
-
             cur.execute("""
-
-
-
-
 
 
 
@@ -15312,15 +7045,7 @@ async def api_respostas_tecnicas_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 SET tecnico = ?, categoria = ?, titulo = ?, texto = ?, equipamento_tipo = ?
-
-
-
-
 
 
 
@@ -15328,15 +7053,7 @@ async def api_respostas_tecnicas_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             """, (tecnico, categoria, titulo, texto, equipamento_tipo, resp_id))
-
-
-
-
 
 
 
@@ -15344,15 +7061,7 @@ async def api_respostas_tecnicas_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         else:
-
-
-
-
 
 
 
@@ -15360,15 +7069,7 @@ async def api_respostas_tecnicas_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 INSERT INTO banco_respostas_tecnicos (tecnico, categoria, titulo, texto, equipamento_tipo)
-
-
-
-
 
 
 
@@ -15376,15 +7077,7 @@ async def api_respostas_tecnicas_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             """, (tecnico, categoria, titulo, texto, equipamento_tipo))
-
-
-
-
 
 
 
@@ -15392,27 +7085,11 @@ async def api_respostas_tecnicas_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             msg = f"✅ Nova resposta '{titulo}' salva no seu Banco de Respostas!"
 
 
 
-
-
-
-
         conn.commit()
-
-
-
-
-
-
-
-
 
 
 
@@ -15432,23 +7109,7 @@ async def api_respostas_tecnicas_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_respostas_tecnicas_deletar(request: web.Request) -> web.Response:
-
-
-
-
 
 
 
@@ -15456,15 +7117,7 @@ async def api_respostas_tecnicas_deletar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if not resp_id:
-
-
-
-
 
 
 
@@ -15472,15 +7125,7 @@ async def api_respostas_tecnicas_deletar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             body = await request.json()
-
-
-
-
 
 
 
@@ -15488,15 +7133,7 @@ async def api_respostas_tecnicas_deletar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         except Exception:
-
-
-
-
 
 
 
@@ -15504,15 +7141,7 @@ async def api_respostas_tecnicas_deletar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if not resp_id:
-
-
-
-
 
 
 
@@ -15524,19 +7153,7 @@ async def api_respostas_tecnicas_deletar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     with get_db_connection(DB_NAME) as conn:
-
-
-
-
 
 
 
@@ -15544,23 +7161,11 @@ async def api_respostas_tecnicas_deletar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         cur.execute("DELETE FROM banco_respostas_tecnicos WHERE id = ?", (resp_id,))
 
 
 
-
-
-
-
         conn.commit()
-
-
-
-
 
 
 
@@ -15576,297 +7181,140 @@ async def api_respostas_tecnicas_deletar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_os_nf_salvar(request: web.Request) -> web.Response:
-
     body = await request.json()
-
     os_id = str(body.get("os_id", "")).strip()
-
     tipo_nota = limpar_texto(body.get("tipo_nota"), "100% NOTA DE SERVIÇO (NFS-e)")
-
     regra_fiscal = limpar_texto(body.get("regra_fiscal"), "SERVICO_TOTAL")
-
     discriminacao_servico = limpar_texto(body.get("discriminacao_servico"), "")
-
     numero_nf = limpar_texto(body.get("numero_nf"), "").upper()
-
     chave_acesso = limpar_texto(body.get("chave_acesso"), "")
-
     status_fiscal = limpar_texto(body.get("status_fiscal"), "EMITIDA").upper()
-
     valor_servicos = limpar_float(body.get("valor_servicos"), 0.0)
-
     valor_pecas = limpar_float(body.get("valor_pecas"), 0.0)
-
     data_emissao = limpar_texto(body.get("data_emissao"), obter_agora_brasil_str("%d/%m/%Y"))
-
     motivo_retificacao = str(body.get("motivo_retificacao", "")).strip()
 
-
-
     usuario_logado = "SETOR_FISCAL"
-
     sess = getattr(request, "emed_user", None) or getattr(request, "_emed_user", None)
-
     if sess and isinstance(sess, dict) and sess.get("nome"):
-
         usuario_logado = sess.get("nome")
-
     ip_origem = request.headers.get("X-Forwarded-For") or (request.remote or "")
 
-
-
     df = _carregar_df_direto()
-
     idx_alvo = None
-
     row_os = None
-
     for idx, row in df.iterrows():
-
         if str(obter_id_os(idx, row)) == os_id:
-
             idx_alvo = idx
-
             row_os = row
-
             break
 
-
-
     if idx_alvo is not None:
-
         df.at[idx_alvo, "numero_nf"] = numero_nf
-
         df.at[idx_alvo, "status_fiscal"] = status_fiscal
-
         _salvar_df_direto(df)
 
-
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         cur.execute("""
-
             SELECT id, numero_nf, status_fiscal, valor_servicos, valor_pecas, data_emissao, chave_acesso, tipo_nota, regra_fiscal, discriminacao_servico
-
             FROM notas_fiscais WHERE os_id = ?
-
         """, (os_id,))
-
         row_nf_check = cur.fetchone()
-
         confirmar_retificacao = bool(body.get("confirmar_retificacao", False))
-
         
-
         if row_nf_check and row_nf_check[2] == "EMITIDA" and not confirmar_retificacao:
-
             return web.json_response({
-
                 "ok": False,
-
                 "duplicidade": True,
-
                 "numero_nf": row_nf_check[1],
-
                 "data_emissao": row_nf_check[5],
-
                 "valor_total": float(row_nf_check[3] or 0) + float(row_nf_check[4] or 0),
-
                 "msg": f"⚠️ A Nota Fiscal {row_nf_check[1]} já foi emitida para a OS #{os_id}! Confirme a retificação para prosseguir."
-
             })
-
             
-
         dados_ant = None
-
         if row_nf_check:
-
             dados_ant = {
-
                 "numero_nf": row_nf_check[1],
-
                 "status_fiscal": row_nf_check[2],
-
                 "valor_servicos": float(row_nf_check[3] or 0.0),
-
                 "valor_pecas": float(row_nf_check[4] or 0.0),
-
                 "data_emissao": row_nf_check[5],
-
                 "chave_acesso": row_nf_check[6],
-
                 "tipo_nota": row_nf_check[7],
-
                 "regra_fiscal": row_nf_check[8],
-
                 "discriminacao_servico": row_nf_check[9]
-
             }
 
-
-
         dados_nov = {
-
             "numero_nf": numero_nf,
-
             "status_fiscal": status_fiscal,
-
             "valor_servicos": valor_servicos,
-
             "valor_pecas": valor_pecas,
-
             "data_emissao": data_emissao,
-
             "chave_acesso": chave_acesso,
-
             "tipo_nota": tipo_nota,
-
             "regra_fiscal": regra_fiscal,
-
             "discriminacao_servico": discriminacao_servico,
-
             "motivo_retificacao": motivo_retificacao
-
         }
 
-
-
         row_os_dict = row_os.to_dict() if row_os is not None else {}
-
         historico_eventos = obter_historico_eventos_fiscais(os_id=os_id, limit=20, db_path=DB_NAME)
-
         avaliacao = avaliar_conformidade_fiscal(dados_nov, row_os_dict, historico_eventos)
 
-
-
         cli_nome = limpar_texto(row_os.get("cliente") if row_os is not None else "CLIENTE EMED", "CLIENTE EMED")
-
         cnpj_cli = limpar_texto(row_os.get("cnpj") if row_os is not None else "", "")
 
-
-
         if row_nf_check:
-
             tipo_evento = "RETIFICACAO"
-
             val_ant_tot = float(dados_ant["valor_servicos"] + dados_ant["valor_pecas"])
-
             val_nov_tot = float(valor_servicos + valor_pecas)
-
             dif_valores = round(val_nov_tot - val_ant_tot, 2)
-
             motivo_evento = motivo_retificacao or f"Retificação formal da NF {row_nf_check[1]} para {numero_nf}"
-
             
-
             cur.execute("""
-
                 UPDATE notas_fiscais
-
                 SET numero_nf = ?, chave_acesso = ?, status_fiscal = ?, valor_servicos = ?, valor_pecas = ?, data_emissao = ?, tipo_nota = ?, regra_fiscal = ?, discriminacao_servico = ?, atualizado_em = CURRENT_TIMESTAMP
-
                 WHERE os_id = ?
-
             """, (numero_nf, chave_acesso, status_fiscal, valor_servicos, valor_pecas, data_emissao, tipo_nota, regra_fiscal, discriminacao_servico, os_id))
-
         else:
-
             tipo_evento = "EMISSAO"
-
             dif_valores = round(valor_servicos + valor_pecas, 2)
-
             motivo_evento = "Emissão inicial de Nota Fiscal no sistema"
-
             
-
             cur.execute("""
-
                 INSERT INTO notas_fiscais (os_id, cliente, cnpj_tomador, tipo_nota, numero_nf, chave_acesso, status_fiscal, valor_servicos, valor_pecas, data_emissao, regra_fiscal, discriminacao_servico, criado_em)
-
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-
             """, (os_id, cli_nome, cnpj_cli, tipo_nota, numero_nf, chave_acesso, status_fiscal, valor_servicos, valor_pecas, data_emissao, regra_fiscal, discriminacao_servico))
-
-
 
         conn.commit()
 
-
-
         evento_id = registrar_evento_auditoria_fiscal(
-
             os_id=os_id,
-
             numero_nf=numero_nf,
-
             tipo_evento=tipo_evento,
-
             usuario=usuario_logado,
-
             ip_origem=ip_origem,
-
             dados_anteriores=dados_ant,
-
             dados_novos=dados_nov,
-
             diferenca_valores=dif_valores,
-
             status_conformidade=avaliacao.get("status_geral", "CONFORME"),
-
             score_conformidade=avaliacao.get("score", 100),
-
             motivo_observacao=motivo_evento,
-
             detalhes_regras=avaliacao.get("regras", []),
-
             db_path=DB_NAME
-
         )
 
-
-
     return web.json_response({
-
         "ok": True,
-
         "msg": f"🧾 Dados fiscais da OS #{os_id} atualizados (NF: {numero_nf}) com auditoria ativa!",
-
         "evento_id": evento_id,
-
         "tipo_evento": tipo_evento,
-
         "avaliacao": avaliacao
-
     })
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -15882,15 +7330,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     body = await request.json()
-
-
-
-
 
 
 
@@ -15898,15 +7338,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     cliente = limpar_texto(body.get("cliente"), "CLIENTE").upper()
-
-
-
-
 
 
 
@@ -15914,15 +7346,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     peca_codigo = limpar_texto(body.get("peca_codigo"), "").upper()
-
-
-
-
 
 
 
@@ -15930,15 +7354,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     quantidade = int(limpar_float(body.get("quantidade"), 1))
-
-
-
-
 
 
 
@@ -15946,15 +7362,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     valor_total = round(quantidade * valor_unitario, 2)
-
-
-
-
 
 
 
@@ -15962,23 +7370,11 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     prazo_entrega = limpar_texto(body.get("prazo_entrega"), "IMEDIATO (EM ESTOQUE)").upper()
 
 
 
-
-
-
-
     observacoes = limpar_texto(body.get("observacoes"), "").upper()
-
-
-
-
 
 
 
@@ -15990,19 +7386,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     saldo_disponivel = 0
-
-
-
-
 
 
 
@@ -16010,15 +7394,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         cur = conn.cursor()
-
-
-
-
 
 
 
@@ -16026,23 +7402,11 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         row_p = cur.fetchone()
 
 
 
-
-
-
-
         if row_p:
-
-
-
-
 
 
 
@@ -16054,57 +7418,26 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         # Validação Comercial eMED: Se o cliente tiver pendência financeira em aberto,
-
         # sugere À VISTA / PIX ou requer opção de Autorização da Diretoria / Negociação
-
         autorizado_diretoria = bool(body.get("autorizado_diretoria", False)) or bool(body.get("autorizacao_diretoria", False))
-
         info_pend = verificar_pendencias_financeiras_cliente(DB_NAME, cliente)
-
         if info_pend.get("tem_pendencia", False):
-
             cond_up = condicao_pagamento.upper()
-
             eh_a_vista_pix = ("VISTA" in cond_up or "PIX" in cond_up or "ANTECIPADO" in cond_up)
-
             if not eh_a_vista_pix and not autorizado_diretoria:
-
                 return web.json_response({
-
                     "ok": False,
-
                     "requer_autorizacao": True,
-
                     "valor_pendente": info_pend.get("valor_total", 0.0),
-
                     "msg": f"💡 Sugestão Comercial: O cliente {cliente} possui pendências anteriores (R$ {info_pend.get('valor_total', 0.0):,.2f}). Selecione 'À VISTA / PIX' ou marque a opção 'Autorizado pela Diretoria / Exceção Comercial' para liberar faturamento a prazo."
-
                 }, status=400)
-
             elif autorizado_diretoria:
-
                 observacoes = f"[AUTORIZADO PELA DIRETORIA / EXCEÇÃO COMERCIAL] {observacoes}".strip()
-
-
 
         # Validação impeditiva: não permitir venda com promessa de entrega imediata se o estoque estiver zerado/insuficiente sem pedido de compra
 
-
-
         if saldo_disponivel < quantidade and not solicitar_compra and "IMEDIATO" in prazo_entrega.upper():
-
-
-
-
 
 
 
@@ -16112,23 +7445,11 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "ok": False,
 
 
 
-
-
-
-
                 "msg": f"⚠️ Saldo físico insuficiente no almoxarifado ({saldo_disponivel} un. disponível para {quantidade} un. solicitada)! Para prosseguir com entrega imediata, ajuste o estoque ou marque a opção 'Solicitar Compra'."
-
-
-
-
 
 
 
@@ -16140,19 +7461,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
         if solicitar_compra or saldo_disponivel <= 0:
-
-
-
-
 
 
 
@@ -16160,15 +7469,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             cur.execute("""
-
-
-
-
 
 
 
@@ -16176,23 +7477,11 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 VALUES ('COMERCIAL / PROPOSTA', ?, ?, 'SOLICITAÇÃO DE COMPRA PARA PROPOSTA', 'PENDENTE DE COMPRA', ?)
 
 
 
-
-
-
-
             """, (f"{cliente} ({equipamento}) [OS #{os_id}]", f"{quantidade}x {peca_codigo} - {peca_nome} (SEM SALDO)", agora_str))
-
-
-
-
 
 
 
@@ -16204,19 +7493,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     if os_id:
-
-
-
-
 
 
 
@@ -16224,15 +7501,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         for idx, row in df.iterrows():
-
-
-
-
 
 
 
@@ -16240,15 +7509,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 df.at[idx, "status_proposta"] = "PROPOSTA_GERADA"
-
-
-
-
 
 
 
@@ -16256,23 +7517,11 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 df.at[idx, "condicao_pagamento"] = condicao_pagamento
 
 
 
-
-
-
-
                 _salvar_df_direto(df)
-
-
-
-
 
 
 
@@ -16284,27 +7533,11 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     msg = f"📄 Proposta gerada com sucesso para {cliente}! Peça: {peca_nome}."
 
 
 
-
-
-
-
     if saldo_disponivel <= 0:
-
-
-
-
 
 
 
@@ -16316,19 +7549,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     return web.json_response({
-
-
-
-
 
 
 
@@ -16336,15 +7557,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "msg": msg,
-
-
-
-
 
 
 
@@ -16352,15 +7565,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "sem_estoque": (saldo_disponivel <= 0),
-
-
-
-
 
 
 
@@ -16368,27 +7573,7 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -16408,15 +7593,7 @@ async def api_pdf_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     os_id = request.match_info.get("os_id", "").strip()
-
-
-
-
 
 
 
@@ -16424,15 +7601,7 @@ async def api_pdf_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     equipa = _montar_equipa_direto()
-
-
-
-
 
 
 
@@ -16440,15 +7609,7 @@ async def api_pdf_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         if str(obter_id_os(idx, row)) == os_id:
-
-
-
-
 
 
 
@@ -16456,15 +7617,7 @@ async def api_pdf_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             pdf_bytes = converter_html_para_pdf_bytes(html_os)
-
-
-
-
 
 
 
@@ -16472,15 +7625,7 @@ async def api_pdf_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             nome_arq = f"Laudo_Tecnico_OS_{os_id}_{cli_slug}.pdf"
-
-
-
-
 
 
 
@@ -16488,15 +7633,7 @@ async def api_pdf_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 body=pdf_bytes,
-
-
-
-
 
 
 
@@ -16504,15 +7641,7 @@ async def api_pdf_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 headers={"Content-Disposition": f'inline; filename="{nome_arq}"'},
-
-
-
-
 
 
 
@@ -16520,23 +7649,7 @@ async def api_pdf_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     return web.Response(text=f"OS #{os_id} não encontrada", status=404)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -16552,15 +7665,7 @@ async def api_html_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     os_id = request.match_info.get("os_id", "").strip()
-
-
-
-
 
 
 
@@ -16568,15 +7673,7 @@ async def api_html_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     df = _carregar_df_direto()
-
-
-
-
 
 
 
@@ -16584,15 +7681,7 @@ async def api_html_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     for idx, row in df.iterrows():
-
-
-
-
 
 
 
@@ -16600,28 +7689,12 @@ async def api_html_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             html_os = _gerar_html_os_formatada(os_id, row, equipa)
 
 
 
-
-
-
-
             if modo_print:
-
                 pass
-
-
-
-
-
-
-
 
 
 
@@ -16632,23 +7705,7 @@ async def api_html_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     return web.Response(text=f"OS #{os_id} não encontrada", status=404)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -16664,15 +7721,7 @@ async def api_imprimir_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     """Abre o laudo técnico da OS em formato HTML otimizado para impressão A4 direta no celular."""
-
-
-
-
 
 
 
@@ -16680,15 +7729,7 @@ async def api_imprimir_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     df = _carregar_df_direto()
-
-
-
-
 
 
 
@@ -16696,23 +7737,11 @@ async def api_imprimir_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     for idx, row in df.iterrows():
 
 
 
-
-
-
-
         if str(obter_id_os(idx, row)) == os_id:
-
-
-
-
 
 
 
@@ -16723,18 +7752,7 @@ async def api_imprimir_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
             return web.Response(text=html_os, content_type="text/html")
-
-
-
-
 
 
 
@@ -16750,45 +7768,7 @@ async def api_imprimir_os(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-async def api_imprimir_termo_aceite_instalacao(request: web.Request) -> web.Response:
-
-    """Abre o Termo Definitivo de Aceite e Entrega Técnica de Instalação em formato A4."""
-
-    try:
-
-        os_id = int(request.match_info.get("os_id", 0))
-
-        html_termo = gerar_html_termo_aceite_instalacao(DB_NAME, os_id)
-
-        return web.Response(text=html_termo, content_type="text/html")
-
-    except Exception as e:
-
-        return web.Response(text=f"Erro ao gerar Termo de Aceite: {e}", status=500)
-
-
-
-
-
 async def api_manual_download(request: web.Request) -> web.Response:
-
-
-
-
 
 
 
@@ -16796,15 +7776,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     rel_path = request.query.get("path", "").strip()
-
-
-
-
 
 
 
@@ -16812,19 +7784,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         return web.Response(text="Caminho inválido", status=400)
-
-
-
-
-
-
-
-
 
 
 
@@ -16840,19 +7800,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     # Fallback: se o caminho relativo não bater direto, procura pelo nome do arquivo na pasta Manuais/
-
-
-
-
 
 
 
@@ -16860,15 +7808,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         nome_busca = os.path.basename(rel_path) if rel_path and rel_path != "undefined" else request.query.get("file", "")
-
-
-
-
 
 
 
@@ -16876,15 +7816,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         pasta_manuais = os.path.join(BASE_DIR, "Manuais")
-
-
-
-
 
 
 
@@ -16892,15 +7824,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             for root, _, files in os.walk(pasta_manuais):
-
-
-
-
 
 
 
@@ -16908,23 +7832,11 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     if nome_busca and f.lower() == nome_busca.lower():
 
 
 
-
-
-
-
                         encontrado = os.path.join(root, f)
-
-
-
-
 
 
 
@@ -16932,15 +7844,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     elif not encontrado and f.lower().endswith(".pdf"):
-
-
-
-
 
 
 
@@ -16948,15 +7852,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 if encontrado and nome_busca:
-
-
-
-
 
 
 
@@ -16964,15 +7860,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         if encontrado and os.path.exists(encontrado):
-
-
-
-
 
 
 
@@ -16980,15 +7868,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         else:
-
-
-
-
 
 
 
@@ -17000,19 +7880,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     # Se apontar para .md mas já existir o .pdf oficial homologado na mesma pasta, serve o .pdf oficial
-
-
-
-
 
 
 
@@ -17020,23 +7888,11 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         pdf_irmao = os.path.splitext(abs_path)[0] + ".pdf"
 
 
 
-
-
-
-
         if os.path.exists(pdf_irmao):
-
-
-
-
 
 
 
@@ -17048,19 +7904,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
     nome_base = os.path.basename(abs_path)
-
-
-
-
 
 
 
@@ -17068,23 +7912,11 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         with open(abs_path, "rb") as f:
 
 
 
-
-
-
-
             return web.Response(
-
-
-
-
 
 
 
@@ -17092,15 +7924,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 content_type="application/pdf",
-
-
-
-
 
 
 
@@ -17108,15 +7932,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     "Content-Disposition": f'inline; filename="{nome_base}"',
-
-
-
-
 
 
 
@@ -17124,23 +7940,11 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 },
 
 
 
-
-
-
-
             )
-
-
-
-
 
 
 
@@ -17148,15 +7952,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-
-
-
-
 
 
 
@@ -17164,15 +7960,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         try:
-
-
-
-
 
 
 
@@ -17180,15 +7968,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             with open(out_pdf, "rb") as f:
-
-
-
-
 
 
 
@@ -17196,15 +7976,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             return web.Response(
-
-
-
-
 
 
 
@@ -17212,15 +7984,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 content_type="application/pdf",
-
-
-
-
 
 
 
@@ -17228,15 +7992,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             )
-
-
-
-
 
 
 
@@ -17244,15 +8000,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             if os.path.exists(out_pdf):
-
-
-
-
 
 
 
@@ -17260,23 +8008,11 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                     os.remove(out_pdf)
 
 
 
-
-
-
-
                 except Exception:
-
-
-
-
 
 
 
@@ -17292,23 +8028,7 @@ async def api_manual_download(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_video_stream(request: web.Request) -> web.Response:
-
-
-
-
 
 
 
@@ -17316,23 +8036,11 @@ async def api_video_stream(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if not nome_vid:
 
 
 
-
-
-
-
         return web.Response(status=404)
-
-
-
-
 
 
 
@@ -17340,15 +8048,7 @@ async def api_video_stream(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     cand2 = os.path.join(BASE_DIR, nome_vid)
-
-
-
-
 
 
 
@@ -17356,23 +8056,11 @@ async def api_video_stream(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if not alvo:
 
 
 
-
-
-
-
         return web.Response(status=404)
-
-
-
-
 
 
 
@@ -17392,217 +8080,101 @@ async def api_video_stream(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_importar_excel(request: web.Request) -> web.Response:
-
-
 
     """Importa planilha atualizada de clientes/equipamentos ou de estoque."""
 
-
-
     try:
-
-
 
         reader = await request.multipart()
 
-
-
         field = await reader.next()
-
-
 
         if not field:
 
-
-
             return web.json_response({"ok": False, "msg": "Nenhum arquivo enviado."}, status=400)
-
-
 
         filename = field.filename or "upload.xlsx"
 
-
-
         conteudo = await field.read()
 
-
-
         
-
-
 
         temp_path = os.path.join(tempfile.gettempdir(), f"emed_upload_{filename}")
 
-
-
         with open(temp_path, "wb") as f_tmp:
-
-
 
             f_tmp.write(conteudo)
 
-
-
             
-
-
 
         df_uploaded = pd.read_excel(temp_path)
 
-
-
         colunas = [str(c).lower().strip() for c in df_uploaded.columns]
 
-
-
         
-
-
 
         # Caso seja planilha de estoque
 
-
-
         if any(c in colunas for c in ["codigo", "nome_peca", "quantidade", "preco_custo", "saldo"]):
 
-
-
             with get_db_connection(DB_NAME) as conn:
-
-
 
                 for _, row in df_uploaded.iterrows():
 
-
-
                     cod = limpar_texto(row.get("codigo") or row.get("código"), "").upper()
-
-
 
                     nome = limpar_texto(row.get("nome_peca") or row.get("peça") or row.get("descricao"), "").upper()
 
-
-
                     qtd = int(limpar_float(row.get("quantidade") or row.get("saldo") or row.get("estoque"), 0))
-
-
 
                     preco = limpar_float(row.get("preco_custo") or row.get("preco_unitario") or row.get("valor"), 0.0)
 
-
-
                     if cod:
-
-
 
                         conn.execute("""
 
-
-
                             INSERT INTO estoque_pecas (codigo, nome_peca, quantidade, preco_custo)
-
-
 
                             VALUES (?, ?, ?, ?)
 
-
-
                             ON CONFLICT(codigo) DO UPDATE SET
-
-
 
                                 nome_peca = excluded.nome_peca,
 
-
-
                                 quantidade = excluded.quantidade,
-
-
 
                                 preco_custo = excluded.preco_custo
 
-
-
                         """, (cod, nome, qtd, preco))
-
-
 
                 conn.commit()
 
-
-
             return web.json_response({"ok": True, "msg": f"✅ Estoque atualizado! {len(df_uploaded)} itens sincronizados com sucesso."})
-
-
 
         
 
-
-
         # Caso seja planilha de clientes/equipamentos
-
-
 
         else:
 
-
-
             if os.path.exists(CAMINHO_EXCEL):
-
-
 
                 import shutil
 
-
-
                 shutil.copyfile(CAMINHO_EXCEL, CAMINHO_EXCEL.replace(".xlsx", "_backup.xlsx"))
-
-
 
             df_uploaded.to_excel(CAMINHO_EXCEL, index=False)
 
-
-
             with get_db_connection(DB_NAME) as conn:
-
-
 
                 df_uploaded.to_sql("clientes_equipamentos", conn, if_exists="replace", index=False)
 
-
-
             return web.json_response({"ok": True, "msg": f"✅ Base de clientes e equipamentos atualizada! {len(df_uploaded)} registros sincronizados."})
-
-
 
     except Exception as e:
 
-
-
         return web.json_response({"ok": False, "msg": f"Erro na importação da planilha: {str(e)}"}, status=500)
-
-
-
-
-
-
 
 
 
@@ -17612,15 +8184,7 @@ async def api_exportar_excel(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if os.path.exists(CAMINHO_EXCEL):
-
-
-
-
 
 
 
@@ -17628,15 +8192,7 @@ async def api_exportar_excel(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             return web.Response(
-
-
-
-
 
 
 
@@ -17644,15 +8200,7 @@ async def api_exportar_excel(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-
-
-
-
 
 
 
@@ -17660,31 +8208,11 @@ async def api_exportar_excel(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             )
 
 
 
-
-
-
-
     return web.Response(status=404)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -17708,31 +8236,11 @@ TOKEN_OFICIAL_GPS = os.environ.get("EMED_GPS_API_KEY", "EMED-GPS-2026-TOKEN-OFIC
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 def _validar_token_gps(request: web.Request) -> bool:
 
 
 
-
-
-
-
     """
-
-
-
-
 
 
 
@@ -17740,15 +8248,7 @@ def _validar_token_gps(request: web.Request) -> bool:
 
 
 
-
-
-
-
       - Header `Authorization: Bearer EMED-GPS-2026-TOKEN-OFICIAL`
-
-
-
-
 
 
 
@@ -17756,15 +8256,7 @@ def _validar_token_gps(request: web.Request) -> bool:
 
 
 
-
-
-
-
       - Query param `?api_key=EMED-GPS-2026-TOKEN-OFICIAL`
-
-
-
-
 
 
 
@@ -17772,15 +8264,7 @@ def _validar_token_gps(request: web.Request) -> bool:
 
 
 
-
-
-
-
     se um token for enviado, valida contra a chave oficial configurada.
-
-
-
-
 
 
 
@@ -17788,15 +8272,7 @@ def _validar_token_gps(request: web.Request) -> bool:
 
 
 
-
-
-
-
     auth_h = request.headers.get("Authorization", "").strip()
-
-
-
-
 
 
 
@@ -17804,15 +8280,7 @@ def _validar_token_gps(request: web.Request) -> bool:
 
 
 
-
-
-
-
     if not auth_h and not api_k:
-
-
-
-
 
 
 
@@ -17820,15 +8288,7 @@ def _validar_token_gps(request: web.Request) -> bool:
 
 
 
-
-
-
-
     if auth_h.lower().startswith("bearer "):
-
-
-
-
 
 
 
@@ -17836,15 +8296,7 @@ def _validar_token_gps(request: web.Request) -> bool:
 
 
 
-
-
-
-
         return tok in (TOKEN_OFICIAL_GPS, "EMED-2026-PILOTO")
-
-
-
-
 
 
 
@@ -17852,15 +8304,7 @@ def _validar_token_gps(request: web.Request) -> bool:
 
 
 
-
-
-
-
         return api_k in (TOKEN_OFICIAL_GPS, "EMED-2026-PILOTO")
-
-
-
-
 
 
 
@@ -17876,31 +8320,11 @@ def _validar_token_gps(request: web.Request) -> bool:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_gps_telemetria(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     """
-
-
-
-
 
 
 
@@ -17908,15 +8332,7 @@ async def api_gps_telemetria(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     Aceita tanto o payload estruturado da Proposta de Integração (J16 4G LTE + NFC + PostGIS)
-
-
-
-
 
 
 
@@ -17924,15 +8340,7 @@ async def api_gps_telemetria(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     """
-
-
-
-
 
 
 
@@ -17940,15 +8348,7 @@ async def api_gps_telemetria(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         return web.json_response({"ok": False, "erro": "Token de API inválido (use Authorization: Bearer EMED-GPS-2026-TOKEN-OFICIAL)"}, status=401)
-
-
-
-
 
 
 
@@ -17956,15 +8356,7 @@ async def api_gps_telemetria(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         body = await request.json()
-
-
-
-
 
 
 
@@ -17972,15 +8364,7 @@ async def api_gps_telemetria(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         body = {}
-
-
-
-
 
 
 
@@ -17988,15 +8372,7 @@ async def api_gps_telemetria(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if identificador_url and not body.get("placa"):
-
-
-
-
 
 
 
@@ -18004,15 +8380,7 @@ async def api_gps_telemetria(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             body["renavam"] = identificador_url
-
-
-
-
 
 
 
@@ -18020,15 +8388,7 @@ async def api_gps_telemetria(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             body["placa"] = identificador_url
-
-
-
-
 
 
 
@@ -18036,23 +8396,7 @@ async def api_gps_telemetria(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     return web.json_response(res)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -18068,15 +8412,7 @@ async def api_gps_lote(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     """
-
-
-
-
 
 
 
@@ -18084,15 +8420,7 @@ async def api_gps_lote(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     Recebe lista de viagens/odômetros em JSON (`[...]` ou `{"viagens": [...]}`) e sincroniza todas.
-
-
-
-
 
 
 
@@ -18100,15 +8428,7 @@ async def api_gps_lote(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if not _validar_token_gps(request):
-
-
-
-
 
 
 
@@ -18116,15 +8436,7 @@ async def api_gps_lote(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     body = await request.json()
-
-
-
-
 
 
 
@@ -18132,15 +8444,7 @@ async def api_gps_lote(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     resultados = []
-
-
-
-
 
 
 
@@ -18148,15 +8452,7 @@ async def api_gps_lote(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         if isinstance(item, dict):
-
-
-
-
 
 
 
@@ -18164,15 +8460,7 @@ async def api_gps_lote(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     return web.json_response({
-
-
-
-
 
 
 
@@ -18180,15 +8468,7 @@ async def api_gps_lote(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "total_processados": len(resultados),
-
-
-
-
 
 
 
@@ -18196,31 +8476,11 @@ async def api_gps_lote(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "msg": f"✅ Lote sincronizado com sucesso: {len(resultados)} veículo(s)/viagem(ns) atualizado(s) no EMED!",
 
 
 
-
-
-
-
     })
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -18236,15 +8496,7 @@ async def api_v1_odometro_doc(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     """Documentação amigável quando alguém acessa o endpoint de odômetro via GET no navegador."""
-
-
-
-
 
 
 
@@ -18252,15 +8504,7 @@ async def api_v1_odometro_doc(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     return web.json_response({
-
-
-
-
 
 
 
@@ -18268,15 +8512,7 @@ async def api_v1_odometro_doc(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "endpoint": f"/api/v1/veiculos/{identificador}/odometro" if identificador else "/api/v1/veiculos/odometro",
-
-
-
-
 
 
 
@@ -18284,15 +8520,7 @@ async def api_v1_odometro_doc(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "status": "ONLINE E PRONTO PARA RECEBER DADOS",
-
-
-
-
 
 
 
@@ -18300,15 +8528,7 @@ async def api_v1_odometro_doc(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "autenticacao_suportada": "Authorization: Bearer EMED-GPS-2026-TOKEN-OFICIAL",
-
-
-
-
 
 
 
@@ -18316,15 +8536,7 @@ async def api_v1_odometro_doc(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "placa": "EMD-2026",
-
-
-
-
 
 
 
@@ -18332,15 +8544,7 @@ async def api_v1_odometro_doc(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             "tecnico": {
-
-
-
-
 
 
 
@@ -18348,23 +8552,11 @@ async def api_v1_odometro_doc(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "nome": "ANTONIO"
 
 
 
-
-
-
-
             },
-
-
-
-
 
 
 
@@ -18372,15 +8564,7 @@ async def api_v1_odometro_doc(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "data_inicio": "2026-10-26T07:30:00Z",
-
-
-
-
 
 
 
@@ -18388,15 +8572,7 @@ async def api_v1_odometro_doc(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "odometro_inicial_km": 45000.0,
-
-
-
-
 
 
 
@@ -18404,15 +8580,7 @@ async def api_v1_odometro_doc(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "km_percorrido": 118.5,
-
-
-
-
 
 
 
@@ -18420,15 +8588,7 @@ async def api_v1_odometro_doc(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             },
-
-
-
-
 
 
 
@@ -18436,15 +8596,7 @@ async def api_v1_odometro_doc(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         },
-
-
-
-
 
 
 
@@ -18452,31 +8604,11 @@ async def api_v1_odometro_doc(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         "url_aplicativo": "https://emed-app-6ofv.onrender.com"
 
 
 
-
-
-
-
     })
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -18492,15 +8624,7 @@ async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     """GET /api/v1/veiculos — Consulta de status, placa, RENAVAM e odômetro atual da frota EMED."""
-
-
-
-
 
 
 
@@ -18508,15 +8632,7 @@ async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     veiculos = []
-
-
-
-
 
 
 
@@ -18524,15 +8640,7 @@ async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         cur = conn.cursor()
-
-
-
-
 
 
 
@@ -18540,15 +8648,7 @@ async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             SELECT id, modelo, placa, renavam, km_atual, km_proxima_revisao,
-
-
-
-
 
 
 
@@ -18556,15 +8656,7 @@ async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                    ultima_atualizacao_gps, ignicao_ligada, status_manutencao
-
-
-
-
 
 
 
@@ -18572,15 +8664,7 @@ async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
             ORDER BY id ASC
-
-
-
-
 
 
 
@@ -18588,15 +8672,7 @@ async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
         for r in cur.fetchall():
-
-
-
-
 
 
 
@@ -18604,15 +8680,7 @@ async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "id": r[0],
-
-
-
-
 
 
 
@@ -18620,15 +8688,7 @@ async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "placa": r[2],
-
-
-
-
 
 
 
@@ -18636,15 +8696,7 @@ async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "status_odometro_atual": float(r[4] or 0),
-
-
-
-
 
 
 
@@ -18652,15 +8704,7 @@ async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "condutor_atual": r[6] or "DISPONÍVEL",
-
-
-
-
 
 
 
@@ -18668,15 +8712,7 @@ async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "latitude": float(r[8] or -3.7319),
-
-
-
-
 
 
 
@@ -18684,15 +8720,7 @@ async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "ultima_atualizacao_gps": r[10] or "",
-
-
-
-
 
 
 
@@ -18700,23 +8728,11 @@ async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
                 "status_manutencao": r[12] or "Disponível",
 
 
 
-
-
-
-
             })
-
-
-
-
 
 
 
@@ -18732,31 +8748,11 @@ async def api_v1_listar_veiculos(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def api_frota_webhook_detran(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     """
-
-
-
-
 
 
 
@@ -18764,15 +8760,7 @@ async def api_frota_webhook_detran(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     Recebe multa ou taxa e executa o Cruzamento Automático de Condutor por Data/Hora e GPS.
-
-
-
-
 
 
 
@@ -18780,15 +8768,7 @@ async def api_frota_webhook_detran(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     if not _validar_token_gps(request):
-
-
-
-
 
 
 
@@ -18796,15 +8776,7 @@ async def api_frota_webhook_detran(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     body = await request.json()
-
-
-
-
 
 
 
@@ -18812,23 +8784,7 @@ async def api_frota_webhook_detran(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     return web.json_response(res)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -18844,15 +8800,7 @@ async def api_frota_executar_robo(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     """Dispara a varredura e cruzamento diário do Robô DETRAN/Autarquia."""
-
-
-
-
 
 
 
@@ -18860,23 +8808,7 @@ async def api_frota_executar_robo(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     return web.json_response(res)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -18892,15 +8824,7 @@ async def api_frota_multa_status(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     """Atualiza status de pagamento/indicação de condutor de uma multa ou taxa."""
-
-
-
-
 
 
 
@@ -18908,15 +8832,7 @@ async def api_frota_multa_status(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     id_m = int(limpar_float(body.get("id"), 0))
-
-
-
-
 
 
 
@@ -18924,15 +8840,7 @@ async def api_frota_multa_status(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     cond_man = limpar_texto(body.get("condutor_identificado"), "")
-
-
-
-
 
 
 
@@ -18940,25 +8848,7 @@ async def api_frota_multa_status(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
     return web.json_response(res)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -18974,87 +8864,45 @@ async def api_frota_multa_status(request: web.Request) -> web.Response:
 
 async def api_sync_offline(request: web.Request) -> web.Response:
 
-
-
     """Sincronização em lote ou individual de OS executadas offline com garantia de idempotência estrita."""
-
-
 
     try:
 
-
-
         body = await request.json()
-
-
 
     except Exception:
 
-
-
         return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
 
-
-
     
-
-
 
     pacotes = body if isinstance(body, list) else [body]
 
-
-
     if not pacotes:
-
-
 
         return web.json_response({"ok": False, "msg": "Nenhum pacote enviado."}, status=400)
 
-
-
     
-
-
 
     df = _carregar_df_direto()
 
-
-
     equipa = _montar_equipa_direto()
 
-
-
     
-
-
 
     resultados = []
 
-
-
     for item in pacotes:
-
-
 
         df, acao = sincronizar_os_offline_idempotente(df, item, equipa, "ANTONIO")
 
-
-
         s_hash = item.get("sync_hash") or gerar_hash_os_offline(item)
-
-
 
         resultados.append({"sync_hash": s_hash, "acao": acao, "os_id": item.get("os_id")})
 
-
-
     
 
-
-
     _salvar_df_direto(df)
-
-
 
     return web.json_response({"ok": True, "processados": len(resultados), "resultados": resultados})
 
@@ -19062,91 +8910,45 @@ async def api_sync_offline(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
 async def api_ordens(request: web.Request) -> web.Response:
-
-
 
     """Multiplexador REST unificado para compatibilidade total com o contrato /api/ordens."""
 
-
-
     if request.method == "POST":
-
-
 
         try:
 
-
-
             body = await request.json()
-
-
 
         except Exception:
 
-
-
             return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
 
-
-
         
-
-
 
         # Se for pacote offline com sync_hash ou flag offline
 
-
-
         if body.get("sync_hash") or body.get("offline"):
-
-
 
             return await api_sync_offline(request)
 
-
-
         
-
-
 
         # Se tiver os_id e não for nova OS explícita, salva/atualiza
 
-
-
         if body.get("os_id") and not body.get("novo", False):
-
-
 
             return await api_salvar_os(request)
 
-
-
         else:
-
-
 
             return await api_nova_os(request)
 
-
-
     elif request.method == "GET":
-
-
 
         df = _carregar_df_direto()
 
-
-
         return web.json_response({"ok": True, "total": len(df), "ordens": df.to_dict(orient="records")})
-
-
 
     return web.json_response({"ok": False, "msg": "Método não permitido."}, status=405)
 
@@ -19155,3958 +8957,1966 @@ async def api_ordens(request: web.Request) -> web.Response:
 
 
 
-
-
-
-
-
-
-
 async def api_cliente_pendencias(request: web.Request) -> web.Response:
-
     """Consulta rápida para o formulário de propostas e telas gerenciais."""
-
     cli = limpar_texto(request.query.get("cliente", ""), "")
-
     cnpj = limpar_texto(request.query.get("cnpj", ""), "")
-
     info = verificar_pendencias_financeiras_cliente(DB_NAME, cli, cnpj)
-
     return web.json_response(info)
 
 
 
-
-
-
-
 async def api_ferramentas_bipagem_lote(request: web.Request) -> web.Response:
-
     """
-
     Retirada rápida de itens pelo Almoxarifado via Bipador QR Code / Leitor de Código de Barras.
-
     O Almoxarife seleciona o técnico e vai bipando os itens. No final, salva e atualiza tudo de uma vez.
-
     """
-
     body = await request.json()
-
     tecnico = limpar_texto(body.get("tecnico"), "").upper()
-
     itens = body.get("itens", [])
-
     cliente = limpar_texto(body.get("cliente"), "HOSPITAL / ATENDIMENTO TÉCNICO").upper()
-
     os_id = str(body.get("os_id", "")).strip()
-
     operador = limpar_texto(body.get("operador"), "ALMOXARIFADO EMED").upper()
-
     agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
 
-
-
     if not tecnico:
-
         return web.json_response({"ok": False, "msg": "Selecione o técnico responsável pela retirada."}, status=400)
-
     if not itens:
-
         return web.json_response({"ok": False, "msg": "Nenhum item foi bipado."}, status=400)
 
-
-
     INSTRUMENTOS_9V = {"FER-001", "FER-002", "FER-008", "FER-011"}
-
     lembretes = []
-
     total_ferramentas = 0
-
     total_pecas = 0
 
-
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         for item_raw in itens:
-
             cod = str(item_raw).strip().upper()
-
             if not cod:
-
                 continue
 
-
-
             # Se for ferramenta FER-...
-
             if cod.startswith("FER-"):
-
                 cur.execute("SELECT id, nome_ferramenta FROM ferramentas_cautela WHERE UPPER(codigo_ferramenta) = ? OR UPPER(numero_serie) = ?", (cod, cod))
-
                 r_fer = cur.fetchone()
-
                 if r_fer:
-
                     cur.execute("""
-
                         UPDATE ferramentas_cautela
-
                         SET status = 'EM_USO', tecnico_responsavel = ?, destino_cliente = ?, os_id = ?, data_saida = ?
-
                         WHERE id = ?
-
                     """, (tecnico, cliente, os_id, agora, r_fer[0]))
-
                     cur.execute("""
-
                         INSERT INTO historico_cautela_ferramentas 
-
                         (codigo_ferramenta, nome_ferramenta, tipo_acao, tecnico, destino_cliente, os_id, operador, data_hora, observacao)
-
                         VALUES (?, ?, 'RETIRADA_BIPADA', ?, ?, ?, ?, ?, 'Retirada rápida por bipagem QR')
-
                     """, (cod, r_fer[1], tecnico, cliente, os_id, operador, agora))
-
                     total_ferramentas += 1
-
                     aviso_ret = obter_instrucao_ferramenta(cod, "RETIRADA")
-
                     lembretes.append(f"{cod}: {aviso_ret}")
 
-
-
             # Se for peça PEC-...
-
             elif cod.startswith("PEC-"):
-
                 cur.execute("SELECT id, nome_peca, quantidade FROM estoque_pecas WHERE UPPER(codigo) = ?", (cod,))
-
                 r_pec = cur.fetchone()
-
                 if r_pec:
-
                     cur.execute("UPDATE estoque_pecas SET quantidade = max(0, quantidade - 1) WHERE id = ?", (r_pec[0],))
-
                     total_pecas += 1
 
-
-
         # Se houver OS vinculada, atualiza a solicitação no Almoxarifado para SEPARADO
-
         if os_id:
-
             cur.execute("""
-
                 UPDATE solicitacoes_pecas 
-
                 SET status_pedido = 'SEPARADO / ENTREGUE AO TÉCNICO', tecnico = ?
-
                 WHERE (destino_cliente LIKE ? OR os_id = ?)
-
                   AND tecnico NOT IN ('SETOR FINANCEIRO / COBRANÇA', 'COMERCIAL / PROPOSTA')
-
             """, (tecnico, f"%[OS #{os_id}]%", str(os_id)))
-
-
 
         conn.commit()
 
-
-
     lembrete_txt = " | ".join(set(lembretes)) if lembretes else ""
-
     return web.json_response({
-
         "ok": True,
-
         "total_ferramentas": total_ferramentas,
-
         "total_pecas": total_pecas,
-
         "lembrete_bateria": lembrete_txt,
-
         "msg": f"✅ Retirada concluída! {total_ferramentas} ferramenta(s) e {total_pecas} peça(s) entregues para 👷 {tecnico}."
-
     })
 
 
-
-
-
 async def api_ferramentas_minhas(request: web.Request) -> web.Response:
-
     """Retorna a lista de ferramentas que estão em posse do técnico logado no momento."""
-
     tecnico = limpar_texto(request.query.get("tecnico", ""), "").upper()
-
     if not tecnico:
-
         return web.json_response({"ok": True, "ferramentas": []})
 
-
-
     INSTRUMENTOS_9V = {"FER-001", "FER-002", "FER-008", "FER-011"}
-
     minhas = []
 
-
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         cur.execute("""
-
             SELECT id, codigo_ferramenta, nome_ferramenta, data_saida, destino_cliente, os_id, localizacao
-
             FROM ferramentas_cautela
-
             WHERE UPPER(tecnico_responsavel) = ? AND status = 'EM_USO'
-
             ORDER BY id DESC
-
         """, (tecnico,))
-
         for r in cur.fetchall():
-
             cod = str(r[1] or "")
-
             usa_9v = cod in INSTRUMENTOS_9V
-
             aviso_ent = obter_instrucao_ferramenta(cod, "ENTREGA")
-
             minhas.append({
-
                 "id": r[0],
-
                 "codigo": cod,
-
                 "nome": r[2],
-
                 "data_saida": r[3],
-
                 "cliente": r[4],
-
                 "os_id": r[5],
-
                 "localizacao": r[6],
-
                 "usa_bateria_9v": usa_9v,
-
                 "aviso_entrega": aviso_ent,
-
                 "lembrete": aviso_ent
-
             })
-
-
 
     return web.json_response({"ok": True, "tecnico": tecnico, "ferramentas": minhas})
 
 
 
-
-
-
-
 async def api_fiscal_liberar_quarentena(request: web.Request) -> web.Response:
-
     """Libera a emissão da NF antecipadamente a partir da validação manual do gestor ou cliente."""
-
     body = await request.json()
-
     os_id = int(body.get("os_id", 0))
-
     motivo = str(body.get("motivo", "LIBERAÇÃO MANUAL DO GESTOR")).strip()
-
     
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         cur.execute("""
-
             UPDATE notas_fiscais
-
             SET status_quarentena = 'LIBERADO',
-
                 status_fiscal = 'LIBERADO PARA EMISSÃO DE NOTA FISCAL',
-
                 feedback_cliente_status = ?
-
             WHERE os_id = ?
-
         """, (motivo, os_id))
-
         conn.commit()
-
         
-
     return web.json_response({
-
         "ok": True,
-
         "msg": f"✅ OS #{os_id} liberada da quarentena para emissão da Nota Fiscal!",
-
         "novo_status": "LIBERADO PARA EMISSÃO DE NOTA FISCAL"
-
     })
-
-
 
 async def api_remessas_diagnostico_listar(request: web.Request) -> web.Response:
-
     """Retorna o histórico de remessas para conserto e diagnóstico externo."""
-
     with get_db_connection(DB_NAME) as conn:
-
         df_rem = pd.read_sql_query("SELECT * FROM remessas_diagnostico ORDER BY id DESC LIMIT 100", conn)
-
         return web.json_response({"ok": True, "remessas": df_rem.to_dict(orient="records")})
 
-
-
 async def api_remessas_diagnostico_salvar(request: web.Request) -> web.Response:
-
     """Gera uma nova Nota/Guia de Remessa para Diagnóstico ou Conserto (CFOP 5.915 estadual ou 6.915 interestadual)."""
-
     body = await request.json()
-
     os_id = str(body.get("os_id", "")).strip()
-
     cliente_origem = limpar_texto(body.get("cliente_origem"), "HOSPITAL CREDENCIADO")
-
     cidade_origem = limpar_texto(body.get("cidade_origem"), "FORTALEZA")
-
     uf_origem = limpar_texto(body.get("uf_origem"), "CE").upper()
-
     cnpj_origem = limpar_texto(body.get("cnpj_origem"), "")
-
     
-
     destinatario_nome = limpar_texto(body.get("destinatario_nome"), "LABORATÓRIO MATRIZ EMED")
-
     destinatario_cnpj = limpar_texto(body.get("destinatario_cnpj"), "")
-
     cidade_destino = limpar_texto(body.get("cidade_destino"), "FORTALEZA")
-
     uf_destino = limpar_texto(body.get("uf_destino"), "CE").upper()
-
     
-
     # Determina CFOP: 5.915 se dentro do CE, 6.915 se interestadual
-
     cfop = "5.915" if uf_destino == uf_origem else "6.915"
-
     
-
     descricao_peca = limpar_texto(body.get("descricao_peca"), "PEÇA ELETROMÉDICA PARA DIAGNÓSTICO")
-
     numero_serie = limpar_texto(body.get("numero_serie"), "S/N")
-
     quantidade = int(limpar_float(body.get("quantidade"), 1))
-
     valor_declarado = float(limpar_float(body.get("valor_declarado"), 1000.0))
-
     motivo_diagnostico = limpar_texto(body.get("motivo_diagnostico"), "DIAGNÓSTICO AVANÇADO EM BANCADA")
-
     modalidade_transporte = limpar_texto(body.get("modalidade_transporte"), "TRANSPORTADORA").upper()
-
     transportadora = limpar_texto(body.get("transportadora"), "")
-
     codigo_rastreio = limpar_texto(body.get("codigo_rastreio"), "").strip()
-
     tecnico_portador = limpar_texto(body.get("tecnico_portador"), "")
-
     data_retorno_prevista = limpar_texto(body.get("data_retorno_prevista"), "")
-
     observacoes = limpar_texto(body.get("observacoes"), "")
-
     
-
     agora_brasil = obter_agora_brasil_str("%d/%m/%Y %H:%M")
-
     ano_atual = obter_agora_brasil().strftime("%Y")
-
     
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         cur.execute("SELECT COUNT(*) FROM remessas_diagnostico")
-
         total_rem = cur.fetchone()[0] + 1
-
         num_remessa = f"REM-{ano_atual}-{total_rem:04d}"
-
         
-
         cur.execute("""
-
             INSERT INTO remessas_diagnostico (
-
                 numero_remessa, os_id, cliente_origem, cidade_origem, uf_origem, cnpj_origem,
-
                 destinatario_nome, destinatario_cnpj, cidade_destino, uf_destino, cfop,
-
                 descricao_peca, numero_serie, quantidade, valor_declarado, motivo_diagnostico,
-
                 modalidade_transporte, transportadora, codigo_rastreio, tecnico_portador,
-
                 status_remessa, data_envio, data_retorno_prevista, observacoes
-
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-
         """, (
-
             num_remessa, os_id, cliente_origem, cidade_origem, uf_origem, cnpj_origem,
-
             destinatario_nome, destinatario_cnpj, cidade_destino, uf_destino, cfop,
-
             descricao_peca, numero_serie, quantidade, valor_declarado, motivo_diagnostico,
-
             modalidade_transporte, transportadora, codigo_rastreio, tecnico_portador,
-
             "EM_TRANSITO", agora_brasil, data_retorno_prevista, observacoes
-
         ))
-
         
-
         # Registra espelho em notas_fiscais
-
         cur.execute("""
-
             INSERT INTO notas_fiscais (
-
                 os_id, cliente, cnpj_tomador, tipo_nota, natureza_operacao, cfop,
-
                 valor_servicos, valor_pecas, valor_liquido, status_fiscal, numero_nf,
-
                 discriminacao_servico, data_emissao
-
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-
         """, (
-
             int(os_id) if os_id.isdigit() else 0,
-
             destinatario_nome, destinatario_cnpj, "REMESSA_DIAGNOSTICO",
-
             f"REMESSA DE MERCADORIA P/ CONSERTO OU DIAGNÓSTICO ({'INTERESTADUAL' if cfop == '6.915' else 'ESTADUAL'})",
-
             cfop, 0.0, valor_declarado, 0.0, "EMITIDA (EM TRÂNSITO FISCAL)", num_remessa,
-
             f"Item: {descricao_peca} (S/N: {numero_serie}) - Motivo: {motivo_diagnostico}. Não gera crédito de ICMS/ISS.",
-
             agora_brasil
-
         ))
-
         conn.commit()
-
         
-
     return web.json_response({
-
         "ok": True,
-
         "msg": f"✅ Nota de Remessa {num_remessa} emitida com sucesso (CFOP {cfop})!",
-
         "numero_remessa": num_remessa,
-
         "cfop": cfop
-
     })
 
-
-
 async def api_remessas_diagnostico_retorno(request: web.Request) -> web.Response:
-
     """Registra o retorno físico da mercadoria/peça do conserto (CFOP 1.916 / 2.916)."""
-
     body = await request.json()
-
     id_rem = int(body.get("id", 0))
-
     obs_retorno = limpar_texto(body.get("observacao"), "Retorno de conserto concluído com sucesso.")
-
     agora_brasil = obter_agora_brasil_str("%d/%m/%Y %H:%M")
-
     
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         cur.execute("""
-
             UPDATE remessas_diagnostico
-
             SET status_remessa = 'RETORNADO',
-
                 data_retorno_real = ?,
-
                 observacoes = observacoes || ' | [RETORNO: ' || ? || ' às ' || ? || ']'
-
             WHERE id = ?
-
         """, (agora_brasil, obs_retorno, agora_brasil, id_rem))
-
         
-
         cur.execute("""
-
             UPDATE notas_fiscais
-
             SET status_fiscal = 'RETORNADO (CONSERTO FINALIZADO)'
-
             WHERE numero_nf = (SELECT numero_remessa FROM remessas_diagnostico WHERE id = ?)
-
         """, (id_rem,))
-
         conn.commit()
-
         
-
     return web.json_response({"ok": True, "msg": f"✅ Retorno da remessa #{id_rem} registrado com sucesso!"})
 
-
-
 async def api_remessas_diagnostico_guia(request: web.Request) -> web.Response:
-
     """Renderiza a Guia de Transporte e Remessa para Diagnóstico com visual timbrado oficial EMED."""
-
     id_rem = int(request.match_info.get("id", 0))
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         cur.execute("SELECT * FROM remessas_diagnostico WHERE id = ?", (id_rem,))
-
         row = cur.fetchone()
-
         if not row:
-
             return web.Response(text="Guia de remessa não localizada.", status=404)
-
         
-
         col_names = [d[0] for d in cur.description]
-
         r = dict(zip(col_names, row))
-
         
-
     html = f"""<!DOCTYPE html>
-
 <html lang="pt-BR">
-
 <head>
-
 <meta charset="UTF-8">
-
 <title>Guia de Remessa para Diagnóstico - {r.get('numero_remessa')}</title>
-
 <style>
-
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 20px; color: #1e293b; background: #f8fafc; }}
-
   .container {{ max-width: 820px; margin: 0 auto; background: #fff; padding: 30px; border: 1.5px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }}
-
   .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; }}
-
   .logo {{ font-size: 24px; font-weight: 900; color: #0284c7; letter-spacing: 1px; }}
-
   .doc-title {{ text-align: right; }}
-
   .doc-title h1 {{ font-size: 16px; margin: 0; color: #0f172a; text-transform: uppercase; }}
-
   .doc-title span {{ font-size: 13px; font-weight: 800; color: #0284c7; }}
-
   .box-info {{ border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; margin-bottom: 15px; background: #f8fafc; }}
-
   .box-title {{ font-size: 12px; font-weight: 800; text-transform: uppercase; color: #475569; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }}
-
   .grid-2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }}
-
   .label {{ font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; }}
-
   .val {{ font-size: 13px; font-weight: 700; color: #0f172a; margin-top: 2px; }}
-
   table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
-
   th {{ background: #0284c7; color: #fff; text-align: left; padding: 8px 10px; font-size: 11px; text-transform: uppercase; }}
-
   td {{ border: 1px solid #e2e8f0; padding: 8px 10px; font-size: 12px; }}
-
   .cfop-badge {{ display: inline-block; background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 4px; font-weight: 800; font-size: 12px; border: 1px solid #7dd3fc; }}
-
   .legal-notice {{ font-size: 10.5px; color: #64748b; background: #f1f5f9; padding: 10px; border-radius: 6px; margin-top: 20px; line-height: 1.4; border-left: 3px solid #0284c7; }}
-
   .signatures {{ display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; }}
-
   .sig-line {{ width: 45%; border-top: 1px solid #94a3b8; text-align: center; font-size: 11px; color: #475569; padding-top: 5px; }}
-
   @media print {{ body {{ background: #fff; margin: 0; }} .container {{ border: none; box-shadow: none; padding: 0; }} .no-print {{ display: none; }} }}
-
 </style>
-
 </head>
-
 <body>
-
 <div class="container">
-
   <div class="no-print" style="margin-bottom: 15px; display: flex; justify-content: flex-end; gap: 8px;">
-
     <button onclick="window.print()" style="padding: 8px 16px; background: #0284c7; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">🖨️ Imprimir Guia / Salvar PDF</button>
-
   </div>
-
   
-
   <div class="header">
-
     <div>
-
       <div class="logo">🏥 eMED ELETROMEDICINA</div>
-
       <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Engenharia Clínica e Hospitalar Especializada</div>
-
     </div>
-
     <div class="doc-title">
-
       <h1>Guia de Remessa para Diagnóstico / Conserto</h1>
-
       <span>{r.get('numero_remessa')} &bull; CFOP {r.get('cfop')}</span>
-
     </div>
-
   </div>
-
-
 
   <div class="grid-2">
-
     <div class="box-info">
-
       <div class="box-title">📍 Unidade de Origem (Remetente)</div>
-
       <div class="label">Cliente / Hospital:</div>
-
       <div class="val">{r.get('cliente_origem')}</div>
-
       <div class="label" style="margin-top: 6px;">Município / UF:</div>
-
       <div class="val">{r.get('cidade_origem')} - {r.get('uf_origem')}</div>
-
       <div class="label" style="margin-top: 6px;">OS Vinculada:</div>
-
       <div class="val">OS #{r.get('os_id') or 'Avulsa'}</div>
-
     </div>
-
-
 
     <div class="box-info">
-
       <div class="box-title">🎯 Destino / Centro Técnico de Reparo</div>
-
       <div class="label">Destinatário:</div>
-
       <div class="val">{r.get('destinatario_nome')}</div>
-
       <div class="label" style="margin-top: 6px;">Município / UF de Destino:</div>
-
       <div class="val">{r.get('cidade_destino')} - {r.get('uf_destino')}</div>
-
       <div class="label" style="margin-top: 6px;">Enquadramento Tributário:</div>
-
       <div class="val"><span class="cfop-badge">CFOP {r.get('cfop')} - {'INTERESTADUAL' if r.get('uf_destino') != r.get('uf_origem') else 'ESTADUAL'}</span></div>
-
     </div>
-
   </div>
 
-
-
   <div class="box-info">
-
     <div class="box-title">🔩 Descrição do Bem / Peça em Trânsito</div>
-
     <table>
-
       <thead>
-
         <tr>
-
           <th>Item / Peça Eletromédica</th>
-
           <th>Nº de Série</th>
-
           <th>Qtd</th>
-
           <th>Valor Declarado (Seguro)</th>
-
           <th>Motivo do Envio / Laudo</th>
-
         </tr>
-
       </thead>
-
       <tbody>
-
         <tr>
-
           <td><b>{r.get('descricao_peca')}</b></td>
-
           <td><code>{r.get('numero_serie')}</code></td>
-
           <td style="text-align: center;">{r.get('quantidade')} UN</td>
-
           <td style="font-weight: 800; color: #047857;">R$ {float(r.get('valor_declarado', 0.0)):,.2f}</td>
-
           <td>{r.get('motivo_diagnostico')}</td>
-
         </tr>
-
       </tbody>
-
     </table>
-
   </div>
-
-
 
   <div class="box-info">
-
     <div class="box-title">🚚 Dados Logísticos &amp; Transporte</div>
-
     <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-
       <div>
-
         <div class="label">Modalidade:</div>
-
         <div class="val">{r.get('modalidade_transporte')}</div>
-
       </div>
-
       <div>
-
         <div class="label">Transportadora / Operador:</div>
-
         <div class="val">{r.get('transportadora') or 'Veículo Oficial EMED'}</div>
-
       </div>
-
       <div>
-
         <div class="label">Código de Rastreamento:</div>
-
         <div class="val"><code>{r.get('codigo_rastreio') or 'Trânsito em Frota'}</code></div>
-
       </div>
-
       <div>
-
         <div class="label">Data de Emissão / Envio:</div>
-
         <div class="val">{r.get('data_envio')}</div>
-
       </div>
-
     </div>
-
   </div>
-
-
 
   <div class="legal-notice">
-
     <b>DISPOSITIVO LEGAL &amp; DECLARAÇÃO DE TRÂNSITO FISCAL:</b><br>
-
     Mercadoria destinada a conserto, diagnóstico e ensaios laboratoriais conforme Artigo correspondente do Regulamento do ICMS (RICMS) c/c CFOP {r.get('cfop')}. Operação ao abrigo de não-incidência / suspensão do ICMS. O valor acima destina-se exclusivamente para fins de cobertura de seguro de carga e fiscalização em trânsito rodoviário/aéreo.
-
   </div>
-
-
 
   <div class="signatures">
-
     <div class="sig-line">
-
       Responsável pela Expedição / Técnico EMED
-
     </div>
-
     <div class="sig-line">
-
       Transportadora / Recebedor do Laboratório
-
     </div>
-
   </div>
-
 </div>
-
 </body>
-
 </html>"""
-
     return web.Response(text=html, content_type="text/html", charset="utf-8")
-
-
-
 
 
 def garantir_schema_rastreio(db_path: str):
-
     try:
-
         with get_db_connection(db_path) as conn:
-
             cur = conn.cursor()
-
             for col in ['codigo_rastreio', 'transportadora']:
-
                 try:
-
                     cur.execute(f"ALTER TABLE solicitacoes_pecas ADD COLUMN {col} TEXT DEFAULT ''")
-
                 except Exception:
-
                     pass
-
             conn.commit()
-
     except Exception:
-
         pass
-
-
-
 
 
 def garantir_schema_medicina_trabalho(db_path: str):
-
     """Garante as tabelas e colunas de medicina ocupacional (NR-7 / ASO) para os funcionários."""
-
     try:
-
         with get_db_connection(db_path) as conn:
-
             cur = conn.cursor()
-
             novas = [
-
                 ("data_ultimo_aso", "TEXT DEFAULT ''"),
-
                 ("data_vencimento_aso", "TEXT DEFAULT ''"),
-
                 ("periodicidade_meses", "INTEGER DEFAULT 12"),
-
                 ("medico_examinador", "TEXT DEFAULT ''"),
-
                 ("clinica_medicina_trabalho", "TEXT DEFAULT ''"),
-
                 ("tipo_exame_aso", "TEXT DEFAULT 'PERIÓDICO'"),
-
                 ("parecer_aptidao", "TEXT DEFAULT 'APTO'"),
-
                 ("observacoes_medicas", "TEXT DEFAULT ''"),
-
                 ("aso_anexo_url", "TEXT DEFAULT ''")
-
             ]
-
             cols = [c[1] for c in cur.execute("PRAGMA table_info(tecnicos)").fetchall()]
-
             for col, tipo in novas:
-
                 if col not in cols:
-
                     try:
-
                         cur.execute(f"ALTER TABLE tecnicos ADD COLUMN {col} {tipo}")
-
                     except Exception:
-
                         pass
-
             cur.execute("""
-
                 CREATE TABLE IF NOT EXISTS historico_exames_medicos (
-
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-
                     tecnico_id INTEGER,
-
                     nome_tecnico TEXT,
-
                     data_exame TEXT,
-
                     data_vencimento TEXT,
-
                     periodicidade_meses INTEGER DEFAULT 12,
-
                     tipo_exame TEXT,
-
                     medico_examinador TEXT,
-
                     clinica TEXT,
-
                     parecer_aptidao TEXT,
-
                     observacoes TEXT,
-
                     registrado_por TEXT,
-
                     criado_em TEXT DEFAULT CURRENT_TIMESTAMP
-
                 )
-
             """)
-
             conn.commit()
-
     except Exception as e:
-
         print("Aviso schema medicina do trabalho:", e)
 
 
-
-
-
 async def api_tecnico_renovar_medico(request: web.Request) -> web.Response:
-
     """Registra a renovação formal do exame médico do trabalho (ASO) do funcionário."""
-
     try:
-
         body = await request.json()
-
     except Exception:
-
         return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
 
-
-
     tid = body.get("tecnico_id") or body.get("id")
-
     nome = limpar_texto(body.get("nome"), "").strip().upper()
-
     data_exame = limpar_texto(body.get("data_exame"), "").strip()
-
     periodicidade = int(limpar_int(body.get("periodicidade_meses"), 12))
-
     medico = limpar_texto(body.get("medico_examinador"), "Dr. Roberto Arruda - CRM/CE 14258").strip()
-
     clinica = limpar_texto(body.get("clinica"), "MedWork Saúde Ocupacional").strip()
-
     tipo_exame = limpar_texto(body.get("tipo_exame"), "PERIÓDICO").strip().upper()
-
     parecer = limpar_texto(body.get("parecer_aptidao"), "APTO").strip().upper()
-
     obs = limpar_texto(body.get("observacoes"), "").strip()
-
     registrado_por = limpar_texto(body.get("registrado_por"), "GESTOR").strip().upper()
 
-
-
     if not data_exame:
-
         data_exame = obter_agora_brasil_str("%Y-%m-%d")
 
-
-
     data_vencimento = limpar_texto(body.get("data_vencimento"), "").strip()
-
     if not data_vencimento:
-
         try:
-
             if "/" in data_exame:
-
                 dt = datetime.strptime(data_exame[:10], "%d/%m/%Y").date()
-
             else:
-
                 dt = datetime.strptime(data_exame[:10], "%Y-%m-%d").date()
-
             ano_novo = dt.year + (dt.month + periodicidade - 1) // 12
-
             mes_novo = (dt.month + periodicidade - 1) % 12 + 1
-
             dia_novo = min(dt.day, 28)
-
             dt_venc = datetime(ano_novo, mes_novo, dia_novo).date()
-
             data_vencimento = dt_venc.strftime("%Y-%m-%d")
-
         except Exception:
-
             data_vencimento = data_exame
 
-
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         if tid:
-
             cur.execute("SELECT id, nome FROM tecnicos WHERE id = ?", (int(tid),))
-
         else:
-
             cur.execute("SELECT id, nome FROM tecnicos WHERE UPPER(nome) = ?", (nome,))
-
         row = cur.fetchone()
-
         if not row:
-
             return web.json_response({"ok": False, "msg": "Funcionário/técnico não localizado no cadastro."}, status=404)
-
         tec_id, tec_nome = row[0], row[1]
 
-
-
         cur.execute("""
-
             UPDATE tecnicos
-
             SET data_ultimo_aso = ?,
-
                 data_vencimento_aso = ?,
-
                 periodicidade_meses = ?,
-
                 medico_examinador = ?,
-
                 clinica_medicina_trabalho = ?,
-
                 tipo_exame_aso = ?,
-
                 parecer_aptidao = ?,
-
                 observacoes_medicas = ?
-
             WHERE id = ?
-
         """, (data_exame, data_vencimento, periodicidade, medico, clinica, tipo_exame, parecer, obs, tec_id))
 
-
-
         cur.execute("""
-
             INSERT INTO historico_exames_medicos
-
             (tecnico_id, nome_tecnico, data_exame, data_vencimento, periodicidade_meses, tipo_exame,
-
              medico_examinador, clinica, parecer_aptidao, observacoes, registrado_por, criado_em)
-
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-
         """, (tec_id, tec_nome, data_exame, data_vencimento, periodicidade, tipo_exame, medico, clinica, parecer, obs, registrado_por, obter_agora_brasil_str("%d/%m/%Y %H:%M")))
-
         conn.commit()
 
-
-
     return web.json_response({
-
         "ok": True,
-
         "msg": f"🩺 Renovação do Médico do Trabalho registrada com sucesso para {tec_nome}!",
-
         "tecnico_id": tec_id,
-
         "nome": tec_nome,
-
         "data_exame": data_exame,
-
         "data_vencimento": data_vencimento,
-
         "parecer": parecer
-
     })
-
-
-
 
 
 async def api_tecnico_historico_medico(request: web.Request) -> web.Response:
-
     """Retorna o histórico de exames médicos ocupacionais e ASOs do funcionário."""
-
     tid = request.match_info.get("id")
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         cur.execute("""
-
             SELECT id, tecnico_id, nome_tecnico, data_exame, data_vencimento, periodicidade_meses,
-
                    tipo_exame, medico_examinador, clinica, parecer_aptidao, observacoes, registrado_por, criado_em
-
             FROM historico_exames_medicos
-
             WHERE tecnico_id = ? OR UPPER(nome_tecnico) = ?
-
             ORDER BY id DESC
-
         """, (tid, str(tid).upper()))
-
         cols = [d[0] for d in cur.description]
-
         historico = [dict(zip(cols, r)) for r in cur.fetchall()]
-
         return web.json_response({"ok": True, "historico": historico})
 
 
-
-
-
 def garantir_schema_fiscal_contabil(db_path: str):
-
     try:
-
         with get_db_connection(db_path) as conn:
-
             cur = conn.cursor()
-
             novas = [
-
                 ("email_cliente", "TEXT DEFAULT ''"),
-
                 ("email_enviado_em", "TEXT DEFAULT ''"),
-
                 ("email_status", "TEXT DEFAULT 'PENDENTE'"),
-
                 ("lote_contabilidade_mes", "TEXT DEFAULT ''"),
-
                 ("enviado_contabilidade", "INTEGER DEFAULT 0"),
-
                 ("data_envio_contabilidade", "TEXT DEFAULT ''")
-
             ]
-
             for col, tipo in novas:
-
                 try:
-
                     cur.execute(f"ALTER TABLE notas_fiscais ADD COLUMN {col} {tipo}")
-
                 except Exception:
-
                     pass
-
             try:
-
                 cur.execute("UPDATE notas_fiscais SET lote_contabilidade_mes = strftime('%Y-%m', criado_em) WHERE lote_contabilidade_mes IS NULL OR lote_contabilidade_mes = ''")
-
             except Exception:
-
                 pass
-
             conn.commit()
-
     except Exception as e:
-
         print("Aviso garantir_schema_fiscal_contabil:", e)
 
 
-
-
-
 async def api_fiscal_enviar_cliente(request: web.Request) -> web.Response:
-
     """Registra e processa o envio da Nota Fiscal por e-mail para o cliente."""
-
     try:
-
         body = await request.json()
-
     except Exception:
-
         return web.json_response({"ok": False, "msg": "Payload inválido."}, status=400)
 
-
-
     os_id = str(body.get("os_id", "")).strip()
-
     email_dest = str(body.get("email", "") or body.get("email_destino", "")).strip()
-
     if not os_id:
-
         return web.json_response({"ok": False, "msg": "ID da OS é obrigatório."}, status=400)
-
     if not email_dest or "@" not in email_dest:
-
         return web.json_response({"ok": False, "msg": "Informe um e-mail válido para o cliente."}, status=400)
 
-
-
     agora_brasil = obter_agora_brasil_str("%d/%m/%Y %H:%M")
-
     mes_competencia = obter_agora_brasil_str("%Y-%m")
 
-
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         cur.execute("SELECT id, numero_nf, cliente, valor_servicos, valor_pecas, chave_acesso FROM notas_fiscais WHERE os_id = ?", (os_id,))
-
         row_nf = cur.fetchone()
-
         num_nf = row_nf[1] if row_nf else f"NFS-{os_id.zfill(4)}"
-
         cliente_nome = row_nf[2] if row_nf else "Cliente"
-
         val_total = (float(row_nf[3] or 0) + float(row_nf[4] or 0)) if row_nf else 0.0
-
         chave_acesso = row_nf[5] if row_nf else ""
 
-
-
         cur.execute("""
-
             UPDATE notas_fiscais
-
             SET email_cliente = ?,
-
                 email_enviado_em = ?,
-
                 email_status = 'ENVIADO',
-
                 lote_contabilidade_mes = COALESCE(NULLIF(lote_contabilidade_mes, ''), ?)
-
             WHERE os_id = ?
-
         """, (email_dest, agora_brasil, mes_competencia, os_id))
-
         conn.commit()
 
-
-
     try:
-
         df = _carregar_df_direto()
-
         for idx, row in df.iterrows():
-
             if str(obter_id_os(idx, row)) == os_id:
-
                 if not df.at[idx, "email"]:
-
                     df.at[idx, "email"] = email_dest
-
                     _salvar_df_direto(df)
-
                 break
-
     except Exception:
-
         pass
 
-
-
     assunto = f"Nota Fiscal Eletrônica {num_nf} - OS #{os_id} - EMED Eletromedicina"
-
     corpo = (
-
         f"Prezado(a) {cliente_nome},\n\n"
-
         f"Segue o comprovante oficial de emissão da Nota Fiscal Eletrônica referente ao atendimento técnico da OS #{os_id}.\n\n"
-
         f"📄 Número da Nota: {num_nf}\n"
-
         f"💰 Valor Total: R$ {val_total:,.2f}\n"
-
         f"🔑 Chave de Acesso: {chave_acesso}\n"
-
         f"📅 Emitida em: {agora_brasil}\n\n"
-
         f"🔗 Visualizar DANFE Oficial: http://localhost:8502/api/fiscal/danfe/{os_id}\n\n"
-
         f"Agradecemos a parceria!\n"
-
         f"EMED Eletromedicina Ltda.\n"
-
         f"Fone Ceará: (85) 3254-2929 | WhatsApp DF: (61) 3234-3647 / (61) 99658-5392\n"
-
         f"Rua Coronel Freire, 16 - Bairro Amador, Eusébio - CE"
-
     )
-
     mailto_url = f"mailto:{urllib.parse.quote(email_dest)}?subject={urllib.parse.quote(assunto)}&body={urllib.parse.quote(corpo)}"
 
-
-
     return web.json_response({
-
         "ok": True,
-
         "msg": f"Nota Fiscal {num_nf} enviada com sucesso para {email_dest}!",
-
         "email_enviado_em": agora_brasil,
-
         "email_destino": email_dest,
-
         "lote_contabilidade": mes_competencia,
-
         "mailto_url": mailto_url
-
     })
-
-
-
 
 
 async def api_fiscal_enviar_contabilidade(request: web.Request) -> web.Response:
-
     """Envia o lote consolidado de Notas Fiscais emitidas no mês para a assessoria contábil."""
-
     try:
-
         body = await request.json()
-
     except Exception:
-
         body = {}
 
-
-
     agora = datetime.now()
-
     mes = str(body.get("mes", agora.month)).zfill(2)
-
     ano = str(body.get("ano", agora.year))
-
     comp = f"{ano}-{mes}"
-
     email_contab = str(body.get("email_contabilidade", "contabilidade@emed.med.br")).strip()
-
     obs = str(body.get("observacoes", "")).strip()
-
     agora_brasil = obter_agora_brasil_str("%d/%m/%Y %H:%M")
 
-
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         padrao_data = f"/{mes}/{ano}"
-
         cur.execute("""
-
             SELECT id, os_id, cliente, cnpj_tomador, numero_nf, valor_servicos, valor_pecas, data_emissao, status_fiscal
-
             FROM notas_fiscais
-
             WHERE (data_emissao LIKE ? OR criado_em LIKE ? OR lote_contabilidade_mes = ?)
-
               AND UPPER(status_fiscal) NOT LIKE '%CANCELADA%'
-
         """, (f"%{padrao_data}%", f"{comp}%", comp))
-
         notas = cur.fetchall()
 
-
-
         if not notas:
-
             return web.json_response({"ok": False, "msg": f"Nenhuma Nota Fiscal ativa encontrada para a competência {mes}/{ano}."})
 
-
-
         total_servicos = sum(float(n[5] or 0) for n in notas)
-
         total_pecas = sum(float(n[6] or 0) for n in notas)
-
         total_faturamento = total_servicos + total_pecas
 
-
-
         ids = [n[0] for n in notas]
-
         placeholders = ",".join("?" * len(ids))
-
         cur.execute(f"""
-
             UPDATE notas_fiscais
-
             SET enviado_contabilidade = 1,
-
                 data_envio_contabilidade = ?,
-
                 lote_contabilidade_mes = ?
-
             WHERE id IN ({placeholders})
-
         """, [agora_brasil, comp] + ids)
-
         conn.commit()
 
-
-
     assunto = f"Fechamento Fiscal & Lote Mensal de NFs - Competência {mes}/{ano} - EMED Eletromedicina"
-
     corpo = (
-
         f"Prezada Assessoria Contábil,\n\n"
-
         f"Encaminhamos o lote oficial consolidado de Notas Fiscais emitidas pela EMED Eletromedicina referente à competência {mes}/{ano}.\n\n"
-
         f"📊 Quantidade de Notas Fiscais: {len(notas)}\n"
-
         f"🛠️ Total Serviços (NFS-e): R$ {total_servicos:,.2f}\n"
-
         f"🔩 Total Peças/Insumos (NF-e): R$ {total_pecas:,.2f}\n"
-
         f"💰 Faturamento Bruto Consolidado: R$ {total_faturamento:,.2f}\n"
-
         f"📅 Data do Fechamento: {agora_brasil}\n"
-
         f"{f'📝 Observações: {obs}' if obs else ''}\n\n"
-
         f"🔗 Dossiê Contábil Completo: http://localhost:8502/api/financeiro/relatorio-contabil/imprimir?mes={int(mes)}&ano={ano}\n"
-
         f"📥 Planilha CSV para Importação: http://localhost:8502/api/fiscal/relatorio-contabil-csv?mes={int(mes)}&ano={ano}\n\n"
-
         f"EMED Eletromedicina Ltda. - CNPJ: 03.611.974/0001-08\n"
-
         f"Rua Coronel Freire, 16 - Bairro Amador, Eusébio - CE"
-
     )
-
     mailto_url = f"mailto:{urllib.parse.quote(email_contab)}?subject={urllib.parse.quote(assunto)}&body={urllib.parse.quote(corpo)}"
 
-
-
     return web.json_response({
-
         "ok": True,
-
         "msg": f"📦 Lote de {len(notas)} Nota(s) Fiscal(is) da competência {mes}/{ano} transmitido à contabilidade com sucesso!",
-
         "mes": mes,
-
         "ano": ano,
-
         "total_nfs": len(notas),
-
         "total_faturamento": total_faturamento,
-
         "data_envio": agora_brasil,
-
         "email_contabilidade": email_contab,
-
         "mailto_url": mailto_url
-
     })
-
-
-
 
 
 async def api_fiscal_relatorio_contabil_csv(request: web.Request) -> web.Response:
-
     """Exporta arquivo CSV compatível com sistemas contábeis para importação de notas fiscais."""
-
     agora = datetime.now()
-
     mes_str = request.query.get("mes", str(agora.month))
-
     ano_str = request.query.get("ano", str(agora.year))
-
     try:
-
         mes = int(mes_str)
-
     except Exception:
-
         mes = agora.month
-
     try:
-
         ano = int(ano_str)
-
     except Exception:
-
         ano = agora.year
 
-
-
     padrao = f"/{mes:02d}/{ano}"
-
     comp = f"{ano}-{mes:02d}"
 
-
-
     with get_db_connection(DB_NAME) as conn:
-
         df_nfs = pd.read_sql_query("SELECT * FROM notas_fiscais", conn)
 
-
-
     df_filtradas = df_nfs[df_nfs["data_emissao"].astype(str).str.contains(padrao) | df_nfs["criado_em"].astype(str).str.contains(comp) | (df_nfs["lote_contabilidade_mes"].astype(str) == comp)]
-
     if df_filtradas.empty:
-
         df_filtradas = df_nfs
 
-
-
     linhas = ["NUMERO_NF;SERIE;DATA_EMISSAO;OS_ID;CLIENTE;CNPJ_TOMADOR;VALOR_SERVICOS;VALOR_PECAS;VALOR_TOTAL;ALIQUOTA_ISS;ISS_DEVIDO;TIPO_NOTA;CHAVE_ACESSO;STATUS_FISCAL;EMAIL_CLIENTE;EMAIL_ENVIADO_EM;LOTE_CONTABIL;ENVIADO_CONTABILIDADE"]
-
     for _, r in df_filtradas.iterrows():
-
         vs = float(r.get("valor_servicos") or 0.0)
-
         vp = float(r.get("valor_pecas") or 0.0)
-
         vt = vs + vp
-
         iss = round(vs * 0.05, 2)
-
         linhas.append(
-
             f"{r.get('numero_nf','')};"
-
             f"{r.get('serie','1')};"
-
             f"{r.get('data_emissao','')};"
-
             f"{r.get('os_id','')};"
-
             f"\"{str(r.get('cliente','')).replace(';', ' ')}\";"
-
             f"{r.get('cnpj_tomador','')};"
-
             f"{vs:.2f};"
-
             f"{vp:.2f};"
-
             f"{vt:.2f};"
-
             f"5.00;"
-
             f"{iss:.2f};"
-
             f"\"{r.get('tipo_nota','')}\";"
-
             f"{r.get('chave_acesso','')};"
-
             f"{r.get('status_fiscal','')};"
-
             f"{r.get('email_cliente','')};"
-
             f"{r.get('email_enviado_em','')};"
-
             f"{r.get('lote_contabilidade_mes','')};"
-
             f"{'SIM' if r.get('enviado_contabilidade') else 'NA_FILA'}"
-
         )
 
-
-
     conteudo_csv = "\r\n".join(linhas)
-
     nome_arquivo = f"EMED_Notas_Fiscais_Contabilidade_{ano}_{mes:02d}.csv"
-
     return web.Response(
-
         text=conteudo_csv,
-
         content_type="text/csv",
-
         charset="utf-8-sig",
-
         headers={"Content-Disposition": f'attachment; filename="{nome_arquivo}"'}
-
     )
 
 
 
 
-
-
-
-
-
 # =========================================================================
-
 # HANDLERS DE AUDITORIA & MONITORAMENTO DE ALTERAÇÕES FISCAIS
-
 # =========================================================================
-
-
 
 async def api_fiscal_auditoria_eventos(request: web.Request) -> web.Response:
-
     """Retorna o histórico de eventos de auditoria das alterações fiscais."""
-
     params = request.rel_url.query
-
     os_id = params.get("os_id")
-
     tipo_evento = params.get("tipo_evento")
-
     status_conf = params.get("status_conformidade")
-
     limit = int(params.get("limit", 50))
-
     
-
     eventos = obter_historico_eventos_fiscais(
-
         os_id=os_id,
-
         tipo_evento=tipo_evento,
-
         status_conformidade=status_conf,
-
         limit=limit,
-
         db_path=DB_NAME
-
     )
-
     return web.json_response({"ok": True, "eventos": eventos, "total": len(eventos)})
 
 
-
-
-
 async def api_fiscal_auditoria_detalhe(request: web.Request) -> web.Response:
-
     """Retorna o diff antes/depois detalhado de um evento de auditoria fiscal."""
-
     try:
-
         evento_id = int(request.match_info.get("id", 0))
-
     except Exception:
-
         return web.json_response({"ok": False, "msg": "ID de evento inválido."}, status=400)
-
         
-
     detalhe = obter_detalhe_evento(evento_id, db_path=DB_NAME)
-
     if not detalhe:
-
         return web.json_response({"ok": False, "msg": "Evento de auditoria não encontrado."}, status=404)
-
         
-
     return web.json_response({"ok": True, "detalhe": detalhe})
 
 
-
-
-
 async def api_fiscal_avaliacao_dashboard(request: web.Request) -> web.Response:
-
     """Retorna indicadores consolidados de conformidade, retificações e monitoramento fiscal."""
-
     dados_dash = obter_resumo_dashboard_fiscal(db_path=DB_NAME)
-
     return web.json_response({"ok": True, "dashboard": dados_dash})
 
 
-
-
-
 async def api_fiscal_auditoria_avaliar_avulso(request: web.Request) -> web.Response:
-
     """Simulador / Validador prévio de conformidade fiscal para uma OS antes de emitir."""
-
     try:
-
         body = await request.json()
-
     except Exception:
-
         return web.json_response({"ok": False, "msg": "Payload inválido."}, status=400)
-
         
-
     os_id = str(body.get("os_id", "")).strip()
-
     dados_nf = body.get("dados_nf") or body
-
     
-
     dados_os = {}
-
     if os_id:
-
         try:
-
             df = _carregar_df_direto()
-
             for idx, row in df.iterrows():
-
                 if str(obter_id_os(idx, row)) == os_id:
-
                     dados_os = row.to_dict()
-
                     break
-
         except Exception:
-
             pass
-
             
-
     historico = obter_historico_eventos_fiscais(os_id=os_id, limit=20, db_path=DB_NAME) if os_id else []
-
     avaliacao = avaliar_conformidade_fiscal(dados_nf, dados_os, historico)
-
     return web.json_response({"ok": True, "avaliacao": avaliacao})
 
 
-
-
-
 async def api_fiscal_cancelar_nota(request: web.Request) -> web.Response:
-
     """Cancela uma Nota Fiscal com registro formal de justificativa e histórico no banco de dados."""
-
     try:
-
         body = await request.json()
-
     except Exception:
-
         return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
-
         
-
     nota_id = body.get("nota_id") or body.get("id")
-
     numero_nf = str(body.get("numero_nf", "")).strip()
-
     motivo = str(body.get("motivo", "")).strip()
-
     
-
     if not motivo:
-
         return web.json_response({"ok": False, "msg": "É obrigatório informar a justificativa/motivo do cancelamento."}, status=400)
-
         
-
     agora_brasil = obter_agora_brasil_str("%d/%m/%Y %H:%M")
-
     
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         row = None
-
         if nota_id:
-
             cur.execute("SELECT id, numero_nf, os_id, cliente, status_fiscal FROM notas_fiscais WHERE id = ?", (int(nota_id),))
-
             row = cur.fetchone()
-
         elif numero_nf:
-
             cur.execute("SELECT id, numero_nf, os_id, cliente, status_fiscal FROM notas_fiscais WHERE UPPER(numero_nf) = ? OR chave_acesso = ?", (numero_nf.upper(), numero_nf))
-
             row = cur.fetchone()
-
             
-
         if not row:
-
             return web.json_response({"ok": False, "msg": "Nota Fiscal não localizada no sistema."}, status=404)
-
             
-
         nid, num_nf, os_id, cliente, st_ant = row
-
         
-
         cur.execute("""
-
             UPDATE notas_fiscais
-
             SET status_fiscal = 'CANCELADA',
-
                 status_quarentena = 'CANCELADA',
-
                 motivo_cancelamento = ?,
-
                 data_cancelamento = ?,
-
                 atualizado_em = ?
-
             WHERE id = ?
-
         """, (motivo, agora_brasil, agora_brasil, nid))
-
         
-
         # Desvincula pendência na OS e registra observação
-
         if os_id:
-
             try:
-
                 cur.execute("""
-
                     UPDATE clientes_equipamentos
-
                     SET observacao = COALESCE(observacao, '') || ' | [NF ' || ? || ' CANCELADA em ' || ? || ': ' || ? || ']'
-
                     WHERE id = ?
-
                 """, (str(num_nf), agora_brasil, motivo, int(os_id)))
-
             except Exception:
-
                 pass
-
                 
-
         conn.commit()
-
         
-
     return web.json_response({
-
         "ok": True,
-
         "msg": f"Nota Fiscal #{num_nf} ({cliente}) cancelada com sucesso!",
-
         "nota_id": nid,
-
         "numero_nf": num_nf,
-
         "status_fiscal": "CANCELADA",
-
         "data_cancelamento": agora_brasil
-
     })
-
-
-
 
 
 async def api_financeiro_relatorio_contabil(request: web.Request) -> web.Response:
-
     """Gera o consolidado mensal de impostos, faturamento e despesas recorrentes para contabilidade."""
-
     mes = request.query.get("mes") # Ex: "10"
-
     ano = request.query.get("ano", str(datetime.now().year))
-
     
-
     with get_db_connection(DB_NAME) as conn:
-
         df_nfs = pd.read_sql_query("SELECT * FROM notas_fiscais", conn)
-
         df_desp = pd.read_sql_query("SELECT * FROM despesas_recorrentes WHERE status = 'ATIVO' ORDER BY dia_vencimento ASC", conn)
-
         
-
     if mes:
-
         padrao = f"/{int(mes):02d}/{ano}"
-
         df_filtradas = df_nfs[df_nfs["data_emissao"].astype(str).str.contains(padrao) | df_nfs["criado_em"].astype(str).str.contains(f"{ano}-{int(mes):02d}")]
-
     else:
-
         df_filtradas = df_nfs
-
         
-
     nfs_ativas = df_filtradas[~df_filtradas["status_fiscal"].astype(str).str.upper().str.contains("CANCELADA")]
-
     nfs_canceladas = df_filtradas[df_filtradas["status_fiscal"].astype(str).str.upper().str.contains("CANCELADA")]
-
     
-
     total_servicos = float(nfs_ativas["valor_servicos"].sum() or 0.0)
-
     total_pecas = float(nfs_ativas["valor_pecas"].sum() or 0.0)
-
     total_bruto = total_servicos + total_pecas
-
     total_cancelado = float(nfs_canceladas["valor_servicos"].sum() + nfs_canceladas["valor_pecas"].sum())
-
     
-
     # Cálculos tributários:
-
     iss_devido = round(total_servicos * 0.05, 2)
-
     simples_nacional_estimado = round(total_servicos * 0.085 + total_pecas * 0.045, 2)
-
     pis_estimado = round(total_bruto * 0.0065, 2)
-
     cofins_estimado = round(total_bruto * 0.0300, 2)
-
     csll_estimada = round(total_servicos * 0.0100, 2)
-
     irpj_estimado = round(total_servicos * 0.0120, 2)
-
     total_tributos_federais = round(pis_estimado + cofins_estimado + csll_estimada + irpj_estimado, 2)
-
     
-
     total_despesas_recorrentes = float(df_desp["valor_mensal_estimado"].sum() or 0.0)
-
     saldo_liquido_operacional = round(total_bruto - simples_nacional_estimado - total_despesas_recorrentes, 2)
-
     
-
     return web.json_response({
-
         "ok": True,
-
         "competencia": f"{mes or 'TODOS'}/{ano}",
-
         "resumo": {
-
             "total_servicos": total_servicos,
-
             "total_pecas": total_pecas,
-
             "total_faturado_bruto": total_bruto,
-
             "total_cancelado": total_cancelado,
-
             "total_faturado_liquido": total_bruto,
-
             "iss_devido": iss_devido,
-
             "simples_nacional_estimado": simples_nacional_estimado,
-
             "pis_estimado": pis_estimado,
-
             "cofins_estimado": cofins_estimado,
-
             "csll_estimada": csll_estimada,
-
             "irpj_estimado": irpj_estimado,
-
             "total_tributos_federais": total_tributos_federais,
-
             "total_despesas_recorrentes": total_despesas_recorrentes,
-
             "saldo_liquido_operacional": saldo_liquido_operacional
-
         },
-
         "notas_ativas": nfs_ativas.to_dict(orient="records"),
-
         "notas_canceladas": nfs_canceladas.to_dict(orient="records"),
-
         "despesas_recorrentes": df_desp.to_dict(orient="records")
-
     })
-
-
-
 
 
 async def api_financeiro_relatorio_contabil_imprimir(request: web.Request) -> web.Response:
-
     """Renderiza a visão oficial impressa/PDF do Fechamento Contábil & Tributário Mensal para o escritório de contabilidade."""
-
     mes_str = request.query.get("mes", str(datetime.now().month))
-
     ano_str = request.query.get("ano", str(datetime.now().year))
-
     try:
-
         mes = int(mes_str)
-
     except Exception:
-
         mes = datetime.now().month
-
     try:
-
         ano = int(ano_str)
-
     except Exception:
-
         ano = datetime.now().year
-
         
-
     with get_db_connection(DB_NAME) as conn:
-
         df_nfs = pd.read_sql_query("SELECT * FROM notas_fiscais", conn)
-
         df_desp = pd.read_sql_query("SELECT * FROM despesas_recorrentes WHERE status = 'ATIVO' ORDER BY dia_vencimento ASC", conn)
-
         
-
     padrao = f"/{mes:02d}/{ano}"
-
     df_filtradas = df_nfs[df_nfs["data_emissao"].astype(str).str.contains(padrao) | df_nfs["criado_em"].astype(str).str.contains(f"{ano}-{mes:02d}")]
-
     if df_filtradas.empty:
-
         df_filtradas = df_nfs
-
         
-
     nfs_ativas = df_filtradas[~df_filtradas["status_fiscal"].astype(str).str.upper().str.contains("CANCELADA")]
-
     nfs_canceladas = df_filtradas[df_filtradas["status_fiscal"].astype(str).str.upper().str.contains("CANCELADA")]
-
     
-
     total_servicos = float(nfs_ativas["valor_servicos"].sum() or 0.0)
-
     total_pecas = float(nfs_ativas["valor_pecas"].sum() or 0.0)
-
     total_bruto = total_servicos + total_pecas
-
     total_cancelado = float(nfs_canceladas["valor_servicos"].sum() + nfs_canceladas["valor_pecas"].sum())
-
     
-
     iss_devido = round(total_servicos * 0.05, 2)
-
     simples_estimado = round(total_servicos * 0.085 + total_pecas * 0.045, 2)
-
     total_despesas = float(df_desp["valor_mensal_estimado"].sum() or 0.0)
-
     saldo_liquido = round(total_bruto - simples_estimado - total_despesas, 2)
-
     
-
     linhas_nfs = ""
-
     for _, r in nfs_ativas.iterrows():
-
         linhas_nfs += f"""
-
         <tr>
-
           <td><b>{r.get('numero_nf')}</b></td>
-
           <td>OS #{r.get('os_id')}</td>
-
           <td>{r.get('cliente')}</td>
-
           <td>{r.get('data_emissao')}</td>
-
           <td>R$ {float(r.get('valor_servicos', 0.0)):,.2f}</td>
-
           <td>R$ {float(r.get('valor_pecas', 0.0)):,.2f}</td>
-
           <td><b>R$ {float(r.get('valor_liquido', 0.0) or (float(r.get('valor_servicos',0))+float(r.get('valor_pecas',0)))):,.2f}</b></td>
-
           <td><span style="color:#059669;font-weight:bold;">{r.get('status_fiscal')}</span></td>
-
         </tr>
-
         """
-
         
-
     linhas_canceladas = ""
-
     for _, r in nfs_canceladas.iterrows():
-
         linhas_canceladas += f"""
-
         <tr style="background:#fef2f2;color:#991b1b;">
-
           <td><b>{r.get('numero_nf')}</b></td>
-
           <td>OS #{r.get('os_id')}</td>
-
           <td>{r.get('cliente')}</td>
-
           <td>{r.get('data_cancelamento') or r.get('atualizado_em')}</td>
-
           <td colspan="2">Motivo: {r.get('motivo_cancelamento') or 'Cancelamento Solicitado'}</td>
-
           <td><b>R$ {float(r.get('valor_liquido', 0.0) or (float(r.get('valor_servicos',0))+float(r.get('valor_pecas',0)))):,.2f}</b></td>
-
           <td><span style="color:#dc2626;font-weight:bold;">CANCELADA</span></td>
-
         </tr>
-
         """
-
         
-
     linhas_despesas = ""
-
     for _, d in df_desp.iterrows():
-
         linhas_despesas += f"""
-
         <tr>
-
           <td><b>Dia {int(d.get('dia_vencimento', 10))}</b></td>
-
           <td>{d.get('categoria')}</td>
-
           <td>{d.get('descricao')}</td>
-
           <td>{d.get('fornecedor')}</td>
-
           <td>{d.get('forma_pagamento')}</td>
-
           <td><b>R$ {float(d.get('valor_mensal_estimado', 0.0)):,.2f}</b></td>
-
         </tr>
-
         """
-
-
 
     html = f"""<!DOCTYPE html>
-
 <html lang="pt-BR">
-
 <head>
-
 <meta charset="UTF-8">
-
 <title>Fechamento Contábil e Tributário - Competência {mes:02d}/{ano}</title>
-
 <style>
-
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 20px; color: #1e293b; background: #f8fafc; }}
-
   .container {{ max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border: 1.5px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }}
-
   .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2.5px solid #0f172a; padding-bottom: 15px; margin-bottom: 20px; }}
-
   .logo {{ font-size: 24px; font-weight: 900; color: #0284c7; letter-spacing: 1px; }}
-
   .kpi-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 25px; }}
-
   .kpi-card {{ border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #f8fafc; text-align: center; }}
-
   .kpi-val {{ font-size: 16px; font-weight: 900; margin-top: 4px; color: #0f172a; }}
-
   .kpi-lbl {{ font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; }}
-
   table {{ width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px; font-size: 12px; }}
-
   th {{ background: #0f172a; color: #fff; text-align: left; padding: 8px 10px; font-size: 11px; text-transform: uppercase; }}
-
   td {{ border: 1px solid #e2e8f0; padding: 7px 10px; }}
-
   .section-title {{ font-size: 14px; font-weight: 900; color: #0f172a; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-top: 25px; }}
-
   .signatures {{ display: flex; justify-content: space-between; margin-top: 45px; padding-top: 20px; }}
-
   .sig-line {{ width: 45%; border-top: 1px solid #94a3b8; text-align: center; font-size: 11px; color: #475569; padding-top: 5px; }}
-
   @media print {{ body {{ background: #fff; margin: 0; }} .container {{ border: none; box-shadow: none; padding: 0; }} .no-print {{ display: none; }} }}
-
 </style>
-
 </head>
-
 <body>
-
 <div class="container">
-
   <div class="no-print" style="margin-bottom: 15px; display: flex; justify-content: flex-end; gap: 8px;">
-
     <button onclick="window.print()" style="padding: 8px 16px; background: #0f172a; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">🖨️ Imprimir Relatório / Gerar PDF Contábil</button>
-
   </div>
-
   
-
   <div class="header">
-
     <div>
-
       <div class="logo">🏥 eMED ELETROMEDICINA</div>
-
       <div style="font-size: 11.5px; color: #475569; margin-top: 2px;">CNPJ: 07.842.190/0001-44 &bull; Engenharia Clínica &amp; Manutenção Hospitalar</div>
-
       <div style="font-size: 11px; color: #64748b;">Fortaleza - CE &bull; Tel: (85) 3299-4400</div>
-
     </div>
-
     <div style="text-align: right;">
-
       <h1 style="font-size: 15px; margin: 0; color: #0f172a; text-transform: uppercase;">Dossiê Contábil &amp; Fechamento Mensal</h1>
-
       <span style="font-size: 13px; font-weight: 800; color: #0284c7;">Competência: {mes:02d}/{ano}</span>
-
     </div>
-
   </div>
-
-
 
   <div class="kpi-grid">
-
     <div class="kpi-card" style="border-top: 3px solid #0284c7;">
-
       <div class="kpi-lbl">Faturamento Bruto</div>
-
       <div class="kpi-val" style="color: #0369a1;">R$ {total_bruto:,.2f}</div>
-
     </div>
-
     <div class="kpi-card" style="border-top: 3px solid #b45309;">
-
       <div class="kpi-lbl">Simples / Tributos Est.</div>
-
       <div class="kpi-val" style="color: #b45309;">R$ {simples_estimado:,.2f}</div>
-
     </div>
-
     <div class="kpi-card" style="border-top: 3px solid #dc2626;">
-
       <div class="kpi-lbl">Despesas Recorrentes</div>
-
       <div class="kpi-val" style="color: #dc2626;">R$ {total_despesas:,.2f}</div>
-
     </div>
-
     <div class="kpi-card" style="border-top: 3px solid #059669;">
-
       <div class="kpi-lbl">Resultado Pré-Contábil</div>
-
       <div class="kpi-val" style="color: #059669;">R$ {saldo_liquido:,.2f}</div>
-
     </div>
-
   </div>
-
-
 
   <div class="section-title">1. Notas Fiscais Emitidas &amp; Apuração de Tributos</div>
-
   <table>
-
     <thead>
-
       <tr>
-
         <th>Nº NF</th>
-
         <th>OS</th>
-
         <th>Tomador / Hospital</th>
-
         <th>Data Emissão</th>
-
         <th>Serviços</th>
-
         <th>Peças</th>
-
         <th>Total NF</th>
-
         <th>Status</th>
-
       </tr>
-
     </thead>
-
     <tbody>
-
       {linhas_nfs or '<tr><td colspan="8" style="text-align:center;color:#64748b;">Nenhuma nota fiscal emitida nesta competência.</td></tr>'}
-
     </tbody>
-
   </table>
-
-
 
   {f"""
-
   <div class="section-title" style="color:#991b1b;border-color:#fecaca;">2. Notas Fiscais Canceladas no Período (Estornos Fiscais)</div>
-
   <table>
-
     <thead>
-
       <tr style="background:#991b1b;">
-
         <th>Nº NF</th>
-
         <th>OS</th>
-
         <th>Tomador</th>
-
         <th>Cancelamento</th>
-
         <th colspan="2">Justificativa Formal</th>
-
         <th>Valor Estornado</th>
-
         <th>Status</th>
-
       </tr>
-
     </thead>
-
     <tbody>
-
       {linhas_canceladas}
-
     </tbody>
-
   </table>
-
   """ if linhas_canceladas else ''}
 
-
-
   <div class="section-title">3. Despesas Operacionais Recorrentes da Empresa (Custos Fixos)</div>
-
   <table>
-
     <thead>
-
       <tr>
-
         <th>Vencimento</th>
-
         <th>Categoria</th>
-
         <th>Descrição da Obrigação</th>
-
         <th>Fornecedor / Favorecido</th>
-
         <th>Forma Pagto</th>
-
         <th>Valor Mensal</th>
-
       </tr>
-
     </thead>
-
     <tbody>
-
       {linhas_despesas}
-
       <tr style="background:#f1f5f9;font-weight:bold;">
-
         <td colspan="5" style="text-align:right;">TOTAL DE DESPESAS OPERACIONAIS FIXAS:</td>
-
         <td style="color:#b91c1c;">R$ {total_despesas:,.2f}</td>
-
       </tr>
-
     </tbody>
-
   </table>
-
-
 
   <div class="section-title">4. Resumo de Encargos e Impostos Estimados para Guia (DAS / ISS)</div>
-
   <table style="width:70%;">
-
     <tr><td><b>ISS Municipal (Fortaleza 5.0% s/ Serviços):</b></td><td style="text-align:right;"><b>R$ {iss_devido:,.2f}</b></td></tr>
-
     <tr><td><b>Simples Nacional DAS Estimado (Serviços + Peças):</b></td><td style="text-align:right;"><b>R$ {simples_estimado:,.2f}</b></td></tr>
-
     <tr><td><b>PIS (0.65% Estimado s/ Faturamento):</b></td><td style="text-align:right;">R$ {round(total_bruto*0.0065, 2):,.2f}</td></tr>
-
     <tr><td><b>COFINS (3.00% Estimado s/ Faturamento):</b></td><td style="text-align:right;">R$ {round(total_bruto*0.03, 2):,.2f}</td></tr>
-
   </table>
 
-
-
   <div class="signatures">
-
     <div class="sig-line">
-
       <b>eMED ELETROMEDICINA LTDA</b><br>
-
       Diretoria Administrativa / Financeira
-
     </div>
-
     <div class="sig-line">
-
       <b>ASSESSORIA CONTÁBIL &amp; FISCAL</b><br>
-
       Contador Responsável / CRC-CE
-
     </div>
-
   </div>
-
 </div>
-
 </body>
-
 </html>"""
-
     return web.Response(text=html, content_type="text/html")
 
 
-
-
-
 async def api_transportadoras_listar(request: web.Request) -> web.Response:
-
     """Retorna o cadastro de transportadoras parceiras e operadores de carga pesada/munck."""
-
     with get_db_connection(DB_NAME) as conn:
-
         df = pd.read_sql_query("SELECT * FROM transportadoras_parceiras ORDER BY possui_seguro_carga DESC, avaliacao_estrelas DESC, id ASC", conn)
-
         return web.json_response({"ok": True, "transportadoras": df.to_dict(orient="records")})
 
 
-
-
-
 async def api_transportadoras_salvar(request: web.Request) -> web.Response:
-
     """Cadastra ou atualiza uma transportadora parceira."""
-
     body = await request.json()
-
     tid = body.get("id")
-
     nome = limpar_texto(body.get("nome"), "")
-
     if not nome:
-
         return web.json_response({"ok": False, "msg": "Nome da transportadora é obrigatório."}, status=400)
-
         
-
     cnpj = limpar_texto(body.get("cnpj"), "")
-
     telefone = limpar_texto(body.get("telefone"), "")
-
     whatsapp = limpar_texto(body.get("whatsapp"), "")
-
     contato = limpar_texto(body.get("contato_responsavel"), "")
-
     cidades = limpar_texto(body.get("cidades_atendidas"), "Fortaleza e Região Metropolitana")
-
     veiculos = limpar_texto(body.get("tipos_veiculo"), "Caminhão Munck, Plataforma Elevatória")
-
     possui_seguro = 1 if body.get("possui_seguro_carga") in [1, True, "1", "true"] else 0
-
     valor_seguro = float(limpar_float(body.get("valor_cobertura_seguro"), 500000.0))
-
     estrelas = int(limpar_int(body.get("avaliacao_estrelas"), 5))
-
     obs = limpar_texto(body.get("observacoes"), "")
-
     agora = obter_agora_brasil_str("%Y-%m-%d %H:%M:%S")
-
     
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         if tid:
-
             cur.execute("""
-
                 UPDATE transportadoras_parceiras SET
-
                     nome = ?, cnpj = ?, telefone = ?, whatsapp = ?, contato_responsavel = ?,
-
                     cidades_atendidas = ?, tipos_veiculo = ?, possui_seguro_carga = ?,
-
                     valor_cobertura_seguro = ?, avaliacao_estrelas = ?, observacoes = ?
-
                 WHERE id = ?
-
             """, (nome, cnpj, telefone, whatsapp, contato, cidades, veiculos, possui_seguro, valor_seguro, estrelas, obs, int(tid)))
-
             msg = f"Transportadora '{nome}' atualizada com sucesso!"
-
         else:
-
             cur.execute("""
-
                 INSERT INTO transportadoras_parceiras (
-
                     nome, cnpj, telefone, whatsapp, contato_responsavel, cidades_atendidas,
-
                     tipos_veiculo, possui_seguro_carga, valor_cobertura_seguro, avaliacao_estrelas,
-
                     status, observacoes, criado_em
-
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ATIVO', ?, ?)
-
             """, (nome, cnpj, telefone, whatsapp, contato, cidades, veiculos, possui_seguro, valor_seguro, estrelas, obs, agora))
-
             msg = f"Transportadora '{nome}' cadastrada com sucesso!"
-
         conn.commit()
-
         
-
     return web.json_response({"ok": True, "msg": msg})
-
-
-
 
 
 async def api_cotacoes_transporte_listar(request: web.Request) -> web.Response:
-
     """Lista as cotações de transporte registradas."""
-
     with get_db_connection(DB_NAME) as conn:
-
         df = pd.read_sql_query("SELECT * FROM cotacoes_transporte ORDER BY id DESC LIMIT 100", conn)
-
         return web.json_response({"ok": True, "cotacoes": df.to_dict(orient="records")})
 
 
-
-
-
 async def api_cotacoes_transporte_salvar(request: web.Request) -> web.Response:
-
     """Registra uma nova cotação de transporte ou atualiza o status de aprovação."""
-
     body = await request.json()
-
     cid = body.get("id")
-
     carga = limpar_texto(body.get("carga_descricao"), "")
-
     if not carga:
-
         return web.json_response({"ok": False, "msg": "Descrição da carga é obrigatória."}, status=400)
-
         
-
     os_id = str(body.get("os_id", "")).strip()
-
     cliente = limpar_texto(body.get("cliente"), "")
-
     origem_cidade = limpar_texto(body.get("origem_cidade"), "FORTALEZA")
-
     origem_uf = limpar_texto(body.get("origem_uf"), "CE")
-
     destino_cidade = limpar_texto(body.get("destino_cidade"), "FORTALEZA")
-
     destino_uf = limpar_texto(body.get("destino_uf"), "CE")
-
     tipo_veiculo = limpar_texto(body.get("tipo_veiculo"), "Caminhão Munck")
-
     peso_kg = float(limpar_float(body.get("peso_kg"), 0.0))
-
     dimensoes = limpar_texto(body.get("dimensoes"), "")
-
     valor_declarado = float(limpar_float(body.get("valor_declarado_carga"), 0.0))
-
     exige_seguro = 1 if body.get("exige_seguro") in [1, True, "1", "true"] else 0
-
     transportadora = limpar_texto(body.get("transportadora_escolhida"), "")
-
     valor_fechado = float(limpar_float(body.get("valor_fechado"), 0.0))
-
     status_cotacao = limpar_texto(body.get("status_cotacao"), "EM COTAÇÃO")
-
     data_prevista = limpar_texto(body.get("data_prevista_transporte"), "")
-
     obs = limpar_texto(body.get("observacoes"), "")
-
     agora_br = obter_agora_brasil_str("%d/%m/%Y")
-
     agora_iso = obter_agora_brasil_str("%Y-%m-%d %H:%M:%S")
-
     ano_atual = datetime.now().year
-
     
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         if cid:
-
             cur.execute("""
-
                 UPDATE cotacoes_transporte SET
-
                     carga_descricao = ?, destino_cidade = ?, destino_uf = ?, tipo_veiculo = ?,
-
                     peso_kg = ?, dimensoes = ?, valor_declarado_carga = ?, exige_seguro = ?,
-
                     transportadora_escolhida = ?, valor_fechado = ?, status_cotacao = ?,
-
                     data_prevista_transporte = ?, observacoes = ?
-
                 WHERE id = ?
-
             """, (carga, destino_cidade, destino_uf, tipo_veiculo, peso_kg, dimensoes, valor_declarado, exige_seguro, transportadora, valor_fechado, status_cotacao, data_prevista, obs, int(cid)))
-
             msg = f"Cotação atualizada com sucesso!"
-
         else:
-
             cur.execute("SELECT COUNT(*) FROM cotacoes_transporte")
-
             tot = cur.fetchone()[0] + 1
-
             num_cot = f"COT-{ano_atual}-{tot:04d}"
-
             cur.execute("""
-
                 INSERT INTO cotacoes_transporte (
-
                     numero_cotacao, os_id, cliente, carga_descricao, origem_cidade, origem_uf,
-
                     destino_cidade, destino_uf, tipo_veiculo, peso_kg, dimensoes,
-
                     valor_declarado_carga, exige_seguro, transportadora_escolhida, valor_fechado,
-
                     status_cotacao, data_cotacao, data_prevista_transporte, observacoes, criado_em
-
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-
             """, (
-
                 num_cot, os_id, cliente, carga, origem_cidade, origem_uf,
-
                 destino_cidade, destino_uf, tipo_veiculo, peso_kg, dimensoes,
-
                 valor_declarado, exige_seguro, transportadora, valor_fechado,
-
                 status_cotacao, agora_br, data_prevista, obs, agora_iso
-
             ))
-
             msg = f"Cotação #{num_cot} registrada com sucesso!"
-
         conn.commit()
-
         
-
     return web.json_response({"ok": True, "msg": msg})
-
-
-
 
 
 async def api_despesas_recorrentes_salvar(request: web.Request) -> web.Response:
-
     """Salva ou atualiza uma despesa operacional recorrente da empresa."""
-
     body = await request.json()
-
     did = body.get("id")
-
     categoria = limpar_texto(body.get("categoria"), "OUTROS")
-
     descricao = limpar_texto(body.get("descricao"), "")
-
     if not descricao:
-
         return web.json_response({"ok": False, "msg": "Descrição da despesa é obrigatória."}, status=400)
-
         
-
     fornecedor = limpar_texto(body.get("fornecedor"), "")
-
     valor = float(limpar_float(body.get("valor_mensal_estimado"), 0.0))
-
     dia = int(limpar_int(body.get("dia_vencimento"), 10))
-
     forma = limpar_texto(body.get("forma_pagamento"), "BOLETO")
-
     status = limpar_texto(body.get("status"), "ATIVO")
-
     obs = limpar_texto(body.get("observacoes"), "")
-
     agora = obter_agora_brasil_str("%Y-%m-%d %H:%M:%S")
-
     
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         if did:
-
             cur.execute("""
-
                 UPDATE despesas_recorrentes SET
-
                     categoria = ?, descricao = ?, fornecedor = ?, valor_mensal_estimado = ?,
-
                     dia_vencimento = ?, forma_pagamento = ?, status = ?, observacoes = ?
-
                 WHERE id = ?
-
             """, (categoria, descricao, fornecedor, valor, dia, forma, status, obs, int(did)))
-
             msg = "Despesa recorrente atualizada!"
-
         else:
-
             cur.execute("""
-
                 INSERT INTO despesas_recorrentes (
-
                     categoria, descricao, fornecedor, valor_mensal_estimado, dia_vencimento,
-
                     forma_pagamento, status, observacoes, criado_em
-
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-
             """, (categoria, descricao, fornecedor, valor, dia, forma, status, obs, agora))
-
             msg = "Despesa recorrente cadastrada!"
-
         conn.commit()
-
         
-
     return web.json_response({"ok": True, "msg": msg})
 
 
 
-
-
-
-
 # ==============================================================================
-
 # INTEGRAÇÃO BANCÁRIA PIX AUTOMÁTICA & ROBÔ DE RASTREAMENTO DE PEÇAS (24x/DIA)
-
 # ==============================================================================
-
-
 
 async def api_pix_webhook(request: web.Request) -> web.Response:
-
     """
-
     Webhook Oficial de Baixa Automática PIX / TED bancária.
-
     Recebe payloads de bancos (Itaú, Cora, Inter, Asaas, etc.) e processa conciliação
-
     automática em 3 níveis (txid, dupla checagem CNPJ + Valor, ou Nome + Valor).
-
     """
-
     try:
-
         body = await request.json()
-
     except Exception:
-
         return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
-
     
-
     # Extração inteligente de campos compatível com BACEN e APIs bancárias
-
     txid = str(body.get("txid", "")).strip()
-
     valor = limpar_float(body.get("valor", 0.0))
-
     cnpj = str(body.get("cnpj", "") or body.get("cpf", "")).strip()
-
     nome = str(body.get("nome", "") or body.get("nome_pagador", "")).strip()
-
     e2e = str(body.get("end_to_end_id", "") or body.get("endToEndId", "")).strip()
-
     
-
     # Suporte ao formato aninhado BACEN: {"pix": [{"txid": "...", "valor": "...", "pagador": {...}}]}
-
     if "pix" in body and isinstance(body["pix"], list) and len(body["pix"]) > 0:
-
         pix_item = body["pix"][0]
-
         txid = txid or str(pix_item.get("txid", "")).strip()
-
         valor = valor or limpar_float(pix_item.get("valor", 0.0))
-
         e2e = e2e or str(pix_item.get("endToEndId", "")).strip()
-
         pagador = pix_item.get("pagador", {})
-
         if isinstance(pagador, dict):
-
             cnpj = cnpj or str(pagador.get("cnpj", "") or pagador.get("cpf", "")).strip()
-
             nome = nome or str(pagador.get("nome", "")).strip()
 
-
-
     resultado = conciliar_pagamento_bancario_duplo(
-
         DB_NAME,
-
         cnpj=cnpj,
-
         valor=valor,
-
         txid=txid,
-
         end_to_end_id=e2e,
-
         nome_pagador=nome
-
     )
-
     
-
     if resultado.get("conciliado"):
-
         # Notifica console do servidor e atualiza estado
-
         print(f"💰 [BAIXA AUTOMÁTICA PIX] OS #{resultado.get('os_id')} liquidada! Cliente: {resultado.get('cliente')} - R$ {resultado.get('valor'):.2f}")
-
     
-
     return web.json_response(resultado)
-
-
-
 
 
 async def api_pix_simular_webhook(request: web.Request) -> web.Response:
-
     """Dispara uma simulação de webhook de baixa automática para testes do operador."""
-
     body = await request.json()
-
     os_id = str(body.get("os_id", "")).strip()
-
     valor = limpar_float(body.get("valor", 0.0))
-
     cnpj = str(body.get("cnpj", "")).strip()
-
     nome = str(body.get("nome", "")).strip()
-
     txid = str(body.get("txid", "")).strip()
-
     
-
     if os_id and not txid:
-
         txid = f"EMED-OS-{os_id}"
-
         
-
     resultado = conciliar_pagamento_bancario_duplo(
-
         DB_NAME,
-
         cnpj=cnpj,
-
         valor=valor,
-
         txid=txid,
-
         nome_pagador=nome
-
     )
-
     return web.json_response(resultado)
 
 
-
-
-
 async def api_robo_rastreio_status(request: web.Request) -> web.Response:
-
     """Retorna o status atual, métricas e histórico recente do Robô de Rastreamento (24x/dia)."""
-
     status_dados = obter_status_robo(DB_NAME)
-
     return web.json_response({"ok": True, "robo": status_dados})
 
 
-
-
-
 async def api_robo_rastreio_executar(request: web.Request) -> web.Response:
-
     """Executa manualmente 1 ciclo imediato do Robô de Rastreamento de Peças."""
-
     res = executar_ciclo_verificacao(DB_NAME)
-
     return web.json_response(res)
-
-
-
 
 
 async def api_robo_rastreio_simular(request: web.Request) -> web.Response:
-
     """Simula a entrega de um pedido de compra para teste imediato de entrada em estoque."""
-
     body = await request.json()
-
     ped_id = int(body.get("id", 0))
-
     codigo = str(body.get("codigo_rastreio", "")).strip() or f"SIMULA_ENTREGUE_{ped_id}"
-
     
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         cur.execute("UPDATE solicitacoes_pecas SET codigo_rastreio = ? WHERE id = ?", (codigo, ped_id))
-
         conn.commit()
-
         
-
     res = executar_ciclo_verificacao(DB_NAME)
-
     return web.json_response({"ok": True, "simulacao": res})
 
 
-
-
-
 async def _robo_rastreamento_pecas_task():
-
     """Tarefa em segundo plano do Robô de Rastreamento: executa 24 vezes por dia (a cada 60 minutos = 3600s)."""
-
     await asyncio.sleep(20)  # Aguarda 20 segundos para estabilização do boot
-
     while True:
-
         try:
-
             print("🤖 [Robô de Rastreamento] Iniciando verificação programada de encomendas (24x/dia)...")
-
             res = executar_ciclo_verificacao(DB_NAME)
-
             print(f"🤖 [Robô de Rastreamento] Ciclo #{res.get('ciclo')} finalizado: {res.get('itens_processados')} pedidos monitorados, {res.get('itens_entregues')} entregas registradas.")
-
         except Exception as e:
-
             print(f"⚠️ [Robô de Rastreamento] Erro no ciclo: {e}")
-
         await asyncio.sleep(3600)  # 3600 segundos = 1 hora (24 verificações em 24 horas)
 
 
-
-
-
 async def api_carga_guia_retirada(request: web.Request) -> web.Response:
-
     """Retorna os dados e mensagem formatada para WhatsApp de retirada no Aeroporto/Transportadora."""
-
     ped_id = int(request.match_info.get("id", 0))
-
     dados = gerar_mensagem_retirada_carga(DB_NAME, ped_id)
-
     return web.json_response(dados)
-
-
-
 
 
 async def api_carga_confirmar_retirada(request: web.Request) -> web.Response:
-
     """Confirma que o portador (Paulinho) retirou a carga no aeroporto e dá entrada física no estoque."""
-
     body = await request.json()
-
     ped_id = int(body.get("id", 0))
-
     portador = limpar_texto(body.get("portador", "Paulinho"), "Paulinho")
-
     res = confirmar_retirada_paulinho(DB_NAME, ped_id, portador)
-
     return web.json_response(res)
 
 
-
-
-
 async def api_carga_simular_aeroporto(request: web.Request) -> web.Response:
-
     """Simula que a carga aérea chegou no aeroporto de cargas (TECA) aguardando o Paulinho."""
-
     body = await request.json()
-
     ped_id = int(body.get("id", 0))
-
     codigo = str(body.get("codigo_rastreio", "")).strip() or f"AWB_AEROPORTO_{ped_id}"
-
     
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         cur.execute("""
-
             UPDATE solicitacoes_pecas
-
             SET codigo_rastreio = ?,
-
                 transportadora = 'Azul Cargo Express / Aeroporto',
-
                 status_compra = 'AGUARDANDO_RETIRADA_AEROPORTO',
-
                 status_pedido = '✈️ DISPONÍVEL P/ RETIRADA NO AEROPORTO (PORTADOR: PAULINHO)',
-
                 tipo_entrega = 'RETIRADA_AEROPORTO',
-
                 portador_retirada = 'Paulinho',
-
                 local_retirada = 'Aeroporto Pinto Martins (TECA) / Fortaleza-CE',
-
                 ultimo_rastreio_status = 'AGUARDANDO_RETIRADA',
-
                 ultimo_rastreio_cidade = 'Fortaleza / CE',
-
                 ultimo_rastreio_data = ?
-
             WHERE id = ?
-
         """, (codigo, obter_agora_brasil_str("%d/%m/%Y %H:%M"), ped_id))
-
         conn.commit()
-
         
-
     return web.json_response({
-
         "ok": True,
-
         "msg": f"✈️ Carga do Pedido #{ped_id} marcada como Disponível no Aeroporto para o Paulinho!"
-
     })
-
-
-
 
 
 async def handle_simbolo_emed(request: web.Request) -> web.Response:
-
     """Serve o símbolo/logo oficial em alta resolução e fundo transparente da EMED."""
-
     candidatos = [
-
         os.path.join(BASE_DIR, "emed_pwa_static", "simbolo_emed_transparente.png"),
-
         os.path.join(BASE_DIR, "emed_pwa_static", "simbolo_emed_oficial.png"),
-
         os.path.join(BASE_DIR, "emed_pwa_static", "simbolo_emed.png"),
-
         os.path.join(BASE_DIR, "emed1.jpg")
-
     ]
-
     for c in candidatos:
-
         if os.path.exists(c):
-
             with open(c, "rb") as f:
-
                 content_type = "image/png" if c.endswith(".png") else "image/jpeg"
-
                 return web.Response(body=f.read(), content_type=content_type)
-
     return web.Response(status=404)
 
 
-
-
-
 async def api_hospital_autorizacao(request: web.Request) -> web.Response:
-
     """Retorna dados do credenciamento e texto formatado para WhatsApp da portaria."""
-
     os_id = int(request.match_info.get("id", 0))
-
     dados = obter_dados_credenciamento_os(DB_NAME, os_id)
-
     if not dados.get("ok"):
-
         return web.json_response(dados, status=404)
-
     texto_wa = gerar_texto_whatsapp_portaria(dados)
-
     dados["texto_whatsapp"] = texto_wa
-
     return web.json_response(dados)
-
-
-
 
 
 async def api_hospital_autorizacao_imprimir(request: web.Request) -> web.Response:
-
     """Gera o documento formal em HTML/PDF de Comunicação de Entrada no Hospital (ex: São Carlos)."""
-
     os_id = int(request.match_info.get("id", 0))
-
     dados = obter_dados_credenciamento_os(DB_NAME, os_id)
-
     if not dados.get("ok"):
-
         return web.Response(text="Ordem de serviço não encontrada.", status=404)
-
     html = gerar_html_autorizacao_entrada(dados)
-
     return web.Response(text=html, content_type="text/html", charset="utf-8")
-
-
-
 
 
 async def api_equipamento_historico(request: web.Request) -> web.Response:
-
     """Retorna os dados completos e histórico anual de manutenções do equipamento."""
-
     equip_id = int(request.match_info.get("id", 0))
-
     dados = obter_historico_anual_equipamento(DB_NAME, equip_id)
-
     return web.json_response(dados)
 
 
-
-
-
 async def handle_qrcode_equipamento(request: web.Request) -> web.Response:
-
     """Exibe o prontuário digital anual do equipamento escaneado pelo QR Code."""
-
     equip_id = int(request.match_info.get("id", 0))
-
     dados = obter_historico_anual_equipamento(DB_NAME, equip_id)
-
     if not dados.get("ok"):
-
         return web.Response(text="Equipamento não localizado.", status=404)
-
     html = gerar_pagina_prontuario_equipamento(dados)
-
     return web.Response(text=html, content_type="text/html", charset="utf-8")
-
-
-
 
 
 async def handle_qrcode_equipamento_etiqueta(request: web.Request) -> web.Response:
-
     """Gera a Etiqueta Física com QR Code para impressão e colagem no chassi da máquina."""
-
     equip_id = int(request.match_info.get("id", 0))
-
     dados = obter_historico_anual_equipamento(DB_NAME, equip_id)
-
     if not dados.get("ok"):
-
         return web.Response(text="Equipamento não localizado.", status=404)
-
         
-
     host = request.headers.get("Host", "127.0.0.1:8502")
-
     proto = "https" if request.secure or "render" in host.lower() else "http"
-
     url_publica = f"{proto}://{host}/qrcode/equipamento/{equip_id}"
-
     qr_b64 = gerar_qrcode_base64(url_publica)
-
     
-
     html = gerar_etiqueta_qrcode_html(dados, qr_b64)
-
     return web.Response(text=html, content_type="text/html", charset="utf-8")
 
-
-
 async def api_clientes_internos_salvar(request: web.Request) -> web.Response:
-
     """Atualiza ou adiciona dados de um cliente interno da EMED."""
-
     try:
-
         body = await request.json()
-
         ci_id = int(body.get("id") or 0)
-
         nome_setor = limpar_texto(body.get("nome_setor", ""), "")
-
         responsavel = limpar_texto(body.get("responsavel", ""), "")
-
         ramal_whatsapp = limpar_texto(body.get("ramal_whatsapp", ""), "")
-
         centro_custo = limpar_texto(body.get("centro_custo", ""), "")
-
         observacoes = limpar_texto(body.get("observacoes", ""), "")
 
-
-
         with sqlite3.connect(DB_NAME) as conn:
-
             if ci_id > 0:
-
                 conn.execute("""
-
                     UPDATE clientes_internos 
-
                     SET nome_setor = ?, responsavel = ?, ramal_whatsapp = ?, centro_custo = ?, observacoes = ?
-
                     WHERE id = ?
-
                 """, (nome_setor, responsavel, ramal_whatsapp, centro_custo, observacoes, ci_id))
-
             else:
-
                 conn.execute("""
-
                     INSERT INTO clientes_internos (nome_setor, responsavel, ramal_whatsapp, centro_custo, observacoes)
-
                     VALUES (?, ?, ?, ?, ?)
-
                 """, (nome_setor, responsavel, ramal_whatsapp, centro_custo, observacoes))
-
             conn.commit()
-
         return web.json_response({"ok": True, "msg": "Setor interno salvo com sucesso!"})
-
     except Exception as e:
-
         return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
 
 async def api_aniversariantes_salvar(request: web.Request) -> web.Response:
-
     """Atualiza ou adiciona aniversariante na equipe EMED."""
-
     try:
-
         body = await request.json()
-
         aniv_id = int(body.get("id") or 0)
-
         nome = limpar_texto(body.get("nome", ""), "").upper()
-
         cargo_setor = limpar_texto(body.get("cargo_setor", ""), "")
-
         data_nascimento = limpar_texto(body.get("data_nascimento", ""), "")
-
         telefone = limpar_texto(body.get("telefone", ""), "")
-
         mensagem_personalizada = limpar_texto(body.get("mensagem_personalizada", ""), "")
 
-
-
         with sqlite3.connect(DB_NAME) as conn:
-
             if aniv_id > 0:
-
                 conn.execute("""
-
                     UPDATE equipe_aniversariantes 
-
                     SET nome = ?, cargo_setor = ?, data_nascimento = ?, telefone = ?, mensagem_personalizada = ?
-
                     WHERE id = ?
-
                 """, (nome, cargo_setor, data_nascimento, telefone, mensagem_personalizada, aniv_id))
-
             else:
-
                 conn.execute("""
-
                     INSERT INTO equipe_aniversariantes (nome, cargo_setor, data_nascimento, telefone, mensagem_personalizada)
-
                     VALUES (?, ?, ?, ?, ?)
-
                     ON CONFLICT(nome) DO UPDATE SET
-
                         cargo_setor = excluded.cargo_setor,
-
                         data_nascimento = excluded.data_nascimento,
-
                         telefone = excluded.telefone,
-
                         mensagem_personalizada = excluded.mensagem_personalizada
-
                 """, (nome, cargo_setor, data_nascimento, telefone, mensagem_personalizada))
-
             conn.commit()
-
         return web.json_response({"ok": True, "msg": f"Aniversariante {nome} salvo com sucesso!"})
-
     except Exception as e:
-
         return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
 
 async def api_atualizar_cliente_endereco(request: web.Request) -> web.Response:
-
     """Atualiza imediatamente o cliente, endereço e cidade de uma OS no banco SQLite e no cache."""
-
     try:
-
         try:
-
             body = await request.json()
-
         except Exception:
-
             return web.json_response({"ok": False, "msg": "Payload JSON inválido ou vazio."}, status=400)
 
-
-
         try:
-
             os_id = int(body.get("os_id", 0))
-
         except (ValueError, TypeError):
-
             return web.json_response({"ok": False, "msg": "ID da OS deve ser um número inteiro válido."}, status=400)
 
-
-
         cliente = limpar_texto(body.get("cliente", ""), "").upper()
-
         endereco = limpar_texto(body.get("endereco", ""), "").upper()
-
         cidade = limpar_texto(body.get("cidade", ""), "").upper()
 
-
-
         if not os_id:
-
             return web.json_response({"ok": False, "msg": "ID da OS é obrigatório."}, status=400)
 
-
-
         with get_db_connection(DB_NAME) as conn:
-
             cur = conn.cursor()
-
             if cliente and endereco and cidade:
-
                 cur.execute("""
-
                     UPDATE clientes_equipamentos
-
                     SET cliente = ?, endereco = ?, cidade = ?
-
                     WHERE id = ?
-
                 """, (cliente, endereco, cidade, os_id))
-
             elif endereco and cidade:
-
                 cur.execute("""
-
                     UPDATE clientes_equipamentos
-
                     SET endereco = ?, cidade = ?
-
                     WHERE id = ?
-
                 """, (endereco, cidade, os_id))
-
             elif endereco:
-
                 cur.execute("""
-
                     UPDATE clientes_equipamentos
-
                     SET endereco = ?
-
                     WHERE id = ?
-
                 """, (endereco, os_id))
-
             
-
             if cur.rowcount == 0:
-
                 return web.json_response({"ok": False, "msg": f"Ordem de serviço #{os_id} não encontrada na base de dados."}, status=404)
 
-
-
         # Atualiza também no DataFrame de memória / Excel
-
         try:
-
             df = _carregar_df_direto()
-
             mask = df["id"] == os_id
-
             if mask.any():
-
                 if cliente:
-
                     df.loc[mask, "cliente"] = cliente
-
                 if endereco:
-
                     df.loc[mask, "endereco"] = endereco
-
                 if cidade:
-
                     df.loc[mask, "cidade"] = cidade
-
                 salvar_dados_seguro(df)
-
         except Exception as e_df:
-
             print("Aviso ao sincronizar DataFrame na atualização de endereço:", e_df)
 
-
-
         return web.json_response({
-
             "ok": True,
-
             "msg": "Endereço e cliente atualizados com sucesso!",
-
             "cliente": cliente,
-
             "endereco": endereco,
-
             "cidade": cidade
-
         })
-
     except Exception as e:
-
         return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
-
 
 
 async def api_equipamento_salvar(request: web.Request) -> web.Response:
-
     """Cria ou atualiza um equipamento hospitalar na base de dados (equipamentos_auvo)."""
-
     try:
-
         dados = await request.json()
-
     except Exception:
-
         return web.json_response({"ok": False, "erro": "JSON inválido"}, status=400)
 
-
-
     eq_id = dados.get("id")
-
     nome = str(dados.get("nome", "")).strip().upper()
-
     cliente_nome = str(dados.get("cliente_nome", "")).strip().upper()
-
     categoria_checklist = str(dados.get("categoria_checklist", "")).strip().upper()
-
     categoria = str(dados.get("categoria", dados.get("categoria_auvo", ""))).strip().upper() or categoria_checklist
-
     numero_serie = str(dados.get("numero_serie", "")).strip().upper()
-
     identificador = str(dados.get("identificador", "")).strip().upper()
-
     descricao = str(dados.get("descricao", "")).strip()
-
     status = str(dados.get("status", "Ativo")).strip()
-
     cidade = str(dados.get("cidade", "FORTALEZA")).strip().upper()
-
     estado = str(dados.get("estado", "CE")).strip().upper()
 
-
-
     if not nome:
-
         return web.json_response({"ok": False, "erro": "Nome do equipamento é obrigatório"}, status=400)
-
     if not cliente_nome:
-
         return web.json_response({"ok": False, "erro": "Nome do hospital/cliente é obrigatório"}, status=400)
 
-
-
     if not categoria_checklist:
-
         try:
-
             from emed_services.checklists_especializados import identificar_categoria_checklist
-
             categoria_checklist = identificar_categoria_checklist(nome)
-
         except Exception:
-
             categoria_checklist = "GERAL"
 
-
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         if eq_id and int(eq_id) > 0:
-
             cur.execute("""
-
                 UPDATE equipamentos
-
                 SET nome = ?, cliente_nome = ?, categoria = ?, categoria_checklist = ?,
-
                     numero_serie = ?, identificador = ?, descricao = ?, status = ?, cidade = ?, estado = ?
-
                 WHERE id = ?
-
             """, (nome, cliente_nome, categoria, categoria_checklist, numero_serie, identificador, descricao, status, cidade, estado, int(eq_id)))
-
             msg = "Equipamento atualizado com sucesso!"
-
             salvo_id = int(eq_id)
-
         else:
-
             cur.execute("""
-
                 INSERT INTO equipamentos (
-
                     nome, cliente_nome, categoria, categoria_checklist,
-
                     numero_serie, identificador, descricao, cidade, estado, status
-
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-
             """, (nome, cliente_nome, categoria, categoria_checklist, numero_serie, identificador, descricao, cidade, estado, status))
-
             salvo_id = cur.lastrowid
-
             msg = "Novo equipamento cadastrado com sucesso!"
-
         os_id_vinc = dados.get("os_id")
-
         if os_id_vinc:
-
             try:
-
                 cur.execute("""
-
                     UPDATE clientes_equipamentos
-
                     SET cliente = ?, equipamento = ?, numero_serie = ?, cidade = ?
-
                     WHERE id = ?
-
                 """, (cliente_nome, nome, numero_serie or "S/N", cidade, int(os_id_vinc)))
-
             except Exception:
-
                 pass
-
         conn.commit()
 
-
-
     return web.json_response({
-
         "ok": True,
-
         "msg": msg,
-
         "id": salvo_id,
-
         "equipamento": {
-
             "id": salvo_id,
-
             "nome": nome,
-
             "cliente_nome": cliente_nome,
-
             "categoria_checklist": categoria_checklist,
-
             "categoria": categoria,
-
             "categoria_auvo": categoria,
-
             "numero_serie": numero_serie,
-
             "identificador": identificador,
-
             "descricao": descricao,
-
             "cidade": cidade,
-
             "estado": estado,
-
             "status": status
-
         }
-
     })
 
 
-
-
-
 async def api_equipamento_status(request: web.Request) -> web.Response:
-
     """Altera o status de um equipamento (descontinuar, reativar ou excluir permanentemente)."""
-
     try:
-
         dados = await request.json()
-
     except Exception:
-
         return web.json_response({"ok": False, "erro": "JSON inválido"}, status=400)
 
-
-
     eq_id = dados.get("id")
-
     acao = str(dados.get("acao", "")).strip().lower()
 
-
-
     if not eq_id:
-
         return web.json_response({"ok": False, "erro": "ID do equipamento é obrigatório"}, status=400)
 
-
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         if acao == "excluir":
-
             cur.execute("DELETE FROM equipamentos WHERE id = ?", (int(eq_id),))
-
             msg = "Equipamento removido permanentemente com sucesso!"
-
             novo_status = "Excluído"
-
         elif acao == "reativar":
-
             cur.execute("UPDATE equipamentos SET status = 'Ativo' WHERE id = ?", (int(eq_id),))
-
             msg = "Equipamento REATIVADO com sucesso!"
-
             novo_status = "Ativo"
-
         else:
-
             cur.execute("UPDATE equipamentos SET status = 'Descontinuado' WHERE id = ?", (int(eq_id),))
-
             msg = "Equipamento marcado como DESCONTINUADO."
-
             novo_status = "Descontinuado"
-
         conn.commit()
-
-
 
     return web.json_response({"ok": True, "msg": msg, "id": int(eq_id), "status": novo_status})
 
 
-
-
-
 async def api_fazer_backup_onedrive(request: web.Request) -> web.Response:
-
     """Garante WAL checkpoint e realiza backup íntegro diretamente para a pasta do OneDrive."""
-
     import shutil
-
     from datetime import datetime
 
-
-
     user_home = os.path.expanduser("~")
-
     onedrive_base = os.path.join(user_home, "OneDrive", "Backups_Sistema_EMED")
-
     if not os.path.exists(os.path.join(user_home, "OneDrive")):
-
         onedrive_base = os.path.join(BASE_DIR, "backups_sistema")
-
     os.makedirs(onedrive_base, exist_ok=True)
 
-
-
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-
     pasta_destino = os.path.join(onedrive_base, f"Backup_EMED_{timestamp}")
-
     os.makedirs(pasta_destino, exist_ok=True)
 
-
-
     try:
-
         with get_db_connection(DB_NAME) as conn_sq:
-
             conn_sq.execute("PRAGMA wal_checkpoint(TRUNCATE);")
-
             conn_sq.commit()
-
     except Exception as e:
-
         print("Aviso no checkpoint:", e)
 
-
-
     db_origem = os.path.join(BASE_DIR, "emed.db")
-
     db_destino = os.path.join(pasta_destino, "emed.db")
-
     shutil.copy2(db_origem, db_destino)
 
-
-
     excel_origem = os.path.join(BASE_DIR, "base_clientes.xlsx")
-
     if os.path.exists(excel_origem):
-
         shutil.copy2(excel_origem, os.path.join(pasta_destino, "base_clientes.xlsx"))
 
-
-
     db_raiz_destino = os.path.join(onedrive_base, f"emed_{timestamp}.db")
-
     shutil.copy2(db_origem, db_raiz_destino)
 
-
-
     return web.json_response({
-
         "ok": True,
-
         "msg": f"Backup realizado com sucesso! Pasta: {pasta_destino}",
-
         "pasta": pasta_destino,
-
         "arquivo_db": db_raiz_destino,
-
         "timestamp": timestamp
-
     })
 
 
-
-
-
 def _iniciar_emed_nav_background():
-
     """Inicia automaticamente o servidor de GPS EmedNav (porta 5000) caso ainda não esteja rodando."""
-
     try:
-
         import urllib.request, subprocess, sys
-
         try:
-
             with urllib.request.urlopen("http://127.0.0.1:5000/api/car", timeout=0.6) as r:
-
                 if r.status == 200:
-
                     return
-
         except Exception:
-
             pass
-
         nav_script = os.path.join(BASE_DIR, "emed_nav", "emed_nav_server.py")
-
         if os.path.exists(nav_script):
-
             subprocess.Popen([sys.executable, nav_script, "5000"], cwd=BASE_DIR)
-
             print("🚀 [EMED-NAV] Servidor dedicado de navegação e GPS iniciado automaticamente na porta 5000!")
-
     except Exception as e:
-
         print(f"⚠️ [EMED-NAV] Falha ao iniciar servidor de GPS em segundo plano: {e}")
 
 
-
-
-
-async def api_pmp_grade_anual(request: web.Request) -> web.Response:
-    """Retorna o Plano de Manutenção Preventiva Anual (3 Etapas por Contrato)."""
-    try:
-        ano = request.query.get("ano")
-        ano_int = int(ano) if ano and ano.isdigit() else None
-        res = obter_grade_pmp_anual(ano_int)
-        return web.json_response(res)
-    except Exception as e:
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
 def criar_app() -> web.Application:
-
-    garantir_schema_dispositivos(DB_NAME)
-
     _iniciar_emed_nav_background()
-
     garantir_schema_rastreio_completo(DB_NAME)
-
     garantir_schema_fiscal_contabil(DB_NAME)
-
     garantir_schema_medicina_trabalho(DB_NAME)
-
     app = web.Application(middlewares=[rate_limiting_middleware, security_headers_middleware, auth_api_middleware], client_max_size=25 * 1024 * 1024)
 
-
-
     # Webhook de Baixa Automatica PIX e Robo de Rastreamento 24x/dia
-
     app.router.add_post("/api/pix/webhook", api_pix_webhook)
-
     app.router.add_post("/api/pix/simular-webhook", api_pix_simular_webhook)
-
     app.router.add_get("/api/almoxarifado/rastreio/status", api_robo_rastreio_status)
-
     app.router.add_post("/api/almoxarifado/rastreio/executar-robo", api_robo_rastreio_executar)
-
     app.router.add_post("/api/almoxarifado/rastreio/simular", api_robo_rastreio_simular)
-
     app.router.add_post("/api/clientes-internos/salvar", api_clientes_internos_salvar)
-
     app.router.add_post("/api/aniversariantes/salvar", api_aniversariantes_salvar)
-
     app.router.add_post("/api/os/atualizar-cliente-endereco", api_atualizar_cliente_endereco)
-
     app.router.add_get("/api/almoxarifado/carga/guia-retirada/{id}", api_carga_guia_retirada)
-
     # Símbolo Oficial, Credenciamento Hospitalar & QR Code Equipamento
-
     app.router.add_get("/api/simbolo-emed", handle_simbolo_emed)
-
     app.router.add_get("/api/hospital/autorizacao-entrada/{id}", api_hospital_autorizacao)
-
     app.router.add_get("/api/hospital/autorizacao-entrada/{id}/imprimir", api_hospital_autorizacao_imprimir)
-
     app.router.add_get("/api/equipamento/{id}/historico-anual", api_equipamento_historico)
-
     app.router.add_get("/qrcode/equipamento/{id}", handle_qrcode_equipamento)
-
     app.router.add_get("/qrcode/equipamento/{id}/etiqueta", handle_qrcode_equipamento_etiqueta)
 
-
-
     app.router.add_post("/api/almoxarifado/carga/confirmar-retirada", api_carga_confirmar_retirada)
-
     app.router.add_post("/api/almoxarifado/carga/simular-aeroporto", api_carga_simular_aeroporto)
 
 
 
 
-
-
-
-
-
         # Rotas de Autenticacao e Seguranca
-
     app.router.add_get("/api/auth/usuarios", api_auth_usuarios)
-
     app.router.add_post("/api/auth/login", api_auth_login)
-
     app.router.add_post("/api/auth/logout", api_auth_logout)
-
     app.router.add_get("/api/auth/status", api_auth_status)
-
-    app.router.add_get("/api/dispositivos/status", api_dispositivos_status)
-
-    app.router.add_get("/api/dispositivos/listar", api_dispositivos_listar)
-
-    app.router.add_post("/api/dispositivos/acao", api_dispositivos_acao)
-
-    app.router.add_post("/api/dispositivos/registrar", api_dispositivos_registrar)
-
-    app.router.add_get("/api/dispositivos/codigo/ativo", api_dispositivos_codigo_ativo)
-
-    app.router.add_post("/api/dispositivos/codigo/gerar", api_dispositivos_codigo_gerar)
-
-    app.router.add_post("/api/dispositivos/liberar-com-codigo", api_dispositivos_liberar_com_codigo)
-
         # Rotas Integradas do EmedNav GPS (Proxy Porta 5000)
-
     app.router.add_get("/nav", handle_proxy_nav)
-
     app.router.add_get("/gps", handle_proxy_nav)
-
     app.router.add_get("/emedcar", handle_proxy_nav)
-
     app.router.add_get("/frota", handle_proxy_nav)
-
     app.router.add_route("*", "/api/car", handle_proxy_nav)
-
     app.router.add_route("*", "/api/car/{tail:.*}", handle_proxy_nav)
-
     app.router.add_route("*", "/api/radars", handle_proxy_nav)
-
     app.router.add_route("*", "/api/radars/{tail:.*}", handle_proxy_nav)
-
     app.router.add_route("*", "/api/route", handle_proxy_nav)
-
     app.router.add_route("*", "/api/route/{tail:.*}", handle_proxy_nav)
-
     app.router.add_route("*", "/api/search", handle_proxy_nav)
-
     app.router.add_route("*", "/api/search/{tail:.*}", handle_proxy_nav)
-
     app.router.add_route("*", "/api/history", handle_proxy_nav)
-
     app.router.add_route("*", "/api/history/{tail:.*}", handle_proxy_nav)
-
     app.router.add_route("*", "/api/fleet", handle_proxy_nav)
-
     app.router.add_route("*", "/api/fleet/{tail:.*}", handle_proxy_nav)
-
+    app.router.add_route("*", "/api/clients", handle_proxy_nav)
+    app.router.add_route("*", "/api/clients/{tail:.*}", handle_proxy_nav)
+    app.router.add_get("/static/{filename:.*}", handle_static_file)
     app.router.add_get("/", handle_index)
-    app.router.add_get("/login", handle_index)
-    app.router.add_get("/login.html", handle_index)
-
-
-
-
 
 
 
@@ -23114,15 +10924,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_get("/sw.js", handle_sw)
-
-
-
-
 
 
 
@@ -23130,17 +10932,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_get("/api/logo-circle", handle_logo_circle)
-    app.router.add_get("/api/app-icon/{tamanho}", handle_app_icon)
-    app.router.add_get("/favicon.ico", handle_favicon_ico)
-
-
-
-
 
 
 
@@ -23148,43 +10940,21 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_get("/healthz", api_ping)
-
-
-
-
 
 
 
     app.router.add_get("/api/bootstrap", api_bootstrap)
 
-
-
     app.router.add_get("/api/kardex", api_kardex)
 
 
 
-
-
-
-
     app.router.add_get("/api/clientes", api_clientes)
-
     app.router.add_get("/api/clientes_auvo", api_clientes)
-
     app.router.add_get("/api/equipamentos", api_equipamentos)
-
     app.router.add_get("/api/equipamentos_auvo", api_equipamentos)
-
     app.router.add_get("/api/checklist", api_checklist)
-
-
-
-
 
 
 
@@ -23192,30 +10962,13 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_post("/api/rascunho", api_salvar_rascunho)
-
-
-
-
 
 
 
     app.router.add_post("/api/iniciar-rota", api_iniciar_rota)
 
-
-
     app.router.add_post("/api/checkin", api_checkin)
-    app.router.add_post("/api/checkout", api_checkout)
-    app.router.add_post("/api/frota/assumir-veiculo", api_frota_assumir_veiculo)
-    app.router.add_get("/api/frota/troca-condutores-historico", api_frota_troca_condutores_historico)
-
-
-
-
 
 
 
@@ -23223,33 +10976,16 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_post("/api/nova-os", api_nova_os)
-
-
 
     app.router.add_get("/api/ordens", api_ordens)
 
-
-
     app.router.add_post("/api/ordens", api_ordens)
-
-
 
     app.router.add_post("/api/sync_offline", api_sync_offline)
 
-
-
     app.router.add_get("/api/cliente-pendencias", api_cliente_pendencias)
-
     app.router.add_post("/api/propostas", api_proposta_salvar)
-
-
-
-
 
 
 
@@ -23257,19 +10993,9 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_post("/api/rotas/despachar", api_despachar_rota)
 
-
-
     app.router.add_post("/api/despachar-rota", api_despachar_rota)
-
-
-
-
 
 
 
@@ -23277,15 +11003,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_post("/api/solicitar-peca", api_solicitar_peca_kit)
-
-
-
-
 
 
 
@@ -23293,15 +11011,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_post("/api/calibracao/equipamento", api_calibracao_equipamento)
-
-
-
-
 
 
 
@@ -23309,15 +11019,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_post("/api/gps/telemetria", api_gps_telemetria)
-
-
-
-
 
 
 
@@ -23325,15 +11027,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     # Endpoints Oficiais da Especificação de Integração v1 (Rastreadores J16 4G + NFC + PostGIS + Scraper DETRAN)
-
-
-
-
 
 
 
@@ -23341,15 +11035,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_get("/api/v1/veiculos/odometro", api_v1_odometro_doc)
-
-
-
-
 
 
 
@@ -23357,15 +11043,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_post("/api/v1/veiculos/odometro", api_gps_telemetria)
-
-
-
-
 
 
 
@@ -23373,15 +11051,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_post("/api/v1/veiculos/{identificador}/odometro", api_gps_telemetria)
-
-
-
-
 
 
 
@@ -23389,15 +11059,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_post("/api/v1/frota/lote", api_gps_lote)
-
-
-
-
 
 
 
@@ -23405,15 +11067,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_post("/api/frota/webhook-detran", api_frota_webhook_detran)
-
-
-
-
 
 
 
@@ -23421,15 +11075,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_post("/api/frota/multa-status", api_frota_multa_status)
-
-
-
-
 
 
 
@@ -23437,43 +11083,21 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_post("/api/satisfacao/registrar", api_satisfacao_registrar)
-
-
-
-
 
 
 
     app.router.add_get("/api/ferramentas", api_ferramentas_listar)
 
-
-
     app.router.add_post("/api/ferramentas/acao", api_ferramentas_acao)
-
     app.router.add_post("/api/ferramentas/bipagem-lote", api_ferramentas_bipagem_lote)
-
     app.router.add_get("/api/ferramentas/minhas", api_ferramentas_minhas)
-
-
 
     app.router.add_post("/api/almoxarifado/compra-acao", api_almox_compra_acao)
 
-
-
     app.router.add_post("/api/almoxarifado/status", api_almox_status)
-
     app.router.add_post("/api/auditoria/excluir", api_auditoria_excluir)
-
     app.router.add_get("/api/auditoria/listar", api_auditoria_listar)
-
-
-
-
 
 
 
@@ -23481,15 +11105,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_post("/api/pix/liquidar", api_pix_liquidar)
-
-
-
-
 
 
 
@@ -23497,15 +11113,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_get("/api/respostas-tecnicas", api_respostas_tecnicas_listar)
-
-
-
-
 
 
 
@@ -23513,15 +11121,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_delete("/api/respostas-tecnicas/{id}", api_respostas_tecnicas_deletar)
-
-
-
-
 
 
 
@@ -23529,69 +11129,34 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_post("/api/os/nf-salvar", api_os_nf_salvar)
-
     app.router.add_get("/api/fiscal/danfe/{os_id}", api_fiscal_danfe)
-
     app.router.add_post("/api/fiscal/enviar-cliente", api_fiscal_enviar_cliente)
-
     app.router.add_post("/api/fiscal/enviar-contabilidade", api_fiscal_enviar_contabilidade)
-
     app.router.add_get("/api/fiscal/relatorio-contabil-csv", api_fiscal_relatorio_contabil_csv)
-
     app.router.add_post("/api/tecnico/assinatura-salvar", api_tecnico_assinatura_salvar)
-
     app.router.add_post("/api/tecnico/renovar-medico", api_tecnico_renovar_medico)
-
     app.router.add_get("/api/tecnico/historico-medico/{id}", api_tecnico_historico_medico)
-
     app.router.add_post("/api/fiscal/liberar-quarentena", api_fiscal_liberar_quarentena)
-
     app.router.add_post("/api/fiscal/cancelar-nota", api_fiscal_cancelar_nota)
-
     app.router.add_post("/api/seguranca/2fa/solicitar", api_seguranca_2fa_solicitar)
-
     app.router.add_post("/api/seguranca/2fa/validar", api_seguranca_2fa_validar)
-
     app.router.add_get("/api/fiscal/auditoria/eventos", api_fiscal_auditoria_eventos)
-
     app.router.add_get("/api/fiscal/auditoria/detalhe/{id}", api_fiscal_auditoria_detalhe)
-
     app.router.add_get("/api/fiscal/avaliacao/dashboard", api_fiscal_avaliacao_dashboard)
-
     app.router.add_post("/api/fiscal/auditoria/avaliar-avulso", api_fiscal_auditoria_avaliar_avulso)
 
-
-
     app.router.add_get("/api/financeiro/relatorio-contabil", api_financeiro_relatorio_contabil)
-
     app.router.add_get("/api/financeiro/relatorio-contabil/imprimir", api_financeiro_relatorio_contabil_imprimir)
-
     app.router.add_get("/api/transportadoras", api_transportadoras_listar)
-
     app.router.add_post("/api/transportadoras/salvar", api_transportadoras_salvar)
-
     app.router.add_get("/api/cotacoes-transporte", api_cotacoes_transporte_listar)
-
     app.router.add_post("/api/cotacoes-transporte/salvar", api_cotacoes_transporte_salvar)
-
     app.router.add_post("/api/despesas-recorrentes/salvar", api_despesas_recorrentes_salvar)
-
     app.router.add_get("/api/remessas-diagnostico", api_remessas_diagnostico_listar)
-
     app.router.add_post("/api/remessas-diagnostico/salvar", api_remessas_diagnostico_salvar)
-
     app.router.add_post("/api/remessas-diagnostico/retorno", api_remessas_diagnostico_retorno)
-
     app.router.add_get("/api/remessas-diagnostico/guia/{id}", api_remessas_diagnostico_guia)
-
-
-
-
 
 
 
@@ -23599,15 +11164,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_get("/api/pdf/{os_id}", api_pdf_os)
-
-
-
-
 
 
 
@@ -23615,20 +11172,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_get("/api/imprimir/{os_id}", api_imprimir_os)
-
-    app.router.add_get("/api/instalacao/termo-aceite/{os_id}", api_imprimir_termo_aceite_instalacao)
-    app.router.add_get("/api/comercial/oportunidades", api_comercial_oportunidades)
-    app.router.add_post("/api/comercial/oportunidade/salvar", api_comercial_oportunidade_salvar)
-    app.router.add_post("/api/comercial/oportunidade/status", api_comercial_oportunidade_status)
-
-
-
-
 
 
 
@@ -23636,48 +11180,17 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
     app.router.add_get("/api/video", api_video_stream)
 
 
 
-
-
-
-
     app.router.add_get("/api/exportar-excel", api_exportar_excel)
-
     app.router.add_post("/api/importar-excel", api_importar_excel)
-
     app.router.add_post("/api/nova_os", api_nova_os)
-
     app.router.add_post("/api/equipamento/salvar", api_equipamento_salvar)
-
     app.router.add_post("/api/equipamento/status", api_equipamento_status)
-
     app.router.add_post("/api/sistema/backup-onedrive", api_fazer_backup_onedrive)
-
     app.router.add_get("/api/sistema/backup-onedrive", api_fazer_backup_onedrive)
-
-    app.router.add_get("/api/triagem/fila", api_triagem_fila)
-
-    app.router.add_post("/api/triagem/aprovar", api_triagem_aprovar)
-
-    app.router.add_get("/api/frota/checklists-status", api_frota_checklists_status)
-
-    app.router.add_post("/api/frota/checklist-salvar", api_frota_checklist_salvar)
-
-    app.router.add_get("/api/almoxarifado/sugestao-pecas", api_almoxarifado_sugestao_pecas)
-
-    app.router.add_get("/api/almoxarifado/ferramentas-cautela", api_almoxarifado_cautela_painel)
-
-    app.router.add_post("/api/almoxarifado/cautela-registrar", api_almoxarifado_cautela_registrar)
-    app.router.add_get("/api/pmp/grade-anual", api_pmp_grade_anual)
-
-
 
     return app
 
@@ -23691,179 +11204,7 @@ def criar_app() -> web.Application:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# =========================================================================
-
-# ROTAS ESTRATÉGICAS: TRIAGEM, FROTAS, COPILOTO E CAUTELA RBC
-
-# =========================================================================
-
-async def api_triagem_fila(request: web.Request) -> web.Response:
-
-    """Retorna fila de OSs aguardando triagem da gestão pós-fechamento."""
-
-    try:
-
-        fila = obter_fila_triagem_pos_atendimento(DB_NAME)
-
-        return web.json_response({"ok": True, "fila": fila, "total": len(fila)})
-
-    except Exception as e:
-
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
-
-
-
-async def api_triagem_aprovar(request: web.Request) -> web.Response:
-
-    """Aprova a OS na triagem, define cobrança/pendência e prepara liberação ao cliente."""
-
-    try:
-
-        body = await request.json()
-
-        os_id = int(body.get("os_id", 0))
-
-        if not os_id:
-
-            return web.json_response({"ok": False, "msg": "ID da OS obrigatório."}, status=400)
-
-        
-
-        res = aprovar_triagem_os(DB_NAME, os_id, body)
-
-        global _CACHE_BOOTSTRAP
-
-        _CACHE_BOOTSTRAP = None
-
-        return web.json_response(res)
-
-    except Exception as e:
-
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
-
-
-
-async def api_frota_checklists_status(request: web.Request) -> web.Response:
-
-    """Retorna o status semanal dos checklists veiculares da frota."""
-
-    try:
-
-        veiculos = obter_status_checklists_veiculos(DB_NAME)
-
-        return web.json_response({"ok": True, "veiculos": veiculos})
-
-    except Exception as e:
-
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
-
-
-
-async def api_frota_checklist_salvar(request: web.Request) -> web.Response:
-
-    """Salva o checklist veicular semanal do gestor de frota."""
-
-    try:
-
-        body = await request.json()
-
-        res = salvar_checklist_veicular_gestor(DB_NAME, body)
-
-        return web.json_response(res)
-
-    except Exception as e:
-
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
-
-
-
-async def api_almoxarifado_sugestao_pecas(request: web.Request) -> web.Response:
-
-    """Copiloto preditivo: sugere peças em estoque com base no defeito e equipamento."""
-
-    try:
-
-        equip = request.query.get("equipamento", "")
-
-        defeito = request.query.get("defeito", "")
-
-        pecas = sugerir_pecas_por_defeito(DB_NAME, equip, defeito)
-
-        return web.json_response({"ok": True, "pecas": pecas})
-
-    except Exception as e:
-
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
-
-
-
-async def api_almoxarifado_cautela_painel(request: web.Request) -> web.Response:
-
-    """Painel do almoxarife: inventário de cautela e monitoramento de calibração RBC."""
-
-    try:
-
-        dados = obter_painel_cautela_ferramentas(DB_NAME)
-
-        return web.json_response(dados)
-
-    except Exception as e:
-
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
-
-
-
-async def api_almoxarifado_cautela_registrar(request: web.Request) -> web.Response:
-
-    """Registra saída ou devolução de ferramenta na cautela do almoxarifado."""
-
-    try:
-
-        body = await request.json()
-
-        res = registrar_movimento_cautela(DB_NAME, body)
-
-        return web.json_response(res)
-
-    except Exception as e:
-
-        return web.json_response({"ok": False, "msg": str(e)}, status=500)
-
-
-
-
-
 async def _background_keep_alive_task():
-
-
-
-
 
 
 
@@ -23871,15 +11212,7 @@ async def _background_keep_alive_task():
 
 
 
-
-
-
-
     render_url = os.environ.get("RENDER_EXTERNAL_URL", "https://emed-app-6ofv.onrender.com")
-
-
-
-
 
 
 
@@ -23887,15 +11220,7 @@ async def _background_keep_alive_task():
 
 
 
-
-
-
-
     await asyncio.sleep(60) # aguarda 1 minuto após startup
-
-
-
-
 
 
 
@@ -23903,15 +11228,7 @@ async def _background_keep_alive_task():
 
 
 
-
-
-
-
         try:
-
-
-
-
 
 
 
@@ -23919,15 +11236,7 @@ async def _background_keep_alive_task():
 
 
 
-
-
-
-
             req = urllib.request.Request(ping_url, headers={"User-Agent": "EMED-Internal-KeepAlive/1.0"})
-
-
-
-
 
 
 
@@ -23935,15 +11244,7 @@ async def _background_keep_alive_task():
 
 
 
-
-
-
-
                 if resp.getcode() == 200:
-
-
-
-
 
 
 
@@ -23951,15 +11252,7 @@ async def _background_keep_alive_task():
 
 
 
-
-
-
-
         except Exception as e:
-
-
-
-
 
 
 
@@ -23967,15 +11260,7 @@ async def _background_keep_alive_task():
 
 
 
-
-
-
-
             pass
-
-
-
-
 
 
 
@@ -23991,23 +11276,7 @@ async def _background_keep_alive_task():
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 async def iniciar_app_com_keepalive():
-
-
-
-
 
 
 
@@ -24015,15 +11284,7 @@ async def iniciar_app_com_keepalive():
 
 
 
-
-
-
-
     # Inicia a tarefa de auto-ping se estiver rodando no Render ou configurado
-
-
-
-
 
 
 
@@ -24031,31 +11292,11 @@ async def iniciar_app_com_keepalive():
 
 
 
-
-
-
-
     app.router.add_post("/api/equipamento/salvar", api_equipamento_salvar)
-
     app.router.add_post("/api/equipamento/status", api_equipamento_status)
-
     app.router.add_post("/api/sistema/backup-onedrive", api_fazer_backup_onedrive)
-
     app.router.add_get("/api/sistema/backup-onedrive", api_fazer_backup_onedrive)
-
     return app
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -24071,15 +11312,7 @@ if __name__ == "__main__":
 
 
 
-
-
-
-
     porta = int(os.environ.get("PORT", os.environ.get("EMED_APP_PORT", 8502)))
-
-
-
-
 
 
 
@@ -24087,17 +11320,7 @@ if __name__ == "__main__":
 
 
 
-
-
-
-
     web.run_app(criar_app(), host="0.0.0.0", port=porta, handle_signals=False, backlog=2048)
-
-
-
-
-
-
 
 
 
