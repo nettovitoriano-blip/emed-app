@@ -1,5 +1,5 @@
-// EmedNav Service Worker - v9 (Full Offline PWA + Cache-First Assets)
-const CACHE_NAME = 'emednav-v9-offline';
+// EmedNav Service Worker - v10 (Full Offline PWA + Cache-First Assets + Multi-Stop Routing)
+const CACHE_NAME = 'emednav-v10-multistop';
 
 const ASSETS_TO_CACHE = [
   '/',

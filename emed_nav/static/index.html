@@ -1541,7 +1541,11 @@
 
     // MODAL DE AÇÃO DE NAVEGAÇÃO
     function openNavModal() {
-      document.getElementById('modal-dest-name').innerText = state.destName || 'Destino Selecionado';
+      let destTitle = state.destName;
+      if (!destTitle && state.waypoints && state.waypoints.length > 0) {
+        destTitle = `${state.waypoints.length} Parada(s): Final em ${state.waypoints[state.waypoints.length - 1].name}`;
+      }
+      document.getElementById('modal-dest-name').innerText = destTitle || 'Destino Selecionado';
       document.getElementById('nav-action-modal').style.display = 'flex';
     }
 
@@ -1576,7 +1580,7 @@
           }, 700);
           return;
         }
-        showToast('⚠️ Escolha um destino ou parada!');
+        showToast('⚠️ Escolha um destino ou adicione paradas!');
         return;
       }
 
@@ -1589,14 +1593,27 @@
     function launchGoogleMaps(lat, lon, destName) {
       const oLat = state.carLat;
       const oLon = state.carLon;
-      const dLat = lat || state.destLat;
-      const dLon = lon || state.destLon;
-      const name = destName || state.destName || document.getElementById('input-destination').value.trim();
+      let dLat = lat || state.destLat;
+      let dLon = lon || state.destLon;
+      let name = destName || state.destName || document.getElementById('input-destination').value.trim();
 
       // Monta lista de waypoints para o Google Maps se existirem
       let waypointsParam = '';
       if (state.waypoints && state.waypoints.length > 0) {
-        waypointsParam = '&waypoints=' + encodeURIComponent(state.waypoints.map(w => `${w.lat},${w.lon}`).join('|'));
+        if (dLat && dLon) {
+          // Destino final já explícito no input/chip, waypoints são as paradas
+          waypointsParam = '&waypoints=' + encodeURIComponent(state.waypoints.map(w => `${w.lat},${w.lon}`).join('|'));
+        } else {
+          // Destino não explícito: a última parada é o destino, as anteriores são waypoints
+          const last = state.waypoints[state.waypoints.length - 1];
+          dLat = last.lat;
+          dLon = last.lon;
+          name = last.name;
+          const inter = state.waypoints.slice(0, -1);
+          if (inter.length > 0) {
+            waypointsParam = '&waypoints=' + encodeURIComponent(inter.map(w => `${w.lat},${w.lon}`).join('|'));
+          }
+        }
       }
 
       if (!dLat || !dLon) {
@@ -1608,7 +1625,7 @@
           }, 700);
           return;
         }
-        showToast('⚠️ Escolha um destino ou digite o endereço!');
+        showToast('⚠️ Escolha um destino ou adicione paradas!');
         return;
       }
 
@@ -2137,15 +2154,26 @@
         e.stopPropagation();
       }
       const q = inputDest.value.trim();
-      if (!q) {
-        showToast('⚠️ Digite o endereço ou toque no mapa!');
+
+      // Se temos paradas adicionadas na rota e o input está vazio, inicializa a rota multi-paradas!
+      if (!q && state.waypoints && state.waypoints.length > 0) {
+        suggBox.style.display = 'none';
+        inputDest.blur();
+        recalculateFullRoute();
+        openNavModal();
+        return;
+      }
+
+      if (!q && !state.destLat) {
+        showToast('⚠️ Digite o destino ou adicione paradas!');
         return;
       }
       suggBox.style.display = 'none';
       inputDest.blur();
 
-      // Se já temos a coordenada deste destino ativo, abre o modal de navegação instantaneamente
+      // Se já temos a coordenada deste destino ativo, recalcula rota completa e abre modal
       if (state.destLat && state.destLon && state.destName) {
+        recalculateFullRoute();
         openNavModal();
         return;
       }
@@ -2204,7 +2232,7 @@
     });
 
     document.getElementById('btn-launch-waze').addEventListener('click', () => {
-      if (state.destLat && state.destLon) {
+      if ((state.destLat && state.destLon) || (state.waypoints && state.waypoints.length > 0)) {
         launchWaze();
       } else {
         triggerRocketAction();
@@ -2212,7 +2240,7 @@
     });
 
     document.getElementById('btn-launch-maps').addEventListener('click', () => {
-      if (state.destLat && state.destLon) {
+      if ((state.destLat && state.destLon) || (state.waypoints && state.waypoints.length > 0)) {
         launchGoogleMaps();
       } else {
         triggerRocketAction();
@@ -2416,7 +2444,7 @@
 
     // REGISTRO DE SERVICE WORKER
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+      navigator.serviceWorker.register('/static/sw.js?v=10').catch(() => {});
     }
 
     // IDENTIFICAÇÃO AUTOMÁTICA DE VEÍCULO POR PROXIMIDADE / NFC + ASSUMIR O VOLANTE
@@ -2568,6 +2596,14 @@
         miniText.innerHTML = `<strong style="color:#38bdf8;">${state.destName}</strong> • ${km} (${min})`;
         miniWaze.style.display = 'block';
         miniMaps.style.display = 'block';
+      } else if (state.waypoints && state.waypoints.length > 0) {
+        const km = document.getElementById('lbl-route-km').innerText || '';
+        const min = document.getElementById('lbl-route-min').innerText || '';
+        const last = state.waypoints[state.waypoints.length - 1];
+        miniIcon.innerText = '🚩';
+        miniText.innerHTML = `<strong style="color:#f59e0b;">${state.waypoints.length} Parada(s):</strong> ${last.name} • ${km} (${min})`;
+        miniWaze.style.display = 'block';
+        miniMaps.style.display = 'block';
       } else {
         miniIcon.innerText = '🗺️';
         miniText.innerText = 'Para onde vamos? (Toque para abrir)';
@@ -2664,11 +2700,9 @@
       renderWaypointsList();
       try { map.closePopup(); } catch(e) {}
 
-      if (state.destLat && state.destLon) {
-        recalculateFullRoute();
-      } else {
-        showToast(`📍 Parada ${idx} adicionada! Agora selecione o destino final.`);
-      }
+      // Recalcula e traça rota imediatamente a partir do GPS do veículo!
+      recalculateFullRoute();
+      showToast(`📍 Parada ${idx} adicionada: ${nome}`);
     }
 
     function removeWaypoint(index) {
@@ -2690,8 +2724,10 @@
         });
 
         renderWaypointsList();
-        if (state.destLat && state.destLon) {
+        if ((state.waypoints && state.waypoints.length > 0) || (state.destLat && state.destLon)) {
           recalculateFullRoute();
+        } else {
+          clearRoute();
         }
         showToast('Parada removida');
       }
@@ -2723,10 +2759,72 @@
     }
 
     function recalculateFullRoute() {
-      if (!state.destLat || !state.destLon) return;
+      // 1. Ponto de partida SEMPRE é o GPS do veículo em tempo real
+      const originLat = state.carLat;
+      const originLon = state.carLon;
+      if (!originLat || !originLon) return;
 
-      const stopsParam = state.waypoints.map(w => `${w.lat},${w.lon}`).join('|');
-      const url = `/api/route?origin_lat=${state.carLat}&origin_lon=${state.carLon}&dest_lat=${state.destLat}&dest_lon=${state.destLon}${stopsParam ? `&stops=${encodeURIComponent(stopsParam)}` : ''}`;
+      // 2. Determina paradas intermediárias e ponto final
+      let finalLat = state.destLat;
+      let finalLon = state.destLon;
+      let finalName = state.destName;
+      let intermediateStops = [];
+
+      if (state.waypoints && state.waypoints.length > 0) {
+        if (finalLat && finalLon) {
+          // Destino explícito já definido no campo/chip: todas as paradas são intermediárias
+          intermediateStops = state.waypoints;
+        } else {
+          // Destino explícito não digitado: a última parada adicionada é o destino final!
+          const lastWp = state.waypoints[state.waypoints.length - 1];
+          finalLat = lastWp.lat;
+          finalLon = lastWp.lon;
+          finalName = lastWp.name;
+          intermediateStops = state.waypoints.slice(0, -1);
+        }
+      }
+
+      if (!finalLat || !finalLon) {
+        return;
+      }
+
+      // Monta lista ordenada de pontos: [GPS do Carro] -> [Parada 1] -> ... -> [Destino Final]
+      const allPoints = [[originLat, originLon], ...intermediateStops.map(s => [s.lat, s.lon]), [finalLat, finalLon]];
+
+      // Traçado provisório instantâneo (0ms de espera)
+      if (state.routeBackGlow) map.removeLayer(state.routeBackGlow);
+      if (state.routePolyline) map.removeLayer(state.routePolyline);
+
+      state.routePolyline = L.polyline(allPoints, {
+        color: '#00b4d8',
+        weight: 4,
+        dashArray: '8, 8',
+        opacity: 0.95
+      }).addTo(map);
+
+      // Distância direta aproximada inicial
+      let distEstMeters = 0;
+      for (let i = 0; i < allPoints.length - 1; i++) {
+        distEstMeters += calcDistanceMeters(allPoints[i][0], allPoints[i][1], allPoints[i+1][0], allPoints[i+1][1]);
+      }
+      const distEstKm = ((distEstMeters / 1000) * 1.25).toFixed(1);
+      const timeEstMin = Math.max(2, Math.round((distEstKm / 45) * 60));
+
+      document.getElementById('lbl-route-km').innerText = `${distEstKm} km`;
+      document.getElementById('lbl-route-min').innerText = `${timeEstMin} min`;
+      document.getElementById('modal-km').innerText = `${distEstKm} km`;
+      document.getElementById('modal-time').innerText = `${timeEstMin} min`;
+      document.getElementById('modal-dest-name').innerText = finalName || 'Destino';
+      document.getElementById('route-summary-bar').style.display = 'flex';
+      document.getElementById('btn-clear-route').style.display = 'flex';
+
+      try {
+        map.fitBounds(allPoints, { padding: [50, 50] });
+      } catch(e) {}
+
+      // Busca traçado real nas rodovias via OSRM / backend
+      const stopsParam = intermediateStops.map(w => `${w.lat},${w.lon}`).join('|');
+      const url = `/api/route?origin_lat=${originLat}&origin_lon=${originLon}&dest_lat=${finalLat}&dest_lon=${finalLon}${stopsParam ? `&stops=${encodeURIComponent(stopsParam)}` : ''}`;
 
       fetch(url)
         .then(r => r.json())
@@ -2754,7 +2852,9 @@
             document.getElementById('modal-km').innerText = `${data.distance_km} km`;
             document.getElementById('modal-time').innerText = `${data.duration_min} min`;
             updateMiniSheetHeader();
-            map.fitBounds(state.routePolyline.getBounds(), { padding: [50, 50] });
+            try {
+              map.fitBounds(state.routePolyline.getBounds(), { padding: [50, 50] });
+            } catch(e) {}
           }
         })
         .catch(() => {});
