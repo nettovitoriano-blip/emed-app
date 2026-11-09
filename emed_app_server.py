@@ -3552,7 +3552,7 @@ async def auth_api_middleware(request: web.Request, handler):
 
     if (
 
-        path in ("/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping", "/api/logo", "/api/logo-circle", "/api/app-icon/192", "/api/app-icon/512", "/api/app-icon/180", "/api/app-icon/maskable", "/api/app-icon/favicon", "/nav", "/gps", "/frota", "/api/bootstrap", "/api/v1/veiculos", "/api/respostas-tecnicas")
+        path in ("/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping", "/api/logo", "/api/logo-circle", "/api/app-icon/192", "/api/app-icon/512", "/api/app-icon/180", "/api/app-icon/maskable", "/api/app-icon/favicon", "/nav", "/gps", "/frota", "/api/bootstrap", "/api/v1/veiculos", "/api/respostas-tecnicas", "/api/iniciar-rota", "/api/checkin", "/api/checkout", "/api/frota/assumir-veiculo", "/api/frota/troca-condutores-historico")
 
         or path.startswith("/static/")
 
@@ -4082,6 +4082,83 @@ async def api_ping(request: web.Request) -> web.Response:
 
 
 
+
+
+
+def obter_oportunidades_comerciais(db_name: str):
+    try:
+        with sqlite3.connect(db_name) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT id, os_id, cliente, equipamento, tipo_oportunidade, 
+                       categoria, valor_estimado, probabilidade, tecnico_responsavel, 
+                       contato_decisor, telefone_decisor, descricao, status, data_criacao
+                FROM oportunidades_comerciais
+                ORDER BY id DESC
+            """)
+            rows = cur.fetchall()
+            cols = ["id", "os_id", "cliente", "equipamento", "tipo_oportunidade", 
+                    "categoria", "valor_estimado", "probabilidade", "tecnico_responsavel", 
+                    "contato_decisor", "telefone_decisor", "descricao", "status", "data_criacao"]
+            return [dict(zip(cols, r)) for r in rows]
+    except Exception as e:
+        print(f"Erro ao obter oportunidades: {e}")
+        return []
+
+async def api_comercial_oportunidades(request: web.Request) -> web.Response:
+    """Retorna a lista de oportunidades comerciais e tubos estratégicos em bancada."""
+    ops = obter_oportunidades_comerciais(DB_NAME)
+    return web.json_response({"ok": True, "oportunidades": ops})
+
+async def api_comercial_oportunidade_salvar(request: web.Request) -> web.Response:
+    """Salva ou atualiza uma oportunidade comercial detectada em campo ou bancada."""
+    try:
+        body = await request.json()
+        os_id = str(body.get("os_id", "")).strip()
+        cliente = str(body.get("cliente", "")).strip().upper()
+        equipamento = str(body.get("equipamento", "")).strip().upper()
+        tipo_op = str(body.get("tipo_oportunidade", "OPORTUNIDADE COMERCIAL")).strip().upper()
+        categoria = str(body.get("categoria", "GERAL")).strip().upper()
+        valor_est = float(body.get("valor_estimado", 0.0) or 0.0)
+        prob = str(body.get("probabilidade", "MÉDIA")).strip().upper()
+        tecnico = str(body.get("tecnico_responsavel", "EQUIPE EMED")).strip().upper()
+        contato = str(body.get("contato_decisor", "")).strip()
+        telefone = str(body.get("telefone_decisor", "")).strip()
+        descricao = str(body.get("descricao", "")).strip()
+        status = str(body.get("status", "ABERTA")).strip().upper()
+        hoje = datetime.datetime.now().strftime("%d/%m/%Y")
+
+        with sqlite3.connect(DB_NAME) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO oportunidades_comerciais 
+                (os_id, cliente, equipamento, tipo_oportunidade, categoria, valor_estimado, probabilidade, tecnico_responsavel, contato_decisor, telefone_decisor, descricao, status, data_criacao)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (os_id, cliente, equipamento, tipo_op, categoria, valor_est, prob, tecnico, contato, telefone, descricao, status, hoje))
+            conn.commit()
+
+        global _CACHE_BOOTSTRAP
+        _CACHE_BOOTSTRAP = None
+
+        return web.json_response({"ok": True, "msg": "Oportunidade registrada no radar comercial com sucesso!"})
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+async def api_comercial_oportunidade_status(request: web.Request) -> web.Response:
+    """Atualiza o status de uma oportunidade (GANHA, PERDIDA, EM_NEGOCIACAO)."""
+    try:
+        body = await request.json()
+        op_id = int(body.get("id", 0))
+        novo_status = str(body.get("status", "ABERTA")).strip().upper()
+        with sqlite3.connect(DB_NAME) as conn:
+            cur = conn.cursor()
+            cur.execute("UPDATE oportunidades_comerciais SET status = ? WHERE id = ?", (novo_status, op_id))
+            conn.commit()
+        global _CACHE_BOOTSTRAP
+        _CACHE_BOOTSTRAP = None
+        return web.json_response({"ok": True, "msg": f"Status atualizado para {novo_status}"})
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
 
 
 async def api_bootstrap(request: web.Request) -> web.Response:
@@ -5415,6 +5492,9 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
             "data_rascunho_servidor": dt_rasc,
+            "latitude": limpar_float(row.get("latitude"), 0.0),
+            "longitude": limpar_float(row.get("longitude"), 0.0),
+            "deslocamento_inicio_hora": limpar_texto(row.get("deslocamento_inicio_hora"), ""),
 
 
 
@@ -8243,6 +8323,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
         "google_review_url": google_url,
+        "oportunidades_comerciais": obter_oportunidades_comerciais(DB_NAME),
 
     }
 
@@ -8973,6 +9054,137 @@ async def api_checkin(request: web.Request) -> web.Response:
 
 
 
+
+
+
+async def api_checkout(request: web.Request) -> web.Response:
+    """Registra checkout e encerramento de atendimento no cliente com validacao GPS e calculo de duracao (fuso Brasil)."""
+    body = await request.json()
+    os_id = str(body.get("os_id", "")).strip()
+    dist_m = body.get("distancia_metros")
+    metodo = str(body.get("metodo", "GPS_SAIDA")).strip()
+    df = _carregar_df_direto()
+    hora_cliente = str(body.get("hora_local", "")).strip()
+    if hora_cliente and len(hora_cliente) >= 16 and "/" in hora_cliente and ":" in hora_cliente:
+        agora_str = hora_cliente
+    else:
+        agora_str = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+
+    for idx, row in df.iterrows():
+        if str(obter_id_os(idx, row)) == os_id:
+            df.at[idx, "checkout_hora"] = agora_str
+            df.at[idx, "status"] = "CONCLUÍDO"
+            cin = limpar_texto(row.get("checkin_hora"), "") or agora_str
+            duracao = calcular_duracao_os(cin, agora_str)
+            df.at[idx, "tempo_atendimento"] = duracao
+            _salvar_df_direto(df)
+            return web.json_response({
+                "ok": True,
+                "os_id": os_id,
+                "checkout_hora": agora_str,
+                "tempo_atendimento": duracao,
+                "msg": f"🏁 Check-out registrado na OS #{os_id} às {agora_str} (Duração: {duracao})!"
+            })
+
+    return web.json_response({"ok": False, "msg": f"OS #{os_id} não encontrada."}, status=404)
+
+
+async def api_frota_assumir_veiculo(request: web.Request) -> web.Response:
+    """Permite que o técnico assuma o volante do veículo via NFC ou Aplicativo, desvinculando o anterior para auditoria/DETRAN."""
+    body = await request.json()
+    vid = int(limpar_float(body.get("veiculo_id"), 0))
+    placa = str(body.get("placa", "")).strip().upper()
+    tecnico = str(body.get("tecnico", "")).strip().upper()
+    metodo = str(body.get("metodo", "APP")).strip().upper()
+    tag_nfc = str(body.get("tag_nfc", "")).strip()
+    km_informado = int(limpar_float(body.get("km_atual"), 0))
+    lat = float(limpar_float(body.get("lat"), -3.7319))
+    lon = float(limpar_float(body.get("lon"), -38.5267))
+    agora_str = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+
+    if not tecnico:
+        return web.json_response({"ok": False, "msg": "Técnico não informado."}, status=400)
+
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS frota_troca_condutores (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                veiculo_id INTEGER,
+                placa TEXT,
+                modelo TEXT,
+                condutor_anterior TEXT,
+                novo_condutor TEXT,
+                metodo TEXT,
+                tag_nfc TEXT,
+                data_hora TEXT,
+                km_atual INTEGER DEFAULT 0,
+                lat REAL,
+                lon REAL,
+                observacao_auditoria TEXT
+            );
+        """)
+        if vid > 0:
+            cur.execute("SELECT id, modelo, placa, condutor_atual, km_atual FROM veiculos WHERE id = ?", (vid,))
+        elif placa:
+            cur.execute("SELECT id, modelo, placa, condutor_atual, km_atual FROM veiculos WHERE UPPER(placa) = ?", (placa,))
+        else:
+            return web.json_response({"ok": False, "msg": "Veículo não especificado."}, status=400)
+
+        row_v = cur.fetchone()
+        if not row_v:
+            return web.json_response({"ok": False, "msg": "Veículo não encontrado."}, status=404)
+
+        v_id, modelo, v_placa, condutor_ant, km_db = row_v[0], row_v[1], row_v[2], row_v[3], row_v[4]
+        km_usar = km_informado if km_informado > 0 else km_db
+
+        obs_auditoria = (
+            f"Troca de condutor registrada via {metodo}. "
+            f"Condutor anterior '{condutor_ant}' desvinculado e substituído por '{tecnico}' às {agora_str}. "
+            f"Registro para fins de responsabilidade DETRAN, multas e seguro."
+        )
+
+        cur.execute("""
+            INSERT INTO frota_troca_condutores 
+            (veiculo_id, placa, modelo, condutor_anterior, novo_condutor, metodo, tag_nfc, data_hora, km_atual, lat, lon, observacao_auditoria)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (v_id, v_placa, modelo, condutor_ant, tecnico, metodo, tag_nfc, agora_str, km_usar, lat, lon, obs_auditoria))
+
+        tag_rfid = f"NFC_{tag_nfc}" if (metodo == "NFC" and tag_nfc) else "APP_CELULAR"
+        cur.execute("""
+            UPDATE veiculos 
+            SET condutor_atual = ?, tag_rfid_atual = ?, ultima_atualizacao_gps = ?
+            WHERE id = ?
+        """, (tecnico, tag_rfid, agora_str, v_id))
+        conn.commit()
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"🚗 Você assumiu o volante do {modelo} ({v_placa}) com sucesso via {metodo}!",
+        "veiculo_id": v_id,
+        "modelo": modelo,
+        "placa": v_placa,
+        "condutor_anterior": condutor_ant,
+        "novo_condutor": tecnico,
+        "metodo": metodo,
+        "data_hora": agora_str
+    })
+
+
+async def api_frota_troca_condutores_historico(request: web.Request) -> web.Response:
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT id, veiculo_id, placa, modelo, condutor_anterior, novo_condutor, metodo, data_hora, observacao_auditoria FROM frota_troca_condutores ORDER BY id DESC LIMIT 50")
+        rows = cur.fetchall()
+        historico = [
+            {
+                "id": r[0], "veiculo_id": r[1], "placa": r[2], "modelo": r[3],
+                "condutor_anterior": r[4], "novo_condutor": r[5], "metodo": r[6],
+                "data_hora": r[7], "observacao": r[8]
+            }
+            for r in rows
+        ]
+    return web.json_response({"ok": True, "historico": historico})
 
 def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
 
@@ -22997,6 +23209,9 @@ def criar_app() -> web.Application:
 
 
     app.router.add_post("/api/checkin", api_checkin)
+    app.router.add_post("/api/checkout", api_checkout)
+    app.router.add_post("/api/frota/assumir-veiculo", api_frota_assumir_veiculo)
+    app.router.add_get("/api/frota/troca-condutores-historico", api_frota_troca_condutores_historico)
 
 
 
@@ -23407,6 +23622,9 @@ def criar_app() -> web.Application:
     app.router.add_get("/api/imprimir/{os_id}", api_imprimir_os)
 
     app.router.add_get("/api/instalacao/termo-aceite/{os_id}", api_imprimir_termo_aceite_instalacao)
+    app.router.add_get("/api/comercial/oportunidades", api_comercial_oportunidades)
+    app.router.add_post("/api/comercial/oportunidade/salvar", api_comercial_oportunidade_salvar)
+    app.router.add_post("/api/comercial/oportunidade/status", api_comercial_oportunidade_status)
 
 
 
