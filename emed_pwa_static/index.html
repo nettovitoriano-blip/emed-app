@@ -211781,42 +211781,66 @@ async function renderMenuGesDispositivos(box) {
 
 
 
-      <!-- CARD DO CÓDIGO DE LIBERAÇÃO RÁPIDA (6 DÍGITOS) -->
-      <div style="background:linear-gradient(135deg, #0d1b2a 0%, #1a2c42 100%);border:1.5px solid #00b4d8;border-radius:16px;padding:20px 24px;margin-bottom:20px;box-shadow:0 10px 30px rgba(0,180,216,0.18);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:18px;">
-        <div style="min-width:280px;flex:1;">
-          <div style="font-size:11.5px;font-weight:800;color:#38bdf8;text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:6px;">
-            <span>🔑</span> Código de Liberação Imediata do Gestor
+      <!-- CARD DO CÓDIGO & QR CODE DE LIBERAÇÃO INSTANTÂNEA -->
+      <div style="background:linear-gradient(135deg, #070d17 0%, #0f172a 50%, #132337 100%);border:1.5px solid #00b4d8;border-radius:18px;padding:22px 24px;margin-bottom:20px;box-shadow:0 12px 36px rgba(0,180,216,0.22);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;">
+        <div style="min-width:300px;flex:1.2;">
+          <div style="font-size:12px;font-weight:900;color:#38bdf8;text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:7px;">
+            <span>🔑</span> Código & QR Code de Liberação Imediata
           </div>
-          <div style="font-size:13px;color:#cbd5e1;margin-top:4px;line-height:1.4;">
-            Informe este código de 6 dígitos ao técnico (ou digite no seu celular/notebook) para liberar o acesso <strong>na mesma hora</strong>, sem precisar esperar.
+          <div style="font-size:13px;color:#cbd5e1;margin-top:6px;line-height:1.45;">
+            Selecione o técnico para gerar um <strong>QR Code exclusivo</strong> para ele escanear na hora com a câmera do celular, ou informe o código de 6 dígitos.
           </div>
-          <div style="font-size:11px;color:#94a3b8;margin-top:4px;" id="txtTempoExpiracaoCodigo">
-            ⏳ Carregando tempo de validade...
+
+          <!-- SELETOR DE TÉCNICO DESTACADO -->
+          <div style="margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(56,189,248,0.2);border-radius:10px;padding:8px 12px;">
+            <label for="selTecnicoLiberacaoQr" style="font-size:11px;font-weight:800;color:#38bdf8;margin:0;white-space:nowrap;display:flex;align-items:center;gap:5px;">
+              <span>👤</span> TÉCNICO ALVO:
+            </label>
+            <select id="selTecnicoLiberacaoQr" onchange="selecionarTecnicoLiberacao(this.value)" style="background:#0b1329;color:#f8fafc;border:1.5px solid #00b4d8;border-radius:8px;padding:6px 12px;font-weight:700;font-size:12px;flex:1;min-width:200px;max-width:320px;outline:none;cursor:pointer;">
+              <option value="TODOS">👥 TODOS OS TÉCNICOS (Código Geral)</option>
+            </select>
+            <button class="btn btn-sm" onclick="gerarNovoCodigoLiberacaoGestor()" style="background:#0284c7;color:#fff;border:none;font-weight:700;padding:6px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:12px;" title="Gerar novo código e QR Code">
+              <span>🔄</span> Gerar Novo
+            </button>
+          </div>
+
+          <div style="font-size:11.5px;color:#94a3b8;margin-top:8px;display:flex;align-items:center;gap:6px;" id="txtTempoExpiracaoCodigo">
+            ⏳ Carregando código e QR Code...
           </div>
         </div>
 
-        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-          <div style="background:#070d17;border:2px dashed #00b4d8;border-radius:12px;padding:8px 20px;text-align:center;">
-            <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">CÓDIGO ATIVO</div>
-            <div id="displayCodigoGestorAtivo" style="font-size:26px;font-weight:900;color:#38bdf8;letter-spacing:4px;font-family:monospace;">
-              --- ---
-            </div>
+        <!-- BLOCO DIREITO: QR CODE & CÓDIGO 6 DÍGITOS -->
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:rgba(2,6,23,0.6);border:1px solid rgba(56,189,248,0.3);border-radius:14px;padding:12px 18px;">
+          <!-- QR CODE CARD -->
+          <div onclick="abrirModalQrCodeGrande()" title="Clique para ver o QR Code em tela cheia" style="cursor:pointer;position:relative;background:#ffffff;border:2.5px solid #00b4d8;border-radius:12px;padding:6px;box-shadow:0 0 25px rgba(0,180,216,0.35);transition:transform 0.15s ease;text-align:center;" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'">
+            <img id="imgQrCodeGestor" src="" alt="QR Code" style="width:115px;height:115px;display:block;border-radius:6px;object-fit:contain;background:#fff;">
+            <div style="font-size:9px;font-weight:900;color:#0284c7;margin-top:4px;letter-spacing:0.5px;">🔍 CLIQUE P/ AMPLIAR</div>
           </div>
 
-          <div style="display:flex;flex-direction:column;gap:6px;">
-            <button class="btn btn-sm" onclick="gerarNovoCodigoLiberacaoGestor()" style="background:#0284c7;color:#fff;border:none;font-weight:700;padding:6px 14px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:6px;">
-              🔄 Gerar Novo Código
-            </button>
+          <!-- DIGITOS E BOTÕES -->
+          <div style="display:flex;flex-direction:column;gap:8px;min-width:180px;">
+            <div style="background:#070d17;border:1.5px dashed #00b4d8;border-radius:10px;padding:8px 14px;text-align:center;">
+              <div style="font-size:9.5px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;" id="lblDestinatarioCodigo">CÓDIGO ATIVO</div>
+              <div id="displayCodigoGestorAtivo" style="font-size:26px;font-weight:900;color:#38bdf8;letter-spacing:4px;font-family:monospace;margin-top:2px;text-shadow:0 0 12px rgba(56,189,248,0.5);">
+                --- ---
+              </div>
+            </div>
+
             <div style="display:flex;gap:6px;">
-              <button class="btn btn-outline btn-sm" onclick="copiarCodigoLiberacao()" style="color:#e0f2fe;border-color:rgba(255,255,255,0.2);padding:5px 10px;font-size:11.5px;">
+              <button class="btn btn-outline btn-sm" onclick="copiarLinkOuCodigoLiberacao()" style="flex:1;color:#e0f2fe;border-color:rgba(255,255,255,0.25);padding:6px 10px;font-size:11.5px;border-radius:7px;display:flex;align-items:center;justify-content:center;gap:4px;" title="Copiar código ou link de ativação">
                 📋 Copiar
               </button>
-              <button class="btn btn-sm" onclick="enviarCodigoWhatsAppTecnico()" style="background:#25d366;color:#fff;border:none;font-weight:700;padding:5px 10px;font-size:11.5px;border-radius:6px;cursor:pointer;">
+              <button class="btn btn-sm" onclick="enviarCodigoWhatsAppTecnico()" style="flex:1;background:#22c55e;color:#fff;border:none;font-weight:700;padding:6px 10px;font-size:11.5px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;" title="Enviar no WhatsApp do técnico">
                 📲 WhatsApp
               </button>
             </div>
+            
+            <button class="btn btn-xs" onclick="abrirModalQrCodeGrande()" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:6px;padding:4px 8px;font-size:10.5px;font-weight:700;cursor:pointer;text-align:center;">
+              📷 Abrir QR Code na Tela
+            </button>
           </div>
         </div>
+      </div>
       </div>
 
       <!-- SEÇÃO: MEUS 4 APARELHOS DE USO PESSOAL (NETTO - GESTOR) -->
@@ -211896,52 +211920,226 @@ async function renderMenuGesDispositivos(box) {
 
 
 let G_CODIGO_GESTOR_ATUAL = "";
+let G_CODIGO_QR_ATUAL = "";
+let G_URL_AUTORIZACAO_ATUAL = "";
+let G_TECNICO_AUTORIZACAO_ATUAL = "TODOS";
+
+function popularSeletorTecnicosLiberacao() {
+  const sel = document.getElementById('selTecnicoLiberacaoQr');
+  if (!sel) return;
+  const tecAtual = (G_TECNICO_AUTORIZACAO_ATUAL || "TODOS").toUpperCase();
+
+  const pendentesNomes = new Set(
+    (G_DISPOSITIVOS_DADOS || [])
+      .filter(d => (d.status || '').toUpperCase() === 'PENDENTE')
+      .map(d => (d.tecnico_nome || '').toUpperCase())
+  );
+
+  const todosTecnicos = new Set();
+  (STATE.data?.tecnicos || []).forEach(t => {
+    const nm = typeof t === 'string' ? t : (t.nome || '');
+    if (nm) todosTecnicos.add(nm.toUpperCase());
+  });
+  (G_DISPOSITIVOS_DADOS || []).forEach(d => {
+    if (d.tecnico_nome) todosTecnicos.add(d.tecnico_nome.toUpperCase());
+  });
+
+  const listaOrdenada = Array.from(todosTecnicos).sort();
+
+  let html = `<option value="TODOS" ${tecAtual === 'TODOS' ? 'selected' : ''}>👥 TODOS OS TÉCNICOS (Código Geral)</option>`;
+
+  // Pendentes no topo
+  pendentesNomes.forEach(nm => {
+    if (nm) {
+      html += `<option value="${nm}" ${tecAtual === nm ? 'selected' : ''} style="font-weight:800;color:#f59e0b;">⚠️ ${nm} (Aguardando Liberação)</option>`;
+    }
+  });
+
+  // Outros técnicos
+  listaOrdenada.forEach(nm => {
+    if (!pendentesNomes.has(nm) && nm !== 'NETTO') {
+      html += `<option value="${nm}" ${tecAtual === nm ? 'selected' : ''}>👤 ${nm}</option>`;
+    }
+  });
+
+  sel.innerHTML = html;
+}
+
+async function selecionarTecnicoLiberacao(tecnico) {
+  G_TECNICO_AUTORIZACAO_ATUAL = tecnico;
+  await gerarNovoCodigoLiberacaoGestor(tecnico);
+}
+
+function aplicarDadosCodigoLiberacao(res) {
+  G_CODIGO_GESTOR_ATUAL = res.codigo;
+  G_CODIGO_QR_ATUAL = res.qr_base64 || "";
+  G_URL_AUTORIZACAO_ATUAL = res.url_autorizacao || "";
+  G_TECNICO_AUTORIZACAO_ATUAL = res.tecnico || "TODOS";
+
+  const disp = document.getElementById('displayCodigoGestorAtivo');
+  const tempo = document.getElementById('txtTempoExpiracaoCodigo');
+  const imgQr = document.getElementById('imgQrCodeGestor');
+  const lblDest = document.getElementById('lblDestinatarioCodigo');
+
+  if (disp) disp.textContent = res.codigo_formatado || res.codigo;
+  
+  const tecTxt = res.tecnico ? `👤 Técnico: <strong>${res.tecnico}</strong>` : '👥 Geral (Todos os Técnicos)';
+  if (tempo) tempo.innerHTML = `🟢 Válido por mais ${res.minutos_restantes} min (Expira às ${res.expira_em.substring(11, 16)}) • ${tecTxt}`;
+  if (lblDest) lblDest.textContent = res.tecnico ? `CÓDIGO P/ ${res.tecnico}` : 'CÓDIGO ATIVO';
+
+  if (imgQr && res.qr_base64) {
+    imgQr.src = res.qr_base64;
+    imgQr.style.display = 'block';
+  }
+
+  // Se modal estiver aberto
+  const modalImg = document.getElementById('imgQrCodeModalGrande');
+  if (modalImg && res.qr_base64) modalImg.src = res.qr_base64;
+  const modalCod = document.getElementById('displayCodigoModalGrande');
+  if (modalCod) modalCod.textContent = res.codigo_formatado || res.codigo;
+  const modalTec = document.getElementById('lblModalTecnicoAlvo');
+  if (modalTec) modalTec.textContent = res.tecnico ? `👤 Técnico: ${res.tecnico}` : '👥 Geral (Qualquer Técnico)';
+}
 
 async function carregarCodigoGestorAtivo() {
   try {
     const res = await apiGet('/api/dispositivos/codigo/ativo');
     if (res && res.ok) {
-      G_CODIGO_GESTOR_ATUAL = res.codigo;
-      const disp = document.getElementById('displayCodigoGestorAtivo');
-      const tempo = document.getElementById('txtTempoExpiracaoCodigo');
-      if (disp) disp.textContent = res.codigo_formatado || res.codigo;
-      if (tempo) tempo.textContent = `🟢 Válido por mais ${res.minutos_restantes} min (Expira às ${res.expira_em.substring(11, 16)})`;
+      aplicarDadosCodigoLiberacao(res);
     }
+    popularSeletorTecnicosLiberacao();
   } catch (e) {
     console.warn('Erro ao obter código:', e);
   }
 }
 
-async function gerarNovoCodigoLiberacaoGestor() {
+async function gerarNovoCodigoLiberacaoGestor(tecnicoForcado) {
   try {
-    const res = await postJSON('/api/dispositivos/codigo/gerar', {});
+    const sel = document.getElementById('selTecnicoLiberacaoQr');
+    const tec = tecnicoForcado !== undefined ? tecnicoForcado : (sel ? sel.value : (G_TECNICO_AUTORIZACAO_ATUAL || 'TODOS'));
+    
+    const disp = document.getElementById('displayCodigoGestorAtivo');
+    if (disp) disp.textContent = "GERANDO...";
+
+    const res = await postJSON('/api/dispositivos/codigo/gerar', {
+      tecnico: tec === 'TODOS' ? null : tec
+    });
+
     if (res && res.ok) {
-      G_CODIGO_GESTOR_ATUAL = res.codigo;
-      const disp = document.getElementById('displayCodigoGestorAtivo');
-      const tempo = document.getElementById('txtTempoExpiracaoCodigo');
-      if (disp) disp.textContent = res.codigo_formatado || res.codigo;
-      if (tempo) tempo.textContent = `🟢 Novo código gerado! Válido por 60 min (Expira às ${res.expira_em.substring(11, 16)})`;
-      alert(`Novo código gerado com sucesso: ${res.codigo_formatado}`);
+      aplicarDadosCodigoLiberacao(res);
+      popularSeletorTecnicosLiberacao();
+      if (typeof mostrarToast === 'function') {
+        mostrarToast(`✅ Código ${res.codigo_formatado} e QR Code gerados!`, 'sucesso');
+      }
+    } else {
+      alert(res?.msg || 'Não foi possível gerar novo código.');
     }
   } catch (e) {
-    alert('Erro ao gerar novo código.');
+    alert('Erro ao gerar novo código: ' + e.message);
+  }
+}
+
+function copiarLinkOuCodigoLiberacao() {
+  if (!G_CODIGO_GESTOR_ATUAL) return;
+  const textoParaCopiar = G_URL_AUTORIZACAO_ATUAL || G_CODIGO_GESTOR_ATUAL;
+  navigator.clipboard.writeText(textoParaCopiar);
+  if (typeof mostrarToast === 'function') {
+    mostrarToast(`📋 Copiado para a área de transferência!`, 'sucesso');
+  } else {
+    alert('Copiado com sucesso!');
   }
 }
 
 function copiarCodigoLiberacao() {
-  if (!G_CODIGO_GESTOR_ATUAL) return;
-  navigator.clipboard.writeText(G_CODIGO_GESTOR_ATUAL);
-  alert(`Código ${G_CODIGO_GESTOR_ATUAL} copiado para a área de transferência!`);
+  copiarLinkOuCodigoLiberacao();
 }
 
 function enviarCodigoWhatsAppTecnico() {
   if (!G_CODIGO_GESTOR_ATUAL) return;
-  const tel = prompt("Informe o WhatsApp do técnico (DDD + número):", "");
-  if (!tel) return;
-  const numLimpo = tel.replace(/\D/g, "");
+  const tec = G_TECNICO_AUTORIZACAO_ATUAL && G_TECNICO_AUTORIZACAO_ATUAL !== 'TODOS' ? G_TECNICO_AUTORIZACAO_ATUAL : 'Técnico';
+  const telPrompt = prompt(`Informe o WhatsApp de ${tec} (DDD + número):`, "");
+  if (!telPrompt) return;
+  const numLimpo = telPrompt.replace(/\D/g, "");
   const numFmt = numLimpo.startsWith("55") ? numLimpo : ("55" + numLimpo);
-  const texto = encodeURIComponent(`*SISTEMA EMED SERVICE — AUTORIZAÇÃO DE CELULAR*\n\nOlá! Seu código de liberação rápida para o Sistema eMED é:\n\n🔑 *${G_CODIGO_GESTOR_ATUAL}*\n\nBasta digitar esse código na tela de login do seu celular para liberar o acesso imediatamente.`);
-  window.open(`https://api.whatsapp.com/send?phone=${numFmt}&text=${texto}`, '_blank');
+  
+  let msg = `🏥 *SISTEMA EMED SERVICE — LIBERAÇÃO DE ACESSO*\n\n`;
+  msg += `Olá, *${tec}*! Seu acesso ao aplicativo eMED está liberado.\n\n`;
+  msg += `🔑 *Código de 6 dígitos:* \`${G_CODIGO_GESTOR_ATUAL}\`\n\n`;
+  if (G_URL_AUTORIZACAO_ATUAL) {
+    msg += `📲 *Ou toque no link abaixo para autorizar seu celular automaticamente sem digitar nada:*\n`;
+    msg += `${G_URL_AUTORIZACAO_ATUAL}\n\n`;
+  }
+  msg += `⏳ *Validade:* 60 minutos.`;
+  
+  window.open(`https://api.whatsapp.com/send?phone=${numFmt}&text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+function abrirModalQrCodeGrande() {
+  let modal = document.getElementById('modalQrCodeGrande');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modalQrCodeGrande';
+    modal.style.cssText = `
+      position:fixed;top:0;left:0;width:100vw;height:100vh;
+      background:rgba(5,11,20,0.88);backdrop-filter:blur(10px);
+      z-index:99999;display:flex;align-items:center;justify-content:center;
+      padding:16px;
+    `;
+    modal.onclick = (e) => { if (e.target === modal) fecharModalQrCodeGrande(); };
+    document.body.appendChild(modal);
+  }
+
+  const tecTxt = G_TECNICO_AUTORIZACAO_ATUAL && G_TECNICO_AUTORIZACAO_ATUAL !== 'TODOS' 
+    ? `👤 TÉCNICO: ${G_TECNICO_AUTORIZACAO_ATUAL}` 
+    : '👥 CÓDIGO GERAL DA EQUIPE';
+
+  modal.innerHTML = `
+    <div style="background:linear-gradient(145deg, #0d1b2a, #132337);border:2px solid #00b4d8;border-radius:20px;padding:26px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,180,216,0.3);text-align:center;position:relative;">
+      <button onclick="fecharModalQrCodeGrande()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;font-weight:900;">✕</button>
+
+      <div style="font-size:12px;font-weight:800;color:#38bdf8;text-transform:uppercase;letter-spacing:1.5px;display:inline-flex;align-items:center;gap:6px;">
+        <span>📱</span> PAREAMENTO INSTANTÂNEO EMED
+      </div>
+
+      <div style="font-size:16px;font-weight:900;color:#f8fafc;margin-top:6px;" id="lblModalTecnicoAlvo">
+        ${tecTxt}
+      </div>
+
+      <div style="margin:20px auto;background:#fff;border:3px solid #00b4d8;border-radius:16px;padding:12px;display:inline-block;box-shadow:0 0 35px rgba(0,180,216,0.4);">
+        <img id="imgQrCodeModalGrande" src="${G_CODIGO_QR_ATUAL}" alt="QR Code" style="width:230px;height:230px;display:block;border-radius:8px;">
+      </div>
+
+      <div style="background:#070d17;border:1.5px dashed #00b4d8;border-radius:10px;padding:8px 18px;display:inline-block;margin-bottom:14px;">
+        <div style="font-size:10px;color:#94a3b8;font-weight:700;">CÓDIGO DE 6 DÍGITOS</div>
+        <div id="displayCodigoModalGrande" style="font-size:30px;font-weight:900;color:#38bdf8;letter-spacing:6px;font-family:monospace;">
+          ${G_CODIGO_GESTOR_ATUAL ? (G_CODIGO_GESTOR_ATUAL.slice(0,3) + ' ' + G_CODIGO_GESTOR_ATUAL.slice(3)) : '--- ---'}
+        </div>
+      </div>
+
+      <p style="font-size:12.5px;color:#cbd5e1;line-height:1.45;margin:0 0 16px 0;">
+        Peça para o técnico <strong>apontar a câmera do celular</strong> para este QR Code. A autorização e login acontecem na hora!
+      </p>
+
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button class="btn btn-sm btn-outline" onclick="copiarLinkOuCodigoLiberacao()" style="color:#fff;border-color:rgba(255,255,255,0.3);padding:8px 14px;border-radius:8px;font-weight:700;">
+          📋 Copiar Link
+        </button>
+        <button class="btn btn-sm" onclick="enviarCodigoWhatsAppTecnico()" style="background:#22c55e;color:#fff;border:none;font-weight:700;padding:8px 16px;border-radius:8px;cursor:pointer;">
+          📲 Enviar no WhatsApp
+        </button>
+        <button class="btn btn-sm" onclick="fecharModalQrCodeGrande()" style="background:#334155;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-weight:700;cursor:pointer;">
+          OK
+        </button>
+      </div>
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+}
+
+function fecharModalQrCodeGrande() {
+  const modal = document.getElementById('modalQrCodeGrande');
+  if (modal) modal.style.display = 'none';
 }
 
 function renderizarMeus4AparelhosGestor() {
