@@ -768,6 +768,7 @@ from emed_services.frota_gestao_checklist import (
 
 from emed_services.copiloto_pecas_preditivo import sugerir_pecas_por_defeito
 
+from emed_services.pmp_anual_preventivas import obter_grade_pmp_anual
 from emed_services.almoxarifado_cautela_rbc import (
 
     obter_painel_cautela_ferramentas,
@@ -3580,6 +3581,7 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/api/frota/")
 
         or path.startswith("/api/almoxarifado/")
+        or path.startswith("/api/pmp/")
 
         or path.startswith("/api/hospital/")
 
@@ -23418,6 +23420,7 @@ def criar_app() -> web.Application:
     app.router.add_get("/api/almoxarifado/ferramentas-cautela", api_almoxarifado_cautela_painel)
 
     app.router.add_post("/api/almoxarifado/cautela-registrar", api_almoxarifado_cautela_registrar)
+    app.router.add_get("/api/pmp/grade-anual", api_pmp_grade_anual)
 
 
 
@@ -23841,3 +23844,15 @@ if __name__ == "__main__":
 
 
 
+
+
+
+async def api_pmp_grade_anual(request: web.Request) -> web.Response:
+    """Retorna o Plano de Manutenção Preventiva Anual (3 Etapas por Contrato)."""
+    try:
+        ano = request.query.get("ano")
+        ano_int = int(ano) if ano and ano.isdigit() else None
+        res = obter_grade_pmp_anual(ano_int)
+        return web.json_response(res)
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)

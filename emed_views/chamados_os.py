@@ -69,6 +69,16 @@ def _obter_logo_base64() -> str:
     return ""
 
 
+def _obter_icone_autosave_base64() -> str:
+    """Retorna o base64 do ícone verde EMED de 'OS salva automaticamente'."""
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    caminho = os.path.join(base_dir, "emed_pwa_static", "icone_auto_save_96.png")
+    try:
+        with open(caminho, "rb") as f:
+            return f"data:image/png;base64,{base64.b64encode(f.read()).decode('utf-8')}"
+    except Exception:
+        return ""
+
 def _render_modo_offline(ctx: AppContext):
     df = ctx.df
     col_off1, col_off2 = st.columns(2)
@@ -1630,7 +1640,14 @@ def _render_execucao_os_ativas(ctx: AppContext):
                 if rascunho_salvo:
                     col_av1, col_av2 = st.columns([3.5, 1.5])
                     with col_av1:
-                        st.info(f"💾 **Rascunho Provisório Ativo:** Salvo automaticamente em `{dt_rascunho}`. Seus dados estão 100% protegidos contra quedas de sinal!")
+                        _ico_as = _obter_icone_autosave_base64()
+                        _img_as = f'<img src="{_ico_as}" style="width:34px;height:34px;object-fit:contain;" alt="Salvo"/>' if _ico_as else "💾"
+                        st.markdown(
+                            f'<div style="display:flex;align-items:center;gap:12px;background:rgba(16,185,129,0.12);border:1px solid #10b981;border-radius:8px;padding:8px 12px;">'
+                            f'{_img_as}<div><b>Rascunho Provisório Ativo:</b> Salvo automaticamente em <code>{dt_rascunho}</code>. '
+                            f'Seus dados estão 100% protegidos contra quedas de sinal!</div></div>',
+                            unsafe_allow_html=True,
+                        )
                     with col_av2:
                         if st.button("🗑️ Descartar Rascunho", key=f"btn_desc_rasc_{idx_os}_{id_os_ativa}"):
                             limpar_rascunho_provisorio(ctx.db_name, str(id_os_ativa))
