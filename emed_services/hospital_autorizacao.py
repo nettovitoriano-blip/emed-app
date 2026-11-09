@@ -326,3 +326,366 @@ def registrar_credenciamento_os(db_name: str, os_id: int, tecnicos_selecionados:
     except Exception as e:
         print(f"Erro ao registrar credenciamento: {e}")
         return False
+
+
+def gerar_html_termo_aceite_instalacao(db_name: str, os_id: int) -> str:
+    """Gera documento oficial A4 de Termo de Aceite Definitivo e Entrega Técnica de Instalação."""
+    dados = {
+        "os_id": os_id,
+        "cliente": "HOSPITAL / CLÍNICA",
+        "cidade": "FORTALEZA",
+        "estado": "CE",
+        "endereco": "",
+        "equipamento": "EQUIPAMENTO MÉDICO",
+        "tecnico": "EQUIPE TÉCNICA EMED",
+        "responsavel": "DIRETORIA / ENGENHARIA CLÍNICA",
+        "data": datetime.datetime.now().strftime("%d/%m/%Y"),
+        "rubrica_cli": ""
+    }
+    try:
+        with sqlite3.connect(db_name) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT id, cliente, cidade, estado, equipamento, 
+                       tecnico_responsavel, responsavel_hospital, contato_responsavel, 
+                       data_agendamento, assinatura_cliente_img, endereco
+                FROM clientes_equipamentos
+                WHERE id = ? OR rowid = ?
+            """, (os_id, os_id))
+            row = cur.fetchone()
+            if row:
+                dados["os_id"] = row[0]
+                dados["cliente"] = (row[1] or dados["cliente"]).upper()
+                dados["cidade"] = (row[2] or dados["cidade"]).upper()
+                dados["estado"] = (row[3] or dados["estado"]).upper()
+                dados["equipamento"] = (row[4] or dados["equipamento"]).upper()
+                dados["tecnico"] = (row[5] or dados["tecnico"]).upper()
+                dados["responsavel"] = (row[6] or row[7] or dados["responsavel"]).upper()
+                dados["data"] = row[8] or dados["data"]
+                dados["rubrica_cli"] = row[9] or ""
+                dados["endereco"] = row[10] or ""
+    except Exception as e:
+        print(f"Erro ao obter dados do termo de aceite: {e}")
+
+    rubrica_html = f'<div style="text-align:center;margin-bottom:4px;"><img src="{dados['rubrica_cli']}" style="height:36px;max-width:180px;object-fit:contain;" /></div>' if dados["rubrica_cli"] else '<div style="height:36px;"></div>'
+
+    html = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Termo de Aceite & Entrega Técnica — OS #{os_id} — {dados['cliente']}</title>
+    <style>
+        @page {{
+            size: A4 portrait;
+            margin: 12mm 15mm;
+        }}
+        * {{ box-sizing: border-box; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: #0f172a;
+            background: #ffffff;
+            margin: 0;
+            padding: 0;
+            font-size: 11pt;
+            line-height: 1.45;
+        }}
+        .header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2.5px solid #002b54;
+            padding-bottom: 10px;
+            margin-bottom: 14px;
+        }}
+        .logo-box {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }}
+        .logo-badge {{
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #002b54, #0284c7);
+            color: #ffffff;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22pt;
+            font-weight: 900;
+        }}
+        .company-name {{
+            font-size: 15pt;
+            font-weight: 900;
+            color: #002b54;
+            letter-spacing: -0.5px;
+        }}
+        .company-sub {{
+            font-size: 8pt;
+            color: #475569;
+            font-weight: 600;
+        }}
+        .doc-meta {{
+            text-align: right;
+            font-size: 8.5pt;
+            color: #334155;
+        }}
+        .doc-title-box {{
+            background: #f0fdf4;
+            border: 1.5px solid #16a34a;
+            border-left: 6px solid #16a34a;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 14px;
+            text-align: center;
+        }}
+        .doc-title {{
+            font-size: 13pt;
+            font-weight: 900;
+            color: #14532d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }}
+        .doc-normas {{
+            font-size: 8pt;
+            color: #166534;
+            font-weight: 700;
+            margin-top: 3px;
+        }}
+        .info-table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+        }}
+        .info-table td {{
+            padding: 6px 10px;
+            font-size: 9pt;
+            border: 1px solid #cbd5e1;
+        }}
+        .info-table .label {{
+            background: #f8fafc;
+            font-weight: 800;
+            color: #334155;
+            width: 25%;
+        }}
+        .section-title {{
+            font-size: 10pt;
+            font-weight: 900;
+            color: #002b54;
+            border-bottom: 1.5px solid #0284c7;
+            padding-bottom: 3px;
+            margin: 12px 0 8px 0;
+            text-transform: uppercase;
+        }}
+        .check-table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+        }}
+        .check-table th {{
+            background: #002b54;
+            color: #ffffff;
+            font-size: 8pt;
+            font-weight: 800;
+            padding: 6px 8px;
+            text-align: left;
+        }}
+        .check-table td {{
+            padding: 5px 8px;
+            font-size: 8.2pt;
+            border: 1px solid #e2e8f0;
+            vertical-align: top;
+        }}
+        .check-table tr:nth-child(even) {{
+            background: #f8fafc;
+        }}
+        .decl-box {{
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 8.5pt;
+            color: #1e293b;
+            line-height: 1.5;
+            margin-bottom: 16px;
+            text-align: justify;
+        }}
+        .signatures-table {{
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }}
+        .signatures-table td {{
+            width: 50%;
+            text-align: center;
+            vertical-align: bottom;
+            padding: 0 15px;
+        }}
+        .sig-line {{
+            border-top: 1.5px solid #334155;
+            padding-top: 5px;
+            font-size: 8.5pt;
+            color: #0f172a;
+        }}
+        .footer {{
+            margin-top: 18px;
+            border-top: 1px solid #cbd5e1;
+            padding-top: 6px;
+            text-align: center;
+            font-size: 7.5pt;
+            color: #64748b;
+        }}
+        .no-print {{
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            background: #16a34a;
+            color: #ffffff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            font-size: 11pt;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }}
+        @media print {{
+            .no-print {{ display: none !important; }}
+            body {{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+        }}
+    </style>
+</head>
+<body>
+    <button class="no-print" onclick="window.print()">🖨️ Imprimir Termo A4</button>
+
+    <div class="header">
+        <div class="logo-box">
+            <div class="logo-badge">e</div>
+            <div>
+                <div class="company-name">EMED ELETROMEDICINA</div>
+                <div class="company-sub">ENGENHARIA CLÍNICA & ASSISTÊNCIA TÉCNICA ESPECIALIZADA</div>
+            </div>
+        </div>
+        <div class="doc-meta">
+            <b>TERMO Nº:</b> INST-{os_id:04d}/2026<br/>
+            <b>OS REFERÊNCIA:</b> #{os_id}<br/>
+            <b>EMISSÃO:</b> {dados['data']}<br/>
+            <b>CNPJ:</b> 07.283.365/0001-10
+        </div>
+    </div>
+
+    <div class="doc-title-box">
+        <div class="doc-title">Termo Definitivo de Aceite e Entrega Técnica de Instalação</div>
+        <div class="doc-normas">Conformidade Técnica com as Resoluções RDC ANVISA nº 611/2022 e Normas ABNT NBR IEC 60601</div>
+    </div>
+
+    <table class="info-table">
+        <tr>
+            <td class="label">INSTITUIÇÃO / HOSPITAL:</td>
+            <td><b>{dados['cliente']}</b></td>
+            <td class="label">DATA COMISSIONAMENTO:</td>
+            <td><b>{dados['data']}</b></td>
+        </tr>
+        <tr>
+            <td class="label">EQUIPAMENTO INSTALADO:</td>
+            <td><b>{dados['equipamento']}</b></td>
+            <td class="label">LOCALIDADE / UF:</td>
+            <td>{dados['cidade']} - {dados['estado']}</td>
+        </tr>
+        <tr>
+            <td class="label">RESPONSÁVEL RECEBIMENTO:</td>
+            <td>{dados['responsavel']}</td>
+            <td class="label">RESPONSÁVEL TÉCNICO:</td>
+            <td><b>{dados['tecnico']} (EMED / CFT)</b></td>
+        </tr>
+    </table>
+
+    <div class="section-title">📋 Roteiro de Comissionamento e Ensaios Técnicos Realizados no Local</div>
+
+    <table class="check-table">
+        <thead>
+            <tr>
+                <th style="width:35px; text-align:center;">ITEM</th>
+                <th style="width:220px;">SUBSISTEMA / REQUISITO</th>
+                <th>PROCEDIMENTO TÉCNICO & RESULTADO DA VERIFICAÇÃO</th>
+                <th style="width:60px; text-align:center;">STATUS</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="text-align:center;"><b>01</b></td>
+                <td><b>Adequação da Sala & Baritação</b></td>
+                <td>Verificação da blindagem radiológica (argamassa baritada / chumbo), visor plumbífero de comando, sinalizador luminoso de feixe ativo e climatização 24h conforme RDC 611.</td>
+                <td style="text-align:center; font-weight:900; color:#15803d;">CONFORME</td>
+            </tr>
+            <tr>
+                <td style="text-align:center;"><b>02</b></td>
+                <td><b>Infraestrutura Elétrica & Aterramento</b></td>
+                <td>Conferência da linha de alimentação trifásica dedicada, disjuntores compatíveis e medição da resistência de aterramento hospitalar exclusivo (&le; 5 &Omega;).</td>
+                <td style="text-align:center; font-weight:900; color:#15803d;">CONFORME</td>
+            </tr>
+            <tr>
+                <td style="text-align:center;"><b>03</b></td>
+                <td><b>Ancoragem Mecânica & Geometria</b></td>
+                <td>Montagem e fixação estrutural da estativa, trilhos, mesa de exames e coluna porta-tubo com nivelamento milimétrico e verificação de torque dos parafusos de sustentação.</td>
+                <td style="text-align:center; font-weight:900; color:#15803d;">CONFORME</td>
+            </tr>
+            <tr>
+                <td style="text-align:center;"><b>04</b></td>
+                <td><b>Interligação de Cabos & Alta Tensão</b></td>
+                <td>Passagem de chicotes, conexão dos cabos de alta tensão com lubrificação dielétrica, isolamento térmico da cúpula e interligação com o gerador e console de comando.</td>
+                <td style="text-align:center; font-weight:900; color:#15803d;">CONFORME</td>
+            </tr>
+            <tr>
+                <td style="text-align:center;"><b>05</b></td>
+                <td><b>Calibrações, Rampa Térmica & Disparo</b></td>
+                <td>Ciclo de condicionamento e aquecimento do tubo de raios-X (degas/warm-up), calibração do colimador luminoso (coincidência feixe/luz) e disparos de teste de carga aprovados.</td>
+                <td style="text-align:center; font-weight:900; color:#15803d;">CONFORME</td>
+            </tr>
+            <tr>
+                <td style="text-align:center;"><b>06</b></td>
+                <td><b>Entrega Técnica & Treinamento</b></td>
+                <td>Instrução operacional e de segurança fornecida ao corpo de enfermagem / técnicos de radiologia, cobrindo rotinas de liga/desliga, intertravamentos e conservação do aparelho.</td>
+                <td style="text-align:center; font-weight:900; color:#15803d;">CONFORME</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="decl-box">
+        <b>DECLARAÇÃO FORMAL DE ACEITE DEFINITIVO:</b><br/>
+        A instituição acima identificada declara, por meio de seu representante legal ou responsável pela Engenharia Clínica/Setor de Diagnóstico por Imagem, que o equipamento biomédico discriminado neste termo foi devidamente desembalado, instalado, calibrado, aferido e comissionado pela equipe da <b>EMED ELETROMEDICINA LTDA.</b>, encontrando-se em perfeitas condições mecânicas, ópticas e eletrônicas de funcionamento. A instituição atesta o recebimento da entrega técnica e declara o equipamento formalmente aceito e <b>LIBERADO PARA OPERAÇÃO CLÍNICA ASSISTENCIAL NORMAL</b>.
+    </div>
+
+    <table class="signatures-table">
+        <tr>
+            <td>
+                {rubrica_html}
+                <div class="sig-line">
+                    <b>{dados['responsavel']}</b><br/>
+                    <span style="font-size:7.5pt; color:#475569;">Responsável pelo Recebimento / Diretoria do Hospital</span><br/>
+                    <span style="font-size:7.5pt; color:#64748b;">{dados['cliente']}</span>
+                </div>
+            </td>
+            <td>
+                <div style="height:36px; display:flex; align-items:center; justify-content:center;">
+                    <span style="font-family:cursive; font-size:14pt; color:#002b54; font-weight:700;">{dados['tecnico']}</span>
+                </div>
+                <div class="sig-line">
+                    <b>{dados['tecnico']}</b><br/>
+                    <span style="font-size:7.5pt; color:#475569;">Especialista em Engenharia Clínica — CFT / CREA</span><br/>
+                    <span style="font-size:7.5pt; color:#64748b;">EMED Eletromedicina Ltda.</span>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="footer">
+        EMED Eletromedicina Ltda. • CNPJ: 07.283.365/0001-10 • Plantão Técnico 24h: (85) 99915-0273 / (85) 99619-7923 • Fortaleza - CE<br/>
+        Documento técnico oficial emitido eletronicamente pelo Sistema de Gestão Hospitalar EMED.
+    </div>
+</body>
+</html>"""
+    return html

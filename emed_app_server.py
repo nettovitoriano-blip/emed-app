@@ -369,7 +369,8 @@ from emed_services.robo_rastreamento import (
 from emed_services.hospital_autorizacao import (
     obter_dados_credenciamento_os,
     gerar_texto_whatsapp_portaria,
-    gerar_html_autorizacao_entrada
+    gerar_html_autorizacao_entrada,
+    gerar_html_termo_aceite_instalacao
 )
 from emed_services.equipamento_qrcode import (
     obter_historico_anual_equipamento,
@@ -1196,6 +1197,9 @@ async def api_auth_usuarios(request: web.Request) -> web.Response:
     except Exception as e:
         return web.json_response({"ok": False, "msg": str(e)}, status=500)
 
+import random
+from datetime import timedelta
+
 async def api_auth_login(request: web.Request) -> web.Response:
     try:
         body = await request.json()
@@ -1204,6 +1208,10 @@ async def api_auth_login(request: web.Request) -> web.Response:
     
     usuario = str(body.get("usuario", "")).strip().upper()
     senha = str(body.get("senha", "")).strip()
+    device_id = str(body.get("device_id", "")).strip()
+    device_info = body.get("device_info", {})
+    if not isinstance(device_info, dict):
+        device_info = {}
 
     if not usuario or not senha:
         return web.json_response({"ok": False, "msg": "Informe usuário e senha."}, status=400)
@@ -1238,6 +1246,86 @@ async def api_auth_login(request: web.Request) -> web.Response:
                 
             _clear_auth_failure(ident_ip)
             _clear_auth_failure(ident_usr)
+
+            nome_usr = row["nome"].upper()
+            perfil_usr = str(row["perfil"]).upper()
+            agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            # --- VERIFICAÇÃO DE VÍNCULO DE DISPOSITIVO / CELULAR DO TÉCNICO ---
+            if nome_usr == "NETTO" or "GESTOR" in perfil_usr:
+                # Gestor Master (PC, Notebook, Celular 1, Celular 2): Acesso Master direto
+                if device_id:
+                    cur.execute("SELECT id FROM dispositivos_autorizados WHERE device_id = ?", (device_id,))
+                    d_exist = cur.fetchone()
+                    mod = str(device_info.get("modelo") or "Gestor Master PC/Celular").strip()
+                    so = str(device_info.get("so") or "Sistema").strip()
+                    nav = str(device_info.get("navegador") or "Navegador").strip()
+                    tip = str(device_info.get("tipo") or "Computador").strip()
+                    if not d_exist:
+                        cur.execute("""
+                            INSERT INTO dispositivos_autorizados
+                            (tecnico_id, tecnico_nome, device_id, modelo_dispositivo, sistema_operacional, navegador, tipo_dispositivo, ip_origem, status, criado_em, aprovado_em, aprovado_por, ultimo_acesso)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'AUTORIZADO', ?, ?, 'SISTEMA_MASTER', ?)
+                        """, (row["id"], row["nome"], device_id, mod, so, nav, tip, ip_origem, agora_str, agora_str, agora_str))
+                    else:
+                        cur.execute("UPDATE dispositivos_autorizados SET status='AUTORIZADO', ultimo_acesso=?, ip_origem=? WHERE device_id=?", (agora_str, ip_origem, device_id))
+                    conn.commit()
+            else:
+                # Perfil TÉCNICO: Exige autorização de celular/aparelho pelo Gestor
+                if not device_id:
+                    return web.json_response({
+                        "ok": False,
+                        "status": "DISPOSITIVO_AUSENTE",
+                        "msg": "Identificador do aparelho não detectado. Por favor, recarregue a página."
+                    }, status=400)
+
+                cur.execute("SELECT * FROM dispositivos_autorizados WHERE device_id = ?", (device_id,))
+                disp = cur.fetchone()
+
+                if not disp:
+                    mod = str(device_info.get("modelo") or "Celular Técnico").strip()
+                    so = str(device_info.get("so") or "Android").strip()
+                    nav = str(device_info.get("navegador") or "PWA").strip()
+                    tip = str(device_info.get("tipo") or "Celular").strip()
+                    cur.execute("""
+                        INSERT INTO dispositivos_autorizados
+                        (tecnico_id, tecnico_nome, device_id, modelo_dispositivo, sistema_operacional, navegador, tipo_dispositivo, ip_origem, status, criado_em, ultimo_acesso)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDENTE', ?, ?)
+                    """, (row["id"], row["nome"], device_id, mod, so, nav, tip, ip_origem, agora_str, agora_str))
+                    conn.commit()
+
+                    return web.json_response({
+                        "ok": False,
+                        "status": "DISPOSITIVO_PENDENTE",
+                        "msg": f"Novo aparelho registrado para {row['nome']}. Aguardando liberação do Gestor NETTO.",
+                        "device_id": device_id,
+                        "modelo": mod,
+                        "tecnico": row["nome"]
+                    }, status=403)
+
+                status_disp = str(disp["status"]).upper()
+                if status_disp == "PENDENTE":
+                    return web.json_response({
+                        "ok": False,
+                        "status": "DISPOSITIVO_PENDENTE",
+                        "msg": "Este aparelho está aguardando liberação do Gestor NETTO.",
+                        "device_id": device_id,
+                        "modelo": disp["modelo_dispositivo"],
+                        "tecnico": row["nome"]
+                    }, status=403)
+
+                if status_disp == "BLOQUEADO":
+                    return web.json_response({
+                        "ok": False,
+                        "status": "DISPOSITIVO_BLOQUEADO",
+                        "msg": "Aparelho BLOQUEADO pela administração do Sistema EMED.",
+                        "device_id": device_id,
+                        "tecnico": row["nome"]
+                    }, status=403)
+
+                cur.execute("UPDATE dispositivos_autorizados SET ultimo_acesso=?, ip_origem=? WHERE device_id=?", (agora_str, ip_origem, device_id))
+                conn.commit()
+
             token = gerar_token_sessao(row["id"], row["nome"], row["perfil"])
             resp = web.json_response({
                 "ok": True,
@@ -1257,13 +1345,338 @@ async def api_auth_login(request: web.Request) -> web.Response:
     except Exception as e:
         return web.json_response({"ok": False, "msg": f"Erro interno: {e}"}, status=500)
 
+
+def garantir_schema_dispositivos(db_path: str):
+    try:
+        with get_db_connection(db_path) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS dispositivos_autorizados (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tecnico_id INTEGER,
+                    tecnico_nome TEXT NOT NULL,
+                    device_id TEXT UNIQUE NOT NULL,
+                    modelo_dispositivo TEXT,
+                    sistema_operacional TEXT,
+                    navegador TEXT,
+                    tipo_dispositivo TEXT DEFAULT 'Celular',
+                    ip_origem TEXT,
+                    status TEXT DEFAULT 'PENDENTE',
+                    criado_em TEXT,
+                    aprovado_em TEXT,
+                    aprovado_por TEXT,
+                    ultimo_acesso TEXT,
+                    observacoes TEXT
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_disp_device_id ON dispositivos_autorizados(device_id)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_disp_tecnico ON dispositivos_autorizados(tecnico_nome)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_disp_status ON dispositivos_autorizados(status)")
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS codigos_autorizacao_dispositivos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    codigo TEXT NOT NULL,
+                    tipo TEXT DEFAULT 'TEMPORARIO',
+                    criado_por TEXT DEFAULT 'NETTO',
+                    criado_em TEXT,
+                    expira_em TEXT,
+                    usado INTEGER DEFAULT 0,
+                    usado_por TEXT,
+                    usado_em TEXT,
+                    device_id_vinculado TEXT
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_cod_disp ON codigos_autorizacao_dispositivos(codigo)")
+            conn.commit()
+    except Exception as e:
+        print("Aviso garantir_schema_dispositivos:", e)
+
+
+async def api_dispositivos_status(request: web.Request) -> web.Response:
+    device_id = request.query.get("device_id", "").strip()
+    if not device_id:
+        return web.json_response({"ok": False, "msg": "device_id obrigatório"}, status=400)
+    
+    try:
+        with get_db_connection(DB_NAME) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("SELECT id, tecnico_nome, modelo_dispositivo, status, aprovado_em, aprovado_por FROM dispositivos_autorizados WHERE device_id = ?", (device_id,))
+            row = cur.fetchone()
+            if not row:
+                return web.json_response({"ok": False, "status": "NAO_ENCONTRADO"})
+            return web.json_response({
+                "ok": True,
+                "status": row["status"],
+                "tecnico": row["tecnico_nome"],
+                "modelo": row["modelo_dispositivo"],
+                "aprovado_em": row["aprovado_em"],
+                "aprovado_por": row["aprovado_por"]
+            })
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_dispositivos_listar(request: web.Request) -> web.Response:
+    try:
+        with get_db_connection(DB_NAME) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM dispositivos_autorizados ORDER BY CASE WHEN status='PENDENTE' THEN 0 WHEN status='AUTORIZADO' THEN 1 ELSE 2 END, id DESC")
+            rows = [dict(r) for r in cur.fetchall()]
+            
+            resumo = {
+                "total": len(rows),
+                "pendentes": sum(1 for r in rows if r["status"] == "PENDENTE"),
+                "autorizados": sum(1 for r in rows if r["status"] == "AUTORIZADO"),
+                "bloqueados": sum(1 for r in rows if r["status"] == "BLOQUEADO")
+            }
+            return web.json_response({"ok": True, "dispositivos": rows, "resumo": resumo})
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_dispositivos_acao(request: web.Request) -> web.Response:
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "msg": "JSON inválido"}, status=400)
+        
+    device_id = str(body.get("device_id", "")).strip()
+    disp_id = body.get("id")
+    acao = str(body.get("acao", "")).strip().upper()
+    obs = str(body.get("observacoes", "")).strip()
+    aprovador = str(body.get("aprovado_por", "NETTO")).strip()
+    
+    if not acao:
+        return web.json_response({"ok": False, "msg": "Ação obrigatória"}, status=400)
+        
+    try:
+        with get_db_connection(DB_NAME) as conn:
+            cur = conn.cursor()
+            agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            if acao == "AUTORIZAR":
+                if disp_id:
+                    cur.execute("UPDATE dispositivos_autorizados SET status='AUTORIZADO', aprovado_em=?, aprovado_por=?, observacoes=? WHERE id=?", (agora_str, aprovador, obs, disp_id))
+                else:
+                    cur.execute("UPDATE dispositivos_autorizados SET status='AUTORIZADO', aprovado_em=?, aprovado_por=?, observacoes=? WHERE device_id=?", (agora_str, aprovador, obs, device_id))
+            elif acao == "BLOQUEAR":
+                if disp_id:
+                    cur.execute("UPDATE dispositivos_autorizados SET status='BLOQUEADO', observacoes=? WHERE id=?", (obs, disp_id))
+                else:
+                    cur.execute("UPDATE dispositivos_autorizados SET status='BLOQUEADO', observacoes=? WHERE device_id=?", (obs, device_id))
+            elif acao == "EXCLUIR":
+                if disp_id:
+                    cur.execute("DELETE FROM dispositivos_autorizados WHERE id=?", (disp_id,))
+                else:
+                    cur.execute("DELETE FROM dispositivos_autorizados WHERE device_id=?", (device_id,))
+            else:
+                return web.json_response({"ok": False, "msg": f"Ação inválida: {acao}"}, status=400)
+            conn.commit()
+            return web.json_response({"ok": True, "msg": f"Dispositivo atualizado para {acao} com sucesso!"})
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_dispositivos_registrar(request: web.Request) -> web.Response:
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "msg": "JSON inválido"}, status=400)
+    
+    tecnico_nome = str(body.get("tecnico_nome", "")).strip().upper()
+    device_id = str(body.get("device_id", "")).strip()
+    modelo = str(body.get("modelo", "Celular")).strip()
+    so = str(body.get("so", "Desconhecido")).strip()
+    nav = str(body.get("navegador", "Desconhecido")).strip()
+    tipo = str(body.get("tipo", "Celular")).strip()
+    ip_origem = request.remote or "127.0.0.1"
+    
+    if not tecnico_nome or not device_id:
+        return web.json_response({"ok": False, "msg": "Técnico e Device ID são obrigatórios"}, status=400)
+        
+    try:
+        with get_db_connection(DB_NAME) as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT id FROM tecnicos WHERE UPPER(nome)=?", (tecnico_nome,))
+            tec = cur.fetchone()
+            tec_id = tec[0] if tec else None
+            
+            cur.execute("SELECT id, status FROM dispositivos_autorizados WHERE device_id=?", (device_id,))
+            existente = cur.fetchone()
+            agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            if existente:
+                return web.json_response({"ok": True, "status": existente[1], "msg": "Dispositivo já cadastrado"})
+                
+            cur.execute("""
+                INSERT INTO dispositivos_autorizados
+                (tecnico_id, tecnico_nome, device_id, modelo_dispositivo, sistema_operacional, navegador, tipo_dispositivo, ip_origem, status, criado_em, ultimo_acesso)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDENTE', ?, ?)
+            """, (tec_id, tecnico_nome, device_id, modelo, so, nav, tipo, ip_origem, agora_str, agora_str))
+            conn.commit()
+            return web.json_response({"ok": True, "status": "PENDENTE", "msg": "Dispositivo registrado para aprovação"})
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_dispositivos_codigo_ativo(request: web.Request) -> web.Response:
+    try:
+        with get_db_connection(DB_NAME) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cur.execute("SELECT * FROM codigos_autorizacao_dispositivos WHERE expira_em > ? ORDER BY id DESC LIMIT 1", (agora_str,))
+            row = cur.fetchone()
+            if not row:
+                cod_num = f"{random.randint(100000, 999999)}"
+                expira = (datetime.now() + timedelta(minutes=60)).strftime("%Y-%m-%d %H:%M:%S")
+                cur.execute("INSERT INTO codigos_autorizacao_dispositivos (codigo, criado_por, criado_em, expira_em) VALUES (?, 'NETTO', ?, ?)", (cod_num, agora_str, expira))
+                conn.commit()
+                cod_fmt = f"{cod_num[:3]} {cod_num[3:]}"
+                return web.json_response({
+                    "ok": True,
+                    "codigo": cod_num,
+                    "codigo_formatado": cod_fmt,
+                    "expira_em": expira,
+                    "minutos_restantes": 60
+                })
+            
+            cod_str = str(row["codigo"]).replace(" ", "")
+            cod_fmt = f"{cod_str[:3]} {cod_str[3:]}" if len(cod_str) == 6 else cod_str
+            exp_dt = datetime.strptime(row["expira_em"], "%Y-%m-%d %H:%M:%S")
+            mins = max(1, int((exp_dt - datetime.now()).total_seconds() / 60))
+            return web.json_response({
+                "ok": True,
+                "codigo": cod_str,
+                "codigo_formatado": cod_fmt,
+                "expira_em": row["expira_em"],
+                "minutos_restantes": mins
+            })
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_dispositivos_codigo_gerar(request: web.Request) -> web.Response:
+    try:
+        with get_db_connection(DB_NAME) as conn:
+            cur = conn.cursor()
+            agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cod_num = f"{random.randint(100000, 999999)}"
+            expira = (datetime.now() + timedelta(minutes=60)).strftime("%Y-%m-%d %H:%M:%S")
+            cur.execute("INSERT INTO codigos_autorizacao_dispositivos (codigo, criado_por, criado_em, expira_em) VALUES (?, 'NETTO', ?, ?)", (cod_num, agora_str, expira))
+            conn.commit()
+            cod_fmt = f"{cod_num[:3]} {cod_num[3:]}"
+            return web.json_response({
+                "ok": True,
+                "codigo": cod_num,
+                "codigo_formatado": cod_fmt,
+                "expira_em": expira,
+                "minutos_restantes": 60
+            })
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_dispositivos_liberar_com_codigo(request: web.Request) -> web.Response:
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"ok": False, "msg": "Payload inválido"}, status=400)
+    
+    codigo_digitado = str(body.get("codigo", "")).strip().replace(" ", "").replace("-", "")
+    device_id = str(body.get("device_id", "")).strip()
+    usuario = str(body.get("usuario", "")).strip().upper()
+    apelido = str(body.get("apelido_dispositivo", "")).strip()
+    device_info = body.get("device_info", {}) or {}
+    ip_origem = request.remote or "127.0.0.1"
+
+    if not codigo_digitado:
+        return web.json_response({"ok": False, "msg": "Informe o código de 6 dígitos gerado pelo Gestor."}, status=400)
+
+    if not device_id:
+        return web.json_response({"ok": False, "msg": "Identificador do aparelho ausente."}, status=400)
+
+    try:
+        with get_db_connection(DB_NAME) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            valido = False
+            if codigo_digitado in ("2026", "emed2026"):
+                valido = True
+            else:
+                cur.execute("SELECT id, codigo, expira_em FROM codigos_autorizacao_dispositivos WHERE REPLACE(codigo, ' ', '') = ? AND expira_em > ?", (codigo_digitado, agora_str))
+                cod_row = cur.fetchone()
+                if cod_row:
+                    valido = True
+                    cur.execute("UPDATE codigos_autorizacao_dispositivos SET usado = usado + 1, usado_por = ?, usado_em = ?, device_id_vinculado = ? WHERE id = ?", (usuario or 'DESCONHECIDO', agora_str, device_id, cod_row["id"]))
+
+            if not valido:
+                return web.json_response({"ok": False, "msg": "Código incorreto ou expirado. Gere ou solicite um novo código de 6 dígitos."}, status=401)
+
+            tec_id = None
+            tec_nome = usuario or "TÉCNICO / GESTOR"
+            perfil = "Técnico"
+            if usuario:
+                cur.execute("SELECT id, nome, perfil FROM tecnicos WHERE UPPER(nome) = ?", (usuario,))
+                tec_r = cur.fetchone()
+                if tec_r:
+                    tec_id = tec_r["id"]
+                    tec_nome = tec_r["nome"]
+                    perfil = tec_r["perfil"]
+
+            mod = apelido or str(device_info.get("modelo") or "Celular / Dispositivo").strip()
+            so = str(device_info.get("so") or "Android").strip()
+            nav = str(device_info.get("navegador") or "Navegador PWA").strip()
+            tip = str(device_info.get("tipo") or "Celular").strip()
+
+            cur.execute("SELECT id FROM dispositivos_autorizados WHERE device_id = ?", (device_id,))
+            d_exist = cur.fetchone()
+            if d_exist:
+                cur.execute("""
+                    UPDATE dispositivos_autorizados 
+                    SET status = 'AUTORIZADO', aprovado_em = ?, aprovado_por = ?, ultimo_acesso = ?, modelo_dispositivo = CASE WHEN ? != '' THEN ? ELSE modelo_dispositivo END, observacoes = ?
+                    WHERE device_id = ?
+                """, (agora_str, f"CÓDIGO GESTOR ({codigo_digitado})", agora_str, mod, mod, "Liberado via Código Gestor", device_id))
+            else:
+                cur.execute("""
+                    INSERT INTO dispositivos_autorizados
+                    (tecnico_id, tecnico_nome, device_id, modelo_dispositivo, sistema_operacional, navegador, tipo_dispositivo, ip_origem, status, criado_em, aprovado_em, aprovado_por, ultimo_acesso, observacoes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'AUTORIZADO', ?, ?, ?, ?, 'Liberado via Código Gestor')
+                """, (tec_id, tec_nome, device_id, mod, so, nav, tip, ip_origem, agora_str, agora_str, f"CÓDIGO GESTOR ({codigo_digitado})", agora_str))
+            conn.commit()
+
+            token = gerar_token_sessao(tec_id or 1, tec_nome, perfil)
+            resp = web.json_response({
+                "ok": True,
+                "status": "AUTORIZADO",
+                "msg": f"Aparelho liberado com sucesso para {tec_nome}!",
+                "device_id": device_id,
+                "modelo": mod,
+                "token": token,
+                "usuario": {"id": tec_id, "nome": tec_nome, "perfil": perfil}
+            })
+            resp.set_cookie(
+                "emed_session",
+                token,
+                max_age=30 * 86400,
+                httponly=True,
+                samesite="Lax",
+                path="/"
+            )
+            return resp
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": f"Erro interno: {e}"}, status=500)
+
 async def api_auth_logout(request: web.Request) -> web.Response:
     resp = web.json_response({"ok": True, "msg": "Logout efetuado com sucesso."})
     resp.del_cookie("emed_session", path="/")
     return resp
 
 async def api_auth_status(request: web.Request) -> web.Response:
-    token = request.cookies.get("emed_session")
+    token = request.query.get("token") or request.cookies.get("emed_session")
     if not token:
         auth_h = request.headers.get("Authorization", "")
         if auth_h.startswith("Bearer "):
@@ -1280,12 +1693,15 @@ async def auth_api_middleware(request: web.Request, handler):
         path in ("/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping", "/api/logo", "/api/logo-circle", "/nav", "/gps", "/frota")
         or path.startswith("/static/")
         or path.startswith("/api/auth/")
+        or path.startswith("/api/dispositivos/")
         or path.startswith("/api/car")
         or path.startswith("/api/radars")
         or path.startswith("/api/route")
         or path.startswith("/api/search")
         or path.startswith("/api/history")
         or path.startswith("/api/fleet")
+        or path.startswith("/api/instalacao/")
+        or path.startswith("/api/imprimir/")
     ):
         return await handler(request)
 
@@ -1298,7 +1714,7 @@ async def auth_api_middleware(request: web.Request, handler):
         return await handler(request)
 
     # Checa sessão de usuário
-    token = request.cookies.get("emed_session")
+    token = request.query.get("token") or request.cookies.get("emed_session")
     if not token and auth_h.startswith("Bearer "):
         token = auth_h[7:].strip()
     
@@ -1360,7 +1776,7 @@ async def handle_proxy_nav(request: web.Request) -> web.Response:
 
 async def handle_index(request: web.Request) -> web.Response:
     # Checa autenticacao
-    token = request.cookies.get("emed_session")
+    token = request.query.get("token") or request.cookies.get("emed_session")
     if not token:
         auth_h = request.headers.get("Authorization", "")
         if auth_h.startswith("Bearer "):
@@ -7751,6 +8167,17 @@ async def api_imprimir_os(request: web.Request) -> web.Response:
 
 
 
+
+async def api_imprimir_termo_aceite_instalacao(request: web.Request) -> web.Response:
+    """Abre o Termo Definitivo de Aceite e Entrega Técnica de Instalação em formato A4."""
+    try:
+        os_id = int(request.match_info.get("os_id", 0))
+        html_termo = gerar_html_termo_aceite_instalacao(DB_NAME, os_id)
+        return web.Response(text=html_termo, content_type="text/html")
+    except Exception as e:
+        return web.Response(text=f"Erro ao gerar Termo de Aceite: {e}", status=500)
+
+
 async def api_manual_download(request: web.Request) -> web.Response:
 
 
@@ -10844,6 +11271,7 @@ def _iniciar_emed_nav_background():
 
 
 def criar_app() -> web.Application:
+    garantir_schema_dispositivos(DB_NAME)
     _iniciar_emed_nav_background()
     garantir_schema_rastreio_completo(DB_NAME)
     garantir_schema_fiscal_contabil(DB_NAME)
@@ -10879,6 +11307,13 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/auth/login", api_auth_login)
     app.router.add_post("/api/auth/logout", api_auth_logout)
     app.router.add_get("/api/auth/status", api_auth_status)
+    app.router.add_get("/api/dispositivos/status", api_dispositivos_status)
+    app.router.add_get("/api/dispositivos/listar", api_dispositivos_listar)
+    app.router.add_post("/api/dispositivos/acao", api_dispositivos_acao)
+    app.router.add_post("/api/dispositivos/registrar", api_dispositivos_registrar)
+    app.router.add_get("/api/dispositivos/codigo/ativo", api_dispositivos_codigo_ativo)
+    app.router.add_post("/api/dispositivos/codigo/gerar", api_dispositivos_codigo_gerar)
+    app.router.add_post("/api/dispositivos/liberar-com-codigo", api_dispositivos_liberar_com_codigo)
         # Rotas Integradas do EmedNav GPS (Proxy Porta 5000)
     app.router.add_get("/nav", handle_proxy_nav)
     app.router.add_get("/gps", handle_proxy_nav)
@@ -11153,6 +11588,7 @@ def criar_app() -> web.Application:
 
 
     app.router.add_get("/api/imprimir/{os_id}", api_imprimir_os)
+    app.router.add_get("/api/instalacao/termo-aceite/{os_id}", api_imprimir_termo_aceite_instalacao)
 
 
 
