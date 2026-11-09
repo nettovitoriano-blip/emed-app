@@ -1287,6 +1287,9 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/api/history")
         or path.startswith("/api/fleet")
         or path.startswith("/api/clients")
+        or path.startswith("/api/app-icon/")
+        or path.startswith("/api/frota/")
+        or path in ("/api/iniciar-rota", "/api/checkin", "/api/checkout")
     ):
         return await handler(request)
 
@@ -3983,6 +3986,217 @@ async def api_checkin(request: web.Request) -> web.Response:
 
 
 
+
+
+
+async def api_checkout(request: web.Request) -> web.Response:
+    """Registra checkout e encerramento de atendimento no cliente com validacao GPS e calculo de duracao (fuso Brasil)."""
+    body = await request.json()
+    os_id = str(body.get("os_id", "")).strip()
+    dist_m = body.get("distancia_metros")
+    metodo = str(body.get("metodo", "GPS_SAIDA")).strip()
+    df = _carregar_df_direto()
+    hora_cliente = str(body.get("hora_local", "")).strip()
+    if hora_cliente and len(hora_cliente) >= 16 and "/" in hora_cliente and ":" in hora_cliente:
+        agora_str = hora_cliente
+    else:
+        agora_str = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+
+    for idx, row in df.iterrows():
+        if str(obter_id_os(idx, row)) == os_id:
+            df.at[idx, "checkout_hora"] = agora_str
+            df.at[idx, "status"] = "CONCLUÍDO"
+            cin = limpar_texto(row.get("checkin_hora"), "") or agora_str
+            duracao = calcular_duracao_os(cin, agora_str)
+            df.at[idx, "tempo_atendimento"] = duracao
+            _salvar_df_direto(df)
+            return web.json_response({
+                "ok": True,
+                "os_id": os_id,
+                "checkout_hora": agora_str,
+                "tempo_atendimento": duracao,
+                "msg": f"🏁 Check-out registrado na OS #{os_id} às {agora_str} (Duração: {duracao})!"
+            })
+
+    return web.json_response({"ok": False, "msg": f"OS #{os_id} não encontrada."}, status=404)
+
+
+async def api_frota_assumir_veiculo(request: web.Request) -> web.Response:
+    """
+    Permite que o técnico assuma o volante do veículo via NFC ou Aplicativo.
+    REQUISITO CRÍTICO DE AUDITORIA & DETRAN:
+    - O trecho percorrido até o momento da troca é encerrado e atribuído EXCLUSIVAMENTE ao condutor anterior.
+    - O novo condutor assume a partir do KM/minuto exato da troca para o restante do percurso.
+    - Nada é misturado no histórico de viagens e multas.
+    """
+    body = await request.json()
+    vid = int(limpar_float(body.get("veiculo_id"), 0))
+    placa = str(body.get("placa", "")).strip().upper()
+    tecnico = str(body.get("tecnico", "")).strip().upper()
+    metodo = str(body.get("metodo", "APP")).strip().upper()
+    tag_nfc = str(body.get("tag_nfc", "")).strip()
+    km_informado = int(limpar_float(body.get("km_atual"), 0))
+    lat = float(limpar_float(body.get("lat"), -3.7319))
+    lon = float(limpar_float(body.get("lon"), -38.5267))
+    agora_str = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+
+    if not tecnico:
+        return web.json_response({"ok": False, "msg": "Técnico não informado."}, status=400)
+
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS frota_troca_condutores (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                veiculo_id INTEGER,
+                placa TEXT,
+                modelo TEXT,
+                condutor_anterior TEXT,
+                novo_condutor TEXT,
+                metodo TEXT,
+                tag_nfc TEXT,
+                data_hora TEXT,
+                km_atual INTEGER DEFAULT 0,
+                lat REAL,
+                lon REAL,
+                observacao_auditoria TEXT
+            );
+        """)
+
+        # Localiza o veículo
+        if vid > 0:
+            cur.execute("SELECT id, modelo, placa, condutor_atual, km_atual, ultima_lat, ultima_lon FROM veiculos WHERE id = ?", (vid,))
+        elif placa:
+            cur.execute("SELECT id, modelo, placa, condutor_atual, km_atual, ultima_lat, ultima_lon FROM veiculos WHERE UPPER(placa) = ?", (placa,))
+        else:
+            return web.json_response({"ok": False, "msg": "Veículo não especificado."}, status=400)
+
+        row_v = cur.fetchone()
+        if not row_v:
+            return web.json_response({"ok": False, "msg": "Veículo não encontrado."}, status=404)
+
+        v_id, modelo, v_placa, condutor_ant, km_db, lat_db, lon_db = row_v
+        km_corte = km_informado if km_informado > 0 else (km_db or 0)
+        lat_corte = lat if (lat and lat != -3.7319) else (lat_db or -3.7319)
+        lon_corte = lon if (lon and lon != -38.5267) else (lon_db or -38.5267)
+
+        placa_clean = v_placa.replace("-", "").strip().upper()
+
+        # Se houver troca de condutor
+        if condutor_ant and condutor_ant.upper() != tecnico:
+            # 1. PASSO A: Fechar percurso do condutor anterior (até o minuto exato da troca)
+            cur.execute("""
+                SELECT id, km_inicial, lat_inicio, lon_inicio, destino_hospital, data_hora_inicio
+                FROM frota_viagens_gps
+                WHERE REPLACE(UPPER(placa), '-', '') = ? AND condutor = ? AND status_viagem = 'EM DESLOCAMENTO'
+                ORDER BY id DESC LIMIT 1
+            """, (placa_clean, condutor_ant))
+            viagem_aberta_ant = cur.fetchone()
+
+            if viagem_aberta_ant:
+                id_v_ant, km_ini_ant, lat_i_ant, lon_i_ant, dest_ant, dt_ini_ant = viagem_aberta_ant
+                km_percorrido_ant = max(0.0, float(km_corte - (km_ini_ant or km_corte)))
+                cur.execute("""
+                    UPDATE frota_viagens_gps
+                    SET data_hora_fim = ?, km_final = ?, km_percorrido = ?,
+                        lat_fim = ?, lon_fim = ?, status_viagem = 'FINALIZADA (TROCA NO TRAJETO)',
+                        destino_hospital = ?
+                    WHERE id = ?
+                """, (
+                    agora_str, km_corte, km_percorrido_ant,
+                    lat_corte, lon_corte,
+                    f"{dest_ant or 'Rota'} [Trecho 1: Conduzido por {condutor_ant} até {agora_str} (KM {km_corte})]",
+                    id_v_ant
+                ))
+            else:
+                # Cria registro histórico do trecho do motorista anterior para não misturar responsabilidade
+                cur.execute("""
+                    INSERT INTO frota_viagens_gps
+                    (placa, modelo, condutor, tag_identificacao, destino_hospital,
+                     data_hora_inicio, data_hora_fim, km_inicial, km_final, km_percorrido,
+                     lat_inicio, lon_inicio, lat_fim, lon_fim, status_viagem)
+                    VALUES (?, ?, ?, 'TURNO_ANTERIOR', ?, ?, ?, ?, ?, 0.0, ?, ?, ?, ?, 'FINALIZADA (TROCA NO TRAJETO)')
+                """, (
+                    v_placa, modelo, condutor_ant,
+                    f"Turno anterior à troca de condutor (encerrado às {agora_str})",
+                    agora_str, agora_str, km_corte, km_corte,
+                    lat_corte, lon_corte, lat_corte, lon_corte
+                ))
+
+            # 2. PASSO B: Iniciar a nova perna / restante do percurso para o NOVO condutor
+            tag_rfid_novo = f"NFC_{tag_nfc}" if (metodo == "NFC" and tag_nfc) else "APP_CELULAR"
+            cur.execute("""
+                INSERT INTO frota_viagens_gps
+                (placa, modelo, condutor, tag_identificacao, destino_hospital,
+                 data_hora_inicio, data_hora_fim, km_inicial, km_final, km_percorrido,
+                 lat_inicio, lon_inicio, lat_fim, lon_fim, velocidade_max_kmh, status_viagem)
+                VALUES (?, ?, ?, ?, ?, ?, 'EM TRÂNSITO', ?, ?, 0.0, ?, ?, ?, ?, 0.0, 'EM DESLOCAMENTO')
+            """, (
+                v_placa, modelo, tecnico, tag_rfid_novo,
+                f"Restante do percurso a partir do KM {km_corte} [Assumido por {tecnico} via {metodo}]",
+                agora_str, km_corte, km_corte,
+                lat_corte, lon_corte, lat_corte, lon_corte
+            ))
+
+            # 3. PASSO C: Gravar na tabela de Auditoria Imutável
+            obs_auditoria = (
+                f"Troca de condutor realizada via {metodo} às {agora_str} (KM {km_corte}). "
+                f"Trecho anterior (até {agora_str}) encerrado e atribuído exclusivamente a '{condutor_ant}'. "
+                f"Restante do percurso iniciado a partir deste ponto sob responsabilidade exclusiva de '{tecnico}'."
+            )
+            cur.execute("""
+                INSERT INTO frota_troca_condutores 
+                (veiculo_id, placa, modelo, condutor_anterior, novo_condutor, metodo, tag_nfc, data_hora, km_atual, lat, lon, observacao_auditoria)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (v_id, v_placa, modelo, condutor_ant, tecnico, metodo, tag_nfc, agora_str, km_corte, lat_corte, lon_corte, obs_auditoria))
+
+            # 4. PASSO D: Atualizar o cadastro do veículo em `veiculos`
+            cur.execute("""
+                UPDATE veiculos 
+                SET condutor_atual = ?, tag_rfid_atual = ?, km_atual = ?,
+                    ultima_lat = ?, ultima_lon = ?, ultima_atualizacao_gps = ?
+                WHERE id = ?
+            """, (tecnico, tag_rfid_novo, km_corte, lat_corte, lon_corte, agora_str, v_id))
+
+        else:
+            # Já era o mesmo condutor
+            tag_rfid_novo = f"NFC_{tag_nfc}" if (metodo == "NFC" and tag_nfc) else "APP_CELULAR"
+            cur.execute("""
+                UPDATE veiculos 
+                SET tag_rfid_atual = ?, ultima_atualizacao_gps = ?
+                WHERE id = ?
+            """, (tag_rfid_novo, agora_str, v_id))
+
+        conn.commit()
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"🚗 Você assumiu o volante do {modelo} ({v_placa}) a partir do KM {km_corte} via {metodo}! Trecho anterior de {condutor_ant} finalizado e registrado.",
+        "veiculo_id": v_id,
+        "modelo": modelo,
+        "placa": v_placa,
+        "condutor_anterior": condutor_ant,
+        "novo_condutor": tecnico,
+        "km_corte": km_corte,
+        "data_hora_corte": agora_str,
+        "metodo": metodo
+    })
+
+
+async def api_frota_troca_condutores_historico(request: web.Request) -> web.Response:
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT id, veiculo_id, placa, modelo, condutor_anterior, novo_condutor, metodo, data_hora, observacao_auditoria FROM frota_troca_condutores ORDER BY id DESC LIMIT 50")
+        rows = cur.fetchall()
+        historico = [
+            {
+                "id": r[0], "veiculo_id": r[1], "placa": r[2], "modelo": r[3],
+                "condutor_anterior": r[4], "novo_condutor": r[5], "metodo": r[6],
+                "data_hora": r[7], "observacao": r[8]
+            }
+            for r in rows
+        ]
+    return web.json_response({"ok": True, "historico": historico})
 
 def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
 
@@ -10969,6 +11183,9 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/iniciar-rota", api_iniciar_rota)
 
     app.router.add_post("/api/checkin", api_checkin)
+    app.router.add_post("/api/checkout", api_checkout)
+    app.router.add_post("/api/frota/assumir-veiculo", api_frota_assumir_veiculo)
+    app.router.add_get("/api/frota/troca-condutores-historico", api_frota_troca_condutores_historico)
 
 
 
