@@ -1223,6 +1223,18 @@
 
 
 
+    
+    function abrirModalCodigoLiberacao() {
+      const dev = detectarDetalhesDispositivo();
+      const u = (document.getElementById('selectUsuario')?.value) || 'Técnico';
+      if (typeof abrirModalEspera === 'function') {
+        abrirModalEspera(u, dev.modelo, dev.devId);
+      } else {
+        const m = document.getElementById('modalDispositivo');
+        if (m) m.style.display = 'flex';
+      }
+    }
+
     function abrirModalEspera(tecnicoNome, modeloAparelho, deviceId) {
 
       document.getElementById('modalTecnicoNome').textContent = tecnicoNome;
