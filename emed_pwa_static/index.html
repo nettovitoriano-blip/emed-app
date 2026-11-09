@@ -58560,7 +58560,22 @@
 
 
 
-          <label class="field-label">Hospital / Cliente *</label>
+          <!-- COPILOTO PREDITIVO DE PEÇAS & ALMOXARIFADO INTELIGENTE -->
+        <div style="background:#082f49;border:1px solid #0284c7;border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <div style="font-size:12px;font-weight:900;color:#e0f2fe;display:flex;align-items:center;gap:6px;">
+              🧠 Copiloto Preditivo de Peças (Almoxarifado Inteligente)
+            </div>
+            <button type="button" class="btn btn-xs" onclick="dispararCopilotoPreditivoPecas('${esc(os.equipamento)}', document.getElementById('osDefeito')?.value || '${esc(os.defeito_relatado || os.pendencia_limpa)}')" style="background:#0284c7;color:#fff;border:none;font-weight:800;font-size:10px;padding:4px 10px;border-radius:4px;cursor:pointer;">
+              🔍 Cruzar Falha com Almoxarifado
+            </button>
+          </div>
+          <div id="boxSugestoesPecasCopiloto" style="font-size:11px;color:#bae6fd;line-height:1.4;">
+            Clique no botão acima para analisar a queixa e cruzar com as peças e localização em estoque.
+          </div>
+        </div>
+
+        <label class="field-label">Hospital / Cliente *</label>
 
 
 
@@ -60721,6 +60736,18 @@
 
 
   <script>
+    // BLINDAGEM GLOBAL ANTECIPADA DE TOASTS
+    window.toastSucesso = window.toastSucesso || function(msg, t) {
+      if (typeof mostrarToast === 'function') { mostrarToast(msg, t || 3800); }
+      else { alert(msg); }
+    };
+    window.toastErro = window.toastErro || function(msg, t) {
+      if (typeof mostrarToast === 'function') { mostrarToast('⚠️ ' + msg, t || 4500); }
+      else { alert('⚠️ ' + msg); }
+    };
+
+    // =========================================================================
+    // PADRONIZAÇÃO AUTOMÁTICA EM MAIÚSCULAS
 
 
 
@@ -146135,6 +146162,17 @@ function renderMenuGesMural(box) {
 
                   👥 Zap Grupo EMED
 
+                </button>
+
+                <!-- FRENTES OPERACIONAIS EMED -->
+                <button class="btn btn-sm" onclick="abrirPainelTriagemPosAtendimento()" style="background:linear-gradient(90deg, #0369a1, #0284c7);color:#fff;border:none;font-weight:800;font-size:10.5px;padding:5px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;" title="Triagem e Auditoria Pós-Atendimento">
+                  📋 Triagem OS
+                </button>
+                <button class="btn btn-sm" onclick="abrirPainelChecklistSemanalFrota()" style="background:linear-gradient(90deg, #15803d, #16a34a);color:#fff;border:none;font-weight:800;font-size:10.5px;padding:5px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;" title="Checklist Semanal da Frota">
+                  🚗 Frota Semanal
+                </button>
+                <button class="btn btn-sm" onclick="abrirPainelCautelaFerramentasRBC()" style="background:linear-gradient(90deg, #7c2d12, #c2410c);color:#fff;border:none;font-weight:800;font-size:10.5px;padding:5px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;" title="Cautela e Calibração RBC">
+                  🧰 Almoxarifado RBC
                 </button>
 
               </div>
@@ -295045,6 +295083,594 @@ Solicitamos a autorização de entrada na guarita predial.
 
 
 
+
+
+
+
+
+    // =========================================================================
+    // FRENTE 1: TRIAGEM PÓS-ATENDIMENTO E LIBERAÇÃO AUTOMÁTICA DE OS AO CLIENTE
+    // =========================================================================
+    async function abrirPainelTriagemPosAtendimento() {
+      mostrarToast("📋 Carregando fila de triagem pós-atendimento...", 1800);
+      try {
+        const res = await apiGet("/api/triagem/fila");
+        if (!res || !res.ok) {
+          mostrarToast("Não foi possível carregar a fila de triagem.");
+          return;
+        }
+
+        document.getElementById("modalTriagemPosAtendimentoBox")?.remove();
+
+        const modalDiv = document.createElement("div");
+        modalDiv.id = "modalTriagemPosAtendimentoBox";
+        modalDiv.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(2,6,23,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;backdrop-filter:blur(4px);";
+
+        const fila = res.fila || [];
+
+        let cardsHtml = "";
+        if (fila.length === 0) {
+          cardsHtml = `
+            <div style="background:#0f172a;border:1px dashed #334155;border-radius:10px;padding:30px;text-align:center;color:#94a3b8;">
+              <div style="font-size:32px;margin-bottom:8px;">✅</div>
+              <div style="font-size:14px;font-weight:800;color:#f8fafc;">Fila de Triagem Zerada!</div>
+              <div style="font-size:12px;margin-top:4px;">Todas as OSs concluídas foram auditadas e liberadas aos clientes.</div>
+            </div>
+          `;
+        } else {
+          fila.forEach(os => {
+            cardsHtml += `
+              <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;border-bottom:1px solid #1e293b;padding-bottom:8px;">
+                  <div>
+                    <span style="font-weight:900;color:#38bdf8;font-size:13px;">OS #${esc(os.id)}</span>
+                    <b style="color:#f8fafc;font-size:13px;margin-left:6px;">${esc(os.cliente)}</b>
+                  </div>
+                  <span style="background:#d97706;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;">
+                    AGUARDANDO AVALIAÇÃO
+                  </span>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:8px;font-size:11.5px;color:#cbd5e1;">
+                  <div>🔬 <b>Equipamento:</b> ${esc(os.equipamento)}</div>
+                  <div>👤 <b>Técnico:</b> ${esc(os.tecnico)}</div>
+                  <div>⏱️ <b>Atendimento:</b> ${esc(os.duracao)} (${esc(os.checkin)} às ${esc(os.checkout)})</div>
+                  <div>🛠️ <b>Tipo:</b> ${esc(os.tipo_servico)} ${os.etapa_preventiva ? `(${esc(os.etapa_preventiva)})` : ''}</div>
+                </div>
+
+                <div style="background:#020617;border:1px solid #1e293b;border-radius:6px;padding:8px 10px;font-size:11px;color:#94a3b8;line-height:1.4;">
+                  <b style="color:#38bdf8;">Serviço Realizado pelo Técnico:</b><br>
+                  ${esc(os.servico_executado || 'Manutenção executada conforme protocolo EMED.')}
+                </div>
+
+                <!-- Formulário de Triagem do Gestor -->
+                <div style="background:#0b1329;border:1px solid #1e3a8a;border-radius:8px;padding:10px 12px;display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:10px;font-size:11.5px;">
+                  <!-- Cobrança -->
+                  <div>
+                    <label style="font-weight:800;color:#38bdf8;display:block;margin-bottom:4px;">💰 Faturamento / Cobrança:</label>
+                    <select id="triagemCobrancaTipo_${os.id}" class="form-control" style="background:#0f172a;color:#f8fafc;border-color:#334155;font-size:11px;padding:4px 6px;">
+                      <option value="INCLUSO_CONTRATO">🟢 Incluso em Contrato (Sem Cobrança)</option>
+                      <option value="FATURAMENTO_BOLETO">📄 Boleto Bancário (Avulso)</option>
+                      <option value="FATURAMENTO_PIX">⚡ PIX (10% de Desconto)</option>
+                      <option value="FATURAMENTO_GARANTIA">🛡️ Em Garantia de Serviço</option>
+                    </select>
+                    <input type="number" id="triagemCobrancaValor_${os.id}" placeholder="Valor R$ (se avulso)" value="${os.valor_os > 0 ? os.valor_os : ''}" class="form-control" style="background:#0f172a;color:#4ade80;font-weight:800;border-color:#334155;font-size:11px;padding:4px 6px;margin-top:4px;">
+                  </div>
+
+                  <!-- Pendências de Retorno -->
+                  <div>
+                    <label style="font-weight:800;color:#fde047;display:block;margin-bottom:4px;">⚠️ Pendências / Retorno:</label>
+                    <input type="text" id="triagemPendenciaObs_${os.id}" placeholder="Sem pendências (ou descreva retorno/peça)" value="${esc(os.pendencias || '')}" class="form-control" style="background:#0f172a;color:#f8fafc;border-color:#334155;font-size:11px;padding:4px 6px;">
+                    <label style="display:flex;align-items:center;gap:6px;color:#94a3b8;font-size:10.5px;margin-top:6px;cursor:pointer;">
+                      <input type="checkbox" id="triagemProforma_${os.id}" ${os.tipo_servico === 'PREVENTIVA' ? 'checked' : ''}>
+                      <span>Emitir Proforma / Certificado de Conformidade</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-top:4px;">
+                  <button type="button" class="btn btn-outline btn-xs" onclick="window.open('/api/imprimir/${os.id}', '_blank')" style="border-color:#64748b;color:#cbd5e1;padding:5px 10px;font-size:11px;border-radius:5px;">
+                    👁️ Ver Laudo Prévio
+                  </button>
+                  <button type="button" class="btn btn-sm" onclick="aprovarTriagemOS('${os.id}')" style="background:#16a34a;color:#ffffff;font-weight:900;border:none;padding:6px 16px;border-radius:6px;font-size:11.5px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                    ✅ Aprovar & Disparar Laudo ao Cliente
+                  </button>
+                </div>
+              </div>
+            `;
+          });
+        }
+
+        modalDiv.innerHTML = `
+          <div style="background:#090d16;color:#f8fafc;width:100%;max-width:850px;max-height:92vh;overflow-y:auto;border-radius:14px;border:1px solid #0284c7;box-shadow:0 20px 40px rgba(0,0,0,0.8);display:flex;flex-direction:column;">
+            <div style="background:linear-gradient(90deg, #0369a1, #0f172a);padding:14px 18px;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center;border-top-left-radius:13px;border-top-right-radius:13px;">
+              <div>
+                <div style="font-size:15px;font-weight:900;color:#e0f2fe;display:flex;align-items:center;gap:8px;">
+                  📋 FILA DE TRIAGEM PÓS-ATENDIMENTO (AUDITORIA & LIBERAÇÃO)
+                </div>
+                <div style="font-size:11.5px;color:#bae6fd;margin-top:2px;">
+                  Avalie cobrança, pendências e proforma antes da liberação e envio automático da OS ao cliente.
+                </div>
+              </div>
+              <button onclick="document.getElementById('modalTriagemPosAtendimentoBox')?.remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;padding:4px 8px;">✕</button>
+            </div>
+
+            <div style="padding:16px 18px;display:flex;flex-direction:column;gap:12px;">
+              ${cardsHtml}
+            </div>
+
+            <div style="background:#0f172a;padding:12px 18px;border-top:1px solid #1e293b;display:flex;justify-content:flex-end;border-bottom-left-radius:13px;border-bottom-right-radius:13px;">
+              <button onclick="document.getElementById('modalTriagemPosAtendimentoBox')?.remove()" style="background:#334155;color:#e2e8f0;border:none;padding:6px 16px;border-radius:6px;font-weight:700;cursor:pointer;">Fechar</button>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(modalDiv);
+
+      } catch (err) {
+        console.error(err);
+        mostrarToast("Erro ao abrir triagem: " + err.message);
+      }
+    }
+    window.abrirPainelTriagemPosAtendimento = abrirPainelTriagemPosAtendimento;
+
+    async function aprovarTriagemOS(osId) {
+      const cobrancaTipo = document.getElementById(`triagemCobrancaTipo_${osId}`)?.value || "INCLUSO_CONTRATO";
+      const cobrancaValor = parseFloat(document.getElementById(`triagemCobrancaValor_${osId}`)?.value || 0.0);
+      const pendenciaObs = document.getElementById(`triagemPendenciaObs_${osId}`)?.value || "";
+      const gerarProforma = document.getElementById(`triagemProforma_${osId}`)?.checked || false;
+
+      mostrarToast(`💾 Homologando OS #${osId} e preparando laudo do cliente...`, 2000);
+      try {
+        const res = await apiPost("/api/triagem/aprovar", {
+          os_id: parseInt(osId),
+          responsavel: "GESTOR NETTO",
+          cobranca_tipo: cobrancaTipo,
+          cobranca_valor: cobrancaValor,
+          pendencia_obs: pendenciaObs,
+          gerar_proforma: gerarProforma
+        });
+
+        if (res && res.ok) {
+          mostrarToast(`✅ OS #${osId} aprovada e liberada com sucesso!`, 3000);
+          
+          // Se tiver WhatsApp do cliente, abre modal com botão de envio imediato
+          if (res.mensagem_cliente && res.telefone_cliente) {
+            let tel = res.telefone_cliente.replace(/\D/g, "");
+            if (tel.length === 10 || tel.length === 11) tel = "55" + tel;
+            const zapUrl = `https://api.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(res.mensagem_cliente)}`;
+            
+            if (confirm(`✅ OS #${osId} homologada com sucesso!
+
+Deseja disparar o laudo técnico agora no WhatsApp do cliente (${res.telefone_cliente})?`)) {
+              window.open(zapUrl, "_blank");
+            }
+          }
+
+          // Recarrega lista
+          abrirPainelTriagemPosAtendimento();
+        } else {
+          mostrarToast(`⚠️ Não foi possível aprovar: ${res?.msg || "Erro desconhecido"}`);
+        }
+      } catch (err) {
+        console.error(err);
+        mostrarToast("Erro ao homologar OS: " + err.message);
+      }
+    }
+    window.aprovarTriagemOS = aprovarTriagemOS;
+
+
+    // =========================================================================
+    // FRENTE 2: CHECKLIST SEMANAL DE FROTAS (GESTOR DE VEÍCULOS)
+    // =========================================================================
+    async function abrirPainelChecklistSemanalFrota() {
+      mostrarToast("🚗 Carregando status semanal dos veículos da frota...", 1800);
+      try {
+        const res = await apiGet("/api/frota/checklists-status");
+        if (!res || !res.ok) {
+          mostrarToast("Não foi possível carregar a frota.");
+          return;
+        }
+
+        document.getElementById("modalChecklistFrotaBox")?.remove();
+
+        const modalDiv = document.createElement("div");
+        modalDiv.id = "modalChecklistFrotaBox";
+        modalDiv.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(2,6,23,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;backdrop-filter:blur(4px);";
+
+        const veiculos = res.veiculos || [];
+        let veicsHtml = "";
+
+        veiculos.forEach(v => {
+          veicsHtml += `
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e293b;padding-bottom:8px;">
+                <div>
+                  <b style="font-size:14px;color:#f8fafc;">🚗 ${esc(v.modelo)} • ${esc(v.placa)}</b>
+                  <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Condutor Designado: <b style="color:#38bdf8;">${esc(v.condutor)}</b></div>
+                </div>
+                <span style="background:${v.cor_status};color:#fff;font-size:10px;font-weight:800;padding:3px 8px;border-radius:4px;">
+                  ${v.lbl_status}
+                </span>
+              </div>
+
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:8px;font-size:11.5px;color:#cbd5e1;">
+                <div>⏱️ <b>Hodômetro:</b> ${v.km_atual.toLocaleString('pt-BR')} km</div>
+                <div>📅 <b>Último Checklist:</b> ${v.ultimo_checklist}</div>
+                <div>🔄 <b>Periodicidade:</b> A cada ${v.intervalo_dias} dias</div>
+              </div>
+
+              <!-- Formulário de Inspeção Rápida -->
+              <div style="background:#020617;border:1px solid #1e293b;border-radius:8px;padding:10px;display:grid;grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));gap:8px;font-size:11px;">
+                <div>
+                  <label style="color:#94a3b8;display:block;margin-bottom:2px;">KM Atual Hodômetro:</label>
+                  <input type="number" id="chkKm_${v.id}" value="${v.km_atual}" class="form-control" style="background:#0f172a;color:#f8fafc;border-color:#334155;font-size:11px;padding:3px 6px;">
+                </div>
+                <div>
+                  <label style="color:#94a3b8;display:block;margin-bottom:2px;">Nível de Óleo:</label>
+                  <select id="chkOleo_${v.id}" class="form-control" style="background:#0f172a;color:#f8fafc;border-color:#334155;font-size:11px;padding:3px 6px;">
+                    <option value="NORMAL">🟢 Normal</option>
+                    <option value="BAIXO">🔴 Baixo (Completar)</option>
+                    <option value="TROCA_NECESSARIA">🟡 Troca Necessária</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="color:#94a3b8;display:block;margin-bottom:2px;">Pneus & Calibragem:</label>
+                  <select id="chkPneus_${v.id}" class="form-control" style="background:#0f172a;color:#f8fafc;border-color:#334155;font-size:11px;padding:3px 6px;">
+                    <option value="NORMAL">🟢 Calibrados & Bons</option>
+                    <option value="CALIBRAR">🟡 Necessita Calibragem</option>
+                    <option value="DESGASTE">🔴 Pneu Careca / Troca</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="color:#94a3b8;display:block;margin-bottom:2px;">Água / Arrefecimento:</label>
+                  <select id="chkArref_${v.id}" class="form-control" style="background:#0f172a;color:#f8fafc;border-color:#334155;font-size:11px;padding:3px 6px;">
+                    <option value="NORMAL">🟢 Normal</option>
+                    <option value="BAIXO">🔴 Baixo (Adicionar)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="color:#94a3b8;display:block;margin-bottom:2px;">Faróis & Lanternas:</label>
+                  <select id="chkLuzes_${v.id}" class="form-control" style="background:#0f172a;color:#f8fafc;border-color:#334155;font-size:11px;padding:3px 6px;">
+                    <option value="FUNCIONANDO">🟢 100% Funcionando</option>
+                    <option value="LAMPADA_QUEIMADA">🟡 Lâmpada Queimada</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="color:#94a3b8;display:block;margin-bottom:2px;">Freios & Ar-Cond.:</label>
+                  <select id="chkFreios_${v.id}" class="form-control" style="background:#0f172a;color:#f8fafc;border-color:#334155;font-size:11px;padding:3px 6px;">
+                    <option value="NORMAL">🟢 Eficiente & Gelando</option>
+                    <option value="REVISAO">🟡 Revisão Recomendada</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">
+                <input type="text" id="chkObs_${v.id}" placeholder="Observações de avaria, limpeza ou manutenção preventiva..." class="form-control" style="background:#020617;color:#f8fafc;border-color:#334155;font-size:11px;padding:4px 8px;flex:1;margin-right:8px;">
+                <button type="button" class="btn btn-sm" onclick="salvarChecklistVeiculoGestor('${v.id}', '${esc(v.placa)}')" style="background:#16a34a;color:#fff;font-weight:900;border:none;padding:6px 14px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;">
+                  💾 Gravar Checklist
+                </button>
+              </div>
+            </div>
+          `;
+        });
+
+        modalDiv.innerHTML = `
+          <div style="background:#090d16;color:#f8fafc;width:100%;max-width:850px;max-height:92vh;overflow-y:auto;border-radius:14px;border:1px solid #16a34a;box-shadow:0 20px 40px rgba(0,0,0,0.8);display:flex;flex-direction:column;">
+            <div style="background:linear-gradient(90deg, #14532d, #0f172a);padding:14px 18px;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center;border-top-left-radius:13px;border-top-right-radius:13px;">
+              <div>
+                <div style="font-size:15px;font-weight:900;color:#dcfce7;display:flex;align-items:center;gap:8px;">
+                  🚗 GESTÃO SEMANAL DE FROTAS & CHECKLIST VEICULAR
+                </div>
+                <div style="font-size:11.5px;color:#86efac;margin-top:2px;">
+                  Inspeção obrigatória a cada 7 dias para assegurar conformidade operacional e auditoria dos R$ 0,31/km.
+                </div>
+              </div>
+              <button onclick="document.getElementById('modalChecklistFrotaBox')?.remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;padding:4px 8px;">✕</button>
+            </div>
+
+            <div style="padding:16px 18px;display:flex;flex-direction:column;gap:12px;">
+              ${veicsHtml}
+            </div>
+
+            <div style="background:#0f172a;padding:12px 18px;border-top:1px solid #1e293b;display:flex;justify-content:flex-end;border-bottom-left-radius:13px;border-bottom-right-radius:13px;">
+              <button onclick="document.getElementById('modalChecklistFrotaBox')?.remove()" style="background:#334155;color:#e2e8f0;border:none;padding:6px 16px;border-radius:6px;font-weight:700;cursor:pointer;">Fechar</button>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(modalDiv);
+
+      } catch (err) {
+        console.error(err);
+        mostrarToast("Erro ao abrir checklist de frota: " + err.message);
+      }
+    }
+    window.abrirPainelChecklistSemanalFrota = abrirPainelChecklistSemanalFrota;
+
+    async function salvarChecklistVeiculoGestor(veiculoId, placa) {
+      const km = parseInt(document.getElementById(`chkKm_${veiculoId}`)?.value || 0);
+      const oleo = document.getElementById(`chkOleo_${veiculoId}`)?.value || "NORMAL";
+      const pneus = document.getElementById(`chkPneus_${veiculoId}`)?.value || "NORMAL";
+      const arref = document.getElementById(`chkArref_${veiculoId}`)?.value || "NORMAL";
+      const luzes = document.getElementById(`chkLuzes_${veiculoId}`)?.value || "FUNCIONANDO";
+      const freios = document.getElementById(`chkFreios_${veiculoId}`)?.value || "NORMAL";
+      const obs = document.getElementById(`chkObs_${veiculoId}`)?.value || "";
+
+      mostrarToast(`💾 Gravando inspeção do veículo ${placa}...`, 1800);
+      try {
+        const res = await apiPost("/api/frota/checklist-salvar", {
+          veiculo_id: parseInt(veiculoId),
+          placa: placa,
+          gestor: "GESTOR DE FROTAS",
+          km_atual: km,
+          nivel_oleo: oleo,
+          freios: freios,
+          pneus: pneus,
+          luzes: luzes,
+          arrefecimento: arref,
+          observacoes: obs,
+          status_geral: "APROVADO"
+        });
+
+        if (res && res.ok) {
+          mostrarToast(`✅ Checklist semanal do veículo ${placa} salvo com sucesso!`, 3000);
+          abrirPainelChecklistSemanalFrota();
+        } else {
+          mostrarToast(`⚠️ Não foi possível salvar: ${res?.msg || "Erro desconhecido"}`);
+        }
+      } catch (err) {
+        console.error(err);
+        mostrarToast("Erro ao salvar checklist: " + err.message);
+      }
+    }
+    window.salvarChecklistVeiculoGestor = salvarChecklistVeiculoGestor;
+
+
+    // =========================================================================
+    // FRENTE 3: COPILOTO PREDITIVO DE PEÇAS & ALMOXARIFADO INTELIGENTE
+    // =========================================================================
+    async function dispararCopilotoPreditivoPecas(equip, defeito) {
+      const boxSugs = document.getElementById("boxSugestoesPecasCopiloto");
+      if (!boxSugs) return;
+
+      boxSugs.innerHTML = "<div style='color:#38bdf8;font-size:11px;'>🔍 Copiloto analisando falha e buscando peças no almoxarifado...</div>";
+
+      try {
+        const res = await apiGet(`/api/almoxarifado/sugestao-pecas?equipamento=${encodeURIComponent(equip || '')}&defeito=${encodeURIComponent(defeito || '')}`);
+        if (!res || !res.ok || !res.pecas || res.pecas.length === 0) {
+          boxSugs.innerHTML = "<div style='color:#94a3b8;font-size:11px;'>Nenhuma peça específica sugerida para esta queixa. Consulte o almoxarifado geral.</div>";
+          return;
+        }
+
+        let html = "<div style='display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:6px;margin-top:4px;'>";
+        res.pecas.forEach(p => {
+          const temSaldo = p.saldo > 0;
+          html += `
+            <div style="background:${temSaldo ? '#0c4a6e' : '#1e293b'};border:1px solid ${temSaldo ? '#0284c7' : '#334155'};border-radius:6px;padding:6px 8px;display:flex;flex-direction:column;gap:3px;font-size:10.5px;">
+              <div style="font-weight:900;color:${temSaldo ? '#bae6fd' : '#f8fafc'};line-height:1.2;">
+                ${esc(p.nome)}
+              </div>
+              <div style="display:flex;justify-content:space-between;color:#94a3b8;font-size:9.5px;">
+                <span>Cód: ${esc(p.codigo)}</span>
+                <span style="font-weight:800;color:${temSaldo ? '#4ade80' : '#f87171'};">Estoque: ${p.saldo} un</span>
+              </div>
+              <div style="font-size:9px;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                📍 ${esc(p.localizacao)}
+              </div>
+              <button type="button" class="btn btn-xs" onclick="selecionarPecaCopiloto('${esc(p.nome)}')" style="background:${temSaldo ? '#0284c7' : '#475569'};color:#fff;border:none;font-size:9.5px;font-weight:800;padding:2px 6px;border-radius:3px;margin-top:2px;cursor:pointer;">
+                ${temSaldo ? '📦 Selecionar Peça' : '⚠️ Sob Encomenda'}
+              </button>
+            </div>
+          `;
+        });
+        html += "</div>";
+        boxSugs.innerHTML = html;
+      } catch (err) {
+        boxSugs.innerHTML = "<div style='color:#f87171;font-size:11px;'>Erro ao sugerir peças do almoxarifado.</div>";
+      }
+    }
+    window.dispararCopilotoPreditivoPecas = dispararCopilotoPreditivoPecas;
+
+    function selecionarPecaCopiloto(nomePeca) {
+      const sel = document.getElementById("osPecaSel");
+      if (sel) {
+        // Tenta achar no select ou coloca no modo manual
+        let achou = false;
+        for (let i = 0; i < sel.options.length; i++) {
+          if (sel.options[i].text.toUpperCase().includes(nomePeca.toUpperCase())) {
+            sel.selectedIndex = i;
+            achou = true;
+            break;
+          }
+        }
+        if (!achou) {
+          sel.value = "MANUAL";
+          const inpMan = document.getElementById("osPecaManual");
+          if (inpMan) {
+            inpMan.style.display = "block";
+            inpMan.value = nomePeca;
+          }
+        }
+        mostrarToast(`📦 Peça '${nomePeca}' selecionada para a OS!`, 2500);
+        if (typeof autoSalvarRascunho === "function") autoSalvarRascunho();
+      }
+    }
+    window.selecionarPecaCopiloto = selecionarPecaCopiloto;
+
+
+    // =========================================================================
+    // FRENTE 4: PAINEL DE CAUTELA DE FERRAMENTAS & CALIBRAÇÃO RBC (ALMOXARIFADO)
+    // =========================================================================
+    async function abrirPainelCautelaFerramentasRBC() {
+      mostrarToast("🧰 Carregando cautela de ferramentas & monitoramento RBC...", 1800);
+      try {
+        const res = await apiGet("/api/almoxarifado/ferramentas-cautela");
+        if (!res || !res.ok) {
+          mostrarToast("Não foi possível carregar as ferramentas.");
+          return;
+        }
+
+        document.getElementById("modalCautelaFerramentasBox")?.remove();
+
+        const modalDiv = document.createElement("div");
+        modalDiv.id = "modalCautelaFerramentasBox";
+        modalDiv.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(2,6,23,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;backdrop-filter:blur(4px);";
+
+        const totais = res.totais || {};
+        const ferramentas = res.ferramentas || [];
+
+        let rowsHtml = "";
+        ferramentas.forEach(f => {
+          const isDisp = (f.status === "DISPONIVEL");
+          rowsHtml += `
+            <tr style="border-bottom:1px solid #1e293b;font-size:11.5px;">
+              <td style="padding:8px 10px;font-weight:800;color:#38bdf8;">${esc(f.codigo)}</td>
+              <td style="padding:8px 10px;font-weight:700;color:#f8fafc;">
+                ${esc(f.nome)}<br>
+                <small style="color:#64748b;font-size:10px;">Série: ${esc(f.numero_serie)} • ${esc(f.localizacao)}</small>
+              </td>
+              <td style="padding:8px 10px;">
+                <span style="background:${isDisp ? '#166534' : '#1e3a8a'};color:#fff;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:4px;">
+                  ${isDisp ? '🟢 DISPONÍVEL' : `🔵 COM ${esc(f.tecnico)}`}
+                </span>
+                ${!isDisp && f.cliente ? `<div style="font-size:9.5px;color:#94a3b8;margin-top:2px;">Cliente: ${esc(f.cliente)} (OS #${esc(f.os_id)})</div>` : ''}
+              </td>
+              <td style="padding:8px 10px;">
+                <span style="background:${f.cor_rbc};color:#fff;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:4px;">
+                  ${f.lbl_rbc}
+                </span>
+                <div style="font-size:9.5px;color:#94a3b8;margin-top:2px;">Cert: ${esc(f.certificado_rbc)}</div>
+              </td>
+              <td style="padding:8px 10px;text-align:right;">
+                ${isDisp ? `
+                  <button type="button" class="btn btn-xs" onclick="abrirModalRegistrarCautela('${f.id}', '${esc(f.nome)}', 'SAIDA')" style="background:#0284c7;color:#fff;border:none;font-weight:800;padding:3px 8px;border-radius:4px;cursor:pointer;">
+                    📤 Cautelar
+                  </button>
+                ` : `
+                  <button type="button" class="btn btn-xs" onclick="registrarDevolucaoCautelaDireto('${f.id}')" style="background:#16a34a;color:#fff;border:none;font-weight:800;padding:3px 8px;border-radius:4px;cursor:pointer;">
+                    📥 Devolver
+                  </button>
+                `}
+              </td>
+            </tr>
+          `;
+        });
+
+        modalDiv.innerHTML = `
+          <div style="background:#090d16;color:#f8fafc;width:100%;max-width:960px;max-height:92vh;overflow-y:auto;border-radius:14px;border:1px solid #0284c7;box-shadow:0 20px 40px rgba(0,0,0,0.8);display:flex;flex-direction:column;">
+            <div style="background:linear-gradient(90deg, #0369a1, #0f172a);padding:14px 20px;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:16px;font-weight:900;color:#e0f2fe;display:flex;align-items:center;gap:8px;">
+                  🧰 CAUTELA DE FERRAMENTAS & CALIBRAÇÃO RBC (ALMOXARIFADO)
+                </div>
+                <div style="font-size:11.5px;color:#bae6fd;margin-top:2px;">
+                  Controle de instrumentos de precisão biomédica e monitoramento rigoroso de validade dos laudos RBC.
+                </div>
+              </div>
+              <button onclick="document.getElementById('modalCautelaFerramentasBox')?.remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;padding:4px 8px;">✕</button>
+            </div>
+
+            <div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px;">
+              <!-- KPI Cards -->
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));gap:10px;">
+                <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px;">
+                  <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;">Total Ferramentas</div>
+                  <div style="font-size:18px;font-weight:900;color:#38bdf8;margin-top:2px;">${totais.total || 0} itens</div>
+                </div>
+                <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px;">
+                  <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;">No Almoxarifado Central</div>
+                  <div style="font-size:18px;font-weight:900;color:#4ade80;margin-top:2px;">${totais.disponiveis || 0} disponíveis</div>
+                </div>
+                <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px;">
+                  <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;">Em Campo com Técnicos</div>
+                  <div style="font-size:18px;font-weight:900;color:#fde047;margin-top:2px;">${totais.em_uso || 0} em uso</div>
+                </div>
+                <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px;">
+                  <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;">Calibração RBC Alerta</div>
+                  <div style="font-size:18px;font-weight:900;color:#f87171;margin-top:2px;">${totais.calibracao_vencendo || 0} vencendo / ${totais.vencidas || 0} vencidas</div>
+                </div>
+              </div>
+
+              <!-- Tabela de Ferramentas -->
+              <div style="border:1px solid #1e293b;border-radius:8px;overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;text-align:left;">
+                  <thead style="background:#0f172a;border-bottom:2px solid #334155;font-size:10.5px;color:#94a3b8;text-transform:uppercase;">
+                    <tr>
+                      <th style="padding:9px 10px;">Cód</th>
+                      <th style="padding:9px 10px;">Instrumento / Modelo</th>
+                      <th style="padding:9px 10px;">Status de Cautela</th>
+                      <th style="padding:9px 10px;">Calibração RBC</th>
+                      <th style="padding:9px 10px;text-align:right;">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rowsHtml}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div style="background:#0f172a;padding:12px 20px;border-top:1px solid #1e293b;display:flex;justify-content:flex-end;">
+              <button onclick="document.getElementById('modalCautelaFerramentasBox')?.remove()" style="background:#334155;color:#f8fafc;border:none;padding:6px 16px;border-radius:6px;font-weight:700;cursor:pointer;">Fechar</button>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(modalDiv);
+
+      } catch (err) {
+        console.error(err);
+        mostrarToast("Erro ao abrir cautela: " + err.message);
+      }
+    }
+    window.abrirPainelCautelaFerramentasRBC = abrirPainelCautelaFerramentasRBC;
+
+    async function registrarDevolucaoCautelaDireto(ferramentaId) {
+      mostrarToast("📥 Registrando devolução ao almoxarifado central...", 1500);
+      try {
+        const res = await apiPost("/api/almoxarifado/cautela-registrar", {
+          ferramenta_id: parseInt(ferramentaId),
+          acao: "DEVOLUCAO",
+          operador: "ALMOXARIFE",
+          observacao: "Devolução confirmada no almoxarifado central"
+        });
+        if (res && res.ok) {
+          mostrarToast("✅ Ferramenta devolvida com sucesso ao almoxarifado!", 2500);
+          abrirPainelCautelaFerramentasRBC();
+        } else {
+          mostrarToast(`⚠️ Não foi possível devolver: ${res?.msg || "Erro"}`);
+        }
+      } catch (err) {
+        mostrarToast("Erro ao registrar devolução: " + err.message);
+      }
+    }
+    window.registrarDevolucaoCautelaDireto = registrarDevolucaoCautelaDireto;
+
+    function abrirModalRegistrarCautela(fId, nome, acao) {
+      const tec = prompt(`📤 Cautelar '${nome}' para qual Técnico?\n(Digite NETTO, LEONARDO, ANTONIO, ARQUIMEDES, GABRIEL, TONY, etc):`, "LEONARDO");
+      if (!tec) return;
+      const cli = prompt(`Qual o Cliente de destino?`, "HOSPITAL SAO CARLOS") || "";
+      const osId = prompt(`Número da OS (opcional):`, "") || "";
+
+      apiPost("/api/almoxarifado/cautela-registrar", {
+        ferramenta_id: parseInt(fId),
+        acao: "SAIDA",
+        tecnico: tec.toUpperCase(),
+        cliente: cli.toUpperCase(),
+        os_id: osId,
+        operador: "ALMOXARIFE",
+        observacao: "Retirada autorizada pelo almoxarifado"
+      }).then(res => {
+        if (res && res.ok) {
+          mostrarToast(`✅ Cautela registrada com sucesso para ${tec}!`, 2500);
+          abrirPainelCautelaFerramentasRBC();
+        } else {
+          mostrarToast(`⚠️ Erro: ${res?.msg || "Falha"}`);
+        }
+      });
+    }
+    window.abrirModalRegistrarCautela = abrirModalRegistrarCautela;
 
 
 </script>

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v66-credenciamento-portaria-e-telemetria-tubo';
+const CACHE_NAME = 'emed-pwa-v67-triagem-frota-copiloto-cautela';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

@@ -370,7 +370,22 @@ from emed_services.hospital_autorizacao import (
     obter_dados_credenciamento_os,
     gerar_texto_whatsapp_portaria,
     gerar_html_autorizacao_entrada,
-    gerar_html_termo_aceite_instalacao
+    gerar_html_termo_aceite_instalacao,
+    obter_lista_tecnicos_credenciamento,
+    registrar_credenciamento_os
+)
+from emed_services.triagem_pos_atendimento import (
+    obter_fila_triagem_pos_atendimento,
+    aprovar_triagem_os
+)
+from emed_services.frota_gestao_checklist import (
+    obter_status_checklists_veiculos,
+    salvar_checklist_veicular_gestor
+)
+from emed_services.copiloto_pecas_preditivo import sugerir_pecas_por_defeito
+from emed_services.almoxarifado_cautela_rbc import (
+    obter_painel_cautela_ferramentas,
+    registrar_movimento_cautela
 )
 from emed_services.equipamento_qrcode import (
     obter_historico_anual_equipamento,
@@ -1702,6 +1717,11 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/api/fleet")
         or path.startswith("/api/instalacao/")
         or path.startswith("/api/imprimir/")
+        or path.startswith("/api/triagem/")
+        or path.startswith("/api/frota/")
+        or path.startswith("/api/almoxarifado/")
+        or path.startswith("/api/hospital/")
+        or path.startswith("/api/gestao/")
     ):
         return await handler(request)
 
@@ -5548,11 +5568,15 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
+    elif acao == "CONCLUIR_LIBERADO":
+        df.at[idx_alvo, "status"] = "CONCLUÍDO / LIBERADO AO CLIENTE"
+        df.at[idx_alvo, "triagem_concluida"] = 1
+        msg_final = f"✅ OS #{os_id} homologada pela triagem e liberada ao cliente!"
     else:
-
-
-
-        df.at[idx_alvo, "status"] = "CONCLUÍDO"
+        # Fila de Triagem Pós-Atendimento: avalia cobrança, pendência e proforma antes de liberar ao cliente
+        df.at[idx_alvo, "status"] = "AGUARDANDO TRIAGEM / LIBERAÇÃO"
+        df.at[idx_alvo, "triagem_concluida"] = 0
+        msg_final = f"📋 OS #{os_id} concluída em campo e enviada para Triagem da Gestão / Financeiro (Fila de Liberação)!" 
 
         try:
             registrar_aplicacao_definitiva_e_fluxo_cobranca(
@@ -11607,6 +11631,13 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/equipamento/status", api_equipamento_status)
     app.router.add_post("/api/sistema/backup-onedrive", api_fazer_backup_onedrive)
     app.router.add_get("/api/sistema/backup-onedrive", api_fazer_backup_onedrive)
+    app.router.add_get("/api/triagem/fila", api_triagem_fila)
+    app.router.add_post("/api/triagem/aprovar", api_triagem_aprovar)
+    app.router.add_get("/api/frota/checklists-status", api_frota_checklists_status)
+    app.router.add_post("/api/frota/checklist-salvar", api_frota_checklist_salvar)
+    app.router.add_get("/api/almoxarifado/sugestao-pecas", api_almoxarifado_sugestao_pecas)
+    app.router.add_get("/api/almoxarifado/ferramentas-cautela", api_almoxarifado_cautela_painel)
+    app.router.add_post("/api/almoxarifado/cautela-registrar", api_almoxarifado_cautela_registrar)
 
     return app
 
@@ -11618,6 +11649,84 @@ def criar_app() -> web.Application:
 
 
 
+
+
+
+# =========================================================================
+# ROTAS ESTRATÉGICAS: TRIAGEM, FROTAS, COPILOTO E CAUTELA RBC
+# =========================================================================
+async def api_triagem_fila(request: web.Request) -> web.Response:
+    """Retorna fila de OSs aguardando triagem da gestão pós-fechamento."""
+    try:
+        fila = obter_fila_triagem_pos_atendimento(DB_NAME)
+        return web.json_response({"ok": True, "fila": fila, "total": len(fila)})
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_triagem_aprovar(request: web.Request) -> web.Response:
+    """Aprova a OS na triagem, define cobrança/pendência e prepara liberação ao cliente."""
+    try:
+        body = await request.json()
+        os_id = int(body.get("os_id", 0))
+        if not os_id:
+            return web.json_response({"ok": False, "msg": "ID da OS obrigatório."}, status=400)
+        
+        res = aprovar_triagem_os(DB_NAME, os_id, body)
+        global _CACHE_BOOTSTRAP
+        _CACHE_BOOTSTRAP = None
+        return web.json_response(res)
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_frota_checklists_status(request: web.Request) -> web.Response:
+    """Retorna o status semanal dos checklists veiculares da frota."""
+    try:
+        veiculos = obter_status_checklists_veiculos(DB_NAME)
+        return web.json_response({"ok": True, "veiculos": veiculos})
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_frota_checklist_salvar(request: web.Request) -> web.Response:
+    """Salva o checklist veicular semanal do gestor de frota."""
+    try:
+        body = await request.json()
+        res = salvar_checklist_veicular_gestor(DB_NAME, body)
+        return web.json_response(res)
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_almoxarifado_sugestao_pecas(request: web.Request) -> web.Response:
+    """Copiloto preditivo: sugere peças em estoque com base no defeito e equipamento."""
+    try:
+        equip = request.query.get("equipamento", "")
+        defeito = request.query.get("defeito", "")
+        pecas = sugerir_pecas_por_defeito(DB_NAME, equip, defeito)
+        return web.json_response({"ok": True, "pecas": pecas})
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_almoxarifado_cautela_painel(request: web.Request) -> web.Response:
+    """Painel do almoxarife: inventário de cautela e monitoramento de calibração RBC."""
+    try:
+        dados = obter_painel_cautela_ferramentas(DB_NAME)
+        return web.json_response(dados)
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_almoxarifado_cautela_registrar(request: web.Request) -> web.Response:
+    """Registra saída ou devolução de ferramenta na cautela do almoxarifado."""
+    try:
+        body = await request.json()
+        res = registrar_movimento_cautela(DB_NAME, body)
+        return web.json_response(res)
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
 
 
 async def _background_keep_alive_task():
