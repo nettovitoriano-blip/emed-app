@@ -93880,7 +93880,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
       renderizarTelaPrincipal();
     }
 
-    function selecionarMenu(menuId, perfilOpcional = null) {
+function selecionarMenu(menuId, perfilOpcional = null) {
       const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase();
       const usuarioPerfil = (localStorage.getItem("emed_perfil_usuario") || "").toUpperCase();
       const isGestor = (usuarioNome === "NETTO") || usuarioPerfil.includes("GESTOR") || usuarioPerfil.includes("MASTER") || (usuarioNome === "");
@@ -110540,13 +110540,13 @@ function renderizarNavegacao() {
                     </div>
 
                     <div class="os-card-body" style="padding:12px;">
-                      <div class="os-cli" style="font-size:15.5px; font-weight:900; color:#f8fafc; margin-bottom:4px;">
+                      <div class="os-cli" style="font-size:16px; font-weight:900; color:#0f172a; margin-bottom:4px;">
                         🏥 ${esc(r.cliente)}
                       </div>
                       ${r.endereco ? `<div style="font-size:11.5px; color:#94a3b8; margin-bottom:6px;">📍 ${esc(r.endereco)}</div>` : ""}
 
                       <!-- COORDENADAS E STATUS GEOFENCE -->
-                      <div id="geofence_box_${idx}" style="background:rgba(0,0,0,0.25); border-radius:8px; padding:8px 10px; margin-bottom:10px; font-size:12px; border:1px solid rgba(255,255,255,0.06);">
+                      <div id="geofence_box_${idx}" style="background:#f8fafc; border-radius:8px; padding:10px; margin-bottom:10px; font-size:12px; border:1px solid #e2e8f0; color:#0f172a;">
                         ${todasConcluidas ? `
                           <div style="color:#34d399; font-weight:700; display:flex; align-items:center; gap:6px;">
                             <span>🏁</span> Atendimento finalizado. Entrada: <strong>${horaCheckin}</strong> | Saída: <strong>${horaCheckout}</strong> ${duracaoAtendimento ? `(Tempo: ${duracaoAtendimento})` : ''}
@@ -110556,7 +110556,7 @@ function renderizarNavegacao() {
                             <span>✅</span> Check-in presencial confirmado às <strong>${horaCheckin}</strong> (Presença validada por GPS).
                           </div>
                         ` : emDeslocamento ? `
-                          <div style="color:#fbbf24; font-weight:800;">
+                          <div style="color:#b45309; font-weight:800;">
                             <div>🚗 Deslocamento iniciado. Monitorando aproximação GPS...</div>
                             <div id="distancia_txt_${idx}" style="font-size:13px; font-weight:900; color:#38bdf8; margin-top:3px;">
                               📡 Calculando distância exata...
@@ -110566,16 +110566,16 @@ function renderizarNavegacao() {
                             </div>
                           </div>
                         ` : `
-                          <div style="color:#94a3b8; font-size:11.5px;">
+                          <div style="color:#64748b; font-size:11.5px;">
                             🎯 <strong>Validação Geofence 250m:</strong> Inicie o deslocamento para ativar a detecção automática de chegada.
                           </div>
                         `}
                       </div>
 
                       <!-- LISTA DE OS DA PARADA -->
-                      <div style="background:rgba(255,255,255,0.03); border-radius:6px; padding:8px; margin-bottom:12px;">
+                      <div style="background:#f1f5f9; border-radius:6px; padding:8px; margin-bottom:12px; border:1px solid #e2e8f0;">
                         ${r.ordens.map(os => `
-                          <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:12px;">
+                          <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #e2e8f0; font-size:12px; color:#1e293b;">
                             <div>
                               <strong style="color:#38bdf8;">OS #${os.id}</strong> — ${esc(os.equipamento || "Equipamento")}
                             </div>
@@ -110731,8 +110731,7 @@ Deseja confirmar mesmo assim com justificativa de chegada?`);
           }
         },
         err => {
-          const conf = confirm("Não foi possível obter o sinal de satélite exato do GPS agora.
-Deseja registrar o Check-in presencial?");
+          const conf = confirm("Não foi possível obter o sinal de satélite exato do GPS agora.\nDeseja registrar o Check-in presencial?");
           if (conf) executarCheckinServidor(osIds, 0, destLat, destLon, "GPS_TIMEOUT_CONFIRMADO");
         },
         { enableHighAccuracy: true, timeout: 10000 }
@@ -110935,6 +110934,19 @@ Deseja registrar o Check-in presencial?");
         mostrarToast("Erro de conexão ao assumir veículo: " + err.message, "erro");
       }
     }
+
+    // Exposição global das funções do Técnico para o DOM e eventos onclick
+    window.calcularDistanciaMetros = calcularDistanciaMetros;
+    window.renderMenuTecRotas = renderMenuTecRotas;
+    window.iniciarMonitoramentoGPSParaCliente = iniciarMonitoramentoGPSParaCliente;
+    window.iniciarRotaCliente = iniciarRotaCliente;
+    window.confirmarCheckinGeofence = confirmarCheckinGeofence;
+    window.executarCheckinServidor = executarCheckinServidor;
+    window.efetuarCheckoutGeofence = efetuarCheckoutGeofence;
+    window.acionarLeituraNFCVeiculo = acionarLeituraNFCVeiculo;
+    window.processarTagNFCVeiculo = processarTagNFCVeiculo;
+    window.abrirModalAssumirVeiculoApp = abrirModalAssumirVeiculoApp;
+    window.solicitarConfirmacaoAssumirVolante = solicitarConfirmacaoAssumirVolante;
 
 
     /* ==========================================================================
