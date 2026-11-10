@@ -1,0 +1,275 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Scan Data Analysis Tools (SCAN, Tracking dd, CAL)</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/16/07</P></td></tr></table><H1 ID="top">Scan Data Analysis Tools (SCAN, Tracking dd, CAL) </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="50%"><col width="50%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised: </td><td valign="">August 2003</td></tr></tbody></table></div></DIV><P CLASS="descriptive">This module contains the following information:</P><UL><LI CLASS="bulletlist"><P><A HREF="304462.htm#SL308312-304462">Section&nbsp;1</A> - Overview</P></LI><LI CLASS="bulletlist"><P><A HREF="304462.htm#SL308315-304462">Section&nbsp;2</A> -
+Definitions within Scan Analysis</P></LI><LI CLASS="bulletlist"><P><A HREF="304462.htm#SL308318-304462">Section&nbsp;3</A> -
+Starting Scan Analysis</P></LI><LI CLASS="bulletlist"><P><A HREF="304462.htm#SL308321-304462">Section&nbsp;4</A> -
+Selections in Scan Analysis</P></LI><LI CLASS="bulletlist"><P><A HREF="304462.htm#SL308324-304462">Section&nbsp;5</A> -
+dd File List Select Overview</P></LI><LI CLASS="bulletlist"><P><A HREF="304462.htm#SL308327-304462">Section&nbsp;6</A> -
+Z-Axis Tracking</P></LI><LI CLASS="bulletlist"><P><A HREF="304462.htm#SL308330-304462">Section&nbsp;7</A> -
+Tube Spit Data Correlation Example</P></LI><LI CLASS="bulletlist"><P><A HREF="304462.htm#SL308333-304462">Section&nbsp;8</A> -
+Typical Examples of CAL Plots with Scan Analysis</P></LI></UL><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL308312-304462">1&nbsp;&nbsp;Overview<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The scan analysis feature allows users to have interactive access to
+scan files collected on the scanner. Scan data to be viewed can come from
+either patient scanning or from service mode tools such as Diagnostic Data
+Collection or Calibration.</P><P CLASS="sect1">Analysis is divided into three major areas of: SCAN ANALYSIS, dd FILE
+ANALYSIS, and CAL FILE ANALYSIS. CAL File analysis is not yet available for
+this system. Each major section provides a file list select interface similar
+to the Image Works List Select, Image Browser. Analysis List Select allows
+you to select the appropriate file of interest.</P><P CLASS="sect1">Any of the normal scan files may be selected for processing within Scan
+Analysis including Axial, Helical, and Scout scans. Once the scan data of
+interest is selected you can select one of several processing options, which
+include: Update, Scan Header, Cal Vectors, Aux Channels, Create MSD dd File,
+Plot MSD, Plot VVC, and Save Scan.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL308315-304462">2&nbsp;&nbsp;Definitions within Scan Analysis<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">dd File (Diagnostic Data File): dd files are a result file from some
+type of operation on the scan data file. dd files are typically some form
+of view summed file that may have had some specific type of processing applied
+to it. For example, the processing applied to the raw data to calculate the
+position of the pin in ISO alignment results in a temporary file that is a
+view summed result that could be saved as a dd file. As long as two dd files
+have the same number of data elements in them, the two files may be added,
+subtracted, multiplied, or divided with each other.</P><P CLASS="sect1">Detector Macro Row: One detector output row for each of the four 4x1.25,
+4x2.5, 4x3.75, or 4x5 acquisition mode combinations for the detector. For
+most of the analysis functions, this provides either four selections for the
+detector row to be examined, or four sets of data results that correspond
+to the detector rows 2A, 1A, 1B, 2B. Refer to <SPAN CLASS="MODULEREF"><A HREF="163134.htm#SL166092-163134"><I>Watson16 Detector Theory</I></A></SPAN> for
+further information.</P><P CLASS="sect1">Means and Standard Deviation File (MSD): This is usually the result
+of combining two or more views mathematically, which results in mean values
+for each channel in the views and an associated standard deviation for each
+channel in the views. In essence all of the user selected views in a scan
+file are summed together, resulting in a single &#8220;master view&#8221;
+that contains the averaged data from all of the views. The mean values represent
+the average data value from the channels, and the standard deviation values
+represent the amount of variability for that channel&#8217;s data values across
+all of the views. The higher the standard deviation, the more the channel
+output varied from view to view.</P><P CLASS="sect1">Scan Header: This is the information contained within the scan file
+that identifies the specific settings in effect when that scan file was created.
+The scan header includes information at several levels, including: Exam, Series,
+and Scan. Information identifying the technique selections, scan time, acquisition
+mode, and many others may be found in the scan header.</P><P CLASS="sect1">Cal Vectors: Within scan analysis, the cal vectors are only those vectors
+contained within the scan data file at the time that the scan was taken.</P><P CLASS="sect1">Aux Channels: The auxiliary channels are data sampling &#8220;channels&#8221;
+in the MDAS that provide a way to place other data into the view besides the
+patient information coming from the detector. These include: Power Supply,
+Temperature, kV, mA, and other analog data values. These analog signals are
+sampled at the same rate as the patient image data and are a snapshot of those
+values at each view sample time.</P><P CLASS="sect1">Z-Axis Channels: These are some special purpose channels built into
+the detector that are used for several different special operations related
+to determining the x-ray beam position on the detector.</P><P CLASS="sect1">VVC (Views vs. Channels): This is a way to graphically represent the
+data values from each channel for each view of data from the MDAS as a shade
+of grey. The display has the views stacked vertically and the channels arranged
+across the display horizontally.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL308318-304462">3&nbsp;&nbsp;Starting Scan Analysis<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Scan Analysis may be started from any of several menu locations, including: <SPAN CLASS="GUIBUTTON">[UTILITIES]</SPAN>, <SPAN CLASS="GUIBUTTON">[TOOLS]</SPAN> and <SPAN CLASS="GUIBUTTON">[IMAGE QUALITY]</SPAN>.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669133500"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Initial Scan Analysis Screen</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304513.jpg" BORDER="0" usemap="#SL304514-304462"></P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL308321-304462">4&nbsp;&nbsp;Selections in Scan Analysis<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Upon starting the Scan List Select window, you can highlight an <SPAN CLASS="MENUCHOICE">EXAM
+&#8594;
+SERIES
+&#8594;
+SCAN</SPAN>, and perform the desired analysis feature by pressing any of
+the following buttons:</P><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133516">4.1&nbsp;&nbsp;UPDATE<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The <SPAN CLASS="GUIBUTTON">[UPDATE]</SPAN> selection will refresh the List Select
+display if new scan files have been created since the Scan Analysis Tool was
+started.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133517">4.2&nbsp;&nbsp;SCAN HEADER<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The <SPAN CLASS="GUIBUTTON">[SCAN HEADER]</SPAN> selection will open a scrolling
+text window that contains the header text information contained in select
+scan file.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133517-dup.1">4.3&nbsp;&nbsp;CAL VECTORS<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The <SPAN CLASS="GUIBUTTON">[CAL VETORS]</SPAN> selection will open a window allowing
+you to select the calibration vectors in the selected scan file that you wish
+to view. After the selections are made, <SPAN CLASS="GUIBUTTON">[OK]</SPAN> will process
+the data requests and display the results.</P><P CLASS="sect2">The resultant plots are auto-scaled, and in some cases, the range of
+data displayed is automatically set. This is to provide a reasonable initial
+view of the data. Always check the scale on the left-hand side of the plot
+displays. Cursor reporting of data value and channel numbers is provided.</P><P CLASS="sect2">The default selections are underlined in <A HREF="javascript:winopen('304462tbld0e174.htm','Table','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Table&nbsp;1</A>.</P><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="SL304652-304462"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Scan File Calibration Vector Selections</SPAN> </P><table summary="Scan File Calibration Vector Selections" border="1"><colgroup><col width="36%"><col width="32%"><col width="32%"></colgroup><thead valign=""><tr valign="top"><th colspan="3" align="left" valign="top">SCAN FILE CAL VECTORS</th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top">Cal Header</td><td align="left" valign="top">Sin </td><td align="left" valign="top">Cos </td></tr><tr valign="top"><td align="left" valign="top">B1 </td><td align="left" valign="top">B2 </td><td align="left" valign="top">B3 </td></tr><tr valign="top"><td align="left" valign="top">PCal </td><td align="left" valign="top">Acal </td><td align="left" valign="top">Misc. </td></tr><tr valign="top"><td align="left" valign="top">XTalk</td><td align="left" valign="top">Matrix
+decon</td><td align="left" valign="top">ZSlope</td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133530">4.4&nbsp;&nbsp;AUX CHANNELS <SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">This selection will open a window that allows you to select which of
+the auxiliary channels in the scan file you wish to look at, as well as the
+start and ending views to display. After the selections are made, <SPAN CLASS="GUIBUTTON">[OK]</SPAN> will
+process the data requests and display the results.</P><P CLASS="sect2">The resultant plots auto-scale, and in some cases the range of data
+displayed is automatically set. This is to provide a reasonable initial view
+of the data. Always check the scale on the left-hand side of the plot displays.
+Cursor reporting of data value and view numbers is provided.</P><P CLASS="sect2">The default selections are underlined in <A HREF="javascript:winopen('304462tbld0e228.htm','Table','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Table&nbsp;2</A>.</P><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="SL304465-304462"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Scan File Auxiliary Channel Selections</SPAN> </P><table summary="Scan File Auxiliary Channel Selections" border="1"><colgroup><col width="50%"><col width="50%"></colgroup><thead valign=""><tr valign="top"><th colspan="2" valign="">SCAN FILE
+AUXILIARY CHANNELS</th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top">Detector
+Heater Temperature </td><td align="left" valign="top">Negative
+5 Volt Reference</td></tr><tr valign="top"><td align="left" valign="top">MA </td><td align="left" valign="top">5 Volt
+Dc Power Supply</td></tr><tr valign="top"><td align="left" valign="top">KV </td><td align="left" valign="top">Positive
+5 Volt Converter</td></tr><tr valign="top"><td align="left" valign="top">Positive
+12 Volt</td><td align="left" valign="top">Digital
+Ground</td></tr><tr valign="top"><td align="left" valign="top">Negative
+12 Volts</td><td align="left" valign="top">Analog
+Ground 11</td></tr><tr valign="top"><td align="left" valign="top">Positive
+5 Volt Analog</td><td align="left" valign="top">Analog
+Ground 12</td></tr><tr valign="top"><td align="left" valign="top">Negative
+5 Volt Analog</td><td align="left" valign="top">Analog
+Ground 15</td></tr><tr valign="top"><td align="left" valign="top">Positive
+5 Volt Test Reference</td><td align="left" valign="top">Analog
+Ground 16</td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133543">4.5&nbsp;&nbsp;Z AXIS CHANNELS<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">This selection allows you to select the start and end views to display
+for the Z Axis Channel data. After the selections are made, <SPAN CLASS="GUIBUTTON">[OK]</SPAN> will
+process the data and display the results.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133544">4.6&nbsp;&nbsp;CREATE MSD DD FILE<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">This will calculate a view averaged &#8220;super view&#8221; for the
+selected views and store the results in a separate file on the systems disk.
+The display will report the path and filename of the file just created. Once
+created, dd File can be viewed or compared with other files to check for specific
+operating characteristics.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133544-dup.1">4.7&nbsp;&nbsp;PLOT MSD<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Provides a set of view summed means and standard deviation plots of
+a scan file. The plotter is started to display the means vectors and the standard
+deviation vectors, computed across the entire scan for each detector macro
+row. Four mean and standard deviation plot sets displaying the window.</P><P CLASS="sect2">After Plot MSD is started, a window will allow you to select:</P><UL><LI CLASS="bulletlist"><P>Start View and EndView</P></LI><LI CLASS="bulletlist"><P>View Compression: Automatic, 2 to 1, 4 to 1</P></LI><LI CLASS="bulletlist"><P>Processing steps:</P><OL><LI CLASS="numlist"><P>Offset Correction: This processing step removes the signal
+bias introduced by the acquisition electronics from the scan data. This operation
+is performed on a channel-by-channel basis for each view.</P></LI><LI CLASS="numlist"><P>Primary Speed Correction (afterglow): This processing applies
+a correction value to each channel value to reduce the effect of scintillator
+afterglow from the detector cells.</P></LI><LI CLASS="numlist"><P>Reference Normalization: Makes use of unobstructed (not blocked
+by the patient) detector cells at the end of the detector to adjust for fluctuations
+in the x-ray beam and effects of aperture size and mA. In the case where the
+reference channels are blocked, the system uses an estimated value for the
+processing. The steps for reference normalizing the scan data involve:</P><OL TYPE="i"><LI CLASS="numlist"><P>Offset correction for the reference channels.</P></LI><LI CLASS="numlist"><P>Dividing the offset corrected scan data by the averaged reference
+channels for each view.</P></LI></OL></LI><LI CLASS="numlist"><P>Convolved Data: This processing step mathematically filters
+the channel data to remove blurring effects that would occur when the views
+are back-projected. The effect is to &#8220;sharpen&#8221; each channel&#8217;s
+data value within the view. Without the convolution step, some of the x-ray
+attenuation data for a particular channel ends up in the channels on either
+side of that particular channel. Convolution puts that adjacent channel contribution
+back into the channel data that it should have been in to begin with.</P></LI></OL></LI></UL><P CLASS="sect2">Cursor reporting of data value and channel numbers is provided.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133546">4.8&nbsp;&nbsp;PLOT VVC<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353669133546-dup.1">4.8.1&nbsp;&nbsp;Description<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The <SPAN CLASS="GUIBUTTON">[PLOT VVC]</SPAN> selection provides Views-vs-Channels
+display of a grey scale representation for the selected scan file. Each view
+of data (or summed, compressed view) is represented on the display as a horizontal
+line. Each pixel in the line represents the data value for a particular channel
+from the DAS.</P><P CLASS="sect3">After VVC is activated, a window will allow you to select:</P><UL><LI CLASS="bulletlist"><P>Row (macro row) One of: 2A, 1A, 1B, 2B</P></LI><LI CLASS="bulletlist"><P>Start View and EndView</P></LI><LI CLASS="bulletlist"><P>Start Channel and End Channel</P></LI><LI CLASS="bulletlist"><P>View Compression: Automatic, 2 to 1, 4 to 1</P></LI><LI CLASS="bulletlist"><P>Processing steps:</P><OL><LI CLASS="numlist"><P>Offset Correction: This processing step removes from the scan
+data, the signal bias introduced by the acquisition electronics. This operation
+is performed on a channel-by-channel basis for each view.</P></LI><LI CLASS="numlist"><P>Primary Speed Correction (afterglow): This processing applies
+a correction value to each channel value to reduce the effect of scintillator
+afterglow from the detector cells.</P></LI><LI CLASS="numlist"><P>Reference Normalization: Makes use of unobstructed (not blocked
+by the patient) detector cells at the end of the detector to adjust for fluctuations
+in the x-ray beam and effects of aperture size and mA. In the case where the
+reference channels are blocked, the system uses an estimated value for the
+processing. The steps for reference normalizing the scan data involve:</P><OL TYPE="i"><LI CLASS="numlist"><P>Offset correction for the reference channels.</P></LI><LI CLASS="numlist"><P>Dividing the offset corrected scan data by the averaged reference
+channels for each view.</P></LI></OL></LI><LI CLASS="numlist"><P>Convolved Data: This processing step mathematically filters
+the channel data to remove blurring effects that would occur when the views
+are back-projected. The effect is to &#8220;sharpen&#8221; each channel&#8217;s
+data value within the view. Without the convolution step, some of the x-ray
+attenuation data for a particular channel ends up in the channels on either
+side of that particular channel. Convolution puts that adjacent channel contribution
+back into the channel data that it should have been in to begin with.</P></LI></OL></LI></UL><P CLASS="sect3">Once displayed, the window and level for the displayed data can be changed
+to better see variations in the data.</P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="ov-1353669133548">4.8.2&nbsp;&nbsp;Cursor Behavior in VVC<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">Cross hair cursor reporting is provided for: Data Value, DAS Channel,
+Detector Channel, and View number. The cursor is moved across the display
+using the mouse.</P><P CLASS="sect3">A selection box on the display allows selection of line cursors and
+box cursors, which allow the selection of a channel, view, or group of channels
+and views for plotting.</P><P CLASS="sect3">The line and box cursors can be moved around the screen to view specific
+areas of interest. When the mouse pointer cursor is moved over a line cursor
+the mouse cursor will change to a four pointer arrow. Pressing the left mouse
+button allows you to &#8217;drag&#8217; the cursor across the display.</P><P CLASS="sect3">For the box cursors, the box may be dragged using the left mouse button
+with the mouse cursor positioned over the box. The size and shape of the box
+can be changed by moving the mouse cursor over the Bottom or Right edges of
+the box. When over the Bottom or Right edges of the box you can press the
+left mouse button to drag the box edge up and down or left and right.</P><P CLASS="sect3">With the channel and view cursors, the plotted data represent all channels
+for a selected view or all views for a selected channel.</P><P CLASS="sect3">With the box cursors, the resulting plot is a view summed means and
+standard deviation plot for the selected views and channels.</P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133548-dup.1">4.9&nbsp;&nbsp;SAVE SCAN<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">This will save the selected scan file to a temporary disk location so
+that it can moved to MOD or transferred via ftp to another location.</P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL308324-304462">5&nbsp;&nbsp;dd File List Select Overview<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">dd math is a means for the user to apply mathematical operations: add,
+subtract, multiply, and divide to dd files, and calculate the channel-to-channel
+difference or ratio of means vs. standard deviation vectors of a dd file.
+It allows the user to specify the scaling factor for the output vector, and
+provides three output modes: dd file, plot, and view numbers.</P><P CLASS="sect1">dd math is part of the dd analysis user interface. Scan Analysis is
+used to generate dd files that may then be manipulated or examined using dd
+File Analysis.</P><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133549">5.1&nbsp;&nbsp;dd Files Generation<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">There are 18 different dd file types of six orientations. The orientations
+are View, Channel, RTS, CAL, Elements, and Header.</P><P CLASS="sect2">Channel oriented means and standard deviation type dd files are the
+only type that can be created from scan data files in the Scan Analysis application.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133549-dup.1">5.2&nbsp;&nbsp;dd Math Functions<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">dd math consists of the following functions:</P><UL><LI CLASS="bulletlist"><P>Add</P></LI><LI CLASS="bulletlist"><P>Subtract</P></LI><LI CLASS="bulletlist"><P>Multiply</P></LI><LI CLASS="bulletlist"><P>Divide</P></LI><LI CLASS="bulletlist"><P>Channel to Channel difference</P></LI><LI CLASS="bulletlist"><P>Ratio of means vs. standard deviation</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133550-dup.3">5.3&nbsp;&nbsp;Add, Subtract, Multiply, Divide<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Applies add, subtract, multiply, and divide between vectors in two dd
+files. The output file is a dd file with one of the following suffixes:</P><UL><LI CLASS="bulletlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">.add</FONT></SPAN></P></LI><LI CLASS="bulletlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">.dif</FONT></SPAN></P></LI><LI CLASS="bulletlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">.mul</FONT></SPAN></P></LI><LI CLASS="bulletlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">.rat</FONT></SPAN></P></LI></UL><P CLASS="sect2">Operations can be performed on dd files in View orientation, Channel
+orientation, RTS orientation, and Cal orientation.</P><P CLASS="sect2">Currently, no dd type restrictions are applied to operations between
+dd files, as long as the dd vectors have the same number of elements. If one
+file has a single vector and the other file has multiple vectors, the mathematical
+operation is applied multiple times using the single vector. Otherwise, the
+mathematical operation is applied component-wise for the number of vectors
+in each file.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133551">5.4&nbsp;&nbsp;Channel to Channel Difference<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Applies the following calculation to the data from the data set(s) in
+the dd files for View, RTS or Cal orientation:</P><P CLASS="sect2">(X2-X1), (X3-X2), (X4-X3),...,(Xn-Xn-1)</P><P CLASS="sect2">where X is the data value for each channel.</P><P CLASS="sect2">The output is channel to channel dd file with extension: <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">.c2c</FONT></SPAN></P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133551-dup.1">5.5&nbsp;&nbsp;Ratio of Means vs. Standard Deviation<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Takes a MSD (means and standard deviation) or RTS (real time statistics)
+type of dd file, calculates the ratio of data in the means vector (1st set)
+to data in standard deviation vector (2nd set). The output file is a ratio
+type of dd file with the extension: <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">.rat</FONT></SPAN></P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133551-dup.2">5.6&nbsp;&nbsp;dd Math Output Mode<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Three output modes are supported in dd math:</P><UL><LI CLASS="bulletlist"><P>Plot - Will plot the output dd vector using an on-screen vector
+display.</P></LI><LI CLASS="bulletlist"><P>dd File - Allows the user to specify the output dd file name
+with a full path or the file basename. If only base name is provided, the
+program will use the default prefix and suffix for the output file. The created
+dd file appears in the dd file list.</P></LI><LI CLASS="bulletlist"><P>View Numbers - View Numbers will display the dd vector numerical
+values on the screen, and the user can perform numerical searches in the window.</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133552-dup.2">5.7&nbsp;&nbsp;dd Analysis User Interfaces<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The dd math operation panel and a set of the dd math operation buttons
+are part of the ddLS screen.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133552-dup.3">5.8&nbsp;&nbsp;Functions in ddLS User Interface<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The ddLS supports the following functions for various file types.</P><UL><LI CLASS="bulletlist"><P>Update</P></LI><LI CLASS="bulletlist"><P>Plot</P></LI><LI CLASS="bulletlist"><P>Save to MOD</P></LI><LI CLASS="bulletlist"><P>Restore From MOD</P></LI><LI CLASS="bulletlist"><P>dd math operations: +, -, x, /, ch2ch, Ratio</P></LI><LI CLASS="bulletlist"><P>Sort By Date or Sort by Type</P></LI></UL><P CLASS="sect2">The user can perform these functions, except dd math operations, by
+simply selecting one or more files in the list select window, and clicking
+the function button. The following file types are supported in the ddLS user
+interface.</P><UL><LI CLASS="bulletlist"><P>dd File</P></LI><LI CLASS="bulletlist"><P>Cal File</P></LI><LI CLASS="bulletlist"><P>Data File</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133553-dup.7">5.9&nbsp;&nbsp;File Operations<SPAN CLASS="SECT2EFF"> </SPAN></H3><UL><LI CLASS="bulletlist"><P>dd Math Operations - Perform: add, subtract, multiply, divide,
+and channel to channel difference operations on dd files. These operations
+are only available for dd file types.</P></LI><LI CLASS="bulletlist"><P>Plot - Plots the vector(s) of the selected files in the display
+window for the following file types: dd Files and Cal Files</P></LI><LI CLASS="bulletlist"><P>View # - Prints the numerical data of the dd vector(s) to
+the display window(s). For image file types and scan file types, it displays
+the VVC plots of the selected files.</P></LI><LI CLASS="bulletlist"><P>Save/Restore to/from MOD - Saves the selected files to the
+MOD and restores all the dd files from <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/MOD/ddfiles</FONT></SPAN> to <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/data</FONT></SPAN> directory.</P></LI><LI CLASS="bulletlist"><P>Update - Refreshes the display in the ddLS user interface.</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133554-dup.4">5.10&nbsp;&nbsp;dd Math Operations in ddLS<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The dd math operation buttons become insensitive if no files are selected
+in the dd math operation panel.</P><P CLASS="sect2">The user may start dd math operation(s) by selecting the file(s) and
+putting them into the selection field by clicking the button FILE #1 or FILE
+#2. If the selected file is not a dd file, the application will not put it
+into the dd math operation field. A message window will pop up and ask user
+to select a dd file.</P><P CLASS="sect2">If only one file is selected and it is of the file type RTS dd file
+or MSD dd file, both <SPAN CLASS="GUIBUTTON">[CHANNEL TO CHANNEL]</SPAN> and <SPAN CLASS="GUIBUTTON">[RATIO
+OF MEANS VS. STDV]</SPAN> become sensitive. If the selected file is not
+of the type MSD or RTS, only <SPAN CLASS="GUIBUTTON">[CHANNEL TO CHANNEL]</SPAN> become
+sensitive. When two dd files are selected, <SPAN CLASS="GUIBUTTON">[ADD]</SPAN>, <SPAN CLASS="GUIBUTTON">[SUBTRACT]</SPAN>, <SPAN CLASS="GUIBUTTON">[MULTIPLY]</SPAN>,
+and <SPAN CLASS="GUIBUTTON">[DIVIDE]</SPAN> become sensitive and <SPAN CLASS="GUIBUTTON">[CHANNEL
+TO CHANNEL]</SPAN> and <SPAN CLASS="GUIBUTTON">[RATIO OF MEANS VS. STDV]</SPAN> become
+insensitive.</P><P CLASS="sect2">The user can specify the output file name when the dd file output mode
+is set. Otherwise the system offers a default dd file name.</P><P CLASS="sect2">The default output scaling factor is 1.0. The user can set the scaling
+factor to any real number.</P><P CLASS="sect2">When the dd math operation buttons are sensitive, the user can select
+the desired button to start the dd math operation.</P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL308327-304462">6&nbsp;&nbsp;Z-Axis Tracking<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The <SPAN CLASS="GUIBUTTON">[Z-AXIS TRACKING]</SPAN> tool is a new <SPAN CLASS="GUIBUTTON">[TAB]</SPAN>,
+located within the <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Analysis Tool</FONT></SPAN>. The tool can be used
+to plot various tracking functions, using a Scan Data Set. For a scan data
+set, the analysis package can plot different data versus views in <SPAN CLASS="GUIBUTTON">[UN-FILTERED ]</SPAN>(the
+default) or <SPAN CLASS="GUIBUTTON">[FILTERED]</SPAN> (20 pt. Boxcar) formats. Numerical
+information (&#8220;Max&#8221;, &#8220;Min&#8221;, &#8220;Mean&#8221;, and
+&#8220;Std. Dev.&#8221;) is also provided. In some plots, the numerical information
+provided can be used for further analysis by comparing it to a &#8220;specification&#8221;
+value, as an indication of a pass/fail condition. Whereas other plots are
+more general, and in some cases may be useful, they are typically only used
+for troubleshooting.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669133556"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Top Level Tracking Menu</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304552.jpg" BORDER="0" usemap="#SL304553-304462"></P></DIV><P CLASS="sect1">In the figures that follow, examples of &#8220;known&#8221; tracking
+plots are shown. Since plots vary from system to system, the examples shown
+should be used only as guides. Compare your system&#8217;s plots and analyze
+them relative to the specification shown in each figure. The plots shown are <SPAN CLASS="GUIBUTTON">[UN-FILTERED]</SPAN> views,
+which is the default option when they are plotted. A <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">20 point boxcar</FONT></SPAN> filter
+takes the 20 view average and then plots the data.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669133572"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Single Scan Pop-Up Menu</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304510.jpg" BORDER="0" usemap="#SL304511-304462"></P></DIV><P CLASS="sect1">A value is not considered to be out of specification unless the limit
+is exceeded for a sustained interval of 100 <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">views</FONT></SPAN> or more.
+In the cases where specifications are not given, consider plots informational
+only.</P><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133586">6.1&nbsp;&nbsp;LOOP ERROR<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">A <SPAN CLASS="GUIBUTTON">[LOOP ERROR]</SPAN> is the difference between the calculated
+position of the beam minus the desired target&#8217;s position (operating
+point) obtained during Collimator Calibration.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669133586-dup.1"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;4:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Loop Error Plot</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304490.gif" BORDER="0" usemap="#SL304491-304462"></P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133601">6.2&nbsp;&nbsp;LOOP ERROR (MBP)<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">A <SPAN CLASS="GUIBUTTON">[LOOP ERROR MBP]</SPAN> (Mean Beam Position) plot is
+the same as the loop error plot, except that the display represents the loop
+error relative to the mean beam position during FASTCAL. The FASTCAL beam
+position is stored in the calibration database.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669133602"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;5:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Loop Error (MBP) Plot</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304467.gif" BORDER="0" usemap="#SL304468-304462"></P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133616">6.3&nbsp;&nbsp;Z RATIO<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2"><SPAN CLASS="GUIBUTTON">[Z-RATIO ]</SPAN>Plot computes the ratio of outer row
+Z-channels (Channels 763, 764, &amp; 765 averaged) to inner row Z-channels.
+This is done for both the &#8220;A&#8221; and &#8220;B&#8221; sides.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669133616-dup.1"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;6:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Z Ratio Plot</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304484.gif" BORDER="0" usemap="#SL304485-304462"></P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133629">6.4&nbsp;&nbsp;CAM POSITION<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The <SPAN CLASS="GUIBUTTON">[CAM POSITION]</SPAN> plot shows the CAM position
+during a scan from collimator opening (center-line). The absolute value of <SPAN CLASS="GUIBUTTON">[A]</SPAN> side
+plus <SPAN CLASS="GUIBUTTON">[B]</SPAN> side is the total aperture size at the collimator.
+Cam positions are stored in the scan file.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669133629-dup.1"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;7:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">CAM Position Plot</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304507.gif" BORDER="0" usemap="#SL304508-304462"></P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133644">6.5&nbsp;&nbsp;APERTURE<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2"><SPAN CLASS="GUIBUTTON">[APERTURE]</SPAN> plot indicates the width of the Collimator
+Cam aperture in millimeters. Due to the distance magnification factor, the
+width at the collimator is smaller than prescribed acquisition mode, or width
+of the beam at the detector window.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669133644-dup.1"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;8:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Aperture Plot</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304501.gif" BORDER="0" usemap="#SL304502-304462"></P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133657">6.6&nbsp;&nbsp;FOCAL SPOT POSITION (A/B)<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2"><SPAN CLASS="GUIBUTTON">[FOCAL SPOT POSITION]</SPAN> plot shows the calculated
+focal spot position from the centerline of either the <SPAN CLASS="GUIBUTTON">[A]</SPAN> or <SPAN CLASS="GUIBUTTON">[B]</SPAN> side.
+The vertical scale (in millimeter) represents that portion of the focal spot
+length. The absolute value of the <SPAN CLASS="GUIBUTTON">[A]</SPAN> side plus the <SPAN CLASS="GUIBUTTON">[B]</SPAN> side
+should equal the focal spot length (Small Spot = 0.7mm, Large Spot = 1.2mm).</P><DIV CLASS="ILLUSTRATION" id="ov-1353669133657-dup.1"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;9:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Focal Spot Position (A/B) Plot</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304493.gif" BORDER="0" usemap="#SL304494-304462"></P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133671">6.7&nbsp;&nbsp;FOCAL SPOT LENGTH<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2"><SPAN CLASS="GUIBUTTON">[FOCAL SPOT LENGTH]</SPAN> plot shows the calculated focal
+spot length. The length may change slightly due to mA, rotor wobble or gantry
+rotation wobble. Length is also based on the calculations, which use values
+from the Z-channels. Typically the small spot size is 0.7mm, and the large
+spot size is 1.2mm.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669133672"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;10:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Focal Spot Length Plot</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304487.gif" BORDER="0" usemap="#SL304488-304462"></P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133685">6.8&nbsp;&nbsp;FOCAL SPOT POSITION<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2"><SPAN CLASS="GUIBUTTON">[FOCAL SPOT POSITION]</SPAN> plot indicates the calculated
+focal spot position relative to the centerline, with the center position being
+0. The focal spot moves during a scan due to mA, rotor wobble, gantry rotation
+wobble, and because of tube (target) heat.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669133685-dup.1"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;11:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Focal Spot Position Plot</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304498.gif" BORDER="0" usemap="#SL304499-304462"></P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133698">6.9&nbsp;&nbsp;CAM RINGING<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2"><SPAN CLASS="GUIBUTTON">[CAM RINGING]</SPAN> provides a plot of high frequency
+variations, such as variations that are 180 degrees out of phase, like typical
+CAM ringing. A specification is not available, but typical values are less
+than 0.1 counts.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669133699"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;12:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">CAM Ringing Plot</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304504.gif" BORDER="0" usemap="#SL304505-304462"></P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133713">6.10&nbsp;&nbsp;ROTOR RUN<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Figure 0-1<SPAN CLASS="GUIBUTTON">[ROTOR RUN]</SPAN> provides a plot of high frequency
+variations that are IN phase, such as the small periodic movement of the anode
+at the rotor run frequency. Typical values are less than 0.1 count values.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669133713-dup.1"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;13:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Rotor Run Plot</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304555.gif" BORDER="0" usemap="#SL304556-304462"></P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133726">6.11&nbsp;&nbsp;BLOCKED CHANNEL<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">A <SPAN CLASS="GUIBUTTON">[BLOCKED CHANNEL]</SPAN> indicates that the value for
+DAS Channel 762 falls below the 10% threshold. Indicating that the channel
+is blocked and tracking (CAM positions) remains constant at the last known
+good position. This plot indicates a normal unblocked scan. Unblocked condition
+is indicated by a numeric value of 0. Blocked view condition is indicated
+by a numeric value of 1.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669133726-dup.1"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;14:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Blocked Channel Menu</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304481.gif" BORDER="0" usemap="#SL304482-304462"></P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353669133739">6.12&nbsp;&nbsp;MULTI-SCAN SELECT<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The <SPAN CLASS="GUIBUTTON">[MULTI-SCAN SELECT]</SPAN> option allows the user
+to calculate and view multiple scans. Select the <SPAN CLASS="GUIBUTTON">[MULTI-SCAN SELECT]</SPAN> button,
+and then select the exams, series, or multiple scans. Once scans are selected,
+then select the plot that you are interested in. Due to the time it may take,
+based on the number of scans selected, a pop-up window may appear, to indicate
+the number of scans selected and the approximate time to calculate. If the
+time is too long, or wrong scans are selected, hit <SPAN CLASS="GUIBUTTON">[CANCEL]</SPAN>.
+Once the <SPAN CLASS="GUIBUTTON">[OK]</SPAN> button is selected, you cannot cancel processing.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669133740"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;15:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Multi-Scan Select Menu</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304546.gif" BORDER="0" usemap="#SL304547-304462"></P></DIV></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL308330-304462">7&nbsp;&nbsp;Tube Spit Data Correlation Example<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">By using a combination of capabilities within Scan Analysis, some things
+just got easier.</P><P CLASS="sect1">In the past, tube spits as a source of image artifacts were frequently
+done by implication. The tube has been spitting lately, so the problem might
+be that.</P><P CLASS="sect1">With some of the new system and software capabilities, it is much easier
+to confirm some of these diagnosis. For example:</P><UL><LI CLASS="bulletlist"><P>VVC data for scan (refer to <A HREF="javascript:winopen('304462illd0e852.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;16</A>). Dark horizontal lines are views with data values lower
+than the views immediately before and after.</P></LI><LI CLASS="bulletlist"><P>Select Channel Cursor and Plot Now (refer to <A HREF="javascript:winopen('304462illd0e857.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;17</A>). Notice how the dip in the channel data
+corresponds to the views around 615. Next take a look at the kV and mA data.</P></LI></UL><DIV CLASS="ILLUSTRATION" id="SL304655-304462"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;16:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">VVC Tube Spit Data Example</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304478.jpg" BORDER="0" usemap="#SL304479-304462"></P></DIV><DIV CLASS="ILLUSTRATION" id="SL304658-304462"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;17:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">All View for one channel KV Spit Data Example</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304534.gif" BORDER="0" usemap="#SL304535-304462"></P></DIV><P CLASS="sect1">Once again the dip in the KV values reported in the view data corresponds
+to views around 615.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669133803"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;18:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE"> - Tube Spit Auxiliary Channel data for kV</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304473.gif" BORDER="0" usemap="#SL304474-304462"></P></DIV><DIV CLASS="ILLUSTRATION" id="ov-1353669133816"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;19:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">- Tube Spit Auxiliary Channel data for mA</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304549.gif" BORDER="0" usemap="#SL304550-304462"></P></DIV><P CLASS="sect1">From the previous examples, it is easy to correlate the views with suspect
+data from the VVC Display with the view by view plots for kV, mA, and Channels.
+Specific information to look for on the examples:</P><UL><LI CLASS="bulletlist"><P>The Min, Max, and average values for kV, mA, and channel data.
+This information provides a quick way to determine the scale of the information
+that you are viewing.</P></LI><LI CLASS="bulletlist"><P>The cursor report information provides a continuous update,
+depending upon the type of data that is being displayed: data values, view
+number, channel number.</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL308333-304462">8&nbsp;&nbsp;Typical Examples of CAL Plots with Scan Analysis<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="ILLUSTRATION" id="ov-1353669133832-dup.2"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;20:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Calibration Vector Acal / Head Filter</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304519.gif" BORDER="0" usemap="#SL304520-304462"></P></DIV><DIV CLASS="ILLUSTRATION" id="ov-1353669133848"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;21:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Calibration Vector Sin / Head Filter</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304522.gif" BORDER="0" usemap="#SL304523-304462"></P></DIV><DIV CLASS="ILLUSTRATION" id="ov-1353669133863"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;22:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Calibration Vector Cosine / Head Filter</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304525.gif" BORDER="0" usemap="#SL304526-304462"></P></DIV><DIV CLASS="ILLUSTRATION" id="ov-1353669133877"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;23:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Calibration Vector &#8220;B1&#8221; / Head Filter</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304528.gif" BORDER="0" usemap="#SL304529-304462"></P></DIV><DIV CLASS="ILLUSTRATION" id="ov-1353669133891"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;24:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Calibration Vector &#8220;B2&#8221; / Head Filter</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304531.gif" BORDER="0" usemap="#SL304532-304462"></P></DIV><DIV CLASS="ILLUSTRATION" id="ov-1353669133918"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;25:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Calibration Vector &#8220;B3&#8221; / Head Filter</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304516.gif" BORDER="0" usemap="#SL304517-304462"></P></DIV><DIV CLASS="ILLUSTRATION" id="ov-1353669133933"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;26:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Scaled P-Cal - Head Filter</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304537.gif" BORDER="0" usemap="#SL304538-304462"></P></DIV><DIV CLASS="ILLUSTRATION" id="ov-1353669133947"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;27:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Matrix DeCon Kernels</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304540.gif" BORDER="0" usemap="#SL304541-304462"></P></DIV><DIV CLASS="ILLUSTRATION" id="ov-1353669133962"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;28:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Z-Slope Cal / Ceiling Function</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304543.gif" BORDER="0" usemap="#SL304544-304462"></P></DIV><DIV CLASS="ILLUSTRATION" id="ov-1353669133975"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;29:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Z-Slope Cal / Z-Slope Kernels</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/304462-304470.gif" BORDER="0" usemap="#SL304471-304462"></P></DIV></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

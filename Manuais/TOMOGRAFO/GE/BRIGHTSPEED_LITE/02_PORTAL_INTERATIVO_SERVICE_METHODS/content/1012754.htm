@@ -1,0 +1,21 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Rotation Function (BSD Select)</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;1/14/08</P></td></tr></table><H1 ID="top">Rotation Function (BSD Select) </H1><P CLASS="descriptive">Rotation function is mainly controlled by the kV control CPU
+function.</P><DIV CLASS="ILLUSTRATION" id="SL1513089-1012754"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">JEDI generator / rotation function</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/1012754-1012752.jpg" BORDER="0" usemap="#SL1513080-1012754"></P></DIV><P CLASS="descriptive">When the CPU receives the exposure enable signal (either by
+a communication message or by a real time hardware line both linked
+to the prep button), it sends the anode speed reference to the rotation
+function. Upon receiving this command, the rotation drive:</P><UL><LI CLASS="bulletlist"><P>compares it to the present anode speed. If the present
+speed is lower: </P></LI><LI CLASS="bulletlist"><P>gets from the tube database the current required to
+accelerate the anode and the acceleration time to apply </P></LI><LI CLASS="bulletlist"><P>drives the inverter with the frequency required for
+the speed selected</P></LI><LI CLASS="bulletlist"><P>measures the phases currents, compare them to the
+current demand and applies the modulation rate to supply the right
+stator current</P></LI><LI CLASS="bulletlist"><P>counts the acceleration time </P></LI><LI CLASS="bulletlist"><P>monitors rotation safeties</P></LI><LI CLASS="bulletlist"><P>sends back each 100ms the speed to the kV control
+CPU </P><P>The speed feedback is used by the kV control CPU to authorize
+exposure.  </P><P>Once the acceleration time is complete, the rotation drive applies
+the inverter current required for the anode speed maintain.  </P><P>When exposure command goes in its inactive state, the CPU either:</P><UL><LI CLASS="bulletlist"><P>sends a speed=0 command to the rotation to stop the
+anode rotation </P></LI><LI CLASS="bulletlist"><P>applies a &#8220;hold&#8221; time to maintain the
+anode rotation speed before stopping it</P></LI><LI CLASS="bulletlist"><P>applies a &#8220;hold&#8221; time to maintain the
+anode rotation speed before going to a low speed mode depending on
+the application.</P></LI></UL></LI></UL><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

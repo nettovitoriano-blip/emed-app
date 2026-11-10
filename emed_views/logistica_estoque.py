@@ -1,0 +1,1113 @@
+import datetime
+import urllib.parse
+import pandas as pd
+import streamlit as st
+from emed_core import (
+    limpar_texto,
+    limpar_float,
+    limpar_int,
+    get_db_connection,
+    obter_id_os,
+    atualizar_status_solicitacao_peca,
+    SUGESTOES_SEPARACAO_POR_ATIVIDADE,
+    KITS_INSTRUMENTOS_POR_SITUACAO,
+    calcular_status_calibracao,
+    obter_resumo_alarmes_calibracao,
+)
+from emed_services import (
+    AppContext,
+    carregar_estoque,
+    carregar_solicitacoes,
+    carregar_baixas_consumiveis,
+    calcular_distancia,
+    formatar_tempo,
+    salvar_dados_seguro,
+)
+
+
+import datetime
+import urllib.parse
+import pandas as pd
+import streamlit as st
+
+def render_gestao_pendencias(ctx: AppContext):
+    df = ctx.df
+    equipa_tecnica = ctx.equipa_tecnica
+    hoje = ctx.hoje
+
+    # Permite visualização por qualquer colaborador na TV do laboratório/oficina
+    st.markdown("""
+        <div style="background: linear-gradient(135deg, #0b132b 0%, #1c2541 60%, #102a43 100%); 
+                    border-radius: 12px; padding: 18px 24px; border: 1.5px solid #3a506b; 
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <h2 style="color: #64dfdf; margin: 0; font-size: 26px; font-weight: 800; letter-spacing: 0.5px;">
+                        🚨 MURAL TV & GESTÃO DE PENDÊNCIAS
+                    </h2>
+                    <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 14px;">
+                        Painel operacional de monitoramento contínuo para a TV do Laboratório, Bancada e Gestão.
+                    </p>
+                </div>
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid #334155; padding: 6px 14px; border-radius: 8px; text-align: right;">
+                    <span style="color: #64dfdf; font-weight: bold; font-size: 13px;">🕒 SISTEMA ATIVO</span>
+                    <div style="color: #cbd5e1; font-size: 11px;">EMED Eletromedicina</div>
+                </div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Controles Superiores da TV (Auto-refresh e Modo de Exibição)
+    c_ctl1, c_ctl2, c_ctl3 = st.columns([2.5, 1.2, 1.3])
+    with c_ctl1:
+        st.caption("Visão coletiva em tempo real: acompanhe chamados críticos, peças em separação e rotas programadas.")
+    with c_ctl2:
+        modo_tv_ampliado = st.toggle("📺 Modo TV (Cards Grandes)", value=True, key="modo_tv_zoom")
+    with c_ctl3:
+        auto_refresh_tv = st.toggle("⏱️ Auto-Refresh TV (60s)", value=False, key="auto_refresh_tv_toggle")
+        if auto_refresh_tv:
+            st.markdown("<script>setTimeout(function(){ window.location.reload(); }, 60000);</script>", unsafe_allow_html=True)
+            st.caption("🟢 Atualização contínua a cada 60s ativa.")
+
+    # Filtra chamados ativos no sistema
+    df_pend = df[df['status'].fillna('ATIVO').astype(str).str.upper().isin(['ATIVO', 'EM ATENDIMENTO', 'EM OBSERVAÇÃO'])].copy()
+
+    # Classificação das pendências
+    def _classificar_item(row):
+        pend = str(row.get('pendencias', '')).upper()
+        cond = str(row.get('condicao_inicial', '')).upper()
+        inst = str(row.get('instrumento_necessario', '')).upper()
+        tipo = str(row.get('tipo_servico', '')).upper()
+        
+        if any(k in pend for k in ['URGENTE', 'CRÍTICO', 'CRITICO', 'EMERGÊNCIA', 'EMERGENCIA']) or any(k in cond for k in ['PARADO', 'INOPERANTE']):
+            return 'CRÍTICA'
+        if any(k in pend for k in ['PEÇA', 'PECA', 'ALMOXARIFADO', 'SEPARAÇÃO', 'SEPARACAO', 'COMPRA']) or any(k in inst for k in ['PEC-', 'PLACA', 'TUBO', 'FONTE', 'PEÇA']):
+            return 'ALMOXARIFADO'
+        if any(k in pend for k in ['PROGRAMADA', 'PREVENTIVA', 'AGUARDA']) or 'PREVENTIVA' in tipo:
+            return 'PROGRAMADA'
+        return 'NORMAL'
+
+    df_pend['categoria_tv'] = df_pend.apply(_classificar_item, axis=1)
+
+    total_pend = len(df_pend)
+    qtd_criticas = len(df_pend[df_pend['categoria_tv'] == 'CRÍTICA'])
+    qtd_pecas = len(df_pend[df_pend['categoria_tv'] == 'ALMOXARIFADO'])
+    qtd_programadas = len(df_pend[df_pend['categoria_tv'] == 'PROGRAMADA'])
+
+    # Big Metrics / KPIs Estilo TV
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.markdown(f"""
+            <div style="background: rgba(239, 68, 68, 0.15); border: 2px solid #ef4444; border-radius: 10px; padding: 12px; text-align: center;">
+                <div style="color: #ef4444; font-size: 28px; font-weight: 900; line-height: 1.1;">{qtd_criticas}</div>
+                <div style="color: #fca5a5; font-size: 13px; font-weight: 700; margin-top: 4px;">🚨 CRÍTICAS / PARADO</div>
+            </div>
+        """, unsafe_allow_html=True)
+    with m2:
+        st.markdown(f"""
+            <div style="background: rgba(245, 158, 11, 0.15); border: 2px solid #f59e0b; border-radius: 10px; padding: 12px; text-align: center;">
+                <div style="color: #f59e0b; font-size: 28px; font-weight: 900; line-height: 1.1;">{qtd_pecas}</div>
+                <div style="color: #fde68a; font-size: 13px; font-weight: 700; margin-top: 4px;">📦 AGUARDA PEÇA / ESTOQUE</div>
+            </div>
+        """, unsafe_allow_html=True)
+    with m3:
+        st.markdown(f"""
+            <div style="background: rgba(59, 130, 246, 0.15); border: 2px solid #3b82f6; border-radius: 10px; padding: 12px; text-align: center;">
+                <div style="color: #3b82f6; font-size: 28px; font-weight: 900; line-height: 1.1;">{qtd_programadas}</div>
+                <div style="color: #bfdbfe; font-size: 13px; font-weight: 700; margin-top: 4px;">📅 PREVENTIVAS / ROTA</div>
+            </div>
+        """, unsafe_allow_html=True)
+    with m4:
+        st.markdown(f"""
+            <div style="background: rgba(16, 185, 129, 0.15); border: 2px solid #10b981; border-radius: 10px; padding: 12px; text-align: center;">
+                <div style="color: #10b981; font-size: 28px; font-weight: 900; line-height: 1.1;">{total_pend}</div>
+                <div style="color: #a7f3d0; font-size: 13px; font-weight: 700; margin-top: 4px;">🛠️ TOTAL EM ATENDIMENTO</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Filtros Rápidos
+    opcoes_filtro_tv = [
+        f"🚨 TODAS AS PENDÊNCIAS ({total_pend})",
+        f"🔴 CRÍTICAS / PARADO ({qtd_criticas})",
+        f"📦 AGUARDA PEÇAS ({qtd_pecas})",
+        f"📅 PROGRAMADAS / ROTA ({qtd_programadas})"
+    ]
+    filtro_sel = st.radio("Filtrar Painel:", opcoes_filtro_tv, horizontal=True)
+
+    if "CRÍTICAS" in filtro_sel:
+        df_exibir = df_pend[df_pend['categoria_tv'] == 'CRÍTICA']
+    elif "AGUARDA PEÇAS" in filtro_sel:
+        df_exibir = df_pend[df_pend['categoria_tv'] == 'ALMOXARIFADO']
+    elif "PROGRAMADAS" in filtro_sel:
+        df_exibir = df_pend[df_pend['categoria_tv'] == 'PROGRAMADA']
+    else:
+        df_exibir = df_pend
+
+    if df_exibir.empty:
+        st.success("🎉 Nenhuma pendência na categoria selecionada no momento!")
+        return
+
+    # Renderização dos Cards da TV
+    cols_por_linha = 1 if not modo_tv_ampliado else 2
+    colunas_cards = st.columns(cols_por_linha)
+
+    for i_card, (idx_p, row_p) in enumerate(df_exibir.iterrows()):
+        col_atual = colunas_cards[i_card % cols_por_linha]
+        id_os_p = obter_id_os(idx_p, row_p)
+        cli_p = limpar_texto(row_p.get('cliente'), 'N/D')
+        cid_p = limpar_texto(row_p.get('cidade'), 'CE')
+        uf_p = limpar_texto(row_p.get('estado'), 'CE')
+        eq_p = limpar_texto(row_p.get('equipamento'), 'N/D')
+        tec_p = limpar_texto(row_p.get('tecnico_responsavel'), 'A DEFINIR')
+        pend_p = limpar_texto(row_p.get('pendencias'), 'Sem descrição')
+        inst_p = limpar_texto(row_p.get('instrumento_necessario'), '')
+        srv_p = limpar_texto(row_p.get('tipo_servico'), 'MANUTENÇÃO')
+        categ = row_p.get('categoria_tv', 'NORMAL')
+
+        # Estilo por prioridade
+        if categ == 'CRÍTICA':
+            borda_cor = '#ef4444'
+            fundo_badge = 'rgba(239, 68, 68, 0.25)'
+            lbl_badge = '🚨 CRÍTICO / EQUIPAMENTO PARADO'
+            cor_badge = '#fca5a5'
+        elif categ == 'ALMOXARIFADO':
+            borda_cor = '#f59e0b'
+            fundo_badge = 'rgba(245, 158, 11, 0.25)'
+            lbl_badge = '📦 AGUARDANDO PEÇA / ALMOXARIFADO'
+            cor_badge = '#fde68a'
+        elif categ == 'PROGRAMADA':
+            borda_cor = '#3b82f6'
+            fundo_badge = 'rgba(59, 130, 246, 0.25)'
+            lbl_badge = '🟡 PROGRAMADA (AGUARDA PRÓXIMA ROTA)'
+            cor_badge = '#bfdbfe'
+        else:
+            borda_cor = '#64dfdf'
+            fundo_badge = 'rgba(100, 223, 223, 0.2)'
+            lbl_badge = '🛠️ ATENDIMENTO EM ANDAMENTO'
+            cor_badge = '#64dfdf'
+
+        tec_badge_cor = '#10b981' if tec_p != 'A DEFINIR' else '#ef4444'
+
+        with col_atual:
+            st.markdown(f"""
+                <div style="background: #1c2541; border: 2px solid {borda_cor}; border-left: 8px solid {borda_cor}; 
+                            border-radius: 10px; padding: 16px; margin-bottom: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="background: {fundo_badge}; color: {cor_badge}; font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 6px; border: 1px solid {borda_cor};">
+                            {lbl_badge}
+                        </span>
+                        <span style="color: #94a3b8; font-size: 13px; font-weight: bold;">OS #{id_os_p} • {srv_p}</span>
+                    </div>
+                    <h3 style="margin: 0 0 4px 0; color: #ffffff; font-size: 19px; font-weight: 800;">
+                        🏥 {cli_p}
+                    </h3>
+                    <div style="color: #94a3b8; font-size: 13px; margin-bottom: 8px;">📍 {cid_p} - {uf_p}</div>
+                    <div style="background: rgba(15, 23, 42, 0.6); padding: 10px 12px; border-radius: 8px; border: 1px solid #334155; margin-bottom: 10px;">
+                        <div style="color: #64dfdf; font-weight: 700; font-size: 14px; margin-bottom: 4px;">
+                            ⚙️ {eq_p}
+                        </div>
+                        <div style="color: #f1f5f9; font-size: 14px; line-height: 1.4;">
+                            <strong>Relato / Pendência:</strong> {pend_p}
+                        </div>
+                        {f'<div style="color: #fde68a; font-size: 13px; margin-top: 4px;"><strong>📦 Demanda / Peça:</strong> {inst_p}</div>' if inst_p and inst_p != "N/D" else ''}
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+                        <span style="color: #cbd5e1;">
+                            👨‍🔧 Técnico: <strong style="color: {tec_badge_cor};">{tec_p}</strong>
+                        </span>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+            # Ações de Gestão (para o Gestor direcionar ou alterar técnico)
+            if ctx.perfil_atual == "Gestor":
+                with st.expander(f"⚙️ Ações de Gestão OS #{id_os_p} ({cli_p})"):
+                    with st.form(f"form_tv_gestor_{idx_p}"):
+                        c_tg1, c_tg2 = st.columns(2)
+                        lista_t_gestor = sorted(list(equipa_tecnica.keys()))
+                        with c_tg1:
+                            idx_tg = lista_t_gestor.index(tec_p.upper()) if tec_p.upper() in lista_t_gestor else 0
+                            novo_t_dir = st.selectbox("Atribuir Técnico:", lista_t_gestor, index=idx_tg, key=f"tv_tec_{idx_p}")
+                            novo_inst_dir = st.text_input("Atualizar Demanda de Peça / Kit:", value="" if inst_p == "Nenhum especificado" else inst_p, key=f"tv_inst_{idx_p}")
+                        with c_tg2:
+                            nova_desc_dir = st.text_input("Atualizar Instrução da Pendência:", value=pend_p, key=f"tv_desc_{idx_p}")
+                            confirmar_dir = st.selectbox("Confirmado na Escala?", ["SIM", "NÃO"], index=0, key=f"tv_conf_{idx_p}")
+
+                        if st.form_submit_button("💾 Salvar Alteração na OS", type="primary"):
+                            df.at[idx_p, 'tecnico_responsavel'] = novo_t_dir
+                            df.at[idx_p, 'telefone_tecnico'] = equipa_tecnica.get(novo_t_dir, {}).get("tel", "")
+                            df.at[idx_p, 'instrumento_necessario'] = novo_inst_dir.strip().upper()
+                            df.at[idx_p, 'pendencias'] = nova_desc_dir.strip().upper()
+                            df.at[idx_p, 'confirmado'] = confirmar_dir
+                            if salvar_dados_seguro(df, ctx.db_name, ctx.caminho_excel):
+                                st.cache_data.clear()
+                                st.success("✅ Pendência atualizada!")
+                                st.rerun()
+
+
+
+def render_solicitacao_pecas(ctx: AppContext):
+    df = ctx.df
+    equipa_tecnica = ctx.equipa_tecnica
+
+    st.markdown("### 🧰 Quadro de Ferramentas & Kits em Tempo Real")
+    st.info("💡 **Consulte antes de se deslocar à empresa:** saiba instantaneamente se o kit está disponível no Almoxarifado ou em posse de outro colega em campo, evitando viagens perdidas!")
+
+    df_est_quadro = carregar_estoque(ctx.db_name)
+    df_sol_ativas = carregar_solicitacoes(ctx.db_name)
+    if not df_sol_ativas.empty:
+        df_sol_ativas = df_sol_ativas[~df_sol_ativas['status_pedido'].fillna('').str.contains('DEVOLVIDO|CANCELADO|ESTORNADO|APLICADO', case=False)]
+
+    if not df_est_quadro.empty:
+        df_ferramentas = df_est_quadro[df_est_quadro['tipo_item'].fillna('').str.contains('INSTRUMENTO|FERRAMENTA', case=False)]
+        if not df_ferramentas.empty:
+            total_ferr = len(df_ferramentas)
+            disp_ferr = sum(1 for _, r in df_ferramentas.iterrows() if limpar_int(r.get('quantidade'), 0) > 0)
+            uso_ferr = total_ferr - disp_ferr
+
+            m_col1, m_col2, m_col3 = st.columns(3)
+            with m_col1:
+                st.metric("Total de Ferramentas & Kits Cadastrados", f"{total_ferr} itens")
+            with m_col2:
+                st.metric("🟢 Disponíveis no Almoxarifado", f"{disp_ferr} itens")
+            with m_col3:
+                st.metric("🔴 Em Uso com Técnicos", f"{uso_ferr} itens")
+
+            filtro_busca_ferr = st.text_input("🔍 Pesquisar ferramenta, kit ou instrumento no quadro:", placeholder="Ex: Multímetro, Mamografia, Colimador, Furadeira, Talha, Osciloscópio...")
+            
+            df_exibicao_f = df_ferramentas
+            if filtro_busca_ferr.strip():
+                df_exibicao_f = df_ferramentas[
+                    df_ferramentas['nome_peca'].str.contains(filtro_busca_ferr, case=False, na=False) |
+                    df_ferramentas['codigo'].str.contains(filtro_busca_ferr, case=False, na=False)
+                ]
+
+            cols_q = st.columns(4)
+            for idx_f, (_, r_ferr) in enumerate(df_exibicao_f.iterrows()):
+                nome_f = r_ferr['nome_peca']
+                cod_f = r_ferr['codigo']
+                qtd_f = limpar_int(r_ferr.get('quantidade'), 0)
+
+                # Identifica qual técnico está com este kit ou ferramenta
+                tecs_com_item = []
+                if not df_sol_ativas.empty:
+                    for _, r_sol in df_sol_ativas.iterrows():
+                        txt_itens = (str(r_sol.get('itens_solicitados', '')) + " " + str(r_sol.get('instrumentos_solicitados', ''))).upper()
+                        if cod_f.upper() in txt_itens or nome_f.upper() in txt_itens:
+                            tecs_com_item.append(str(r_sol.get('tecnico', '')).upper())
+
+                if tecs_com_item:
+                    disp_cor = "#ef4444"
+                    disp_bg = "rgba(239, 68, 68, 0.15)"
+                    tecs_unicos = ", ".join(sorted(list(set(tecs_com_item))))
+                    disp_txt = f"🔴 COM: {tecs_unicos}"
+                elif qtd_f > 0:
+                    disp_cor = "#10b981"
+                    disp_bg = "rgba(16, 185, 129, 0.12)"
+                    disp_txt = f"🟢 NO ALMOXARIFADO ({qtd_f} un.)"
+                else:
+                    disp_cor = "#ef4444"
+                    disp_bg = "rgba(239, 68, 68, 0.12)"
+                    disp_txt = "🔴 EM USO NO CAMPO"
+
+                with cols_q[idx_f % 4]:
+                    st.markdown(f"""
+                        <div style="background: #1e293b; border-radius: 8px; padding: 12px; margin-bottom: 12px; border: 1px solid #334155; border-top: 3px solid {disp_cor}; min-height: 110px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 11px; color: #94a3b8; font-weight: bold;">{cod_f}</span>
+                                <span style="background: {disp_bg}; color: {disp_cor}; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">{disp_txt}</span>
+                            </div>
+                            <div style="font-size: 12px; font-weight: 700; color: #f8fafc; margin: 6px 0 6px 0; line-height: 1.3;">{nome_f[:55]}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    st.markdown("### ✋ Pegar / Retirar Ferramenta ou Peça (Registrar Posse)")
+    st.caption("Sem burocracia ou comprovantes: apenas selecione quem está pegando e tique os itens para que toda a equipe saiba onde a ferramenta está.")
+
+    df_est_atual = carregar_estoque(ctx.db_name)
+    lista_t_sol = sorted(list(equipa_tecnica.keys()))
+
+    with st.form("form_solicitacao_almoxarifado"):
+        usr_sol_up = ctx.usuario_atual.upper()
+        idx_sol_u = lista_t_sol.index(usr_sol_up) if usr_sol_up in lista_t_sol else 0
+        tec_solicitante = st.selectbox(
+            "👨‍🔧 Técnico com o Material / Responsável pela Retirada *",
+            lista_t_sol,
+            index=idx_sol_u,
+            help="Tique o técnico que está saindo ou trabalhando com este material."
+        )
+        cli_destino_sol = f"COM O TÉCNICO ({tec_solicitante})"
+
+        st.markdown("#### ☑️ Ticagem de Materiais, Instrumentos e Peças em Estoque")
+        itens_ticados = []
+        if df_est_atual.empty:
+            st.warning("Nenhum item registado no estoque.")
+        else:
+            # 1. INSTRUMENTOS E FERRAMENTARIA
+            df_inst = df_est_atual[df_est_atual['tipo_item'].fillna('').str.contains('INSTRUMENTO|FERRAMENTA', case=False)]
+            if not df_inst.empty:
+                st.markdown("##### 🔬 Instrumentos de Medição & Ferramentas Calibradas")
+                for _, r_item in df_inst.iterrows():
+                    cod_i = r_item['codigo']
+                    nome_i = r_item['nome_peca']
+                    qtd_disp_i = limpar_int(r_item.get('quantidade'), 0)
+                    c_it1, c_it2 = st.columns([3.8, 1])
+                    with c_it1:
+                        marcado = st.checkbox(
+                            f"🔬 [{cod_i}] {nome_i} | Saldo Almoxarifado: {qtd_disp_i} un.",
+                            disabled=(qtd_disp_i <= 0),
+                            key=f"chk_item_{cod_i}"
+                        )
+                    with c_it2:
+                        qtd_ped = st.number_input(
+                            "Qtd",
+                            min_value=1,
+                            max_value=max(1, qtd_disp_i),
+                            value=1,
+                            disabled=(qtd_disp_i <= 0),
+                            key=f"num_item_{cod_i}"
+                        )
+                    if marcado and qtd_disp_i > 0:
+                        itens_ticados.append({"codigo": cod_i, "nome": nome_i, "qtd": int(qtd_ped)})
+
+            # 2. PEÇAS DE REPOSIÇÃO
+            df_pec = df_est_atual[df_est_atual['tipo_item'].fillna('').str.contains('COMERCIAL|PEÇA', case=False)]
+            if not df_pec.empty:
+                st.markdown("##### ⚙️ Peças de Reposição & Componentes Sobressalentes")
+                for _, r_item in df_pec.iterrows():
+                    cod_i = r_item['codigo']
+                    nome_i = r_item['nome_peca']
+                    qtd_disp_i = limpar_int(r_item.get('quantidade'), 0)
+                    c_it1, c_it2 = st.columns([3.8, 1])
+                    with c_it1:
+                        marcado = st.checkbox(
+                            f"⚙️ [{cod_i}] {nome_i} | Saldo Almoxarifado: {qtd_disp_i} un.",
+                            disabled=(qtd_disp_i <= 0),
+                            key=f"chk_item_{cod_i}"
+                        )
+                    with c_it2:
+                        qtd_ped = st.number_input(
+                            "Qtd",
+                            min_value=1,
+                            max_value=max(1, qtd_disp_i),
+                            value=1,
+                            disabled=(qtd_disp_i <= 0),
+                            key=f"num_item_{cod_i}"
+                        )
+                    if marcado and qtd_disp_i > 0:
+                        itens_ticados.append({"codigo": cod_i, "nome": nome_i, "qtd": int(qtd_ped)})
+
+            # 3. CONSUMÍVEIS E LIMPEZA
+            df_con = df_est_atual[df_est_atual['tipo_item'].fillna('').str.contains('CONSUM|LIMPEZA', case=False)]
+            if not df_con.empty:
+                st.markdown("##### 🧪 Consumíveis & Limpeza Técnica")
+                for _, r_item in df_con.iterrows():
+                    cod_i = r_item['codigo']
+                    nome_i = r_item['nome_peca']
+                    qtd_disp_i = limpar_int(r_item.get('quantidade'), 0)
+                    c_it1, c_it2 = st.columns([3.8, 1])
+                    with c_it1:
+                        marcado = st.checkbox(
+                            f"🧪 [{cod_i}] {nome_i} | Saldo Almoxarifado: {qtd_disp_i} un.",
+                            disabled=(qtd_disp_i <= 0),
+                            key=f"chk_item_{cod_i}"
+                        )
+                    with c_it2:
+                        qtd_ped = st.number_input(
+                            "Qtd",
+                            min_value=1,
+                            max_value=max(1, qtd_disp_i),
+                            value=1,
+                            disabled=(qtd_disp_i <= 0),
+                            key=f"num_item_{cod_i}"
+                        )
+                    if marcado and qtd_disp_i > 0:
+                        itens_ticados.append({"codigo": cod_i, "nome": nome_i, "qtd": int(qtd_ped)})
+
+        st.markdown("#### 📋 Sugestão de Separação por Atividade (Checklist Rápido do Almoxarifado)")
+        lista_opcoes_sug = ["-- Seleção Livre Direta no Estoque --"] + list(SUGESTOES_SEPARACAO_POR_ATIVIDADE.keys())
+        sug_rapida = st.selectbox(
+            "Selecione uma Sugestão de Carga por Atividade (Opcional):",
+            lista_opcoes_sug,
+            help="Carrega instantaneamente a lista de instrumentos e materiais sugeridos para o tipo de intervenção técnica."
+        )
+        texto_sug_padrao = ""
+        if sug_rapida != "-- Seleção Livre Direta no Estoque --":
+            sug_dados = SUGESTOES_SEPARACAO_POR_ATIVIDADE[sug_rapida]
+            texto_sug_padrao = f"[{sug_dados['nome']}]\n" + "\n".join(f"• {it}" for it in sug_dados["itens"])
+            st.caption(f"✨ **Recomendados para {sug_dados['nome']}:** " + ", ".join(sug_dados["itens"]))
+
+        instrumentos_extras_sol = st.text_area(
+            "📐 Instrumentos & Ferramentas a Separar pelo Almoxarifado:",
+            value=texto_sug_padrao,
+            placeholder="EX: MULTÍMETRO 1000V, OSCILOSCÓPIO, PHANTOM DE RESOLUÇÃO, TALHA, NÍVEL LASER...",
+            height=110
+        )
+
+        if st.form_submit_button("✅ Pegar Ferramenta / Registrar Saída", type="primary"):
+            if not itens_ticados and not instrumentos_extras_sol.strip():
+                st.error("⚠️ Selecione pelo menos um material ou indique o instrumento necessário!")
+            else:
+                erro_conflito = None
+                resumo_itens_str = "NENHUMA PEÇA DE ESTOQUE"
+                data_ped_agora = datetime.datetime.now().strftime('%d/%m/%Y %H:%M')
+
+                with get_db_connection(ctx.db_name) as conn_res:
+                    cur_res = conn_res.cursor()
+                    for it in itens_ticados:
+                        cur_res.execute("SELECT quantidade FROM estoque_pecas WHERE codigo = ?", (it['codigo'],))
+                        linha_q = cur_res.fetchone()
+                        saldo_real_agora = int(linha_q[0]) if linha_q else 0
+                        if it['qtd'] > saldo_real_agora:
+                            erro_conflito = (
+                                f"⚠️ Conflito de Estoque Online! O item '{it['nome']}' possui apenas "
+                                f"{saldo_real_agora} un. disponíveis (outro técnico acabou de reservar)."
+                            )
+                            break
+
+                    if not erro_conflito:
+                        if itens_ticados:
+                            resumo_itens_str = ", ".join([f"{i['qtd']}x {i['nome']} ({i['codigo']})" for i in itens_ticados])
+                        for it in itens_ticados:
+                            cur_res.execute(
+                                "UPDATE estoque_pecas SET quantidade = quantidade - ? WHERE codigo = ?",
+                                (it['qtd'], it['codigo'])
+                            )
+                        cur_res.execute("""
+                            INSERT INTO solicitacoes_pecas
+                            (tecnico, destino_cliente, itens_solicitados, instrumentos_solicitados, status_pedido, data_pedido)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        """, (
+                            tec_solicitante, cli_destino_sol, resumo_itens_str,
+                            instrumentos_extras_sol.strip().upper(),
+                            "ENTREGUE AO TÉCNICO / EM CAMPO", data_ped_agora
+                        ))
+
+                if erro_conflito:
+                    st.error(erro_conflito)
+                else:
+                    st.cache_data.clear()
+                    st.success(f"✅ Registrado com sucesso! Agora toda a equipe já sabe que o material está com **{tec_solicitante}**.")
+                    st.rerun()
+
+    st.markdown("---")
+    st.markdown("#### 🔄 Ferramentas em Campo & Devolução Rápida ao Almoxarifado")
+    st.caption("Ao devolver a ferramenta ou sobra de peça à empresa, clique em 'Devolver' para restabelecer imediatamente a disponibilidade no quadro.")
+    df_sol_hist = carregar_solicitacoes(ctx.db_name)
+    if not df_sol_hist.empty:
+        df_em_campo = df_sol_hist[~df_sol_hist['status_pedido'].fillna('').str.contains('DEVOLVIDO|CANCELADO|ESTORNADO|APLICADO', case=False)]
+        if not df_em_campo.empty:
+            st.markdown("##### 🔴 Materiais em Campo ou em Teste no Cliente (Clique para Devolver):")
+            for _, r_campo in df_em_campo.iterrows():
+                id_c = r_campo['id']
+                tec_c = r_campo['tecnico']
+                itens_c = r_campo['itens_solicitados']
+                data_c = r_campo.get('data_pedido', '')
+                st_p_c = r_campo.get('status_pedido', '')
+                tag_st = "🟡 [EM TESTE NO CLIENTE]" if "TESTE" in str(st_p_c).upper() else "🔴 [EM CAMPO]"
+                col_info_c, col_btn_c = st.columns([3.8, 1.4])
+                with col_info_c:
+                    st.markdown(f"**{tag_st} 👨‍🔧 {tec_c}** | `{data_c}` | 🛠️ {itens_c}")
+                with col_btn_c:
+                    if st.button("📥 Devolver ao Almoxarifado", key=f"btn_dev_rapido_{id_c}", type="primary"):
+                        ok_dev, msg_dev = atualizar_status_solicitacao_peca(ctx.db_name, id_c, "DEVOLVIDO AO ESTOQUE / BAIXA DE RETORNO")
+                        if ok_dev:
+                            st.cache_data.clear()
+                            st.success(f"✅ Material de {tec_c} devolvido com sucesso! O quadro foi liberado.")
+                            st.rerun()
+                        else:
+                            st.error(msg_dev)
+        else:
+            st.success("🟢 Todas as ferramentas e kits estão no Almoxarifado no momento! Nenhuma em campo.")
+
+        with st.expander("📋 Ver Histórico Geral de Movimentações"):
+            df_sol_vis = df_sol_hist.copy()
+            cols_renomear = {
+                "id": "#",
+                "tecnico": "Técnico",
+                "itens_solicitados": "Itens Retirados",
+                "status_pedido": "Situação",
+                "data_pedido": "Data Retirada"
+            }
+            cols_exibir = [c for c in cols_renomear.keys() if c in df_sol_vis.columns]
+            st.dataframe(df_sol_vis[cols_exibir].rename(columns=cols_renomear), use_container_width=True, hide_index=True)
+
+
+def _normalizar_cidade(txt: str) -> str:
+    if not txt:
+        return ""
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize('NFKD', str(txt)) if not unicodedata.combining(c)).strip().lower()
+
+
+COORDENADAS_BRASIL = {
+    # DISTRITO FEDERAL & POLO CENTRO-OESTE
+    "brasilia": (-15.7975, -47.8919),
+    "taguatinga": (-15.8331, -48.0567),
+    "asa sul": (-15.8205, -47.9300),
+    "asa norte": (-15.7650, -47.8850),
+    "vicente pires": (-15.8080, -48.0170),
+    "aguas claras": (-15.8398, -48.0264),
+    "ceilandia": (-15.8200, -48.1100),
+    "guara": (-15.8190, -47.9850),
+    "sobradinho": (-15.6520, -47.7880),
+    "gama": (-16.0200, -48.0600),
+    "goiania": (-16.6869, -49.2648),
+    "anapolis": (-16.3267, -48.9533),
+    "rio verde": (-17.7925, -50.9192),
+
+    # CEARÁ & POLO NORDESTE
+    "fortaleza": (-3.7172, -38.5433),
+    "fotaleza": (-3.7172, -38.5433),
+    "eusebio": (-3.8856, -38.4614),
+    "juazeiro": (-7.2009, -39.3148),
+    "juazeiro do norte": (-7.2009, -39.3148),
+    "crato": (-7.2347, -39.4069),
+    "barbalha": (-7.3086, -39.3039),
+    "sobral": (-3.6895, -40.3486),
+    "taua": (-6.0044, -40.2934),
+    "iguatu": (-6.3594, -39.2986),
+    "tiangua": (-3.7325, -40.9922),
+    "crateus": (-5.1764, -40.6761),
+    "quixada": (-4.9714, -39.0153),
+    "russas": (-4.9403, -37.9753),
+    "itapipoca": (-3.4947, -39.5786),
+    "maracanau": (-3.8681, -38.6253),
+    "caucaia": (-3.7364, -38.6531),
+    "poranga": (-4.7450, -40.9256),
+
+    # DEMAIS ESTADOS / POLOS REGIONAIS
+    "araripina": (-7.4811, -40.4994),
+    "petrolina": (-9.3875, -40.5028),
+    "recife": (-8.0476, -34.8770),
+    "caruaru": (-8.2833, -35.9761),
+    "mossoro": (-5.1878, -37.3442),
+    "natal": (-5.7945, -35.2110),
+    "joao pessoa": (-7.1153, -34.8610),
+    "campina grande": (-7.2247, -35.8772),
+    "catole": (-6.3439, -37.7467),
+    "teresina": (-5.0920, -42.8038),
+    "parnaiba": (-3.0039, -41.7761),
+    "salvador": (-12.9777, -38.5016),
+    "sao luis": (-2.5307, -44.3068),
+    "belo horizonte": (-19.9167, -43.9345),
+    "sao paulo": (-23.5505, -46.6333),
+    "rio de janeiro": (-22.9068, -43.1729)
+}
+
+
+def resolver_coordenadas_cliente(cidade: str, estado: str = "", endereco: str = "", lat_cad=None, lon_cad=None):
+    try:
+        if lat_cad is not None and lon_cad is not None and not pd.isna(lat_cad) and not pd.isna(lon_cad):
+            l1, l2 = float(lat_cad), float(lon_cad)
+            if l1 != 0.0 and l2 != 0.0:
+                return l1, l2
+    except Exception:
+        pass
+
+    cid_n = _normalizar_cidade(cidade)
+    end_n = _normalizar_cidade(endereco)
+    uf_n = str(estado or "").strip().upper()
+
+    for k, coords in COORDENADAS_BRASIL.items():
+        if k in cid_n or k in end_n:
+            return coords
+
+    if uf_n == "DF" or "brasilia" in end_n or "distrito federal" in end_n:
+        return COORDENADAS_BRASIL["brasilia"]
+    elif uf_n == "PE":
+        return COORDENADAS_BRASIL["petrolina"]
+    elif uf_n == "RN":
+        return COORDENADAS_BRASIL["mossoro"]
+    elif uf_n == "PB":
+        return COORDENADAS_BRASIL["joao pessoa"]
+    elif uf_n == "PI":
+        return COORDENADAS_BRASIL["teresina"]
+    elif uf_n == "BA":
+        return COORDENADAS_BRASIL["salvador"]
+    elif uf_n == "GO":
+        return COORDENADAS_BRASIL["goiania"]
+    elif uf_n == "MA":
+        return COORDENADAS_BRASIL["sao luis"]
+
+    return COORDENADAS_BRASIL["fortaleza"]
+
+
+def render_mapa_rotas(ctx: AppContext):
+    df = ctx.df
+
+    st.markdown("### 🗺️ Mapa Operacional & Planeamento de Rotas EMED")
+    st.caption("Acompanhamento georreferenciado dos hospitais, bases operacionais e planeamento de rotas técnicas.")
+
+    c_topo1, c_topo2 = st.columns([1.8, 1.2])
+    with c_topo1:
+        polo_sel = st.radio(
+            "📍 **Filtrar Polo no Mapa:**",
+            ["🌐 Todos os Polos (Brasil)", "🏢 Polo Brasília (DF)", "🏛️ Polo Matriz (Ceará & NE)"],
+            horizontal=True,
+            key="filtro_polo_mapa"
+        )
+    with c_topo2:
+        mostrar_bases = st.checkbox("📍 Destacar Bases Operacionais EMED", value=True)
+
+    cores_hex = ["#64dfdf", "#f72585", "#7209b7", "#4cc9f0", "#ff9f1c", "#2ec4b6", "#e71d36", "#ffb703"]
+    pontos_mapa = []
+
+    # Bases Operacionais EMED
+    if mostrar_bases:
+        if "Brasília" in polo_sel or "Todos" in polo_sel:
+            pontos_mapa.append({
+                'lat': -15.8080, 'lon': -48.0170,
+                'cliente': "🏢 BASE FILIAL EMED (BRASÍLIA - DF)",
+                'cidade': "BRASÍLIA - DF",
+                'tipo': 'BASE',
+                'color': "#ffb703"
+            })
+        if "Matriz" in polo_sel or "Todos" in polo_sel:
+            pontos_mapa.append({
+                'lat': -3.8856, 'lon': -38.4614,
+                'cliente': "🏛️ MATRIZ EMED (EUSÉBIO - CE)",
+                'cidade': "EUSÉBIO - CE",
+                'tipo': 'BASE',
+                'color': "#ffb703"
+            })
+
+    clientes_agrupados = []
+    df_validos = df[
+        df['cliente'].fillna('').str.strip().ne('') &
+        ~df['cliente'].str.upper().str.contains("NENHUM (AGUARDANDO", regex=False)
+    ]
+
+    for idx_c, (cli_nome, grp) in enumerate(df_validos.groupby('cliente')):
+        r0 = grp.iloc[0]
+        cid = str(r0.get('cidade', '')).strip().upper()
+        uf = str(r0.get('estado', '')).strip().upper()
+        end = str(r0.get('endereco', '')).strip().upper()
+        lat_banco = r0.get('latitude') if 'latitude' in r0 else None
+        lon_banco = r0.get('longitude') if 'longitude' in r0 else None
+
+        lat, lon = resolver_coordenadas_cliente(cid, uf, end, lat_banco, lon_banco)
+
+        eh_df = (uf == "DF" or "BRASIL" in cid or "DF" in end)
+        if "Brasília" in polo_sel and not eh_df:
+            continue
+        if "Matriz" in polo_sel and eh_df:
+            continue
+
+        equip_lista = [str(e) for e in grp['equipamento'].unique() if str(e).strip() and "NENHUM" not in str(e).upper()]
+        equip_str = ", ".join(equip_lista[:3]) if equip_lista else "Equipamentos Hospitalares"
+
+        cor_p = cores_hex[idx_c % len(cores_hex)]
+        pontos_mapa.append({
+            'lat': lat, 'lon': lon,
+            'cliente': cli_nome,
+            'cidade': f"{cid} - {uf}" if uf else cid,
+            'tipo': 'CLIENTE',
+            'color': cor_p
+        })
+        clientes_agrupados.append({
+            'cliente': cli_nome,
+            'cidade': cid,
+            'estado': uf,
+            'endereco': end,
+            'lat': lat,
+            'lon': lon,
+            'equipamentos': equip_str,
+            'qtd_os': len(grp),
+            'color': cor_p
+        })
+
+    df_pontos = pd.DataFrame(pontos_mapa)
+    if not df_pontos.empty:
+        zoom_nivel = 9 if "Brasília" in polo_sel else (6 if "Matriz" in polo_sel else 4)
+        st.map(df_pontos, latitude="lat", longitude="lon", size=350, color="color", zoom=zoom_nivel)
+    else:
+        st.warning("Nenhum cliente encontrado para o polo selecionado.")
+
+    st.markdown("#### 🛣️ Planeador de Rotas Técnicas & Itinerário")
+    nomes_clientes_opcao = [c['cliente'] for c in clientes_agrupados]
+    clientes_selecionados_rota = st.multiselect(
+        "Selecione os hospitais para traçar o itinerário da rota:",
+        options=nomes_clientes_opcao,
+        key="multiselect_rota_clientes"
+    )
+
+    if clientes_selecionados_rota:
+        pts_filtrados = [c for c in clientes_agrupados if c['cliente'] in clientes_selecionados_rota]
+        if len(pts_filtrados) >= 2:
+            km_total = 0.0
+            for i_r in range(len(pts_filtrados) - 1):
+                km_total += calcular_distancia(
+                    pts_filtrados[i_r]['lat'], pts_filtrados[i_r]['lon'],
+                    pts_filtrados[i_r+1]['lat'], pts_filtrados[i_r+1]['lon']
+                )
+            destinos_enc = "/".join([urllib.parse.quote(c['endereco'] if c['endereco'] else f"{c['cidade']}, {c['estado']}") for c in pts_filtrados])
+            origem_base = "Rua 3 Chacara 46A Vicente Pires Brasilia DF" if "Brasília" in polo_sel else "Rua Coronel Freire 16 Eusebio CE"
+            gmaps_rota_url = f"https://www.google.com/maps/dir/{urllib.parse.quote(origem_base)}/{destinos_enc}"
+
+            st.info(f"🛣️ **Distância Total Estimada:** {km_total:.1f} KM | ⏱️ **Tempo Estimado:** {formatar_tempo(km_total)}")
+            st.markdown(f"""
+                <a href="{gmaps_rota_url}" target="_blank" style="background:#0284c7; color:white; padding:8px 16px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:13px; display:inline-block; margin-bottom:12px;">
+                    🧭 Abrir Itinerário Completo no Google Maps (Navegação GPS)
+                </a>
+            """, unsafe_allow_html=True)
+
+    st.markdown("#### 🏥 Hospitais & Unidades no Mapa")
+    colunas_cartoes = st.columns(2)
+    for idx_card, c_info in enumerate(clientes_agrupados):
+        col_c = colunas_cartoes[idx_card % 2]
+        with col_c:
+            end_gps = c_info['endereco'] if c_info['endereco'] else f"{c_info['cidade']}, {c_info['estado']}"
+            waze_url = f"https://waze.com/ul?q={urllib.parse.quote(end_gps)}"
+            gmaps_url = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(end_gps)}"
+            st.markdown(f"""
+            <div style="background: #1c2541; border-left: 4px solid {c_info['color']}; border-radius: 6px; padding: 10px 14px; margin-bottom: 10px;">
+                <div style="font-size: 14px; font-weight: 800; color: #f8fafc;">{c_info['cliente']}</div>
+                <div style="font-size: 11.5px; color: #64dfdf; font-weight: bold; margin-top: 2px;">📍 {c_info['cidade']} - {c_info['estado']}</div>
+                <div style="font-size: 11px; color: #cbd5e1; margin-top: 3px;">⚙️ <b>Equipamentos:</b> {c_info['equipamentos']}</div>
+                <div style="font-size: 10.5px; color: #94a3b8; margin-top: 2px;">🏠 <i>{end_gps}</i></div>
+                <div style="margin-top: 8px; display: flex; gap: 8px;">
+                    <a href="{waze_url}" target="_blank" style="background:#334155; color:#64dfdf; padding:4px 10px; border-radius:4px; font-size:11px; text-decoration:none; font-weight:bold;">
+                        🚗 Waze
+                    </a>
+                    <a href="{gmaps_url}" target="_blank" style="background:#0284c7; color:white; padding:4px 10px; border-radius:4px; font-size:11px; text-decoration:none; font-weight:bold;">
+                        🗺️ Google Maps
+                    </a>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+
+
+def _gerar_proximo_codigo_item(df_est: pd.DataFrame, categoria: str) -> str:
+    pref = "PEC"
+    cat_upper = str(categoria or "").upper()
+    if "INSTRUMENTO" in cat_upper or "FERRAMENTA" in cat_upper:
+        pref = "INST"
+    elif "CONSUM" in cat_upper:
+        pref = "CONS"
+
+    numeros = []
+    if not df_est.empty and 'codigo' in df_est.columns:
+        for c in df_est['codigo'].dropna():
+            c_str = str(c).strip().upper()
+            if c_str.startswith(pref):
+                nums = ''.join([ch for ch in c_str if ch.isdigit()])
+                if nums:
+                    numeros.append(int(nums))
+    proximo = max(numeros) + 1 if numeros else 1
+    return f"{pref}-{proximo:03d}"
+
+
+def render_gestao_estoque(ctx: AppContext):
+    st.markdown("### 📦 Controlo do Almoxarifado, Ferramentas & Peças Comerciais EMED")
+
+    resumo_al = obter_resumo_alarmes_calibracao(ctx.db_name)
+    qtd_urgentes = resumo_al.get("total_alarmes_urgentes", 0)
+    rotulo_alarmes = f"⏰ Alarmes de Calibração & Créditos ({qtd_urgentes} 🚨)" if qtd_urgentes > 0 else "⏰ Alarmes de Calibração & Créditos"
+
+    opcoes_abas_almox = [
+        "📋 Catálogo Geral do Almoxarifado",
+        rotulo_alarmes,
+        "➕ Cadastrar / Editar Item",
+        "🔧 Baixa de Consumíveis (Uso Interno)"
+    ]
+
+    idx_default = 0
+    if st.session_state.get("aba_almoxarifado_ativa") == "alarmes":
+        idx_default = 1
+        st.session_state.aba_almoxarifado_ativa = None
+
+    aba_sel = st.radio(
+        "Navegação do Almoxarifado:",
+        opcoes_abas_almox,
+        index=idx_default,
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+
+    df_est_view = carregar_estoque(ctx.db_name)
+
+    if aba_sel == "📋 Catálogo Geral do Almoxarifado":
+        if df_est_view.empty:
+            st.info("Nenhuma peça registada no estoque.")
+        else:
+            if qtd_urgentes > 0:
+                st.markdown(f"""
+                    <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid #ef4444; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #ef4444; font-weight: bold; font-size: 13.5px;">🚨 Existem {qtd_urgentes} alarmes de calibração / créditos anuais ativos no almoxarifado!</span>
+                        <span style="color: #cbd5e1; font-size: 12px;">Consulte a aba "{rotulo_alarmes}".</span>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            # Métricas de Categorias do Almoxarifado
+            qtd_total = len(df_est_view)
+            qtd_inst = len(df_est_view[df_est_view['tipo_item'].fillna('').str.contains('INSTRUMENTO|FERRAMENTA', case=False)])
+            qtd_pec = len(df_est_view[df_est_view['tipo_item'].fillna('').str.contains('COMERCIAL|PEÇA', case=False)])
+            qtd_con = len(df_est_view[df_est_view['tipo_item'].fillna('').str.contains('CONSUM|LIMPEZA', case=False)])
+
+            m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+            m_col1.metric("📦 Total de Itens", f"{qtd_total} itens")
+            m_col2.metric("🔬 Instrumentos & Ferramentas", f"{qtd_inst} un.")
+            m_col3.metric("⚙️ Peças de Reposição (OS)", f"{qtd_pec} un.")
+            m_col4.metric("🧪 Consumíveis & Limpeza", f"{qtd_con} un.")
+
+            st.markdown("#### 📋 Catálogo Geral do Almoxarifado")
+            filtro_aba_est = st.radio(
+                "Filtrar Visualização do Almoxarifado:",
+                ["TODOS OS ITENS", "🔬 INSTRUMENTOS & FERRAMENTARIA", "⚙️ PEÇAS DE REPOSIÇÃO (OS)", "🧪 CONSUMÍVEIS & LIMPEZA"],
+                horizontal=True
+            )
+
+            df_filtrado_view = df_est_view.copy()
+            if "INSTRUMENTOS" in filtro_aba_est:
+                df_filtrado_view = df_filtrado_view[df_filtrado_view['tipo_item'].fillna('').str.contains('INSTRUMENTO|FERRAMENTA', case=False)]
+            elif "PEÇAS" in filtro_aba_est:
+                df_filtrado_view = df_filtrado_view[df_filtrado_view['tipo_item'].fillna('').str.contains('COMERCIAL|PEÇA', case=False)]
+            elif "CONSUMÍVEIS" in filtro_aba_est:
+                df_filtrado_view = df_filtrado_view[df_filtrado_view['tipo_item'].fillna('').str.contains('CONSUM|LIMPEZA', case=False)]
+
+            df_est_mostra = df_filtrado_view.copy()
+            custo_num = pd.to_numeric(df_est_mostra['preco_custo'], errors='coerce').fillna(0.0)
+            mc_num = pd.to_numeric(df_est_mostra['margem_contrato'], errors='coerce').fillna(30.0)
+            ma_num = pd.to_numeric(df_est_mostra['margem_avulso'], errors='coerce').fillna(60.0)
+            df_est_mostra['Preço Venda Contrato (R$)'] = (custo_num * (1 + mc_num / 100.0)).round(2)
+            df_est_mostra['Preço Venda Avulso (R$)'] = (custo_num * (1 + ma_num / 100.0)).round(2)
+
+            if 'data_validade_calibracao' in df_est_mostra.columns:
+                def _obter_badge_cal(row):
+                    req_cal = str(row.get('requer_calibracao', '0')) in ['1', 'True', 'true']
+                    dt_val = row.get('data_validade_calibracao')
+                    req_cred = str(row.get('requer_creditos', '0')) in ['1', 'True', 'true']
+                    saldo = row.get('saldo_creditos')
+
+                    partes = []
+                    if req_cal or (pd.notna(dt_val) and str(dt_val).strip()):
+                        if pd.notna(dt_val) and str(dt_val).strip():
+                            res = calcular_status_calibracao(str(dt_val))
+                            partes.append(f"{res['badge']} (Venc: {dt_val})")
+                        else:
+                            partes.append("⚠️ Sem data")
+
+                    if req_cred:
+                        partes.append(f"💳 {saldo or 0} créditos")
+
+                    return " | ".join(partes) if partes else "—"
+
+                df_est_mostra['Calibração & Créditos'] = df_est_mostra.apply(_obter_badge_cal, axis=1)
+
+            st.dataframe(df_est_mostra, use_container_width=True, hide_index=True)
+
+    elif aba_sel == rotulo_alarmes:
+        from emed_views.alarmes_calibracao import render_alarmes_calibracao
+        render_alarmes_calibracao(ctx)
+
+    elif aba_sel == "➕ Cadastrar / Editar Item":
+        st.markdown("#### ➕ Cadastrar / Editar Item no Almoxarifado")
+        if not df_est_view.empty:
+            lista_pecas_fmt = (df_est_view['codigo'].astype(str) + " - " + df_est_view['nome_peca'].astype(str)).tolist()
+            opcoes_pecas_ed = ["➕ CADASTRAR NOVO ITEM"] + lista_pecas_fmt
+        else:
+            opcoes_pecas_ed = ["➕ CADASTRAR NOVO ITEM"]
+
+        escolha_peca_ed = st.selectbox("Selecione um Item para Editar/Somar Estoque ou Cadastre um Novo:", opcoes_pecas_ed)
+
+        row_p_ed = None
+        if escolha_peca_ed != "➕ CADASTRAR NOVO ITEM":
+            cod_sel_ed = escolha_peca_ed.split(" - ")[0].strip()
+            row_p_ed = df_est_view[df_est_view['codigo'] == cod_sel_ed].iloc[0]
+
+        cod_sugerido_padrao = _gerar_proximo_codigo_item(df_est_view, "PEÇA COMERCIAL (OS)") if row_p_ed is None else limpar_texto(row_p_ed['codigo'])
+
+        with st.form("form_novo_ou_editar_peca"):
+            cp1, cp2 = st.columns(2)
+            with cp1:
+                cod_p = st.text_input(
+                    "Código Padronizado do Item *",
+                    value=cod_sugerido_padrao,
+                    help="Código gerado automaticamente no padrão da empresa (PEC-, INST- ou CONS-). Pode ser editado se necessário."
+                )
+                nome_p = st.text_input(
+                    "Nome / Descrição do Item *",
+                    value=limpar_texto(row_p_ed['nome_peca']) if row_p_ed is not None else "",
+                    placeholder="EX: ESTABILIZADOR DE FILAMENTO GE ou MULTÍMETRO DIGITAL"
+                )
+                idx_cat_p = 0 if row_p_ed is None or "COMERCIAL" in str(row_p_ed.get('tipo_item', '')) else (
+                    2 if "INSTRUMENTO" in str(row_p_ed.get('tipo_item', '')).upper() or "FERRAMENTA" in str(row_p_ed.get('tipo_item', '')).upper() else 1
+                )
+                tipo_item_p = st.selectbox(
+                    "Categoria Padrão do Item *",
+                    ["PEÇA COMERCIAL (OS)", "CONSUMÍVEL INTERNO (USO DIÁRIO / SEM NF SAÍDA)", "INSTRUMENTO / FERRAMENTA"],
+                    index=idx_cat_p
+                )
+                opcoes_loc = ["Almoxarifado Matriz (Eusébio - CE)", "Base Avançada (Filial Brasília - DF)", "Veículo Técnico / Mala"]
+                loc_salva = str(row_p_ed.get('localizacao', '')) if row_p_ed is not None else ""
+                idx_loc = 1 if "Brasília" in loc_salva or "DF" in loc_salva else 0
+                localizacao_p = st.selectbox("Unidade / Localização do Almoxarifado *", opcoes_loc, index=idx_loc)
+
+            with cp2:
+                qtd_p = st.number_input(
+                    "Quantidade Total em Estoque *",
+                    min_value=0,
+                    value=limpar_int(row_p_ed['quantidade'], 1) if row_p_ed is not None else 1
+                )
+                estoque_min_salvo = limpar_int(row_p_ed.get('estoque_minimo'), 2) if row_p_ed is not None else 2
+                estoque_min_p = st.number_input("Estoque Mínimo (Ponto de Reposição Padrão) *", min_value=0, value=estoque_min_salvo)
+
+                custo_p = st.number_input(
+                    "Preço de Custo Unitário (R$)",
+                    min_value=0.0,
+                    value=limpar_float(row_p_ed['preco_custo'], 100.0) if row_p_ed is not None else 100.0,
+                    step=10.0
+                )
+                val_mc = limpar_float(row_p_ed.get('margem_contrato'), 30.0) if row_p_ed is not None else 30.0
+                val_ma = limpar_float(row_p_ed.get('margem_avulso'), 60.0) if row_p_ed is not None else 60.0
+                m_cont_p = st.number_input("Margem Padrão Contrato (%)", min_value=0.0, value=val_mc, step=5.0)
+                m_avul_p = st.number_input("Margem Padrão Avulso (%)", min_value=0.0, value=val_ma, step=5.0)
+
+                pv_cont = custo_p * (1 + m_cont_p / 100.0)
+                pv_avul = custo_p * (1 + m_avul_p / 100.0)
+                st.caption(f"💰 **Preço Sugerido Contrato:** R$ {pv_cont:,.2f} | **Preço Sugerido Avulso:** R$ {pv_avul:,.2f}")
+
+            st.markdown("##### 🔬 Parâmetros de Calibração & Créditos Anuais (Opcional para Instrumentos)")
+            ci1, ci2, ci3 = st.columns(3)
+            with ci1:
+                val_req_cal = False
+                if row_p_ed is not None:
+                    val_req_cal = str(row_p_ed.get('requer_calibracao', '0')) in ['1', 'True', 'true'] or "INSTRUMENTO" in str(row_p_ed.get('tipo_item', '')).upper()
+                chk_req_cal = st.checkbox("Requer Calibração Anual", value=val_req_cal)
+                dt_ult_cal = st.text_input(
+                    "Data Última Calibração (YYYY-MM-DD)",
+                    value=str(row_p_ed.get('data_ultima_calibracao', '') or '') if row_p_ed is not None else ""
+                )
+            with ci2:
+                dt_val_cal = st.text_input(
+                    "Data Validade Calibração (YYYY-MM-DD)",
+                    value=str(row_p_ed.get('data_validade_calibracao', '') or '') if row_p_ed is not None else ""
+                )
+                cert_cal = st.text_input(
+                    "Certificado de Calibração",
+                    value=str(row_p_ed.get('certificado_calibracao', '') or '') if row_p_ed is not None else ""
+                )
+            with ci3:
+                val_req_cred = False
+                if row_p_ed is not None:
+                    val_req_cred = str(row_p_ed.get('requer_creditos', '0')) in ['1', 'True', 'true']
+                chk_req_cred = st.checkbox("Requer Recarga Anual de Créditos", value=val_req_cred)
+                saldo_cred = st.number_input(
+                    "Saldo de Créditos / Disparos",
+                    min_value=0,
+                    value=int(row_p_ed.get('saldo_creditos', 0) or 0) if row_p_ed is not None else 0
+                )
+
+            c_bp1, c_bp2 = st.columns(2)
+            with c_bp1:
+                btn_salvar_peca = st.form_submit_button("💾 Registar / Atualizar Item no Estoque", type="primary")
+            with c_bp2:
+                btn_excluir_peca = st.form_submit_button("🗑️ Excluir Item do Estoque")
+
+            if btn_salvar_peca:
+                if not cod_p.strip() or not nome_p.strip():
+                    st.error("⚠️ Preencha o código e o nome do item!")
+                else:
+                    try:
+                        with get_db_connection(ctx.db_name) as conn_ip:
+                            conn_ip.execute("""
+                                INSERT INTO estoque_pecas
+                                (codigo, nome_peca, quantidade, preco_custo, margem_contrato, margem_avulso, tipo_item,
+                                 requer_calibracao, data_ultima_calibracao, data_validade_calibracao, certificado_calibracao,
+                                 requer_creditos, saldo_creditos, localizacao, estoque_minimo)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                ON CONFLICT(codigo) DO UPDATE SET
+                                    nome_peca = excluded.nome_peca,
+                                    quantidade = excluded.quantidade,
+                                    preco_custo = excluded.preco_custo,
+                                    margem_contrato = excluded.margem_contrato,
+                                    margem_avulso = excluded.margem_avulso,
+                                    tipo_item = excluded.tipo_item,
+                                    requer_calibracao = excluded.requer_calibracao,
+                                    data_ultima_calibracao = excluded.data_ultima_calibracao,
+                                    data_validade_calibracao = excluded.data_validade_calibracao,
+                                    certificado_calibracao = excluded.certificado_calibracao,
+                                    requer_creditos = excluded.requer_creditos,
+                                    saldo_creditos = excluded.saldo_creditos,
+                                    localizacao = excluded.localizacao,
+                                    estoque_minimo = excluded.estoque_minimo
+                            """, (
+                                cod_p.strip().upper(), nome_p.strip().upper(),
+                                int(qtd_p), float(custo_p), float(m_cont_p), float(m_avul_p), tipo_item_p,
+                                1 if chk_req_cal else 0,
+                                dt_ult_cal.strip() or None,
+                                dt_val_cal.strip() or None,
+                                cert_cal.strip() or None,
+                                1 if chk_req_cred else 0,
+                                int(saldo_cred),
+                                localizacao_p.strip(),
+                                float(estoque_min_p)
+                            ))
+                        st.cache_data.clear()
+                        st.success(f"✅ Item '{nome_p.strip().upper()}' guardado e tabela atualizada com sucesso!")
+                        st.rerun()
+                    except Exception as ex:
+                        st.error(f"Erro ao salvar item: {ex}")
+
+            if btn_excluir_peca and row_p_ed is not None:
+                with get_db_connection(ctx.db_name) as conn_ip:
+                    conn_ip.execute("DELETE FROM estoque_pecas WHERE codigo = ?", (row_p_ed['codigo'],))
+                st.cache_data.clear()
+                st.success("🗑️ Item excluído do estoque!")
+                st.rerun()
+
+    elif aba_sel == "🔧 Baixa de Consumíveis (Uso Interno)":
+        st.markdown("#### 🔧 Baixa de Consumíveis para Manutenções do Dia a Dia ou Uso Interno na Empresa")
+        st.caption("Utilize para dar saída em abraçadeiras, fitas isolantes, álcool isopropílico, parafusos, solda, etc., sem nota fiscal de saída.")
+        if df_est_view.empty:
+            st.info("Cadastre itens no estoque primeiro.")
+        else:
+            with st.form("form_baixa_consumivel"):
+                cb1, cb2 = st.columns(2)
+                with cb1:
+                    opcoes_cons_lista = (
+                        df_est_view['codigo'] + " - " + df_est_view['nome_peca']
+                        + " (Saldo: " + df_est_view['quantidade'].astype(str) + ")"
+                    ).tolist()
+                    item_cons_sel = st.selectbox("Selecione o Consumível / Material", opcoes_cons_lista)
+                    qtd_cons_baixa = st.number_input("Quantidade Consumida", min_value=1, value=1)
+                with cb2:
+                    setor_tec_cons = st.text_input("Técnico ou Setor que Utilizou *", value=ctx.usuario_atual)
+                    finalidade_cons = st.text_input(
+                        "Finalidade / Onde foi aplicado *",
+                        placeholder="EX: ORGANIZAÇÃO DE CABOS EM INSTALAÇÃO / BANCADA INTERNA"
+                    )
+
+                if st.form_submit_button("📉 Confirmar Baixa por Consumo Interno", type="primary"):
+                    cod_c_alvo = item_cons_sel.split(" - ")[0].strip()
+                    row_c_alvo = df_est_view[df_est_view['codigo'] == cod_c_alvo].iloc[0]
+                    if qtd_cons_baixa > limpar_int(row_c_alvo['quantidade'], 0):
+                        st.error("⚠️ Quantidade superior ao saldo disponível em estoque!")
+                    elif not finalidade_cons.strip():
+                        st.error("⚠️ Informe a finalidade do consumo!")
+                    else:
+                        with get_db_connection(ctx.db_name) as conn_bc:
+                            conn_bc.execute(
+                                "UPDATE estoque_pecas SET quantidade = quantidade - ? WHERE codigo = ?",
+                                (int(qtd_cons_baixa), cod_c_alvo)
+                            )
+                            conn_bc.execute("""
+                                INSERT INTO baixas_consumiveis
+                                (tecnico_setor, codigo_item, nome_item, quantidade, finalidade, data_baixa)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            """, (
+                                setor_tec_cons.strip().upper(), cod_c_alvo, row_c_alvo['nome_peca'],
+                                int(qtd_cons_baixa), finalidade_cons.strip().upper(),
+                                datetime.datetime.now().strftime('%d/%m/%Y %H:%M')
+                            ))
+                        st.cache_data.clear()
+                        st.success("✅ Baixa de consumível registada com sucesso!")
+                        st.rerun()
+
+        st.markdown("###### 📜 Histórico de Consumo Interno")
+        st.dataframe(carregar_baixas_consumiveis(ctx.db_name), use_container_width=True, hide_index=True)

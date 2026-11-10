@@ -1,0 +1,54 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>dd File List Select Overview</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/15/07</P></td></tr></table><H1 ID="top">dd File List Select Overview </H1><P CLASS="descriptive">dd math is a means for the user to apply mathematical operations: add,
+subtract, multiply, and divide to dd files, and calculate the channel-to-channel
+difference or ratio of means vs. standard deviation vectors of a dd file.
+It allows the user to specify the scaling factor for the output vector, and
+provides three output modes: dd file, plot, and view numbers.</P><P CLASS="descriptive">dd math is part of the dd analysis user interface. Scan Analysis is
+used to generate dd files that may then be manipulated or examined using dd
+File Analysis.</P><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct4-4-4-1-38514">1&nbsp;&nbsp;dd Files Generation<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">There are 18 different dd file types of six orientations. The orientations
+are View, Channel, RTS, CAL, Elements, and Header.</P><P CLASS="sect1">Channel oriented means and standard deviation type dd files are the
+only type that can be created from scan data files in the Scan Analysis application.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct4-4-4-2-38514">2&nbsp;&nbsp;dd Math Functions<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">dd math consists of the following functions:</P><UL><LI CLASS="bulletlist"><P>Add</P></LI><LI CLASS="bulletlist"><P>Subtract</P></LI><LI CLASS="bulletlist"><P>Multiply</P></LI><LI CLASS="bulletlist"><P>Divide</P></LI><LI CLASS="bulletlist"><P>Channel to Channel difference</P></LI><LI CLASS="bulletlist"><P>Ratio of means vs. standard deviation</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct4-4-4-3-38514">3&nbsp;&nbsp;Add, Subtract, Multiply, Divide<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Applies add, subtract, multiply, and divide between vectors in two dd
+files. The output file is a dd file with one of the following suffixes:</P><UL><LI CLASS="bulletlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">.add</FONT></SPAN></P></LI><LI CLASS="bulletlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">.dif</FONT></SPAN></P></LI><LI CLASS="bulletlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">.mul</FONT></SPAN></P></LI><LI CLASS="bulletlist"><P><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">.rat</FONT></SPAN></P></LI></UL><P CLASS="sect1">Operations can be performed on dd files in View orientation, Channel
+orientation, RTS orientation, and Cal orientation.</P><P CLASS="sect1">Currently, no dd type restrictions are applied to operations between
+dd files, as long as the dd vectors have the same number of elements. If one
+file has a single vector and the other file has multiple vectors, the mathematical
+operation is applied multiple times using the single vector. Otherwise, the
+mathematical operation is applied component-wise for the number of vectors
+in each file.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct4-4-4-4-38514">4&nbsp;&nbsp;Channel to Channel Difference<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Applies the following calculation to the data from the data set(s) in
+the dd files for View, RTS or Cal orientation:</P><P CLASS="sect1">(X2-X1), (X3-X2), (X4-X3),...,(Xn-Xn-1)</P><P CLASS="sect1">where X is the data value for each channel.</P><P CLASS="sect1">The output is channel to channel dd file with extension: <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">.c2c</FONT></SPAN></P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct4-4-4-5-38514">5&nbsp;&nbsp;Ratio of Means vs. Standard Deviation<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Takes a MSD (means and standard deviation) or RTS (real time statistics)
+type of dd file, calculates the ratio of data in the means vector (1st set)
+to data in standard deviation vector (2nd set). The output file is a ratio
+type of dd file with the extension: <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">.rat</FONT></SPAN></P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct4-4-4-6-38514">6&nbsp;&nbsp;dd Math Output Mode<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Three output modes are supported in dd math:</P><UL><LI CLASS="bulletlist"><P>Plot - Will plot the output dd vector using an on-screen vector
+display.</P></LI><LI CLASS="bulletlist"><P>dd File - Allows the user to specify the output dd file name
+with a full path or the file basename. If only base name is provided, the
+program will use the default prefix and suffix for the output file. The created
+dd file appears in the dd file list.</P></LI><LI CLASS="bulletlist"><P>View Numbers - View Numbers will display the dd vector numerical
+values on the screen, and the user can perform numerical searches in the window.</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct4-4-4-7-38514">7&nbsp;&nbsp;dd Analysis User Interfaces<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The dd math operation panel and a set of the dd math operation buttons
+are part of the ddLS screen.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct4-4-4-8-38514">8&nbsp;&nbsp;Functions in ddLS User Interface<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The ddLS supports the following functions for various file types.</P><UL><LI CLASS="bulletlist"><P>Update</P></LI><LI CLASS="bulletlist"><P>Plot</P></LI><LI CLASS="bulletlist"><P>Save to MOD</P></LI><LI CLASS="bulletlist"><P>Restore From MOD</P></LI><LI CLASS="bulletlist"><P>dd math operations: +, -, x, /, ch2ch, Ratio</P></LI><LI CLASS="bulletlist"><P>Sort By Date or Sort by Type</P></LI></UL><P CLASS="sect1">The user can perform these functions, except dd math operations, by
+simply selecting one or more files in the list select window, and clicking
+the function button. The following file types are supported in the ddLS user
+interface.</P><UL><LI CLASS="bulletlist"><P>dd File</P></LI><LI CLASS="bulletlist"><P>Cal File</P></LI><LI CLASS="bulletlist"><P>Data File</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct4-4-4-9-38514">9&nbsp;&nbsp;File Operations<SPAN CLASS="SECT1EFF"> </SPAN></H2><UL><LI CLASS="bulletlist"><P>dd Math Operations - Perform: add, subtract, multiply, divide,
+and channel to channel difference operations on dd files. These operations
+are only available for dd file types.</P></LI><LI CLASS="bulletlist"><P>Plot - Plots the vector(s) of the selected files in the display
+window for the following file types: dd Files and Cal Files</P></LI><LI CLASS="bulletlist"><P>View # - Prints the numerical data of the dd vector(s) to
+the display window(s). For image file types and scan file types, it displays
+the VVC plots of the selected files.</P></LI><LI CLASS="bulletlist"><P>Save/Restore to/from MOD - Saves the selected files to the
+MOD and restores all the dd files from <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/MOD/ddfiles</FONT></SPAN> to <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/data</FONT></SPAN> directory.</P></LI><LI CLASS="bulletlist"><P>Update - Refreshes the display in the ddLS user interface.</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct4-4-4-10-38514">10&nbsp;&nbsp;dd Math Operations in ddLS<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The dd math operation buttons become insensitive if no files are selected
+in the dd math operation panel.</P><P CLASS="sect1">The user may start dd math operation(s) by selecting the file(s) and
+putting them into the selection field by clicking the button FILE #1 or FILE
+#2. If the selected file is not a dd file, the application will not put it
+into the dd math operation field. A message window will pop up and ask user
+to select a dd file.</P><P CLASS="sect1">If only one file is selected and it is of the file type RTS dd file
+or MSD dd file, both <SPAN CLASS="GUIBUTTON">[CHANNEL TO CHANNEL]</SPAN> and <SPAN CLASS="GUIBUTTON">[RATIO
+OF MEANS VS. STDV]</SPAN> will become sensitive. If the selected file
+is not of the type MSD or RTS, only <SPAN CLASS="GUIBUTTON">[CHANNEL TO CHANNEL]</SPAN> becomes
+sensitive. When two dd files are selected, <SPAN CLASS="GUIBUTTON">[ADD]</SPAN>, <SPAN CLASS="GUIBUTTON">[SUBTRACT]</SPAN>, <SPAN CLASS="GUIBUTTON">[MULTIPLY]</SPAN>,
+and <SPAN CLASS="GUIBUTTON">[DIVIDE]</SPAN> become sensitive and <SPAN CLASS="GUIBUTTON">[CHANNEL
+TO CHANNEL]</SPAN> and <SPAN CLASS="GUIBUTTON">[RATIO OF MEANS VS. STDV]</SPAN> become
+insensitive.</P><P CLASS="sect1">The user can specify the output file name when the dd file output mode
+is set. Otherwise the system offers a default dd file name.</P><P CLASS="sect1">The default output scaling factor is 1.0. The user can set the scaling
+factor to any real number.</P><P CLASS="sect1">When the dd math operation buttons are sensitive, the user can select
+the desired button to start the dd math operation.</P></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

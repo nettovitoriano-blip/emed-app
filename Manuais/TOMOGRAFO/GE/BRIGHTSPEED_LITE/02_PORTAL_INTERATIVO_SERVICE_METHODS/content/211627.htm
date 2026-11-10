@@ -1,0 +1,106 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Flash Download Tool (GOC3 and later Consoles)</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/16/07</P></td></tr></table><H1 ID="top">Flash Download Tool (GOC3 and later Consoles) </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="50%"><col width="50%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised on:</td><td valign="">September 20, 2005</td></tr></tbody></table></div></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353668975691">1&nbsp;&nbsp;The Need for FLASH Version Verification and Download Tool<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Application and characterization parameters are stored in the on-board
+FLASH memory of the TGPU, DCB, CCB, MTCB, JEDI and ORP control boards, and
+must be the same as the files stored on disk. To ensure that these files are
+correct and current, a utility to validate the versions of the files (comparing
+Unique ID and CRC in FLASH with the files saved on the system disk) runs silently
+and automatically when the scanner hardware is reset.</P><P CLASS="sect1">The CCB characterization file, which uses the device&#8217;s serial
+number for a unique ID, is handled differently than other files. The CCB aperture
+char file is specific to its accompanying collimator and is NOT part of the
+load from cold. Therefore, in cases when the characterization file is not
+on the system disk or saved in the system state, the system must upload the
+file from FLASH to the disk. Once uploaded to the system disk, the file can
+be saved to system state and downloaded back to the device, in the event the
+CCB is swapped out or replaced.</P><P CLASS="sect1">In summary, the Flash Download Tool provides the mechanism for getting
+the correct files uploaded from FLASH or downloaded from the system disk to
+FLASH as required.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353668975692">2&nbsp;&nbsp;FLASH Download Tool<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The FLASH Download Tool provides the user with the following functionality:</P><UL><LI CLASS="bulletlist"><P>Query the FLASH memory and system disk to determine correctness
+of FLASH files.</P></LI><LI CLASS="bulletlist"><P>Download and store files to the FLASH memory when control
+boards are replaced.</P></LI><LI CLASS="bulletlist"><P>Upload files to the system disk as required.</P></LI></UL><P CLASS="sect1">The tool is in several locations on the service desktop, including the <SPAN CLASS="GUIBUTTON">[UTILITY]</SPAN> list
+under <SPAN CLASS="GUIBUTTON">[INSTALL]</SPAN>.</P><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668975692-dup.4">2.1&nbsp;&nbsp;FLASH Download Tool User Interface<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">After the tool is invoked from the Service Desktop Manager, the FLASH
+Download Tool screen appears. By default, all five nodes are selected at startup.
+The user selects <SPAN CLASS="GUIBUTTON">[QUERY]</SPAN> to simply query the nodes and
+selects <SPAN CLASS="GUIBUTTON">[UPDATE]</SPAN> to query, update, and then re-query
+the nodes. The Node, File Name, and Status are presented to the user in the
+Results window whenever a query is done. The Result and Status areas in the
+illustration below show the result of a successful query.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="ov-1353668975693">2.2&nbsp;&nbsp;Button Processing<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The buttons for the FLASH Download Tool are described below. During
+a Query or an Update, all buttons are disabled except for the <SPAN CLASS="GUIBUTTON">[STOP]</SPAN> button.</P><OL><LI CLASS="numlist"><P>Query/Update Options</P><UL><LI CLASS="bulletlist"><P>Pressing the <SPAN CLASS="GUIBUTTON">[QUERY]</SPAN> button will cause
+the FLASH Download Tool to query the nodes.</P></LI><LI CLASS="bulletlist"><P>Pressing the <SPAN CLASS="GUIBUTTON">[UPDATE]</SPAN> button will cause
+the FLASH Download Tool to update the nodes. The FLASH Download Tool will
+first perform a query, then update the nodes, then re-query the nodes. If
+the firmware is down or an ALM is updated, then the query/update sequence
+may be repeated.</P></LI></UL></LI><LI CLASS="numlist"><P>Pressing <SPAN CLASS="GUIBUTTON">[DISMISS]</SPAN> will exit from the
+FLASH Download Tool.</P></LI><LI CLASS="numlist"><P>Pressing <SPAN CLASS="GUIBUTTON">[STOP]</SPAN> will terminate the current
+query or update as soon as reasonable.</P></LI><LI CLASS="numlist"><P>The Node column is the name of the node, either STC, ETC,
+OBC, CCB, or DCB. The File Name column is the actual name of the file obtained
+from the node. The Status column indicates the status of the file, with OK
+indicating that no update of the file is required.</P></LI></OL></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353668975694-dup.1">3&nbsp;&nbsp;Serial Number Input Cases<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Each collimator has a unique <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">aperture.char</FONT></SPAN> file with
+information for its cam movement and serial number. If the collimator and
+CCB or the CCB only is replaced, the correct char file must be updated and
+stored on both the CCB and the system disk using the Flash Download Tool.
+When the CCB is replaced, or when the collimator with CCB is replaced, the
+following occurs:</P><OL><LI CLASS="numlist"><P>Starting up system, during hardware initialization, the <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">gesyslog</FONT></SPAN> reports
+missing or invalid files and directs the user to run the Flash Download Tool.</P></LI><LI CLASS="numlist"><P>Enter Flash Download Tool and select <SPAN CLASS="GUIBUTTON">[UPDATE]</SPAN>.
+The user is prompted to enter the serial number imprinted on the component
+for which the CHAR file is needed (see <A HREF="javascript:winopen('211627illd0e170.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;1</A>).</P></LI><LI CLASS="numlist"><P>After entering the number, the FLASH Download Tool will compare
+the serial number entered by the user with the unique ID in the CHAR file
+on the system disk and on the CCB.</P><OL TYPE="a"><LI CLASS="numlist"><P>CCB Replacement Case - The serial number entered will match
+the unique ID on the system disk, and the file downloads to the CCB from the
+disk.</P><P>If a second pop-up to upload appears (see <A HREF="javascript:winopen('211627illd0e175.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;2</A>), the number entered is not matching what is on the system
+Disk. There is likely a problem with the serial number that was entered. Select <SPAN CLASS="GUIBUTTON">[NO]</SPAN> and
+recheck the number.</P></LI><LI CLASS="numlist"><P>Collimator &amp; CCB Replacement Case - The serial number
+entered matches the unique ID on the collimator, (and therefore is a different
+ID than what is on the system disk), then an additional window (see <A HREF="javascript:winopen('211627illd0e175.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;2</A>) appears, and the user is
+informed that the serial number entered requires the upload of a file from
+the CCB to the system disk. The user is then able to accept or refuse the
+file transfer.</P><P>An invalid serial number message is reported to the user in the Status
+window, if the number entered matches neither the unique ID on the node nor
+the system disk.</P></LI></OL></LI></OL><DIV CLASS="ILLUSTRATION" id="SL211643-211627"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">FLASH Download Tool Serial Number Window</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/211627-38459.gif" BORDER="0" usemap="#SL211650-211627"></P></DIV><DIV CLASS="ILLUSTRATION" id="SL211646-211627"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">FLASH Download Tool Upload Window</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/211627-38466.gif" BORDER="0" usemap="#SL211651-211627"></P></DIV><P CLASS="sect1">After all possible uploads and downloads of files, processes similar
+to those in the FLASH Version Verification Utility are invoked automatically,
+to confirm the successful transfer of all necessary files. If the necessary
+files are still absent, or an error occurs, then the FLASH Download Tool Status
+window indicates an inoperable system condition. If successful, the tool enables
+scanning capabilities for the system.</P><P CLASS="sect1">System resources are taken during download and version verification
+to prevent scanning. The system locks out the user, if the transfer of any
+file is refused by exiting the tool before completing all transfers.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353668975758">4&nbsp;&nbsp;FLASH Version Verification Error Handling<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The FLASH Version Verification Utility is automatically activated after
+a node is reset or when the system is initialized. The operation of the utility
+itself is invisible to the user unless an error occurs. If an error is detected
+by the utility, then the window shown in <A HREF="javascript:winopen('211627illd0e191.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;3</A> is displayed. An error is logged and the system is inhibited
+from scanning.</P><DIV CLASS="ILLUSTRATION" id="SL211653-211627"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">FLASH Version Verification Utility Window</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/211627-38469.gif" BORDER="0" usemap="#SL211655-211627"></P></DIV><P CLASS="sect1">The &lt;attention-message&gt; in the window shall be one of the following:</P><UL><LI CLASS="bulletlist"><P>One or more of the controllers or system disk contains missing
+or invalid files. Please run the FLASH Download Tool from the Service Desktop
+Manager to correct this problem.</P></LI><LI CLASS="bulletlist"><P>The collimator or system disk subsystem contains missing or
+invalid files. Please run the FLASH Download Tool from the Service Desktop
+Manager to correct this problem.</P></LI><LI CLASS="bulletlist"><P>The DAS subsystem or system disk contains missing or invalid
+files. Please run the FLASH Download Tool from the Service Desktop Manager
+to correct this problem.</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353668975785-dup.3">5&nbsp;&nbsp;Flash Download Tool Exception Handling<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The error cases handled by the FLASH Download Tool are explained below
+in <A HREF="javascript:winopen('211627tbld0e215.htm','Table','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Table&nbsp;1</A>. Note that errors
+recorded by the FLASH Version Verification Utility will not be repeated in
+the error log. All errors are recorded in the &#8220;GE system log&#8221;.</P><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="SL211657-211627"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE"> FLASH Download Tool Exception Handling </SPAN> </P><table summary=" FLASH Download Tool Exception Handling " border="1"><colgroup><col width="254"><col width="420"></colgroup><thead valign=""><tr valign="top"><th align="left" valign="top">ERROR DESCRIPTION</th><th align="left" valign="top">ACTION</th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Missing or Invalid
+ALM</FONT></SPAN> (Application Load Module) <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">file on the SBC disk.</FONT></SPAN> (The
+ALM file is the application executable file.)</td><td align="left" valign="top">An error message is reported
+to the error log indicating the message code of the missing file from the
+DARC. The FLASH Download Tool Status window reports a file error. The HOP
+or <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">fwmgr</FONT></SPAN> locks the system scanning capabilities.</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Missing or Invalid
+ALM file on the FLASH memory</FONT></SPAN></td><td align="left" valign="top">An error message is reported
+to the error log indicating the message code of the missing file on the FLASH.
+The FLASH Download Tool Status window reports a file error. The FLASH Download
+Tool attempts to replace the file. If the file cannot be replaced, the HOP
+or <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">fwmgr</FONT></SPAN> locks the system scanning capabilities.</td></tr><tr valign="top"><td align="left" valign="top"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Missing or Invalid
+CHAR file on the SBC disk</FONT></SPAN></td><td align="left" valign="top">An error message is reported
+to the error log indicating the message code of the missing file from the
+DARC. The FLASH Download Tool Status window reports a file error. The FLASH
+Download Tool continues to download the next required CHAR file(s) until all
+possible files have been recovered. The HOP or <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">fwmgr</FONT></SPAN> locks
+the system scanning capabilities.</td></tr><tr valign="top"><td align="left" valign="top">Missing or Invalid CHAR file
+on the FLASH memory</td><td align="left" valign="top">An error message is reported
+to the error log indicating the message code of the missing file on the FLASH.
+The FLASH Download Tool Status window reports a file error. The FLASH Download
+Tool attempts to replace the file. The FLASH Download Tool continues to download
+the next required CHAR file(s) until all possible files have been recovered.
+If the missing or invalid file could not be replaced, the HOP or <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">fwmgr</FONT></SPAN> locks
+the system scanning capabilities.</td></tr><tr valign="top"><td align="left" valign="top">Invalid CRC or Status received
+from the node</td><td align="left" valign="top">An error message is reported
+to the error log. The HOP or <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">fwmgr</FONT></SPAN> locks the system scanning
+capabilities.</td></tr></tbody></table></div></DIV></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

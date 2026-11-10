@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emed Eletromedicina - Sistema Integrado</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50 shadow-xl">
+        <div class="container mx-auto flex flex-col md:flex-row justify-between items-center gap-3">
+            <div class="flex items-center space-x-4">
+                
+                <!-- Logo Emed Integrada -->
+                <img src="emed_svg-1.png" alt="Logo Emed" class="h-12 w-auto object-contain bg-slate-50 rounded-lg p-1.5 shadow-md" 
+                     onerror="this.outerHTML='<div class=\\'bg-blue-600 p-2.5 rounded-xl text-white shadow-md shadow-blue-500/20\\'><i class=\\'fa-solid fa-bolt text-xl\\'></i></div>'">
+                
+                <div>
+                    <h1 class="text-xl font-bold text-white tracking-wide">Emed Eletromedicina</h1>
+                    <p class="text-xs text-slate-400">Engenharia Clínica e Suporte Técnico Especializado</p>
+                </div>
+            </div>
+            
+            <!-- Indicadores Rápidos -->
+            <div class="flex items-center space-x-3 text-xs">
+                <span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-3 py-1.5 rounded-lg flex items-center font-medium">
+                    <i class="fa-solid fa-database mr-2"></i> Base Central Ativa
+                </span>
+                <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-lg flex items-center font-medium">
+                    <i class="fa-solid fa-layer-group mr-2"></i> v7.1 Multicategorias
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="container mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+        <!-- Sidebar / Navigation -->
+        <aside class="lg:col-span-1 space-y-4">
+            <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-lg space-y-2">
+                <h2 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-2">Painel de Operações</h2>
+                
+                <button onclick="switchMainTab('procedimentos')" id="btn-procedimentos" class="nav-tab-btn w-full text-left px-4 py-3 rounded-xl bg-blue-600 text-white font-medium transition flex items-center space-x-3 shadow-md shadow-blue-600/25">
+                    <i class="fa-solid fa-toolbox w-5 text-center"></i>
+                    <span>Catálogo & POPs</span>
+                </button>
+
+                <button onclick="switchMainTab('triagem')" id="btn-triagem" class="nav-tab-btn w-full text-left px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-300 font-medium transition flex items-center space-x-3">
+                    <i class="fa-solid fa-headset w-5 text-center"></i>
+                    <span>Pré-Atendimento & Triagem</span>
+                </button>
+
+                <button onclick="switchMainTab('os')" id="btn-os" class="nav-tab-btn w-full text-left px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-300 font-medium transition flex items-center space-x-3">
+                    <i class="fa-solid fa-clipboard-list w-5 text-center"></i>
+                    <span>Ordens de Serviço (OS)</span>
+                </button>
+
+                <button onclick="switchMainTab('preinstalacao')" id="btn-preinstalacao" class="nav-tab-btn w-full text-left px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-300 font-medium transition flex items-center space-x-3">
+                    <i class="fa-solid fa-compass-drafting w-5 text-center"></i>
+                    <span>Planejamento & Site Survey</span>
+                </button>
+
+                <button onclick="switchMainTab('biblioteca')" id="btn-biblioteca" class="nav-tab-btn w-full text-left px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-300 font-medium transition flex items-center space-x-3">
+                    <i class="fa-solid fa-server w-5 text-center"></i>
+                    <span>Servidor de Manuais</span>
+                </button>
+
+                <button onclick="switchMainTab('pecas')" id="btn-pecas" class="nav-tab-btn w-full text-left px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-300 font-medium transition flex items-center space-x-3">
+                    <i class="fa-solid fa-coins w-5 text-center"></i>
+                    <span>Peças & Faturamento</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Workspace -->
+        <main class="lg:col-span-3">
+
+            <!-- TAB: PROCEDIMENTOS & POPS POR EQUIPAMENTO -->
+            <section id="tab-procedimentos" class="main-tab-content space-y-6">
+                
+                <!-- CATEGORIAS DE EQUIPAMENTOS -->
+                <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-md">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Categoria do Equipamento:</p>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        
+                        <!-- TOMÓGRAFO -->
+                        <button onclick="selectEquipment('tomografo')" id="equip-btn-tomografo" class="equip-btn p-3 rounded-xl border border-slate-800 bg-slate-950 text-center transition hover:border-slate-700 flex flex-col items-center justify-center space-y-2">
+                            <i class="fa-solid fa-circle-notch text-slate-400 text-xl"></i>
+                            <h4 class="font-bold text-slate-300 text-xs">Tomógrafo</h4>
+                        </button>
+
+                        <!-- RAIO-X -->
+                        <button onclick="selectEquipment('raiox')" id="equip-btn-raiox" class="equip-btn p-3 rounded-xl border-2 border-blue-500 bg-blue-500/10 text-center transition flex flex-col items-center justify-center space-y-2">
+                            <i class="fa-solid fa-x-ray text-blue-400 text-xl"></i>
+                            <h4 class="font-bold text-white text-xs">Raio-X</h4>
+                        </button>
+
+                        <!-- MAMÓGRAFO -->
+                        <button onclick="selectEquipment('mamografo')" id="equip-btn-mamografo" class="equip-btn p-3 rounded-xl border border-slate-800 bg-slate-950 text-center transition hover:border-slate-700 flex flex-col items-center justify-center space-y-2">
+                            <i class="fa-solid fa-laptop-medical text-slate-400 text-xl"></i>
+                            <h4 class="font-bold text-slate-300 text-xs">Mamógrafo</h4>
+                        </button>
+
+                        <!-- DO (Densitometria) -->
+                        <button onclick="selectEquipment('do')" id="equip-btn-do" class="equip-btn p-3 rounded-xl border border-slate-800 bg-slate-950 text-center transition hover:border-slate-700 flex flex-col items-center justify-center space-y-2">
+                            <i class="fa-solid fa-bone text-slate-400 text-xl"></i>
+                            <h4 class="font-bold text-slate-300 text-xs">DO</h4>
+                        </button>
+
+                        <!-- QUADRO ELÉTRICO -->
+                        <button onclick="selectEquipment('quadro')" id="equip-btn-quadro" class="equip-btn p-3 rounded-xl border border-slate-800 bg-slate-950 text-center transition hover:border-slate-700 flex flex-col items-center justify-center space-y-2">
+                            <i class="fa-solid fa-plug text-slate-400 text-xl"></i>
+                            <h4 class="font-bold text-slate-300 text-xs">Quadro Elétrico</h4>
+                        </button>
+
+                    </div>
+                </div>
+
+                <!-- CONTEÚDO: TOMÓGRAFO -->
+                <div id="content-tomografo" class="equip-content hidden space-y-6">
+                    <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <span class="text-xs bg-slate-800 text-slate-400 px-2.5 py-1 rounded font-bold uppercase">Tomografia GE</span>
+                                <h3 class="text-lg font-bold text-white mt-1">Modelos Suportados: Brivo CT385</h3>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                            <button onclick="loadGeProc('balance')" class="p-3 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition">
+                                <span class="text-[10px] text-blue-400 font-bold">MECÂNICA</span>
+                                <h4 class="font-bold text-white mt-1">Balanceamento Gantry</h4>
+                            </button>
+                            <button onclick="loadGeProc('bow')" class="p-3 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition">
+                                <span class="text-[10px] text-blue-400 font-bold">ALINHAMENTO</span>
+                                <h4 class="font-bold text-white mt-1">Beam on Window (BOW)</h4>
+                            </button>
+                            <button onclick="loadGeProc('colimador')" class="p-3 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition">
+                                <span class="text-[10px] text-blue-400 font-bold">CALIBRAÇÃO</span>
+                                <h4 class="font-bold text-white mt-1">Collimator Calib.</h4>
+                            </button>
+                            <button onclick="loadGeProc('hv')" class="p-3 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 transition">
+                                <span class="text-[10px] text-blue-400 font-bold">ALTA TENSÃO</span>
+                                <h4 class="font-bold text-white mt-1">Resistor Feedback HV</h4>
+                            </button>
+                        </div>
+
+                        <div id="ge-proc-display" class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs space-y-2 mt-4">
+                            <h4 class="font-bold text-white text-sm" id="ge-proc-title">Selecione uma rotina do Tomógrafo</h4>
+                            <div id="ge-proc-desc" class="text-slate-400">As instruções, ferramentas e tempos estimados aparecerão aqui.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CONTEÚDO: RAIO-X -->
+                <div id="content-raiox" class="equip-content space-y-6">
+                    
+                    <!-- Sub-Menu Raio-X -->
+                    <div class="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
+                        <button onclick="switchSubTab('raiox', 'pendulum-instalacao')" id="sub-raiox-pendulum-instalacao" class="sub-tab-btn px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold transition flex items-center space-x-2">
+                            <i class="fa-solid fa-ruler-combined"></i><span>Pendulum DR: Instalação</span>
+                        </button>
+                        <button onclick="switchSubTab('raiox', 'pendulum-preventiva')" id="sub-raiox-pendulum-preventiva" class="sub-tab-btn px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium transition flex items-center space-x-2">
+                            <i class="fa-solid fa-calendar-check"></i><span>Pendulum DR: Preventiva</span>
+                        </button>
+                        <button onclick="switchSubTab('raiox', 'pendulum-calibracao')" id="sub-raiox-pendulum-calibracao" class="sub-tab-btn px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium transition flex items-center space-x-2">
+                            <i class="fa-solid fa-sliders"></i><span>Pendulum DR: Calibração</span>
+                        </button>
+                    </div>
+
+                    <!-- RAIO-X: PENDULUM INSTALAÇÃO -->
+                    <div id="subview-raiox-pendulum-instalacao" class="subview-raiox space-y-4">
+                        <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded font-bold uppercase">Philips/VMI Pendulum DR</span>
+                                    <h3 class="text-lg font-bold text-white mt-2">Requisitos Civis e Fixação Mecânica da Estativa</h3>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                    <h4 class="font-bold text-blue-400 text-sm mb-2 flex items-center"><i class="fa-solid fa-building mr-2"></i>Condições da Sala</h4>
+                                    <ul class="text-xs text-slate-300 space-y-1.5 list-disc list-inside">
+                                        <li><strong>Pé-direito mínimo:</strong> 2,60 m (indispensável para rotação total).</li>
+                                        <li><strong>Base estrutural:</strong> Concreto de $100 \times 100 \times 8\text{ cm}$.</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                    <h4 class="font-bold text-blue-400 text-sm mb-2 flex items-center"><i class="fa-solid fa-screwdriver-wrench mr-2"></i>Ancoragem & Montagem</h4>
+                                    <ul class="text-xs text-slate-300 space-y-1.5 list-disc list-inside">
+                                        <li><strong>Furação da base:</strong> Broca de 15 mm para chumbadores.</li>
+                                        <li><strong>Alimentação:</strong> Conferir $220\text{ V}_{\text{ac}}$ na placa PCI0252.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RAIO-X: PENDULUM PREVENTIVAS -->
+                    <div id="subview-raiox-pendulum-preventiva" class="subview-raiox hidden space-y-4">
+                        <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+                            <h3 class="text-lg font-bold text-white">Checklists de Preventiva</h3>
+                            <div class="space-y-2 text-xs">
+                                <div class="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                    <h4 class="font-bold text-emerald-400 mb-1">Trimestral (5h 10m)</h4>
+                                    <p class="text-slate-400">Giro do anodo, coincidência do colimador luminosa vs radiação ($\leq 2\%$), freios eletromagnéticos e limpeza de logs da Workstation DR.</p>
+                                </div>
+                                <div class="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                    <h4 class="font-bold text-purple-400 mb-1">Anual (+3h 50m extras)</h4>
+                                    <p class="text-slate-400">Inspeção do cabo de aço, lubrificação de guias lineares e a <strong>calibração obrigatória de Darkfield & Flatfield no Detector DR (80 min).</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RAIO-X: PENDULUM CALIBRAÇÃO -->
+                    <div id="subview-raiox-pendulum-calibracao" class="subview-raiox hidden space-y-4">
+                        <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+                            <h3 class="text-lg font-bold text-white">Calibração (Tela H) e Falhas</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                                    <h4 class="font-bold text-amber-400"><i class="fa-solid fa-sliders mr-1"></i> Placa PCI0259</h4>
+                                    <p class="text-slate-300">Ajuste de elevação (48cm a 164cm) e Distância Foco-Receptor (100cm a 180cm) pelos trimpots.</p>
+                                </div>
+                                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                                    <h4 class="font-bold text-rose-400"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Erros Críticos</h4>
+                                    <p class="text-slate-300"><strong>Erro 13:</strong> NVRAM corrompida.<br><strong>Erros N1/N2:</strong> Falha de sincronia Gerador vs Workstation.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CONTEÚDO: MAMÓGRAFO -->
+                <div id="content-mamografo" class="equip-content hidden space-y-6">
+                    <div class="bg-slate-900 p-10 rounded-2xl border border-dashed border-slate-700 text-center space-y-4">
+                        <div class="bg-slate-800 inline-block p-4 rounded-full text-slate-500 mb-2">
+                            <i class="fa-solid fa-laptop-medical text-3xl"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-white">Módulo Mamografia</h3>
+                        <p class="text-sm text-slate-400">Banco de dados aguardando indexação dos manuais de mamógrafos para geração de POPs.</p>
+                    </div>
+                </div>
+
+                <!-- CONTEÚDO: DO (Densitometria) -->
+                <div id="content-do" class="equip-content hidden space-y-6">
+                    <div class="bg-slate-900 p-10 rounded-2xl border border-dashed border-slate-700 text-center space-y-4">
+                        <div class="bg-slate-800 inline-block p-4 rounded-full text-slate-500 mb-2">
+                            <i class="fa-solid fa-bone text-3xl"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-white">Módulo Densitometria Óssea (DO)</h3>
+                        <p class="text-sm text-slate-400">Banco de dados aguardando indexação dos equipamentos de Densitometria.</p>
+                    </div>
+                </div>
+
+                <!-- CONTEÚDO: QUADRO ELÉTRICO -->
+                <div id="content-quadro" class="equip-content hidden space-y-6">
+                    <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <span class="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded font-bold uppercase">Infraestrutura</span>
+                                <h3 class="text-lg font-bold text-white mt-2">Quadros Elétricos / QDC Emed</h3>
+                            </div>
+                        </div>
+                        <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 text-xs text-slate-300">
+                            <p class="mb-4">Espaço reservado para documentação de projeto de quadros de distribuição, diagramas unifilares, dimensionamento de disjuntores (curva C/D) e malha de aterramento hospitalar para proteção dos equipamentos.</p>
+                            <ul class="list-disc list-inside space-y-1 text-slate-400">
+                                <li>Dimensionamento de Transformadores e UPS.</li>
+                                <li>Revisão de DPS e DR das salas de exames.</li>
+                                <li>Medição de resistência de terra ($\leq 5 \Omega$ para painéis digitais).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- TAB: TRIAGEM -->
+            <section id="tab-triagem" class="main-tab-content hidden space-y-6">
+                <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
+                    <h2 class="text-xl font-bold text-white flex items-center"><i class="fa-solid fa-headset text-blue-500 mr-2"></i>Roteiro de Triagem Anti-Viagem Improdutiva</h2>
+                    <p class="text-xs text-slate-400">Filtro obrigatório para atendentes e técnicos antes de despachar chamados para cidades distantes.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                            <span class="text-blue-400 font-bold uppercase">Passo 1: Evidências em Imagem</span>
+                            <p class="text-slate-300">Exigir foto nítida do código de falha no display ou tela do gerador e foto da etiqueta de série do equipamento.</p>
+                        </div>
+                        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                            <span class="text-blue-400 font-bold uppercase">Passo 2: Peça na Mão</span>
+                            <p class="text-slate-300">Checar se o componente suspeito (placa, fusível especial, cabo) está separado no kit de viagem antes de iniciar a rota.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: ORDENS DE SERVIÇO (OS) -->
+            <section id="tab-os" class="main-tab-content hidden space-y-6">
+                <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-bold text-white flex items-center"><i class="fa-solid fa-clipboard-list text-blue-500 mr-2"></i>Ordens de Serviço</h2>
+                        <button onclick="abrirModalOS()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-md shadow-blue-600/30">
+                            <i class="fa-solid fa-plus mr-1.5"></i>Nova OS
+                        </button>
+                    </div>
+
+                    <div id="form-os-container" class="hidden bg-slate-950 p-4 rounded-xl border border-blue-500/30 space-y-3 text-xs">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <input type="text" id="os-cliente" placeholder="Cliente / Hospital" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                            <select id="os-equipamento" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                                <option value="RX Pendulum DR V002">RX Pendulum DR V002</option>
+                                <option value="Tomógrafo GE Brivo CT385">Tomógrafo GE Brivo CT385</option>
+                                <option value="Outro Equipamento">Outro Equipamento</option>
+                            </select>
+                            <input type="text" id="os-tecnico" placeholder="Técnico Responsável" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                            <select id="os-status" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                                <option value="Triagem">Triagem</option>
+                                <option value="Em Deslocamento">Em Deslocamento</option>
+                                <option value="Concluída">Concluída (Pendente Cobrança)</option>
+                                <option value="Faturada">Faturada</option>
+                            </select>
+                            <input type="text" id="os-pecas" placeholder="Peças aplicadas ou retiradas em campo" class="md:col-span-2 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="salvarOS()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold">Salvar OS</button>
+                            <button onclick="fecharModalOS()" class="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg">Cancelar</button>
+                        </div>
+                    </div>
+
+                    <div id="lista-os" class="space-y-3"></div>
+                </div>
+            </section>
+
+            <!-- TAB: PLANEJAMENTO & SITE SURVEY -->
+            <section id="tab-preinstalacao" class="main-tab-content hidden space-y-6">
+                <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-bold text-white flex items-center"><i class="fa-solid fa-compass-drafting text-blue-500 mr-2"></i>Planejamento de Pré-Instalação</h2>
+                        <button onclick="abrirModalSite()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-md shadow-blue-600/30">
+                            <i class="fa-solid fa-plus mr-1.5"></i>Novo Projeto
+                        </button>
+                    </div>
+
+                    <div id="form-site-container" class="hidden bg-slate-950 p-4 rounded-xl border border-blue-500/30 space-y-3 text-xs">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <input type="text" id="site-hospital" placeholder="Nome do Hospital / Clínica" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                            <select id="site-equip" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                                <option value="RX Pendulum DR V002">RX Pendulum DR V002</option>
+                                <option value="Tomógrafo GE Brivo CT385">Tomógrafo GE Brivo CT385</option>
+                            </select>
+                            <select id="site-status" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                                <option value="Vistoria Pendente">Vistoria Pendente</option>
+                                <option value="Pendência Civil/Elétrica">Reprovado (Pendências de Infra)</option>
+                                <option value="Aprovado para Montagem">Aprovado para Montagem</option>
+                            </select>
+                            <input type="text" id="site-link" placeholder="Link do Manual de Instalação (Servidor)" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                            <textarea id="site-checklist" placeholder="Anotações de infraestrutura: Concreto 100x100x8cm, pé direito 2,60m, aterramento, climatização..." class="md:col-span-2 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white h-20"></textarea>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="salvarSite()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold">Salvar Projeto</button>
+                            <button onclick="fecharModalSite()" class="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg">Cancelar</button>
+                        </div>
+                    </div>
+
+                    <div id="lista-sites" class="space-y-3"></div>
+                </div>
+            </section>
+
+            <!-- TAB: SERVIDOR DE MANUAIS -->
+            <section id="tab-biblioteca" class="main-tab-content hidden space-y-6">
+                <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-bold text-white flex items-center"><i class="fa-solid fa-server text-blue-500 mr-2"></i>Servidor de Manuais Emed</h2>
+                        <button onclick="abrirModalManual()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-md shadow-emerald-600/30">
+                            <i class="fa-solid fa-link mr-1.5"></i>Indexar Arquivo
+                        </button>
+                    </div>
+
+                    <div id="form-manual-container" class="hidden bg-slate-950 p-4 rounded-xl border border-emerald-500/30 space-y-3 text-xs">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <input type="text" id="man-equipamento" placeholder="Equipamento / Modelo" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                            <select id="man-categoria" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                                <option value="Raio-X">Raio-X</option>
+                                <option value="Tomografia">Tomografia</option>
+                                <option value="Mamografia">Mamografia</option>
+                            </select>
+                            <input type="text" id="man-link" placeholder="Caminho de Rede ou URL (Ex: http://servidor/manuais/rx.pdf)" class="md:col-span-2 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="salvarManual()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold">Salvar Indexação</button>
+                            <button onclick="fecharModalManual()" class="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg">Cancelar</button>
+                        </div>
+                    </div>
+
+                    <div id="lista-manuais" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                </div>
+            </section>
+
+            <!-- TAB: PEÇAS E FATURAMENTO -->
+            <section id="tab-pecas" class="main-tab-content hidden space-y-6">
+                <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
+                    <h2 class="text-xl font-bold text-white flex items-center"><i class="fa-solid fa-coins text-blue-500 mr-2"></i>Controle Financeiro de Peças Usadas</h2>
+                    <p class="text-xs text-slate-400">Rastreio de peças aplicadas em campo que precisam de baixa no estoque e emissão de cobrança.</p>
+                    <div id="lista-pecas-pendentes" class="space-y-2 text-xs"></div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Script Logic Engine -->
+    <script>
+        // Navegação das Abas Principais
+        function switchMainTab(tabId) {
+            document.querySelectorAll('.main-tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-tab-btn').forEach(el => {
+                el.classList.remove('bg-blue-600', 'text-white', 'shadow-md', 'shadow-blue-600/25');
+                el.classList.add('hover:bg-slate-800', 'text-slate-300');
+            });
+
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            const btn = document.getElementById('btn-' + tabId);
+            if(btn) {
+                btn.classList.remove('hover:bg-slate-800', 'text-slate-300');
+                btn.classList.add('bg-blue-600', 'text-white', 'shadow-md', 'shadow-blue-600/25');
+            }
+
+            if(tabId === 'os') carregarOS();
+            if(tabId === 'preinstalacao') carregarSites();
+            if(tabId === 'biblioteca') carregarManuais();
+            if(tabId === 'pecas') carregarPecasPendentes();
+        }
+
+        // Seletor de Equipamento (As 5 Categorias)
+        function selectEquipment(equipKey) {
+            // Esconder todos os conteúdos
+            document.querySelectorAll('.equip-content').forEach(el => el.classList.add('hidden'));
+            
+            // Resetar visual de todos os botões
+            document.querySelectorAll('.equip-btn').forEach(el => {
+                el.classList.remove('border-blue-500', 'bg-blue-500/10', 'border-2');
+                el.classList.add('border-slate-800', 'bg-slate-950', 'border');
+                
+                // Resetar ícones e textos para cor padrão
+                const icon = el.querySelector('i');
+                const text = el.querySelector('h4');
+                if(icon) { icon.classList.remove('text-blue-400'); icon.classList.add('text-slate-400'); }
+                if(text) { text.classList.remove('text-white'); text.classList.add('text-slate-300'); }
+            });
+
+            // Mostrar o conteúdo alvo e ativar o botão alvo
+            const content = document.getElementById('content-' + equipKey);
+            const btn = document.getElementById('equip-btn-' + equipKey);
+            if (content && btn) {
+                content.classList.remove('hidden');
+                btn.classList.remove('border-slate-800', 'bg-slate-950', 'border');
+                btn.classList.add('border-blue-500', 'bg-blue-500/10', 'border-2');
+                
+                // Pintar ícone e texto do botão ativo
+                const activeIcon = btn.querySelector('i');
+                const activeText = btn.querySelector('h4');
+                if(activeIcon) { activeIcon.classList.remove('text-slate-400'); activeIcon.classList.add('text-blue-400'); }
+                if(activeText) { activeText.classList.remove('text-slate-300'); activeText.classList.add('text-white'); }
+            }
+        }
+
+        // Sub-Tabs de navegação interna dos Raio-X
+        function switchSubTab(category, subTabKey) {
+            document.querySelectorAll('.subview-' + category).forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('#content-' + category + ' .sub-tab-btn').forEach(el => {
+                el.classList.remove('bg-blue-600', 'text-white');
+                el.classList.add('bg-slate-900', 'hover:bg-slate-800', 'text-slate-300');
+            });
+
+            const targetView = document.getElementById('subview-' + category + '-' + subTabKey.split('-')[1]);
+            const targetBtn = document.getElementById('sub-' + category + '-' + subTabKey);
+            
+            if (targetView) targetView.classList.remove('hidden');
+            if (targetBtn) {
+                targetBtn.classList.remove('bg-slate-900', 'hover:bg-slate-800', 'text-slate-300');
+                targetBtn.classList.add('bg-blue-600', 'text-white');
+            }
+        }
+
+        // Funções GE Brivo
+        const geProcedures = {
+            balance: { title: "Balanceamento do Gantry", desc: "Tempo: 1h30 a 2h30<br>Ferramentas: Kit 46-268445G1." },
+            bow: { title: "Alinhamento BOW", desc: "Aguarde de 15 a 30 min. Tubo em 12 horas (-0.240mm ± 0.150mm)." },
+            colimador: { title: "Calibração de Colimador", desc: "Selecione [Calibration] > [COLLIMATOR CALIBRATION]." },
+            hv: { title: "Resistor de Feedback HV", desc: "Use bleeder de alta tensão e respeite o raio mínimo nos cabos HV." }
+        };
+
+        function loadGeProc(key) {
+            const p = geProcedures[key];
+            document.getElementById('ge-proc-title').innerText = p.title;
+            document.getElementById('ge-proc-desc').innerHTML = p.desc;
+        }
+
+        // Funções de Gerenciamento de OS, Sites, Manuais e Peças (Idênticas ao sistema anterior)
+        function abrirModalOS() { document.getElementById('form-os-container').classList.remove('hidden'); }
+        function fecharModalOS() { document.getElementById('form-os-container').classList.add('hidden'); }
+        function salvarOS() {
+            const cliente = document.getElementById('os-cliente').value;
+            const equipamento = document.getElementById('os-equipamento').value;
+            const tecnico = document.getElementById('os-tecnico').value;
+            const status = document.getElementById('os-status').value;
+            const pecas = document.getElementById('os-pecas').value;
+            if(!cliente || !tecnico) return alert('Preencha Cliente e Técnico.');
+            let lista = JSON.parse(localStorage.getItem('emed_os') || '[]');
+            lista.push({ id: Date.now(), cliente, equipamento, tecnico, status, pecas: pecas || 'Nenhuma peça', data: new Date().toLocaleDateString('pt-BR') });
+            localStorage.setItem('emed_os', JSON.stringify(lista));
+            fecharModalOS(); carregarOS();
+        }
+        function carregarOS() {
+            let lista = JSON.parse(localStorage.getItem('emed_os') || '[]');
+            const container = document.getElementById('lista-os');
+            if(!lista.length) return container.innerHTML = `<p class="text-xs text-slate-500 italic">Nenhuma OS cadastrada.</p>`;
+            container.innerHTML = lista.map(os => `<div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center text-xs"><div><div class="flex space-x-2"><span class="bg-blue-500/10 text-blue-400 px-2 rounded font-bold">OS #${os.id.toString().slice(-4)}</span><span class="text-slate-400">${os.data}</span><span class="bg-amber-500/10 text-amber-400 px-2 rounded font-medium">${os.status}</span></div><h4 class="font-bold text-white text-sm mt-1.5">${os.cliente} (${os.equipamento})</h4><p class="text-slate-300 mt-1">Tec: ${os.tecnico} | Peças: ${os.pecas}</p></div><button onclick="deletarOS(${os.id})" class="text-red-400 px-2"><i class="fa-solid fa-trash"></i></button></div>`).join('');
+        }
+        function deletarOS(id) {
+            localStorage.setItem('emed_os', JSON.stringify(JSON.parse(localStorage.getItem('emed_os')).filter(os => os.id !== id)));
+            carregarOS();
+        }
+
+        function abrirModalSite() { document.getElementById('form-site-container').classList.remove('hidden'); }
+        function fecharModalSite() { document.getElementById('form-site-container').classList.add('hidden'); }
+        function salvarSite() {
+            let lista = JSON.parse(localStorage.getItem('emed_sites') || '[]');
+            lista.push({ id: Date.now(), hospital: document.getElementById('site-hospital').value, equip: document.getElementById('site-equip').value, status: document.getElementById('site-status').value, checklist: document.getElementById('site-checklist').value });
+            localStorage.setItem('emed_sites', JSON.stringify(lista));
+            fecharModalSite(); carregarSites();
+        }
+        function carregarSites() {
+            let lista = JSON.parse(localStorage.getItem('emed_sites') || '[]');
+            document.getElementById('lista-sites').innerHTML = lista.length ? lista.map(s => `<div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs"><b>${s.hospital}</b> - ${s.equip}<br><button onclick="deletarSite(${s.id})" class="text-red-400 mt-2">Apagar</button></div>`).join('') : '<p class="text-xs text-slate-500">Nenhum site cadastrado.</p>';
+        }
+        function deletarSite(id) {
+            localStorage.setItem('emed_sites', JSON.stringify(JSON.parse(localStorage.getItem('emed_sites')).filter(s => s.id !== id)));
+            carregarSites();
+        }
+
+        function abrirModalManual() { document.getElementById('form-manual-container').classList.remove('hidden'); }
+        function fecharModalManual() { document.getElementById('form-manual-container').classList.add('hidden'); }
+        function salvarManual() {
+            let lista = JSON.parse(localStorage.getItem('emed_manuais') || '[]');
+            lista.push({ id: Date.now(), equip: document.getElementById('man-equipamento').value, link: document.getElementById('man-link').value });
+            localStorage.setItem('emed_manuais', JSON.stringify(lista));
+            fecharModalManual(); carregarManuais();
+        }
+        function carregarManuais() {
+            let lista = JSON.parse(localStorage.getItem('emed_manuais') || '[]');
+            document.getElementById('lista-manuais').innerHTML = lista.length ? lista.map(m => `<div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs"><b>${m.equip}</b><br><a href="${m.link}" target="_blank" class="text-emerald-400">Abrir</a> <button onclick="deletarManual(${m.id})" class="text-red-400 ml-3">Apagar</button></div>`).join('') : '<p class="text-xs text-slate-500">Nenhum manual cadastrado.</p>';
+        }
+        function deletarManual(id) {
+            localStorage.setItem('emed_manuais', JSON.stringify(JSON.parse(localStorage.getItem('emed_manuais')).filter(m => m.id !== id)));
+            carregarManuais();
+        }
+
+        function carregarPecasPendentes() {
+            const pendentes = JSON.parse(localStorage.getItem('emed_os') || '[]').filter(os => os.status === 'Concluída' && os.pecas !== 'Nenhuma peça');
+            document.getElementById('lista-pecas-pendentes').innerHTML = pendentes.length ? pendentes.map(os => `<div class="p-3 bg-slate-950 border border-amber-500/25 rounded-xl text-xs"><b>${os.cliente}</b><br>${os.pecas}</div>`).join('') : '<p class="text-xs text-slate-500">Nenhuma peça aguardando cobrança.</p>';
+        }
+
+    </script>
+</body>
+</html>

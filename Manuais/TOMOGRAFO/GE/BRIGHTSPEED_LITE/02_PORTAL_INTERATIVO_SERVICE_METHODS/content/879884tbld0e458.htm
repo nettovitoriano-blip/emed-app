@@ -1,0 +1,20 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Verify Disks and Mount State Command Example Output</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><DIV CLASS="TABLE"><CENTER><P CLASS="TABLEINTRO" ID="SL1525030-879884"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;4:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Verify Disks and Mount State Command Example Output</SPAN> </P><table summary="Verify Disks and Mount State Command Example Output" border="1"><colgroup><col width="100%"></colgroup><tbody valign=""><tr valign="top"><td valign=""><PRE>[ctuser@darc ~]$ df /raw_data
+Filesystem           1K-blocks      Used Available Use% Mounted on</PRE><P CLASS="entry"><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>/dev/md0</B></FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">          
+   71550208       288  71549920   1% /</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>raw_data</B></FONT></SPAN></P><PRE>
+[ctuser@darc ~]$ df
+Filesystem           1K-blocks      Used Available Use% Mounted on
+/dev/hda2              4182720   2768432   1414288  67% /
+/dev/hda1               101086      4939     90928   6% /boot
+none                    972692         0    972692   0% /dev/shm
+/dev/hda7             30580776    147212  30433564   1% /usr/g
+/dev/md0              71550208       288  71549920   1% /raw_data
+
+[ctuser@darc ~]$ cat /proc/scsi/scsi
+Attached devices:
+Host: scsi0 Channel: 00 Id: 00 Lun: 00</PRE><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Vendor: SEAGATE  Model: ST3</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>36</B></FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">754LW       Rev: 0003</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Type:   Direct-Access
+                   ANSI SCSI revision: 03</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">Host: scsi0 Channel: 00 Id: 01 Lun: 00</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Vendor: SEAGATE  Model: ST3</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>36</B></FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">754LW       Rev: 0003</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">  Type:   Direct-Access
+                   ANSI SCSI revision: 03</FONT></SPAN></P></td></tr></tbody></table></CENTER></DIV></BODY></HTML>

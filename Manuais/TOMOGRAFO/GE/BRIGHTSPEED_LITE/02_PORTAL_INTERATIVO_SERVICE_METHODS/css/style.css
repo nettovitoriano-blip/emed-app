@@ -1,0 +1,208 @@
+avoidance {
+		text-transform: uppercase;
+}
+
+
+A:link {
+	color: #3300FF;
+	text-decoration: underline;
+	font-family: arial, helvetica, sans-serif;
+	background-color : transparent;
+}
+
+A:visited {
+	color: #660066;
+	text-decoration: underline;
+	font-family: arial, helvetica, sans-serif;
+	background-color : transparent;
+}
+
+A:hover {
+	color: #3300FF;
+	text-decoration: underline;
+	font-family: arial, helvetica, sans-serif;
+	background-color : transparent;
+}
+
+
+body{
+	font-size: 10pt;
+}
+
+p  {
+	font-family : arial, helvetica, sans-serif;
+	font-weight : normal;
+	color: #000000;
+	background-color: transparent;
+}
+
+li.bulletlist {
+	font-family : arial, helvetica, sans-serif;
+	font-weight : normal;
+}
+
+li.numlist {
+	font-family : arial, helvetica, sans-serif;
+	font-weight : normal;
+}
+
+h1  {
+	font-family : arial, helvetica, sans-serif;
+	font-size : 16pt;
+	font-weight : bold;
+	font-style: normal;
+	color: #4B0082;
+	text-align : center;
+	background-color: transparent;
+}
+
+h2  {
+	font-family : arial, helvetica, sans-serif;
+	font-size : 14pt;
+	font-weight : bold;
+	font-style: normal;
+	color: #4B0082;
+	background-color: transparent;
+}
+
+h3  {
+	font-family : arial, helvetica, sans-serif;
+	font-size : 12pt;
+	font-weight : bold;
+	font-style: normal;
+	color: #4B0082;
+	background-color: transparent;
+}
+
+h4  {
+	font-family : arial, helvetica, sans-serif;
+	font-size : 10pt;
+	font-weight : bold;
+	font-style: normal:;
+	color: #4B0082;
+	background-color: transparent;
+}
+
+TD {
+	font-family : arial, helvetica, sans-serif;
+	font-size : 10pt;
+	font-weight : normal;
+	color: Black;
+}
+
+TH {
+	font-family : arial, helvetica, sans-serif;
+	font-size : 10pt;
+	font-weight : normal;
+	color: #000000;
+}
+
+.effstring{
+	font-family: arial, helvetica, sans-serif;
+	font-size: 10pt;
+	font-weight: bold;
+	font-style: normal;
+}
+
+.ILLUSTRATION{
+	font-family: arial, helvetica, sans-serif;
+	font-size: 10pt;
+	font-weight: normal;
+	font-style: normal;
+	text-align : center;
+}
+
+.TABLE{
+	font-family: arial, helvetica, sans-serif;
+	font-size: 10pt;
+	font-weight: normal;
+	font-style: normal;
+}
+
+TH.REQCONDTABLE{
+	background-color : #E6E6FA;
+}
+
+.note{
+	font-family: arial, helvetica, sans-serif;
+	font-size: 10pt;
+	font-weight: normal;
+	font-style: normal; 
+}
+
+.step1{
+	font-family : arial, helvetica, sans-serif;
+	font-size : 10pt;
+	font-weight : normal;
+	list-style : decimal;
+}
+
+.step2{
+	font-family : arial, helvetica, sans-serif;
+	font-size : 10pt;
+	font-weight : normal;
+	list-style : lower-alpha;
+}
+
+TH.TimingTable{
+	background-color: #E6E6FA;
+}
+
+TH.ITEMTABLE{
+	background-color: #E6E6FA;
+}
+
+.CTRLPANEL{
+	text-decoration : overline;
+}
+
+TR.ADMON{
+	padding-right : 12px;
+};
+
+TABLE.ADMONStep1{
+	padding-left: 8px;
+}
+
+.sideBar{
+	font-family: arial, helvetica, sans-serif;
+	font-size: 8pt;
+	font-style: normal;
+	font-weight: bold;
+	color: White;
+}
+
+.TOCLISTING {
+	font-family: arial, helvetica, sans-serif;
+	font-size: 10pt;
+	font-style: normal;
+	font-weight: bold;
+	font : larger/18px;
+}
+
+.breadcrumb {
+	FONT-WEIGHT: normal; 
+	FONT-SIZE: 8pt; COLOR: #000066; 
+	FONT-STYLE: normal; 
+	FONT-FAMILY: Arial, Helvetica, Sans-Serif; 
+}
+
+.YES { 
+	font-family: Arial, Helvetica, sans-serif;
+	font-style: normal;
+	font-weight: normal;
+	font-size: 10pt;
+	margin-left: 25px;
+ }
+ 
+ .NO { 
+	font-family: Arial, Helvetica, sans-serif;
+	font-style: normal;
+	font-weight: normal;
+	font-size: 10pt;
+	margin-left: 25px;
+ }
+
+.universalcontent{
+	margin-left:-16px;
+}

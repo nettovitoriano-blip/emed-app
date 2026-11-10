@@ -1,0 +1,169 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>All-In-One Console Theory</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;2.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;8/6/08</P></td></tr></table><H1 ID="top">All-In-One Console Theory </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="50%"><col width="50%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised on:</td><td valign="">June 2, 2008</td></tr></tbody></table></div></DIV><P CLASS="descriptive">This module contains the following subsections:</P><UL><LI CLASS="bulletlist"><P><A HREF="1064739.htm#SL2079043-1064739">Section&nbsp;1</A> - Overview (All-In-One Console)</P></LI><LI CLASS="bulletlist"><P><A HREF="1064739.htm#SL2079056-1064739">Section&nbsp;2</A> - Host computer</P></LI><LI CLASS="bulletlist"><P><A HREF="1064739.htm#SL379006-1064739">Section&nbsp;3</A> - Image Generation (IG) Computer</P></LI><LI CLASS="bulletlist"><P><A HREF="1064739.htm#SL2079104-1064739">Section&nbsp;4</A> - Reconstruction Acceleration Card (RAC)</P></LI><LI CLASS="bulletlist"><P><A HREF="1064739.htm#SL2079105-1064739">Section&nbsp;5</A> - Power</P></LI><LI CLASS="bulletlist"><P><A HREF="1064739.htm#SL2079106-1064739">Section&nbsp;6</A> - Intercom Component</P></LI><LI CLASS="bulletlist"><P><A HREF="1064739.htm#SL379009-1064739">Section&nbsp;7</A> - SCSI Tower</P></LI><LI CLASS="bulletlist"><P><A HREF="1064739.htm#SL2079107-1064739">Section&nbsp;8</A> - Cooling Package</P></LI><LI CLASS="bulletlist"><P><A HREF="1064739.htm#SL2079108-1064739">Section&nbsp;9</A> - Service and Diagnostics</P></LI><LI CLASS="bulletlist"><P><A HREF="1064739.htm#SL2079110-1064739">Section&nbsp;10</A> - Console Block Diagrams</P></LI></UL><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL2079043-1064739">1&nbsp;&nbsp;Overview<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The All-In-One Console consists of the following components. </P><UL><LI CLASS="bulletlist"><P>Host Computer - incorporates the Scan
+Data Disks and CDIP board from DARC Node in the previous console GRE/GOC4.
+There is no DRAC node presence in AIO (All-In-One) console. </P></LI><LI CLASS="bulletlist"><P>Image Generator (IG) - Is the same
+as the previous console version GRE/GOC4. IG is an option for AIO
+(All-In-One) console and only applicable when using Fluoro Option. </P></LI><LI CLASS="bulletlist"><P>Intercom - Is the same as previous
+console version GRE/GOC4.</P></LI><LI CLASS="bulletlist"><P>Cooling Package, including:</P><UL><LI CLASS="bulletlist"><P>Fans</P></LI><LI CLASS="bulletlist"><P>Front and Rear Covers with Foam Insulation </P></LI><LI CLASS="bulletlist"><P>Air Filter</P></LI></UL></LI></UL><P CLASS="sect1">For AIO console, Host computer receives raw data from the Data
+Acquisition System (DAS) through an on-board Data Interface processor
+(CDIP) card, and stores that data in the Scan Data Disks located in
+the Host computer. The raw data is then delivered from the scan data
+disks in the Host PC to the IG processes in Host PC or in IG node.
+The IG processes then create images (If IG node is installed, IG computer
+creates images using on-board processors and Recon Accelerator Cards
+(RAC)). The images generated are saved in image disk in host computer.
+ </P><P CLASS="sect1">Though each IG node will have a floppy boot disk, the host computer
+should be capable of booting IG node via Gigabit Ethernet, using Serial
+Over LAN (SOLAN) functionality. </P><P CLASS="sect1">The host computer for the All-In-One console will be an off-the-shelf,
+Linux-based system, which meets EMC requirements per CISPR 11.</P><P CLASS="sect1">Key performance specification of the AIO console are:</P><UL><LI CLASS="bulletlist"><P>Recon times: 6 fps @ 2D BP </P></LI><LI CLASS="bulletlist"><P>Latency: &lt; 5.0 seconds</P></LI><LI CLASS="bulletlist"><P>Image Matrix: &lt; 512 x 512 pixels</P></LI><LI CLASS="bulletlist"><P>2D BP: hardware and software support</P></LI><LI CLASS="bulletlist"><P>3D BP: not yet supported</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL2079056-1064739">2&nbsp;&nbsp;Host Computer<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Host Computer in AIO console not only provides the same functions
+as previous console GOC4, but also provides data acquisition and image
+reconstruction functions.  </P><P CLASS="sect1">Host Computer controls all the AIO console functions and data
+flow, including actual image generation. Software in Host computer
+sends the reconstruction request, recognize the recon mode, timing,
+parameters, and data, and be able to generate the image set. The raw
+data is first restored from the disks. The Host Computer then creates
+an image set and requests image generation to the IG node (If presence)
+or IG process in Host Computer. While most of the software components
+(e.g. Recon_Control, Data_Restore, Image_Buffer, and Data_Acq) reside
+on Host Computer, the components related to image generation are calculated
+on the IG node.  If IG node is not presence, the components related
+to image generation also reside on Host Computer.   </P><P CLASS="sect1">Main data flow of the Host Computer is described as follows:</P><UL><LI CLASS="bulletlist"><P>Receive raw data from the Gantry</P></LI><LI CLASS="bulletlist"><P>Store the raw data to the scan data
+disks</P></LI><LI CLASS="bulletlist"><P>Restore the raw data from the scan
+data disks and transfer to IG node over GB Ethernet. If IG node is
+not presence, the raw data will be transferred to buffer memory in
+Host Computer.</P></LI><LI CLASS="bulletlist"><P>Take multi-image streams from the IG
+node and save them on image disk in host computer. </P></LI><LI CLASS="bulletlist"><P>If IG is not presence, images stream
+will be got from Image generation process ran on Host computer, and
+be saved on image disk in Host Computer.</P></LI></UL><P CLASS="sect1">The Host Computer is comprised of the following:</P><UL><LI CLASS="bulletlist"><P>HP computer: a computer using a high-performance
+PC workstation</P></LI><LI CLASS="bulletlist"><P>System disk: the OS and Applications
+software are stored on this disk</P></LI><LI CLASS="bulletlist"><P>Image disk: Images are stored on this
+disk</P></LI><LI CLASS="bulletlist"><P>Scan data disks: the raw data are stored
+on two scan data disks.</P></LI><LI CLASS="bulletlist"><P>CDIP card: the DAS Interface Processor
+card</P></LI><LI CLASS="bulletlist"><P>Gigabit Ethernet (GbE) cards</P></LI><LI CLASS="bulletlist"><P>DVD-ROM drive: will be used for software
+installation and stand-alone use</P></LI><LI CLASS="bulletlist"><P>Floppy drive: a 3&frac12;&#8221; floppy
+drive will be used for BIOS flash, if necessary</P></LI><LI CLASS="bulletlist"><P>SCSI card: used to connect SCSI tower </P></LI><LI CLASS="bulletlist"><P>Graphics board: connect to two LCD
+monitors</P></LI></UL><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2079072-1064739">2.1&nbsp;&nbsp;Motherboard<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The Host Computer will take advantage of a standard, off-the-shelf
+motherboard, using dual microprocessors to increase processing density.
+The Host Computer will use very high performance general-purpose processors,
+memory, and a server motherboard with GB Ethernet and SAS port(s),
+and power supply.</P><UL><LI CLASS="bulletlist"><P>Dual Processors: Intel &reg; Xeon&#8482;
+Quad Core processors or successor</P></LI><LI CLASS="bulletlist"><P>Memory: Min. 8GB FBD DDR2-667 REG ECC
+DIMM</P></LI><LI CLASS="bulletlist"><P>Onboard SAS Devices: four (4) SAS ports
+reside on mother board</P></LI><LI CLASS="bulletlist"><P>Seven (7) PCI/PCI-X/PCI-E expansion
+slots. </P><UL><LI CLASS="bulletlist"><P>SLOT 1 PCI: Dual ultra SCSI card </P></LI><LI CLASS="bulletlist"><P>SLOT 2 PCI-E: graphics card </P></LI><LI CLASS="bulletlist"><P>SLOT 3 PCI-E: Open </P></LI><LI CLASS="bulletlist"><P>SLOT 4 PCI-E: Open </P></LI><LI CLASS="bulletlist"><P>SLOT 5 PCI-X: CDIP card </P></LI><LI CLASS="bulletlist"><P>SLOT 6 PCI-X: Dual Port Gigabit Ethernet
+Card </P></LI><LI CLASS="bulletlist"><P>SLOT 7 PCI-X: Dual Port Gigabit Ethernet
+Card</P></LI></UL></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2079084-1064739">2.2&nbsp;&nbsp;Chassis<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The chassis is a standard EIA 19" x 4U rack-mount with a max.
+depth of 20". The chassis have a cooling system capable of sufficiently
+dissipating heat created by the motherboard's dual processors. </P><P CLASS="sect2">Power Supply: ATX or SSI EEB compliant; input 100-120Vac / 200-240Vac,
+@ 50-60Hz, auto-detecting</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2079085-1064739">2.3&nbsp;&nbsp;Disk Drives<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">There are four (4) SAS hard disk drives (146GB) in Host computer.
+Below are the definition of these four hard disk drives:</P><UL><LI CLASS="bulletlist"><P>SAS0: System disk </P></LI><LI CLASS="bulletlist"><P>SAS1: Image disk </P></LI><LI CLASS="bulletlist"><P>SAS2: Scan data disk 1 </P></LI><LI CLASS="bulletlist"><P>SAS3: Scan data disk 2</P></LI></UL><P CLASS="sect2">Below are key performance specifications of the hard disk drives:</P><UL><LI CLASS="bulletlist"><P>Minimum rotational rate of 15,000 RPM </P></LI><LI CLASS="bulletlist"><P>SAS interface (3 Gigabits/second burst
+rate)</P></LI><LI CLASS="bulletlist"><P>Formatted capacity of 146 Gigabytes</P></LI><LI CLASS="bulletlist"><P>Form Factor: 3.5&#8221; half height
+form factor</P></LI></UL><P CLASS="sect2">The Scan Data Disks are connected to the mother board via internal
+SAS bus cable. To increase the disk read/write speeds software RAID0
+(striping) is employed. </P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2079094-1064739">2.4&nbsp;&nbsp;CDIP Card<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">This PCI CDIP card supports almost the same functionality as
+the current DIP in that it converts the optical signal received from
+the Gantry into electrical raw data and writes that data to one of
+the double buffers on the card. When the received data count reaches
+a predetermined value it will switch over to the other buffer. The
+Host Computer then receives this data via the PCI bus. This card supports
+64bit, 66MHz, PCI bus interface with an FPGA, and should be able to
+support 833MB/sec data rate optical fiber interface.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2079095-1064739">2.5&nbsp;&nbsp;Gigabit Ethernet Card <SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Optional IG node is to be connected to the Host computer via
+Gigabit Ethernet (GbE) card connected to one of the PCI-X slots.  </P><P CLASS="sect2">Dual Gigabit Ethernet ports</P><UL><LI CLASS="bulletlist"><P>10Base-T, 100Base-TX, 1000Base-TX IEEE802.3ab
+compatible</P></LI><LI CLASS="bulletlist"><P>64bit, 66MHz (or higher) PCI-X interface</P></LI><LI CLASS="bulletlist"><P>Low profile form factor</P></LI></UL><P CLASS="sect2">Gigabit Ethernet card ports definition is described below:</P><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="170"><col width="131"><col width="192"></colgroup><tbody valign=""><tr valign="middle"><td align="center" valign="middle"><B>Physical Port</B></td><td align="center" valign="middle"><B>Name</B></td><td align="center" valign="middle"><B>xw8400</B></td></tr><tr valign="top"><td valign="">A (Right upper port)		</td><td valign="">HSP</td><td valign="">eth2</td></tr><tr valign="top"><td valign="">B (Right low port)</td><td valign="">G1 (STC)</td><td valign="">eth3</td></tr><tr valign="top"><td valign="">C (Left Upper port)</td><td valign="">IG1</td><td valign="">eth0 (master hostid)</td></tr><tr valign="top"><td valign="">D (Left low port)</td><td valign="">G2 (TGP)</td><td valign="">eth1</td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2079099-1064739">2.6&nbsp;&nbsp;DVD-ROM Drive<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The DVD-ROM drive is used for software installation, system
+diagnostics, and to support stand-alone operation of the Host computer. </P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2079100-1064739">2.7&nbsp;&nbsp;Floppy Drive<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">This 3&frac12;&#8221; floppy disk drive will be used for BIOS
+upgrades or for a boot disk, if necessary.</P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL379006-1064739">3&nbsp;&nbsp;Image Generation (IG) Computer<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949778-1064739">3.1&nbsp;&nbsp;Overview<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The Image Generator (IG) component mounts an FPGA accelerator
+card (RAC card) on a PCI-X slot. The IG node works under the Host
+computer's supervision as a very high performance image generation
+calculator. When an IG node receives an image generation request from
+the Host computer it will perform image generation processes. (i.e.
+preprocess, filtered back projection and post process, etc.) When
+an image set is calculated, the IG node notifies the Host computer
+and transfers the set of pixel image data to the Host computer via
+Gigabit Ethernet. IG node is connected to the Host computer directly,
+without a switching Hub.</P><P CLASS="sect2">The IG node consists of the following:</P><UL><LI CLASS="bulletlist"><P>IG computer: computer using a high-performance
+PC server</P></LI><LI CLASS="bulletlist"><P>RAC Card: Recon Accelerator Card plugged
+into a PCI-X slot in the IG computer</P></LI><LI CLASS="bulletlist"><P>Floppy drive: a 3&frac12;&#8221; floppy
+drive will be used for BIOS flash, if necessary</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949779-1064739">3.2&nbsp;&nbsp;Motherboard<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The IG motherboard shall meet the following requirements:</P><UL><LI CLASS="bulletlist"><P>Support Dual Intel&reg; Xeon<SPAN CLASS="SUP"><SUP>TM</SUP></SPAN> Socket604 processors (2.8GHz minimum)</P></LI><LI CLASS="bulletlist"><P>Onboard regulation of processor voltages</P></LI><LI CLASS="bulletlist"><P>Intel&reg; E750x chipset</P></LI><LI CLASS="bulletlist"><P>533Mhz Front Side Bus (FSB)</P></LI><LI CLASS="bulletlist"><P>Minimum of one (1) 10/100/1000 Mb onboard
+ethernet port</P></LI><LI CLASS="bulletlist"><P>2.0GB DDR-266 SDRAM&reg; memory using
+minimum two (2) 184-pin DIMM sockets</P></LI><LI CLASS="bulletlist"><P>Support Serial Over LAN (SOLAN)</P></LI><LI CLASS="bulletlist"><P>One (1) PCI-X expansion slot (100Mhz
+min.) accommodating a riser card</P></LI><LI CLASS="bulletlist"><P>BIOS configuration shall be in accordance
+with details outlined in Appendix A of direction 2362872PSP</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949789-1064739">3.3&nbsp;&nbsp;PCI Expansion<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The IG shall include at least one (1) PCI-X expansion slot capable
+of accommodating a full-height &#8220;short&#8221; card.</P><P CLASS="sect2">This expansion slot shall contain a Recon Accelerator Card (GE
+Healthcare part no. 2316826).</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949790-1064739">3.4&nbsp;&nbsp;Floppy Disk Drive<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The IG shall contain one (1) internal 3.5&#8221;, half-height,
+1.44MB floppy diskette drive.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949791-1064739">3.5&nbsp;&nbsp;Ethernet Ports<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The IG does not require Ethernet ports in addition to the board-resident
+port.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949792-1064739">3.6&nbsp;&nbsp;Physical Size<SPAN CLASS="SECT2EFF"> </SPAN></H3><UL><LI CLASS="bulletlist"><P>Chassis type: Rack-mountable</P></LI><LI CLASS="bulletlist"><P>Mounting orientation: Horizontal</P></LI><LI CLASS="bulletlist"><P>Maximum chassis height: 1U (44.5mm/1.75&#8221;)</P></LI><LI CLASS="bulletlist"><P>Maximum chassis width: 19&#8221; Rack
+standard</P></LI><LI CLASS="bulletlist"><P>Maximum chassis depth: 508mm (20&#8221;)</P></LI><LI CLASS="bulletlist"><P>Maximum weight: 10 Kg (22 lbs)</P></LI><LI CLASS="bulletlist"><P>Internal signal and power harness drops
+must be sufficient to support maximum configuration above</P></LI><LI CLASS="bulletlist"><P>Handles shall be mounted at each side
+of the front of the chassis for ease of removal from a rack. Handles
+shall protrude no more than 20mm (3/4&#8221;) from the chassis front
+panel.</P></LI></UL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1949801-1064739">3.7&nbsp;&nbsp;External Switches and Indicators<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The IG shall include external switches and indicators on the
+chassis as follows:</P><UL><LI CLASS="bulletlist"><P>A system pushbutton POWER ON/OFF switch
+which toggles system power ON or OFF when pressed or held.</P></LI><LI CLASS="bulletlist"><P>A pushbutton system RESET switch accessible
+on the front of the chassis that re-initializes all internal hardware
+without cycling power   to the IG (hard reset/soft boot).</P></LI><LI CLASS="bulletlist"><P>LED indicators shall be accessible
+and visible on the front of the chassis as follows:</P><UL><LI CLASS="bulletlist"><P>System power is ON - steady GREEN -
+labeled &#8220;I/O&#8221;</P></LI><LI CLASS="bulletlist"><P>System error - flashing or steady RED
+- labeled &#8220;FLT&#8221;</P></LI><LI CLASS="bulletlist"><P>LAN Activity - flashing GREEN - labeled
+&#8220;LAN&#8221;</P></LI></UL></LI></UL></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL2079104-1064739">4&nbsp;&nbsp;Reconstruction Acceleration Card (RAC) <SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">This &#8220;low-profile&#8221; PCI card accelerates the two-dimensional
+(2D) back-projection process of the GOC4 and is plugged into a 64bit,
+66MHz (533MB/sec) PCI-X slot on the IG node.</P><P CLASS="sect1">This parallel beam back-projector provides the GOC4 the ability
+to off-load the back-projection application from general-purpose processors
+to fully programmable hardware. This option dramatically increases
+the reconstruction performance per cost ratio.</P><P CLASS="sect1">Following are the high-level CTQs for the RAC card:</P><UL><LI CLASS="bulletlist"><P>Perform 2D parallel beam back-projection
+at &gt;6fps</P></LI><LI CLASS="bulletlist"><P>PCI-X low-profile compatible</P></LI><LI CLASS="bulletlist"><P>Communicate with IG computer through
+a go =&gt; complete protocol</P></LI><LI CLASS="bulletlist"><P>Support PCI and Mailbox interrupts</P></LI><LI CLASS="bulletlist"><P>Reconstruct any image matrix size up
+to 524,288 32bit pixels</P></LI><LI CLASS="bulletlist"><P>In-system programmable FPGA design
+via software download</P></LI></UL><P CLASS="sect1">The major elements of the RAC card consist of:</P><UL><LI CLASS="bulletlist"><P>Field Programmable Gate Array (FPGA)</P></LI><LI CLASS="bulletlist"><P>QDR&#8482; SRAM - creates two blocks
+of memory</P></LI><LI CLASS="bulletlist"><P>FLASH Memory - contains the FPGA's
+configuration code</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL2079105-1064739">5&nbsp;&nbsp;Power<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The Host computer and optional IG node are each powered by an
+AC switching power supply internal to each chassis. Each node receives
+its AC power from a 120Vac single-phase outlet box internal to the
+console chassis.</P><P CLASS="sect1">A redundant power supply and/or UPS option does not need to
+be supported by each node. The NGPDU will provide 120Vac to the operator's
+console. The switching power supply internal to each node is required
+to allow &plusmn;5% stability.</P><P CLASS="sect1">These AC switching power supply in each node shall be SSI EPS12V,
+SSI EPS1U, SSI EPS2U, or ATX compliant.</P><UL><LI CLASS="bulletlist"><P>SSI EPS12V: 24-pin for motherboard,
+8-pin +12V for processor, 4-pin for peripherals</P></LI><LI CLASS="bulletlist"><P>SSI EPS1U: 62-pin edge finger for 1U
+chassis server</P></LI><LI CLASS="bulletlist"><P>SSI EPS2U: 24-pin for motherboard,
+8-pin +12V for processor, 4-pin for peripherals</P></LI><LI CLASS="bulletlist"><P>ATX: standard PC power supply, 20-pin
+for motherboard, 4-pin for peripherals</P></LI></UL><P CLASS="sect1">The table below lists the node, power supply wattage, input
+port (max current), and output port.</P><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="121" align="left"><col width="91" align="left"><col width="169" align="left"><col width="145" align="left"></colgroup><tbody valign=""><tr valign="middle"><td align="left" valign="middle">Power Supply</td><td align="left" valign="middle">Wattage</td><td align="left" valign="middle">Input Port</td><td align="left" valign="middle">Output Port</td></tr><tr valign="top"><td align="left" valign="middle">Host Computer</td><td align="left" valign="middle">800W Max</td><td align="left" valign="middle">Max 13.2 A @ 100-127 VAc</td><td align="left" valign="middle">&nbsp;</td></tr><tr valign="middle"><td align="left" valign="middle">IG Node</td><td align="left" valign="middle">300-350 W</td><td align="left" valign="middle">2.9A @ 120 Vac</td><td align="left" valign="middle">3.3V, 5.0V, +12V, -12V, 5VSB</td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL2079106-1064739">6&nbsp;&nbsp;Intercom Component<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The intercom block has an audio amplifier circuit, enabling
+communication between the console operator and the patient on the
+table. This block also has sound source switching functionality.</P><P CLASS="sect1">The sound sources are:</P><UL><LI CLASS="bulletlist"><P>Console microphone on the SCIM (Operator's
+voice)</P></LI><LI CLASS="bulletlist"><P>Gantry microphone output (Patient's
+voice)</P></LI><LI CLASS="bulletlist"><P>Auto-voice L and R (output from the
+host computer)</P></LI></UL><P CLASS="sect1">These sound sources are multiplexed by the TALK button on the
+SCIM and by the Auto-voice output itself. The selected output signal
+goes to the following devices, based on prioritized logic.</P><UL><LI CLASS="bulletlist"><P>Table speaker</P></LI><LI CLASS="bulletlist"><P>Console speaker on the SCIM</P></LI><LI CLASS="bulletlist"><P>Auto-voice recording input on the host
+computer</P><P>Also refer to <SPAN CLASS="MODULEREF"><A HREF="366374.htm#SL366376-366374"><I>GOC4 Intercom Theory and
+Adjustments</I></A></SPAN>.</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL379009-1064739">7&nbsp;&nbsp;SCSI Tower<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Two Bay External SCSI tower that is used on the Global Recon
+Engine Console. The tower will contain a MOD read/write device and
+a DVD-RAM drive.</P><DIV CLASS="ILLUSTRATION" id="SL1949814-1064739"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">SCSI Tower (Exploded View) </SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/364904-190275.jpg" BORDER="0" usemap="#SL2079027-1064739"></P></DIV><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e624"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Click on the PDF icon below, to view the full version
+of the illustration.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><DIV CLASS="MEDIA"><CENTER><P CLASS="MEDIATITLE"><SPAN CLASS="MEDIAINTRO"><B>Media File&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="MEDIATITLE">SCSI Tower (Exploded View) </SPAN> </P></CENTER><CENTER><P CLASS="MEDIAOBJ"><A HREF="../media/364904-190277.pdf" TARGET="_blank"><IMG SRC="../icons/pdf.gif" BORDER="0" ALIGN="top" HSPACE="4" WIDTH="28" HEIGHT="31"></A></P></CENTER></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL2079107-1064739">8&nbsp;&nbsp;Cooling Package<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The cooling package consists of three (3) components:</P><UL><LI CLASS="bulletlist"><P>Fan Assembly</P></LI><LI CLASS="bulletlist"><P>Front and Rear Covers, with Foam, for
+sound reduction and air flow control</P></LI><LI CLASS="bulletlist"><P>Air Filter</P></LI></UL><P CLASS="sect1">The Fan Assembly has perpendicular mounted larger fans than
+the GOC3 consoles. The Individual Fans are FRUs.</P><P CLASS="sect1">The Front and Rear covers are equipped with Insulating Foam,
+to both deaden noise and direct air flow for proper cooling.</P><P CLASS="sect1">The Air Filter is designed to capture room contaminates. It
+needs to be periodically cleaned (during a regular PM cycle).</P><P CLASS="sect1">The following diagrams illustrate the Cooling Package Components.</P><DIV CLASS="ILLUSTRATION" id="SL1949902-1064739"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Console Cooling Fans</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/364904-379039.jpg" BORDER="0" usemap="#SL2079035-1064739"></P></DIV><DIV CLASS="ILLUSTRATION" id="SL1949903-1064739"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Console Rear Cover, with Foam</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/364904-379041.jpg" BORDER="0" usemap="#SL2079039-1064739"></P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL2079108-1064739">9&nbsp;&nbsp;Service and Diagnostics<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The AIO console supports two types of diagnostic, power-on test
+and offline test. The power-on test is a subset of offline test. This
+test sweeps devices condition and checks the motherboard and some
+devices BIST results at system power-on after OS booted. The offline
+test checks each device condition, interface, and environment more
+strictly. </P><P CLASS="sect1">AIO console supports some kind of diagnostic tools.</P><UL><LI CLASS="bulletlist"><P>Motherboard diagnostics, including
+memory test</P></LI><LI CLASS="bulletlist"><P>DIP diagnostic</P></LI><LI CLASS="bulletlist"><P>RAC BIST and/or diagnostic</P></LI><LI CLASS="bulletlist"><P>Scan Data Disk diagnostic</P></LI><LI CLASS="bulletlist"><P>Network / connectivity test</P></LI></UL><P CLASS="sect1">Assemblies are assigned as FRUs based on the likelihood of need
+for replacement and fixed-right- first-time (FRFT). The following
+is a breakdown of AIO Console FRUs:</P><UL><LI CLASS="bulletlist"><P>Host Computer</P></LI><LI CLASS="bulletlist"><P>CDIP Board</P></LI><LI CLASS="bulletlist"><P>Hard disk drive</P></LI><LI CLASS="bulletlist"><P>IG (optional)</P></LI><LI CLASS="bulletlist"><P>intercom</P></LI><LI CLASS="bulletlist"><P>SCSI Tower</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL2079110-1064739">10&nbsp;&nbsp;Console Block Diagrams<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Data Flow Dictionary</P><OL><LI CLASS="numlist"><P>Gantry -&gt; DIP: Serial data receive
+from a fiber optic interface </P></LI><LI CLASS="numlist"><P>DIP -&gt; Disk: Scan Data Store </P></LI><LI CLASS="numlist"><P>Disk -&gt; Recon Control: Offset Data </P></LI><LI CLASS="numlist"><P>Disk -&gt; Data Restore: View Data </P></LI><LI CLASS="numlist"><P>Recon Control -&gt; IG process on host
+(or optional IG computer): Calibration Data, offset vector, tables,
+parameters </P></LI><LI CLASS="numlist"><P>Data Restore -&gt; IG process on host
+(or optional IG computer): If IG computer exists, view Data transfer
+from the Host to IG over gigabit Ethernet. Otherwise, data transfer
+between software processes within host computer. </P></LI><LI CLASS="numlist"><P>IG process -&gt; Image Buffer Create:
+Pixel image data and small header are transferred from the IG process
+in host or in optional IG computer  to image buffer create process
+in Host. </P></LI><LI CLASS="numlist"><P>Image Create -&gt; Image DB: DICOM image
+data and are transferred from the image buffer create process to image
+DB in host.</P></LI></OL><DIV CLASS="ILLUSTRATION" id="SL2079119-1064739"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;4:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">AIO console Detail Hardware Level Data Flow </SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/1064739-1064762.jpg" BORDER="0" usemap="#SL2078983-1064739"></P></DIV><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e745"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Click on the PDF icon below, for a PDF version of the
+above illustration.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><DIV CLASS="MEDIA"><CENTER><P CLASS="MEDIATITLE"><SPAN CLASS="MEDIAINTRO"><B>Media File&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="MEDIATITLE">AIO console Detail Hardware Level Data Flow </SPAN> </P></CENTER><CENTER><P CLASS="MEDIAOBJ"><A HREF="../media/1064739-1064763.pdf" TARGET="_blank"><IMG SRC="../icons/pdf.gif" BORDER="0" ALIGN="top" HSPACE="4" WIDTH="28" HEIGHT="31"></A></P></CENTER></DIV><DIV CLASS="MEDIA"><CENTER><P CLASS="MEDIATITLE"><SPAN CLASS="MEDIAINTRO"><B>Media File&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="MEDIATITLE">AIO console Interconnect Diagram </SPAN> </P></CENTER><CENTER><P CLASS="MEDIAOBJ"><A HREF="../media/1064739-1064433.pdf" TARGET="_blank"><IMG SRC="../icons/pdf.gif" BORDER="0" ALIGN="top" HSPACE="4" WIDTH="28" HEIGHT="31"></A></P></CENTER></DIV></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

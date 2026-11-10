@@ -1,0 +1,22 @@
+name: Robô Anti-Sono EMED (Keep Alive 24/7)
+
+on:
+  schedule:
+    # Executa a cada 10 minutos para garantir que o Render nunca entre em hibernação
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping-render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Servidor EMED na Nuvem
+        run: |
+          echo "Disparando ping anti-sono para o servidor EMED..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://emed-app-6ofv.onrender.com/api/bootstrap")
+          echo "Status retornado: $STATUS"
+          if [ "$STATUS" -eq 200 ]; then
+            echo "✅ Servidor EMED acordado e respondendo perfeitamente (HTTP 200)!"
+          else
+            echo "⚠️ Servidor respondeu com status $STATUS"
+          fi

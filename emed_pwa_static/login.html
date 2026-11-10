@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <title>Acesso Seguro — SISTEMA EMED SERVICE</title>
+
+  <link rel="icon" type="image/png" href="/api/app-icon/favicon">
+
+  <link rel="manifest" href="/manifest.json">
+
+  <meta name="theme-color" content="#0d1b2a">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+
+    * {
+
+      box-sizing: border-box;
+
+      margin: 0;
+
+      padding: 0;
+
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+    }
+
+    body {
+
+      background: radial-gradient(circle at 50% 10%, #1b2838 0%, #0d1b2a 60%, #050b14 100%);
+
+      color: #e0e6ed;
+
+      min-height: 100vh;
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      padding: 20px;
+
+    }
+
+    .login-container {
+
+      width: 100%;
+
+      max-width: 440px;
+
+      background: rgba(26, 38, 57, 0.88);
+
+      backdrop-filter: blur(16px);
+
+      -webkit-backdrop-filter: blur(16px);
+
+      border: 1px solid rgba(255, 255, 255, 0.14);
+
+      border-radius: 22px;
+
+      padding: 38px 30px;
+
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 180, 216, 0.15);
+
+      animation: fadeIn 0.4s ease-out;
+
+      position: relative;
+
+    }
+
+    @keyframes fadeIn {
+
+      from { opacity: 0; transform: translateY(12px); }
+
+      to { opacity: 1; transform: translateY(0); }
+
+    }
+
+    .brand-header {
+
+      text-align: center;
+
+      margin-bottom: 26px;
+
+    }
+
+    .logo-badge {
+
+      display: inline-flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      width: 76px;
+
+      height: 76px;
+
+      background: rgba(0, 180, 216, 0.12);
+
+      border: 2px solid rgba(0, 180, 216, 0.45);
+
+      border-radius: 20px;
+
+      margin-bottom: 14px;
+
+      box-shadow: 0 8px 24px rgba(0, 180, 216, 0.25);
+
+    }
+
+    .logo-badge img {
+
+      width: 54px;
+
+      height: 54px;
+
+      object-fit: contain;
+
+    }
+
+    .brand-title {
+
+      font-size: 21px;
+
+      font-weight: 800;
+
+      letter-spacing: 0.4px;
+
+      color: #ffffff;
+
+      margin-bottom: 5px;
+
+      text-transform: uppercase;
+
+    }
+
+    .brand-title span {
+
+      color: #00b4d8;
+
+    }
+
+    .brand-subtitle {
+
+      font-size: 13px;
+
+      font-weight: 500;
+
+      color: #cbd5e1;
+
+      letter-spacing: 0.3px;
+
+    }
+
+    .form-group {
+
+      margin-bottom: 18px;
+
+    }
+
+    .form-label {
+
+      display: block;
+
+      font-size: 11.5px;
+
+      font-weight: 700;
+
+      color: #cbd5e1;
+
+      text-transform: uppercase;
+
+      letter-spacing: 0.8px;
+
+      margin-bottom: 7px;
+
+    }
+
+    .select-wrapper, .input-wrapper {
+
+      position: relative;
+
+    }
+
+    select, input[type="text"], input[type="password"] {
+
+      width: 100%;
+
+      height: 48px;
+
+      background: rgba(15, 23, 42, 0.75);
+
+      border: 1px solid rgba(255, 255, 255, 0.16);
+
+      border-radius: 12px;
+
+      padding: 0 16px;
+
+      color: #ffffff;
+
+      font-size: 14.5px;
+
+      transition: all 0.2s ease;
+
+      outline: none;
+
+      -webkit-appearance: none;
+
+    }
+
+    select:focus, input:focus {
+
+      border-color: #00b4d8;
+
+      box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.25);
+
+      background: rgba(15, 23, 42, 0.95);
+
+    }
+
+    select option {
+
+      background: #0f172a;
+
+      color: #ffffff;
+
+    }
+
+    .device-info-badge {
+
+      display: flex;
+
+      align-items: center;
+
+      gap: 10px;
+
+      background: rgba(15, 23, 42, 0.6);
+
+      border: 1px solid rgba(255, 255, 255, 0.08);
+
+      border-radius: 10px;
+
+      padding: 8px 12px;
+
+      margin-bottom: 18px;
+
+      font-size: 11.5px;
+
+      color: #94a3b8;
+
+    }
+
+    .device-info-badge .dev-icon {
+
+      font-size: 16px;
+
+    }
+
+    .device-info-badge .dev-text {
+
+      flex: 1;
+
+      overflow: hidden;
+
+      text-overflow: ellipsis;
+
+      white-space: nowrap;
+
+    }
+
+    .device-info-badge .dev-text strong {
+
+      color: #38bdf8;
+
+    }
+
+    .btn-submit {
+
+      width: 100%;
+
+      height: 50px;
+
+      background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%);
+
+      color: #ffffff;
+
+      border: none;
+
+      border-radius: 12px;
+
+      font-size: 15px;
+
+      font-weight: 700;
+
+      cursor: pointer;
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      gap: 10px;
+
+      box-shadow: 0 10px 25px rgba(0, 180, 216, 0.35);
+
+      transition: all 0.2s ease;
+
+      margin-top: 6px;
+
+    }
+
+    .btn-submit:hover {
+
+      background: linear-gradient(135deg, #00c7ee 0%, #0088ce 100%);
+
+      transform: translateY(-1px);
+
+      box-shadow: 0 12px 30px rgba(0, 180, 216, 0.45);
+
+    }
+
+    .btn-submit:active {
+
+      transform: translateY(1px);
+
+    }
+
+    .btn-submit:disabled {
+
+      opacity: 0.6;
+
+      cursor: not-allowed;
+
+    }
+
+    .feedback-msg {
+
+      margin-top: 14px;
+
+      padding: 12px 14px;
+
+      border-radius: 10px;
+
+      font-size: 13px;
+
+      display: none;
+
+      text-align: center;
+
+      animation: fadeIn 0.2s;
+
+    }
+
+    .feedback-msg.error {
+
+      display: block;
+
+      background: rgba(239, 68, 68, 0.15);
+
+      border: 1px solid rgba(239, 68, 68, 0.35);
+
+      color: #fca5a5;
+
+    }
+
+    .feedback-msg.success {
+
+      display: block;
+
+      background: rgba(16, 185, 129, 0.15);
+
+      border: 1px solid rgba(16, 185, 129, 0.35);
+
+      color: #6ee7b7;
+
+    }
+
+    .footer-note {
+
+      text-align: center;
+
+      font-size: 11px;
+
+      color: #64748b;
+
+      margin-top: 24px;
+
+    }
+
+    .footer-note span {
+
+      color: #00b4d8;
+
+    }
+
+
+
+    /* Modal de Bloqueio / Aguardando Autorizacao */
+
+    .device-modal-backdrop {
+
+      position: fixed;
+
+      top: 0; left: 0; right: 0; bottom: 0;
+
+      background: rgba(4, 9, 16, 0.95);
+
+      backdrop-filter: blur(12px);
+
+      -webkit-backdrop-filter: blur(12px);
+
+      display: none;
+
+      align-items: center;
+
+      justify-content: center;
+
+      padding: 20px;
+
+      z-index: 9999;
+
+      animation: fadeIn 0.25s ease-out;
+
+    }
+
+    .device-modal-box {
+
+      width: 100%;
+
+      max-width: 460px;
+
+      background: #0d1b2a;
+
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.95), 0 0 50px rgba(0, 180, 216, 0.3);
+
+      border: 1px solid rgba(0, 180, 216, 0.4);
+
+      border-radius: 20px;
+
+      padding: 32px 26px;
+
+      text-align: center;
+
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(0, 180, 216, 0.2);
+
+    }
+
+    .pulse-ring {
+
+      width: 72px;
+
+      height: 72px;
+
+      border-radius: 50%;
+
+      background: rgba(234, 179, 8, 0.15);
+
+      border: 2px solid #eab308;
+
+      display: inline-flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      font-size: 32px;
+
+      margin-bottom: 20px;
+
+      animation: pulseAnim 2s infinite ease-in-out;
+
+    }
+
+    .pulse-ring.bloqueado {
+
+      background: rgba(239, 68, 68, 0.15);
+
+      border-color: #ef4444;
+
+      animation: none;
+
+    }
+
+    .pulse-ring.aprovado {
+
+      background: rgba(16, 185, 129, 0.15);
+
+      border-color: #10b981;
+
+      animation: none;
+
+    }
+
+    @keyframes pulseAnim {
+
+      0% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.5); }
+
+      70% { box-shadow: 0 0 0 16px rgba(234, 179, 8, 0); }
+
+      100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0); }
+
+    }
+
+    .modal-title {
+
+      font-size: 18.5px;
+
+      font-weight: 800;
+
+      color: #ffffff;
+
+      margin-bottom: 8px;
+
+    }
+
+    .modal-desc {
+
+      font-size: 13px;
+
+      color: #94a3b8;
+
+      line-height: 1.5;
+
+      margin-bottom: 20px;
+
+    }
+
+    .modal-card-info {
+
+      background: #0c1624;
+
+      border: 1px solid rgba(255, 255, 255, 0.08);
+
+      border-radius: 12px;
+
+      padding: 14px;
+
+      text-align: left;
+
+      font-size: 12px;
+
+      margin-bottom: 20px;
+
+    }
+
+    .modal-card-info .row-item {
+
+      display: flex;
+
+      justify-content: space-between;
+
+      padding: 4px 0;
+
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+    }
+
+    .modal-card-info .row-item:last-child {
+
+      border-bottom: none;
+
+    }
+
+    .modal-card-info .label {
+
+      color: #64748b;
+
+    }
+
+    .modal-card-info .val {
+
+      font-weight: 600;
+
+      color: #f1f5f9;
+
+    }
+
+    .polling-indicator {
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      gap: 8px;
+
+      font-size: 12px;
+
+      color: #38bdf8;
+
+      font-weight: 600;
+
+    }
+
+    .spinner-dot {
+
+      width: 8px;
+
+      height: 8px;
+
+      background: #38bdf8;
+
+      border-radius: 50%;
+
+      animation: ping 1.2s infinite cubic-bezier(0, 0, 0.2, 1);
+
+    }
+
+    @keyframes ping {
+
+      75%, 100% { transform: scale(2); opacity: 0; }
+
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+
+
+  <div class="login-container">
+
+    <div class="brand-header">
+
+      <div class="logo-badge">
+
+        <img src="/logo_emed_arroba.png" alt="EMED" onerror="this.src='/api/logo'">
+
+      </div>
+
+      <h1 class="brand-title">SISTEMA <span>EMED</span> SERVICE</h1>
+
+      <p class="brand-subtitle">Equipamentos de Diagnóstico por Imagem</p>
+
+    </div>
+
+
+
+    <!-- Badge do Aparelho Detectado -->
+
+    <div class="device-info-badge" id="badgeDispositivo">
+
+      <span class="dev-icon" id="devIcon">📱</span>
+
+      <span class="dev-text" id="devText">Detectando aparelho...</span>
+
+    </div>
+
+
+
+    <form id="loginForm" onsubmit="realizarLogin(event)">
+
+      <div class="form-group">
+
+        <label class="form-label" for="selectUsuario">Profissional / Técnico</label>
+
+        <div class="select-wrapper">
+
+          <select id="selectUsuario" required>
+
+            <option value="" disabled selected>Carregando técnicos...</option>
+
+          </select>
+
+        </div>
+
+      </div>
+
+
+
+      <div class="form-group">
+
+        <label class="form-label" for="inputSenha">Senha / PIN de Acesso</label>
+
+        <div class="input-wrapper">
+
+          <input type="password" id="inputSenha" placeholder="Digite seu PIN ou senha" required autocomplete="current-password">
+
+        </div>
+
+      </div>
+
+
+
+      <div style="text-align:right;margin-bottom:14px;">
+
+        <button type="button" onclick="abrirPromptCodigoDireto()" style="background:none;border:none;color:#38bdf8;font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline;">
+
+          🔑 Tem código do Gestor? Liberar aparelho
+
+        </button>
+
+      </div>
+
+      <button type="submit" id="btnEntrar" class="btn-submit">
+
+        <span>Acessar Sistema</span>
+
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+
+          <polyline points="12 5 19 12 12 19"></polyline>
+
+        </svg>
+
+      </button>
+
+
+
+      <div id="feedback" class="feedback-msg"></div>
+
+    </form>
+
+
+
+    <div class="footer-note">
+
+      Conexão Segura & Criptografada • <span>emedservice.med.br</span>
+
+    </div>
+
+  </div>
+
+
+
+  <!-- MODAL DE ESPERA: LIBERAÇÃO PELO CELULAR DO GESTOR -->
+
+  <div id="modalDispositivo" class="device-modal-backdrop">
+
+    <div class="device-modal-box">
+
+      <div id="modalIconBox" class="pulse-ring">📱</div>
+
+      <h2 id="modalTitle" class="modal-title">Aparelho Pendente de Liberação</h2>
+
+      <p id="modalDesc" class="modal-desc">
+
+        Por segurança da Engenharia Clínica e conformidade operacional, o acesso por este celular/aparelho precisa ser liberado pelo <strong>Gestor NETTO</strong>.
+
+      </p>
+
+
+
+      <div class="modal-card-info">
+
+        <div class="row-item">
+
+          <span class="label">Profissional:</span>
+
+          <span class="val" id="modalTecnicoNome">--</span>
+
+        </div>
+
+        <div class="row-item">
+
+          <span class="label">Aparelho Detectado:</span>
+
+          <span class="val" id="modalAparelhoNome">--</span>
+
+        </div>
+
+        <div class="row-item">
+
+          <span class="label">Identificador (ID):</span>
+
+          <span class="val" id="modalDeviceId" style="font-family:monospace;font-size:11px;">--</span>
+
+        </div>
+
+        <div class="row-item">
+
+          <span class="label">Status:</span>
+
+          <span class="val" id="modalStatusBadge" style="color:#eab308;">⏳ AGUARDANDO LIBERAÇÃO</span>
+
+        </div>
+
+      </div>
+
+
+
+      <div id="modalPollingBox" class="polling-indicator">
+
+        <span class="spinner-dot"></span>
+
+        <span>Aguardando autorização em tempo real...</span>
+
+      </div>
+
+
+
+      <!-- Opção de Liberar na Hora com Código de 6 Dígitos -->
+
+      <div style="margin-top:18px;padding:16px;background:rgba(15,23,42,0.85);border:1px solid rgba(0,180,216,0.35);border-radius:14px;text-align:left;">
+
+        <div style="font-size:12px;font-weight:800;color:#38bdf8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+
+          <span>🔑</span> Ou digite o Código do Gestor:
+
+        </div>
+
+        <p style="font-size:11.5px;color:#94a3b8;margin-bottom:10px;line-height:1.4;">
+
+          Se o Gestor NETTO gerou o código de 6 dígitos (ou você é o gestor), digite abaixo para liberar na hora:
+
+        </p>
+
+        <div style="display:flex;gap:8px;">
+
+          <input type="text" id="inputCodigoLiberacao" placeholder="Ex: 454 848" maxlength="12" style="text-align:center;font-size:17px;font-weight:900;letter-spacing:3px;background:#0d1b2a;border:1.5px solid #00b4d8;border-radius:10px;color:#ffffff;height:44px;flex:1;outline:none;" onkeypress="if(event.key==='Enter')validarCodigoLiberacao()">
+
+          <button type="button" onclick="validarCodigoLiberacao()" style="background:linear-gradient(135deg,#00b4d8,#0077b6);color:#fff;border:none;border-radius:10px;padding:0 18px;font-weight:800;font-size:13.5px;cursor:pointer;white-space:nowrap;box-shadow:0 4px 12px rgba(0,180,216,0.35);">
+
+            Liberar Já 🚀
+
+          </button>
+
+        </div>
+
+        <div id="feedbackCodigo" style="display:none;margin-top:8px;font-size:12px;text-align:center;padding:6px;border-radius:6px;"></div>
+
+      </div>
+
+
+
+      <div style="margin-top:20px;display:flex;gap:10px;">
+
+        <button type="button" onclick="fecharModalEspera()" style="width:100%;height:42px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:10px;color:#cbd5e1;font-weight:600;font-size:13px;cursor:pointer;">Voltar / Trocar Usuário</button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+
+  <script>
+
+    let gPollingTimer = null;
+
+    let gUltimaTentativa = null;
+
+
+
+    /* Geração e persistência do ID único deste Aparelho */
+
+    function obterOuCriarDeviceId() {
+
+      let devId = localStorage.getItem('emed_device_id');
+
+      if (!devId) {
+
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+
+          devId = 'EMED-' + crypto.randomUUID();
+
+        } else {
+
+          devId = 'EMED-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 9);
+
+        }
+
+        localStorage.setItem('emed_device_id', devId);
+
+      }
+
+      return devId;
+
+    }
+
+
+
+    /* Detecção de detalhes do Celular / Computador */
+
+    function detectarDetalhesDispositivo() {
+
+      const ua = navigator.userAgent || '';
+
+      let modelo = 'Dispositivo Web';
+
+      let so = 'Desconhecido';
+
+      let tipo = 'Computador';
+
+      let navegador = 'Navegador PWA';
+
+      let icon = '💻';
+
+
+
+      if (/Android/i.test(ua)) {
+
+        so = 'Android';
+
+        tipo = 'Celular';
+
+        icon = '📱';
+
+        const match = ua.match(/Android[^;]+;\s*([^;)]+)\s*[;)]/i);
+
+        if (match && match[1]) {
+
+          modelo = match[1].replace(/Build\/.*$/, '').trim();
+
+        } else {
+
+          modelo = 'Celular Android';
+
+        }
+
+      } else if (/iPhone/i.test(ua)) {
+
+        so = 'iOS';
+
+        tipo = 'Celular';
+
+        icon = '📱';
+
+        modelo = 'Apple iPhone';
+
+      } else if (/iPad/i.test(ua)) {
+
+        so = 'iPadOS';
+
+        tipo = 'Tablet';
+
+        icon = '📟';
+
+        modelo = 'Apple iPad';
+
+      } else if (/Windows NT 10.0/i.test(ua)) {
+
+        so = 'Windows 10/11';
+
+        tipo = 'Computador';
+
+        icon = '💻';
+
+        modelo = 'PC Windows';
+
+      } else if (/Macintosh/i.test(ua)) {
+
+        so = 'macOS';
+
+        tipo = 'Computador';
+
+        icon = '💻';
+
+        modelo = 'Apple Mac';
+
+      } else if (/Linux/i.test(ua)) {
+
+        so = 'Linux';
+
+        tipo = 'Computador';
+
+        icon = '💻';
+
+        modelo = 'Computador Linux';
+
+      }
+
+
+
+      if (/Chrome|CriOS/i.test(ua) && !/Edg/i.test(ua)) {
+
+        navegador = 'Google Chrome';
+
+      } else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) {
+
+        navegador = 'Safari';
+
+      } else if (/Edg/i.test(ua)) {
+
+        navegador = 'Microsoft Edge';
+
+      } else if (/Firefox/i.test(ua)) {
+
+        navegador = 'Mozilla Firefox';
+
+      }
+
+
+
+      return { modelo, so, tipo, navegador, icon, devId: obterOuCriarDeviceId() };
+
+    }
+
+
+
+    function atualizarBadgeDispositivo() {
+
+      const d = detectarDetalhesDispositivo();
+
+      const badgeIcon = document.getElementById('devIcon');
+
+      const badgeText = document.getElementById('devText');
+
+      if (badgeIcon) badgeIcon.textContent = d.icon;
+
+      if (badgeText) {
+
+        badgeText.innerHTML = `<strong>${d.modelo}</strong> (${d.so}) &bull; ID: ${d.devId.substring(0, 16)}...`;
+
+      }
+
+    }
+
+
+
+    async function carregarUsuarios() {
+
+      const select = document.getElementById('selectUsuario');
+
+      try {
+
+        const resp = await fetch('/api/auth/usuarios');
+
+        const data = await resp.json();
+
+        if (data && data.usuarios && data.usuarios.length > 0) {
+
+          select.innerHTML = '<option value="" disabled selected>Selecione seu nome</option>';
+
+          const ultimoNome = localStorage.getItem('emed_tecnico_selecionado') || '';
+
+          data.usuarios.forEach(u => {
+
+            const opt = document.createElement('option');
+
+            opt.value = u.nome;
+
+            opt.textContent = `${u.nome} (${u.perfil})`;
+
+            if (u.nome.toUpperCase() === ultimoNome.toUpperCase()) {
+
+              opt.selected = true;
+
+            }
+
+            select.appendChild(opt);
+
+          });
+
+        } else {
+
+          select.innerHTML = '<option value="ANTONIO">ANTONIO (Técnico)</option><option value="NETTO">NETTO (Gestor)</option>';
+
+        }
+
+      } catch (e) {
+
+        select.innerHTML = '<option value="ANTONIO">ANTONIO (Técnico)</option><option value="NETTO">NETTO (Gestor)</option>';
+
+      }
+
+    }
+
+
+
+    async function realizarLogin(e) {
+
+      if (e) e.preventDefault();
+
+      const usuario = document.getElementById('selectUsuario').value;
+
+      const senha = document.getElementById('inputSenha').value;
+
+      const btn = document.getElementById('btnEntrar');
+
+      const fb = document.getElementById('feedback');
+
+      const dev = detectarDetalhesDispositivo();
+
+
+
+      if (!usuario || !senha) return;
+
+
+
+      gUltimaTentativa = { usuario, senha };
+
+
+
+      btn.disabled = true;
+
+      btn.innerHTML = '<span>Verificando Aparelho...</span>';
+
+      fb.className = 'feedback-msg';
+
+      fb.style.display = 'none';
+
+
+
+      try {
+
+        const resp = await fetch('/api/auth/login', {
+
+          method: 'POST',
+
+          headers: { 'Content-Type': 'application/json' },
+
+          body: JSON.stringify({
+
+            usuario,
+
+            senha,
+
+            device_id: dev.devId,
+
+            device_info: {
+
+              modelo: dev.modelo,
+
+              so: dev.so,
+
+              navegador: dev.navegador,
+
+              tipo: dev.tipo
+
+            }
+
+          })
+
+        });
+
+        const res = await resp.json();
+
+
+
+        if (resp.ok && res.ok) {
+
+          pararPolling();
+
+          fb.textContent = `Acesso autorizado! Bem-vindo(a), ${res.usuario.nome}!`;
+
+          fb.className = 'feedback-msg success';
+
+          fb.style.display = 'block';
+
+          const nomeLogado = (res.usuario.nome || '').toUpperCase();
+          const perfilLogado = (res.usuario.perfil || '').toUpperCase();
+          const isGestor1 = (nomeLogado === 'NETTO') && (perfilLogado.includes('GESTOR') || perfilLogado === '');
+
+          localStorage.setItem('emed_tecnico_selecionado', res.usuario.nome);
+          localStorage.setItem('emed_perfil_usuario', isGestor1 ? 'Gestor' : 'Técnico');
+          localStorage.setItem('emed_perfil', isGestor1 ? 'GESTOR' : 'TECNICO');
+          localStorage.setItem('emed_menu_ativo', isGestor1 ? 'GES_MURAL' : 'TEC_OS');
+          localStorage.setItem('emed_tec_filtro', isGestor1 ? 'TODOS' : res.usuario.nome);
+          localStorage.setItem('emed_token', res.token);
+
+          setTimeout(() => {
+            window.location.href = isGestor1 ? '/?modo=gestor' : '/?modo=tecnico';
+          }, 400);
+
+        } else if (res.status === 'DISPOSITIVO_PENDENTE') {
+
+          btn.disabled = false;
+
+          btn.innerHTML = '<span>Acessar Sistema</span>';
+
+          abrirModalEspera(usuario, dev.modelo, dev.devId);
+
+        } else if (res.status === 'DISPOSITIVO_BLOQUEADO') {
+
+          btn.disabled = false;
+
+          btn.innerHTML = '<span>Acessar Sistema</span>';
+
+          abrirModalBloqueado(usuario, dev.modelo, dev.devId);
+
+        } else {
+
+          btn.disabled = false;
+
+          btn.innerHTML = '<span>Acessar Sistema</span>';
+
+          fb.textContent = res.msg || 'Senha incorreta. Tente novamente.';
+
+          fb.className = 'feedback-msg error';
+
+          fb.style.display = 'block';
+
+          document.getElementById('inputSenha').focus();
+
+          document.getElementById('inputSenha').select();
+
+        }
+
+      } catch (err) {
+
+        btn.disabled = false;
+
+        btn.innerHTML = '<span>Acessar Sistema</span>';
+
+        fb.textContent = 'Erro de conexão com o servidor. Verifique sua rede.';
+
+        fb.className = 'feedback-msg error';
+
+        fb.style.display = 'block';
+
+      }
+
+    }
+
+
+
+    
+    function abrirModalCodigoLiberacao() {
+      const dev = detectarDetalhesDispositivo();
+      const u = (document.getElementById('selectUsuario')?.value) || 'Técnico';
+      if (typeof abrirModalEspera === 'function') {
+        abrirModalEspera(u, dev.modelo, dev.devId);
+      } else {
+        const m = document.getElementById('modalDispositivo');
+        if (m) m.style.display = 'flex';
+      }
+    }
+
+    function abrirModalEspera(tecnicoNome, modeloAparelho, deviceId) {
+
+      document.getElementById('modalTecnicoNome').textContent = tecnicoNome;
+
+      document.getElementById('modalAparelhoNome').textContent = modeloAparelho;
+
+      document.getElementById('modalDeviceId').textContent = deviceId;
+
+      document.getElementById('modalStatusBadge').textContent = '⏳ AGUARDANDO LIBERAÇÃO';
+
+      document.getElementById('modalStatusBadge').style.color = '#eab308';
+
+      document.getElementById('modalTitle').textContent = 'Aparelho Pendente de Liberação';
+
+      document.getElementById('modalDesc').innerHTML = `Uma solicitação foi emitida para o <strong>Gestor NETTO</strong>. Assim que ele clicar em <strong>[Autorizar]</strong> no painel de gestão, este celular entrará automaticamente.`;
+
+      
+
+      const iconBox = document.getElementById('modalIconBox');
+
+      iconBox.className = 'pulse-ring';
+
+      iconBox.textContent = '📱';
+
+
+
+      document.getElementById('modalPollingBox').style.display = 'flex';
+
+      document.getElementById('modalDispositivo').style.display = 'flex';
+
+
+
+      iniciarPolling(deviceId);
+
+    }
+
+
+
+    function abrirModalBloqueado(tecnicoNome, modeloAparelho, deviceId) {
+
+      pararPolling();
+
+      document.getElementById('modalTecnicoNome').textContent = tecnicoNome;
+
+      document.getElementById('modalAparelhoNome').textContent = modeloAparelho;
+
+      document.getElementById('modalDeviceId').textContent = deviceId;
+
+      document.getElementById('modalStatusBadge').textContent = '🚫 ACESSO BLOQUEADO';
+
+      document.getElementById('modalStatusBadge').style.color = '#ef4444';
+
+      document.getElementById('modalTitle').textContent = 'Aparelho Bloqueado';
+
+      document.getElementById('modalDesc').innerHTML = `O acesso por este celular/aparelho foi suspenso pela administração do Sistema EMED. Entre em contato com a coordenação para reativação.`;
+
+
+
+      const iconBox = document.getElementById('modalIconBox');
+
+      iconBox.className = 'pulse-ring bloqueado';
+
+      iconBox.textContent = '🔒';
+
+
+
+      document.getElementById('modalPollingBox').style.display = 'none';
+
+      document.getElementById('modalDispositivo').style.display = 'flex';
+
+    }
+
+
+
+    
+
+    function abrirPromptCodigoDireto() {
+
+      const usuario = document.getElementById('selectUsuario').value || 'NETTO';
+
+      const dev = detectarDetalhesDispositivo();
+
+      abrirModalEspera(usuario, dev.modelo, dev.devId);
+
+      setTimeout(() => {
+
+        const inp = document.getElementById('inputCodigoLiberacao');
+
+        if (inp) { inp.focus(); }
+
+      }, 300);
+
+    }
+
+
+
+    async function validarCodigoLiberacao() {
+
+      const codInput = document.getElementById('inputCodigoLiberacao');
+
+      const fb = document.getElementById('feedbackCodigo');
+
+      const cod = (codInput ? codInput.value : '').trim();
+
+      const dev = detectarDetalhesDispositivo();
+
+      const params = new URLSearchParams(window.location.search);
+      const urlUser = (params.get('usuario') || params.get('u') || '').trim().toUpperCase();
+      const usuario = (urlUser || (gUltimaTentativa ? gUltimaTentativa.usuario : document.getElementById('selectUsuario')?.value) || 'NETTO').toUpperCase();
+
+
+
+      if (!cod) {
+
+        if (fb) {
+
+          fb.textContent = 'Digite o código de 6 dígitos.';
+
+          fb.style.display = 'block';
+
+          fb.style.background = 'rgba(239,68,68,0.2)';
+
+          fb.style.color = '#fca5a5';
+
+        }
+
+        return;
+
+      }
+
+
+
+      if (fb) {
+
+        fb.textContent = 'Verificando código com o servidor...';
+
+        fb.style.display = 'block';
+
+        fb.style.background = 'rgba(0,180,216,0.2)';
+
+        fb.style.color = '#38bdf8';
+
+      }
+
+
+
+      try {
+
+        const resp = await fetch('/api/dispositivos/liberar-com-codigo', {
+
+          method: 'POST',
+
+          headers: { 'Content-Type': 'application/json' },
+
+          body: JSON.stringify({
+
+            codigo: cod,
+
+            device_id: dev.devId,
+
+            usuario: usuario,
+
+            device_info: {
+
+              modelo: dev.modelo,
+
+              so: dev.so,
+
+              navegador: dev.navegador,
+
+              tipo: dev.tipo
+
+            }
+
+          })
+
+        });
+
+        const res = await resp.json();
+
+
+
+        if (resp.ok && res.ok) {
+
+          pararPolling();
+
+          if (fb) {
+
+            fb.textContent = 'Código Válido! Aparelho Liberado!';
+
+            fb.style.background = 'rgba(16,185,129,0.2)';
+
+            fb.style.color = '#6ee7b7';
+
+          }
+
+          
+
+          const iconBox = document.getElementById('modalIconBox');
+
+          if (iconBox) {
+
+            iconBox.className = 'pulse-ring aprovado';
+
+            iconBox.textContent = '✅';
+
+          }
+
+          const stBadge = document.getElementById('modalStatusBadge');
+
+          if (stBadge) {
+
+            stBadge.textContent = '✅ AUTORIZADO VIA CÓDIGO!';
+
+            stBadge.style.color = '#10b981';
+
+          }
+
+          const title = document.getElementById('modalTitle');
+
+          if (title) title.textContent = 'Aparelho Liberado com Sucesso!';
+
+          
+
+          const pollBox = document.getElementById('modalPollingBox');
+
+          if (pollBox) {
+
+            pollBox.innerHTML = '<span style="color:#10b981;font-weight:700;">Conexão estabelecida! Entrando no sistema...</span>';
+
+          }
+
+
+
+          const nomeUsr2 = (res.usuario?.nome || usuario).toUpperCase();
+          const perfilUsr2 = (res.usuario?.perfil || '').toUpperCase();
+          const isGestor2 = (nomeUsr2 === 'NETTO') || perfilUsr2.includes('GESTOR') || perfilUsr2.includes('MASTER') || perfilUsr2 === '';
+
+          if (res.token) {
+            try {
+              document.cookie = `emed_session=${res.token}; path=/; max-age=2592000; SameSite=Lax`;
+            } catch(e) {}
+            localStorage.setItem('emed_token', res.token);
+            localStorage.setItem('emed_tecnico_selecionado', res.usuario?.nome || usuario);
+            localStorage.setItem('emed_perfil_usuario', isGestor2 ? 'Gestor' : 'Técnico');
+            localStorage.setItem('emed_perfil', isGestor2 ? 'GESTOR' : 'TECNICO');
+            localStorage.setItem('emed_menu_ativo', isGestor2 ? 'GES_MURAL' : 'TEC_OS');
+            localStorage.setItem('emed_tec_filtro', isGestor2 ? 'TODOS' : (res.usuario?.nome || usuario));
+          }
+
+          setTimeout(() => {
+            const redirectUrl = (isGestor2 ? '/?modo=gestor' : '/?modo=tecnico') + (res.token ? ('&token=' + encodeURIComponent(res.token)) : '');
+            window.location.href = redirectUrl;
+          }, 600);
+
+        } else {
+
+          if (fb) {
+
+            fb.textContent = res.msg || 'Código incorreto ou expirado.';
+
+            fb.style.background = 'rgba(239,68,68,0.2)';
+
+            fb.style.color = '#fca5a5';
+
+          }
+
+          if (codInput) codInput.select();
+
+        }
+
+      } catch (e) {
+
+        if (fb) {
+
+          fb.textContent = 'Erro de conexão com o servidor.';
+
+          fb.style.background = 'rgba(239,68,68,0.2)';
+
+          fb.style.color = '#fca5a5';
+
+        }
+
+      }
+
+    }
+
+
+
+    function fecharModalEspera() {
+
+      pararPolling();
+
+      document.getElementById('modalDispositivo').style.display = 'none';
+
+    }
+
+
+
+    function iniciarPolling(deviceId) {
+
+      pararPolling();
+
+      gPollingTimer = setInterval(async () => {
+
+        try {
+
+          const resp = await fetch(`/api/dispositivos/status?device_id=${encodeURIComponent(deviceId)}`);
+
+          const data = await resp.json();
+
+          if (data && data.ok && data.status === 'AUTORIZADO') {
+
+            pararPolling();
+
+            const iconBox = document.getElementById('modalIconBox');
+
+            iconBox.className = 'pulse-ring aprovado';
+
+            iconBox.textContent = '✅';
+
+            document.getElementById('modalStatusBadge').textContent = '✅ AUTORIZADO!';
+
+            document.getElementById('modalStatusBadge').style.color = '#10b981';
+
+            document.getElementById('modalTitle').textContent = 'Aparelho Liberado com Sucesso!';
+
+            document.getElementById('modalDesc').innerHTML = `<strong>Acesso aprovado pelo Gestor!</strong> Conectando ao Sistema EMED...`;
+
+            document.getElementById('modalPollingBox').innerHTML = `<span style="color:#10b981;font-weight:700;">Conexão estabelecida! Entrando...</span>`;
+
+            
+
+            setTimeout(() => {
+
+              if (gUltimaTentativa) {
+
+                realizarLogin();
+
+              } else {
+
+                window.location.reload();
+
+              }
+
+            }, 1000);
+
+          } else if (data && data.ok && data.status === 'BLOQUEADO') {
+
+            abrirModalBloqueado(data.tecnico || 'TÉCNICO', data.modelo || 'Celular', deviceId);
+
+          }
+
+        } catch (e) {}
+
+      }, 2500);
+
+    }
+
+
+
+    function pararPolling() {
+
+      if (gPollingTimer) {
+
+        clearInterval(gPollingTimer);
+
+        gPollingTimer = null;
+
+      }
+
+    }
+
+
+
+    document.addEventListener('DOMContentLoaded', async () => {
+
+      atualizarBadgeDispositivo();
+
+      try {
+
+        await carregarUsuarios();
+
+      } catch (e) {}
+
+
+
+      // Checa se a página foi aberta via escaneamento do QR Code (?usuario=...&codigo=...)
+
+      const params = new URLSearchParams(window.location.search);
+
+      const urlCod = (params.get('codigo') || params.get('cod') || '').trim();
+
+      const urlUser = (params.get('usuario') || params.get('u') || '').trim().toUpperCase();
+
+
+
+      if (urlCod) {
+
+        if (urlUser) {
+
+          const sel = document.getElementById('selectUsuario');
+
+          if (sel) {
+
+            for (let opt of sel.options) {
+
+              if (opt.value.toUpperCase() === urlUser) {
+
+                opt.selected = true;
+
+                break;
+
+              }
+
+            }
+
+          }
+
+        }
+
+        abrirModalCodigoLiberacao();
+
+        const inp = document.getElementById('inputCodigoLiberacao');
+
+        if (inp) inp.value = urlCod;
+
+
+
+        const fb = document.getElementById('feedbackCodigo');
+
+        if (fb) {
+
+          fb.textContent = `📲 QR Code detectado! Autorizando aparelho de ${urlUser || 'Técnico'}...`;
+
+          fb.style.display = 'block';
+
+          fb.style.background = 'rgba(0,180,216,0.25)';
+
+          fb.style.color = '#38bdf8';
+
+        }
+
+
+
+        setTimeout(() => {
+
+          validarCodigoLiberacao();
+
+        }, 600);
+
+        return;
+
+      }
+
+
+
+      document.getElementById('inputSenha').focus();
+
+    });
+
+  </script>
+
+</body>
+
+</html>

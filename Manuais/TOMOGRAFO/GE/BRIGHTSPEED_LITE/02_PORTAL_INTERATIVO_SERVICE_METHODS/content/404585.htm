@@ -1,0 +1,79 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Example Config/INFO Output</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/14/07</P></td></tr></table><H1 ID="top">Example Config/INFO Output </H1><P CLASS="descriptive">This section contains an example system hardware configuration INFO
+file output that is displayed when you type the following in a shell: <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>cat
+/usr/g/config/INFO</B></FONT></SPAN><SPAN CLASS="KEYBOARD">&lt;Enter&gt;</SPAN>.</P><P CLASS="descriptive">For some parameters, the values for your system may differ from those
+in the example.</P><PRE>setenv SERVICE_ID GE_SERVICE
+setenv HOSPITAL_NAME                        ________________
+setenv MENUTZ "America"                     ________________
+setenv SUNTZ "US/Central"                   ________________
+setenv TZ "CST6CDT US"                      ________________
+setenv TZTEXT "Chicago"                     ________________
+setenv REGENERATE_DATABASE no
+setenv NEXT_MOD_NUMBER 1
+setenv NEXT_DIAGNOSTIC_EXAM_NUMBER 50000
+setenv GATEWAY_HOSTNAME                     ________________
+setenv GATEWAY_IP                           ________________
+setenv GATEWAY_NETMASK                      ________________
+setenv GATEWAY_BROADCAST                    ________________
+setenv GATEWAY_DEFAULT                      ________________
+setenv TUBETYPE 15 (Performix) / 16 (Hercules) / 17 (OEM) ______________
+setenv PDUTYPE CT_Compact / NG PDU          ________________
+setenv DASMTYPE 2
+setenv KV_VALUES "80 100 120 140"           ________________
+setenv DEFAULTARCHIVE DICOM
+setenv ADVANTAGERW FALSE
+setenv CTIDATETIMEFORMAT 4
+setenv TIMESEPAR /
+setenv WEIGHT lb
+setenv DOCTITLE "radiologist"
+setenv CAMERATYPE ""
+setenv SUITEID                              ________________
+setenv FILTERTYPE 2
+setenv CAMERA no
+setenv DEFFORMAT 12
+setenv DOGREYSCALE yes
+setenv DOSLIDES no
+setenv DOZOOM no
+setenv FILMINTERP sharp
+setenv PRINTER_HOSTNAME                        ________________
+setenv PRINTER_IPADDRESS                       ________________
+setenv PRINTER no
+setenv O2_PRESENT n
+setenv GANTRY_TYPE h2 / hp/ wb                 ________________
+setenv LANGUAGE en_US
+setenv DOSE y
+setenv NETWORK yes
+setenv USENIS yes
+setenv CHGDARCSUBNET yes
+setenv DOMAINNAME                              ________________
+setenv NIS_SERVER                              ________________
+setenv DARC_SUBNET                             ________________
+setenv NEXT_PATIENT_EXAM_NUMBER 1
+setenv MOBILESYSTEM no                         ________________
+setenv STREAK y
+setenv INROOMSCAN off
+setenv AAA n
+setenv AUTOMA_INDEX_TABLE_TYPE type2           ________________
+setenv RECONHARDWARE GRE / No O2 Pegasus       ________________
+setenv DASTYPE SDAS or MDAS 4 / 8/ 16          ________________
+setenv DETECTORTYPE Warp3
+setenv REFRESH_RATE 76
+
+setenv yp s
+setenv ypmaster ${SUITEID}_OC0
+setenv HOSTNAME SBC0
+setenv ALIAS ${SUITEID}_SBC0
+setenv UNSYSID $GATEWAY_HOSTNAME
+setenv SERVID $GATEWAY_HOSTNAME
+setenv tubeType $TUBETYPE
+setenv ACRNEMA xxxx
+setenv REGEN no 
+
+setenv HRCTTITLE                               ________________
+setenv HRPORTNUM                               ________________
+setenv HRAETITLE                               ________________
+setenv HRIPADDR                                ________________
+{ctuser@hosatname}</PRE><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

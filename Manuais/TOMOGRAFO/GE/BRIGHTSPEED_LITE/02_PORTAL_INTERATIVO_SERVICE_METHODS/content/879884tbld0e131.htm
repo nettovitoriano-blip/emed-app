@@ -1,0 +1,27 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Example Create Command Output</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><DIV CLASS="TABLE"><CENTER><P CLASS="TABLEINTRO" ID="SL1525025-879884"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Example Create Command Output</SPAN> </P><table summary="Example Create Command Output" border="1"><colgroup><col width="100%"></colgroup><tbody valign=""><tr valign="top"><td valign=""><PRE>{ctuser@hostname}[1] rsh darc
+Last login: Mon Jul 24 17:03:43 from oc
+[ctuser@darc ~]$ sudo gre-raid -c
+gre-raid: built Jun 22 2006 20:34:02
+ </PRE><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/dev/sd&lt;x&gt;: scanning disk array...</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>done</B></FONT></SPAN></P><PRE>Device    Bus  ID  Mfg       Model        Fwrev  Serial-number
+/dev/sda  0    0   SEAGATE   ST336754LW   0003   3KQ1H79N00007634SPRT
+/dev/sdb  0    1   SEAGATE   ST336754LW   0003   3KQ1JP5300007634RNN5
+ 
+Adaptec driver not found. Continuing...
+dasType: non-VDAS
+/usr/g/config/gre-raid-2.cfg: RAID-0 profile</PRE><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/raw_data: unmounting filesystem...</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>done</B></FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/dev/md0: stopping...</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>done</B></FONT></SPAN></P><PRE>/var/log/messages: checking for SCSI errors...done
+************************** Warning ******************************
+* If a new disk array is created, all scan data on the current  *
+* disk array will be lost.                                      *
+*****************************************************************
+Are you sure you want to create a new disk array (yes/no)? yes
+ 
+/var/log/messages: 0 drive(s) found with SCSI errors found since last start
+ </PRE><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/dev/sda: testing...drive_spec...52.0MB/sec...</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>done</B></FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/dev/sdb: testing...drive_spec...51.9MB/sec...</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>done</B></FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">&nbsp;</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/dev/sda: partitioning...</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>done</B></FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/dev/sdb: partitioning...</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>done</B></FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/dev/md0: creating disk array...</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>done</B></FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/dev/md0: RAID-0 active
+with </FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>(2) drives</B></FONT></SPAN><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">, 256k chunk
+size, and 69GB capacity</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/dev/md0: creating
+filesystem...</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>done</B></FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/raw_data: mounting /dev/md0 filesystem...</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>done</B></FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">&nbsp;</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/raw_data:
+testing...170.1MB/sec...</FONT></SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>done</B></FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/raw_data: 0.0% used, 68.2GB avail </FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">&nbsp;</FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>gre-raid: success</B></FONT></SPAN></P><P CLASS="entry"><SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">[ctuser@darc ~]$</FONT></SPAN></P></td></tr></tbody></table></CENTER></DIV></BODY></HTML>

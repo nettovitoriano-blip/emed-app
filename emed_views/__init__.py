@@ -1,0 +1,82 @@
+from emed_views.portal_qr import verificar_e_renderizar_portal_qr
+from emed_views.mural_despacho import render_mural_despacho, render_minhas_pendencias
+from emed_views.bi_analytics import render_graficos_bi
+from emed_views.comercial_orcamentos import render_followup_orcamentos
+from emed_views.clientes_parque import render_clientes_equipamentos
+from emed_views.chamados_os import render_chamados_os
+from emed_views.logistica_estoque import (
+    render_gestao_pendencias,
+    render_solicitacao_pecas,
+    render_mapa_rotas,
+    render_gestao_estoque,
+)
+from emed_views.administracao import (
+    render_gestao_administracao,
+    render_atualizar_km,
+    render_editor_planilha,
+)
+from emed_views.manuais_tecnicos import render_manuais_tecnicos
+from emed_views.emedonline import render_emedonline
+from emed_views.alarmes_calibracao import render_alarmes_calibracao
+from emed_views.portal_cliente import render_portal_cliente
+from emed_views.conciliacao_pix import render_conciliacao_pix
+from emed_views.pesquisa_satisfacao import render_pesquisa_satisfacao
+from emed_views.workspace_tecnico import render_workspace_tecnico
+from emed_views.emed_car import render_emed_car
+
+
+def _render_alarmes_almoxarifado(ctx):
+    import streamlit as st
+    st.session_state.aba_almoxarifado_ativa = "alarmes"
+    render_gestao_estoque(ctx)
+
+
+VIEW_ROUTER = {
+    "🤖 EmedOnline (Triagem & Rota)": render_emedonline,
+    "🏥 Portal do Cliente (Autoatendimento)": render_portal_cliente,
+    "💳 Conciliação Bancária & Pagamentos PIX": render_conciliacao_pix,
+    "⭐ Pesquisa de Satisfação & Google Reviews": render_pesquisa_satisfacao,
+    "🚗 EmedCar (GPS, Rotas & Radares)": render_emed_car,
+    "🛠️ Workspace do Técnico & Fábrica de ITs": render_workspace_tecnico,
+    "⏰ Alarmes de Calibração & Créditos": _render_alarmes_almoxarifado,
+    "📊 Mural & Despacho WhatsApp": render_mural_despacho,
+    "📋 Minhas Pendências (Técnico)": render_minhas_pendencias,
+    "📚 Manuais & Procedimentos": render_manuais_tecnicos,
+    "📈 Gráficos & BI": render_graficos_bi,
+    "⏳ Follow-up de Orçamentos": render_followup_orcamentos,
+    "👥 Clientes & Equipamentos": render_clientes_equipamentos,
+    "🎫 Abertura de Chamados & OS": render_chamados_os,
+    "🚨 Gestão de Pendências": render_gestao_pendencias,
+    "📦 Solicitação de Peças & Ferramentas": render_solicitacao_pecas,
+    "🗺️ Mapa & Planeamento de Rotas": render_mapa_rotas,
+    "📦 Gestão de Estoque & Peças": render_gestao_estoque,
+    "⚙️ Gestão & Administração": render_gestao_administracao,
+    "🚗 Atualizar Quilometragem (Opcional)": render_atualizar_km,
+    "📝 Editor Direto da Planilha": render_editor_planilha,
+}
+
+__all__ = [
+    "verificar_e_renderizar_portal_qr",
+    "render_emedonline",
+    "render_portal_cliente",
+    "render_conciliacao_pix",
+    "render_pesquisa_satisfacao",
+    "render_workspace_tecnico",
+    "render_emed_car",
+    "render_alarmes_calibracao",
+    "render_mural_despacho",
+    "render_minhas_pendencias",
+    "render_manuais_tecnicos",
+    "render_graficos_bi",
+    "render_followup_orcamentos",
+    "render_clientes_equipamentos",
+    "render_chamados_os",
+    "render_gestao_pendencias",
+    "render_solicitacao_pecas",
+    "render_mapa_rotas",
+    "render_gestao_estoque",
+    "render_gestao_administracao",
+    "render_atualizar_km",
+    "render_editor_planilha",
+    "VIEW_ROUTER",
+]

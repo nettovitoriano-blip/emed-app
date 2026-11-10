@@ -1,0 +1,37 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Scan Data Path Diagnostic_Pancake DAS</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;3.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;7/23/12</P></td></tr></table><H1 ID="top">Scan Data Path Diagnostic_Pancake DAS </H1><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL2089110-1099924">1&nbsp;&nbsp;Overview<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="49%"><col width="51%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised:</td><td valign="">July 23, 2012</td></tr></tbody></table></div></DIV><P CLASS="sect1">The Scan data path diagnostic is intended to aid in troubleshooting
+intermittent failures along the scan data path from the ADB boards
+and DIP board in Console.</P><P CLASS="sect1">There are two main tabs on the top left for Automated and Manual
+test selections.  The automated test selections run without any user
+intervention.  The manual tests require manual intervention such as
+loopback testing that requires manual cable connection changes.</P><DIV CLASS="ILLUSTRATION" id="SL2089111-1099924"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Scan Data Path Screen</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/1099924-1107332.jpg" BORDER="0" usemap="#SL3310554-1099924"></P></DIV><P CLASS="sect1">Test 1 runs a known data pattern from the ADB board back to
+the console.  The Host then compares the data pattern to the known
+pattern and indicates any difference as an error. Test 2 and 3 work
+the same way from the DIFB and DCB.</P><P CLASS="sect1">There are several test options available in the bottom left
+of the GUI to aid in troubleshooting problems that may be caused by
+interactions with other gantry functions. These test options are grouped
+into Gantry options and Other Options and are further defined below:</P><UL><LI CLASS="bulletlist"><P>Test Iterations - allows the user to
+run multiple tests back to back to test for intermittant issues.</P></LI><LI CLASS="bulletlist"><P>Processing - Continuous mode that run
+the tests until completion or Stop mode that will stop on the first
+error.</P></LI><LI CLASS="bulletlist"><P>Trigger Source - trigger data collection
+using the normal TGP source or the DCB internally generated triggers.</P></LI><LI CLASS="bulletlist"><P>Gantry - Disabled is the default, Enabled
+opens the Speed field for the user to select a rotation speed, Position
+opens the position field to allow the user to select a specific tube
+position (typical for slipring antenna troubleshooting). Gantry rotation
+enabled or position selected requires a Scan button press to initiate
+the test.</P></LI><LI CLASS="bulletlist"><P>Speed - Selectable gantry speed once
+Gantry rotation is enabled.</P></LI><LI CLASS="bulletlist"><P>Position - Allows an entry from 0-359.
+ Value represents the tube location with zero at the top of the gantry
+and moving clockwise around the gantry.</P></LI><LI CLASS="bulletlist"><P>Xray - Turns xray on or off for the
+test scan. A low technique scan is used with the filter closed and
+collimator at its smallest opening.  Xray enabled requires a Scan
+button press to initiate the test.</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL2089119-1099924">2&nbsp;&nbsp;Data Patterns<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Data pattern test results for the ADB, DIFB, and DCB boards
+can be viewed using Scan Analysis.  Note the Exam and series for the
+desired test to view in the result screen of the Scan Data Path GUI.
+ The following example screens show the data patterns to be expected
+from each test. The data patterns shown are the View Vs Channels (VVC)
+plot of one channel using all default settings within Scan Analysis.
+ All Channels will look the same.</P><DIV CLASS="ILLUSTRATION" id="SL2089120-1099924"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">PDAS DCB Data Pattern</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/1099924-1107333.jpg" BORDER="0" usemap="#SL3310558-1099924"></P></DIV><DIV CLASS="ILLUSTRATION" id="SL2089122-1099924"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">PDAS DIFB Data Pattern</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/1099924-1107335.jpg" BORDER="0" usemap="#SL3310562-1099924"></P></DIV><DIV CLASS="ILLUSTRATION" id="SL2089123-1099924"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;4:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">PDAS ADB Data Pattern</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/1099924-1107334.jpg" BORDER="0" usemap="#SL3310566-1099924"></P></DIV></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

@@ -1,0 +1,196 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>GRE SDDA SCSI Disk Firmware Settings</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/14/07</P></td></tr></table><H1 ID="top">GRE SDDA SCSI Disk Firmware Settings </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col align="right" width="50%"><col width="50%"></colgroup><tbody valign=""><tr valign="top"><td align="right" valign="">Last Revised:</td><td valign="">30 March 2006</td></tr></tbody></table></div></DIV><P CLASS="descriptive">Example of what you should see:</P><PRE>telenet localhost 623
+
+Server: darc
+Username: 
+Password:
+
+dpccli&gt; reset -c
+
+*** Wait about 1 minute until you see a prompt to hit Ctrl-A ***
+
+                Adaptec  SCSISelect(TM)  Utility BUILD 41001S2                  
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+|||||||||||||||+------------------------------------------------+|||||||||||||||
+||||||||||||||||         AIC-7902 A at slot 00 04:07:00         ||||||||||||||||
+||||||||||||||||         AIC-7902 B at slot 00 04:07:01         ||||||||||||||||
+|||||||||||||||+------------------------------------------------+|||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+  &lt;Arrows&gt; move cursor, &lt;Enter&gt; to select option,&lt;Esc&gt; to exit (*=default)   
+
+
+
+
+*** Select "AIC-7902 A"
+
+
+                Adaptec  SCSISelect(TM)  Utility BUILD 41001S2                  
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
++====================== AIC-7902 A at slot 00, 04:07:00 =======================+
+|                                                                              |
+|          Would you like to configure the SCSI controller, or run the         |
+|          SCSI Disk Utilities?  Select the option and press &lt;Enter&gt;. 
+|                                                                              |
+|                                                                              |
+|+--------------------------------- Options ----------------------------------+|
+||                  Configure/View SCSI Controller Settings                   ||
+||                            SCSI Disk Utilities                             ||
+||                          Enable HostRAID Support                           ||
+|+----------------------------------------------------------------------------+|
+|                                                                              |
++==============================================================================+
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+&lt;Arrows&gt; move cursor, &lt;Enter&gt; to select option,&lt;Esc&gt; to exit (*=default)
+
+
+
+
+*** Select "Configure/View SCSI Controller Settings"
+
+                Adaptec  SCSISelect(TM)  Utility BUILD 41001S2                  
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
++====================== AIC-7902 A at slot 00, 04:07:00 =======================+
+|+- Configuration ------------------------------------------------------------+|
+||                                                                            ||
+|| SCSI Bus Interface Definitions                                             ||
+|| SCSI Controller ID........................ 7                               ||
+|| SCSI Controller Parity.................... Enabled                         ||
+|| SCSI Controller Termination............... Enabled                         ||
+||                                                                            ||
+|| Additional Options                                                         ||
+|| Boot Device Configuration................. Press &lt;Enter&gt;                   ||
+|| SCSI Device Configuration................. Press &lt;Enter&gt;                   ||
+|| Advanced Configuration.................... Press &lt;Enter&gt;                   ||
+||                                                                            ||
+||             &lt;F6&gt; - Reset to SCSI Controller Defaults                       ||
+|+----------------------------------------------------------------------------+|
+|+- BIOS Information ---------------------------------------------------------+|
+||                                                                            ||
+|| Interrupt (IRQ) Channel...........................09                       ||
+|| I/O Port Addresses................................4000h,4400h              ||
+|+----------------------------------------------------------------------------+|
++==============================================================================+
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+&lt;Arrows&gt; move cursor, &lt;Enter&gt; to select option, &lt;Esc&gt; to exit (*=default)
+
+
+
+
+*** Select "SCSI Device Configuration"
+
+                Adaptec  SCSISelect(TM)  Utility BUILD 41001S2                  
++========================= SCSI Device Configuration ==========================+
+|  SCSI Device ID                     #0   #1   #2   #3   #4   #5   #6   #7    |
+|  --------------------------------------------------------------------------  |
+|  Sync Transfer Rate (MB/Sec)....... 160  160  320  320  320  320  320  320   |
+|  Packetized........................ Yes  Yes  Yes  Yes  Yes  Yes  Yes  Yes   |
+|  QAS............................... Yes  Yes  Yes  Yes  Yes  Yes  Yes  Yes   |
+|  Initiate Wide Negotiation......... Yes  Yes  Yes  Yes  Yes  Yes  Yes  Yes   |
+|  Enable Disconnection.............. Yes  Yes  Yes  Yes  Yes  Yes  Yes  Yes   |
+|  Send Start Unit Command........... Yes  Yes  Yes  Yes  Yes  Yes  Yes  Yes   |
+|  BIOS Multiple LUN Support......... No   No   No   No   No   No   No   No    |
+|  Include in BIOS Scan.............. Yes  Yes  Yes  Yes  Yes  Yes  Yes  Yes   |
+|                                                                              |
+|  SCSI Device ID                     #8   #9   #10  #11  #12  #13  #14  #15   |
+|  --------------------------------------------------------------------------  |
+|  Sync Transfer Rate (MB/Sec)....... 320  320  320  320  320  320  320  320   |
+|  Packetized........................ Yes  Yes  Yes  Yes  Yes  Yes  Yes  Yes   |
+|  QAS............................... Yes  Yes  Yes  Yes  Yes  Yes  Yes  Yes   |
+|  Initiate Wide Negotiation......... Yes  Yes  Yes  Yes  Yes  Yes  Yes  Yes   |
+|  Enable Disconnection.............. Yes  Yes  Yes  Yes  Yes  Yes  Yes  Yes   |
+|  Send Start Unit Command........... Yes  Yes  Yes  Yes  Yes  Yes  Yes  Yes   |
+|  BIOS Multiple LUN Support......... No   No   No   No   No   No   No   No    |
+|  Include in BIOS Scan.............. Yes  Yes  Yes  Yes  Yes  Yes  Yes  Yes   |
++==============================================================================+
+
+&lt;Arrows&gt; move cursor, &lt;Enter&gt; to select option, &lt;Esc&gt; to exit (*=default)
+
+
+
+
+*** Set device #0 and device #1 to 160.  All other devices are "don't care".
+*** Hit Esc 3 times until you see the following &#8230; 
+ 
+
+
+                Adaptec  SCSISelect(TM)  Utility BUILD 41001S2                  
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+|||||||||||||||+--------------+- Exit Utility? --+--------------+|||||||||||||||
+||||||||||||||||         AIC-7|       Yes        |07:00         ||||||||||||||||
+||||||||||||||||         AIC-7|       No         |07:01         ||||||||||||||||
+|||||||||||||||+--------------+------------------+--------------+|||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+
+
+
+*** Select Yes
+*** The system will reboot and you may see the following screen...
+
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                    +======================================+                    
+                    |      Please select boot device:      |                    
+                    +======================================+                    
+                    | ATAPI CD-ROM                         |                    
+                    | Hard Drive                           |                    
+                    | IBA 1.1.08 Slot 0339                 |                    
+                    | IBA 1.1.08 Slot 0338                 |                    
+                    |                                      |                    
+                    |                                      |                    
+                    |                                      |                    
+                    |                                      |                    
+                    +======================================+                    
+                    |   Use  and  to change selection,   |                      
+                    |    Use ENTER to select and save,     |                    
+                    |    Use ESC to Exit without save.     |                    
+                    +======================================+     
+
+*** Hit Esc and quit your telnet session.</PRE><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

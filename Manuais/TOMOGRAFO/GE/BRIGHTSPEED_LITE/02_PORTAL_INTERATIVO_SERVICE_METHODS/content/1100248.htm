@@ -1,0 +1,101 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>SmarTube&#8482; Setup</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;6/20/10</P></td></tr></table><H1 ID="top">SmarTube&#8482; Setup </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="48%"><col width="52%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised on:</td><td valign="">08 Dec 2009</td></tr></tbody></table></div></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1577124-1100248">1&nbsp;&nbsp;Personnel Requirements<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="20%"><col width="30%"><col width="24%"><col width="26%"></colgroup><tbody valign=""><tr valign="top"><td align="center" valign="">Required Persons</td><td align="center" valign="">Preliminary Requirements</td><td align="center" valign="">Procedure</td><td align="center" valign="">Finalization</td></tr><tr valign="top"><td align="center" valign="">1</td><td align="center" valign="">None</td><td align="center" valign="">30 Minutes</td><td align="center" valign="">None</td></tr></tbody></table></div></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1577125-1100248">2&nbsp;&nbsp;Overview<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The SmarTube software includes a number of enhancements.  One
+of the enhancements that affects the tube change procedure is an enhancement
+known as Secure Tube Identification.  We have included this feature
+to confirm that a tube with &#8220;system-known&#8221; operating characteristics
+is installed so GE can assure that all system elements will perform
+as designed.  This feature allows positive identification of the GE
+CT tube in use so that the interaction between the tube and the system
+operating characteristics may be optimized for best performance.</P><P CLASS="sect1">In contrast, if a non-GE supplied tube is used there can be
+operating impact on the system.  For instance-mechanical stability,
+life expectancy of other components, calibration differences, the
+accuracy of dose reporting and image quality may be affected.  GE
+does not test non-GE supplied tubes for suitability, and therefore
+GE cannot assure system performance for systems utilizing a non-GE
+supplied tube.  If a non-GE supplied tube is installed the SmarTube
+software displays a message for the CT Operator on the console indicating
+that fact.   No features will be disabled if a non-GE supplied tube
+is detected; however, advisories will be posted to alert the user
+of the possibility for performance discrepancies.  The advisories
+are purely informational.  The CT equipment users benefit by having
+a mechanism to quickly and effectively confirm the configuration of
+their systems without having to perform a physical inspection.  This
+is a phased release for the following three software platforms:</P><P CLASS="sect1">FMI 25363 - GOC1 Irix/Pegasus systems (HiSpeed QX/i, LightSpeed
+2.X, 3.X and 4.X) </P><P CLASS="sect1">FMI 25364 - GOC2 Linux/Pegasus systems (HiSpeed QX/i, LightSpeed
+2.X, 3.X and 4.X) </P><P CLASS="sect1">FMI 25365 - GRE console systems, Pathfinder 1.5 (all systems
+from LightSpeed 1.X)  </P><P CLASS="sect1">Among the new features enabled by SmarTube are the following:</P><UL><LI CLASS="bulletlist"><P>Tube Identification - allows positive
+identification of the GE CT tube in use so that the system may be
+optimized for the particular tube&#8217;s operating characteristics
+(discussed above)</P></LI><LI CLASS="bulletlist"><P>Enhanced Tube Management - results
+in an average 7% to 20%+ improvement in GE tube life depending upon
+system platform type (not available on H1 based LightSpeed QX/I system).</P><P>Note that Enhanced Tube Management is provided with GE-supplied
+tubes subject to an included license. A license for systems not using
+GE-supplied tubes is available for a fee. However, Enhanced Tube Management
+has been exclusively developed and designed for use with GE-supplied
+tubes. GE has conducted no testing for any other tube configuration,
+makes no representation concerning, and assumes no responsibility
+for compatibility with non-GE-supplied tubes.</P></LI><LI CLASS="bulletlist"><P>Enhanced Dose Reporting - facilitates
+saving of patient dose data in a format that will allow easy communication
+and storage</P></LI><LI CLASS="bulletlist"><P>Enhanced Data Capture - allows development
+of improved proactive remote diagnostic capability and additional
+features planned for future implementation.</P></LI><LI CLASS="bulletlist"><P>Enhanced Advisory Messaging-communicates
+exception information in situations where system performance may be
+affected by the use of a non-GE supplied tube</P></LI></UL><P CLASS="sect1">There are two basic tube types related to this topic.</P><UL><LI CLASS="bulletlist"><P>GE Supplied Tubes</P></LI><LI CLASS="bulletlist"><P>Non-GE Supplied Tubes</P></LI></UL><P CLASS="sect1">When installing a new tube it will be necessary to utilize the
+new Tube Install Calibration (TIC) tool.  The tool is in Common Service
+Desktop under Configuration. Follow the process shown in the Process
+Flow section of this document.  You will need to select Tube Identity
+(&#8220;GE Medical Systems Tube&#8221; or &#8220;All Others&#8221;)
+using the Tube Install Certification Tool.  It will be necessary to
+insert the GE Employee Service Key (Class M) in order to permanently
+authenticate the tube as a GE supplied tube.</P><P CLASS="sect1">If  &#8220;All Others&#8221; is chosen, advisory messages will
+be posted on systems with Non-GE-Supplied tubes during Fast Cal indicating
+that Fast Calibration techniques are designed specifically for GEHC
+Tubes and that the performance of the system cannot be guaranteed
+with unrecognized tubes.  In addition, a message will be posted on
+the Dose Report screen save image indicating that GE cannot assure
+the accuracy of reported dose information for any configurations that
+include tubes other than GE Medical Systems Tubes.</P><P CLASS="sect1">If the installed x-ray tube is a GE-Supplied tube and the field
+service engineer did not have all the appropriate information to complete
+verification, a message will be displayed indicating verification
+needs to be completed.  If the GE-Supplied tube is installed by either
+an in-house or 3rd party service provider, the same message will be
+displayed and the customer will need to call to have a GE Service
+Representative dispatched to verify the identity of the tube.  A message
+will be displayed for 30 days or until the field service engineer
+is able to complete tube installation verification within the 30-day
+window.  If verification is not complete within 30 days then the system
+will revert to &#8220;All Others&#8221; status and operate accordingly.</P><P CLASS="sect1">If the tube is a GE-Supplied tube and if the tube has been properly
+authenticated with a GE Employee Service Key (Class M) then the warning
+messages are not necessary and will not be posted.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1577126-1100248">3&nbsp;&nbsp;Preliminary Requirements<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1577127-1100248">3.1&nbsp;&nbsp;Tools and Test Equipment<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="22%" align="center"><col width="9%" align="center"><col width="30%" align="center"><col width="12%" align="center"><col width="27%" align="center"></colgroup><tbody valign=""><tr valign="top"><td align="center" valign="">Item</td><td align="center" valign="">Qty</td><td align="center" valign="">Effectivity</td><td align="center" valign="">Part#</td><td align="center" valign="">Manufacturer</td></tr><tr valign="top"><td align="center" valign="">Class M Service Key (See Note)</td><td align="center" valign="">1</td><td align="center" valign="">Linux Based Operating Systems</td><td align="center" valign="">&nbsp;</td><td align="center" valign="">&nbsp;</td></tr></tbody></table></div></DIV><TABLE CLASS="ADMONsect2" CELLSPACING="0%" CELLPADDING="0%" ID="d0e151"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">This tool is only available to GE Healthcare service personnel.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1577128-1100248">3.2&nbsp;&nbsp;Safety<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Potential Tube damage or explosion if a non-GE Tube is classified
+as a GE Tube.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1577129-1100248">3.3&nbsp;&nbsp;Required Conditions<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">Applies to any system that does not support Smart Tube ID.</P><P CLASS="sect2">Class M Service key required to effectively record Tube type
+when the following events occur. (This tool is only available to GE
+Healthcare service personnel.)</P><UL><LI CLASS="bulletlist"><P>Tube is changed</P></LI><LI CLASS="bulletlist"><P>After Load From Cold (LFC) software
+install</P></LI><LI CLASS="bulletlist"><P>When performing Beam on Window</P></LI><LI CLASS="bulletlist"><P>When performing Hot or Cold ISO alignment</P></LI></UL></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1577130-1100248">4&nbsp;&nbsp;Procedure<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1577131-1100248">4.1&nbsp;&nbsp;Tube Selection<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">For all tube changes, the following needs to be performed.</P><OL><LI CLASS="numlist"><P>Select the <SPAN CLASS="GUIBUTTON">[Tube Install
+Certification Tool]</SPAN> in the <SPAN CLASS="GUILABEL"><I>Common Service Desktop</I></SPAN> under <SPAN CLASS="GUIBUTTON">[Configuration]</SPAN>.</P><TABLE CLASS="ADMONlistitem" CELLSPACING="0%" CELLPADDING="0%" ID="d0e200"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Do not double click the <SPAN CLASS="GUIBUTTON">[Tube Install Certification
+Tool]</SPAN>.  This will cause more than one tool screen to be
+displayed, one with message <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">service key information not available</FONT></SPAN>. If this happens, delete screens and try again.  If this happens
+more than once, reboot the system and try again.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P></LI><LI CLASS="numlist"><P><SPAN CLASS="EFFSTRING"><FONT COLOR="#008000"><B>
+(For&nbsp;GE Healthcare service personnel
+only) 
+</B></FONT></SPAN> Insert the Class M Service Key.</P></LI><LI CLASS="numlist"><P>Verification of GE Medical System tube:
+ This can be verified by checking the tube insert model number that
+can be found on tube rating plate.</P></LI><LI CLASS="numlist"><P>In the Tube Install Certification Tool, <SPAN CLASS="GUILABEL"><I>Change Tube Identity</I></SPAN> field, select <SPAN CLASS="GUIBUTTON">[GE Medical
+Systems Tube]</SPAN> or <SPAN CLASS="GUIBUTTON">[All Others]</SPAN> as appropriate.
+See <A HREF="javascript:winopen('1100248illd0e256.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;1</A>.</P></LI><LI CLASS="numlist"><P>Select <SPAN CLASS="GUIBUTTON">[Confirm]</SPAN>. A confirmation screen is displayed.</P></LI><LI CLASS="numlist"><P>On the confirmation screen, select <SPAN CLASS="GUIBUTTON">[Accept]</SPAN>. </P></LI><LI CLASS="numlist"><P>Exit the Tube Install Certification
+Tool by selecting <SPAN CLASS="GUIBUTTON">[Dismiss]</SPAN>.</P></LI><LI CLASS="numlist"><P><SPAN CLASS="EFFSTRING"><FONT COLOR="#008000"><B>
+(For&nbsp; non-GE service personnel) 
+</B></FONT></SPAN>Additionally for a GE Medical Systems Tube, follow the process shown
+in <A HREF="javascript:winopen('1100248illd0e261.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;2</A>. </P></LI></OL><DIV CLASS="ILLUSTRATION" id="SL3091670-1100248"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Tube Install Certification Tool Screen</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/1100248-1100249.jpg" BORDER="0" usemap="#SL3091660-1100248"></P></DIV><DIV CLASS="ILLUSTRATION" id="SL572554-1100248"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Tube Authentication Process</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/1100248-580933.jpg" BORDER="0" usemap="#SL580937-1100248"></P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL1577132-1100248">4.2&nbsp;&nbsp;Tube Installation Certification (TIC) Customer Messages<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The Tube Installation Certification (TIC) functional flow is
+displayed in <A HREF="javascript:winopen('1100248illd0e279.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;3</A>. The installation path determines if the customer will see any
+popup windows or Dose Reporting qualifiers similar to <A HREF="javascript:winopen('1100248illd0e304.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;4</A>, <A HREF="javascript:winopen('1100248illd0e309.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;5</A>, and <A HREF="javascript:winopen('1100248illd0e314.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;6</A>.</P><DIV CLASS="ILLUSTRATION" id="SL572559-1100248"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Tube Identity Selection and Messages Flowchart</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/1074539-544217.jpg" BORDER="0" usemap="#SL621368-1100248"></P></DIV><TABLE CLASS="ADMONsect2" CELLSPACING="0%" CELLPADDING="0%" ID="d0e284"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Possible popup messages at startup:<UL><LI CLASS="bulletlist"><P>If the tube selection is GE tube without
+time limit, no popup messages relating to tube identity are shown
+on boot-up.</P></LI><LI CLASS="bulletlist"><P>If the tube selection is GE <B>with</B> time limit, a message with days remaining for GE
+FE to verify tube is shown on boot-up until GE FE removes the time
+limit with service key (see <A HREF="javascript:winopen('1100248illd0e304.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;4</A>). If not verified by GE FE within the time limit,
+the system defaults to &#8220;All Others'.</P></LI><LI CLASS="bulletlist"><P>If the tube is set to 'All Others',
+unrecognized x-ray tube installed message is always shown at boot-up
+(see <A HREF="javascript:winopen('1100248illd0e309.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;5</A>).</P></LI></UL></TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><DIV CLASS="ILLUSTRATION" id="SL572562-1100248"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;4:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">30 Day Configuration Install Message</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/1100248-580953.jpg" BORDER="0" usemap="#SL580957-1100248"></P></DIV><DIV CLASS="ILLUSTRATION" id="SL572565-1100248"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;5:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Unrecognized X-Ray Tube Installed Message</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/1130474-580954.jpg" BORDER="0" usemap="#SL580959-1100248"></P></DIV><DIV CLASS="ILLUSTRATION" id="SL572568-1100248"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;6:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Unrecognized X-Ray Tube &#8220;Dose&#8221; Message (Example
+Shown)</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/1100248-580955.jpg" BORDER="0" usemap="#SL580960-1100248"></P></DIV></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1577133-1100248">5&nbsp;&nbsp;Finalization<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">No finalization required.</P></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

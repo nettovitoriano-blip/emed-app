@@ -1,0 +1,110 @@
+p  {
+	font-family : arial, helvetica, sans-serif;
+	font-size : 10pt;
+	font-weight : normal;
+	color: #000000;
+	background-color: transparent;
+	margin-left: 5px;
+	margin-right: 5px;
+}
+
+li {
+	font-family : arial, helvetica, sans-serif;
+	font-size : 10pt;
+	font-weight : normal;
+}
+
+h1  {
+	font-family : arial, helvetica, sans-serif;
+	font-size : 14pt;
+	font-weight : bold;
+	font-style: normal;
+	color: #4B0082;
+	text-align : center;
+	background-color: transparent;
+}
+
+h2  {
+	font-family : arial, helvetica, sans-serif;
+	font-size : 12pt;
+	font-weight : bold;
+	font-style: normal;
+	color: #4B0082;
+	margin-left: 5px;
+	margin-right: 5px;
+	background-color: transparent;
+}
+
+h3  {
+	font-family : arial, helvetica, sans-serif;
+	font-size : 10pt;
+	font-weight : bold;
+	font-style: normal;
+	color: #4B0082;
+	margin-left: 5px;
+	margin-right: 5px;
+	background-color: transparent;
+}
+
+.title{
+	font-family: arial, helvetica, sans-serif;
+	font-size: 11pt;
+	color: #333366;
+	font-style: italic;
+	font-weight: bolder;
+}
+
+.navbutton{
+	font-family: arial, helvetica, sans-serif;
+	font-size: 11pt;
+	color: #333366;
+	font-style: normal;
+	font-weight: bolder;
+}
+
+.sideBar{
+	font-family: arial, helvetica, sans-serif;
+	font-size: 8pt;
+	font-style: normal;
+	font-weight: bold;
+	color: White;
+}
+
+.windowtext{
+	font-family: arial, helvetica, sans-serif;
+	font-size: 10pt;
+	font-style: normal;
+	font-weight: normal;
+	padding-left : 10px;
+	padding-top : 10px;
+}
+
+A:link {
+	color: #000099;
+	text-decoration: none;
+	background-color : transparent;
+}
+
+A:visited {
+	color: #000099;
+	text-decoration: none;
+	background-color : transparent;
+}
+
+A:hover {
+	color: #6666CC;
+	text-decoration: none;
+	background-color : transparent;
+}
+
+.TOCLISTING {
+	font-family: arial, helvetica, sans-serif;
+	font-size: 10pt;
+	font-style: normal;
+	font-weight: bold;
+	font : larger/18px;
+}td {
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 10px;
+
+}

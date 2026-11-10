@@ -1,0 +1,94 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Linux Commands</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;5.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;11/20/11</P></td></tr></table><H1 ID="top">Linux Commands </H1><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL2164796-116366">1&nbsp;&nbsp;Linux Commands<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2164797-116366">1.1&nbsp;&nbsp;Essentials<SPAN CLASS="SECT2EFF"> </SPAN></H3><DL><DT><I>logout</I>&nbsp;
+</DT><DD><P CLASS="def">Use this command when you are done, always.</P></DD><DT><I>/</I>&nbsp;
+</DT><DD><P CLASS="def">Root directory.</P></DD><DT><I>./</I>&nbsp;
+</DT><DD><P CLASS="def">Current directory.</P></DD><DT><I>./command_name</I>&nbsp;
+</DT><DD><P CLASS="def">Run a command in the current directory when the current directory
+is not on the path.</P></DD><DT><I>../</I>&nbsp;
+</DT><DD><P CLASS="def">Parent directory.</P></DD><DT><I>~</I>&nbsp;
+</DT><DD><P CLASS="def">Home directory.</P></DD></DL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2164798-116366">1.2&nbsp;&nbsp;Files and Directories<SPAN CLASS="SECT2EFF"> </SPAN></H3><DL><DT><I>cd</I>&nbsp;
+</DT><DD><P CLASS="def">Change directory.</P></DD><DT><I>pwd</I>&nbsp;
+</DT><DD><P CLASS="def">Print working directory - the directory where you are.</P></DD><DT><I>mkdir</I>&nbsp;
+</DT><DD><P CLASS="def">Make a new directory.</P></DD><DT><I>ls</I>&nbsp;
+</DT><DD><P CLASS="def">List files.</P></DD><DT><I>ls -a</I>&nbsp;
+</DT><DD><P CLASS="def">Lists all files in the directory, including hidden files. A
+hidden file is one whose name starts with a period (.).</P></DD><DT><I>cp</I>&nbsp;
+</DT><DD><P CLASS="def">Copy a file.</P></DD><DT><I>less</I>&nbsp;
+</DT><DD><P CLASS="def">View a text file.</P></DD><DT><I>cat</I>&nbsp;
+</DT><DD><P CLASS="def">Prints the contents of a file on the screen.</P></DD><DT><I>more</I>&nbsp;
+</DT><DD><P CLASS="def">Display the contents of a file, pausing between each screen
+full. Type more file.</P></DD><DT><I>control-D</I>&nbsp;
+</DT><DD><P CLASS="def">Pressing the control key and the d key at the same time interrupts
+programs and returns you to the prompt.</P></DD></DL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2164799-116366">1.3&nbsp;&nbsp;System Status<SPAN CLASS="SECT2EFF"> </SPAN></H3><DL><DT><I>date</I>&nbsp;
+</DT><DD><P CLASS="def">Displays the current date and time.</P></DD><DT><I>top</I>&nbsp;
+</DT><DD><P CLASS="def">A program to see how your memory and CPU are holding up.</P></DD><DT><I>ps</I>&nbsp;
+</DT><DD><P CLASS="def">Display running processes ('ps -ef | grep username' gives all
+the processes owned by a particular user).</P></DD><DT><I>w</I>&nbsp;
+</DT><DD><P CLASS="def">Display who is on and where they are on from.</P></DD><DT><I>tail -f</I>&nbsp;
+</DT><DD><P CLASS="def">Tail follow a file as it grows.</P></DD><DT><I>chkconfig -list</I>&nbsp;
+</DT><DD><P CLASS="def">Query or update system services/daemons for different run levels.</P></DD><DT><I>df</I>&nbsp;
+</DT><DD><P CLASS="def">Displays capacity and free capacity on different physical devices
+such as hard drive partitions that are mounted on the file system.
+Gives free space in blocks.</P></DD><DT><I>du</I>&nbsp;
+</DT><DD><P CLASS="def">Displays information on disk usage.</P></DD><DT><I>du / -bh | less</I>&nbsp;
+</DT><DD><P CLASS="def">Display detailed disk usage for each subdirectory starting at
+root.</P></DD></DL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2164800-116366">1.4&nbsp;&nbsp;Networking<SPAN CLASS="SECT2EFF"> </SPAN></H3><DL><DT><I>telnet</I>&nbsp;
+</DT><DD><P CLASS="def">Open a remote session with host.</P></DD><DT><I>rlogin</I>&nbsp;
+</DT><DD><P CLASS="def">Open a remote session with host.</P></DD><DT><I>ftp</I>&nbsp;
+</DT><DD><P CLASS="def">File Transfer Protocol: send and receive files between machines.</P></DD><DT><I>ping</I>&nbsp;
+</DT><DD><P CLASS="def">Check to make sure a remote machine is reachable.</P></DD></DL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2164801-116366">1.5&nbsp;&nbsp;Editors and Text Processors<SPAN CLASS="SECT2EFF"> </SPAN></H3><DL><DT><I>emacs</I>&nbsp;
+</DT><DD><P CLASS="def">Visual Editor.</P></DD><DT><I>grep</I>&nbsp;
+</DT><DD><P CLASS="def">Searches a file for a pattern.</P></DD></DL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2843017-116366">1.6&nbsp;&nbsp;Format a DVD-RAM Media Disk<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">To Format a DVD-RAM media:</P><OL><LI CLASS="numlist"><P>Open a Terminal Window.</P></LI><LI CLASS="numlist"><P>Enter the following commands to become
+root:</P><OL TYPE="a"><LI CLASS="numlist"><P>Type: <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>su-</B></FONT></SPAN></P></LI><LI CLASS="numlist"><P>Type: <SPAN CLASS="INPUTVAR"><FONT FACE="COURIER"><B><I>&lt;root password&gt;</I></B></FONT></SPAN></P></LI></OL></LI><LI CLASS="numlist"><P>Insert DVD-RAM media.</P></LI><LI CLASS="numlist"><P>Type: <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>mkfsDVD</B></FONT></SPAN></P></LI><LI CLASS="numlist"><P>	Eject DVD-RAM media.</P></LI></OL></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2843034-116366">1.7&nbsp;&nbsp;Mount/Unmount a USB Device at the Host Computer<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL2843035-116366">1.7.1&nbsp;&nbsp;Mount a USB Device<SPAN CLASS="SECT1EFF"> </SPAN></H4><OL><LI CLASS="numlist"><P>Plug in the USB device to one of the
+USB ports on the front of the Host computer.</P></LI><LI CLASS="numlist"><P>Open a Terminal Window.</P></LI><LI CLASS="numlist"><P>Enter the following commands to become
+root:</P><OL TYPE="a"><LI CLASS="numlist"><P>Type: <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>su-</B></FONT></SPAN></P></LI><LI CLASS="numlist"><P>Type: <SPAN CLASS="INPUTVAR"><FONT FACE="COURIER"><B><I>&lt;root password&gt;</I></B></FONT></SPAN></P></LI></OL></LI><LI CLASS="numlist"><P>Type: <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>mountUSB</B></FONT></SPAN></P></LI><LI CLASS="numlist"><P>Exit root.</P></LI><LI CLASS="numlist"><P>Exit the Terminal Window.</P></LI></OL></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL2843044-116366">1.7.2&nbsp;&nbsp;Unmount a USB Device<SPAN CLASS="SECT1EFF"> </SPAN></H4><OL><LI CLASS="numlist"><P>Open a Terminal Window (if not already
+open).</P></LI><LI CLASS="numlist"><P>Enter the following commands (if not
+already at root permission):</P><OL TYPE="a"><LI CLASS="numlist"><P>Type: <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>su-</B></FONT></SPAN></P></LI><LI CLASS="numlist"><P>Type: <SPAN CLASS="INPUTVAR"><FONT FACE="COURIER"><B><I>&lt;root password&gt;</I></B></FONT></SPAN></P></LI></OL></LI><LI CLASS="numlist"><P>Type: <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>unmountUSB</B></FONT></SPAN></P></LI><LI CLASS="numlist"><P>Exit root.</P></LI><LI CLASS="numlist"><P>Exit the Terminal Window.</P></LI></OL></DIV></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL2164802-116366">2&nbsp;&nbsp;Using Linux Commands<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2164803-116366">2.1&nbsp;&nbsp;Navigation<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL2164804-116366">2.1.1&nbsp;&nbsp;cd<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>cd</B></FONT></SPAN> command changes directories. It's
+a very common navigation command that you'll end up using, just like
+you might have done in MS-DOS.</P><P CLASS="sect3">You must put a space between <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>cd</B></FONT></SPAN> and the
+"<SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>..</B></FONT></SPAN>" or else it won't work; Linux doesn't see
+the two dots as an extension to the cd command, but rather a different
+command altogether.</P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL2164805-116366">2.1.2&nbsp;&nbsp;ls<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>ls</B></FONT></SPAN> letters stand for list. It basically
+works the same way as the dir command in DOS. Only being a Unix command,
+you can do more with it.</P><P CLASS="sect3">Typing <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>ls</B></FONT></SPAN> will give you a listing of all
+the files in the current directory. If you're new to Linux, chances
+are that the directories you are commonly in will be empty, and after
+the <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>ls</B></FONT></SPAN> command is run, you aren't given any information
+and will just be returned to the command prompt (the shell).</P><P CLASS="sect3">There are &#8220;hidden&#8221; files in Linux, too. Their file
+names start with a dot, and doing a normal <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>ls</B></FONT></SPAN> won't show them in a directory. Many configuration files start with
+a dot on their file names because they would only get in the way of
+users who would like to see more commonly used items. To view hidden
+files, use the <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>-a</B></FONT></SPAN> flag with the <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>ls</B></FONT></SPAN> command, i.e. <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>ls -a</B></FONT></SPAN>.</P><P CLASS="sect3">To view more information about the files in a directory, use
+the <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>-l</B></FONT></SPAN> flag with <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>ls</B></FONT></SPAN>. It
+will show the file permissions as well as the file size, which are
+probably what are the most useful things to know about files.</P><P CLASS="sect3">You might occasionally want to have a listing of all the subdirectories,
+also. A simple <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>-R</B></FONT></SPAN> flag will do, so you could
+look upon <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>ls -R</B></FONT></SPAN> as a rough equivalent of the <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>dir /s</B></FONT></SPAN> command in MS-DOS.</P><P CLASS="sect3">You can put flags together, so to view all the files in a directory,
+show their permissions/size, and view all the files that way through
+the subdirectories, you could type <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>ls -laR</B></FONT></SPAN>.</P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL2164806-116366">2.1.3&nbsp;&nbsp;pwd<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">This command simply shows what directory you're in at the moment.
+It stands for &#8220;Print Working Directory&#8221;. It's useful for
+scripting in case you might ever want to refer to your current directory.</P></DIV></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2164807-116366">2.2&nbsp;&nbsp;Editing<SPAN CLASS="SECT2EFF"> </SPAN></H3><P CLASS="sect2">The basic syntax to invoke these text editors is the same. Type
+the name of the editor followed by the file you want to edit, separated
+by a space in between. Non-existent files will be blank. Blank files
+will be blank as well.</P><P CLASS="sect2"><B>vim</B></P><P CLASS="sect2">Most modern distributions include <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>vim</B></FONT></SPAN>,
+derived from the infamously arcane Unix editor, <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>vi</B></FONT></SPAN>.</P><P CLASS="sect2">Using <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>vim</B></FONT></SPAN> is different in that there are
+several modes in which you use it. To do actual editing of the files,
+press <SPAN CLASS="KEYBOARD">&lt;ESC&gt;</SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>i</B></FONT></SPAN> (both separately).
+Then to save it, press <SPAN CLASS="KEYBOARD">&lt;ESC&gt;</SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>:w</B></FONT></SPAN> . Escape, the colon, and &#8220;w&#8221; should be keyed in one
+after the other. Finally, to quit, type <SPAN CLASS="KEYBOARD">&lt;ESC&gt;</SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>:q</B></FONT></SPAN> . The same rules apply as in previous vim commands.</P><P CLASS="sect2">You can use &#8220;w&#8221; and &#8220;q&#8221; at the same
+time to enable yourself to write to the file and then quit right afterwards.
+Just press <SPAN CLASS="KEYBOARD">&lt;ESC&gt;</SPAN><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>:wq</B></FONT></SPAN> .</P><P CLASS="sect2">If you don't have <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>vim</B></FONT></SPAN> installed, try <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>vi</B></FONT></SPAN> instead.</P></DIV><DIV CLASS="SECT2"><H3 CLASS="SECT2" ID="SL2164808-116366">2.3&nbsp;&nbsp;Monitoring Your System<SPAN CLASS="SECT2EFF"> </SPAN></H3><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL2164809-116366">2.3.1&nbsp;&nbsp;tail<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">The program <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>tail</B></FONT></SPAN> allows you to follow a
+file as it is growing. It is often used to follow <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/var/log/</FONT></SPAN>messages, by typing <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>tail -f /var/log/messages</B></FONT></SPAN>. Of course, you can use anything else, including the other logs
+in <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/var/log/</FONT></SPAN>. Another file you may want to keep
+an eye out for is <SPAN CLASS="SCRNFIX"><FONT FACE="COURIER">/var/log/secure</FONT></SPAN>.</P><P CLASS="sect3">If you want to leave that running all the time, it's recommended
+you have some sort of terminal program in X, logged in as <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>root</B></FONT></SPAN> through <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>su</B></FONT></SPAN>.</P><P CLASS="sect3">Another program you may want to look at is <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>head</B></FONT></SPAN>. It monitors the top of the file specified, instead of the bottom.</P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL2164810-116366">2.3.2&nbsp;&nbsp;top<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">This program shows a lot of stuff that goes on with your system.
+In the program, you can type:</P><P CLASS="sect3"><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>M</B></FONT></SPAN> for memory usage information</P><P CLASS="sect3"><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>P</B></FONT></SPAN> for CPU information</P><P CLASS="sect3"><SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>q</B></FONT></SPAN> to quit</P></DIV><DIV CLASS="SECT3"><H4 CLASS="SECT3" ID="SL2164811-116366">2.3.3&nbsp;&nbsp;w<SPAN CLASS="SECT1EFF"> </SPAN></H4><P CLASS="sect3">Typing <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>w</B></FONT></SPAN> will tell you who is logged in.
+This can be helpful if you're the only one who uses your computer
+and you see someone logged in that's not supposed to be.</P><P CLASS="sect3">Another alternative is <SPAN CLASS="INPUTFIX"><FONT FACE="COURIER"><B>who</B></FONT></SPAN>.</P></DIV></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL2164812-116366">3&nbsp;&nbsp;Linux Reference Books<SPAN CLASS="SECT1EFF"> </SPAN></H2><UL><LI CLASS="bulletlist"><P><SPAN CLASS="pubref"><I>Learning GNU Emacs</I></SPAN> - another book on another powerful text editor. It's good especially
+if you program or simply prefer Emacs.</P></LI><LI CLASS="bulletlist"><P><SPAN CLASS="pubref"><I>Learning Red Hat Linux</I></SPAN>, 2nd Edition, by Bill McCarty (Paperback)</P></LI><LI CLASS="bulletlist"><P><SPAN CLASS="pubref"><I>Sams Teach Yourself Linux Programming
+in 24 Hours (Complete Learning Edition)</I></SPAN>, by Warren Gay (Editor),
+Tony Zhang (Editor)</P></LI><LI CLASS="bulletlist"><P><SPAN CLASS="pubref"><I>Essential Reference for any
+Linux Newbie :-)</I></SPAN>: A list by Jacob Weiskoff,</P></LI><LI CLASS="bulletlist"><P><SPAN CLASS="pubref"><I>Red Hat Linux 7 for Dummies</I></SPAN></P></LI></UL></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

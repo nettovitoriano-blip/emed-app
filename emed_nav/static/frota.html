@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>eMED Frota — Central de Monitoramento GPS & Telemetria 4G</title>
+  <link rel="icon" type="image/svg+xml" href="/static/simbolo_emed_clean.svg">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #060b16; color: #f8fafc;
+    }
+
+    #fleet-app {
+      display: flex; flex-direction: column; width: 100%; height: 100%;
+    }
+
+    /* TOPBAR CORPORATIVA EMED */
+    .fleet-header {
+      height: 64px;
+      background: linear-gradient(90deg, #071022 0%, #0c1b33 55%, #071022 100%);
+      border-bottom: 2px solid rgba(56, 189, 248, 0.35);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px;
+      z-index: 1200;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.65);
+    }
+
+    .brand-box {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .brand-logo-wrap {
+      background: #ffffff;
+      padding: 4px 10px;
+      border-radius: 10px;
+      display: flex; align-items: center; gap: 8px;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.45);
+      border: 1.5px solid #38bdf8;
+    }
+    .brand-logo-wrap img {
+      height: 30px; object-fit: contain;
+    }
+    .brand-titles {
+      display: flex; flex-direction: column;
+    }
+    .brand-main {
+      font-size: 15px; font-weight: 900; color: #f8fafc; letter-spacing: 0.4px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .badge-admin {
+      font-size: 10px; background: rgba(56, 189, 248, 0.2); color: #38bdf8;
+      border: 1px solid #38bdf8; padding: 2px 7px; border-radius: 999px; font-weight: 800;
+    }
+    .brand-sub {
+      font-size: 11px; color: #94a3b8;
+    }
+
+    /* KPIS DO TOPO */
+    .header-kpis {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .kpi-pill {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid #1e293b;
+      padding: 5px 11px;
+      border-radius: 10px;
+      display: flex; flex-direction: column;
+      min-width: 110px;
+    }
+    .kpi-label {
+      font-size: 9px; color: #94a3b8; text-transform: uppercase; font-weight: 700;
+    }
+    .kpi-val {
+      font-size: 13px; font-weight: 900; color: #38bdf8;
+    }
+    .kpi-val.green { color: #4ade80; }
+
+    .header-actions {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .btn-top {
+      background: #1e293b; color: #f8fafc;
+      border: 1px solid #334155;
+      padding: 8px 13px; border-radius: 10px;
+      font-size: 12px; font-weight: 800; cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+      text-decoration: none; transition: all 0.2s;
+    }
+    .btn-top:hover {
+      border-color: #38bdf8; background: rgba(56, 189, 248, 0.15);
+    }
+    .btn-top.primary {
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      border-color: #38bdf8;
+    }
+
+    /* CORPO PRINCIPAL: SIDEBAR + MAPA */
+    .fleet-body {
+      flex: 1; display: flex; position: relative; overflow: hidden;
+    }
+
+    /* SIDEBAR ESQUERDA */
+    .fleet-sidebar {
+      width: 400px;
+      background: rgba(10, 15, 29, 0.98);
+      border-right: 1.5px solid #1e293b;
+      display: flex; flex-direction: column;
+      z-index: 1000;
+    }
+
+    /* ABAS DA SIDEBAR */
+    .sidebar-tabs {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      padding: 10px; gap: 6px;
+      background: #060b16;
+      border-bottom: 1px solid #1e293b;
+    }
+    .tab-btn {
+      background: #0f172a; color: #94a3b8;
+      border: 1px solid #1e293b;
+      padding: 9px 6px; border-radius: 8px;
+      font-size: 12px; font-weight: 800; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      transition: all 0.18s;
+    }
+    .tab-btn.active {
+      background: rgba(56, 189, 248, 0.16);
+      color: #38bdf8;
+      border-color: #38bdf8;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
+    }
+
+    .tab-pane {
+      flex: 1; overflow-y: auto; padding: 12px; display: none;
+    }
+    .tab-pane.active {
+      display: block;
+    }
+
+    /* CARD DE VEÍCULO */
+    .vehicle-card {
+      background: linear-gradient(145deg, #0f172a 0%, #162038 100%);
+      border: 1.5px solid #38bdf8;
+      border-radius: 14px;
+      padding: 13px;
+      margin-bottom: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+      transition: transform 0.15s;
+    }
+    .v-card-top {
+      display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;
+    }
+    .v-plate-badge {
+      background: #ffffff; color: #0f172a;
+      border: 2px solid #0284c7;
+      border-radius: 6px; padding: 2px 8px;
+      font-weight: 900; font-size: 13px; letter-spacing: 1px;
+      display: inline-block;
+    }
+    .v-model {
+      font-size: 14px; font-weight: 800; color: #f8fafc; margin-top: 4px;
+    }
+    .v-status-pill {
+      background: rgba(34, 197, 94, 0.18); color: #4ade80;
+      border: 1px solid #22c55e;
+      padding: 3px 8px; border-radius: 999px;
+      font-size: 10px; font-weight: 800;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .pulse-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: #4ade80;
+      box-shadow: 0 0 8px #4ade80;
+      animation: dotPulse 1.2s infinite alternate;
+    }
+    @keyframes dotPulse {
+      from { opacity: 0.4; transform: scale(0.85); }
+      to { opacity: 1; transform: scale(1.2); }
+    }
+
+    .v-metrics-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 8px;
+      background: rgba(6, 11, 22, 0.65);
+      padding: 9px; border-radius: 10px;
+      border: 1px solid #1e293b;
+      margin-bottom: 8px;
+    }
+    .v-metric {
+      display: flex; flex-direction: column;
+    }
+    .v-metric-lbl { font-size: 9px; color: #94a3b8; font-weight: 700; }
+    .v-metric-val { font-size: 12px; color: #f8fafc; font-weight: 900; margin-top: 2px; }
+
+    /* FAIXA DE CONTROLE DO CHIP 4G */
+    .chip-banner {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 7px 10px;
+      margin-bottom: 10px;
+      font-size: 11px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .chip-banner.ALERTA {
+      background: rgba(234, 179, 8, 0.15);
+      border-color: #eab308;
+      color: #fef08a;
+    }
+    .chip-banner.VENCIDO {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: #ef4444;
+      color: #fecaca;
+      animation: alertBlink 1s infinite alternate;
+    }
+    @keyframes alertBlink {
+      from { box-shadow: 0 0 4px rgba(239,68,68,0.3); }
+      to { box-shadow: 0 0 14px rgba(239,68,68,0.8); }
+    }
+
+    .v-actions-row {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;
+    }
+    .btn-v-action {
+      background: #1e293b; color: #e2e8f0;
+      border: 1px solid #334155;
+      padding: 7px 6px; border-radius: 8px;
+      font-size: 11px; font-weight: 800; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 4px;
+    }
+    .btn-v-action:hover {
+      border-color: #38bdf8; color: #38bdf8;
+    }
+    .btn-v-action.highlight {
+      background: rgba(56, 189, 248, 0.18); border-color: #38bdf8; color: #7dd3fc;
+    }
+
+    /* CARDS DE DIAS DO HISTÓRICO */
+    .day-card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .day-card:hover, .day-card.active {
+      border-color: #38bdf8;
+      background: rgba(56, 189, 248, 0.12);
+    }
+    .day-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 6px;
+    }
+    .day-date {
+      font-size: 14px; font-weight: 900; color: #f8fafc;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .day-pts-badge {
+      background: rgba(56, 189, 248, 0.15); color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 800;
+    }
+    .day-sub {
+      font-size: 11px; color: #94a3b8;
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 4px;
+    }
+
+    /* MAPA E RESUMO LIMPO DA ROTA SELECIONADA */
+    .fleet-map-area {
+      flex: 1; position: relative; height: 100%;
+    }
+    #map {
+      width: 100%; height: 100%;
+    }
+
+    #route-info-banner {
+      position: absolute; bottom: 18px; left: 18px; right: 18px;
+      max-width: 680px; margin: 0 auto;
+      background: rgba(10, 15, 29, 0.96);
+      backdrop-filter: blur(12px);
+      border: 2px solid #38bdf8;
+      border-radius: 14px;
+      padding: 12px 16px;
+      z-index: 1100;
+      box-shadow: 0 12px 35px rgba(0,0,0,0.8);
+      display: none;
+    }
+
+    /* BOTÕES FLUTUANTES DO MAPA */
+    .map-floating-tools {
+      position: absolute; top: 16px; right: 16px;
+      display: flex; flex-direction: column; gap: 8px;
+      z-index: 1050;
+    }
+    .btn-float {
+      background: rgba(15, 23, 42, 0.92);
+      border: 1.5px solid #334155;
+      color: #f8fafc;
+      padding: 9px 12px; border-radius: 10px;
+      font-size: 12px; font-weight: 800; cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+    }
+    .btn-float.active {
+      border-color: #38bdf8; color: #38bdf8;
+    }
+
+    /* MODAIS */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.78); z-index: 2500;
+      align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-box {
+      background: #0f172a; border: 2px solid #38bdf8;
+      border-radius: 16px; width: 100%; max-width: 460px;
+      max-height: 92vh; overflow-y: auto;
+      padding: 18px; box-shadow: 0 15px 40px rgba(0,0,0,0.9);
+    }
+    .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-group { margin-bottom: 10px; }
+    .form-group label { display: block; font-size: 10px; color: #94a3b8; font-weight: 800; margin-bottom: 4px; text-transform: uppercase; }
+    .form-input {
+      width: 100%; padding: 9px 11px; border-radius: 8px;
+      border: 1px solid #334155; background: #060b16; color: #f8fafc;
+      font-size: 13px;
+    }
+
+    .mobile-sheet-toggle-bar {
+      display: none;
+      background: #0a101f;
+      border-bottom: 1px solid #1e293b;
+      padding: 6px 12px;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+
+    @media (max-width: 860px) {
+      .fleet-header { padding: 6px 10px; }
+      .brand-logo-wrap { height: 32px; padding: 2px 6px; }
+      .brand-main { font-size: 13px; }
+      .brand-sub { display: none; }
+      .header-kpis { display: none; }
+      .btn-top { padding: 6px 8px; font-size: 11px; }
+      .fleet-body { flex-direction: column-reverse; }
+      .fleet-sidebar { width: 100%; height: 44%; border-right: none; border-top: 2px solid #38bdf8; transition: height 0.2s ease; }
+      .fleet-map-area { height: 56%; transition: height 0.2s ease; }
+      .mobile-sheet-toggle-bar { display: flex; }
+      .fleet-body.sidebar-collapsed .fleet-sidebar { height: 42px; overflow: hidden; }
+      .fleet-body.sidebar-collapsed .fleet-map-area { height: calc(100% - 42px); }
+    }
+  </style>
+</head>
+<body>
+  <div id="fleet-app">
+    <!-- TOPBAR CORPORATIVA -->
+    <header class="fleet-header">
+      <div class="brand-box">
+        <div class="brand-logo-wrap">
+          <img src="/static/logo_emed_oficial.png" alt="eMED Eletromedicina" onerror="this.src='/static/simbolo_emed_clean.svg'" />
+        </div>
+        <div class="brand-titles">
+          <div class="brand-main">
+            <span>CENTRAL DE FROTA eMED</span>
+            <span class="badge-admin">ADMIN GPS 4G</span>
+          </div>
+          <div class="brand-sub">Monitoramento de Veículos, Condutores, Chips 4G & Clientes</div>
+        </div>
+      </div>
+
+      <div class="header-kpis">
+        <div class="kpi-pill">
+          <span class="kpi-label">Frota Ativa</span>
+          <span id="kpi-vehicles" class="kpi-val green">2 Veículos</span>
+        </div>
+        <div class="kpi-pill">
+          <span class="kpi-label">Radares no Banco</span>
+          <span id="kpi-radars" class="kpi-val">16.480 radares</span>
+        </div>
+        <div class="kpi-pill">
+          <span class="kpi-label">Clientes Ativos</span>
+          <span id="kpi-clients" class="kpi-val">504 clientes</span>
+        </div>
+        <div class="kpi-pill">
+          <span class="kpi-label">Armazenamento</span>
+          <span id="kpi-db" class="kpi-val">1.58 MB (+10 anos)</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn-top" onclick="openNewVehicleModal()">➕ Novo Veículo / Chip</button>
+        <a href="/" class="btn-top primary">🧭 Abrir Navegador GPS</a>
+      </div>
+    </header>
+
+    <!-- CORPO: SIDEBAR + MAPA -->
+    <div class="fleet-body" id="fleet-body-wrap">
+      <aside class="fleet-sidebar">
+        <div class="mobile-sheet-toggle-bar" onclick="toggleMobileFleetSidebar()">
+          <span style="font-size:11px; font-weight:800; color:#38bdf8;">🗺️ Painel da Frota eMED</span>
+          <button type="button" id="btn-fleet-mob-toggle" style="background:rgba(56,189,248,0.18); border:1px solid #38bdf8; color:#38bdf8; border-radius:10px; padding:2px 9px; font-size:11px; font-weight:800; cursor:pointer;">🔽 Maximizar Mapa</button>
+        </div>
+        <div class="sidebar-tabs">
+          <button class="tab-btn active" onclick="switchTab('vehicles', this)">
+            <span style="font-size:16px;">🚗</span>
+            <span>Frota & Chips</span>
+          </button>
+          <button class="tab-btn" onclick="switchTab('history', this)">
+            <span style="font-size:16px;">⏱️</span>
+            <span>Rotas & Condutor</span>
+          </button>
+          <button class="tab-btn" onclick="switchTab('clients', this)">
+            <span style="font-size:16px;">🏥</span>
+            <span>Clientes (@)</span>
+          </button>
+        </div>
+
+        <!-- ABA 1: VEÍCULOS AO VIVO + CONTROLE DE CHIP 4G -->
+        <div id="tab-vehicles" class="tab-pane active">
+          <div id="vehicles-list">Carregando frota eMED...</div>
+        </div>
+
+        <!-- ABA 2: HISTÓRICO LIMPO DE ROTAS & INDICAR CONDUTOR -->
+        <div id="tab-history" class="tab-pane">
+          <div style="background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.3); border-radius:10px; padding:9px 11px; margin-bottom:12px; font-size:11px; color:#cbd5e1;">
+            💡 <strong>Consulta Rápida:</strong> Clique em qualquer dia para visualizar o trajeto limpo no mapa (clique nos pontos da linha se quiser ver hora/velocidade) e <strong>indicar o condutor</strong>.
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px; font-weight:900; color:#38bdf8; text-transform:uppercase; margin-bottom:6px;">
+              📍 Rotas Geradas Hoje no Navegador
+            </div>
+            <div id="traced-today-list"></div>
+          </div>
+
+          <div style="border-top:1px solid #1e293b; padding-top:12px;">
+            <div style="font-size:11px; font-weight:900; color:#4ade80; text-transform:uppercase; margin-bottom:8px;">
+              📡 Viagens Registradas por Data (Clique para ver Rota)
+            </div>
+            <div id="history-days-list">Carregando histórico de dias...</div>
+          </div>
+        </div>
+
+        <!-- ABA 3: CLIENTES NO MAPA (COM EDIÇÃO CONTRATO / AVULSO / DESATIVAR) -->
+        <div id="tab-clients" class="tab-pane">
+          <div style="display:flex; gap:6px; margin-bottom:8px;">
+            <button class="btn-v-action" style="flex:1; border-color:#38bdf8; color:#38bdf8;" onclick="setClientFilter('ALL')">Todos</button>
+            <button class="btn-v-action" style="flex:1; border-color:#0284c7; color:#7dd3fc;" onclick="setClientFilter('CONTRATO')">🔵 Contrato</button>
+            <button class="btn-v-action" style="flex:1; border-color:#ef4444; color:#fca5a5;" onclick="setClientFilter('AVULSO')">🔴 Avulso</button>
+            <button class="btn-v-action highlight" onclick="openClientModal(null)" title="Cadastrar Novo Cliente">➕ Novo</button>
+          </div>
+          <input type="text" id="client-search-input" class="form-input" placeholder="Buscar cliente ou cidade para localizar ou editar..." oninput="renderClientsList()" style="margin-bottom:10px;" />
+          <div id="clients-sidebar-list" style="display:flex; flex-direction:column; gap:6px;"></div>
+        </div>
+      </aside>
+
+      <!-- ÁREA DO MAPA -->
+      <main class="fleet-map-area">
+        <div id="map"></div>
+
+        <!-- BOTÕES FLUTUANTES SUPERIORES DIREITOS -->
+        <div class="map-floating-tools">
+          <button class="btn-float active" id="btn-toggle-map-clients" onclick="toggleMapClients()">
+            <img src="/static/simbolo_emed_clean.svg" style="width:18px; height:18px;" />
+            <span id="lbl-clients-btn">Clientes: Todos</span>
+          </button>
+          <button class="btn-float" onclick="toggleSatellite()">🛰️ Alternar Satélite / Mapa</button>
+          <button class="btn-float" onclick="syncMyRealLocation()">📍 Atualizar Posição p/ Meu GPS Atual</button>
+        </div>
+
+        <!-- BARRA LIMPA DE RESUMO DA ROTA SELECIONADA + INDICAR CONDUTOR -->
+        <div id="route-info-banner">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div style="font-size:14px; font-weight:900; color:#38bdf8;">
+                🗺️ Rota do Dia <span id="banner-day-lbl">--/--/----</span>
+                <span id="banner-km-lbl" style="color:#4ade80; margin-left:8px;"></span>
+              </div>
+              <div style="font-size:11px; color:#94a3b8; margin-top:2px;">
+                Clique em qualquer ponto da rota no mapa se desejar ver o horário e velocidade exatos.
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button class="btn-top primary" onclick="openDriverModalForActiveDay()" style="padding:7px 12px;">
+                👤 Condutor: <span id="banner-driver-lbl">ANTONIO</span> ✏️
+              </button>
+              <button class="btn-top" onclick="clearRouteView()" style="border-color:#ef4444; color:#fca5a5; padding:7px 10px;">
+                ✖ Fechar Rota
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- MODAL CADASTRAR/EDITAR VEÍCULO E CHIP 4G -->
+  <div id="vehicle-modal" class="modal-backdrop">
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 id="vehicle-modal-title" style="font-size:15px; color:#38bdf8;">🚗 Cadastrar / Editar Veículo & Chip 4G</h3>
+        <button onclick="closeVehicleModal()" style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer;">✕</button>
+      </div>
+
+      <div class="form-row-2">
+        <div class="form-group">
+          <label>Placa do Veículo</label>
+          <input type="text" id="v-placa" class="form-input" placeholder="Ex: PMT4541" />
+        </div>
+        <div class="form-group">
+          <label>Tipo de Veículo</label>
+          <select id="v-tipo" class="form-input">
+            <option value="CARRO">🚗 Carro / Passeio</option>
+            <option value="MOTO">🏍️ Motocicleta</option>
+            <option value="UTILITARIO">🚐 Utilitário / Furgao</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Modelo / Descrição do Veículo</label>
+        <input type="text" id="v-modelo" class="form-input" placeholder="Ex: Fiat Argo 1.3 / Renault Captur" />
+      </div>
+
+      <div style="background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.3); border-radius:8px; padding:8px 10px; margin-bottom:10px; font-size:11px; color:#cbd5e1;">
+        🛞 <strong>Identificação Automática de Condutor:</strong> Não é necessário informar condutor no cadastro. O motorista é identificado automaticamente via <strong>Tag NFC</strong> ou por <strong>Proximidade no App</strong> ao entrar no veículo e assumir o volante.
+      </div>
+
+      <div class="form-row-2">
+        <div class="form-group">
+          <label>Hodômetro Atual (KM)</label>
+          <input type="number" id="v-km" class="form-input" placeholder="Ex: 70011" />
+        </div>
+        <div class="form-group">
+          <label>IMEI do Rastreador 4G</label>
+          <input type="text" id="v-imei" class="form-input" placeholder="Ex: 869890080097193" />
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #1e293b; margin:10px 0; padding-top:10px;">
+        <div style="font-size:12px; font-weight:900; color:#4ade80; margin-bottom:8px;">
+          📱 DADOS DO CHIP 4G / M2M & LEMBRETE DE RENOVAÇÃO
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>Número da Linha / ICCID do Chip</label>
+            <input type="text" id="v-chip-num" class="form-input" placeholder="Ex: (85) 99999-4541" />
+          </div>
+          <div class="form-group">
+            <label>Operadora do Chip</label>
+            <select id="v-chip-op" class="form-input">
+              <option value="Vivo M2M 4G">Vivo M2M / 4G</option>
+              <option value="Claro 4G">Claro 4G / M2M</option>
+              <option value="TIM 4G">TIM 4G / M2M</option>
+              <option value="Algar / MultiOperadora">Algar / MultiOperadora</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>Data de Ativação / Recarga</label>
+            <input type="date" id="v-chip-ativ" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>Data de Validade (Lembrete)</label>
+            <input type="date" id="v-chip-val" class="form-input" />
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; gap:8px; margin-top:14px;">
+        <button id="btn-del-vehicle" class="btn-top" style="border-color:#ef4444; color:#fca5a5; display:none;" onclick="deleteVehicle()">🗑️ Excluir</button>
+        <div style="display:flex; gap:8px; flex:1; justify-content:flex-end;">
+          <button class="btn-top" onclick="closeVehicleModal()">Cancelar</button>
+          <button class="btn-top primary" onclick="saveVehicle()">💾 Salvar Veículo & Chip</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL INDICAR / ALTERAR CONDUTOR -->
+  <div id="driver-modal" class="modal-backdrop">
+    <div class="modal-box" style="max-width:380px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="font-size:15px; color:#38bdf8;">👤 Indicar Condutor Responsável</h3>
+        <button onclick="closeDriverModal()" style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer;">✕</button>
+      </div>
+      <div id="driver-modal-sub" style="font-size:12px; color:#94a3b8; margin-bottom:12px;"></div>
+
+      <div style="font-size:11px; color:#cbd5e1; font-weight:800; margin-bottom:6px;">SELEÇÃO RÁPIDA DE TÉCNICO / CONDUTOR:</div>
+      <div id="quick-drivers-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:12px;"></div>
+
+      <div class="form-group">
+        <label>Ou digite o nome do condutor:</label>
+        <input type="text" id="input-driver-name" class="form-input" placeholder="Nome do condutor..." />
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button class="btn-top" style="flex:1; justify-content:center;" onclick="closeDriverModal()">Cancelar</button>
+        <button class="btn-top primary" style="flex:1; justify-content:center;" onclick="confirmDriverChange()">✅ Confirmar Condutor</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDITAR CLIENTE (CONTRATO vs AVULSO / REMOVER ANTIGOS) -->
+  <div id="client-modal" class="modal-backdrop">
+    <div class="modal-box" style="max-width:420px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 id="client-modal-title" style="font-size:15px; color:#38bdf8;">🏥 Editar Cliente eMED</h3>
+        <button onclick="closeClientModal()" style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer;">✕</button>
+      </div>
+      <input type="hidden" id="c-id" />
+
+      <div class="form-group">
+        <label>Modalidade de Atendimento (Cor do Alfinete @)</label>
+        <select id="c-tipo" class="form-input" style="font-weight:800;">
+          <option value="CONTRATO">🔵 CONTRATO FIXO eMED (Alfinete Azul)</option>
+          <option value="AVULSO">🔴 ATENDIMENTO AVULSO (Alfinete Vermelho)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Nome do Hospital / Clínica / Cliente</label>
+        <input type="text" id="c-nome" class="form-input" placeholder="Nome do cliente..." />
+      </div>
+
+      <div class="form-row-2">
+        <div class="form-group">
+          <label>Cidade</label>
+          <input type="text" id="c-cidade" class="form-input" placeholder="Ex: Fortaleza" />
+        </div>
+        <div class="form-group">
+          <label>UF (Estado)</label>
+          <input type="text" id="c-uf" class="form-input" placeholder="Ex: CE" maxlength="2" />
+        </div>
+      </div>
+
+      <div class="form-row-2">
+        <div class="form-group">
+          <label>Latitude</label>
+          <input type="number" step="any" id="c-lat" class="form-input" />
+        </div>
+        <div class="form-group">
+          <label>Longitude</label>
+          <input type="number" step="any" id="c-lon" class="form-input" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Telefone / Contato</label>
+        <input type="text" id="c-tel" class="form-input" placeholder="(85) 99999-0000" />
+      </div>
+
+      <div style="display:flex; justify-content:space-between; gap:8px; margin-top:16px;">
+        <button id="btn-disable-client" class="btn-top" style="border-color:#ef4444; color:#fca5a5;" onclick="disableClient()" title="Remove este cliente do mapa caso não seja mais atendido pela eMED">
+          🚫 Não Atendemos Mais
+        </button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-top" onclick="closeClientModal()">Cancelar</button>
+          <button class="btn-top primary" onclick="saveClient()">💾 Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Inicia centralizado em Fortaleza / CE (localização real)
+    let myRealLat = -3.7965;
+    let myRealLon = -38.5678;
+
+    const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([myRealLat, myRealLon], 13);
+    const tileRoads = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
+    const tileSat = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 20 });
+    let isSat = false;
+
+    const vehicleMarkers = {};
+    let fleetVehicles = [];
+    let fleetDrivers = ["ANTONIO", "NETTO", "ARQUIMEDES", "GABRIEL", "SÉRGIO", "FELIPE"];
+    let allClients = [];
+    let clientFilterMode = 'ALL';
+    const clientsLayer = L.layerGroup().addTo(map);
+    const routeLayerGroup = L.layerGroup().addTo(map);
+
+    let activeHistoryDay = '';
+    let activeHistoryDriver = 'ANTONIO';
+    let driverTarget = { dia: '', placa: '' };
+
+    // Captura silenciosa do GPS real do dispositivo ao abrir para manter Fortaleza/posição real atualizada
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        myRealLat = pos.coords.latitude;
+        myRealLon = pos.coords.longitude;
+        fetch('/api/car/update_pos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat: myRealLat, lon: myRealLon })
+        }).then(() => loadFleetOverview());
+      }, () => {}, { enableHighAccuracy: true, timeout: 6000 });
+    }
+
+    function syncMyRealLocation() {
+      if (!navigator.geolocation) {
+        alert('Geolocalização não disponível neste navegador.');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        myRealLat = pos.coords.latitude;
+        myRealLon = pos.coords.longitude;
+        await fetch('/api/car/update_pos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat: myRealLat, lon: myRealLon })
+        });
+        await loadFleetOverview();
+        map.flyTo([myRealLat, myRealLon], 16, { duration: 0.8 });
+      }, () => {
+        map.flyTo([myRealLat, myRealLon], 15, { duration: 0.8 });
+      }, { enableHighAccuracy: true });
+    }
+
+    function switchTab(tabId, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + tabId).classList.add('active');
+      if (tabId === 'history') {
+        loadHistoryDays();
+        renderTracedToday();
+      }
+    }
+
+    function toggleSatellite() {
+      if (isSat) {
+        map.removeLayer(tileSat);
+        tileRoads.addTo(map);
+      } else {
+        map.removeLayer(tileRoads);
+        tileSat.addTo(map);
+      }
+      isSat = !isSat;
+    }
+
+    function getVehicleEmoji(tipo) {
+      const t = (tipo || 'CARRO').toUpperCase();
+      if (t.includes('MOTO')) return '🏍️';
+      if (t.includes('UTIL')) return '🚐';
+      return '🚗';
+    }
+
+    function createVehicleIcon(v) {
+      const emoji = getVehicleEmoji(v.tipo_veiculo);
+      return L.divIcon({
+        className: 'fleet-car-icon',
+        html: `
+          <div style="position:relative; display:flex; flex-direction:column; align-items:center;">
+            <div style="background:#0f172a; color:#f8fafc; border:1.5px solid #38bdf8; border-radius:6px; padding:1px 6px; font-size:10px; font-weight:900; white-space:nowrap; margin-bottom:3px; box-shadow:0 3px 8px rgba(0,0,0,0.6);">
+              ${v.placa} • ${v.condutor}
+            </div>
+            <div style="width:38px; height:38px; border-radius:50%; background:radial-gradient(circle, #0284c7 0%, #0f172a 85%); border:3px solid #ffffff; box-shadow:0 0 15px #38bdf8; display:flex; align-items:center; justify-content:center; font-size:20px;">
+              ${emoji}
+            </div>
+          </div>
+        `,
+        iconSize: [95, 62],
+        iconAnchor: [47, 42]
+      });
+    }
+
+    async function loadFleetOverview() {
+      try {
+        const res = await fetch('/api/fleet');
+        const data = await res.json();
+        if (!data.success) return;
+
+        fleetVehicles = data.vehicles || [];
+        if (data.drivers && data.drivers.length) {
+          fleetDrivers = data.drivers;
+        }
+
+        const st = data.stats || {};
+        document.getElementById('kpi-vehicles').textContent = `${st.total_vehicles || 1} Veículos Ativos`;
+        document.getElementById('kpi-radars').textContent = `${(st.total_radars || 16480).toLocaleString('pt-BR')} radares`;
+        document.getElementById('kpi-clients').textContent = `${st.total_clients || 504} clientes`;
+        document.getElementById('kpi-db').textContent = `${st.db_size_mb || 1.6} MB (+10 anos)`;
+
+        const container = document.getElementById('vehicles-list');
+        container.innerHTML = fleetVehicles.map((v, idx) => {
+          const emoji = getVehicleEmoji(v.tipo_veiculo);
+          return `
+            <div class="vehicle-card">
+              <div class="v-card-top">
+                <div onclick="focusVehicle(${idx})" style="cursor:pointer;">
+                  <span class="v-plate-badge">${emoji} ${v.placa}</span>
+                  <div class="v-model">${v.modelo}</div>
+                </div>
+                <div class="v-status-pill">
+                  <span class="pulse-dot"></span>
+                  <span>ONLINE 4G</span>
+                </div>
+              </div>
+
+              <div class="v-metrics-grid">
+                <div class="v-metric">
+                  <span class="v-metric-lbl">VELOCIDADE</span>
+                  <span class="v-metric-val" style="color:#38bdf8;">${Math.round(v.speed)} km/h</span>
+                </div>
+                <div class="v-metric">
+                  <span class="v-metric-lbl">HODÔMETRO</span>
+                  <span class="v-metric-val">${Number(v.km_atual).toLocaleString('pt-BR')} km</span>
+                </div>
+                <div class="v-metric" title="Identificado automaticamente via NFC ou App por proximidade ao assumir o volante">
+                  <span class="v-metric-lbl">NO VOLANTE (NFC/APP)</span>
+                  <span class="v-metric-val" style="color:#4ade80;">🛞 ${v.condutor}</span>
+                </div>
+              </div>
+
+              <!-- BANNER DO CHIP 4G COM LEMBRETE DE VALIDADE -->
+              <div class="chip-banner ${v.chip_status}" onclick="openEditVehicleModal(${idx})" style="cursor:pointer;" title="Clique para editar dados do Chip 4G ou validade">
+                <div>
+                  <div style="font-weight:800;">📱 Chip: ${v.chip_operadora} (${v.chip_numero})</div>
+                  <div style="font-size:10px; opacity:0.85;">Ativado em: ${v.chip_data_ativacao || '--'} • Último sinal: ${v.updated_at}</div>
+                </div>
+                <div style="font-weight:900; text-align:right; font-size:11px;">
+                  ${v.chip_label}
+                </div>
+              </div>
+
+              <div class="v-actions-row">
+                <button class="btn-v-action" onclick="focusVehicle(${idx})">🎯 Localizar</button>
+                <button class="btn-v-action highlight" onclick="openEditVehicleModal(${idx})">✏️ Veículo / Chip</button>
+                <button class="btn-v-action" onclick="openHistoryTab()">⏱️ Ver Rotas</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        // Atualiza marcadores no mapa
+        Object.values(vehicleMarkers).forEach(m => map.removeLayer(m));
+        fleetVehicles.forEach((v, idx) => {
+          const offsetLat = v.lat + (idx * 0.00035);
+          const offsetLon = v.lon + (idx * 0.00035);
+          const icon = createVehicleIcon(v);
+          vehicleMarkers[v.placa] = L.marker([offsetLat, offsetLon], { icon }).addTo(map)
+            .bindPopup(`
+              <div style="font-family:sans-serif; min-width:190px;">
+                <div style="font-weight:900; font-size:14px; color:#0f172a;">${getVehicleEmoji(v.tipo_veiculo)} ${v.modelo} (${v.placa})</div>
+                <div style="font-size:12px; margin-top:4px;">👤 Condutor: <b>${v.condutor}</b></div>
+                <div style="font-size:12px;">🛣️ Hodômetro: <b>${Number(v.km_atual).toLocaleString('pt-BR')} km</b></div>
+                <div style="font-size:11px; color:#0284c7; font-weight:700; margin-top:4px;">📱 ${v.chip_operadora}: ${v.chip_label}</div>
+                <div style="font-size:10px; color:#64748b; margin-top:3px;">Atualizado: ${v.updated_at}</div>
+              </div>
+            `);
+        });
+      } catch (e) {
+        console.error('Erro ao carregar frota:', e);
+      }
+    }
+
+    function focusVehicle(idx) {
+      const v = fleetVehicles[idx];
+      if (!v) return;
+      map.flyTo([v.lat, v.lon], 16, { duration: 0.7 });
+      if (vehicleMarkers[v.placa]) vehicleMarkers[v.placa].openPopup();
+    }
+
+    function openHistoryTab() {
+      const histBtn = document.querySelectorAll('.tab-btn')[1];
+      switchTab('history', histBtn);
+    }
+
+    // ROTAS TRAÇADAS HOJE NO NAVEGADOR
+    function renderTracedToday() {
+      const box = document.getElementById('traced-today-list');
+      let list = [];
+      try {
+        list = JSON.parse(localStorage.getItem('emednav_traced_routes') || '[]');
+      } catch (e) {}
+
+      if (list.length === 0) {
+        box.innerHTML = `<div style="font-size:12px; color:#64748b; background:#0f172a; padding:10px; border-radius:8px; border:1px solid #1e293b;">Nenhuma rota simulada hoje neste navegador.</div>`;
+        return;
+      }
+
+      box.innerHTML = list.map((item, idx) => `
+        <div class="day-card" onclick="drawTracedRoute(${idx})">
+          <div class="day-header">
+            <span class="day-date">🏁 ${item.destName}</span>
+            <span class="day-pts-badge">${item.distKm} km</span>
+          </div>
+          <div class="day-sub">
+            <span>🕒 Gerada às ${item.hora}</span>
+            <span>⏱️ ~${item.durMin} min</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function drawTracedRoute(idx) {
+      try {
+        const list = JSON.parse(localStorage.getItem('emednav_traced_routes') || '[]');
+        const item = list[idx];
+        if (!item) return;
+        const v0 = fleetVehicles[0] || { lat: myRealLat, lon: myRealLon };
+        const res = await fetch(`/api/route?origin_lat=${v0.lat}&origin_lon=${v0.lon}&dest_lat=${item.destLat}&dest_lon=${item.destLon}`);
+        const data = await res.json();
+        if (data.success && data.coordinates) {
+          routeLayerGroup.clearLayers();
+          L.polyline(data.coordinates, { color: '#38bdf8', weight: 10, opacity: 0.28 }).addTo(routeLayerGroup);
+          const poly = L.polyline(data.coordinates, { color: '#0284c7', weight: 5, opacity: 0.95 }).addTo(routeLayerGroup);
+          map.fitBounds(poly.getBounds(), { padding: [50, 50] });
+        }
+      } catch (e) {}
+    }
+
+    // HISTÓRICO DE VIAGENS GRAVADAS PELO GPS (SEM REPLAY CONFUSO, ROTA LIMPA + INDICAR CONDUTOR)
+    async function loadHistoryDays(selectedDate = '') {
+      const box = document.getElementById('history-days-list');
+      try {
+        const url = selectedDate ? `/api/history?date=${encodeURIComponent(selectedDate)}` : '/api/history';
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!data.success) return;
+
+        const days = data.days || [];
+        if (days.length === 0) {
+          box.innerHTML = '<div style="color:#64748b;">Nenhum registro encontrado.</div>';
+          return;
+        }
+
+        box.innerHTML = days.map(d => {
+          const isSel = d.dia === selectedDate;
+          const hIni = (d.inicio || '').split(' ')[1] || '';
+          const hFim = (d.fim || '').split(' ')[1] || '';
+          const cond = d.condutor || 'ANTONIO';
+          return `
+            <div class="day-card ${isSel ? 'active' : ''}" onclick="loadHistoryDays('${d.dia}')">
+              <div class="day-header">
+                <span class="day-date">📅 ${d.dia}</span>
+                <span class="day-pts-badge">⚡ Máx: ${Math.round(d.vel_max || 0)} km/h</span>
+              </div>
+              <div class="day-sub">
+                <span>🕒 ${hIni} às ${hFim} (${d.total_pontos} reg.)</span>
+                <button class="btn-v-action highlight" style="padding:4px 8px;" onclick="event.stopPropagation(); openDriverModal('${d.dia}', '${d.placa || 'EMD-2026'}', '${cond}');">
+                  👤 ${cond} ✏️
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        if (selectedDate && data.points && data.points.length > 0) {
+          drawCleanDayRoute(data.selected_day, data.points, data.km_percorrido || 0);
+        }
+      } catch (e) {
+        box.innerHTML = '<div style="color:#ef4444;">Erro ao carregar histórico.</div>';
+      }
+    }
+
+    async function drawCleanDayRoute(dia, pts, kmTotal) {
+      routeLayerGroup.clearLayers();
+      activeHistoryDay = dia;
+      activeHistoryDriver = (pts[0] && pts[0].condutor) ? pts[0].condutor : 'ANTONIO';
+
+      const first = pts[0];
+      const last = pts[pts.length - 1];
+
+      // Se início e fim têm deslocamento real (> 200m), traça rota rodoviária limpa via OSRM para nunca rabiscar linhas cruzadas!
+      let roadCoords = pts.map(p => [p.lat, p.lon]);
+      try {
+        const res = await fetch(`/api/route?origin_lat=${first.lat}&origin_lon=${first.lon}&dest_lat=${last.lat}&dest_lon=${last.lon}`);
+        const rData = await res.json();
+        if (rData.success && rData.coordinates && rData.coordinates.length > 2) {
+          roadCoords = rData.coordinates;
+          if (rData.distance_km > 0) kmTotal = rData.distance_km;
+        }
+      } catch (e) {}
+
+      L.polyline(roadCoords, { color: '#38bdf8', weight: 11, opacity: 0.25 }).addTo(routeLayerGroup);
+      const mainPoly = L.polyline(roadCoords, { color: '#0284c7', weight: 5, opacity: 0.95 }).addTo(routeLayerGroup);
+
+      // Marcador de Início e Chegada
+      L.circleMarker([first.lat, first.lon], {
+        radius: 8, fillColor: '#22c55e', color: '#ffffff', weight: 2.5, fillOpacity: 1
+      }).addTo(routeLayerGroup).bindPopup(`<b>🟢 Partida (${dia})</b><br>🕒 Hora: ${first.hora}<br>👤 Condutor: ${activeHistoryDriver}`);
+
+      L.circleMarker([last.lat, last.lon], {
+        radius: 8, fillColor: '#ef4444', color: '#ffffff', weight: 2.5, fillOpacity: 1
+      }).addTo(routeLayerGroup).bindPopup(`<b>🏁 Ponto Final (${dia})</b><br>🕒 Hora: ${last.hora}<br>⚡ Vel: ${Math.round(last.vel)} km/h<br>👤 Condutor: ${activeHistoryDriver}`);
+
+      // Pontos intermediários discretos e clicáveis (apenas se o gestor quiser clicar em um ponto específico)
+      const step = Math.max(1, Math.floor(pts.length / 20));
+      pts.forEach((pt, idx) => {
+        if (idx === 0 || idx === pts.length - 1 || idx % step !== 0) return;
+        L.circleMarker([pt.lat, pt.lon], {
+          radius: 5, fillColor: '#38bdf8', color: '#0f172a', weight: 1.5, fillOpacity: 0.9
+        }).addTo(routeLayerGroup).bindPopup(`
+          <div style="font-family:sans-serif;">
+            <b>📍 Registro de Passagem</b><br>
+            🕒 Horário: <b>${pt.hora}</b><br>
+            ⚡ Velocidade: <b>${Math.round(pt.vel)} km/h</b><br>
+            👤 Condutor: <b>${pt.condutor}</b>
+          </div>
+        `);
+      });
+
+      map.fitBounds(mainPoly.getBounds(), { padding: [60, 60], maxZoom: 16 });
+
+      document.getElementById('route-info-banner').style.display = 'block';
+      document.getElementById('banner-day-lbl').textContent = dia;
+      document.getElementById('banner-km-lbl').textContent = kmTotal > 0 ? `• ${kmTotal} km` : '';
+      document.getElementById('banner-driver-lbl').textContent = activeHistoryDriver;
+    }
+
+    function clearRouteView() {
+      routeLayerGroup.clearLayers();
+      document.getElementById('route-info-banner').style.display = 'none';
+    }
+
+    // INDICAR / ALTERAR CONDUTOR
+    function openDriverModal(dia, placa, currentDriver) {
+      driverTarget = { dia: dia || '', placa: placa || '' };
+      document.getElementById('driver-modal-sub').textContent = dia
+        ? `Definir condutor para todas as viagens do dia ${dia}:`
+        : `Definir condutor atual do veículo ${placa}:`;
+      document.getElementById('input-driver-name').value = currentDriver || 'ANTONIO';
+
+      const grid = document.getElementById('quick-drivers-grid');
+      grid.innerHTML = fleetDrivers.map(d => `
+        <button class="btn-v-action" style="padding:9px;" onclick="document.getElementById('input-driver-name').value='${d}'">
+          👤 ${d}
+        </button>
+      `).join('');
+
+      document.getElementById('driver-modal').style.display = 'flex';
+    }
+
+    function openDriverModalForActiveDay() {
+      openDriverModal(activeHistoryDay, 'EMD-2026', activeHistoryDriver);
+    }
+
+    function closeDriverModal() {
+      document.getElementById('driver-modal').style.display = 'none';
+    }
+
+    async function confirmDriverChange() {
+      const condutor = document.getElementById('input-driver-name').value.trim().toUpperCase();
+      if (!condutor) return;
+      const res = await fetch('/api/history/driver', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dia: driverTarget.dia,
+          placa: driverTarget.placa,
+          condutor
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        activeHistoryDriver = condutor;
+        document.getElementById('banner-driver-lbl').textContent = condutor;
+        closeDriverModal();
+        loadFleetOverview();
+        if (driverTarget.dia) loadHistoryDays(driverTarget.dia);
+      }
+    }
+
+    // CLIENTES EMED (@ AZUL CONTRATO / @ VERMELHO AVULSO + EDIÇÃO COMPLETA)
+    async function loadClients() {
+      try {
+        const res = await fetch('/api/clients');
+        const data = await res.json();
+        if (!data.success) return;
+        allClients = data.destinos || [];
+        renderMapClients();
+        renderClientsList();
+      } catch (e) {}
+    }
+
+    function renderMapClients() {
+      clientsLayer.clearLayers();
+      if (clientFilterMode === 'NONE') return;
+
+      allClients.forEach((c, idx) => {
+        const isContrato = (c.tipo_contrato || 'AVULSO') === 'CONTRATO';
+        if (clientFilterMode === 'CONTRATO' && !isContrato) return;
+        if (clientFilterMode === 'AVULSO' && isContrato) return;
+
+        const svgFile = isContrato ? '/static/simbolo_emed_clean.svg' : '/static/simbolo_emed_red.svg';
+        const borderCol = isContrato ? '#0284c7' : '#dc2626';
+        const badgeBg = isContrato ? '#0284c7' : '#dc2626';
+        const badgeTxt = isContrato ? 'CONTRATO eMED' : 'CLIENTE AVULSO';
+
+        const icon = L.divIcon({
+          className: 'emed-fleet-client-pin',
+          html: `
+            <div style="width:28px; height:28px; background:#ffffff; border:2px solid ${borderCol}; border-radius:50% 50% 50% 4px; transform:rotate(-45deg); display:flex; align-items:center; justify-content:center; box-shadow:0 3px 8px rgba(0,0,0,0.45);">
+              <img src="${svgFile}" style="width:20px; height:20px; transform:rotate(45deg);" />
+            </div>
+          `,
+          iconSize: [28, 28],
+          iconAnchor: [14, 28]
+        });
+
+        L.marker([c.lat, c.lon], { icon }).addTo(clientsLayer)
+          .bindPopup(`
+            <div style="font-family:sans-serif; min-width:210px;">
+              <span style="background:${badgeBg}; color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px;">${badgeTxt}</span>
+              <div style="font-weight:900; font-size:13px; margin-top:5px; color:#0f172a;">${c.nome}</div>
+              <div style="font-size:11px; color:#475569; margin-bottom:8px;">📍 ${c.cidade}</div>
+              <button onclick="openClientModalByIndex(${idx})" style="width:100%; background:#0284c7; color:#fff; border:none; padding:6px 10px; border-radius:6px; font-weight:800; font-size:11px; cursor:pointer;">
+                ✏️ Editar (Contrato / Avulso / Remover)
+              </button>
+            </div>
+          `);
+      });
+    }
+
+    function setClientFilter(mode) {
+      clientFilterMode = mode;
+      const lbl = document.getElementById('lbl-clients-btn');
+      if (mode === 'ALL') lbl.textContent = 'Clientes: Todos';
+      else if (mode === 'CONTRATO') lbl.textContent = 'Clientes: Contrato (Azul)';
+      else if (mode === 'AVULSO') lbl.textContent = 'Clientes: Avulso (Verm.)';
+      else lbl.textContent = 'Clientes: Ocultos';
+      renderMapClients();
+      renderClientsList();
+    }
+
+    function toggleMapClients() {
+      const order = ['ALL', 'CONTRATO', 'AVULSO', 'NONE'];
+      const next = order[(order.indexOf(clientFilterMode) + 1) % order.length];
+      setClientFilter(next);
+    }
+
+    function renderClientsList() {
+      const q = (document.getElementById('client-search-input').value || '').toLowerCase().trim();
+      const box = document.getElementById('clients-sidebar-list');
+      const filtered = [];
+      allClients.forEach((c, idx) => {
+        const isContrato = (c.tipo_contrato || 'AVULSO') === 'CONTRATO';
+        if (clientFilterMode === 'CONTRATO' && !isContrato) return;
+        if (clientFilterMode === 'AVULSO' && isContrato) return;
+        if (q && !(c.nome || '').toLowerCase().includes(q) && !(c.cidade || '').toLowerCase().includes(q)) return;
+        filtered.push({ c, idx });
+      });
+
+      box.innerHTML = filtered.slice(0, 70).map(({ c, idx }) => {
+        const isContrato = (c.tipo_contrato || 'AVULSO') === 'CONTRATO';
+        const badgeCol = isContrato ? '#38bdf8' : '#f87171';
+        return `
+          <div style="background:#0f172a; border:1px solid #1e293b; border-left:4px solid ${badgeCol}; padding:8px 10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <div onclick="map.flyTo([${c.lat}, ${c.lon}], 16, {duration:0.7})" style="cursor:pointer; flex:1;">
+              <div style="font-size:12px; font-weight:800; color:#f8fafc;">${c.nome}</div>
+              <div style="font-size:11px; color:#94a3b8; margin-top:2px;">
+                📍 ${c.cidade} • <strong style="color:${badgeCol};">${isContrato ? 'CONTRATO' : 'AVULSO'}</strong>
+              </div>
+            </div>
+            <button class="btn-v-action" onclick="openClientModalByIndex(${idx})" title="Editar Cliente">✏️</button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openClientModalByIndex(idx) {
+      openClientModal(allClients[idx]);
+    }
+
+    function openClientModal(c) {
+      if (c) {
+        document.getElementById('client-modal-title').textContent = '🏥 Editar Cliente eMED';
+        document.getElementById('c-id').value = c.id || '';
+        document.getElementById('c-tipo').value = c.tipo_contrato || 'AVULSO';
+        document.getElementById('c-nome').value = c.nome || '';
+        document.getElementById('c-cidade').value = c.cidade_raw || (c.cidade || '').split('/')[0].trim();
+        document.getElementById('c-uf').value = c.estado_raw || ((c.cidade || '').split('/')[1] || 'CE').trim();
+        document.getElementById('c-lat').value = c.lat || myRealLat;
+        document.getElementById('c-lon').value = c.lon || myRealLon;
+        document.getElementById('c-tel').value = c.telefone || '';
+        document.getElementById('btn-disable-client').style.display = 'inline-flex';
+      } else {
+        document.getElementById('client-modal-title').textContent = '➕ Novo Cliente eMED';
+        document.getElementById('c-id').value = '';
+        document.getElementById('c-tipo').value = 'CONTRATO';
+        document.getElementById('c-nome').value = '';
+        document.getElementById('c-cidade').value = 'Fortaleza';
+        document.getElementById('c-uf').value = 'CE';
+        document.getElementById('c-lat').value = myRealLat;
+        document.getElementById('c-lon').value = myRealLon;
+        document.getElementById('c-tel').value = '';
+        document.getElementById('btn-disable-client').style.display = 'none';
+      }
+      document.getElementById('client-modal').style.display = 'flex';
+    }
+
+    function closeClientModal() {
+      document.getElementById('client-modal').style.display = 'none';
+    }
+
+    async function saveClient() {
+      const payload = {
+        acao: 'SALVAR',
+        id: document.getElementById('c-id').value,
+        tipo_contrato: document.getElementById('c-tipo').value,
+        nome: document.getElementById('c-nome').value,
+        cidade: document.getElementById('c-cidade').value,
+        estado: document.getElementById('c-uf').value,
+        lat: document.getElementById('c-lat').value,
+        lon: document.getElementById('c-lon').value,
+        telefone: document.getElementById('c-tel').value
+      };
+      const res = await fetch('/api/clients/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        closeClientModal();
+        loadClients();
+        loadFleetOverview();
+      }
+    }
+
+    async function disableClient() {
+      const cid = document.getElementById('c-id').value;
+      if (!cid) return;
+      const res = await fetch('/api/clients/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acao: 'DESATIVAR', id: cid })
+      });
+      const data = await res.json();
+      if (data.success) {
+        closeClientModal();
+        loadClients();
+        loadFleetOverview();
+      }
+    }
+
+    // CADASTRO E EDIÇÃO DE VEÍCULOS + CHIP 4G (SEM CONDUTOR FIXO)
+    function openNewVehicleModal() {
+      const today = new Date().toISOString().slice(0, 10);
+      const nextMonth = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+      document.getElementById('vehicle-modal-title').textContent = '➕ Cadastrar Novo Veículo & Chip 4G';
+      document.getElementById('v-placa').value = '';
+      document.getElementById('v-tipo').value = 'CARRO';
+      document.getElementById('v-modelo').value = '';
+      document.getElementById('v-km').value = '0';
+      document.getElementById('v-imei').value = '';
+      document.getElementById('v-chip-num').value = '(85) 99999-';
+      document.getElementById('v-chip-op').value = 'Vivo M2M 4G';
+      document.getElementById('v-chip-ativ').value = today;
+      document.getElementById('v-chip-val').value = nextMonth;
+      document.getElementById('btn-del-vehicle').style.display = 'none';
+      document.getElementById('vehicle-modal').style.display = 'flex';
+    }
+
+    function openEditVehicleModal(idx) {
+      const v = fleetVehicles[idx];
+      if (!v) return;
+      document.getElementById('vehicle-modal-title').textContent = `✏️ Editar ${v.placa} & Chip 4G`;
+      document.getElementById('v-placa').value = v.placa;
+      document.getElementById('v-tipo').value = v.tipo_veiculo || 'CARRO';
+      document.getElementById('v-modelo').value = v.modelo;
+      document.getElementById('v-km').value = v.km_atual;
+      document.getElementById('v-imei').value = v.imei || '';
+      document.getElementById('v-chip-num').value = v.chip_numero || '';
+      document.getElementById('v-chip-op').value = v.chip_operadora || 'Vivo M2M 4G';
+      document.getElementById('v-chip-ativ').value = v.chip_data_ativacao || '';
+      document.getElementById('v-chip-val').value = v.chip_data_validade || '';
+      document.getElementById('btn-del-vehicle').style.display = 'inline-flex';
+      document.getElementById('vehicle-modal').style.display = 'flex';
+    }
+
+    function closeVehicleModal() {
+      document.getElementById('vehicle-modal').style.display = 'none';
+    }
+
+    async function saveVehicle() {
+      const payload = {
+        acao: 'SALVAR',
+        placa: document.getElementById('v-placa').value,
+        tipo_veiculo: document.getElementById('v-tipo').value,
+        modelo: document.getElementById('v-modelo').value,
+        km_atual: document.getElementById('v-km').value,
+        imei: document.getElementById('v-imei').value,
+        chip_numero: document.getElementById('v-chip-num').value,
+        chip_operadora: document.getElementById('v-chip-op').value,
+        chip_data_ativacao: document.getElementById('v-chip-ativ').value,
+        chip_data_validade: document.getElementById('v-chip-val').value,
+        lat: myRealLat,
+        lon: myRealLon
+      };
+      const res = await fetch('/api/fleet/vehicle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        closeVehicleModal();
+        loadFleetOverview();
+      }
+    }
+
+    async function deleteVehicle() {
+      const placa = document.getElementById('v-placa').value;
+      if (!placa) return;
+      const res = await fetch('/api/fleet/vehicle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acao: 'EXCLUIR', placa })
+      });
+      const data = await res.json();
+      if (data.success) {
+        closeVehicleModal();
+        loadFleetOverview();
+      }
+    }
+
+    function toggleMobileFleetSidebar() {
+      const wrap = document.getElementById('fleet-body-wrap');
+      const btn = document.getElementById('btn-fleet-mob-toggle');
+      const isCol = wrap.classList.toggle('sidebar-collapsed');
+      btn.innerText = isCol ? '🔼 Abrir Lista' : '🔽 Maximizar Mapa';
+      setTimeout(() => map.invalidateSize(), 220);
+    }
+
+    loadFleetOverview();
+    loadClients();
+    setInterval(loadFleetOverview, 6000);
+  </script>
+</body>
+</html>

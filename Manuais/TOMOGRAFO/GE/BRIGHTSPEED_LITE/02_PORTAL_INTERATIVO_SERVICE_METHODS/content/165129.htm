@@ -1,0 +1,35 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>MDAS 16 Backplanes Theory</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/14/07</P></td></tr></table><H1 ID="top">MDAS 16 Backplanes Theory </H1><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669389981">1&nbsp;&nbsp;MDAS 16 Backplanes<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The backplane used on MDAS 16 is separated into three sections: Right,
+Center and Left. The three backplane boards are connected via a ribbon cable,
+with a 100-pin connector on each board.</P><UL><LI CLASS="bulletlist"><P>Right Backplane</P><P>The Right backplane contains connectors for Converter boards 1 through
+28. The pinout of these connectors is defined in &#8220;External Interface
+Pinouts&#8221; section, in <SPAN CLASS="MODULEREF"><A HREF="165711.htm#SL166549-165711"><I>MDAS 16 Pinouts, Jumpers, and LEDs</I></A></SPAN>.</P><P>FET LEDs are located on the Right Backplane (see &#8220;LEDs&#8221;
+in <SPAN CLASS="MODULEREF"><A HREF="165711.htm#SL166549-165711"><I>MDAS
+16 Pinouts, Jumpers, and LEDs</I></A></SPAN>).</P></LI><LI CLASS="bulletlist"><P>Center Backplane</P><P>The Center backplane contains connectors for converter boards 29 through
+68. The pinout of these connectors is defined in &#8220;External Interface
+Pinouts&#8221; section, in <SPAN CLASS="MODULEREF"><A HREF="165711.htm#SL166549-165711"><I>MDAS 16 Pinouts, Jumpers, and LEDs</I></A></SPAN>.</P><P>Test Points are available on the Center Backplane to measure Power Supply
+voltages (see Table &#8220;Backplane Voltage Test Points&#8221; in <SPAN CLASS="MODULEREF"><A HREF="165711.htm#SL166549-165711"><I>MDAS 16 Pinouts, Jumpers,
+and LEDs</I></A></SPAN>).</P></LI><LI CLASS="bulletlist"><P>Left Backplane</P><P>The Left backplane contains connectors for converter boards 69 through
+96. The pinout of these connectors is defined in &#8220;External Interface
+Pinouts&#8221; section in <SPAN CLASS="MODULEREF"><A HREF="165711.htm#SL166549-165711"><I>MDAS 16 Pinouts, Jumpers, and LEDs</I></A></SPAN>.</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669390051">2&nbsp;&nbsp;Backplane Protection<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The DAS backplanes have been subdivided into four sections each. Test
+points and load resistors have been added to protect the DAS backplanes from
+short circuit of the DVSS (-5v_a). This is the detector bias voltage which
+applies -5vdc to the FET switching array. This is not the FET Control lines
+circuitry. During normal system conditions the test points would read -5vdc
+referenced to DAS analog ground. Reference section Detector Bias Test Points
+-5v_A (DVSS) in <SPAN CLASS="MODULEREF"><A HREF="165711.htm#SL166549-165711"><I>MDAS 16 Pinouts, Jumpers, and LEDs</I></A></SPAN>for
+details.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669390068">3&nbsp;&nbsp;DAS Detector Interface (DDIF)<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The DDIF is a pin and socket interface. Both the DAS backplane and Detector
+Flex leads are female pins. The &#8220;Interposer&#8221; is a male to male
+interface. <A HREF="javascript:winopen('165129illd0e91.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;1</A> shows the
+design features of this interface. The BGA or female connector is also on
+the DAS backplane (not shown) minus the backshell. <A HREF="javascript:winopen('165129illd0e100.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;2</A> shows the DAS Detector interface layout.</P><DIV CLASS="ILLUSTRATION" id="SL165169-165129"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">DAS Detector Interface (DDIF)</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/165129-165124.jpg" BORDER="0" usemap="#SL165174-165129"></P></DIV><P CLASS="sect1">The Interposer uses four (4) large ground pins as guides to center the
+device in the BGA connectors. There are 150 pins per interface and 114 interfaces
+total, 2 per detector module.</P><P CLASS="sect1">There are 128 data channels, 6 FET control lines, 9 analog grounds,
+1 signal ground, 4 shield grounds, 1 Bias Voltage line and 1 unused pin. An
+analog isolation ground trace surrounds the Bias and FET control lines. This
+is to ensure that no leakage currents can occur resulting in random FET control
+settings. The shield grounds perform EMI isolation. The signal ground reduces
+stray current induction onto the data lines.</P><DIV CLASS="ILLUSTRATION" id="SL165172-165129"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Detector and MDAS 16 DDIF Layout</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/165129-165121.gif" BORDER="0" usemap="#SL165175-165129"></P></DIV></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

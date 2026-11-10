@@ -1,0 +1,93 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>DICOM Functions</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;3.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/17/09</P></td></tr></table><H1 ID="top">DICOM Functions </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="50%"><col width="50%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised:</td><td valign="">Sept 2, 2004</td></tr></tbody></table></div></DIV><TABLE CLASS="ADMONdescriptive" CELLSPACING="0%" CELLPADDING="0%" ID="d0e39"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">The following section contains a general description
+of the functions supported by DICOM on the GEMS scanner. </TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct1-2-1-35534">1&nbsp;&nbsp;Storage<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The Service Class User (SCU) sends image data and the Service Class
+Provider (SCP) receives image data. The image data is formatted into Objects
+such as CT, MR, Secondary Capture (SC), CR, X-ray RF, X-ray US, NM, etc. See <A HREF="javascript:winopen('35534illd0e57.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;1</A>.</P><UL><LI CLASS="bulletlist"><P>GE Application: MR Signa Manual Send - User initiates the
+transfer of image (or series/ study of images) from the Signa to an Advantage.
+The Signa may also send to a non-GE device.</P></LI><LI CLASS="bulletlist"><P>GE Application: CT System Auto Transfer - Automatically transfers
+images to the Advantage Windows at scan. Again, it may also send images to
+a non-GE device.</P></LI></UL><DIV CLASS="ILLUSTRATION" id="SL35537-35534"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">DICOM Storage</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/35534-35545.gif" BORDER="0" usemap="#SL35546-35534"></P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct1-2-2-35534">2&nbsp;&nbsp;Query Retrieve (Q/R)<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Allows a system to query another system for a list of available images
+(query). Also allows a system to request another system to send images (retrieve).
+The SCU initiates the queries and retrieval, and the SCP responds to queries
+with a list of available data, as well as responding to the retrieval request
+by sending images. See <A HREF="javascript:winopen('35534illd0e71.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;2</A>.</P><P CLASS="sect1">GE Application: Pull Query - The Advantage Review-Diagnostic (ARD) user
+requests a list of images from the CT System. The ARD requests the scanner
+to send some of these images to the ARD and the scanner sends the images using
+the Service Class.</P><DIV CLASS="ILLUSTRATION" id="SL35538-35534"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">DICOM Query/Retrieve</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/35534-35548.gif" BORDER="0" usemap="#SL35549-35534"></P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct1-2-3-35534">3&nbsp;&nbsp;Modality Worklist Management<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Allows a scanner (SCU) to obtain patient requested procedure information
+for scheduled examinations from Information Management System (IMS). Often
+called the DICOM interface, however the scanner will generally not be connected
+directly to HIS/ RIS but to an IMS, which in turn connect to the HIS/ RIS.
+See <A HREF="javascript:winopen('35534illd0e85.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;3</A>.</P><P CLASS="sect1">GE Application - A worklist is presented to the technician who simply
+selects the scheduled patient from the list rather than manually entering
+the patient demographics information. Saves typing time and avoids typing
+errors. Automates scheduling and information flow.</P><DIV CLASS="ILLUSTRATION" id="SL35539-35534"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">DICOM Modality Worklist Management</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/35534-35551.gif" BORDER="0" usemap="#SL35552-35534"></P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct1-2-4-35534">4&nbsp;&nbsp;Study Component Management<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Allows a modality (SCU) to keep an Imaging Information Management System
+(IMS) updated on the progress and completion of an examination. The associated
+series of form a Study Component whose actual content and status is transmitted
+to the Information Management system (SCP). See <A HREF="javascript:winopen('35534illd0e99.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;4</A>.</P><P CLASS="sect1">GE Application - Quality management in the imaging process, automatic
+inputs to billing, and timely triggering of post acquisition (post processing,
+interpretation, ICU, etc.) events.</P><DIV CLASS="ILLUSTRATION" id="SL35540-35534"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;4:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">DICOM Study Component Management</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/35534-35554.gif" BORDER="0" usemap="#SL35555-35534"></P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct1-2-5-35534">5&nbsp;&nbsp;Storage Commitment<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Allows modalities (SCU) to relinquish archiving responsibility to an
+external device (e.g., network archive) acting as a Service Class Provider
+(SCP). The Storage Service Class is used in conjunction with the Commitment
+Service Class to transfer the images to the storage device(s). See <A HREF="javascript:winopen('35534illd0e113.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;5</A>.</P><P CLASS="sect1">GE Application - (Primary Archive Node) Frees up disk space on the scanner
+without extensive manual archiving. Function needed on a scanner to safely
+work with a network manager.</P><DIV CLASS="ILLUSTRATION" id="SL35541-35534"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;5:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">DICOM Storage Commitment</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/35534-35557.gif" BORDER="0" usemap="#SL35558-35534"></P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct1-2-6-35534">6&nbsp;&nbsp;Results Management<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Allows the radiologist reports to be retrieved by the Service Class
+User (SCU). See <A HREF="javascript:winopen('35534illd0e127.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;6</A>.</P><P CLASS="sect1">GE Application: Reports may be viewed with the patient&#8217;s images
+when retrieved from an Information System.</P><DIV CLASS="ILLUSTRATION" id="SL35542-35534"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;6:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">DICOM Results Management</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/35534-35560.gif" BORDER="0" usemap="#SL35561-35534"></P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct1-2-7-35534">7&nbsp;&nbsp;Basic Print Management<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Allows a workstation or scanner to send images to a printer for hard
+copy output. For example, a workstation (SCU) sends images to a laser camera
+(SCP) to be copied on film. This network interface permits workstations to
+share one camera interface, which can reside anywhere on the network. See <A HREF="javascript:winopen('35534illd0e142.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;7</A>.</P><TABLE CLASS="ADMONsect1" CELLSPACING="0%" CELLPADDING="0%" ID="d0e139"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Camera manufacturers are just beginning to offer DICOM products.
+Currently, no GE products support this feature.</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><DIV CLASS="ILLUSTRATION" id="SL35543-35534"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;7:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">DICOM Basic Print Management</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/35534-35563.gif" BORDER="0" usemap="#SL35564-35534"></P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct1-2-8-35534">8&nbsp;&nbsp;1.3 GB MOD Media<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Standardizes the physical media (Magneto Optical Disk holding 1. 3 Billion
+bytes of data) and the logical format in which images are stored on the archive
+media. A device supporting the Media Interchange Service Class may support
+the following roles:</P><UL><LI CLASS="bulletlist"><P>File-Set Creator (FSC) to initialize a new piece of media
+and write a number of images</P></LI><LI CLASS="bulletlist"><P>File-Set Reader (FSR) to read the imaging directory and selected
+images stored on a media</P></LI><LI CLASS="bulletlist"><P>File-Set Updater (FSU) to read and update the imaging directory
+as well as images on the media</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct1-2-9-35534">9&nbsp;&nbsp;640 MB CD-R Media<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Standardizes the physical media (Recordable Compact Disk holding 640
+Million bytes of data) and the logical format in which images are stored on
+the archive media. A device supporting the Media Interchange Service Class
+may support one or more of the roles defined above.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct1-2-10-35534">10&nbsp;&nbsp;Verification<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Allows any system to send a test message to another system to verify
+the network connection.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="sct1-2-11-35534">11&nbsp;&nbsp;Glossary of DICOM Terms<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">CONFIGURATION</P><P CLASS="sect1">The DICOM Print Configuration Information field is controlled by the
+Camera Manufacturer. It is typically used to set information on the Look-up
+Table to be used to convert the inputted digital image data to the hardcopy
+film output (since the range of valid data for the input may not match the
+range for the output data); however, it is not limited to this purpose. The
+string field is defined by the Camera Manufacturer and is currently up to
+1024 bytes. The value is equivalent to working the contrast on a image monitor.</P><P CLASS="sect1">DENSITY</P><P CLASS="sect1">Density is a film term that represents the pixel value at a particular
+point on the film. Empty Density is the pixel representation of a blank image
+frame on a film. Border Density is the pixel representation of the area outside
+of the image frames on the film. Minimum Density is the minimum pixel representation
+to be used within an image, while Maximum Density is the maximum pixel representation
+to be used within an image. The last two values are equivalent to working
+the brightness on a image monitor. The range and effect of the last two density
+parameters are Camera Manufacturer dependent.</P><P CLASS="sect1">DICOM</P><P CLASS="sect1">Acronym for Digital Imaging and Communication in Medicine. This standard
+is a detailed specification for transferring medical images and related information
+between computers.</P><P CLASS="sect1">MAGNIFICATION TYPE</P><P CLASS="sect1">Images from the CT scanner are digitized at a low resolution and are
+then printed at a higher resolution. To accomplish this, images are interpolated
+prior to being printed. A number of techniques may be used to perform the
+image interpolation. The most common techniques are:</P><UL><LI CLASS="bulletlist"><P>Replication: This is the simplest method of interpolation
+(zero order interpolation). In this case adjacent data is used to calculate
+the fill data. The resultant images are typically extremely blocky and contain
+jagged edges.</P></LI><LI CLASS="bulletlist"><P>Bilinear: Also known as first order (linear) interpolation,
+this technique consists of fitting straight lines through adjacent data points
+to determine intermediate points. The resultant images are somewhat blurred.</P></LI><LI CLASS="bulletlist"><P>Cubic: Third order (cubic) interpolation is usually the favored
+technique. There are a large number of possible formulations for cubic interpolation.
+Each differs by the coefficients used in the process. The Camera Manufacturers
+use a second parameter called a Smoothing Type to set the coefficients. The
+implementation of the coefficient is Camera Manufacturer dependent. The cubic
+interpolation presents the smoothest version of interpolation when compared
+to replication or bilinear interpolation.</P></LI></UL><P CLASS="sect1">SERVICE CLASS</P><P CLASS="sect1">Represents a specific application feature by defining a set of related
+SOP classes (DICOM Print).</P><P CLASS="sect1">SMOOTHING TYPE</P><P CLASS="sect1">A value used in conjunction with the Magnification Type. It is only
+relevant when the magnification type is set to Cubic. Smoothing is used to
+set the coefficients for the formulation of the interpolation. The valid values
+and meaning of the Smoothing Type parameter are controlled by the DICOM Print
+Manufacturer. For example, Imation expects a smoothing factor of 0 to 15,
+while Agfa expects a smoothing factor of VR type 0, or falling within the
+range of 100 to 299.</P><P CLASS="sect1">SCP</P><P CLASS="sect1">Acronym for Service Class Provider. This is the Service Class server.
+(In the case of DICOM Print, this is the DICOM Print Camera.)</P><P CLASS="sect1">SCU</P><P CLASS="sect1">Acronym for Service Class User. This is the Service Class client. (In
+the case of DICOM Print, this is the CT Scanner.)</P><P CLASS="sect1">SOP</P><P CLASS="sect1">Acronym for Service Object Pair. This term is used in DICOM to specify
+the capabilities of a DICOM entity. The entity is defined by the union of
+the Information Object Definition (IOD) (e.g., CT image) and the DICOM Message
+Service Element (DIMSE) Services (e.g., store).</P><P CLASS="sect1"></P></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

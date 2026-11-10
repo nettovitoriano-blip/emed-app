@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NotaFiscalEmed tipo="NFSE">
+  <OSId>1</OSId>
+  <Cliente>HOSPITAL SAO CARLOS</Cliente>
+  <CNPJ>00.000.000/0001-00</CNPJ>
+  <Equipamento>COMPACTO PLUS 300</Equipamento>
+  <Discriminacao>É NECESSARIO SUBSTITUIR O BOTAO DA PERA</Discriminacao>
+  <CodigoServicoISS>14.01</CodigoServicoISS>
+  <ValorServicos>1200.00</ValorServicos>
+  <ValorPecas>300.00</ValorPecas>
+  <ValorDesconto>0.00</ValorDesconto>
+  <AliquotaISS>5.00</AliquotaISS>
+  <ValorLiquido>1440.00</ValorLiquido>
+  <DataEmissao>2026-10-18T22:00:24Z</DataEmissao>
+</NotaFiscalEmed>

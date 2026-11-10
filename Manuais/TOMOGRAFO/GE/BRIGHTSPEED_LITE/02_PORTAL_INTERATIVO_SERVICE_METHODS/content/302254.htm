@@ -1,0 +1,62 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Detector Heater Control Board (DHCB) Theory</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;2/16/07</P></td></tr></table><H1 ID="top">Detector Heater Control Board (DHCB) Theory </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="50%"><col width="50%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised:</td><td valign="">February 2003</td></tr></tbody></table></div></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669010390">1&nbsp;&nbsp;Detector Heater Control Board (DHCB) Overview<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">In order to obtain consistent and accurate results, the detector must
+be kept at a constant temperature. The detector temperature is maintained
+by hardware circuits on the Detector Heater Control Board  	 
+(DHCB)
+. The heater is supplied power by the DHCB, while
+the DHCB gets power from the external 24V power supply, same as the LightSpeed
+16. This differs from LightSpeed and LightSpeed Plus, where the detector heater
+control and power were supplied by the DCB.</P><P CLASS="sect1">The DHCB monitors detector temperature via the three thermistors embedded
+in the external rail of the detector. Hardware circuits on the analog section
+of the DHCB convert thermistor resistance into a digital value that represents
+the detector temperature. These digital values are kept in a register on the
+DHCB, and temperature values are averaged over 10 samples. The output is then
+compared with upper and lower limits. When the temperature value goes below
+the lower limit, the DHCB enables the heater power supply via a HTR_ON signal.
+When the temperature value goes above the upper limit, the DHCB turns the
+heater power off. In this way, the DHCB can keep the detector at a constant
+temperature.</P><DIV CLASS="ILLUSTRATION" id="ov-1353669010391"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Detector Heater Control</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/302254-302256.gif" BORDER="0" usemap="#SL302257-302254"></P></DIV><P CLASS="sect1">The modules in the detector system are maintained at a temperature of
+36 &plusmn; 0.3 degrees C (module to module variation) and to 36 &plusmn;
+0.05 degree C (near thermistor).</P><P CLASS="sect1">The primary function, provided by the 8xC591 micro-controller, is to
+perform basic control and monitor of temperature in three zones of the LIghtSpeed
+16 detector and report status, faults and errors to the system via the DCB.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669010406">2&nbsp;&nbsp;Basic DHCB Functions<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The 8xC591 micro-controller is responsible for providing the following
+functions:</P><UL><LI CLASS="bulletlist"><P>Power-On Self-Test</P></LI><LI CLASS="bulletlist"><P>Board Initialization</P></LI><LI CLASS="bulletlist"><P>Communication</P></LI><LI CLASS="bulletlist"><P>DMB EEPROM Access</P></LI><LI CLASS="bulletlist"><P>DHCB EEPROM Access</P></LI><LI CLASS="bulletlist"><P>Fault Detection and reporting</P></LI><LI CLASS="bulletlist"><P>Firmware Revision reporting</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669010407-dup.6">3&nbsp;&nbsp;Power-On Self-Test<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">At the time of power-on or board reset, the micro-controller will perform
+2 tests.</P><UL><LI CLASS="bulletlist"><P>The micro-controller&#8217;s RAM will be checked for proper
+operation by writing and reading back various patterns.</P></LI><LI CLASS="bulletlist"><P>A checksum verification of the application firmware will be
+performed. If either of these tests fail the converter card application firmware
+can not be executed. To indicate this failure the LED will flash rapidly at
+a 5 Hz rate. This LED will continue to flash until communication with the
+DCB is established.</P></LI></UL><P CLASS="sect1">If either of the 2 tests fails, the FW will disable all heater outputs.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669010408-dup.1">4&nbsp;&nbsp;Initialization<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">After power-up or rest, the micro-controller&#8217;s firmware will perform
+its initialization functions that are partitioned into 5 tasks - hardware
+initialization, DMB memory validation, communication, parameter, and CPU Watchdog
+initialization.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669010408-dup.2">5&nbsp;&nbsp;Communication Initialization<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The DCB establishes communication with the DHCB via the RS232 communication
+interface. The Communication link is a Master (DCB) / Slave (DHCB) configuration.
+Therefore, the DCB initiates all communication and the DHCB simply responds.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669010408-dup.3">6&nbsp;&nbsp;On-Detector &amp; On-Board Temp. Control Table Memory Validation<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Upon initialization, the temperature control tables in both the DMB
+and DHCB are accessed and their respective checksums are validated. If either
+table fails its checksum test, the appropriate error bits are masked into
+the DHCB.</P></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="ov-1353669010408-dup.4">7&nbsp;&nbsp;Status and Fault Handling<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The general philosophy of status and fault handling is that when a change
+in status or fault occurs, the associated Status/error flag is set. When the
+DCB queries the DHCB, the status/error bit mask is sent to the DCB and depending
+on the type of error, the appropriate action is then taken.</P><P CLASS="sect1">Each DHCB condition/fault is represented in a status/error bit map.</P><P CLASS="sect1">Status/Error Flags</P><P CLASS="sect1">The following are Status/Error Flags. The LED will flash per the table
+below (i.e., if we have a DHCB EEPROM, the LED will flash twice, then pause
+off, then repeat).</P><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="ov-1353669010409"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">DHCB Error Code and LED Display</SPAN> </P><table summary="DHCB Error Code and LED Display" border="1"><colgroup><col width="24%"><col width="24%"><col width="52%"></colgroup><thead valign=""><tr valign="top"><th align="center" valign=""><B>Status/Error
+Code</B></th><th align="center" valign=""><B>Number
+of Flashes</B></th><th align="center" valign=""><B>Description</B></th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top">0x0000</td><td align="left" valign="top">None</td><td align="left" valign="top">No Error</td></tr><tr valign="top"><td align="left" valign="top">0x0001</td><td align="left" valign="top">1</td><td align="left" valign="top">General
+Error. </td></tr><tr valign="top"><td align="left" valign="top">0x0002</td><td align="left" valign="top">2</td><td align="left" valign="top">I2C Error</td></tr><tr valign="top"><td align="left" valign="top">0x0004</td><td align="left" valign="top">3</td><td align="left" valign="top">EEPROM
+Readback Verify Error</td></tr><tr valign="top"><td align="left" valign="top">0x0008</td><td align="left" valign="top">4</td><td align="left" valign="top">On-Detector
+EEPROM Error</td></tr><tr valign="top"><td align="left" valign="top">0x0010</td><td align="left" valign="top">5</td><td align="left" valign="top">On-Board
+EEPROM Error</td></tr><tr valign="top"><td align="left" valign="top">0x0020</td><td align="left" valign="top">6</td><td align="left" valign="top">Spare-1
+Error</td></tr><tr valign="top"><td align="left" valign="top">0x0040</td><td align="left" valign="top">7</td><td align="left" valign="top">Spare-2
+Error</td></tr><tr valign="top"><td align="left" valign="top">0x0080</td><td align="left" valign="top">8</td><td align="left" valign="top">Spare-3
+Error</td></tr><tr valign="top"><td align="left" valign="top">0x0100</td><td align="left" valign="top">9</td><td align="left" valign="top">Serial
+Rec Timeout Error</td></tr><tr valign="top"><td align="left" valign="top">0x0200</td><td align="left" valign="top">10</td><td align="left" valign="top">Sensor
+and/or Control Abort Fault</td></tr><tr valign="top"><td align="left" valign="top">0x0400</td><td align="left" valign="top">11</td><td align="left" valign="top">DHCB Mfg.
+Identification Table in EEPROM is invalid</td></tr><tr valign="top"><td align="left" valign="top">0x0800</td><td align="left" valign="top">12</td><td align="left" valign="top">Temperature
+Control Table in EEPROM is invalid</td></tr><tr valign="top"><td align="left" valign="top">0x1000</td><td align="left" valign="top">13</td><td align="left" valign="top">I2C ADC
+Failure</td></tr><tr valign="top"><td align="left" valign="top">0x2000</td><td align="left" valign="top">14</td><td align="left" valign="top">Clock
+Loss Logic Error</td></tr><tr valign="top"><td align="left" valign="top">0x4000</td><td align="left" valign="top">15</td><td align="left" valign="top">DHCB is
+in Service Mode</td></tr><tr valign="top"><td align="left" valign="top">0x8000</td><td align="left" valign="top">16</td><td align="left" valign="top">Reset
+Occurred</td></tr></tbody></table></div></DIV></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

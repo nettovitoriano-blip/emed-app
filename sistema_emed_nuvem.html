@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emed Eletromedicina - Sistema Integrado Nuvem</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans antialiased" onload="inicializarSistema()">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50 shadow-xl">
+        <div class="container mx-auto flex flex-col md:flex-row justify-between items-center gap-3">
+            <div class="flex items-center space-x-4">
+                <img src="emed_svg-1.png" alt="Logo Emed" class="h-12 w-auto object-contain bg-slate-50 rounded-lg p-1.5 shadow-md" 
+                     onerror="this.outerHTML='<div class=\\'bg-blue-600 p-2.5 rounded-xl text-white shadow-md shadow-blue-500/20\\'><i class=\\'fa-solid fa-bolt text-xl\\'></i></div>'">
+                <div>
+                    <h1 class="text-xl font-bold text-white tracking-wide">Emed Eletromedicina</h1>
+                    <p class="text-xs text-slate-400">Engenharia Clínica e Suporte Técnico em Nuvem</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3 text-xs">
+                <span id="firebase-status" class="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-1.5 rounded-lg flex items-center font-medium">
+                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> A ligar ao Firebase...
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="container mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+        <!-- Sidebar / Navigation -->
+        <aside class="lg:col-span-1 space-y-4">
+            <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-lg space-y-2">
+                <h2 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-2">Painel de Operações</h2>
+                
+                <button onclick="switchMainTab('cadastros')" id="btn-cadastros" class="nav-tab-btn w-full text-left px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-300 font-medium transition flex items-center space-x-3">
+                    <i class="fa-solid fa-building-user w-5 text-center"></i>
+                    <span>Clientes & Equipamentos</span>
+                </button>
+
+                <button onclick="switchMainTab('os')" id="btn-os" class="nav-tab-btn w-full text-left px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-300 font-medium transition flex items-center space-x-3">
+                    <i class="fa-solid fa-clipboard-list w-5 text-center"></i>
+                    <span>Ordens de Serviço (OS)</span>
+                </button>
+
+                <button onclick="switchMainTab('estoque')" id="btn-estoque" class="nav-tab-btn w-full text-left px-4 py-3 rounded-xl bg-blue-600 text-white font-medium transition flex items-center space-x-3 shadow-md shadow-blue-600/25">
+                    <i class="fa-solid fa-boxes-stacked w-5 text-center"></i>
+                    <span>Controle de Estoque</span>
+                </button>
+
+                <button onclick="switchMainTab('procedimentos')" id="btn-procedimentos" class="nav-tab-btn w-full text-left px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-300 font-medium transition flex items-center space-x-3">
+                    <i class="fa-solid fa-toolbox w-5 text-center"></i>
+                    <span>Manuais & POPs</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Workspace -->
+        <main class="lg:col-span-3">
+
+            <!-- TAB: CONTROLE DE ESTOQUE -->
+            <section id="tab-estoque" class="main-tab-content space-y-6">
+                <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-bold text-white flex items-center"><i class="fa-solid fa-boxes-stacked text-blue-500 mr-2"></i>Controle de Estoque</h2>
+                    </div>
+
+                    <div class="bg-slate-950 p-4 rounded-xl border border-blue-500/30 space-y-3 text-xs">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <input type="text" id="est-nome" placeholder="Descrição da Peça / Componente" class="md:col-span-2 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                            <input type="text" id="est-pn" placeholder="Part Number (PN) / Modelo" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                            <input type="number" id="est-qtd" placeholder="Qtd Inicial" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white" min="0">
+                            
+                            <div class="md:col-span-4 bg-slate-900 border border-dashed border-slate-700 rounded-lg p-3 flex items-center space-x-3">
+                                <label for="est-foto" class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition flex items-center">
+                                    <i class="fa-solid fa-camera mr-2 text-blue-400"></i> Anexar Foto da Peça
+                                </label>
+                                <input type="file" id="est-foto" accept="image/*" class="hidden" onchange="mostrarNomeArquivo()">
+                                <span id="est-foto-nome" class="text-slate-500 italic">Nenhuma imagem selecionada</span>
+                            </div>
+                        </div>
+                        <button onclick="salvarItemEstoque()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition">Adicionar ao Estoque</button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="text-[10px] uppercase bg-slate-950 text-slate-400 border border-slate-800 rounded-t-xl">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-tl-xl w-12 text-center">Foto</th>
+                                    <th class="px-4 py-3">Descrição da Peça</th>
+                                    <th class="px-4 py-3">Part Number</th>
+                                    <th class="px-4 py-3 text-center">Qtd Atual</th>
+                                    <th class="px-4 py-3 text-center rounded-tr-xl">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lista-estoque" class="bg-slate-900 border border-t-0 border-slate-800 rounded-b-xl"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: MANUAIS & POPS -->
+            <section id="tab-procedimentos" class="main-tab-content hidden space-y-6">
+                <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-white flex items-center"><i class="fa-solid fa-toolbox text-blue-500 mr-2"></i>Catálogo Técnico & Manuais</h2>
+                        <p class="text-xs text-slate-400 mt-1">Procedimentos Operacionais Padrão (POP) e guias de calibração médica.</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <button onclick="selectManualTab('ge')" id="mbtn-ge" class="manual-tab-btn p-3 rounded-xl border border-blue-500 bg-blue-500/10 text-center transition flex flex-col items-center justify-center space-y-2">
+                            <i class="fa-solid fa-circle-notch text-blue-400 text-xl"></i>
+                            <h4 class="font-bold text-white text-xs">Tomógrafo GE Brivo</h4>
+                        </button>
+                        <button onclick="selectManualTab('vmi')" id="mbtn-vmi" class="manual-tab-btn p-3 rounded-xl border border-slate-800 bg-slate-950 text-center transition hover:border-slate-700 flex flex-col items-center justify-center space-y-2">
+                            <i class="fa-solid fa-x-ray text-slate-400 text-xl"></i>
+                            <h4 class="font-bold text-slate-300 text-xs">Raio-X VMI/Philips</h4>
+                        </button>
+                    </div>
+
+                    <div id="mcontent-ge" class="manual-content space-y-4">
+                        <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-3">
+                            <span class="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded font-bold uppercase">Tomografia GE Brivo CT385</span>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs mt-3">
+                                <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl">
+                                    <span class="text-blue-400 font-bold">Balanceamento Gantry</span>
+                                    <p class="text-slate-300 mt-1">Tempo: 1h30 a 2h30. Ferramenta: Kit 46-268445G1.</p>
+                                </div>
+                                <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl">
+                                    <span class="text-blue-400 font-bold">Beam on Window (BOW)</span>
+                                    <p class="text-slate-300 mt-1">Ajuste de tubo em 12 horas (-0.240mm ± 0.150mm).</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="mcontent-vmi" class="manual-content hidden space-y-4">
+                        <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-3">
+                            <span class="text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2.5 py-1 rounded font-bold uppercase">Raio-X Pendulum DR</span>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs mt-3">
+                                <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl">
+                                    <span class="text-purple-400 font-bold">Pré-requisito Civil</span>
+                                    <p class="text-slate-300 mt-1">Pé-direito mínimo de 2,60m e base de concreto de 100x100x8cm.</p>
+                                </div>
+                                <div class="p-3 bg-slate-900 border border-slate-800 rounded-xl">
+                                    <span class="text-purple-400 font-bold">Calibração Detector DR</span>
+                                    <p class="text-slate-300 mt-1">Rotina Darkfield & Flatfield (Aprox. 80 min).</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: ORDENS DE SERVIÇO (OS) -->
+            <section id="tab-os" class="main-tab-content hidden space-y-6">
+                <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-bold text-white flex items-center"><i class="fa-solid fa-clipboard-list text-blue-500 mr-2"></i>Ordens de Serviço</h2>
+                        <button onclick="abrirModalOS()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-md shadow-blue-600/30">
+                            <i class="fa-solid fa-plus mr-1.5"></i>Nova OS
+                        </button>
+                    </div>
+
+                    <div id="form-os-container" class="hidden bg-slate-950 p-4 rounded-xl border border-blue-500/30 space-y-3 text-xs">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <select id="os-cliente-select" onchange="atualizarEquipamentosOS()" class="md:col-span-2 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white"></select>
+                            <input type="text" id="os-cliente-avulso-desc" placeholder="Nome do Cliente Novo/Avulso" class="hidden md:col-span-2 bg-amber-500/10 border border-amber-500/50 rounded-lg p-2.5 text-amber-100">
+
+                            <select id="os-equip-select" onchange="verificarEquipAvulso()" class="md:col-span-2 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                                <option value="">Selecione o Cliente primeiro...</option>
+                            </select>
+                            <input type="text" id="os-equip-avulso-desc" placeholder="Qual o equipamento? (Ex: Arco Cirúrgico Ziehm)" class="hidden md:col-span-2 bg-amber-500/10 border border-amber-500/50 rounded-lg p-2.5 text-amber-100">
+                            
+                            <input type="text" id="os-tecnico" placeholder="Técnico Responsável" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                            <select id="os-status" class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                                <option value="Triagem">Triagem</option>
+                                <option value="Em Deslocamento">Em Deslocamento</option>
+                                <option value="Concluída">Concluída (Pendente Cobrança)</option>
+                                <option value="Faturada">Faturada</option>
+                            </select>
+                            <input type="text" id="os-pecas" placeholder="Peças aplicadas ou retiradas em campo" class="md:col-span-2 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white">
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="salvarOS()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold">Salvar OS</button>
+                            <button onclick="fecharModalOS()" class="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg">Cancelar</button>
+                        </div>
+                    </div>
+
+                    <div id="lista-os" class="space-y-3"></div>
+                </div>
+            </section>
+
+            <!-- TAB: CADASTROS -->
+            <section id="tab-cadastros" class="main-tab-content hidden space-y-6">
+                <div class="flex space-x-2 border-b border-slate-800 pb-3">
+                    <button onclick="switchCadastroTab('clientes')" id="btn-cad-clientes" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold transition">
+                        <i class="fa-solid fa-hospital mr-2"></i>Base de Clientes
+                    </button>
+                    <button onclick="switchCadastroTab('equipamentos')" id="btn-cad-equipamentos" class="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-sm font-medium transition">
+                        <i class="fa-solid fa-x-ray mr-2"></i>Parque Instalado
+                    </button>
+                </div>
+
+                <div id="view-cad-clientes" class="space-y-4">
+                    <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                            <input type="text" id="cad-cli-nome" placeholder="Nome Fantasia / Hospital" class="md:col-span-2 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white">
+                            <input type="text" id="cad-cli-cnpj" placeholder="CNPJ" class="bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white">
+                            <input type="text" id="cad-cli-cidade" placeholder="Cidade (Ex: Fortaleza)" class="bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white">
+                            <input type="text" id="cad-cli-contato" placeholder="Nome do Contato" class="bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white">
+                            <input type="text" id="cad-cli-tel" placeholder="Telefone / WhatsApp" class="bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white">
+                        </div>
+                        <button onclick="salvarCliente()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition">Salvar Cliente</button>
+                    </div>
+                    <div id="lista-clientes" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                </div>
+
+                <div id="view-cad-equipamentos" class="hidden space-y-4">
+                    <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                            <select id="cad-eq-cliente" class="md:col-span-2 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white"></select>
+                            <select id="cad-eq-categoria" class="md:col-span-2 sm:col-span-1 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white">
+                                <option value="Raio-X">Raio-X</option>
+                                <option value="Tomógrafo">Tomógrafo</option>
+                                <option value="Mamógrafo">Mamógrafo</option>
+                                <option value="Arco Cirúrgico">Arco Cirúrgico</option>
+                                <option value="Densitometria">Densitometria</option>
+                            </select>
+                            <input type="text" id="cad-eq-fabricante" placeholder="Fabricante" class="bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white">
+                            <input type="text" id="cad-eq-modelo" placeholder="Modelo" class="bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white">
+                            <input type="text" id="cad-eq-serie" placeholder="Número de Série" class="bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white">
+                        </div>
+                        <button onclick="salvarEquipamento()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition">Cadastrar Ativo</button>
+                    </div>
+                    <div id="lista-equipamentos" class="space-y-3"></div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Firebase SDKs & Otimização Assíncrona -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC9rk7Hq9Vz1R4cv1uQsJoRcJia0pfaQog",
+            authDomain: "emed-eletromedicina.firebaseapp.com",
+            projectId: "emed-eletromedicina",
+            storageBucket: "emed-eletromedicina.firebasestorage.app",
+            messagingSenderId: "638378637867",
+            appId: "1:638378637867:web:1863793897faad193fc86e",
+            measurementId: "G-TY5PM4R4F8"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const statusEl = document.getElementById('firebase-status');
+            statusEl.className = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-lg flex items-center font-medium";
+            statusEl.innerHTML = `<i class=\"fa-solid fa-cloud-arrow-up mr-2\"></i> Nuvem Conectada`;
+            carregarEstoque(); // Carrega apenas o estoque inicial de forma leve
+        });
+
+        // ESTOQUE
+        window.fbSalvarEstoque = async (nome, pn, qtd, foto) => {
+            await addDoc(collection(db, "estoque"), { nome, pn, qtd, foto, criadoEm: Date.now() });
+            carregarEstoque();
+        };
+
+        window.fbGetEstoque = async () => {
+            const snap = await getDocs(collection(db, "estoque"));
+            let arr = [];
+            snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
+            return arr;
+        };
+
+        window.fbUpdateQtdEstoque = async (id, novaQtd) => {
+            await updateDoc(doc(db, "estoque", id), { qtd: novaQtd });
+            carregarEstoque();
+        };
+
+        window.fbDeletarEstoque = async (id) => {
+            await deleteDoc(doc(db, "estoque", id));
+            carregarEstoque();
+        };
+
+        // CLIENTES
+        window.fbSalvarCliente = async (nome, cnpj, cidade, contato, tel) => {
+            await addDoc(collection(db, "clientes"), { nome, cnpj, cidade, contato, tel, criadoEm: Date.now() });
+            carregarClientes();
+        };
+
+        window.fbGetClientes = async () => {
+            const snap = await getDocs(collection(db, "clientes"));
+            let arr = [];
+            snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
+            return arr;
+        };
+
+        window.fbDeletarCliente = async (id) => {
+            await deleteDoc(doc(db, "clientes", id));
+            carregarClientes();
+        };
+
+        // EQUIPAMENTOS
+        window.fbSalvarEquipamento = async (cliente_id, categoria, fabricante, modelo, serie) => {
+            await addDoc(collection(db, "equipamentos"), { cliente_id, categoria, fabricante, modelo, serie, criadoEm: Date.now() });
+            carregarEquipamentos();
+        };
+
+        window.fbGetEquipamentos = async () => {
+            const snap = await getDocs(collection(db, "equipamentos"));
+            let arr = [];
+            snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
+            return arr;
+        };
+
+        window.fbDeletarEquipamento = async (id) => {
+            await deleteDoc(doc(db, "equipamentos", id));
+            carregarEquipamentos();
+        };
+
+        // ORDENS DE SERVIÇO
+        window.fbSalvarOS = async (cliente_equip, tecnico, status, pecas) => {
+            await addDoc(collection(db, "ordens_servico"), { cliente_equip, tecnico, status, pecas, data: new Date().toLocaleDateString('pt-BR'), criadoEm: Date.now() });
+            carregarOS();
+        };
+
+        window.fbGetOS = async () => {
+            const snap = await getDocs(collection(db, "ordens_servico"));
+            let arr = [];
+            snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
+            return arr;
+        };
+
+        window.fbDeletarOS = async (id) => {
+            await deleteDoc(doc(db, "ordens_servico", id));
+            carregarOS();
+        };
+    </script>
+
+    <!-- Script de Interface Leve -->
+    <script>
+        function inicializarSistema() {
+            switchMainTab('estoque');
+        }
+
+        function switchMainTab(tabId) {
+            document.querySelectorAll('.main-tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-tab-btn').forEach(el => {
+                el.classList.remove('bg-blue-600', 'text-white', 'shadow-md', 'shadow-blue-600/25');
+                el.classList.add('hover:bg-slate-800', 'text-slate-300');
+            });
+            const targetTab = document.getElementById('tab-' + tabId);
+            if(targetTab) targetTab.classList.remove('hidden');
+            const btn = document.getElementById('btn-' + tabId);
+            if(btn) {
+                btn.classList.remove('hover:bg-slate-800', 'text-slate-300');
+                btn.classList.add('bg-blue-600', 'text-white', 'shadow-md', 'shadow-blue-600/25');
+            }
+
+            // Carrega os dados apenas da aba correspondente (evita travamentos)
+            if(tabId === 'estoque') carregarEstoque();
+            if(tabId === 'os') carregarOS();
+            if(tabId === 'cadastros') carregarClientes();
+        }
+
+        function switchCadastroTab(subTab) {
+            document.getElementById('view-cad-clientes').classList.add('hidden');
+            document.getElementById('view-cad-equipamentos').classList.add('hidden');
+            document.getElementById('btn-cad-clientes').className = "px-4 py-2 rounded-lg bg-slate-900 text-slate-300 text-sm font-medium transition";
+            document.getElementById('btn-cad-equipamentos').className = "px-4 py-2 rounded-lg bg-slate-900 text-slate-300 text-sm font-medium transition";
+
+            document.getElementById('view-cad-' + subTab).classList.remove('hidden');
+            document.getElementById('btn-cad-' + subTab).className = "px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold transition";
+
+            if(subTab === 'clientes') carregarClientes();
+            if(subTab === 'equipamentos') { carregarEquipamentos(); atualizarDropdownClientes(); }
+        }
+
+        // ESTOQUE FRONT
+        function mostrarNomeArquivo() {
+            const file = document.getElementById('est-foto').files[0];
+            const span = document.getElementById('est-foto-nome');
+            span.innerText = file ? file.name : 'Nenhuma imagem selecionada';
+            span.className = file ? 'text-emerald-400 font-medium' : 'text-slate-500 italic';
+        }
+
+        async function salvarItemEstoque() {
+            const nome = document.getElementById('est-nome').value;
+            const pn = document.getElementById('est-pn').value;
+            const qtd = parseInt(document.getElementById('est-qtd').value) || 0;
+            const fileInput = document.getElementById('est-foto');
+            if(!nome) return alert('A descrição da peça é obrigatória!');
+
+            if (fileInput.files && fileInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    const img = new Image();
+                    img.onload = async function() {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 120;
+                        canvas.height = img.height * (120 / img.width);
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        await window.fbSalvarEstoque(nome, pn || 'S/N', qtd, canvas.toDataURL('image/jpeg', 0.7));
+                        limparFormEstoque();
+                    }
+                    img.src = e.target.result;
+                }
+                reader.readAsDataURL(fileInput.files[0]);
+            } else {
+                await window.fbSalvarEstoque(nome, pn || 'S/N', qtd, null);
+                limparFormEstoque();
+            }
+        }
+
+        function limparFormEstoque() {
+            document.getElementById('est-nome').value = '';
+            document.getElementById('est-pn').value = '';
+            document.getElementById('est-qtd').value = '';
+            document.getElementById('est-foto').value = '';
+            document.getElementById('est-foto-nome').innerText = 'Nenhuma imagem selecionada';
+        }
+
+        async function carregarEstoque() {
+            const tbody = document.getElementById('lista-estoque');
+            tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-4 text-center text-slate-500 italic">A carregar estoque da nuvem...</td></tr>`;
+            try {
+                const lista = await window.fbGetEstoque();
+                if(!lista.length) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-4 text-center text-slate-500 italic">Nenhuma peça cadastrada.</td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = lista.map(item => `
+                    <tr class="border-b border-slate-800 hover:bg-slate-800/50 transition">
+                        <td class="px-4 py-3 text-center">
+                            ${item.foto ? `<img src="${item.foto}" class="w-10 h-10 object-cover rounded bg-slate-950 border border-slate-700 mx-auto">` : `<div class="w-10 h-10 rounded bg-slate-950 border border-slate-800 flex items-center justify-center mx-auto text-slate-600"><i class="fa-solid fa-image"></i></div>`}
+                        </td>
+                        <td class="px-4 py-3 font-bold text-white">${item.nome}</td>
+                        <td class="px-4 py-3 text-slate-400">${item.pn}</td>
+                        <td class="px-4 py-3 text-center"><span class="${item.qtd > 0 ? 'text-emerald-400' : 'text-rose-400'} font-bold text-sm">${item.qtd}</span></td>
+                        <td class="px-4 py-3">
+                            <div class="flex justify-center space-x-1.5">
+                                <button onclick="window.fbUpdateQtdEstoque('${item.id}', ${item.qtd + 1})" class="bg-slate-700 hover:bg-blue-600 text-white w-7 h-7 rounded flex items-center justify-center"><i class="fa-solid fa-plus"></i></button>
+                                <button onclick="window.fbUpdateQtdEstoque('${item.id}', ${Math.max(0, item.qtd - 1)})" class="bg-slate-700 hover:bg-amber-600 text-white w-7 h-7 rounded flex items-center justify-center"><i class="fa-solid fa-minus"></i></button>
+                                <button onclick="window.fbDeletarEstoque('${item.id}')" class="bg-slate-700 hover:bg-rose-600 text-white w-7 h-7 rounded flex items-center justify-center ml-2"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch(e) {
+                tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-4 text-center text-rose-400">Erro ao carregar dados do Firebase.</td></tr>`;
+            }
+        }
+
+        // CLIENTES FRONT
+        async function salvarCliente() {
+            const nome = document.getElementById('cad-cli-nome').value;
+            const cnpj = document.getElementById('cad-cli-cnpj').value;
+            const cidade = document.getElementById('cad-cli-cidade').value;
+            const contato = document.getElementById('cad-cli-contato').value;
+            const tel = document.getElementById('cad-cli-tel').value;
+            if(!nome) return alert('O nome do Cliente é obrigatório!');
+            await window.fbSalvarCliente(nome, cnpj, cidade, contato, tel);
+            document.getElementById('cad-cli-nome').value = '';
+            document.getElementById('cad-cli-cnpj').value = '';
+            document.getElementById('cad-cli-cidade').value = '';
+            document.getElementById('cad-cli-contato').value = '';
+            document.getElementById('cad-cli-tel').value = '';
+        }
+
+        async function carregarClientes() {
+            const container = document.getElementById('lista-clientes');
+            container.innerHTML = `<p class="text-xs text-slate-500 italic md:col-span-2">A carregar clientes...</p>`;
+            const lista = await window.fbGetClientes();
+            if(!lista.length) {
+                container.innerHTML = `<p class="text-xs text-slate-500 italic md:col-span-2">Nenhum cliente cadastrado.</p>`;
+                return;
+            }
+            container.innerHTML = lista.map(c => `
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs flex flex-col justify-between">
+                    <div>
+                        <h4 class="font-bold text-white text-sm mb-1">${c.nome}</h4>
+                        <p class="text-slate-400"><i class="fa-solid fa-location-dot mr-1"></i> ${c.cidade || 'N/I'}</p>
+                        <p class="text-slate-400 mt-1"><i class="fa-solid fa-user mr-1"></i> ${c.contato || 'Sem contato'} - ${c.tel}</p>
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-slate-800 flex justify-end">
+                        <button onclick="window.fbDeletarCliente('${c.id}')" class="text-red-400 hover:text-red-300 font-bold"><i class="fa-solid fa-trash mr-1"></i> Excluir</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // EQUIPAMENTOS FRONT
+        async function atualizarDropdownClientes() {
+            const clientes = await window.fbGetClientes();
+            const dropdown = document.getElementById('cad-eq-cliente');
+            dropdown.innerHTML = clientes.length ? `<option value="">Selecione o proprietário...</option>` + clientes.map(c => `<option value="${c.id}">${c.nome} (${c.cidade || 'Geral'})</option>`).join('') : `<option value="">Cadastre um cliente primeiro...</option>`;
+        }
+
+        async function salvarEquipamento() {
+            const cliente_id = document.getElementById('cad-eq-cliente').value;
+            const categoria = document.getElementById('cad-eq-categoria').value;
+            const fabricante = document.getElementById('cad-eq-fabricante').value;
+            const modelo = document.getElementById('cad-eq-modelo').value;
+            const serie = document.getElementById('cad-eq-serie').value;
+            if(!cliente_id || !modelo) return alert('Selecione o Cliente e digite o Modelo!');
+            await window.fbSalvarEquipamento(cliente_id, categoria, fabricante, modelo, serie);
+            document.getElementById('cad-eq-fabricante').value = '';
+            document.getElementById('cad-eq-modelo').value = '';
+            document.getElementById('cad-eq-serie').value = '';
+            carregarEquipamentos();
+        }
+
+        async function carregarEquipamentos() {
+            const container = document.getElementById('lista-equipamentos');
+            container.innerHTML = `<p class="text-xs text-slate-500 italic">A carregar equipamentos...</p>`;
+            const [equipamentos, clientes] = await Promise.all([window.fbGetEquipamentos(), window.fbGetClientes()]);
+            let clientesMap = {};
+            clientes.forEach(c => clientesMap[c.id] = c.nome);
+
+            if(!equipamentos.length) {
+                container.innerHTML = `<p class="text-xs text-slate-500 italic">Nenhum equipamento cadastrado.</p>`;
+                return;
+            }
+            container.innerHTML = equipamentos.map(eq => {
+                let dono = clientesMap[eq.cliente_id] || 'Cliente Removido';
+                return `
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs flex justify-between items-center">
+                        <div>
+                            <div class="flex items-center space-x-2 mb-1">
+                                <span class="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded font-bold">${eq.categoria}</span>
+                                <span class="text-slate-400 font-bold"><i class="fa-solid fa-hospital-user mr-1"></i>${dono}</span>
+                            </div>
+                            <h4 class="font-bold text-white text-sm">${eq.fabricante} ${eq.modelo}</h4>
+                            <p class="text-slate-400">NS: ${eq.serie || 'N/I'}</p>
+                        </div>
+                        <button onclick="window.fbDeletarEquipamento('${eq.id}'); carregarEquipamentos();" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ORDENS DE SERVIÇO CASCATA
+        async function abrirModalOS() {
+            document.getElementById('form-os-container').classList.remove('hidden');
+            document.getElementById('os-cliente-avulso-desc').value = '';
+            document.getElementById('os-equip-avulso-desc').value = '';
+            const clientes = await window.fbGetClientes();
+            const dropdownCli = document.getElementById('os-cliente-select');
+            let html = `<option value="">1. Selecione o Cliente...</option><option value="AVULSO_CLIENTE" class="text-amber-400 font-bold">⚠️ Cliente Avulso</option>`;
+            clientes.forEach(c => html += `<option value="${c.id}">${c.nome}</option>`);
+            dropdownCli.innerHTML = html;
+            atualizarEquipamentosOS();
+        }
+
+        function fecharModalOS() { document.getElementById('form-os-container').classList.add('hidden'); }
+
+        async function atualizarEquipamentosOS() {
+            const clienteId = document.getElementById('os-cliente-select').value;
+            const selectEquip = document.getElementById('os-equip-select');
+            const inputCliAvulso = document.getElementById('os-cliente-avulso-desc');
+            const inputEqAvulso = document.getElementById('os-equip-avulso-desc');
+
+            if(clienteId === 'AVULSO_CLIENTE') {
+                inputCliAvulso.classList.remove('hidden');
+                selectEquip.classList.add('hidden');
+                inputEqAvulso.classList.remove('hidden');
+            } else if (!clienteId) {
+                inputCliAvulso.classList.add('hidden');
+                inputEqAvulso.classList.add('hidden');
+                selectEquip.classList.remove('hidden');
+                selectEquip.innerHTML = `<option value="">Selecione o Cliente primeiro...</option>`;
+            } else {
+                inputCliAvulso.classList.add('hidden');
+                selectEquip.classList.remove('hidden');
+                const equipamentos = await window.fbGetEquipamentos();
+                const eqCliente = equipamentos.filter(eq => eq.cliente_id == clienteId);
+                let html = `<option value="">2. Selecione o Equipamento...</option><option value="AVULSO_EQUIP" class="text-amber-400 font-bold">⚠️ Equipamento Avulso neste Cliente</option>`;
+                eqCliente.forEach(eq => html += `<option value="${eq.categoria} ${eq.fabricante} ${eq.modelo}">${eq.categoria} ${eq.fabricante} ${eq.modelo}</option>`);
+                selectEquip.innerHTML = html;
+                verificarEquipAvulso();
+            }
+        }
+
+        function verificarEquipAvulso() {
+            const equipVal = document.getElementById('os-equip-select').value;
+            const inputEqAvulso = document.getElementById('os-equip-avulso-desc');
+            if(equipVal === 'AVULSO_EQUIP') inputEqAvulso.classList.remove('hidden');
+            else inputEqAvulso.classList.add('hidden');
+        }
+
+        async function salvarOS() {
+            const clienteId = document.getElementById('os-cliente-select').value;
+            const tecnico = document.getElementById('os-tecnico').value;
+            const status = document.getElementById('os-status').value;
+            const pecas = document.getElementById('os-pecas').value;
+            if(!clienteId || !tecnico) return alert('Selecione o Cliente e preencha o Técnico.');
+
+            let strOS = "";
+            if(clienteId === 'AVULSO_CLIENTE') {
+                const cName = document.getElementById('os-cliente-avulso-desc').value;
+                const eName = document.getElementById('os-equip-avulso-desc').value;
+                if(!cName || !eName) return alert('Preencha os campos avulsos.');
+                strOS = `⚠️ [Avulso] ${cName} | ${eName}`;
+            } else {
+                const clientes = await window.fbGetClientes();
+                const cliObj = clientes.find(c => c.id == clienteId);
+                const cliName = cliObj ? cliObj.nome : 'Cliente';
+                const equipVal = document.getElementById('os-equip-select').value;
+                if(!equipVal) return alert('Selecione o Equipamento.');
+                if(equipVal === 'AVULSO_EQUIP') {
+                    const eName = document.getElementById('os-equip-avulso-desc').value;
+                    if(!eName) return alert('Preencha o nome do equipamento avulso.');
+                    strOS = `${cliName} | ⚠️ [Eq. Avulso] ${eName}`;
+                } else {
+                    strOS = `${cliName} | ${equipVal}`;
+                }
+            }
+
+            await window.fbSalvarOS(strOS, tecnico, status, pecas || 'Nenhuma peça');
+            fecharModalOS();
+            carregarOS();
+        }
+
+        async function carregarOS() {
+            const container = document.getElementById('lista-os');
+            container.innerHTML = `<p class="text-xs text-slate-500 italic">A carregar ordens de serviço...</p>`;
+            const lista = await window.fbGetOS();
+            if(!lista.length) {
+                container.innerHTML = `<p class="text-xs text-slate-500 italic">Nenhuma OS registada.</p>`;
+                return;
+            }
+            container.innerHTML = lista.map(os => {
+                const isAvulso = os.cliente_equip.includes('⚠️');
+                return `
+                    <div class="bg-slate-950 p-4 rounded-xl border ${isAvulso ? 'border-amber-500/30' : 'border-slate-800'} flex justify-between items-center text-xs">
+                        <div>
+                            <div class="flex space-x-2">
+                                <span class="bg-blue-500/10 text-blue-400 px-2 rounded font-bold">OS #${os.id.slice(-4)}</span>
+                                <span class="text-slate-400">${os.data}</span>
+                                <span class="bg-amber-500/10 text-amber-400 px-2 rounded font-medium">${os.status}</span>
+                            </div>
+                            <h4 class="font-bold ${isAvulso ? 'text-amber-400' : 'text-white'} text-sm mt-1.5">${os.cliente_equip}</h4>
+                            <p class="text-slate-300 mt-1"><i class="fa-solid fa-user-gear mr-1"></i> ${os.tecnico} | <i class="fa-solid fa-box mr-1"></i> ${os.pecas}</p>
+                        </div>
+                        <button onclick="window.fbDeletarOS('${os.id}'); carregarOS();" class="text-red-400 px-2"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Manuais & POPs Tab Logic
+        function selectManualTab(key) {
+            document.querySelectorAll('.manual-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.manual-tab-btn').forEach(el => {
+                el.classList.remove('border-blue-500', 'bg-blue-500/10');
+                el.classList.add('border-slate-800', 'bg-slate-950');
+                const icon = el.querySelector('i');
+                const text = el.querySelector('h4');
+                if(icon) { icon.classList.remove('text-blue-400'); icon.classList.add('text-slate-400'); }
+                if(text) { text.classList.remove('text-white'); text.classList.add('text-slate-300'); }
+            });
+
+            document.getElementById('mcontent-' + key).classList.remove('hidden');
+            const btn = document.getElementById('mbtn-' + key);
+            btn.classList.remove('border-slate-800', 'bg-slate-950');
+            btn.classList.add('border-blue-500', 'bg-blue-500/10');
+            const activeIcon = btn.querySelector('i');
+            const activeText = btn.querySelector('h4');
+            if(activeIcon) { activeIcon.classList.remove('text-slate-400'); activeIcon.classList.add('text-blue-400'); }
+            if(activeText) { activeText.classList.remove('text-slate-300'); activeText.classList.add('text-white'); }
+        }
+    </script>
+</body>
+</html>

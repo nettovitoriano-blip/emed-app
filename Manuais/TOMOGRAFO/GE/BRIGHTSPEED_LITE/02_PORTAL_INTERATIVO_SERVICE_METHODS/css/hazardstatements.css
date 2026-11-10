@@ -1,0 +1,35 @@
+.blackTriangle img { width:20px;height:17px; }
+.blackTriangle { display:inline-block;width:20px;height:17px;margin-right:3px; }
+.whiteTriangle img { width:20px;height:17px; }
+.whiteTriangle { display:inline-block;width:20px;height:17px;margin-right:3px; }
+table.hazardStOuter {
+	border-width: 1px 1px 1px 1px;
+	border-spacing: 0px;
+	border-style: solid solid solid solid;
+	border-color: black black black black;
+	border-collapse: collapse;
+}
+
+table.hazardStOuter tbody td{
+	padding:0px;
+	text-align:center;
+}
+
+table.hazardStInner {
+	border-width: 0px 0px 0px 0px;
+	border-spacing: 0px;
+	border-collapse: collapse;
+	margin-left:auto;
+	margin-right:auto;
+}
+
+table.hazardStInner tbody td.hazardText{
+	font-size:18px;
+	font-weight:bold;
+	color:#000000;
+}
+table.hazardStInner tbody td.hazardWhiteText{
+	font-size:18px;
+	font-weight:bold;
+	color:#FFFFFF;
+}

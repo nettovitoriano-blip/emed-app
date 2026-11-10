@@ -1,0 +1,51 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Rotation Board (BSD Select)</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;1.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;1/14/08</P></td></tr></table><H1 ID="top">Rotation Board (BSD Select) </H1><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1513075-1012753">1&nbsp;&nbsp;Introduction<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">The rotation function involves the following sub-assemblies:</P><UL><LI CLASS="bulletlist"><P>Rotation board  </P></LI><LI CLASS="bulletlist"><P>Tube stator</P></LI></UL><P CLASS="sect1">The main features of the function are:</P><UL><LI CLASS="bulletlist"><P>One type of rotation board is available: high speed
+(max speed=180Hz=10800rpm) rotation board (with the capacity to drive
+the rotor in Low Speed). </P></LI><LI CLASS="bulletlist"><P>Each rotation board is capable to drive GE tubes (23Ohms/23Ohms
+stator), CGR tubes (50/110) and all vendors tubes. Tube adaptation
+is made by selecting the right capacitors module to adapt to the stator.</P></LI><LI CLASS="bulletlist"><P>High-speed rotation is capable to drive both tri-phased
+stator and bi-phased stators.</P></LI><LI CLASS="bulletlist"><P>The rotation function also manages the tube thermal
+safeties and the tube cooling commands.</P></LI></UL></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1513076-1012753">2&nbsp;&nbsp;High speed rotation<SPAN CLASS="SECT1EFF"> </SPAN></H2><DIV CLASS="ILLUSTRATION" id="SL1513077-1012753"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">JEDI generator / high speed rotation</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/1012753-1012751.jpg" BORDER="0" usemap="#SL1513031-1012753"></P></DIV></DIV><DIV CLASS="SECT1"><H2 CLASS="SECT1" ID="SL1513078-1012753">3&nbsp;&nbsp;Rotation Principle<SPAN CLASS="SECT1EFF"> </SPAN></H2><P CLASS="sect1">Since the rotation function must be able to drive either tri-phased
+stator or bi-phased stators, the inverter is a three-leg inverter
+with six IGBTs. This module is packaged in one pack.  </P><P CLASS="sect1">The inverter is feed by the DC Bus.  </P><P CLASS="sect1">The inverter drive uses a PWM (Pulse Width Modulation) of the
+IGBTs commands.  </P><P CLASS="sect1">This principle consists in applying a periodic command on the
+IGBTs equal to the speed selected in order to generate a sine wave
+current in each phase at the anode speed frequency with the optimum
+angle between the phases.  </P><P CLASS="sect1">Inside this &#8220;fundamental&#8221; command frequency, the
+IGBTs commands duration is modulated in order to get the right level
+of current in the phases. </P><DIV CLASS="ILLUSTRATION" id="SL1513079-1012753"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Example of bi-phased SLEM motors high drive timing</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/1012753-1012755.jpg" BORDER="0" usemap="#SL1513070-1012753"></P></DIV><P CLASS="sect1">Depending on the stator windings number (2 or 3), of their impedance
+and of the speed selected, the main and auxiliary phases are either
+connected directly to the phases (example: in high speed mode on a
+tri-phased low impedance stator, in low speed mode for a bi-phased
+stator, in high speed brake) or through a module of shift capacitors
+whose role is to put the right angle between the phases to ensure
+maximum efficiency in acceleration and run. </P><P CLASS="sect1">This capacitor module is defined for each stator and so different
+from one stator to another. Rotation is including a relay, which allow
+to put the capacitors in the circuit and to short-circuit it depending
+of the state of the rotation drive.    </P><P CLASS="sect1">As the IGBTs are connected to the DC voltage, IGBTs gates drives
+require isolation. This is accomplished through optocouplers. Gates
+drives power supplies are generated by a small flyback power supply
+which uses the +15V of the Control Bus to generate 4 isolated +15V
+to power each IGBT gate (and the 5V for all logic function).</P><P CLASS="sect1">The rotation drive mainly relies on a 16 bits, 20MHz, 32Kbyte
+memory micro controller.  </P><P CLASS="sect1">It is in charge of the main functions:</P><UL><LI CLASS="bulletlist"><P>Get at power-up the rotation database containing all
+the data required to drive the stator  (through the CAN serial line
+of the Control Bus):</P><UL><LI CLASS="bulletlist"><P>Currents reference for each state </P></LI><LI CLASS="bulletlist"><P>Acceleration and brake durations</P></LI><LI CLASS="bulletlist"><P>Inverter current safety levels</P></LI></UL></LI><LI CLASS="bulletlist"><P>Receive the commands (go to speed=10000rpm), and update
+the rotation state accordingly </P></LI><LI CLASS="bulletlist"><P>Measure the inverter currents and regulate the inverter
+ (fundamental and modulation)</P></LI><LI CLASS="bulletlist"><P>Give the feedbacks (speed=10000rpm, errors) to the
+main software, and put the rotation in a safe state in case of error</P></LI><LI CLASS="bulletlist"><P>Read the tube safeties and drive the tube cooling</P></LI></UL><P CLASS="sect1">The microcontroller commands the power bridge drive through
+an EPLD in charge of:</P><UL><LI CLASS="bulletlist"><P>mixing fundamental and modulation commands </P></LI><LI CLASS="bulletlist"><P>demultiplexing the PWM command to command the 6 IGBTs</P></LI><LI CLASS="bulletlist"><P>stop the inverter in case a safeties which require
+a fast action : inverter overload, mains drop, tube temperature reaches
+70 degrees</P></LI><LI CLASS="bulletlist"><P>drive the high speed relay</P></LI></UL><P CLASS="sect1">Fundamental frequency is applied so that the sine wave in the
+phases is at the frequency corresponding to the desired anode speed.
+It is calculated by the microcontroller. </P><P CLASS="sect1">The modulation of the IGBT commands is the result of a regulation
+loop, which ensure to reach the right current level for the tube and
+the rotation state. </P><P CLASS="sect1">This loop ensures optimum acceleration performances in all conditions
+of DC bus and of stator temperature. The current is measured inside
+2 phases, reconstructed for the third phase.  </P><P CLASS="sect1">Then the measure is compared to the reference value and the
+error leads to an adjustment of the modulation rate. All rotation
+states are regulated except the brake. Brake includes a state where
+a DC current is generated in open loop mode, the commands frequency
+depending only of the tube and the line voltage.</P></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>

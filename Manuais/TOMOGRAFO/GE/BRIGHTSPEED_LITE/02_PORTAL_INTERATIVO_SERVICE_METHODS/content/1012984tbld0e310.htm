@@ -1,0 +1,28 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Error Class Definitions</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><DIV CLASS="TABLE"><CENTER><P CLASS="TABLEINTRO" ID="SL1517387-1012984"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;4:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Error Class Definitions</SPAN> </P><table summary="Error Class Definitions" border="1"><colgroup><col width="9%"><col width="91%"></colgroup><thead valign=""><tr valign="top"><th align="left" valign="top">Class</th><th align="left" valign="top">Description</th></tr></thead><tbody valign=""><tr valign="top"><td align="left" valign="top">1</td><td align="left" valign="top">Errors which have no
+impact on the system operation. Errors detected in background diagnostics
+during application. They are referred as &#8221;Warning&#8221; errors,
+to monitor drifts and used for engineering tracking. The generator
+phase remains unchanged. Errors are stored in the JEDI event log.</td></tr><tr valign="top"><td align="left" valign="top">2</td><td align="left" valign="top">Errors which are detected
+by JEDI and that are recoverable automatically without noticeable
+effect on the system, such as error related to recovered tube spits.
+The generator phase remains unchanged. Errors which usually occur
+during exposure.</td></tr><tr valign="top"><td align="left" valign="top">3</td><td align="left" valign="top">Errors detected by JEDI
+during exposure. They stop the exposure and revert the generator into
+a safe state. Error will be reset on Exposure Command release. It
+will require another Exposure Command to restart the sequence. The
+generator phase is set to &#8221;error&#8221; until the error is cleared.</td></tr><tr valign="top"><td align="left" valign="top">4</td><td align="left" valign="top">Errors which are related
+to any hardware failures, software application or communication errors.
+JEDI will revert to a safe state. If preparation is in progress, it
+is stopped. Errors are cleared either by a reset error action from
+the system (for system having a reset error mechanism) or by a prep
+release or by a new prep command. The generator phase is set to &#8221;error&#8221;
+until the error is cleared. Application cannot work if errors are
+persistent.</td></tr><tr valign="top"><td align="left" valign="top">5</td><td align="left" valign="top">These codes may appear
+when the generator or tube temperature limits are reached. The application
+waits until the thermal information disappears. The error information
+is temporary. The generator phase is set to &#8221;error&#8221; until
+the error is cleared.</td></tr></tbody></table></CENTER></DIV></BODY></HTML>

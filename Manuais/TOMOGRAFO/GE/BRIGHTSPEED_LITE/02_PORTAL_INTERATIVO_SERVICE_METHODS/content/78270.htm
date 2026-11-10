@@ -1,0 +1,86 @@
+<HTML><HEAD>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <TITLE>Troubleshooting Rings in an Axial Image</TITLE><LINK REL="StyleSheet" HREF="../css/style.css" type="text/css"><LINK REL="StyleSheet" HREF="../css/hazardstatements.css" type="text/css"><!--[if lt IE 7]>
+			<LINK REL="StyleSheet" HREF="../css/ie6alphaloader.css" type="text/css" />
+			<![endif]--><script language="JavaScript" src="../scripts/winopen.js"></script><script language="JavaScript" src="../scripts/webmonk.gos"></script><script language="JavaScript" src="../scripts/modules_init.js"></script><script language="JavaScript" src="../scripts/bookmark.js"></script><script language="JavaScript" src="../scripts/efunctions.js"></script><script language="JavaScript" src="../scripts/cgmhotspot.js"></script></HEAD><BODY><table width="100%" border="0" cellspacing="0" cellpadding="0" class="background"><tr valign="top"><td width="5%"><img src="../images/transparent.gif" width="10" height="10"><script language="JavaScript" src="../scripts/bookmark2.js"></script></td><td><P CLASS="BREADCRUMB"></P></td><td align="right"><P CLASS="BREADCRUMB">Operating Documentation<BR><B>Direction&nbsp;&nbsp;</B>5181178-800,&nbsp;&nbsp;<B>Rev#</B>&nbsp;&nbsp;16<BR>BrightSpeed Select Service Methods Gen<BR><B>Module Version</B>&nbsp;&nbsp;2.0,&nbsp;&nbsp;<B>Version Date</B>&nbsp;&nbsp;3/9/09</P></td></tr></table><H1 ID="top">Troubleshooting Rings in an Axial Image </H1><DIV CLASS="INFTABLE"><div align="center"><table border="1"><colgroup><col width="51%"><col width="49%"></colgroup><tbody valign=""><tr valign="top"><td valign="">Last Revised:</td><td valign="">9 February 2009</td></tr></tbody></table></div></DIV><TABLE CLASS="ADMONdescriptive" CELLSPACING="0%" CELLPADDING="0%" ID="d0e39"><TBODY VALIGN="TOP" CLASS="ADMON"><TR CLASS="ADMON"><TD CLASS="ADMON"><B>NOTE:</B></TD><TD CLASS="ADMON">Related Topic: Refer also to &#8220;Image Quality Test
+Procedures&#8221; (located in <SPAN CLASS="MENUCHOICE">Troubleshooting
+&#8594;
+Image Quality</SPAN> folder).</TD></TR></TBODY></TABLE><P CLASS="TABLESPACER"></P><P CLASS="descriptive">Using the Example shown
+in <A HREF="javascript:winopen('78270illd0e209.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;1</A>, there is an obvious ring in the first image within
+the group of 4 images. During an Axial series, it is important to
+know certain parameters about the Scan Prescription. See <A HREF="javascript:winopen('78270tbld0e54.htm','Table','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Table&nbsp;1</A>.</P><DIV CLASS="TABLE"><div align="center"><P CLASS="TABLEINTRO" ID="SL78274-78270"><SPAN CLASS="TABLEINTRO"><B>Table&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="TABLETITLE">Troubleshooting a Ring in an Axial Image</SPAN> </P><table summary="Troubleshooting a Ring in an Axial Image" border="1"><colgroup><col width="93"><col width="101"><col width="480"></colgroup><thead valign=""><tr valign="top"><th colspan="2" align="left" valign="top">SCAN (RX) PRESCRIPTION</th><th align="left" valign="top">COMMENTS</th></tr></thead><tbody valign=""><tr valign="top"><td rowspan="3" align="left" valign="top">Scan Type</td><td rowspan="3" align="left" valign="top">Axial</td><td align="left" valign="top">In a Axial mode, there
+are several options relative to scanning and displaying images, either
+4 x i, or 2 x I (where i = thickness)</td></tr><tr valign="top"><td valign="">In a 4 x i mode, images are created from the rows used as indicated
+by slice thickness. <B>This mode should always be used to
+troubleshoot Detector / DAS related artifacts.</B></td></tr><tr valign="top"><td valign="">In a 2 x i mode Recon actually combines 2 rows of data to produce
+a thicker slice.</td></tr><tr valign="top"><td align="left" valign="top">Scan Type</td><td align="left" valign="top">Helical</td><td align="left" valign="top">Images are created using
+data from all Rows used during data acquisition. (The actual rows
+being dependent on slice thickness) The amount of data used to reconstruct
+a image from a row, or row weighting is dependent on table speed.</td></tr><tr valign="top"><td rowspan="8" align="left" valign="top">Head First </td><td rowspan="8" align="left" valign="top">Head First</td><td align="left" valign="top">Image 1 consists of
+the Data in Row 4A</td></tr><tr valign="top"><td valign="">Image 2 consists of the Data in Row 3A</td></tr><tr valign="top"><td valign="">Image 3 consists of the Data in Row 2A</td></tr><tr valign="top"><td valign="">Image 4 consists of the Data in Row 1A </td></tr><tr valign="top"><td valign="">Image 5 consists of the Data in Row 1B</td></tr><tr valign="top"><td valign="">Image 6 consists of the Data in Row 2B</td></tr><tr valign="top"><td valign="">Image 7 consists of the Data in Row 3B</td></tr><tr valign="top"><td valign="">Image 8 consists of the Data in Row 4B</td></tr><tr valign="top"><td rowspan="8" align="left" valign="top">Feet First</td><td rowspan="8" align="left" valign="top">Feet First</td><td align="left" valign="top">Image 1 consists of
+the Data in Row 4B</td></tr><tr valign="top"><td valign="">Image 2 consists of the Data in Row 3B</td></tr><tr valign="top"><td valign="">Image 3 consists of the Data in Row 2B</td></tr><tr valign="top"><td valign="">Image 4 consists of the Data in Row 1B</td></tr><tr valign="top"><td valign="">Image 1 consists of the Data in Row 1A</td></tr><tr valign="top"><td valign="">Image 2 consists of the Data in Row 2A</td></tr><tr valign="top"><td valign="">Image 3 consists of the Data in Row 3A</td></tr><tr valign="top"><td valign="">Image 4 consists of the Data in Row 4A</td></tr><tr valign="top"><td rowspan="8" align="left" valign="top">Slice Thickness</td><td align="left" valign="top">4 x 1.25</td><td align="left" valign="top">Uses 4 Center rows of
+the Detector (D2, D1, D1, D2)</td></tr><tr valign="top"><td valign="">4 x 2.50</td><td valign="">Uses 8 Center rows of the Detector  (D4+D3, D2+D1, D1+D2, D3+D4)</td></tr><tr valign="top"><td valign="">4 x 3.75</td><td valign="">Uses 12 Center rows of the Detector (D6+D5+D4, D3+D2+D1, ....)</td></tr><tr valign="top"><td valign="">4 x 5.00</td><td valign="">Uses 16 rows of the Detector (D8+D7+D6+D5, D4+D3+D2+D1,...)</td></tr><tr valign="top"><td valign="">8 x 1.25</td><td valign="">Uses 16 rows of the Detector  (D8, D7, D6, D5, D4, D3, D2,
+D1, D1, D2...)</td></tr><tr valign="top"><td valign="">8 x 2.50</td><td valign="">Uses 16 rows of the Detector  (D8+D7, D6+D5, D4+D3, D2+D1,
+D1+D2...)</td></tr><tr valign="top"><td valign="">1 x 1.25</td><td valign="">Uses 1 Center row of the Detector  (A side D1)</td></tr><tr valign="top"><td valign="">Thin Twin</td><td valign="">Uses 2 Center rows of the Detector  (D1, D1)</td></tr><tr valign="top"><td align="left" valign="top">Technique</td><td align="left" valign="top">KV vs. Slice Thickness</td><td align="left" valign="top">The DAS Converter boards
+have 31 pre-amp gains that are selected by selected technique. These
+gains are not User selectable, however it is important to know if
+a Artifact only appears at the same pre-amp gain. The pre-amp gain
+used can be found within the scan header by using Scan Analysis.</td></tr><tr valign="top"><td align="left" valign="top">Focal Spot Size</td><td align="left" valign="top">Small vs. Large</td><td align="left" valign="top">Technique dependent
+small spot &#8804; 24KW, Large spot &gt; 24KW</td></tr><tr valign="top"><td align="left" valign="top">Calibration Used</td><td align="left" valign="top">Small vs. Large</td><td align="left" valign="top">Needed to know if artifact
+may be caused by cal vectors</td></tr></tbody></table></div></DIV><DIV CLASS="ILLUSTRATION" id="SL78273-78270"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;1:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Example of Bad Channel in Axial Image Series</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/78270-78312.gif" BORDER="0" usemap="#SL78313-78270"></P></DIV><P CLASS="descriptive">Looking at the Example in <A HREF="javascript:winopen('78270illd0e209.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;1</A>,
+just by knowing the scan series was using Axial 4 x 5.00 Mode and
+was done Head first (Annotation of image vs. Table position), it can
+be determined that the Ring is probably in Row 2A of the Scanfile.</P><P CLASS="descriptive">To confirm this, use Scan Analysis and plot the Means &amp; Standard Deviations 	 
+(MSD)
+ of the selected Exam, Series, and Scan Number. From the Service
+Desktop:</P><OL><LI CLASS="numlist"><P>Select <SPAN CLASS="GUIBUTTON">[UTILITIES]</SPAN>.</P></LI><LI CLASS="numlist"><P>Select <SPAN CLASS="GUIBUTTON">[TOOLS]</SPAN>.</P></LI><LI CLASS="numlist"><P>Select <SPAN CLASS="GUIBUTTON">[SCAN ANALYSIS]</SPAN>.</P></LI></OL><DIV CLASS="ILLUSTRATION" id="I11-8-78270"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;2:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Scan Analysis GUI</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/78270-78316.gif" BORDER="0" usemap="#SL78317-78270"></P></DIV><P CLASS="descriptive">Select an <SPAN CLASS="GUIBUTTON">[EXAM NUMBER]</SPAN>, <SPAN CLASS="GUIBUTTON">[SERIES]</SPAN>, and <SPAN CLASS="GUIBUTTON">[SCAN NUMBER]</SPAN>. Remember that 1 scan, in
+a 4 x i mode, is made up of 4 Data sets (or rows), which produces
+4 images. In the example, images 1 through 4 are created from scan
+1. Once the scan is highlighted, select <SPAN CLASS="GUIBUTTON">[PLOT MSD]</SPAN>.</P><DIV CLASS="ILLUSTRATION" id="I11-9-78270"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;3:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Plot MSD GUI</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/78270-78284.gif" BORDER="0" usemap="#SL78285-78270"></P></DIV><P CLASS="descriptive">Leave the view compression defaulted to <SPAN CLASS="GUIBUTTON">[NONE]</SPAN>, but choose <SPAN CLASS="GUIBUTTON">[CONVOLVED DATA]</SPAN>, which will identify
+a ring type artifact better in the resultant plot. Select <SPAN CLASS="GUIBUTTON">[OK]</SPAN>.</P><DIV CLASS="ILLUSTRATION" id="SL78275-78270"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;4:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Scan Analysis (2A) Means &amp; Standard Deviation GUI</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/78270-78290.gif" BORDER="0" usemap="#SL78291-78270"></P></DIV><P CLASS="descriptive">The Scan Analysis Tool will first plot Row 2A. Any of the 4
+rows of Means and Standard Deviations can be viewed by selecting the
+appropriate tabs (see <A HREF="javascript:winopen('78270illd0e280.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;4</A>). Select the tab that indicates
+the row where the ring is expected based on your initial observations.
+It maybe necessary to adjust the level to find a spike in the data
+or view other rows. Look for any abnormal spikes.</P><DIV CLASS="ILLUSTRATION" id="SL78276-78270"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;5:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Scan Analysis (1A) Means &amp; St. Dev. GUI</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/78270-78294.gif" BORDER="0" usemap="#SL78295-78270"></P></DIV><P CLASS="descriptive">In Row 2A (see <A HREF="javascript:winopen('78270illd0e280.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;4</A>), the ring is apparent. Notice
+the large spike in the data on channel 189. Row 1A (see <A HREF="javascript:winopen('78270illd0e289.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;5</A>)
+has a small spike on channel 189 that is a result of capacitive discharge
+from row 2b channel 189. The small spike can be ignored. It is a product
+of the major spike on row 2B. Rows 1B and 2B look good. See Figures <A HREF="javascript:winopen('78270illd0e304.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;6</A> and <A HREF="javascript:winopen('78270illd0e309.htm','Illustration','width=720,height=500,menubar=no,toolbar=no,status=yes,resizable=yes,scrollbars=yes')">Illustration&nbsp;7</A>.</P><DIV CLASS="ILLUSTRATION" id="SL78277-78270"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;6:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Scan Analysis (1B) Means &amp; St. Dev. GUI</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/78270-78297.gif" BORDER="0" usemap="#SL78298-78270"></P></DIV><DIV CLASS="ILLUSTRATION" id="SL78278-78270"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;7:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Scan Analysis (2A) Means &amp; St. Dev. GUI</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/78270-78302.gif" BORDER="0" usemap="#SL78303-78270"></P></DIV><P CLASS="descriptive">Now the Ring has been verified. It is in Row 2B and is on DAS
+Channel 189.</P><P CLASS="descriptive">From within Scan Analysis, Cal vectors can be plotted to see
+if the bad DAS channel is present.</P><P CLASS="descriptive">Determine if the ring
+is caused by a particular acquisition mode by scanning a phantom using
+different modes or slice thickness&#8217;. The example was scanned
+in a 4 x 5.00 mode and the ring appeared on Row 2A, therefore, the
+Detector rows or diodes used were D8+D7+D6+D5. They produce row 2A.
+If another scan was taken at 4 x 1.25 mode, then the first image,
+or row 2A data would be acquired from Detector row D2. If the ring
+is a hard failure (consistent every time) and if after changing slice
+thickness the ring does away, the ring may have been caused by a suspect
+detector. Remember to use 8 x 1.25 mm in the 8 slice system configuration.
+Perform further detector verification before replacing a detector.
+If the ring is still present, the problem could still be the detector,
+but may be a DAS board or elastomer interface connection.</P><P CLASS="descriptive">By using the <SPAN CLASS="GUIBUTTON">[DAS / DETECTOR]</SPAN> Architecture
+Tool, found in the pull-down menu under <SPAN CLASS="GUIBUTTON">[FILE]</SPAN>, select the tool. A TTY window appears and prompts for a Detector
+Row and DAS Channel. The program will display the associated DAS Converter
+board, Detector channel, module number, elastomer number, and other
+important information.Find the associated DAS converter board number.
+If you have multiple rings, look for patterns (Converter Bd, Row,
+etc.).</P><P CLASS="descriptive">If DAS is Suspect, swap filter Cards and repeat Scan &amp; Analyze.
+When swapping cards make sure you swap with a card 4 slots away, slot
+12 with slot 16 for example. This ensures the data from FET multiplexing
+is not on the same card.</P><OL><LI CLASS="numlist"><P>If bad channel follows bd. replace
+the bd.</P></LI><LI CLASS="numlist"><P>If bad channel stays at same location,
+problem area could be:</P><OL TYPE="a"><LI CLASS="numlist"><P>DAS Backplane</P></LI><LI CLASS="numlist"><P>DAS Backplane to Elastomeric connection
+point</P></LI><LI CLASS="numlist"><P>Elastomeric to Detector Flex connection
+point</P><OL TYPE="i"><LI CLASS="numlist"><P>Bad Detector (Replace)</P></LI><LI CLASS="numlist"><P>Bad Flex (part of detector, replace
+Detector)</P></LI><LI CLASS="numlist"><P>Bad Flex to Detector connection point
+(part of detector, replace Detector)</P></LI><LI CLASS="numlist"><P>Bad Detector Channel (part of detector,
+replace Detector</P></LI><LI CLASS="numlist"><P>Bad Detector Cell (part of detector,
+replace Detector)</P></LI></OL></LI></OL></LI></OL><P CLASS="descriptive">Troubleshoot Ring Artifacts in a Helical series by duplicating
+the problem in a Axial Mode. If the Helical data is used to troubleshoot,
+the bad data can be in any row since all 8 rows of data can be used
+to produce a Helical image and the number of views to produce a helical
+image are weighted differently based on table speed and pitch.</P><P CLASS="descriptive">Note that the Helical images are a result of the same bad DAS
+Channel as the Above Axial example. The hard ring in the Axial example
+appears as partial arcs in the Helical images.</P><DIV CLASS="ILLUSTRATION" id="I11-14-78270"><P CLASS="ILLUSTITLE"><SPAN CLASS="ILLUSINTRO"><B>Illustration&nbsp;8:&nbsp;&nbsp;</B></SPAN><SPAN CLASS="ILLUSTITLE">Example of Bad Channel in Helical Image Series</SPAN> </P><P CLASS="ILLUSTGRAPHIC"><IMG SRC="../media/78270-78306.gif" BORDER="0" usemap="#SL78307-78270"></P></DIV><P CLASS="backtotop" ALIGN="right"><A HREF="#top"><IMG BORDER="0" SRC="../icons/top.gif" ALT="../icons/top.gif" WIDTH="57" HEIGHT="23"></A></P></BODY></HTML>
