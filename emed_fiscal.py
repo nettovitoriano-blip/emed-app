@@ -106,6 +106,21 @@ class CertificadoManager:
     def status_certificado(cls, filial_codigo: str, db_name: str) -> Dict[str, Any]:
         p = cls.get_cert_path(filial_codigo)
         existe = p.exists() and p.stat().st_size > 0
+        
+        # Se não existe em disco mas está salvo no banco em base64, restaura automaticamente
+        if not existe:
+            try:
+                with _get_db_connection(db_name) as conn:
+                    cur = conn.execute("SELECT valor FROM configuracoes_sistema WHERE chave = ?", (f"cert_b64_{filial_codigo.lower()}",))
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        raw_bytes = base64.b64decode(row[0])
+                        p.parent.mkdir(parents=True, exist_ok=True)
+                        p.write_bytes(raw_bytes)
+                        existe = True
+            except Exception:
+                pass
+
         return {
             "instalado": existe,
             "caminho": str(p) if existe else None,
@@ -114,18 +129,29 @@ class CertificadoManager:
         }
 
     @classmethod
-    def salvar_certificado(cls, filial_codigo: str, arquivo_bytes: bytes, senha: str, db_name: str) -> Tuple[bool, str]:
+    def salvar_certificado(cls, filial_codigo: str, arquivo_bytes: bytes, senha: str, db_name: str, replicar_todas: bool = True) -> Tuple[bool, str]:
         try:
-            p = cls.get_cert_path(filial_codigo)
-            p.write_bytes(arquivo_bytes)
+            alvos = ["FILIAL_DF", "MATRIZ_CE"] if replicar_todas else [filial_codigo]
             agora_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-            with _get_db_connection(db_name) as conn:
-                conn.execute("""
-                    INSERT OR REPLACE INTO configuracoes_sistema (chave, valor, data_atualizacao)
-                    VALUES (?, ?, ?)
-                """, (f"cert_senha_{filial_codigo.lower()}", senha, agora_str))
-                conn.commit()
-            return True, f"✅ Certificado A1 da {filial_codigo} instalado com sucesso em {p.name}!"
+            b64_str = base64.b64encode(arquivo_bytes).decode("ascii")
+
+            for cod in alvos:
+                p = cls.get_cert_path(cod)
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_bytes(arquivo_bytes)
+                with _get_db_connection(db_name) as conn:
+                    conn.execute("""
+                        INSERT OR REPLACE INTO configuracoes_sistema (chave, valor, data_atualizacao)
+                        VALUES (?, ?, ?)
+                    """, (f"cert_senha_{cod.lower()}", senha, agora_str))
+                    conn.execute("""
+                        INSERT OR REPLACE INTO configuracoes_sistema (chave, valor, data_atualizacao)
+                        VALUES (?, ?, ?)
+                    """, (f"cert_b64_{cod.lower()}", b64_str, agora_str))
+                    conn.commit()
+
+            msg = "✅ Certificado A1 da EMED instalado e ativado com sucesso para Matriz e Filial!" if replicar_todas else f"✅ Certificado A1 da {filial_codigo} instalado com sucesso!"
+            return True, msg
         except Exception as exc:
             return False, f"Erro ao salvar certificado: {exc}"
 
@@ -704,28 +730,43 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
         </div>
         """, unsafe_allow_html=True)
 
-    with st.expander(f"⚙️ Configurar Dados Fiscais & Certificado Digital A1 ({cfg_ativa.get('nome')})"):
-        st.info("💡 Você pode alterar os dados oficiais da filial ou carregar o Certificado Digital A1 (.pfx) para transmissão direta.")
+    tipo_unidade = "Matriz" if codigo_filial == "MATRIZ_CE" else "Filial"
+    nome_unidade = "Matriz (Eusébio - CE)" if codigo_filial == "MATRIZ_CE" else "Filial Brasília (DF)"
+
+    with st.expander(f"⚙️ Configurar Dados Fiscais & Certificado Digital A1 ({nome_unidade})"):
+        if st_cert['instalado']:
+            st.markdown(f"""
+            <div style="background:#064e3b; border:1px solid #10b981; border-radius:6px; padding:10px 14px; margin-bottom:12px; color:#ecfdf5; font-size:12px;">
+                <b>🔒 CERTIFICADO DIGITAL A1 GRAVADO & ATIVO PARA A {tipo_unidade.upper()}!</b><br/>
+                O arquivo do certificado já está instalado e protegido no sistema. Você <b>não precisa</b> reenviar o certificado ao trocar de unidade ou navegar entre telas.<br/>
+                <span style="color:#a7f3d0; font-size:11px;">(Caso precise atualizar por vencimento ou renovação anual, basta carregar o novo arquivo .pfx abaixo).</span>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.info(f"💡 Você pode alterar os dados oficiais da {tipo_unidade.lower()} ou carregar o Certificado Digital A1 (.pfx) para transmissão direta à SEFAZ.")
+
         c_conf1, c_conf2 = st.columns(2)
         with c_conf1:
-            novo_cnpj = st.text_input("CNPJ da Filial:", value=cfg_ativa.get("cnpj", ""), key=f"inp_cnpj_{codigo_filial}")
+            novo_cnpj = st.text_input(f"CNPJ da {tipo_unidade}:", value=cfg_ativa.get("cnpj", ""), key=f"inp_cnpj_{codigo_filial}")
             novo_im = st.text_input("Inscrição Municipal / CF/DF:", value=cfg_ativa.get("inscricao_municipal", ""), key=f"inp_im_{codigo_filial}")
             nova_razao = st.text_input("Razão Social Completa:", value=cfg_ativa.get("razao_social", ""), key=f"inp_razao_{codigo_filial}")
             novo_end = st.text_input("Endereço Completo:", value=cfg_ativa.get("endereco", ""), key=f"inp_end_{codigo_filial}")
         with c_conf2:
-            nova_serie = st.text_input("Série da Nota Fiscal:", value=cfg_ativa.get("serie_padrao", "DF-1"), key=f"inp_ser_{codigo_filial}")
-            nova_aliq = st.number_input("Alíquota ISS Padrão (%):", value=float(cfg_ativa.get("aliquota_iss_padrao", 5.0)), min_value=0.0, max_value=10.0, step=0.1, key=f"inp_aliq_{codigo_filial}")
+            nova_serie = st.text_input("Série da Nota Fiscal:", value=cfg_ativa.get("serie_padrao", "DF-1" if codigo_filial == "FILIAL_DF" else "1"), key=f"inp_ser_{codigo_filial}")
+            nova_aliq = st.number_input(f"Alíquota ISS Padrão da {tipo_unidade} (%):", value=float(cfg_ativa.get("aliquota_iss_padrao", 5.0)), min_value=0.0, max_value=10.0, step=0.1, key=f"inp_aliq_{codigo_filial}")
             novo_fone = st.text_input("Telefone da Unidade:", value=cfg_ativa.get("telefone", ""), key=f"inp_fone_{codigo_filial}")
             novo_email = st.text_input("E-mail Financeiro:", value=cfg_ativa.get("email", ""), key=f"inp_mail_{codigo_filial}")
 
-        st.markdown("#### 🔐 Upload de Certificado Digital A1 (.pfx / .p12)")
+        st.markdown(f"#### 🔐 Certificado Digital A1 (.pfx / .p12) &bull; {tipo_unidade}")
         col_cert1, col_cert2 = st.columns([2, 1])
         with col_cert1:
-            arq_cert = st.file_uploader("Arquivo do Certificado A1 (.pfx)", type=["pfx", "p12"], key=f"file_cert_{codigo_filial}")
+            arq_cert = st.file_uploader(f"Carregar Novo Arquivo .pfx / .p12 ({tipo_unidade}):", type=["pfx", "p12"], key=f"file_cert_{codigo_filial}")
         with col_cert2:
             senha_cert = st.text_input("Senha do Certificado:", type="password", key=f"pwd_cert_{codigo_filial}")
 
-        if st.button("💾 Salvar Parâmetros da Filial", type="primary", key=f"btn_salv_cfg_{codigo_filial}"):
+        replicar_cert = st.checkbox("🔗 Aplicar este mesmo Certificado A1 da EMED para todas as unidades (Matriz e Filial)", value=True, key=f"chk_rep_{codigo_filial}")
+
+        if st.button(f"💾 Salvar Parâmetros da {tipo_unidade}", type="primary", key=f"btn_salv_cfg_{codigo_filial}"):
             cfg_ativa.update({
                 "cnpj": novo_cnpj.strip(),
                 "inscricao_municipal": novo_im.strip(),
@@ -741,14 +782,15 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
             if arq_cert and senha_cert:
                 ok_c, msg_c = CertificadoManager.salvar_certificado(
                     codigo_filial if codigo_filial != "CONSOLIDADO" else "FILIAL_DF",
-                    arq_cert.read(), senha_cert, db_name
+                    arq_cert.read(), senha_cert, db_name,
+                    replicar_todas=replicar_cert
                 )
                 if ok_c:
                     st.success(msg_c)
                 else:
                     st.error(msg_c)
 
-            st.success("✅ Configurações salvas com sucesso!")
+            st.success(f"✅ Parâmetros da {tipo_unidade} ({cfg_ativa.get('sigla')}) salvos com sucesso! Alíquota ISS: {float(nova_aliq):.1f}%")
             st.rerun()
 
     with _get_db_connection(db_name) as conn:
