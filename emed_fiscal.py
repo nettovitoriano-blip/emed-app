@@ -916,13 +916,24 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
                 </div>
                 """, unsafe_allow_html=True)
 
+                html_p = res_nota.get("html_path")
+                danfe_content = ""
+                if html_p and os.path.exists(html_p):
+                    with open(html_p, "r", encoding="utf-8") as f_h:
+                        danfe_content = f_h.read()
+
                 c_act1, c_act2, c_act3 = st.columns(3)
                 with c_act1:
-                    st.markdown(f"""
-                    <a href="/api/fiscal/danfe/{os_id_sel}" target="_blank" style="background:#0284c7; color:white; padding:10px 14px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:13px; display:inline-block; text-align:center; width:100%;">
-                        👁️ Abrir / Imprimir Espelho DANFE
-                    </a>
-                    """, unsafe_allow_html=True)
+                    if danfe_content:
+                        st.download_button(
+                            "🖨️ Baixar / Imprimir Espelho DANFE (HTML)",
+                            data=danfe_content,
+                            file_name=f"DANFE_{res_nota.get('numero_nf')}.html",
+                            mime="text/html",
+                            use_container_width=True
+                        )
+                    else:
+                        st.info("Espelho DANFE disponível na visualização abaixo.")
 
                 with c_act2:
                     xml_p = res_nota.get("xml_path")
@@ -942,14 +953,19 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
                         f"🏥 *Cliente:* {res_nota.get('cliente')}\n"
                         f"📋 *NFS-e Nº:* {res_nota.get('numero_nf')} (OS #{os_id_sel})\n"
                         f"💰 *Valor Total:* R$ {float(res_nota.get('valor_liquido') or 0):,.2f}\n"
-                        f"🔗 *Espelho da Nota:* http://localhost:8502/api/fiscal/danfe/{os_id_sel}"
+                        f"🔐 *Chave de Acesso:* {res_nota.get('chave_acesso')}\n"
+                        f"✅ *Status:* AUTORIZADA SEFAZ"
                     )
                     link_wpp = f"https://wa.me/?text={urllib.parse.quote(msg_wpp)}"
                     st.markdown(f"""
                     <a href="{link_wpp}" target="_blank" style="background:#16a34a; color:white; padding:10px 14px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:13px; display:inline-block; text-align:center; width:100%;">
-                        📲 Enviar Link via WhatsApp
+                        📲 Enviar Resumo via WhatsApp
                     </a>
                     """, unsafe_allow_html=True)
+
+                if danfe_content:
+                    with st.expander("👁️ Visualizar Espelho da NFS-e (DANFE Hospitalar Oficial)", expanded=True):
+                        st.components.v1.html(danfe_content, height=560, scrolling=True)
 
             except Exception as exc:
                 st.error(f"Erro na emissão fiscal: {exc}")
@@ -983,3 +999,53 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
         st.dataframe(pd.DataFrame(hist_tab), use_container_width=True, hide_index=True)
     else:
         st.caption("Nenhuma nota fiscal emitida registrada ainda nesta filial.")
+
+    st.markdown("---")
+    st.markdown("#### 🚫 Cancelamento de Nota Fiscal (SEFAZ / Homologação)")
+    with _get_db_connection(db_name) as conn:
+        cur_canc = conn.execute("""
+            SELECT id, numero_nf, cliente, valor_liquido, filial_emissora, os_id, chave_acesso
+            FROM notas_fiscais
+            WHERE status_fiscal NOT LIKE '%CANCELAD%' AND numero_nf IS NOT NULL AND numero_nf != ''
+            ORDER BY id DESC
+        """)
+        notas_ativas_canc = cur_canc.fetchall()
+
+    if notas_ativas_canc:
+        dict_opcoes_canc = {f"NFS-e Nº {n[1]} — {n[2]} (R$ {float(n[3] or 0):,.2f})": n for n in notas_ativas_canc}
+        sel_label_canc = st.selectbox("Selecione a Nota Fiscal que deseja Cancelar:", list(dict_opcoes_canc.keys()), key="sel_canc_nf_drop")
+        nota_alvo = dict_opcoes_canc[sel_label_canc]
+
+        col_just1, col_just2 = st.columns([2.5, 1.5])
+        with col_just1:
+            justificativa_canc = st.text_input(
+                "Justificativa Legal do Cancelamento:",
+                value="Emissão realizada em ambiente de simulação e testes de homologação",
+                key="input_just_cancelamento"
+            )
+        with col_just2:
+            st.write("")
+            st.write("")
+            if st.button("🚫 Cancelar esta Nota Fiscal", type="primary", key="btn_executar_cancelamento"):
+                if len(justificativa_canc.strip()) < 8:
+                    st.warning("⚠️ Informe uma justificativa com no mínimo 8 caracteres.")
+                else:
+                    id_alvo_db = nota_alvo[0]
+                    num_nf_alvo = nota_alvo[1]
+                    with _get_db_connection(db_name) as conn:
+                        conn.execute("""
+                            UPDATE notas_fiscais
+                            SET status_fiscal = 'CANCELADA',
+                                atualizado_em = datetime('now'),
+                                discriminacao_servico = discriminacao_servico || '\n\n[CANCELADA: ' || ? || ']'
+                            WHERE id = ?
+                        """, (justificativa_canc.strip(), id_alvo_db))
+                        conn.commit()
+                    st.success(f"✅ Nota Fiscal {num_nf_alvo} cancelada com sucesso no sistema!")
+                    time.sleep(1)
+                    if hasattr(st, "rerun"):
+                        st.rerun()
+                    elif hasattr(st, "experimental_rerun"):
+                        st.experimental_rerun()
+    else:
+        st.info("Nenhuma nota fiscal ativa pendente de cancelamento.")
