@@ -1,0 +1,16 @@
+﻿# JSON que serão armazenados no disco persistente
+users.json
+config.json
+devices.json
+
+# Cache Python
+__pycache__/
+
+# Vídeo grande (não versionar)
+tutorial_emissao_nf.mp4
+
+# Script de geração de vídeo (opcional)
+gerar_video_tutorial_nf.py
+
+# Caso queira excluir a pasta assets inteira, descomente a linha abaixo:
+# assets/
