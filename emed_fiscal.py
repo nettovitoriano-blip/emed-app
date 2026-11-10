@@ -14,6 +14,7 @@ Suporta:
 
 import os
 import io
+import time
 import json
 import uuid
 import hashlib
