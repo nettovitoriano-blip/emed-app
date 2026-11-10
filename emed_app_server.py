@@ -1020,11 +1020,66 @@ def _clear_auth_failure(ident: str):
 _RATE_LIMIT_STORE = {} # {ip: [timestamps]}
 _RATE_LIMIT_SENSITIVE_STORE = {} # {ip: [timestamps]}
 
+# Extensões e caminhos estáticos que NUNCA devem sofrer rate limit
+_STATIC_EXTENSIONS = (
+    ".html", ".htm", ".css", ".js", ".mjs", ".json", ".webmanifest",
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp",
+    ".woff", ".woff2", ".ttf", ".eot", ".map", ".pdf"
+)
+
 @web.middleware
 async def rate_limiting_middleware(request: web.Request, handler):
-    path = request.path
-    if path in ("/api/ping", "/healthz", "/favicon.ico") or path.startswith("/static/"):
+    path = request.path.lower()
+    
+    # 1. ISENÇÃO TOTAL para páginas web, PWA, assets e arquivos estáticos
+    if (
+        path in ("/", "/index.html", "/login.html", "/login", "/sw.js", "/manifest.json", "/favicon.ico", "/healthz", "/api/ping", "/api/logo", "/api/icone-autosave")
+        or path.startswith(("/static/", "/emed_pwa_static/", "/manuais/", "/uploads/"))
+        or any(path.endswith(ext) for ext in _STATIC_EXTENSIONS)
+    ):
         return await handler(request)
+
+    # 2. Identificação precisa do IP real (suporte a Cloudflare e Proxies)
+    ip = (
+        request.headers.get("CF-Connecting-IP")
+        or request.headers.get("X-Real-IP")
+        or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+        or (request.remote or "127.0.0.1")
+    )
+    now = time.time()
+
+    # 3. Usuários autenticados com cookie de sessão possuem limite generoso para trabalho normal
+    tem_sessao_valida = bool(request.cookies.get("emed_session"))
+    limite_geral = 2500 if tem_sessao_valida else 1200 # Suporte pleno a CGNAT móvel 4G/5G e Wi-Fi hospitalar
+
+    reqs = _RATE_LIMIT_STORE.get(ip, [])
+    reqs = [t for t in reqs if now - t < 60]
+    reqs.append(now)
+    _RATE_LIMIT_STORE[ip] = reqs
+
+    if len(reqs) > limite_geral:
+        return web.json_response({
+            "ok": False,
+            "erro": f"Muitas requisições. Rate limit excedido ({limite_geral} req/min). Aguarde alguns segundos.",
+            "retry_after": 60
+        }, status=429, headers={"Retry-After": "60"})
+
+    # 4. Limite estrito APENAS para rotas críticas de autenticação contra força bruta (30 req/min)
+    rotas_sensiveis = ("/api/auth/login", "/api/fiscal/cancelar-nota", "/api/os/excluir", "/api/seguranca/2fa")
+    if any(path.startswith(r) for r in rotas_sensiveis):
+        s_reqs = _RATE_LIMIT_SENSITIVE_STORE.get(ip, [])
+        s_reqs = [t for t in s_reqs if now - t < 60]
+        s_reqs.append(now)
+        _RATE_LIMIT_SENSITIVE_STORE[ip] = s_reqs
+
+        if len(s_reqs) > 30:
+            return web.json_response({
+                "ok": False,
+                "erro": "Excesso de tentativas em rota sensível. Bloqueio temporário ativado.",
+                "retry_after": 60
+            }, status=429, headers={"Retry-After": "60"})
+
+    return await handler(request)
 
     ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (request.remote or "127.0.0.1")
     now = time.time()
