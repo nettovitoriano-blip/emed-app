@@ -249,7 +249,12 @@ class MultiFilialFiscalProvider(FiscalProvider):
       <div style="text-align: right;">
         <span class="badge">NFS-e Nº {num_nf}</span>
         <div style="font-size: 11px; margin-top: 4px; color: #94a3b8;">Série: {serie}</div>
+        <div style="font-size: 10px; margin-top: 3px; color: #38bdf8; font-weight: bold;">{payload.get('tipo_nota', 'NFS-e')}</div>
       </div>
+    </div>
+
+    <div style="margin-top: 12px; background: #0f172a; padding: 6px 12px; border-radius: 4px; border: 1px solid #334155; font-size: 11px; color: #cbd5e1;">
+      <b>Operação / Natureza Fiscal:</b> {payload.get('natureza_operacao', 'TRIBUTAÇÃO NO MUNICÍPIO / DF')} {f"&bull; <b>CFOP:</b> {payload.get('cfop')}" if payload.get('cfop') else ""}
     </div>
 
     <div style="margin-top: 15px;">
@@ -837,6 +842,19 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
         </div>
     """, unsafe_allow_html=True)
 
+    st.markdown("##### 📌 Tipo de Operação & Finalidade da Nota Fiscal")
+    tipo_op_fiscal = st.selectbox(
+        "Selecione a Finalidade da Nota Fiscal:",
+        [
+            "🛠️ PRESTAÇÃO DE SERVIÇOS & PEÇAS (FATURAMENTO DE MANUTENÇÃO)",
+            "🔬 NOTA DE DIAGNÓSTICO TÉCNICO & LAUDO PERICIAL",
+            "📦 DEVOLUÇÃO / RETORNO DE REMESSA PARA CONSERTO (CFOP 5916 / 6916)",
+            "🚚 REMESSA PARA CONSERTO OU CALIBRAÇÃO (CFOP 5915 / 6915)"
+        ],
+        index=0,
+        key=f"tipo_op_fiscal_{os_id_sel}"
+    )
+
     with st.form(key=f"form_emissao_nf_{os_id_sel}"):
         st.markdown("##### 1. Dados do Tomador dos Serviços (Cliente Hospitalar)")
         c_tom1, c_tom2, c_tom3 = st.columns([2, 1, 1])
@@ -855,21 +873,46 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
         with c_end3:
             f_uf = st.text_input("UF:", value=dados_pre.get("tomador_uf", ""))
 
-        st.markdown("##### 2. Discriminação dos Serviços de Engenharia Clínica")
+        st.markdown("##### 2. Discriminação dos Serviços & Operação Fiscal")
+        
+        # Sugestão inteligente de texto conforme a finalidade escolhida
+        disc_inicial = dados_pre.get("discriminacao_servico", "")
+        if "DIAGNÓSTICO" in tipo_op_fiscal:
+            disc_inicial = (
+                f"Prestação de serviços técnicos especializados de DIAGNÓSTICO TÉCNICO, ENSAIOS E AVALIAÇÃO PERICIAL "
+                f"no equipamento médico {dados_pre.get('equipamento', 'MÉDICO-HOSPITALAR')}. "
+                f"Atendimento referente à Ordem de Serviço #{os_id_sel}. "
+                f"Emissão de laudo técnico de conformidade, ensaios elétricos e testes de viabilidade operacional. "
+                f"Cliente: {dados_pre.get('cliente')} ({dados_pre.get('tomador_cidade')} - {dados_pre.get('tomador_uf')})."
+            )
+        elif "DEVOLUÇÃO" in tipo_op_fiscal:
+            disc_inicial = (
+                f"RETORNO / DEVOLUÇÃO DE MERCADORIA OU BEM RECEBIDO PARA CONSERTO OU REPARO. "
+                f"Equipamento: {dados_pre.get('equipamento', 'MÉDICO-HOSPITALAR')}. "
+                f"Referente à OS #{os_id_sel}. "
+                f"Operação ao abrigo de não-incidência / suspensão de tributos conforme legislação vigente (CFOP 5916/6916). "
+                f"Destinatário: {dados_pre.get('cliente')}."
+            )
+
         f_discriminacao = st.text_area(
-            "Texto da Nota Fiscal (Descrição Oficial do Serviço):",
-            value=dados_pre.get("discriminacao_servico", ""),
-            height=90
+            "Texto da Nota Fiscal (Descrição Oficial do Serviço / Trânsito):",
+            value=disc_inicial,
+            height=95
         )
+
+        # Ajuste de alíquota sugerida para Devolução (0%) ou Serviço Padrão (5%)
+        aliq_sugerida = 0.0 if ("DEVOLUÇÃO" in tipo_op_fiscal or "REMESSA" in tipo_op_fiscal) else float(dados_pre.get("aliquota_iss", 5.0))
+        val_serv_sugerido = float(dados_pre.get("valor_servicos", 0.0))
+        val_pec_sugerido = 0.0 if "DEVOLUÇÃO" in tipo_op_fiscal else float(dados_pre.get("valor_pecas", 0.0))
 
         st.markdown("##### 3. Valores e Tributação (SEFAZ-DF)")
         c_val1, c_val2, c_val3, c_val4 = st.columns(4)
         with c_val1:
-            f_val_srv = st.number_input("Valor Mão de Obra / Serviços (R$):", value=float(dados_pre.get("valor_servicos", 0.0)), min_value=0.0, step=50.0)
+            f_val_srv = st.number_input("Valor Mão de Obra / Serviços (R$):", value=val_serv_sugerido, min_value=0.0, step=50.0)
         with c_val2:
-            f_val_pec = st.number_input("Valor Peças / Produtos (R$):", value=float(dados_pre.get("valor_pecas", 0.0)), min_value=0.0, step=50.0)
+            f_val_pec = st.number_input("Valor Peças / Produtos (R$):", value=val_pec_sugerido, min_value=0.0, step=50.0)
         with c_val3:
-            f_aliq_iss = st.number_input("Alíquota ISS DF (%):", value=float(dados_pre.get("aliquota_iss", 5.0)), min_value=0.0, max_value=10.0, step=0.5)
+            f_aliq_iss = st.number_input("Alíquota ISS DF (%):", value=aliq_sugerida, min_value=0.0, max_value=10.0, step=0.5)
         with c_val4:
             f_desconto = st.number_input("Desconto Concedido (R$):", value=float(dados_pre.get("valor_desconto", 0.0)), min_value=0.0, step=10.0)
 
@@ -890,6 +933,17 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
         )
 
     if btn_emitir:
+        nat_op_calc = "TRIBUTAÇÃO NO MUNICÍPIO / DF"
+        cfop_calc = ""
+        if "DIAGNÓSTICO" in tipo_op_fiscal:
+            nat_op_calc = "PRESTAÇÃO DE SERVIÇO DE DIAGNÓSTICO TÉCNICO"
+        elif "DEVOLUÇÃO" in tipo_op_fiscal:
+            nat_op_calc = "RETORNO DE MERCADORIA/BEM RECEBIDO PARA CONSERTO"
+            cfop_calc = "5916" if (f_uf.strip().upper() == "DF" or f_uf.strip().upper() == "CE") else "6916"
+        elif "REMESSA" in tipo_op_fiscal:
+            nat_op_calc = "REMESSA DE BEM PARA CONSERTO/REPARO"
+            cfop_calc = "5915" if (f_uf.strip().upper() == "DF" or f_uf.strip().upper() == "CE") else "6915"
+
         payload_salvar = {
             "cliente": f_cliente.strip(),
             "cnpj_tomador": f_cnpj.strip(),
@@ -897,6 +951,9 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
             "tomador_cidade": f_cid.strip(),
             "tomador_uf": f_uf.strip(),
             "email_cliente": f_email.strip(),
+            "tipo_nota": tipo_op_fiscal,
+            "natureza_operacao": nat_op_calc,
+            "cfop": cfop_calc,
             "discriminacao_servico": f_discriminacao.strip(),
             "valor_servicos": float(f_val_srv),
             "valor_pecas": float(f_val_pec),
