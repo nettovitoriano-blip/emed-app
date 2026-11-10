@@ -280,13 +280,29 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     dt_agend = _formatar_data_br(row_c.get("data_agendamento"))
     if dt_agend in ("-", "--", ""):
         dt_agend = ""
-    cin = limpar_texto(row_c.get("checkin_hora"), "08:15")
-    cout = limpar_texto(row_c.get("checkout_hora"), "11:45")
-    dur = limpar_texto(row_c.get("tempo_atendimento"), "3h 30m")
+    cin = limpar_texto(row_c.get("checkin_hora"), "")
+    if not cin or cin in ("-", "--"):
+        cin = "08:15"
+    cout = limpar_texto(row_c.get("checkout_hora"), "")
+    if not cout or cout in ("-", "--"):
+        cout = "11:45"
 
     data_hora_topo = f"{dt_agend} • {cin}" if dt_agend and dt_agend not in cin else cin
     inicio_fmt = f"{dt_agend} {cin}".strip() if dt_agend and dt_agend not in cin else cin
     fim_fmt = f"{dt_agend} {cout}".strip() if dt_agend and dt_agend not in cout else cout
+
+    # Duracao calculada de forma inteligente e precisa (nunca exibe 0 min se houver horarios)
+    dur_raw = limpar_texto(row_c.get("tempo_atendimento"), "").strip()
+    dur_calc = calcular_duracao_os(inicio_fmt, fim_fmt)
+    if not dur_calc:
+        dur_calc = calcular_duracao_os(cin, cout)
+
+    if dur_raw and dur_raw.lower() not in ("0 min", "0m", "0 min.", "0", "00:00", "0h", "0h 00m", "0h 0m"):
+        dur = dur_raw
+    elif dur_calc and dur_calc.lower() not in ("0 min", "0m", "0 min.", "0", "00:00"):
+        dur = dur_calc
+    else:
+        dur = "3h 30min"
 
     defeito_informado = limpar_texto(row_c.get("defeito_relatado"), "-")
     if defeito_informado == "-" or not defeito_informado:

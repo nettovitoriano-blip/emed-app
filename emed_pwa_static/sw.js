@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v69-radar-comercial-tubos';
+const CACHE_NAME = 'emed-pwa-v72-laudo-mural-duracao-fix';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
