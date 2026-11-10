@@ -4,7 +4,7 @@
 Funcionalidades principais:
 - Login seguro com logo oficial e ícone fiscal azul estilizado.
 - Suporte a administradores (netto, vitor, admin).
-- Logout no sidebar.
+- Logout definitivo no sidebar (com limpeza total de parâmetros e sessão).
 - Aba "Técnico" com QR Code para login automático de técnicos.
 - Aba "Emissão NF" (tutorial video, emissão e rotinas).
 - Aba "Logs" (visualização e download).
@@ -39,14 +39,14 @@ CONFIG_FILE = Path(__file__).parent / "config.json"
 DEVICES_FILE = Path(__file__).parent / "devices.json"
 
 def safe_rerun():
-    """Rerun compatível com Streamlit moderno e versões antigas."""
+    """Rerun compatível com Streamlit moderno e versões legadas."""
     if hasattr(st, "rerun"):
         st.rerun()
     elif hasattr(st, "experimental_rerun"):
         st.experimental_rerun()
 
 def safe_clear_query_params():
-    """Limpa query params sem deprecation errors."""
+    """Limpa a query string da URL para evitar loops de autenticação."""
     try:
         if hasattr(st, "query_params"):
             st.query_params.clear()
@@ -149,6 +149,7 @@ def authenticate():
             st.session_state["authenticated"] = True
             st.session_state["username"] = matched["username"]
             st.session_state["role"] = matched["role"]
+            safe_clear_query_params()
             safe_rerun()
         else:
             st.error("Credenciais inválidas. Verifique o usuário e senha informados.")
@@ -180,7 +181,7 @@ def get_query_params():
 
 query_params = get_query_params()
 token_val = query_params.get("token")
-if token_val:
+if token_val and not st.session_state.get("authenticated"):
     if isinstance(token_val, list):
         token_val = token_val[0]
     try:
@@ -202,6 +203,7 @@ if token_val:
                 devices[username] = list(set(devices[username]))
                 DEVICES_FILE.write_text(json.dumps(devices, indent=2), encoding="utf-8")
                 st.success(f"Login automático realizado. Dispositivo cadastrado (ID: {device_id}).")
+                # Limpa query param imediatamente para permitir logout futuro
                 safe_clear_query_params()
                 safe_rerun()
     except Exception as e:
@@ -233,11 +235,11 @@ st.markdown(
 
 st.write("")
 
-# Sidebar logout
+# Sidebar logout (limpeza completa de sessão e query string)
 if st.session_state.get("authenticated"):
     if st.sidebar.button("🚪 Sair (Logout)", use_container_width=True):
-        for key in ["authenticated", "username", "role"]:
-            st.session_state.pop(key, None)
+        st.session_state.clear()
+        safe_clear_query_params()
         safe_rerun()
 
 # Sidebar menu
