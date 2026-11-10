@@ -2,11 +2,11 @@
 """Streamlit UI for EMED Fiscal / EMED Nota.
 
 Funcionalidades principais:
-- Login seguro com logo oficial e ícone fiscal.
+- Login seguro com logo oficial e ícone fiscal azul estilizado.
 - Suporte a administradores (netto, vitor, admin).
 - Logout no sidebar.
 - Aba "Técnico" com QR Code para login automático de técnicos.
-- Aba "Emissão NF" (tutorial video, emissão e cron).
+- Aba "Emissão NF" (tutorial video, emissão e rotinas).
 - Aba "Logs" (visualização e download).
 - Aba "Sobre".
 - Aba "Config" (administradores).
@@ -23,10 +23,13 @@ from io import BytesIO
 import streamlit as st
 import qrcode
 
-# Configurações de página Streamlit (deve ser o primeiro comando Streamlit)
+ASSETS_DIR = Path(__file__).parent / "assets"
+BLUE_ICON_PATH = ASSETS_DIR / "icone_fiscal_azul.png"
+
+# Configurações de página Streamlit
 st.set_page_config(
     page_title="EMED Fiscal – Emissão NF",
-    page_icon="🧾",
+    page_icon=str(BLUE_ICON_PATH) if BLUE_ICON_PATH.is_file() else "🧾",
     layout="centered"
 )
 
@@ -34,6 +37,23 @@ st.set_page_config(
 USERS_FILE = Path(__file__).parent / "users.json"
 CONFIG_FILE = Path(__file__).parent / "config.json"
 DEVICES_FILE = Path(__file__).parent / "devices.json"
+
+def safe_rerun():
+    """Rerun compatível com Streamlit moderno e versões antigas."""
+    if hasattr(st, "rerun"):
+        st.rerun()
+    elif hasattr(st, "experimental_rerun"):
+        st.experimental_rerun()
+
+def safe_clear_query_params():
+    """Limpa query params sem deprecation errors."""
+    try:
+        if hasattr(st, "query_params"):
+            st.query_params.clear()
+        elif hasattr(st, "experimental_set_query_params"):
+            st.experimental_set_query_params()
+    except Exception:
+        pass
 
 def load_json(file_path: Path, default):
     """Carrega JSON de file_path ou cria com default se não existir."""
@@ -64,15 +84,21 @@ DEFAULT_CONFIG = {
 CONFIG = load_json(CONFIG_FILE, DEFAULT_CONFIG)
 
 
+def get_image_base64(path: Path) -> str:
+    """Retorna a string base64 de uma imagem."""
+    if path.is_file():
+        return base64.b64encode(path.read_bytes()).decode("utf-8")
+    return ""
+
+
 def get_logo_path():
     """Busca o melhor arquivo de logo disponível para exibição."""
     candidates = [
-        Path(__file__).parent / "assets" / "emed_logo_user_dark.png",
-        Path(__file__).parent / "assets" / "emed_logo.png",
-        Path(__file__).parent / "assets" / "emed_logo_oficial.png",
+        ASSETS_DIR / "emed_logo_user_dark.png",
+        ASSETS_DIR / "emed_logo.png",
+        ASSETS_DIR / "emed_logo_oficial.png",
         Path(__file__).parent / "emed_logo_user_dark.png",
         Path(__file__).parent / "emed_logo_oficial.png",
-        Path(__file__).parent / "emed_logo_clean_white_bg.png"
     ]
     for c in candidates:
         if c.is_file():
@@ -81,22 +107,32 @@ def get_logo_path():
 
 
 def authenticate():
-    """Exibe formulário de login estilizado com logo e ícone fiscal."""
+    """Exibe formulário de login estilizado com logo e o ícone fiscal azul da EMED."""
     if st.session_state.get("authenticated"):
         return True
 
     logo_path = get_logo_path()
-    col1, col2, col3 = st.columns([1, 2, 1])
+    blue_icon_b64 = get_image_base64(BLUE_ICON_PATH)
+
+    col1, col2, col3 = st.columns([1, 2.5, 1])
     with col2:
         if logo_path:
-            st.image(logo_path, use_column_width=True)
+            st.image(logo_path, use_container_width=True)
+            
+        icon_html = f'<img src="data:image/png;base64,{blue_icon_b64}" width="42" height="42" style="vertical-align: middle; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));" />' if blue_icon_b64 else '🧾'
+        
         st.markdown(
-            "<h3 style='text-align: center; margin-top: -5px; color: #38bdf8; font-weight: 700;'>"
-            "🧾 EMED Fiscal • Módulo NF"
-            "</h3>"
-            "<p style='text-align: center; font-size: 13px; color: #94a3b8; margin-bottom: 25px;'>"
-            "Painel de Emissão de Notas & Gestão Tributária"
-            "</p>",
+            f"""
+            <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 5px; margin-bottom: 2px;">
+                {icon_html}
+                <span style="color: #38bdf8; font-size: 24px; font-weight: 700; letter-spacing: -0.3px;">
+                    EMED Fiscal • Módulo NF
+                </span>
+            </div>
+            <p style="text-align: center; font-size: 13px; color: #94a3b8; margin-bottom: 24px;">
+                Painel de Emissão de Notas & Gestão Tributária
+            </p>
+            """,
             unsafe_allow_html=True
         )
 
@@ -113,7 +149,7 @@ def authenticate():
             st.session_state["authenticated"] = True
             st.session_state["username"] = matched["username"]
             st.session_state["role"] = matched["role"]
-            st.experimental_rerun()
+            safe_rerun()
         else:
             st.error("Credenciais inválidas. Verifique o usuário e senha informados.")
     return False
@@ -132,17 +168,23 @@ def is_admin() -> bool:
 # Token QR (login automático de técnicos) – validade 30 min
 def get_query_params():
     try:
-        return st.experimental_get_query_params()
-    except AttributeError:
-        import urllib.parse
-        qs = st.experimental_get_query_string() if hasattr(st, "experimental_get_query_string") else ""
-        return urllib.parse.parse_qs(qs)
+        if hasattr(st, "query_params"):
+            return dict(st.query_params)
+        elif hasattr(st, "experimental_get_query_params"):
+            return st.experimental_get_query_params()
+    except Exception:
+        pass
+    import urllib.parse
+    qs = st.experimental_get_query_string() if hasattr(st, "experimental_get_query_string") else ""
+    return urllib.parse.parse_qs(qs)
 
 query_params = get_query_params()
-if "token" in query_params:
+token_val = query_params.get("token")
+if token_val:
+    if isinstance(token_val, list):
+        token_val = token_val[0]
     try:
-        token = query_params["token"][0]
-        decoded = base64.urlsafe_b64decode(token.encode()).decode()
+        decoded = base64.urlsafe_b64decode(str(token_val).encode()).decode()
         data = json.loads(decoded)
         username = data.get("username")
         ts = data.get("ts")
@@ -160,8 +202,8 @@ if "token" in query_params:
                 devices[username] = list(set(devices[username]))
                 DEVICES_FILE.write_text(json.dumps(devices, indent=2), encoding="utf-8")
                 st.success(f"Login automático realizado. Dispositivo cadastrado (ID: {device_id}).")
-                st.experimental_set_query_params()
-                st.experimental_rerun()
+                safe_clear_query_params()
+                safe_rerun()
     except Exception as e:
         st.error(f"Erro ao processar token de autenticação: {e}")
 
@@ -170,27 +212,33 @@ if "token" in query_params:
 if not authenticate():
     st.stop()
 
-# Header da aplicação logada
-logo_path = get_logo_path()
-col_h1, col_h2 = st.columns([1, 4])
-with col_h1:
-    if logo_path:
-        st.image(logo_path, width=140)
-with col_h2:
-    st.markdown(
-        f"<h3 style='margin: 0; padding: 0;'>🧾 EMED Fiscal – Emissão NF</h3>"
-        f"<span style='color: #64748b; font-size: 13px;'>Usuário conectado: <b>{st.session_state.get('username')}</b> ({st.session_state.get('role')})</span>",
-        unsafe_allow_html=True
-    )
+# Header da aplicação logada com o ícone fiscal azul
+blue_icon_b64 = get_image_base64(BLUE_ICON_PATH)
+icon_html = f'<img src="data:image/png;base64,{blue_icon_b64}" width="38" height="38" style="vertical-align: middle; margin-right: 8px;" />' if blue_icon_b64 else '🧾 '
 
-st.markdown("---")
+st.markdown(
+    f"""
+    <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+        <div style="display: flex; align-items: center;">
+            {icon_html}
+            <div>
+                <h3 style="margin: 0; padding: 0; color: #f8fafc; font-size: 20px;">EMED Fiscal – Emissão NF</h3>
+                <span style="color: #64748b; font-size: 13px;">Usuário conectado: <b style="color: #38bdf8;">{st.session_state.get('username')}</b> ({st.session_state.get('role')})</span>
+            </div>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.write("")
 
 # Sidebar logout
 if st.session_state.get("authenticated"):
     if st.sidebar.button("🚪 Sair (Logout)", use_container_width=True):
         for key in ["authenticated", "username", "role"]:
             st.session_state.pop(key, None)
-        st.experimental_rerun()
+        safe_rerun()
 
 # Sidebar menu
 menu_items = ["Emissão NF", "Logs", "Sobre"]
@@ -208,7 +256,7 @@ if selected_tab == "Emissão NF":
     if YOUTUBE_ID:
         tutorial_src = f"https://www.youtube.com/watch?v={YOUTUBE_ID}"
     else:
-        local_video = Path(__file__).parent / "assets" / "tutorial_emissao_nf.mp4"
+        local_video = ASSETS_DIR / "tutorial_emissao_nf.mp4"
         tutorial_src = str(local_video) if local_video.is_file() else None
         
     with st.expander("📺 Tutorial – como gerar a pré-visualização e emissão (passo a passo)", expanded=False):
@@ -262,7 +310,7 @@ elif selected_tab == "Logs":
     log_path = Path(r"logs/emed_fiscal.log")
     start_date = st.date_input("Filtrar por data (opcional)", value=None)
     if st.button("Atualizar Logs"):
-        st.experimental_rerun()
+        safe_rerun()
     if log_path.is_file():
         content = log_path.read_text(encoding="utf-8")
         if start_date:
