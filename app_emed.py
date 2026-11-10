@@ -262,7 +262,11 @@ selected_tab = st.sidebar.radio("Navegação do Módulo", menu_items)
 # ABA 1: EMISSÃO FISCAL
 if selected_tab == "Emissão Fiscal (NFS-e)":
     if render_modulo_fiscal:
-        render_modulo_fiscal(db_name=str(DB_PATH))
+        render_modulo_fiscal(
+            db_name=str(DB_PATH),
+            usuario_atual=str(st.session_state.get("username", "netto")),
+            perfil_atual=str(st.session_state.get("role", "admin"))
+        )
     else:
         st.error("Módulo fiscal em processo de inicialização. Recarregue a página.")
 
