@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v69-radar-comercial-tubos';
+const CACHE_NAME = 'emed-pwa-v73-logout-assinaturatec-headerfix';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

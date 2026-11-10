@@ -53357,49 +53357,65 @@
 
 
     @media (max-width: 768px) {
-
-
-
       .topbar {
-
-
-
-        padding: 8px 10px !important;
-
-
-
-        gap: 6px !important;
-
-
-
+        padding: 6px 8px !important;
+        gap: 4px !important;
         max-width: 100vw !important;
-
-
-
       }
-
-
-
-      .brand-title {
-
-
-
-        font-size: 13px !important;
-
-
-
-        white-space: nowrap !important;
-
-
-
+      .topbar-row {
+        gap: 4px !important;
+        justify-content: space-between !important;
+      }
+      .btn-drawer-symbol {
+        padding: 4px !important;
+        flex-shrink: 0 !important;
+      }
+      .brand-center {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
         overflow: hidden !important;
-
-
-
+        justify-content: center !important;
+      }
+      .brand-center > div {
+        min-width: 0 !important;
+        overflow: hidden !important;
+        gap: 6px !important;
+      }
+      .brand-logo-img {
+        width: 32px !important;
+        height: 32px !important;
+        flex-shrink: 0 !important;
+      }
+      .brand-title {
+        font-size: 13px !important;
+        letter-spacing: 0.5px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
         text-overflow: ellipsis !important;
-
-
-
+      }
+      .topbar-right {
+        flex-shrink: 0 !important;
+        gap: 3px !important;
+      }
+      #headerUserChip {
+        padding: 2px 6px !important;
+        gap: 4px !important;
+        max-width: 110px !important;
+        margin-right: 2px !important;
+      }
+      #headerUserChip .user-name-text {
+        max-width: 60px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        display: inline-block !important;
+        vertical-align: middle !important;
+      }
+      #headerUserChip .user-role-badge {
+        display: none !important;
+      }
+      #btnInstallAppTopo {
+        display: none !important;
       }
 
 
@@ -55066,7 +55082,7 @@
 
 
 
-          <div class="brand-title">EMED ELETROMEDICINA</div>
+          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span></div>
 
 
 
@@ -75360,132 +75376,8 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
     function abrirModalAssinaturaTecnico(tecNome = null) {
-
-
-
-      const modal = document.getElementById("modalAssinaturaTecnico");
-
-
-
-      if (!modal) return;
-
-
-
-      const sel = document.getElementById("modalAssTec_nome");
-
-
-
-      const inpPadrao = document.getElementById("modalAssTec_padrao");
-
-
-
-
-
-
-
-      const tecAlvo = tecNome || STATE.usuario || "MARCOS";
-
-
-
-      if (sel) sel.value = tecAlvo.toUpperCase();
-
-
-
-
-
-
-
-      const dTec = (STATE.data?.tecnicos || []).find(t => t.nome?.toUpperCase() === tecAlvo.toUpperCase());
-
-
-
-      if (inpPadrao) inpPadrao.value = dTec?.assinatura_padrao || `${tecAlvo.toUpperCase()} - CFT`;
-
-
-
-
-
-
-
-      modal.style.display = "flex";
-
-
-
-      modal.classList.add("open");
-
-
-
-      _canvasTecHasDrawing = false;
-
-
-
-
-
-
-
-      setTimeout(() => {
-
-
-
-        iniciarCanvasAssinaturaTecnico();
-
-
-
-        if (dTec?.rubrica_img) {
-
-
-
-          const img = new Image();
-
-
-
-          img.onload = () => {
-
-
-
-            const c = document.getElementById("canvasAssinaturaTecnico");
-
-
-
-            if (c) {
-
-
-
-              c.getContext("2d").drawImage(img, 20, 20, 180, 70);
-
-
-
-              _canvasTecHasDrawing = true;
-
-
-
-            }
-
-
-
-          };
-
-
-
-          img.src = dTec.rubrica_img;
-
-
-
-        }
-
-
-
-      }, 150);
-
-
-
+      abrirModalAssinaturaPaisagem("TECNICO", tecNome);
     }
-
-
-
-
-
-
 
     function fecharModalAssinaturaTecnico() {
 
@@ -96765,7 +96657,33 @@ function selecionarMenu(menuId, perfilOpcional = null) {
 
 
 
-function renderizarNavegacao() {
+async function efetuarLogout() {
+      try {
+        if (confirm("Deseja realmente sair e desconectar sua conta?")) {
+          try {
+            await fetch("/api/auth/logout", { method: "POST" });
+          } catch (e) {}
+
+          document.cookie = "emed_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+          document.cookie = "emed_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=" + window.location.hostname + ";";
+
+          localStorage.removeItem("emed_tecnico_selecionado");
+          localStorage.removeItem("emed_usuario_perfil");
+          localStorage.removeItem("emed_perfil_usuario");
+          localStorage.removeItem("emed_token");
+          localStorage.removeItem("emed_auth_user");
+          localStorage.removeItem("token");
+          sessionStorage.clear();
+
+          window.location.replace("/login.html");
+        }
+      } catch (err) {
+        console.error("Erro no logout:", err);
+        window.location.replace("/login.html");
+      }
+    }
+
+    function renderizarNavegacao() {
       const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase();
       const usuarioPerfil = (localStorage.getItem("emed_perfil_usuario") || "").toUpperCase();
       // STRICT CHECK: ONLY exact 'NETTO' with Gestor is Gestor!
@@ -96797,11 +96715,11 @@ function renderizarNavegacao() {
       if (headerUserChip) {
         headerUserChip.innerHTML = `
           <span style="font-size:12px;">👤</span>
-          <span style="font-size:12px;font-weight:800;color:#f8fafc;">${esc(usuarioNome || "Usuário")}</span>
-          <span style="font-size:9.5px;background:${isGestor ? '#eab308' : '#0284c7'};color:#fff;padding:1px 6px;border-radius:10px;font-weight:800;">
+          <span class="user-name-text" style="font-size:12px;font-weight:800;color:#f8fafc;">${esc(usuarioNome || "Usuário")}</span>
+          <span class="user-role-badge" style="font-size:9.5px;background:${isGestor ? '#eab308' : '#0284c7'};color:#fff;padding:1px 6px;border-radius:10px;font-weight:800;">
             ${isGestor ? 'GESTOR' : 'TÉCNICO'}
           </span>
-          <button onclick="efetuarLogout()" title="Sair / Trocar Usuário" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:12px;margin-left:2px;padding:0;">🚪</button>
+          <button onclick="efetuarLogout()" title="Sair / Trocar Usuário" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:13px;margin-left:2px;padding:2px 4px;">🚪</button>
         `;
       }
       const drawerUserName = document.getElementById("drawerUserName");
@@ -249921,7 +249839,12 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
-    async function abrirModalAssinaturaPaisagem() {
+    let _modoAssinaturaPaisagem = "CLIENTE";
+    let _tecnicoAlvoAssinatura = null;
+
+    async function abrirModalAssinaturaPaisagem(modo = "CLIENTE", tecNome = null) {
+      _modoAssinaturaPaisagem = modo;
+      _tecnicoAlvoAssinatura = tecNome;
 
 
 
@@ -250113,135 +250036,15 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
-      const nomeResp = document.getElementById("osAssNome")?.value || "Responsável do Hospital";
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       const lblTitulo = document.getElementById("lblTituloAssinaturaPaisagem");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      if (lblTitulo) lblTitulo.innerText = `Assinatura: ${nomeResp.toUpperCase()}`;
+      if (_modoAssinaturaPaisagem === "TECNICO") {
+        const nomeTec = _tecnicoAlvoAssinatura || (localStorage.getItem("emed_tecnico_selecionado") || "VALFREDO NETTO").toUpperCase();
+        _tecnicoAlvoAssinatura = nomeTec;
+        if (lblTitulo) lblTitulo.innerText = `Assinatura do Técnico: ${nomeTec.toUpperCase()}`;
+      } else {
+        const nomeResp = document.getElementById("osAssNome")?.value || "Responsável do Hospital";
+        if (lblTitulo) lblTitulo.innerText = `Assinatura do Cliente: ${nomeResp.toUpperCase()}`;
+      }
 
 
 
@@ -251265,7 +251068,10 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
+      modal.style.display = "flex";
       modal.className = "modal-paisagem-ativa";
+      _assinouPaisagem = false;
+      _linhasReais = [];
 
 
 
@@ -266050,261 +265856,38 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
       const dataUrl = vCanvas.toDataURL("image/png");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       window._assinaturaDataUrl = dataUrl;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      // Atualiza o preview no formulário da OS
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      // SE FOR ASSINATURA DO TÉCNICO: Salva no banco de dados e homologa na tabela de técnicos
+      if (_modoAssinaturaPaisagem === "TECNICO") {
+        const nomeTec = _tecnicoAlvoAssinatura || (localStorage.getItem("emed_tecnico_selecionado") || "VALFREDO NETTO").toUpperCase();
+        try {
+          mostrarToast("⏳ Gravando sua rubrica digital no banco de dados...");
+          const res = await apiPost("/api/tecnico/assinatura-salvar", {
+            nome: nomeTec,
+            assinatura_img: dataUrl,
+            assinatura_padrao: `${nomeTec} - CFT`
+          });
+          if (res && res.ok) {
+            mostrarToast("✅ Sua assinatura touch foi homologada e salva com sucesso!");
+            if (STATE.data?.tecnicos) {
+              const t = STATE.data.tecnicos.find(x => x.nome?.toUpperCase() === nomeTec.toUpperCase());
+              if (t) t.rubrica_img = dataUrl;
+            }
+            if (STATE.menuAtivo === "TEC_PERFIL") {
+              selecionarMenu("TEC_PERFIL");
+            }
+          } else {
+            mostrarToast("❌ " + (res?.msg || "Falha ao gravar"));
+          }
+        } catch (err) {
+          mostrarToast("❌ Erro de comunicação com o servidor.");
+        }
+        fecharModalAssinaturaPaisagem();
+        return;
+      }
+
+      // Atualiza o preview no formulário da OS (CLIENTE)
       const boxStatus = document.getElementById("boxStatusAssinatura");
 
 
