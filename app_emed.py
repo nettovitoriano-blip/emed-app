@@ -120,12 +120,8 @@ if "token" in query_params:
                 # Limpar parâmetros da query para evitar login automático recorrente
                 st.experimental_set_query_params()
                 st.experimental_rerun()
-
-
-
-
-
-
+    except Exception as e:
+        st.error(f"Erro ao processar token: {e}")
 
 # UI principal
 
