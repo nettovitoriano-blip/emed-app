@@ -280,29 +280,13 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     dt_agend = _formatar_data_br(row_c.get("data_agendamento"))
     if dt_agend in ("-", "--", ""):
         dt_agend = ""
-    cin = limpar_texto(row_c.get("checkin_hora"), "")
-    if not cin or cin in ("-", "--"):
-        cin = "08:15"
-    cout = limpar_texto(row_c.get("checkout_hora"), "")
-    if not cout or cout in ("-", "--"):
-        cout = "11:45"
+    cin = limpar_texto(row_c.get("checkin_hora"), "08:15")
+    cout = limpar_texto(row_c.get("checkout_hora"), "11:45")
+    dur = limpar_texto(row_c.get("tempo_atendimento"), "3h 30m")
 
     data_hora_topo = f"{dt_agend} • {cin}" if dt_agend and dt_agend not in cin else cin
     inicio_fmt = f"{dt_agend} {cin}".strip() if dt_agend and dt_agend not in cin else cin
     fim_fmt = f"{dt_agend} {cout}".strip() if dt_agend and dt_agend not in cout else cout
-
-    # Duracao calculada de forma inteligente e precisa (nunca exibe 0 min se houver horarios)
-    dur_raw = limpar_texto(row_c.get("tempo_atendimento"), "").strip()
-    dur_calc = calcular_duracao_os(inicio_fmt, fim_fmt)
-    if not dur_calc:
-        dur_calc = calcular_duracao_os(cin, cout)
-
-    if dur_raw and dur_raw.lower() not in ("0 min", "0m", "0 min.", "0", "00:00", "0h", "0h 00m", "0h 0m"):
-        dur = dur_raw
-    elif dur_calc and dur_calc.lower() not in ("0 min", "0m", "0 min.", "0", "00:00"):
-        dur = dur_calc
-    else:
-        dur = "3h 30min"
 
     defeito_informado = limpar_texto(row_c.get("defeito_relatado"), "-")
     if defeito_informado == "-" or not defeito_informado:
@@ -452,32 +436,31 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
         status_label = status_os.upper()
 
     cabecalho_padrao_html = f"""
-  <table style="border-bottom: 2px solid #0284c7; margin-bottom: 8px; padding-bottom: 6px;">
+  <table style="border-bottom: 2px solid #0284c7; margin-bottom: 8px; padding-bottom: 6px; width: 100%;">
     <tr>
-      <td style="width: 27%; vertical-align: middle; padding-right: 8px;">
-        <img src="{logo_b64}" width="138" style="width: 138px; max-height: 58px; object-fit: contain; display: block;" alt="EMED Eletromedicina" />
+      <td style="width: 20%; vertical-align: middle; padding-right: 6px;">
+        <img src="{logo_b64}" width="132" style="width: 132px; max-height: 54px; object-fit: contain; display: block;" alt="EMED Eletromedicina" />
       </td>
-      <td style="width: 57%; vertical-align: middle; text-align: center; border-left: 1.5px solid #e2e8f0; border-right: 1.5px solid #e2e8f0; padding: 0 8px;">
-        <div style="font-size: 10pt; font-weight: bold; color: #0f172a;">EMED&nbsp;ELETROMEDICINA&nbsp;LTDA.</div>
-        <div style="font-size: 6.8pt; font-weight: bold; color: #0284c7; margin-bottom: 2px;">Manuten&ccedil;&atilde;o em Equipamentos de Diagn&oacute;stico por Imagem</div>
-        <div style="font-size: 6.3pt; color: #334155; line-height: 1.3;">
-          <b>Matriz (CE):</b> CNPJ: 03.611.974/0001-08 &bull; Rua Coronel Freire, 16 - Centro - Eus&eacute;bio / Fortaleza - CE &bull; CEP: 61760-000 &bull; Fone: (85) 3254-2929
+      <td style="width: 65%; vertical-align: middle; text-align: center; border-left: 1.5px solid #e2e8f0; border-right: 1.5px solid #e2e8f0; padding: 0 10px;">
+        <div style="font-size: 10.5pt; font-weight: 800; color: #0f172a; letter-spacing: 0.2px;">EMED&nbsp;ELETROMEDICINA&nbsp;LTDA.</div>
+        <div style="font-size: 7.2pt; font-weight: 700; color: #0284c7; margin-bottom: 3px;">Manuten&ccedil;&atilde;o em Equipamentos de Diagn&oacute;stico por Imagem</div>
+        <div style="font-size: 6.1pt; color: #334155; line-height: 1.35; white-space: nowrap;">
+          <b>Matriz (CE):</b> CNPJ: 03.611.974/0001-08 &bull; Rua Coronel Freire, 16 - Centro - Eus&eacute;bio - CE &bull; CEP: 61760-000 &bull; Fone: (85) 3254-2929
         </div>
-        <div style="font-size: 6.3pt; color: #334155; line-height: 1.3;">
-          <b>Filial (DF):</b> CNPJ: 03.611.974/0002-80 &bull; Rua 3, Ch&aacute;cara 46A, Lote 01 - Vicente Pires - Bras&iacute;lia - DF &bull; Fone: (61) 3234-3647 / (61) 99658-5392
+        <div style="font-size: 6.1pt; color: #334155; line-height: 1.35; white-space: nowrap;">
+          <b>Filial (DF):</b> CNPJ: 03.611.974/0002-80 &bull; Rua 3, Ch&aacute;cara 46A, Lote 01 - Vicente Pires - Bras&iacute;lia - DF &bull; Fone: (61) 3234-3647 / 99658-5392
         </div>
       </td>
-      <td style="width: 16%; vertical-align: middle; padding-left: 8px;">
-        <table style="border: 1.5px solid {cor_num_borda}; width: 100%;">
+      <td style="width: 15%; vertical-align: middle; padding-left: 6px;">
+        <table style="border: 1.5px solid {cor_num_borda}; width: 100%; border-collapse: collapse;">
           <tr>
-            <td style="background: {cor_num_bg}; color: #ffffff; text-align: center; padding: 2px 4px;">
-              <div style="font-size: 5.2pt; font-weight: bold; letter-spacing: 0.2px;">ORDEM DE SERVI&Ccedil;O</div>
-              <div style="font-size: 9pt; font-weight: bold; line-height: 1.15;">N&ordm; {id_os_c}</div>
-              <div style="font-size: 5.5pt; font-weight: bold;">{status_label}</div>
+            <td style="background: {cor_num_bg}; color: #ffffff; text-align: center; padding: 5px 2px;">
+              <div style="font-size: 5.6pt; font-weight: bold; letter-spacing: 0.4px;">ORDEM DE SERVI&Ccedil;O</div>
+              <div style="font-size: 11pt; font-weight: 900; line-height: 1.1;">N&ordm;&nbsp;{id_os_c}</div>
             </td>
           </tr>
           <tr>
-            <td style="background: #f8fafc; color: #334155; text-align: center; font-size: 5.8pt; font-weight: bold; padding: 2px 4px;">
+            <td style="background: #f8fafc; color: #334155; text-align: center; font-size: 6.2pt; font-weight: bold; padding: 3px 2px; border-top: 1px solid {cor_num_borda}; white-space: nowrap;">
               {data_hora_topo}
             </td>
           </tr>
@@ -698,9 +681,11 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     </div>
   </div>
 
-  <!-- 5. PEÇAS & COMPONENTES APLICADOS -->
+  <!-- 5. PEÇAS & COMPONENTES APLICADOS / MANUTENÇÃO PREVENTIVA -->
   <div class="sec-box">
-    <div class="sec-title" style="background: #475569;">5. PEÇAS E COMPONENTES APLICADOS</div>
+    <div class="sec-title" style="background: #475569;">
+      {"5. PEÇAS E COMPONENTES APLICADOS" if pecas_itens else "5. MANUTENÇÃO PREVENTIVA PROGRAMADA (PEÇAS E COMPONENTES)"}
+    </div>
     {f'''
     <table>
       <thead>
@@ -721,8 +706,8 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
       </tbody>
     </table>
     ''' if pecas_itens else '''
-    <div style="padding: 5px 9px; font-size: 7.5pt; color: #64748b; font-style: italic;">
-      Nenhuma peça substituída neste atendimento.
+    <div style="padding: 6px 9px; font-size: 7.6pt; color: #1e293b; background: #f8fafc; font-weight: 600;">
+      Manutenção Preventiva Programada &mdash; Nenhuma peça substituída neste atendimento.
     </div>
     '''}
   </div>

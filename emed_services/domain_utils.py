@@ -59,64 +59,13 @@ def classificar_pendencia(texto_pend):
 
 
 def calcular_duracao_os(checkin_str, checkout_str):
-    if not checkin_str or not checkout_str:
-        return ""
-    s_in = str(checkin_str).strip()
-    s_out = str(checkout_str).strip()
-    if not s_in or not s_out:
-        return ""
-
-    dt_in = None
-    dt_out = None
-
-    formatos_completos = [
-        "%d/%m/%Y %H:%M:%S",
-        "%d/%m/%Y %H:%M",
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d %H:%M",
-        "%d/%m/%Y",
-        "%Y-%m-%d"
-    ]
-
-    for fmt in formatos_completos:
-        if dt_in is None:
-            try:
-                dt_in = datetime.datetime.strptime(s_in, fmt)
-            except Exception:
-                pass
-        if dt_out is None:
-            try:
-                dt_out = datetime.datetime.strptime(s_out, fmt)
-            except Exception:
-                pass
-
-    if dt_in is None or dt_out is None or dt_in == dt_out:
-        import re
-        m_in = re.search(r"(\d{1,2}):(\d{2})(?::(\d{2}))?", s_in)
-        m_out = re.search(r"(\d{1,2}):(\d{2})(?::(\d{2}))?", s_out)
-        if m_in and m_out:
-            h_in, min_in = int(m_in.group(1)), int(m_in.group(2))
-            h_out, min_out = int(m_out.group(1)), int(m_out.group(2))
-            base_date = datetime.date(2026, 1, 1)
-            if dt_in is not None:
-                base_date = dt_in.date()
-            dt_in = datetime.datetime.combine(base_date, datetime.time(h_in, min_in))
-            base_date_out = base_date
-            if dt_out is not None and dt_out.date() > base_date:
-                base_date_out = dt_out.date()
-            dt_out = datetime.datetime.combine(base_date_out, datetime.time(h_out, min_out))
-            if dt_out < dt_in:
-                dt_out += datetime.timedelta(days=1)
-
-    if dt_in and dt_out:
+    try:
+        dt_in = datetime.datetime.strptime(str(checkin_str).strip(), "%d/%m/%Y %H:%M")
+        dt_out = datetime.datetime.strptime(str(checkout_str).strip(), "%d/%m/%Y %H:%M")
         diff = dt_out - dt_in
         minutos_tot = max(0, int(diff.total_seconds() // 60))
-        if minutos_tot > 0:
-            horas = minutos_tot // 60
-            mins = minutos_tot % 60
-            if horas > 0:
-                return f"{horas}h {mins:02d}min" if mins > 0 else f"{horas}h"
-            else:
-                return f"{mins} min"
-
-    return ""
+        horas = minutos_tot // 60
+        mins = minutos_tot % 60
+        return f"{horas}h {mins}min" if horas > 0 else f"{mins} min"
+    except Exception:
+        return ""
