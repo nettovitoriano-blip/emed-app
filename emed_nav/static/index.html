@@ -715,18 +715,29 @@
     <div id="map-wrapper">
       <div id="map"></div>
 
-      <!-- BOTÕES FLUTUANTES NO MAPA -->
+      <!-- BOTÕES FLUTUANTES NO MAPA (MINIMALISTA & MENOS POLUIÇÃO) -->
       <div class="map-fab-stack">
-        <button id="btn-toggle-clients" class="map-fab" title="Alternar Filtro de Clientes (Todos / Contrato / Avulso / Oculto)" style="border-color:#38bdf8; background:#0f172a; color:#38bdf8; font-size:16px;">
-          🏥
-        </button>
-        <button id="btn-toggle-radars" class="map-fab" title="Visualização de Radares (Ligado / Auto-Zoom / Oculto)" style="border-color:#f59e0b; background:#1e293b; color:#fbbf24; font-size:16px;">📷</button>
-        <button id="btn-customize-map" class="map-fab" title="Personalizar Telas & Camadas do Mapa" onclick="openMapCustomizeModal()" style="border-color:#a855f7; background:linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); color:#ffffff; font-size:16px;">🎨</button>
-        <button id="btn-pin-mode" class="map-fab" title="Ativar Marcação de Destino no Toque" style="font-size:16px;">📍</button>
-        <button id="btn-center-car" class="map-fab" title="Centralizar no Carro">🎯</button>
-        <button id="btn-toggle-layers" class="map-fab" title="Alternar Mapa (Satélite / Vias)">🛰️</button>
-        <button id="btn-clear-route" class="map-fab" title="Limpar Rota Ativa" style="display:none; color:#ef4444; border-color:#ef4444;">❌</button>
-        <button id="btn-fit-route" class="map-fab" title="Ver Rota Completa">🗺️</button>
+        <button id="btn-center-car" class="map-fab" title="Centralizar no Carro" style="border-color:#22c55e; background:linear-gradient(135deg, #15803d 0%, #0f172a 100%); color:#4ade80;">🎯</button>
+        <button id="btn-toggle-clients" class="map-fab" title="Filtro de Clientes (Todos / Contrato / Avulso / Oculto)" style="border-color:#38bdf8; background:#0f172a; color:#38bdf8;">🏥</button>
+        <button id="btn-toggle-radars" class="map-fab" title="Radares e Velocidade" style="border-color:#f59e0b; background:#1e293b; color:#fbbf24;">📷</button>
+        <button id="btn-toggle-layers" class="map-fab" title="Satélite / Vias">🛰️</button>
+        <button id="btn-fab-more" class="map-fab" onclick="toggleFabMoreMenu()" title="Mais Ferramentas" style="border-color:#94a3b8; background:rgba(30,41,59,0.85); color:#e2e8f0; font-size:18px;">⋯</button>
+        
+        <!-- POPOVER MINIMALISTA DE FERRAMENTAS EXTRAS -->
+        <div id="fab-more-popover" style="display:none; position:absolute; right:50px; bottom:0; background:rgba(15,23,42,0.95); border:1px solid #38bdf8; border-radius:12px; padding:6px; flex-direction:column; gap:6px; box-shadow:0 8px 24px rgba(0,0,0,0.6); z-index:900; min-width:140px;">
+          <button id="btn-pin-mode" style="background:rgba(255,255,255,0.08); border:none; color:#f8fafc; font-size:12px; font-weight:700; padding:6px 10px; border-radius:6px; text-align:left; cursor:pointer; display:flex; align-items:center; gap:8px;">
+            <span>📍</span> Fixar Pin no Mapa
+          </button>
+          <button id="btn-fit-route" style="background:rgba(255,255,255,0.08); border:none; color:#f8fafc; font-size:12px; font-weight:700; padding:6px 10px; border-radius:6px; text-align:left; cursor:pointer; display:flex; align-items:center; gap:8px;">
+            <span>🗺️</span> Enquadrar Rota
+          </button>
+          <button id="btn-customize-map" onclick="openMapCustomizeModal()" style="background:rgba(255,255,255,0.08); border:none; color:#f8fafc; font-size:12px; font-weight:700; padding:6px 10px; border-radius:6px; text-align:left; cursor:pointer; display:flex; align-items:center; gap:8px;">
+            <span>🎨</span> Personalizar Visual
+          </button>
+          <button id="btn-clear-route" onclick="clearRoute()" style="background:rgba(239,68,68,0.2); border:1px solid #ef4444; color:#f87171; font-size:12px; font-weight:700; padding:6px 10px; border-radius:6px; text-align:left; cursor:pointer; display:flex; align-items:center; gap:8px;">
+            <span>❌</span> Cancelar Rota
+          </button>
+        </div>
       </div>
     </div>
 
@@ -748,6 +759,47 @@
         </div>
       </div>
 
+      <!-- MODO COCKPIT FLUIDO (ATIVADO QUANDO ROTA ESTÁ EM ANDAMENTO - ZERO MODAIS) -->
+      <div id="cockpit-active-card" style="display:none; flex-direction:column; gap:8px; margin-bottom:6px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+          <div style="flex:1; overflow:hidden;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span id="cockpit-step-counter" style="background:#f59e0b; color:#0f172a; font-size:11px; font-weight:900; padding:2px 8px; border-radius:10px; display:inline-block;">Etapa 1</span>
+              <span id="cockpit-km-eta" style="font-size:13px; font-weight:800; color:#38bdf8;">-- km • -- min</span>
+            </div>
+            <div id="cockpit-target-name" style="font-size:15px; font-weight:900; color:#f8fafc; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              Destino
+            </div>
+          </div>
+          <button onclick="clearRoute()" title="Cancelar Rota" style="background:rgba(239,68,68,0.2); border:1px solid #ef4444; color:#f87171; border-radius:8px; width:34px; height:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:14px; flex-shrink:0;">✕</button>
+        </div>
+
+        <!-- BOTÕES GRANDES DE NAVEGAÇÃO DIRETA AO VOLANTE -->
+        <div style="display:flex; gap:8px;">
+          <button id="btn-cockpit-maps" onclick="launchGoogleMaps()" style="flex:1; height:46px; border-radius:10px; background:linear-gradient(135deg, #16a34a 0%, #15803d 100%); border:1px solid #4ade80; color:#ffffff; font-size:13px; font-weight:900; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; box-shadow:0 4px 12px rgba(22,163,74,0.3);">
+            <span>🧭</span> GOOGLE MAPS
+          </button>
+          <button id="btn-cockpit-waze" onclick="launchWaze()" style="flex:1; height:46px; border-radius:10px; background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border:1px solid #38bdf8; color:#ffffff; font-size:13px; font-weight:900; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; box-shadow:0 4px 12px rgba(2,132,199,0.3);">
+            <span>🚀</span> WAZE
+          </button>
+        </div>
+
+        <!-- MODO TRABALHO DO TÉCNICO (ETAPAS DA ROTA) -->
+        <div id="cockpit-tech-actions" style="display:none; gap:6px; align-items:center; flex-wrap:wrap; margin-top:2px;">
+          <button id="btn-cockpit-complete" onclick="completeCurrentStop()" style="flex:2; min-width:160px; height:40px; background:linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color:#052e16; border:1.5px solid #86efac; border-radius:8px; font-weight:900; font-size:12.5px; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; box-shadow:0 0 12px rgba(34,197,94,0.4);">
+            <span>✅</span> Concluir Parada (Avançar)
+          </button>
+          <button id="btn-cockpit-optimize" onclick="optimizeRouteOrder()" style="flex:1; min-width:115px; height:40px; background:rgba(245,158,11,0.2); border:1px solid #f59e0b; color:#fbbf24; border-radius:8px; font-weight:800; font-size:11.5px; display:flex; align-items:center; justify-content:center; gap:4px; cursor:pointer;">
+            <span>⚡</span> Otimizar Ordem
+          </button>
+          <button onclick="toggleEditRouteMode()" style="height:40px; padding:0 10px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#cbd5e1; border-radius:8px; font-weight:700; font-size:11px; cursor:pointer;">
+            ✏️ Paradas
+          </button>
+        </div>
+      </div>
+
+      <!-- PAINEL DE BUSCA & CONFIGURAÇÃO (MODO LIVRE) -->
+      <div id="panel-search-and-chips">
       <!-- ATALHOS REGIONAIS 1-TOQUE -->
       <div class="quick-chips">
         <div class="chip" data-dest="Hospital Wilson Rosado, Mossoró, RN" data-lat="-5.1884" data-lon="-37.3486">🏥 Wilson Rosado</div>
@@ -776,9 +828,14 @@
       <!-- SEÇÃO DE PARADAS INTERMEDIÁRIAS (WAYPOINTS) -->
       <div id="waypoints-section">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <button id="btn-toggle-add-stop" class="btn-add-stop-toggle" type="button" onclick="toggleAddStopInput()">
-            <span>➕</span> <span>Adicionar Parada</span>
-          </button>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button id="btn-toggle-add-stop" class="btn-add-stop-toggle" type="button" onclick="toggleAddStopInput()">
+              <span>➕</span> <span>Adicionar Parada</span>
+            </button>
+            <button id="btn-optimize-stops" onclick="optimizeRouteOrder()" type="button" style="display:none; background:rgba(245,158,11,0.2); border:1px solid #f59e0b; color:#fbbf24; font-size:11px; font-weight:800; padding:4px 8px; border-radius:6px; cursor:pointer; align-items:center; gap:4px;">
+              <span>⚡</span> Otimizar Ordem
+            </button>
+          </div>
           <span id="lbl-stops-summary" style="font-size:11px; font-weight:700; color:#38bdf8; display:none;">0 parada(s)</span>
         </div>
 
@@ -819,6 +876,7 @@
           <span>🧭</span> NAVEGAR NO MAPS
         </button>
       </div>
+      </div> <!-- /#panel-search-and-chips -->
     </footer>
 
     <!-- MODAL DE NAVEGAÇÃO IMEDIATA (WAZE / MAPS) -->
@@ -1703,7 +1761,7 @@
     }
 
     // TRAÇADOR E FIXADOR DE DESTINO INSTANTÂNEO (0ms DE DELAY)
-    function setDestination(lat, lon, nome, autoOpenModal = true) {
+    function setDestination(lat, lon, nome, autoOpenModal = false) {
       const safeNome = (nome && String(nome) !== 'undefined') ? String(nome).trim() : '';
       state.destLat = lat;
       state.destLon = lon;
@@ -1805,9 +1863,15 @@
       document.getElementById('route-summary-bar').style.display = 'none';
       document.getElementById('btn-clear-route').style.display = 'none';
       document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      
+      const cockpit = document.getElementById('cockpit-active-card');
+      const panelSearch = document.getElementById('panel-search-and-chips');
+      if (cockpit) cockpit.style.display = 'none';
+      if (panelSearch) panelSearch.style.display = 'block';
+
       closeNavModal();
       map.setView([state.carLat, state.carLon], 15);
-      showToast('❌ Rota cancelada. Modo livre.');
+      showToast('❌ Rota encerrada. Modo livre.');
     }
 
     // 🎯 RECURSO CONTROLADO: TOQUE NO MAPA SÓ CRIA DESTINO SE O MODO PIN ESTIVER ATIVO!
@@ -2029,12 +2093,14 @@
               <div style="margin-bottom:4px;">${badgeHtml}</div>
               <strong style="color:${isContrato ? '#38bdf8' : '#f87171'}; font-size:13px;">${cli.nome}</strong><br>
               <span style="color:#94a3b8;">${cli.cidade}</span><br>
-              <button onclick="setDestination(${cli.lat}, ${cli.lon}, '${cli.nome.replace(/'/g, "\\'")}', true)" style="margin-top:8px; background:${isContrato ? '#0284c7' : '#dc2626'}; border:none; color:white; font-weight:800; padding:7px 10px; border-radius:6px; width:100%; cursor:pointer;">
-                🚀 Traçar Rota até Aqui
-              </button>
-              <button onclick="addWaypoint(${cli.lat}, ${cli.lon}, '${cli.nome.replace(/'/g, "\\'")}')" style="margin-top:4px; background:rgba(245,158,11,0.2); border:1px solid #f59e0b; color:#fbbf24; font-weight:800; padding:6px 10px; border-radius:6px; width:100%; cursor:pointer; font-size:11px;">
-                ➕ Adicionar como Parada
-              </button>
+              <div style="display:flex; gap:6px; margin-top:8px;">
+                <button onclick="setDestination(${cli.lat}, ${cli.lon}, '${cli.nome.replace(/'/g, "\\'")}', false)" style="flex:1; background:${isContrato ? '#0284c7' : '#dc2626'}; border:none; color:white; font-weight:800; padding:8px 6px; border-radius:6px; cursor:pointer; font-size:11px; display:flex; align-items:center; justify-content:center; gap:4px;">
+                  🚀 Ir Direto
+                </button>
+                <button onclick="addWaypoint(${cli.lat}, ${cli.lon}, '${cli.nome.replace(/'/g, "\\'")}')" style="flex:1; background:rgba(245,158,11,0.25); border:1px solid #f59e0b; color:#fbbf24; font-weight:800; padding:8px 6px; border-radius:6px; cursor:pointer; font-size:11px; display:flex; align-items:center; justify-content:center; gap:4px;">
+                  ➕ + Parada
+                </button>
+              </div>
             </div>
           `;
           marker.bindPopup(popupContent);
@@ -2226,7 +2292,6 @@
         suggBox.style.display = 'none';
         inputDest.blur();
         recalculateFullRoute();
-        openNavModal();
         return;
       }
 
@@ -2237,10 +2302,9 @@
       suggBox.style.display = 'none';
       inputDest.blur();
 
-      // Se já temos a coordenada deste destino ativo, recalcula rota completa e abre modal
+      // Se já temos a coordenada deste destino ativo, recalcula rota completa direto no Cockpit
       if (state.destLat && state.destLon && state.destName) {
         recalculateFullRoute();
-        openNavModal();
         return;
       }
 
@@ -2510,7 +2574,7 @@
 
     // REGISTRO DE SERVICE WORKER
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/static/sw.js?v=12').catch(() => {});
+      navigator.serviceWorker.register('/static/sw.js?v=13').catch(() => {});
     }
 
     // IDENTIFICAÇÃO AUTOMÁTICA DE VEÍCULO POR PROXIMIDADE / NFC + ASSUMIR O VOLANTE
@@ -2802,33 +2866,207 @@
     function renderWaypointsList() {
       const listEl = document.getElementById('waypoints-list');
       const summaryEl = document.getElementById('lbl-stops-summary');
-
       const tipEl = document.getElementById('waypoints-maps-tip');
+      const btnOptimize = document.getElementById('btn-optimize-stops');
+      const btnCockpitOpt = document.getElementById('btn-cockpit-optimize');
+
       if (!state.waypoints || state.waypoints.length === 0) {
         listEl.style.display = 'none';
         listEl.innerHTML = '';
-        summaryEl.style.display = 'none';
+        if (summaryEl) summaryEl.style.display = 'none';
         if (tipEl) tipEl.style.display = 'none';
+        if (btnOptimize) btnOptimize.style.display = 'none';
+        if (btnCockpitOpt) btnCockpitOpt.style.display = 'none';
         return;
       }
 
+      if (summaryEl) {
+        summaryEl.style.display = 'inline';
+        summaryEl.innerText = `${state.waypoints.length} parada(s)`;
+      }
       if (tipEl) tipEl.style.display = 'flex';
+      if (btnOptimize) {
+        btnOptimize.style.display = state.waypoints.length >= 2 ? 'inline-flex' : 'none';
+      }
+      if (btnCockpitOpt) {
+        btnCockpitOpt.style.display = state.waypoints.length >= 2 ? 'inline-flex' : 'none';
+      }
 
-      summaryEl.style.display = 'inline';
-      summaryEl.innerText = `${state.waypoints.length} parada(s)`;
       listEl.style.display = 'flex';
       listEl.innerHTML = state.waypoints.map((wp, idx) => `
-        <div class="waypoint-item">
+        <div class="waypoint-item" style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:rgba(15,23,42,0.7); border-radius:8px; border:1px solid rgba(56,189,248,0.2); gap:6px;">
           <div style="display:flex; align-items:center; gap:8px; overflow:hidden; flex:1;">
-            <span class="waypoint-badge">${idx + 1}</span>
-            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px;">${wp.name}</span>
+            <span class="waypoint-badge" style="background:#f59e0b; color:#0f172a; font-weight:900; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0;">${idx + 1}</span>
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; font-weight:600; color:#e2e8f0;">${wp.name}</span>
           </div>
-          <div style="display:flex; align-items:center; gap:5px; flex-shrink:0;">
-            <button class="btn-stop-nav" onclick="launchWazeSingle(${wp.lat}, ${wp.lon}, '${wp.name.replace(/'/g, "\\'")}')" title="Navegar no Waze para esta parada" style="background:rgba(0,180,216,0.2); border:1px solid #00b4d8; color:#38bdf8; border-radius:5px; padding:3px 7px; font-size:10.5px; font-weight:800; cursor:pointer;">Waze</button>
-            <button class="btn-remove-stop" onclick="removeWaypoint(${idx})" title="Remover parada">✕</button>
+          <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+            ${idx > 0 ? `<button onclick="moveWaypoint(${idx}, -1)" title="Subir parada" style="background:rgba(255,255,255,0.1); border:none; color:#cbd5e1; border-radius:4px; width:22px; height:22px; cursor:pointer; font-size:10px;">▲</button>` : ''}
+            ${idx < state.waypoints.length - 1 ? `<button onclick="moveWaypoint(${idx}, 1)" title="Descer parada" style="background:rgba(255,255,255,0.1); border:none; color:#cbd5e1; border-radius:4px; width:22px; height:22px; cursor:pointer; font-size:10px;">▼</button>` : ''}
+            <button class="btn-stop-nav" onclick="launchWazeSingle(${wp.lat}, ${wp.lon}, '${wp.name.replace(/'/g, "\\'")}')" title="Navegar no Waze para esta parada" style="background:rgba(0,180,216,0.2); border:1px solid #00b4d8; color:#38bdf8; border-radius:4px; padding:3px 7px; font-size:10.5px; font-weight:800; cursor:pointer;">Waze</button>
+            <button class="btn-remove-stop" onclick="removeWaypoint(${idx})" title="Remover parada" style="background:rgba(239,68,68,0.2); border:none; color:#f87171; border-radius:4px; width:22px; height:22px; cursor:pointer; font-size:11px; font-weight:bold;">✕</button>
           </div>
         </div>
       `).join('');
+    }
+
+    // ==========================================================================
+    // SISTEMA MODERNO DE ROTA FLUIDA: OTIMIZAÇÃO (TSP), CONCLUIR ETAPA & COCKPIT
+    // ==========================================================================
+    function optimizeRouteOrder() {
+      if (!state.waypoints || state.waypoints.length < 2) {
+        showToast('Adicione pelo menos 2 paradas para otimizar a ordem!');
+        return;
+      }
+      
+      let currentLat = state.carLat;
+      let currentLon = state.carLon;
+      let remaining = [...state.waypoints];
+      let optimized = [];
+
+      while (remaining.length > 0) {
+        let nearestIdx = 0;
+        let minDist = Infinity;
+        for (let i = 0; i < remaining.length; i++) {
+          let d = calcDistanceMeters(currentLat, currentLon, remaining[i].lat, remaining[i].lon);
+          if (d < minDist) {
+            minDist = d;
+            nearestIdx = i;
+          }
+        }
+        let chosen = remaining.splice(nearestIdx, 1)[0];
+        optimized.push(chosen);
+        currentLat = chosen.lat;
+        currentLon = chosen.lon;
+      }
+
+      state.waypoints = optimized;
+
+      // Reindexa markers no mapa
+      state.waypoints.forEach((wp, i) => {
+        const num = i + 1;
+        const newIcon = L.divIcon({
+          className: 'custom-stop-marker',
+          html: `<div style="background:#f59e0b; color:#0f172a; font-weight:900; font-size:12px; width:28px; height:28px; border-radius:50%; border:2px solid #ffffff; box-shadow:0 0 10px rgba(245,158,11,0.8); display:flex; align-items:center; justify-content:center;">${num}</div>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14]
+        });
+        wp.marker.setIcon(newIcon);
+        wp.marker.setPopupContent(`<strong>Parada ${num}:</strong><br>${wp.name}`);
+      });
+
+      renderWaypointsList();
+      recalculateFullRoute();
+      showToast('⚡ Rota otimizada! Menor percurso traçado a partir do GPS do carro.');
+      speakFeedback('Rota otimizada pela ordem mais rápida.');
+    }
+
+    function completeCurrentStop() {
+      if (!state.waypoints || state.waypoints.length === 0) {
+        clearRoute();
+        showToast('🏁 Destino alcançado!');
+        return;
+      }
+
+      const completed = state.waypoints.shift();
+      if (completed && completed.marker) {
+        map.removeLayer(completed.marker);
+      }
+
+      if (state.waypoints.length > 0) {
+        state.waypoints.forEach((wp, i) => {
+          const num = i + 1;
+          const newIcon = L.divIcon({
+            className: 'custom-stop-marker',
+            html: `<div style="background:#f59e0b; color:#0f172a; font-weight:900; font-size:12px; width:28px; height:28px; border-radius:50%; border:2px solid #ffffff; box-shadow:0 0 10px rgba(245,158,11,0.8); display:flex; align-items:center; justify-content:center;">${num}</div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+          });
+          wp.marker.setIcon(newIcon);
+          wp.marker.setPopupContent(`<strong>Parada ${num}:</strong><br>${wp.name}`);
+        });
+
+        renderWaypointsList();
+        recalculateFullRoute();
+        const nextWp = state.waypoints[0];
+        showToast(`✅ Parada concluída! Próxima etapa: ${nextWp.name}`);
+        speakFeedback(`Parada concluída. Próximo destino: ${nextWp.name}`);
+      } else {
+        clearRoute();
+        showToast('🎉 Parabéns! Todas as paradas do roteiro foram concluídas!');
+        speakFeedback('Todas as paradas foram concluídas!');
+      }
+    }
+
+    function moveWaypoint(index, direction) {
+      const newIndex = index + direction;
+      if (newIndex < 0 || newIndex >= state.waypoints.length) return;
+      const temp = state.waypoints[index];
+      state.waypoints[index] = state.waypoints[newIndex];
+      state.waypoints[newIndex] = temp;
+
+      state.waypoints.forEach((wp, i) => {
+        const num = i + 1;
+        const newIcon = L.divIcon({
+          className: 'custom-stop-marker',
+          html: `<div style="background:#f59e0b; color:#0f172a; font-weight:900; font-size:12px; width:28px; height:28px; border-radius:50%; border:2px solid #ffffff; box-shadow:0 0 10px rgba(245,158,11,0.8); display:flex; align-items:center; justify-content:center;">${num}</div>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14]
+        });
+        wp.marker.setIcon(newIcon);
+        wp.marker.setPopupContent(`<strong>Parada ${num}:</strong><br>${wp.name}`);
+      });
+
+      renderWaypointsList();
+      recalculateFullRoute();
+      showToast('Ordem das paradas atualizada');
+    }
+
+    function toggleEditRouteMode() {
+      const panel = document.getElementById('panel-search-and-chips');
+      const isHidden = panel.style.display === 'none';
+      panel.style.display = isHidden ? 'block' : 'none';
+    }
+
+    function toggleFabMoreMenu() {
+      const popover = document.getElementById('fab-more-popover');
+      const isHidden = popover.style.display === 'none';
+      popover.style.display = isHidden ? 'flex' : 'none';
+    }
+
+    function speakFeedback(text) {
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = 'pt-BR';
+          u.rate = 1.1;
+          window.speechSynthesis.speak(u);
+        }
+      } catch(e) {}
+    }
+
+    function updateCockpitUI(targetName, distKm, timeMin, isMulti) {
+      const cockpit = document.getElementById('cockpit-active-card');
+      const panelSearch = document.getElementById('panel-search-and-chips');
+      const targetEl = document.getElementById('cockpit-target-name');
+      const stepEl = document.getElementById('cockpit-step-counter');
+      const etaEl = document.getElementById('cockpit-km-eta');
+      const techActions = document.getElementById('cockpit-tech-actions');
+
+      cockpit.style.display = 'flex';
+      panelSearch.style.display = 'none';
+
+      targetEl.innerText = targetName || 'Destino';
+      etaEl.innerText = `${distKm} km • ${timeMin} min`;
+
+      if (isMulti && state.waypoints && state.waypoints.length > 0) {
+        stepEl.style.display = 'inline-block';
+        stepEl.innerText = `Etapa 1 de ${state.waypoints.length}`;
+        techActions.style.display = 'flex';
+      } else {
+        stepEl.style.display = 'none';
+        techActions.style.display = 'none';
+      }
     }
 
     function recalculateFullRoute() {
@@ -2890,6 +3128,7 @@
       document.getElementById('modal-dest-name').innerText = finalName || 'Destino';
       document.getElementById('route-summary-bar').style.display = 'flex';
       document.getElementById('btn-clear-route').style.display = 'flex';
+      updateCockpitUI(finalName, distEstKm, timeEstMin, state.waypoints && state.waypoints.length > 0);
 
       try {
         map.fitBounds(allPoints, { padding: [50, 50] });
@@ -2925,6 +3164,7 @@
             document.getElementById('modal-km').innerText = `${data.distance_km} km`;
             document.getElementById('modal-time').innerText = `${data.duration_min} min`;
             updateMiniSheetHeader();
+            updateCockpitUI(finalName, data.distance_km, data.duration_min, state.waypoints && state.waypoints.length > 0);
             try {
               map.fitBounds(state.routePolyline.getBounds(), { padding: [50, 50] });
             } catch(e) {}
