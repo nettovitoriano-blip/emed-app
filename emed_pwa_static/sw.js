@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v73-logout-assinaturatec-headerfix';
+const CACHE_NAME = 'emed-pwa-v74-tecnico-ui-simplificada';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

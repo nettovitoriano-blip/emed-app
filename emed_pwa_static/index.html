@@ -55536,7 +55536,10 @@
 
 
 
-        <button class="btn-sync-icon" onclick="sincronizarTudo(true)" title="Sincronizar com Servidor">🔄</button>
+        <button class="btn-sync-icon" onclick="sincronizarTudo(true)" title="Atualizar Sistema e OS (Técnico)" style="position:relative; display:inline-flex; flex-direction:column; align-items:center; justify-content:center; padding:3px 7px; line-height:1; min-width:34px; height:32px;">
+          <span style="font-size:13px; line-height:1; margin-bottom:-2px;">👷</span>
+          <span style="font-size:10px; line-height:1;">🔄</span>
+        </button>
 
 
 
@@ -80838,6 +80841,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
       TECNICO: [
         { id: "TEC_OS", icone: "🎫", titulo: "Chamados & Minhas OS", desc: "Execução em campo, Check-in, Checklist POP, Fotos, Assinatura e Laudo 1 Página" },
+        { id: "TEC_PAINEL", icone: "🏠", titulo: "Painel Interativo", desc: "Saudação diária, aniversariantes, alertas operacionais e valores EMED" },
         { id: "TEC_ROTAS", icone: "🗺️", titulo: "Minhas Rotas & Mapa", desc: "Apenas os hospitais e clientes com chamados sob sua responsabilidade" },
         { id: "TEC_PEND", icone: "📋", titulo: "Minhas Pendências", desc: "Retornos técnicos e pendências atribuídas ao seu nome" },
         { id: "TEC_PERFIL", icone: "✍️", titulo: "Cadastro & Assinatura", desc: "Seu cadastro pessoal, CFT e rubrica digital touch para emissão de laudos" },
@@ -96838,12 +96842,13 @@ async function efetuarLogout() {
 
       const modeSwitchBox = document.querySelector(".mode-switch");
       if (!isGestor) {
-        // TÉCNICO: Não precisa dos menus acima (Master, Técnico, Gestor, Triagem)
+        // TÉCNICO: Não exibe Master, Técnico, Gestor, Triagem no topo
         if (modeSwitchBox) modeSwitchBox.style.display = "none";
         STATE.perfil = "TECNICO";
       } else {
-        // GESTOR: Exibe os seletores de perfil
-        if (modeSwitchBox) modeSwitchBox.style.display = "flex";
+        // Oculta os seletores Master/Técnico/Gestor/Triagem quando estiver na visão de Técnico ou no celular
+        const ehCelular = window.innerWidth <= 768;
+        if (modeSwitchBox) modeSwitchBox.style.display = (STATE.perfil === "TECNICO" || ehCelular) ? "none" : "flex";
         const btnFull = document.getElementById("tabModeFull");
         const btnTec = document.getElementById("tabModeTecnico");
         const btnGestor = document.getElementById("tabModeGestor");
@@ -96861,7 +96866,7 @@ async function efetuarLogout() {
       const headerUserChip = document.getElementById("headerUserChip");
       if (headerUserChip) {
         headerUserChip.innerHTML = `
-          <span style="font-size:12px;">👤</span>
+          <span style="font-size:13px;">${STATE.perfil === "TECNICO" || !isGestor ? "👷" : "👤"}</span>
           <span class="user-name-text" style="font-size:12px;font-weight:800;color:#f8fafc;">${esc(usuarioNome || "Usuário")}</span>
           <span class="user-role-badge" style="font-size:9.5px;background:${isGestor ? '#eab308' : '#0284c7'};color:#fff;padding:1px 6px;border-radius:10px;font-weight:800;">
             ${isGestor ? 'GESTOR' : 'TÉCNICO'}
@@ -97991,6 +97996,7 @@ async function efetuarLogout() {
         case "TEC_ROTAS": return renderMenuTecRotas(box);
         case "TEC_PERFIL": return renderMenuTecPerfil(box);
         case "TEC_OS": return renderMenuTecOS(box);
+        case "TEC_PAINEL": return renderMenuTecPainel(box);
 
 
 
@@ -101068,7 +101074,7 @@ async function efetuarLogout() {
 
 
 
-                <span class="badge ${clsBadge}"><img class="emed-st-ico" src="/api/app-icon/status-${({concluido:'autorizada_salva',obs:'aviso',ativo:'enviando'})[clsBadge]||'pendente'}" alt="" />${esc(st)}</span>
+                <span class="badge ${clsBadge}"><img class="emed-st-ico" onerror="this.style.display='none'" src="/api/app-icon/status-${({concluido:'autorizada_salva',obs:'aviso',ativo:'enviando'})[clsBadge]||'pendente'}" alt="" />${esc(st)}</span>
 
 
 
@@ -104754,7 +104760,51 @@ async function efetuarLogout() {
 
 
 
-    function renderMenuTecOS(box) {
+        function renderMenuTecPainel(box) {
+      box.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          ${htmlPainelAlertasInterativo()}
+
+          <div class="section-box" style="background:linear-gradient(135deg, #002b54 0%, #0f172a 100%); color:#ffffff; border:1px solid rgba(56,189,248,0.3); padding:16px; border-radius:12px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.12); padding-bottom:8px;">
+              <span style="font-size:20px;">🏥</span>
+              <div>
+                <div style="font-size:14.5px; font-weight:900; color:#38bdf8; letter-spacing:0.3px;">EMED ELETROMEDICINA — CULTURA &amp; VALORES</div>
+                <div style="font-size:11px; color:#cbd5e1;">Engenharia Clínica e Diagnóstico por Imagem (emed.med.br)</div>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr; gap:10px;">
+              <div style="background:rgba(255,255,255,0.06); border-left:3px solid #38bdf8; padding:10px 12px; border-radius:6px;">
+                <div style="font-size:11.5px; font-weight:800; color:#38bdf8; margin-bottom:3px;">🎯 MISSÃO</div>
+                <div style="font-size:12px; line-height:1.45; color:#f1f5f9;">
+                  Garantir que a tecnologia médica e os equipamentos de diagnóstico por imagem estejam sempre seguros, confiáveis e plenamente operacionais para que instituições de saúde e médicos possam salvar vidas com excelência.
+                </div>
+              </div>
+
+              <div style="background:rgba(255,255,255,0.06); border-left:3px solid #f59e0b; padding:10px 12px; border-radius:6px;">
+                <div style="font-size:11.5px; font-weight:800; color:#fbbf24; margin-bottom:3px;">🔭 VISÃO</div>
+                <div style="font-size:12px; line-height:1.45; color:#f1f5f9;">
+                  Ser referência nacional e parceiro estratégico de hospitais, clínicas e centros de diagnóstico pela excelência técnica, agilidade e alto padrão de qualidade em engenharia clínica.
+                </div>
+              </div>
+
+              <div style="background:rgba(255,255,255,0.06); border-left:3px solid #22c55e; padding:10px 12px; border-radius:6px;">
+                <div style="font-size:11.5px; font-weight:800; color:#4ade80; margin-bottom:4px;">💎 NOSSOS VALORES</div>
+                <ul style="margin:0; padding-left:16px; font-size:12px; line-height:1.5; color:#f1f5f9;">
+                  <li><b>Segurança e Confiabilidade:</b> Rigor técnico absoluto em equipamentos críticos.</li>
+                  <li><b>Agilidade e Disponibilidade:</b> Prontidão no atendimento para reduzir tempo de máquina parada.</li>
+                  <li><b>Excelência Técnica:</b> Qualificação contínua em alta complexidade tecnológica.</li>
+                  <li><b>Parceria e Comprometimento:</b> Transparência e confiança mútua com o corpo clínico.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+function renderMenuTecOS(box) {
 
 
 
@@ -106089,679 +106139,24 @@ async function efetuarLogout() {
 
 
 
-        <div class="kpi-grid" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-bottom:12px; width:100%; box-sizing:border-box;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <div class="kpi-card" style="padding:8px 4px; min-width:0; text-align:center;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <div class="kpi-label" style="font-size:10px; font-weight:800; line-height:1.15;">🎫 OS Ativas</div><div class="kpi-val" style="font-size:20px; font-weight:900; margin-top:3px;">${ativasCount}</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <div class="kpi-card amber" style="padding:8px 4px; min-width:0; text-align:center;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <div class="kpi-label" style="font-size:10px; font-weight:800; line-height:1.15;">${"🔬 Observação (" + obsCount + ")"}</div><div class="kpi-val" style="font-size:20px; font-weight:900; margin-top:3px;">${obsCount}</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          <div class="kpi-card green" style="padding:8px 4px; min-width:0; text-align:center;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <div class="kpi-label" style="font-size:10px; font-weight:800; line-height:1.15;">${"✅ Concluídas (" + concCount + ")"}</div><div class="kpi-val" style="font-size:20px; font-weight:900; margin-top:3px;">${concCount}</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        <div class="kpi-grid" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; margin-bottom:12px; width:100%; box-sizing:border-box;">
+          <button type="button" onclick="STATE.abaStatusOS='ATIVAS';renderizarTelaPrincipal();" class="kpi-card" style="padding:10px 6px; min-width:0; text-align:center; cursor:pointer; border:${STATE.abaStatusOS==='ATIVAS'?'2px solid #0284c7':'1px solid #e2e8f0'}; background:${STATE.abaStatusOS==='ATIVAS'?'#eff6ff':'#ffffff'}; box-shadow:${STATE.abaStatusOS==='ATIVAS'?'0 4px 10px rgba(2,132,199,0.2)':'none'};">
+            <div class="kpi-label" style="font-size:11px; font-weight:800; line-height:1.15; color:#0f172a;">⚡ OS ATIVAS</div>
+            <div class="kpi-val" style="font-size:22px; font-weight:900; margin-top:2px; color:#0284c7;">${ativasCount}</div>
+          </button>
+          <button type="button" onclick="STATE.abaStatusOS='OBSERVACAO';renderizarTelaPrincipal();" class="kpi-card amber" style="padding:10px 6px; min-width:0; text-align:center; cursor:pointer; border:${STATE.abaStatusOS==='OBSERVACAO'?'2px solid #d97706':'1px solid #e2e8f0'}; background:${STATE.abaStatusOS==='OBSERVACAO'?'#fffbeb':'#ffffff'}; box-shadow:${STATE.abaStatusOS==='OBSERVACAO'?'0 4px 10px rgba(217,119,6,0.2)':'none'};">
+            <div class="kpi-label" style="font-size:11px; font-weight:800; line-height:1.15; color:#92400e;">🔬 OBSERVAÇÃO</div>
+            <div class="kpi-val" style="font-size:22px; font-weight:900; margin-top:2px; color:#d97706;">${obsCount}</div>
+          </button>
+          <button type="button" onclick="STATE.abaStatusOS='CONCLUIDAS';renderizarTelaPrincipal();" class="kpi-card green" style="padding:10px 6px; min-width:0; text-align:center; cursor:pointer; border:${STATE.abaStatusOS==='CONCLUIDAS'?'2px solid #16a34a':'1px solid #e2e8f0'}; background:${STATE.abaStatusOS==='CONCLUIDAS'?'#f0fdf4':'#ffffff'}; box-shadow:${STATE.abaStatusOS==='CONCLUIDAS'?'0 4px 10px rgba(22,163,74,0.2)':'none'};">
+            <div class="kpi-label" style="font-size:11px; font-weight:800; line-height:1.15; color:#166534;">✅ CONCLUÍDAS</div>
+            <div class="kpi-val" style="font-size:22px; font-weight:900; margin-top:2px; color:#16a34a;">${concCount}</div>
+          </button>
+          <button type="button" onclick="STATE.abaStatusOS='TODAS';renderizarTelaPrincipal();" class="kpi-card" style="padding:10px 6px; min-width:0; text-align:center; cursor:pointer; border:${STATE.abaStatusOS==='TODAS'?'2px solid #475569':'1px solid #e2e8f0'}; background:${STATE.abaStatusOS==='TODAS'?'#f8fafc':'#ffffff'}; box-shadow:${STATE.abaStatusOS==='TODAS'?'0 4px 10px rgba(71,85,105,0.18)':'none'};">
+            <div class="kpi-label" style="font-size:11px; font-weight:800; line-height:1.15; color:#334155;">📋 TODAS</div>
+            <div class="kpi-val" style="font-size:22px; font-weight:900; margin-top:2px; color:#334155;">${todasCount}</div>
+          </button>
         </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        ${htmlPainelAlertasInterativo()}
 
 
 
@@ -107494,327 +106889,7 @@ async function efetuarLogout() {
 
 
 
-          <div style="display:flex; gap:4px; flex-wrap:wrap; width:100%;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <button class="btn btn-sm ${STATE.abaStatusOS==='ATIVAS'?'btn-primary':'btn-outline'}" style="flex:1; min-width:65px; padding:6px 2px; font-size:11px;" onclick="STATE.abaStatusOS='ATIVAS';renderizarTelaPrincipal();">${"⚡ Ativas (" + ativasCount + ")"}</button>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <button class="btn btn-sm ${STATE.abaStatusOS==='OBSERVACAO'?'btn-primary':'btn-outline'}" style="flex:1; min-width:80px; padding:6px 2px; font-size:11px;" onclick="STATE.abaStatusOS='OBSERVACAO';renderizarTelaPrincipal();">${"🔬 Observação (" + obsCount + ")"}</button>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <button class="btn btn-sm ${STATE.abaStatusOS==='CONCLUIDAS'?'btn-primary':'btn-outline'}" style="flex:1; min-width:80px; padding:6px 2px; font-size:11px;" onclick="STATE.abaStatusOS='CONCLUIDAS';renderizarTelaPrincipal();">${"✅ Concluídas (" + concCount + ")"}</button>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <button class="btn btn-sm ${STATE.abaStatusOS==='TODAS'?'btn-primary':'btn-outline'}" style="flex:1; min-width:60px; padding:6px 2px; font-size:11px;" onclick="STATE.abaStatusOS='TODAS';renderizarTelaPrincipal();">${"📋 Todas (" + todasCount + ")"}</button>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          </div>
+          
 
 
 
