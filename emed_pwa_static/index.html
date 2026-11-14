@@ -76563,6 +76563,153 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
+    function normalizarTextoBuscaPeca(str) {
+      return String(str || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+    }
+
+    function filtrarPecasPropostaRapida(termo) {
+      const sel = document.getElementById("propPecaSel");
+      const badge = document.getElementById("badgeContadorFiltroPeca");
+      if (!sel) return;
+      const todas = STATE.data?.estoque || [];
+      const tNorm = normalizarTextoBuscaPeca(termo);
+      const palavras = tNorm ? tNorm.split(/\s+/).filter(Boolean) : [];
+
+      const filtradas = palavras.length === 0
+        ? todas
+        : todas.filter(p => {
+            const alvo = normalizarTextoBuscaPeca(`${p.codigo || ""} ${p.nome_peca || ""} ${p.categoria || ""}`);
+            return palavras.every(w => alvo.includes(w));
+          });
+
+      const valorAtual = sel.value;
+      let htmlOpts = `<option value="NENHUMA">-- ${palavras.length ? `Resultados encontrados (${filtradas.length})` : 'Selecione a peça para checar o estoque físico'} --</option>`;
+      htmlOpts += filtradas.map(p => `<option value="${esc(p.codigo)}">${esc(p.codigo)} — ${esc(p.nome_peca)} (Saldo Físico: ${p.quantidade})</option>`).join("");
+      sel.innerHTML = htmlOpts;
+
+      if (badge) {
+        badge.textContent = `${filtradas.length} de ${todas.length}`;
+      }
+
+      if (palavras.length > 0 && filtradas.length > 0) {
+        const mantem = filtradas.find(p => String(p.codigo) === String(valorAtual));
+        sel.value = mantem ? mantem.codigo : filtradas[0].codigo;
+        verificarEstoqueProposta(sel.value);
+      } else if (palavras.length === 0 && valorAtual && valorAtual !== "NENHUMA") {
+        sel.value = valorAtual;
+      } else {
+        verificarEstoqueProposta("NENHUMA");
+      }
+    }
+
+    function alternarUnidadeCompraEstoque() {
+      const un = document.getElementById("estUnidadeCompra")?.value || "UNIDADE";
+      const box = document.getElementById("boxConversaoMetroEstoque");
+      if (box) {
+        box.style.display = (un === "METRO" || un === "FRACIONADO") ? "block" : "none";
+      }
+      recalcularConversaoEPrecificacaoEstoque();
+    }
+
+    function recalcularConversaoEPrecificacaoEstoque(aplicarPrecoAuto = true) {
+      const un = document.getElementById("estUnidadeCompra")?.value || "UNIDADE";
+      const metNota = parseFloat(String(document.getElementById("estMetragemNota")?.value || "0").replace(",", ".")) || 0;
+      const metUnit = parseFloat(String(document.getElementById("estMetragemUnitaria")?.value || "0").replace(",", ".")) || 0;
+      const modoVenda = document.getElementById("estModoVendaMetro")?.value || "UNIDADE";
+      const elQtd = document.getElementById("estQtd");
+      const boxResumo = document.getElementById("resumoConversaoMetro");
+
+      let qtdUnidadesCalc = parseFloat(elQtd?.value || "1") || 1;
+
+      if (un === "METRO" || un === "FRACIONADO") {
+        if (modoVenda === "UNIDADE" && metNota > 0 && metUnit > 0) {
+          const exato = metNota / metUnit;
+          qtdUnidadesCalc = Math.max(1, Math.round(exato * 100) / 100);
+          if (elQtd) elQtd.value = Math.round(qtdUnidadesCalc);
+          if (boxResumo) {
+            boxResumo.innerHTML = `✅ <b>Conversão Automática Ativa:</b> Nota com <b>${metNota}m</b> ÷ <b>${metUnit}m</b> por unidade = <b style="color:#0284c7;font-size:13px;">${qtdUnidadesCalc} unidade(s) pronta(s)</b> para venda unitária. <span style="color:#475569;">(O sistema registrará que 1 UN equivale a ${metUnit}m)</span>`;
+          }
+        } else if (modoVenda === "METRO" && metNota > 0) {
+          if (boxResumo) {
+            boxResumo.innerHTML = `📏 <b>Venda no Metro:</b> Item mantido em metragem (${metNota}m). Informe a quantidade de metros ou centímetros para controle.`;
+          }
+        } else if (boxResumo) {
+          boxResumo.innerHTML = `ℹ️ Informe a metragem total da nota (ex: <b>0.0250</b>) e a medida de 1 unidade (ex: <b>0.0125</b>) para converter automaticamente em unidades.`;
+        }
+      }
+
+      // Cálculo de Precificação Inteligente
+      const valorInformado = parseFloat(String(document.getElementById("estCusto")?.value || "0").replace(",", ".")) || 0;
+      const tipoCusto = document.getElementById("estTipoCustoNota")?.value || "UNITARIO";
+      const impFator = parseFloat(String(document.getElementById("estImpostoFator")?.value || "0.35").replace(",", ".")) || 0;
+      const fretePerc = parseFloat(String(document.getElementById("estFretePerc")?.value || "0").replace(",", ".")) || 0;
+      const mult = parseFloat(String(document.getElementById("estMultiplicador")?.value || "2").replace(",", ".")) || 1;
+      const modoFormula = document.getElementById("estModoFormulaPreco")?.value || "COMPLETA";
+
+      const divisorQtd = Math.max(1, Math.round(qtdUnidadesCalc));
+      const custoUnitReal = (tipoCusto === "TOTAL_NOTA" && divisorQtd > 1)
+        ? (valorInformado / divisorQtd)
+        : valorInformado;
+
+      // Normaliza imposto: se usuário digitou 35 em vez de 0.35, converte para 0.35
+      const taxaImposto = impFator > 1.5 ? (impFator / 100.0) : impFator;
+      const taxaFrete = fretePerc > 1.5 ? (fretePerc / 100.0) : fretePerc;
+
+      // 3 opções de cálculo claras para o usuário:
+      // 1) Completa (Markup sobre Custo + Imposto + Frete): Custo * (1 + Imposto + Frete) * Mult
+      const precoCompleta = custoUnitReal * (1 + taxaImposto + taxaFrete) * mult;
+      // 2) Aditiva: Custo + ((Custo * Imposto) * Mult) + (Custo * Frete)
+      const precoAditiva = custoUnitReal + ((custoUnitReal * taxaImposto) * mult) + (custoUnitReal * taxaFrete);
+      // 3) Direta literal: (Custo * Imposto) * Mult
+      const precoLiteral = (custoUnitReal * taxaImposto) * mult;
+
+      let precoEscolhido = precoCompleta;
+      if (modoFormula === "ADITIVA") precoEscolhido = precoAditiva;
+      if (modoFormula === "LITERAL") precoEscolhido = precoLiteral;
+
+      const elPreco = document.getElementById("estPreco");
+      if (aplicarPrecoAuto && elPreco && custoUnitReal > 0) {
+        elPreco.value = precoEscolhido.toFixed(2);
+      }
+
+      const boxCalc = document.getElementById("boxExplicacaoCalculoPreco");
+      if (boxCalc) {
+        if (custoUnitReal > 0) {
+          boxCalc.innerHTML = `
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;">
+              <div>
+                🧮 <b>Custo Unit. Base:</b> R$ ${custoUnitReal.toFixed(2)} ${tipoCusto === "TOTAL_NOTA" && divisorQtd > 1 ? `(R$ ${valorInformado.toFixed(2)} ÷ ${divisorQtd} un)` : ""}
+                &bull; <b>Imposto:</b> ${(taxaImposto * 100).toFixed(1)}% (fator ${taxaImposto.toFixed(2)})
+                ${taxaFrete > 0 ? `&bull; <b>Frete/DIFAL:</b> ${(taxaFrete * 100).toFixed(1)}%` : ""}
+                &bull; <b>Markup:</b> ×${mult}
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button type="button" class="btn btn-xs" style="background:#0284c7;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;" onclick="document.getElementById('estPreco').value='${precoCompleta.toFixed(2)}'">
+                  Aplicar Completa: R$ ${precoCompleta.toFixed(2)}
+                </button>
+                <button type="button" class="btn btn-xs" style="background:#0f766e;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;" onclick="document.getElementById('estPreco').value='${precoAditiva.toFixed(2)}'">
+                  Custo + (Imp×${mult}): R$ ${precoAditiva.toFixed(2)}
+                </button>
+                <button type="button" class="btn btn-xs" style="background:#475569;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;" onclick="document.getElementById('estPreco').value='${precoLiteral.toFixed(2)}'">
+                  (Custo×${taxaImposto}×${mult}): R$ ${precoLiteral.toFixed(2)}
+                </button>
+              </div>
+            </div>
+          `;
+        } else {
+          boxCalc.innerHTML = `💡 Informe o <b>Valor de Compra (R$)</b> acima para o sistema calcular automaticamente o imposto (${(taxaImposto*100).toFixed(0)}%), frete e multiplicador (×${mult}), ou edite o Preço de Venda livremente.`;
+        }
+      }
+
+      if (typeof recalcularFormPreviaEstoque === "function") {
+        recalcularFormPreviaEstoque();
+      }
+    }
+
     function verificarEstoqueProposta(codPeca) {
 
 
@@ -144592,38 +144739,14 @@ function renderMenuGesMural(box) {
 
 
 
-              <label class="field-label">Peça Solicitada do Almoxarifado EMED</label>
-
-
-
-
-
-
-
+              <label class="field-label">Peça Solicitada do Almoxarifado EMED (Busca Rápida por Nome ou Código)</label>
+              <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">
+                <input id="propBuscaRapidaPeca" type="text" class="input" placeholder="🔍 Digite qualquer palavra ou código para filtrar (ex: correia, fusivel, 480gb)..." oninput="filtrarPecasPropostaRapida(this.value)" style="flex:1;border:1.5px solid #0284c7;background:#f8fafc;font-weight:600;" />
+                <span id="badgeContadorFiltroPeca" style="font-size:11px;font-weight:800;color:#0369a1;background:#e0f2fe;padding:5px 10px;border-radius:6px;white-space:nowrap;">${(STATE.data?.estoque || []).length} itens</span>
+              </div>
               <select id="propPecaSel" class="select" onchange="verificarEstoqueProposta(this.value)">
-
-
-
-
-
-
-
                 <option value="NENHUMA">-- Selecione a peça para checar o estoque físico --</option>
-
-
-
-
-
-
-
                 ${(STATE.data?.estoque || []).map(p => `<option value="${esc(p.codigo)}">${esc(p.codigo)} — ${esc(p.nome_peca)} (Saldo Físico: ${p.quantidade})</option>`).join("")}
-
-
-
-
-
-
-
               </select>
 
 
@@ -171435,181 +171558,111 @@ function fecharModalInsumosViagem() {
 
 
           <div class="section-box" id="formCadastroEstoque" style="margin-bottom:12px;">
-
-
-
-
-
-
-
-            <div class="section-title">➕ Cadastrar / Ajustar Item no Estoque</div>
-
-
-
-
-
-
-
+            <div class="section-title">➕ Cadastrar / Ajustar Item no Estoque (Com Conversão de Metro &amp; Precificação Inteligente)</div>
             <div class="form-grid">
-
-
-
-
-
-
-
               <div><label class="field-label">Código Item (ERP)</label><input id="estCod" class="input" placeholder="Ex: 245 ou PEC-001" /></div>
-
-
-
-
-
-
-
-              <div><label class="field-label">Nome da Peça / Instrumento</label><input id="estNome" class="input" placeholder="Ex: AMPOLA DE RAIOS-X 20/40" /></div>
-
-
-
-
-
-
-
+              <div><label class="field-label">Nome da Peça / Instrumento</label><input id="estNome" class="input" placeholder="Ex: CORREIA DENTADA / AMPOLA" /></div>
               <div>
-
-
-
-
-
-
-
                 <label class="field-label">Categoria / Grupo</label>
-
-
-
-
-
-
-
                 <select id="estCat" class="select">
-
-
-
-
-
-
-
                   <option value="PEÇA DE REPOSIÇÃO">🔩 PEÇA DE REPOSIÇÃO (REVENDA)</option>
-
-
-
-
-
-
-
                   <option value="CONSUMÍVEL">🧴 CONSUMÍVEL &amp; OFICINA (INTERNO)</option>
-
-
-
-
-
-
-
                   <option value="FERRAMENTA / IMOBILIZADO">🧰 FERRAMENTA / EQUIPAMENTO (IMOBILIZADO)</option>
-
-
-
-
-
-
-
                   <option value="INSTRUMENTO CALIBRAÇÃO">🔬 INSTRUMENTO PADRÃO RBC (CALIBRAÇÃO)</option>
-
-
-
-
-
-
-
                 </select>
-
-
-
-
-
-
-
               </div>
-
-
-
-
-
-
-
-              <div><label class="field-label">Quantidade Fìsica</label><input id="estQtd" class="input" type="number" value="1" /></div>
-
-
-
-
-
-
-
-              <div><label class="field-label">Preço Unitário (R$)</label><input id="estPreco" class="input" type="number" step="0.01" value="0.00" /></div>
-
-
-
-
-
-
-
-              <div><label class="field-label">Validade Calibração (Se aplicável)</label><input id="estValCal" class="input" type="date" /></div>
-
-
-
-
-
-
-
-              <div><label class="field-label">Nº Certificado RBC (Se aplicável)</label><input id="estCertCal" class="input" placeholder="Ex: RBC-2026-99" /></div>
-
-
-
-
-
-
-
+              <div>
+                <label class="field-label">Unidade na Nota de Entrada</label>
+                <select id="estUnidadeCompra" class="select" onchange="alternarUnidadeCompraEstoque()" style="border-color:#0284c7;font-weight:700;">
+                  <option value="UNIDADE">📦 UNIDADE (UN) — Padrão (1 p/ 1)</option>
+                  <option value="METRO">📏 METRO (M) — Correias, Mangueiras, Cabos</option>
+                  <option value="FRACIONADO">🎞️ ROLO / PACOTE FRACIONÁVEL</option>
+                </select>
+              </div>
+              <div><label class="field-label">Localização no Almoxarifado</label><input id="estLoc" class="input" value="ALMOXARIFADO CENTRAL" placeholder="Ex: Prateleira B3 / Gaveta 4" /></div>
+              <div><label class="field-label">Quantidade Física (Estoque)</label><input id="estQtd" class="input" type="number" value="1" oninput="recalcularConversaoEPrecificacaoEstoque(false)" style="font-weight:800;" /></div>
             </div>
 
+            <!-- CAIXA DE CONVERSÃO DE METRO PARA UNIDADE (ABRE AO SELECIONAR METRO) -->
+            <div id="boxConversaoMetroEstoque" style="display:none;background:#f0f9ff;border:1.5px solid #0284c7;border-radius:8px;padding:12px;margin-top:10px;">
+              <div style="font-size:12px;font-weight:800;color:#0369a1;margin-bottom:8px;">
+                📏 Conversão Inteligente de Item Comprado no Metro (Ex: Correia 0,0250m na Nota = 2 Unidades de 0,0125m)
+              </div>
+              <div class="form-grid">
+                <div>
+                  <label class="field-label">Metragem Total na Nota de Entrada (m)</label>
+                  <input id="estMetragemNota" class="input" type="number" step="0.0001" placeholder="Ex: 0.0250" oninput="recalcularConversaoEPrecificacaoEstoque(true)" />
+                </div>
+                <div>
+                  <label class="field-label">Metragem Unitária (Quanto mede 1 Peça?)</label>
+                  <input id="estMetragemUnitaria" class="input" type="number" step="0.0001" placeholder="Ex: 0.0125" oninput="recalcularConversaoEPrecificacaoEstoque(true)" />
+                </div>
+                <div>
+                  <label class="field-label">Como será a Venda / Baixa deste Item?</label>
+                  <select id="estModoVendaMetro" class="select" onchange="recalcularConversaoEPrecificacaoEstoque(true)">
+                    <option value="UNIDADE">🔩 Venda Unitária (Converter Metro ➔ Unidades)</option>
+                    <option value="METRO">📏 Venda no Metro (Manter em Metro)</option>
+                  </select>
+                </div>
+              </div>
+              <div id="resumoConversaoMetro" style="margin-top:8px;font-size:12px;color:#0f172a;background:#e0f2fe;padding:8px 10px;border-radius:6px;">
+                ℹ️ Informe a metragem total da nota (ex: <b>0.0250</b>) e a metragem de 1 unidade (ex: <b>0.0125</b>) para calcular as unidades automaticamente.
+              </div>
+            </div>
 
-
-
-
-
+            <!-- CALCULADORA DE PRECIFICAÇÃO DE PEÇA (CUSTO, IMPOSTO 0.35, FRETE E MULTIPLICADOR * 2) -->
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:12px;margin-top:10px;">
+              <div style="font-size:12px;font-weight:800;color:#1e293b;margin-bottom:8px;">
+                💰 Formação de Preço da Peça (Custo de Compra + Imposto 0.35 + Custos Extras × Multiplicador)
+              </div>
+              <div class="form-grid">
+                <div>
+                  <label class="field-label">Valor de Compra na Nota (R$)</label>
+                  <input id="estCusto" class="input" type="number" step="0.01" value="0.00" oninput="recalcularConversaoEPrecificacaoEstoque(true)" />
+                </div>
+                <div>
+                  <label class="field-label">Esse Valor de Compra refere-se a:</label>
+                  <select id="estTipoCustoNota" class="select" onchange="recalcularConversaoEPrecificacaoEstoque(true)">
+                    <option value="UNITARIO">1 Unidade Individual</option>
+                    <option value="TOTAL_NOTA">Valor Total da Metragem / Lote (Dividir pelas Unidades)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="field-label">Fator Imposto (Editável — Padrão 0.35 = 35%)</label>
+                  <input id="estImpostoFator" class="input" type="number" step="0.01" value="0.35" oninput="recalcularConversaoEPrecificacaoEstoque(true)" />
+                </div>
+                <div>
+                  <label class="field-label">Frete / DIFAL / Taxa Extra (%)</label>
+                  <input id="estFretePerc" class="input" type="number" step="0.5" value="0" oninput="recalcularConversaoEPrecificacaoEstoque(true)" />
+                </div>
+                <div>
+                  <label class="field-label">Multiplicador Comercial (Padrão × 2)</label>
+                  <input id="estMultiplicador" class="input" type="number" step="0.1" value="2.0" oninput="recalcularConversaoEPrecificacaoEstoque(true)" />
+                </div>
+                <div>
+                  <label class="field-label">Fórmula Automática Sugerida</label>
+                  <select id="estModoFormulaPreco" class="select" onchange="recalcularConversaoEPrecificacaoEstoque(true)">
+                    <option value="COMPLETA">Completa: Custo × (1 + Imposto + Frete) × 2</option>
+                    <option value="ADITIVA">Aditiva: Custo + (Custo × 0.35 × 2)</option>
+                    <option value="LITERAL">Direta: (Custo × 0.35) × 2</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="field-label" style="color:#0284c7;font-weight:900;">Preço Final de Venda Unitário (R$) [Editável]</label>
+                  <input id="estPreco" class="input" type="number" step="0.01" value="0.00" style="border:2px solid #0284c7;font-weight:900;color:#0f172a;background:#fff;" />
+                </div>
+                <div><label class="field-label">Validade Calibração (Se aplicável)</label><input id="estValCal" class="input" type="date" /></div>
+                <div><label class="field-label">Nº Certificado RBC (Se aplicável)</label><input id="estCertCal" class="input" placeholder="Ex: RBC-2026-99" /></div>
+              </div>
+              <div id="boxExplicacaoCalculoPreco" style="margin-top:8px;font-size:11.5px;color:#334155;background:#f1f5f9;padding:8px 10px;border-radius:6px;">
+                💡 Informe o <b>Valor de Compra (R$)</b> acima para calcular automaticamente com imposto (0.35) e multiplicador (×2), ou digite o preço de venda diretamente.
+              </div>
+              <div id="boxPreviaCalculadaForm" style="margin-top:6px;"></div>
+            </div>
 
             <div style="margin-top:10px;text-align:right;">
-
-
-
-
-
-
-
               <button class="btn btn-primary" onclick="salvarItemEstoque()">💾 Salvar Item no Estoque</button>
-
-
-
-
-
-
-
             </div>
-
-
-
-
-
-
-
           </div>
 
 
@@ -172138,7 +172191,16 @@ function fecharModalInsumosViagem() {
 
 
 
-        nome_peca: elNome.value,
+        nome_peca: (() => {
+          let n = (elNome.value || "").trim();
+          const unComp = document.getElementById("estUnidadeCompra")?.value || "UNIDADE";
+          const modoV = document.getElementById("estModoVendaMetro")?.value || "UNIDADE";
+          const metU = parseFloat(String(document.getElementById("estMetragemUnitaria")?.value || "0").replace(",", ".")) || 0;
+          if ((unComp === "METRO" || unComp === "FRACIONADO") && modoV === "UNIDADE" && metU > 0 && !n.toUpperCase().includes("1 UN =")) {
+            n = `${n} (1 UN = ${metU}m)`;
+          }
+          return n;
+        })(),
 
 
 
