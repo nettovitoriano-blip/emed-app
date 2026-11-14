@@ -55536,9 +55536,8 @@
 
 
 
-        <button class="btn-sync-icon" onclick="sincronizarTudo(true)" title="Atualizar Sistema e OS (Técnico)" style="position:relative; display:inline-flex; flex-direction:column; align-items:center; justify-content:center; padding:3px 7px; line-height:1; min-width:34px; height:32px;">
-          <span style="font-size:13px; line-height:1; margin-bottom:-2px;">👷</span>
-          <span style="font-size:10px; line-height:1;">🔄</span>
+        <button class="btn-sync-icon" onclick="sincronizarTudo(true)" title="Atualizar Sistema e OS" style="position:relative; display:inline-flex; align-items:center; justify-content:center; padding:3px; width:34px; height:34px; border-radius:50%;">
+          <img src="/api/logo-circle" alt="EMED" style="width:24px; height:24px; border-radius:50%; object-fit:cover; display:block;" onerror="this.outerHTML='🔄'">
         </button>
 
 
@@ -95488,94 +95487,21 @@ function selecionarMenu(menuId, perfilOpcional = null) {
 
 
 
-      // Filtrar manuais que tenham relação com o modelo
-
-
-
-
-
-
-
+            // Filtrar manuais exclusivamente relacionados ao equipamento/modelo específico
+      const eqModeloFull = `${eqNome} ${(os.modelo || "").toUpperCase()}`.trim();
+      const stopWordsEq = new Set(["FIXO", "PORTATIL", "PORTÁTIL", "DIGITAL", "ANALOGICO", "ANALÓGICO", "MEDICO", "MÉDICO", "HOSPITALAR", "EQUIPAMENTO", "APARELHO", "SISTEMA", "RAIO", "RAIOS", "TOMOGRAFO", "TOMÓGRAFO", "ULTRASSOM", "ARCO", "COM", "PARA", "SEM", "POR", "DOS", "DAS"]);
+      const tokensEq = eqModeloFull
+        .replace(/[^A-Z0-9]+/g, " ")
+        .split(/\s+/)
+        .filter(t => t.length >= 3 && !stopWordsEq.has(t));
       const manuaisRelacionados = manuais.filter(m => {
-
-
-
-
-
-
-
-        const tit = (m.titulo || "").toUpperCase();
-
-
-
-
-
-
-
-        const cod = (m.codigo || "").toUpperCase();
-
-
-
-
-
-
-
-        if (eqNome.includes("LOTUS") && (tit.includes("LOTUS") || cod.includes("LOTUS"))) return true;
-
-
-
-
-
-
-
-        if (eqNome.includes("CRYSTAL") && (tit.includes("CRYSTAL") || cod.includes("CRYSTAL"))) return true;
-
-
-
-
-
-
-
-        if (eqNome.includes("SHIMADZU") && (tit.includes("SHIMADZU") || cod.includes("SHIMADZU"))) return true;
-
-
-
-
-
-
-
-        if (eqNome.includes("GE") && (tit.includes("GE") || tit.includes("OPTIMA") || tit.includes("BRIVO"))) return true;
-
-
-
-
-
-
-
-        if ((eqNome.includes("CT") || eqNome.includes("TOMO")) && (tit.includes("TOMO") || tit.includes("CT"))) return true;
-
-
-
-
-
-
-
-        if ((eqNome.includes("RX") || eqNome.includes("RAIO")) && (tit.includes("RX") || tit.includes("RAIO"))) return true;
-
-
-
-
-
-
-
-        return false;
-
-
-
-
-
-
-
+        const alvoM = `${m.titulo || ""} ${m.codigo || ""} ${m.equipamento || ""} ${m.modelo || ""}`.toUpperCase();
+        if (tokensEq.length > 0) {
+          const hits = tokensEq.filter(t => alvoM.includes(t));
+          if (tokensEq.length >= 2) return hits.length >= 2 || (hits.length === 1 && hits[0].length >= 5);
+          return hits.length >= 1;
+        }
+        return eqNome && alvoM.includes(eqNome);
       });
 
 
@@ -96841,14 +96767,17 @@ async function efetuarLogout() {
       const isGestor = (usuarioNome === "NETTO") && (!usuarioPerfil || usuarioPerfil.includes("GESTOR"));
 
       const modeSwitchBox = document.querySelector(".mode-switch");
+      if (modeSwitchBox) {
+        const ehCelular = window.innerWidth <= 768;
+        if (!isGestor || STATE.perfil === "TECNICO" || ehCelular) {
+          modeSwitchBox.style.setProperty("display", "none", "important");
+        } else {
+          modeSwitchBox.style.setProperty("display", "flex", "important");
+        }
+      }
       if (!isGestor) {
-        // TÉCNICO: Não exibe Master, Técnico, Gestor, Triagem no topo
-        if (modeSwitchBox) modeSwitchBox.style.display = "none";
         STATE.perfil = "TECNICO";
       } else {
-        // Oculta os seletores Master/Técnico/Gestor/Triagem quando estiver na visão de Técnico ou no celular
-        const ehCelular = window.innerWidth <= 768;
-        if (modeSwitchBox) modeSwitchBox.style.display = (STATE.perfil === "TECNICO" || ehCelular) ? "none" : "flex";
         const btnFull = document.getElementById("tabModeFull");
         const btnTec = document.getElementById("tabModeTecnico");
         const btnGestor = document.getElementById("tabModeGestor");
@@ -100306,198 +100235,24 @@ async function efetuarLogout() {
 
 
 
-      const telLimpo = (os.whatsapp || os.contato_responsavel || "").replace(/\D/g, "");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+            const telLimpo = (os.whatsapp || os.telefone || os.contato_responsavel || "").replace(/\D/g, "");
+      const dataBrCard = (() => {
+        const raw = String(os.data_agendamento || "").trim();
+        const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        return m ? `${m[3]}/${m[2]}/${m[1]}` : (raw || "-");
+      })();
+      const nomeContatoWpp = os.contato_responsavel || os.responsavel_local || os.solicitante || "Responsável";
+      const eqModeloWpp = [os.equipamento, os.modelo].filter(Boolean).join(" / ");
       const msgWpp = encodeURIComponent(
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        `Olá! Aqui é da *EMED Eletromedicina* referente à *OS #${os.id}* (${os.cliente} - ${os.equipamento}).`
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        `Olá *${nomeContatoWpp}*! Tudo bem?\n` +
+        `Aqui é *${os.tecnico_responsavel || "Equipe Técnica"}* da *EMED Eletromedicina*.\n\n` +
+        `📋 *Ordem de Serviço:* #${os.id}\n` +
+        `🏥 *Cliente/Unidade:* ${os.cliente || "-"}\n` +
+        `🔬 *Equipamento/Modelo:* ${eqModeloWpp || "-"}${os.numero_serie && os.numero_serie !== "S/N" ? ` (N/S: ${os.numero_serie})` : ""}\n` +
+        `🛠️ *Serviço:* ${os.tipo_servico || "-"}\n` +
+        `📅 *Data Agendada:* ${dataBrCard}\n` +
+        (telLimpo ? `📞 *Contato:* ${os.whatsapp || os.telefone || os.contato_responsavel}\n` : "") +
+        `\nEntrando em contato referente ao atendimento técnico deste equipamento. Qualquer dúvida, estou à disposição!`
       );
 
 
@@ -100882,261 +100637,18 @@ async function efetuarLogout() {
 
 
 
-              <span class="os-num">OS #${esc(os.id)} • ${esc(os.data_agendamento)}</span>
+                            <div>
+                <div class="os-num" style="font-size:16px;font-weight:900;color:#002b54;line-height:1.15;">OS #${esc(os.id)}</div>
+                <div style="font-size:12px;font-weight:700;color:#475569;margin-top:2px;">📅 ${esc(dataBrCard)}</div>
+              </div>
 
+              <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
 
+                ${temRasc
+                  ? `<span class="badge" style="background:#dcfce7;color:#15803d;border:1px solid #86efac;font-weight:800;">💾 Salvo</span>`
+                  : `<button type="button" class="badge" onclick="event.stopPropagation();abrirModalOS('${esc(os.id)}')" style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;font-weight:700;cursor:pointer;" title="Abrir OS para preencher e salvar">💾 Salvar</button>`}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <div style="display:flex;gap:4px;align-items:center;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                ${temRasc ? `<span class="badge rascunho">💾 Rascunho Salvo</span>` : ""}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                <span class="badge ${clsBadge}"><img class="emed-st-ico" onerror="this.style.display='none'" src="/api/app-icon/status-${({concluido:'autorizada_salva',obs:'aviso',ativo:'enviando'})[clsBadge]||'pendente'}" alt="" />${esc(st)}</span>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                ${st.includes("CAMINHO") ? "" : `<span class="badge ${clsBadge}"><img class="emed-st-ico" onerror="this.style.display='none'" src="/api/app-icon/status-${({concluido:'autorizada_salva',obs:'aviso',ativo:'enviando'})[clsBadge]||'pendente'}" alt="" />${esc(st)}</span>`}
 
               </div>
 
@@ -101980,134 +101492,20 @@ async function efetuarLogout() {
 
 
 
-              <div class="os-pend">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                <b>📋 Relato / Pendência:</b> ${esc(os.pendencia_limpa || os.defeito_relatado || 'Sem pendência')}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                            <div class="os-pend" style="display:flex;flex-direction:column;gap:6px;">
+                <div><b>📝 Relato / Solicitação:</b> ${esc(os.defeito_relatado || os.pendencia_limpa || 'Sem relato registrado')}</div>
+                ${(() => {
+                  const pTxt = String(os.pendencia_limpa || "").trim();
+                  const pUp = pTxt.toUpperCase();
+                  const temPend = pTxt && !pUp.includes("NENHUMA PEND") && !pUp.includes("SEM PEND") && pTxt !== "-";
+                  if (temPend && pTxt !== String(os.defeito_relatado || "").trim()) {
+                    return `<div style="background:#fef2f2;border:1px solid #fecaca;border-left:3px solid #dc2626;border-radius:6px;padding:5px 8px;color:#991b1b;font-size:12px;"><b>🚨 Pendências:</b> ${esc(pTxt)}</div>`;
+                  }
+                  if (temPend) {
+                    return `<div style="background:#fffbeb;border:1px solid #fde68a;border-left:3px solid #d97706;border-radius:6px;padding:5px 8px;color:#92400e;font-size:12px;"><b>🚨 Pendência Ativa:</b> ${esc(pTxt)}</div>`;
+                  }
+                  return `<div style="color:#15803d;font-size:11.5px;font-weight:600;">✅ Pendências: Nenhuma pendência registrada</div>`;
+                })()}
               </div>
 
 
@@ -102828,159 +102226,7 @@ async function efetuarLogout() {
 
 
 
-            <a class="btn btn-outline btn-sm" href="/api/pdf/${encodeURIComponent(os.id)}" target="_blank">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              📄 PDF
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            </a>
-
-
-
-
-
-
-
-            <button class="btn btn-outline btn-sm" onclick="abrirModalDadosNF('${esc(os.id)}')" title="Registrar / Visualizar Nota Fiscal" style="color:#6b21a8;border-color:#d8b4fe;">
-
-
-
-
-
-
-
-              🧾 NF
-
-
-
-
-
-
-
-            </button>
+            
 
 
 
@@ -104997,12 +104243,19 @@ function renderMenuTecOS(box) {
 
 
       const tecnicos = (d.tecnicos || []).map(t => t.nome);
-      const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase();
+      const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase().trim();
       const usuarioPerfil = (localStorage.getItem("emed_perfil_usuario") || "").toUpperCase();
       const isGestor = (usuarioNome === "NETTO") || usuarioPerfil.includes("GESTOR") || usuarioPerfil.includes("MASTER") || (usuarioNome === "");
-      if (!isGestor && usuarioNome) {
-        STATE.tecnicoFiltro = usuarioNome;
-      }
+      const osPertenceAoTecnico = (o) => {
+        if (!usuarioNome) return true;
+        return String(o.tecnico_responsavel || "").toUpperCase().includes(usuarioNome);
+      };
+      const osTemPendencia = (o) => {
+        const st = (o.status || "").toUpperCase();
+        if (st.includes("CONCLU")) return false;
+        const p = String(o.pendencia_limpa || "").trim().toUpperCase();
+        return st.includes("OBSERVA") || st.includes("PEND") || (Boolean(p) && !p.includes("NENHUMA PEND") && !p.includes("SEM PEND") && p !== "-");
+      };
 
 
 
@@ -105195,7 +104448,7 @@ function renderMenuTecOS(box) {
 
 
 
-        if (STATE.tecnicoFiltro !== "TODOS" && o.tecnico_responsavel !== STATE.tecnicoFiltro) return false;
+        if (!osPertenceAoTecnico(o)) return false;
 
 
 
@@ -105387,7 +104640,7 @@ function renderMenuTecOS(box) {
 
 
 
-        if (STATE.abaStatusOS === "OBSERVACAO" && !st.includes("OBSERVA")) return false;
+        if ((STATE.abaStatusOS === "PENDENCIAS" || STATE.abaStatusOS === "OBSERVACAO") && !osTemPendencia(o)) return false;
 
 
 
@@ -106027,23 +105280,9 @@ function renderMenuTecOS(box) {
 
 
 
-            const ordensBase = ordens.filter(o => STATE.tecnicoFiltro === "TODOS" || o.tecnico_responsavel === STATE.tecnicoFiltro);
-
-
-
-
-
-
-
+                  const ordensBase = ordens.filter(osPertenceAoTecnico);
       const ativasCount = ordensBase.filter(o => !(o.status || "").toUpperCase().includes("CONCLU")).length;
-
-
-
-
-
-
-
-      const obsCount = ordensBase.filter(o => (o.status || "").toUpperCase().includes("OBSERVA")).length;
+      const pendCount = ordensBase.filter(osTemPendencia).length;
 
 
 
@@ -106144,9 +105383,9 @@ function renderMenuTecOS(box) {
             <div class="kpi-label" style="font-size:11px; font-weight:800; line-height:1.15; color:#0f172a;">⚡ OS ATIVAS</div>
             <div class="kpi-val" style="font-size:22px; font-weight:900; margin-top:2px; color:#0284c7;">${ativasCount}</div>
           </button>
-          <button type="button" onclick="STATE.abaStatusOS='OBSERVACAO';renderizarTelaPrincipal();" class="kpi-card amber" style="padding:10px 6px; min-width:0; text-align:center; cursor:pointer; border:${STATE.abaStatusOS==='OBSERVACAO'?'2px solid #d97706':'1px solid #e2e8f0'}; background:${STATE.abaStatusOS==='OBSERVACAO'?'#fffbeb':'#ffffff'}; box-shadow:${STATE.abaStatusOS==='OBSERVACAO'?'0 4px 10px rgba(217,119,6,0.2)':'none'};">
-            <div class="kpi-label" style="font-size:11px; font-weight:800; line-height:1.15; color:#92400e;">🔬 OBSERVAÇÃO</div>
-            <div class="kpi-val" style="font-size:22px; font-weight:900; margin-top:2px; color:#d97706;">${obsCount}</div>
+          <button type="button" onclick="STATE.abaStatusOS='PENDENCIAS';renderizarTelaPrincipal();" class="kpi-card amber" style="padding:10px 6px; min-width:0; text-align:center; cursor:pointer; border:${(STATE.abaStatusOS==='PENDENCIAS'||STATE.abaStatusOS==='OBSERVACAO')?'2px solid #d97706':'1px solid #e2e8f0'}; background:${(STATE.abaStatusOS==='PENDENCIAS'||STATE.abaStatusOS==='OBSERVACAO')?'#fffbeb':'#ffffff'}; box-shadow:${(STATE.abaStatusOS==='PENDENCIAS'||STATE.abaStatusOS==='OBSERVACAO')?'0 4px 10px rgba(217,119,6,0.2)':'none'};">
+            <div class="kpi-label" style="font-size:11px; font-weight:800; line-height:1.15; color:#92400e;">🚨 PENDÊNCIAS</div>
+            <div class="kpi-val" style="font-size:22px; font-weight:900; margin-top:2px; color:#d97706;">${pendCount}</div>
           </button>
           <button type="button" onclick="STATE.abaStatusOS='CONCLUIDAS';renderizarTelaPrincipal();" class="kpi-card green" style="padding:10px 6px; min-width:0; text-align:center; cursor:pointer; border:${STATE.abaStatusOS==='CONCLUIDAS'?'2px solid #16a34a':'1px solid #e2e8f0'}; background:${STATE.abaStatusOS==='CONCLUIDAS'?'#f0fdf4':'#ffffff'}; box-shadow:${STATE.abaStatusOS==='CONCLUIDAS'?'0 4px 10px rgba(22,163,74,0.2)':'none'};">
             <div class="kpi-label" style="font-size:11px; font-weight:800; line-height:1.15; color:#166534;">✅ CONCLUÍDAS</div>
@@ -106428,148 +105667,7 @@ function renderMenuTecOS(box) {
 
 
 
-            <div style="flex:1; min-width:140px;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              ${!isGestor && usuarioNome ? `
-  <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
-    <span style="font-size:16px;">👷</span>
-    <div>
-      <div style="font-size:10px;color:#94a3b8;font-weight:700;">TÉCNICO RESPONSÁVEL</div>
-      <div style="font-size:13px;font-weight:800;color:#38bdf8;">${esc(usuarioNome)}</div>
-    </div>
-  </div>
-` : `
-  <select class="select" style="width:100%;" onchange="STATE.tecnicoFiltro=this.value;localStorage.setItem('emed_tec_filtro',this.value);renderizarTelaPrincipal();">
-    <option value="TODOS" ${STATE.tecnicoFiltro==='TODOS'?'selected':''}>👷 Todos os Técnicos (${ordens.length})</option>
-    ${tecnicos.map(t => `<option value="${esc(t)}" ${STATE.tecnicoFiltro===t?'selected':''}>👷 ${esc(t)}</option>`).join("")}
-  </select>
-`}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            </div>
+            
 
 
 
@@ -215701,6 +214799,17 @@ function renderMenuCliTriagem(box) {
 
 
 
+    function clienteExigeCredenciamentoPortaria(cliente) {
+      const c = String(cliente || "").toUpperCase();
+      return c.includes("SAO CARLOS") || c.includes("SÃO CARLOS");
+    }
+    function interativaAbrirModalCredenciamentoPortaria(osId, tecnico) {
+      if (typeof mostrarToast === "function") {
+        mostrarToast(`🛡️ Protocolo de portaria (${tecnico || "Técnico"}) registrado para OS #${osId}.`, "info");
+      } else {
+        alert(`🛡️ Protocolo de portaria (${tecnico || "Técnico"}) registrado para OS #${osId}.`);
+      }
+    }
     async function abrirModalOS(osId) {
 
       window._osAtivaId = osId;

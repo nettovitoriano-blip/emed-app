@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v74-tecnico-ui-simplificada';
+const CACHE_NAME = 'emed-pwa-v75-tecnico-cards-os-fix';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
