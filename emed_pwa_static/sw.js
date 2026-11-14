@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v75-tecnico-cards-os-fix';
+const CACHE_NAME = 'emed-pwa-v76-raiox-voz-cabecalho';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
