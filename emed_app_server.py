@@ -5457,6 +5457,11 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
             "peca_baixada_ref": limpar_texto(row.get("peca_baixada_ref"), ""),
+            "peca_selecionada": limpar_texto(row.get("peca_baixada_ref"), ""),
+            "status_proposta": limpar_texto(row.get("status_proposta"), "SEM_PROPOSTA"),
+            "foto_evidencia": f_ant,
+            "foto_depois": f_dep,
+            "fotos_adicionais": limpar_texto(row.get("fotos_adicionais"), ""),
 
 
 

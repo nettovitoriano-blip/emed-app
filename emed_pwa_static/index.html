@@ -101417,6 +101417,11 @@ async function efetuarLogout() {
                   if (temPend) {
                     return `<div style="background:#fffbeb;border:1px solid #fde68a;border-left:3px solid #d97706;border-radius:6px;padding:5px 8px;color:#92400e;font-size:12px;"><b>🚨 Pendência Ativa:</b> ${esc(pTxt)}</div>`;
                   }
+                  const pecCard = String(os.peca_baixada_ref || os.peca_selecionada || "").trim();
+                  const temPecCard = pecCard && !["NENHUMA", "NENHUMA PEÇA", "SEM PEÇA", "-"].includes(pecCard.toUpperCase());
+                  if (temPecCard) {
+                    return `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-left:3px solid #2563eb;border-radius:6px;padding:5px 8px;color:#1e40af;font-size:12px;"><b>🧩 Peça Aplicada (Cobrança / Triagem):</b> ${esc(pecCard)}</div>`;
+                  }
                   return `<div style="color:#15803d;font-size:11.5px;font-weight:600;">✅ Pendências: Nenhuma pendência registrada</div>`;
                 })()}
               </div>
@@ -104221,7 +104226,7 @@ function renderMenuTecOS(box) {
         const st = (o.status || "").toUpperCase();
         if (st.includes("CONCLU") && !st.includes("PEND")) return false;
         const p = String(o.pendencia_limpa || "").trim().toUpperCase();
-        const pec = String(o.peca_selecionada || "").trim().toUpperCase();
+        const pec = String(o.peca_baixada_ref || o.peca_selecionada || "").trim().toUpperCase();
         const temPecaCobrar = Boolean(pec && pec !== "NENHUMA PEÇA" && pec !== "NENHUMA PECA" && pec !== "-");
         return st.includes("OBSERVA") || st.includes("PEND") || temPecaCobrar || (Boolean(p) && !p.includes("NENHUMA PEND") && !p.includes("SEM PEND") && p !== "-");
       };
@@ -201575,6 +201580,41 @@ function renderMenuCliTriagem(box) {
         alert(`🛡️ Protocolo de portaria (${tecnico || "Técnico"}) registrado para OS #${osId}.`);
       }
     }
+    function filtrarPecasModalOS(q) {
+      const sel = document.getElementById("osPecaSel");
+      if (!sel) return;
+      const termo = String(q || "").trim().toUpperCase();
+      Array.from(sel.options).forEach(opt => {
+        if (opt.value === "NENHUMA PEÇA" || opt.value === "MANUAL" || opt.selected) {
+          opt.hidden = false;
+          opt.style.display = "";
+          return;
+        }
+        const match = !termo || opt.text.toUpperCase().includes(termo);
+        opt.hidden = !match;
+        opt.style.display = match ? "" : "none";
+      });
+    }
+
+    function renderizarPreviewFotosSalvasModalOS() {
+      const grid = document.getElementById("previewFotosGrid");
+      if (!grid) return;
+      const fotos = window._fotosEvidenciaB64 || [];
+      grid.innerHTML = "";
+      fotos.forEach((raw, idx) => {
+        if (!raw) return;
+        const s = String(raw).trim();
+        const src = (s.startsWith("data:") || s.startsWith("http") || s.startsWith("/")) ? s : `/api/foto/${encodeURIComponent(s)}`;
+        const div = document.createElement("div");
+        div.style = "position:relative;display:inline-block;";
+        div.innerHTML = `
+          <img src="${src}" style="width:68px;height:68px;object-fit:cover;border-radius:6px;border:1.5px solid #0284c7;display:block;" onerror="this.style.opacity='0.35'" />
+          <button type="button" onclick="removerFotoEvidencia(this, ${idx})" style="position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+        `;
+        grid.appendChild(div);
+      });
+    }
+
     async function abrirModalOS(osId) {
 
       window._osAtivaId = osId;
@@ -202188,6 +202228,18 @@ function renderMenuCliTriagem(box) {
 
 
       window._fotosEvidenciaB64 = val('fotos_multiplas_b64', []) || [];
+      if (!Array.isArray(window._fotosEvidenciaB64) || window._fotosEvidenciaB64.length === 0) {
+        const fotosSrv = [];
+        [os.foto_evidencia, os.foto_depois, os.fotos_adicionais].forEach(campo => {
+          if (campo && String(campo).trim() && String(campo).trim() !== "-") {
+            String(campo).split(";").forEach(u => {
+              const lim = u.trim();
+              if (lim && lim !== "-" && !fotosSrv.includes(lim)) fotosSrv.push(lim);
+            });
+          }
+        });
+        window._fotosEvidenciaB64 = fotosSrv;
+      }
 
 
 
@@ -207449,261 +207501,19 @@ function renderMenuCliTriagem(box) {
 
 
 
-              <label class="field-label">Peça Aplicada do Estoque (Apenas Peças)</label>
+                            <label class="field-label">Peça Aplicada do Estoque (Apenas Peças)</label>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+              <input id="filtroPecaOS" type="text" class="input" placeholder="🔍 Filtrar peça por código ou nome..." oninput="filtrarPecasModalOS(this.value)" style="margin-bottom:6px;font-size:12px;" />
 
               <select id="osPecaSel" class="select" onchange="alternarPecaManual();autoSalvarRascunho();">
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
                 <option value="NENHUMA PEÇA">-- Nenhuma Peça Baixada --</option>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                ${estoquePecas.map(p => `<option value="${esc(p.codigo)} - ${esc(p.nome_peca)}" ${pecaAtual.includes(p.codigo)?'selected':''}>${esc(p.codigo)} - ${esc(p.nome_peca)} (Saldo: ${p.quantidade})</option>`).join("")}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                ${estoquePecas.map(p => {
+                  const pUp = String(pecaAtual || "").toUpperCase();
+                  const selP = (p.codigo && pUp.includes(String(p.codigo).toUpperCase())) || (p.nome_peca && pUp.includes(String(p.nome_peca).toUpperCase()));
+                  return `<option value="${esc(p.codigo)} - ${esc(p.nome_peca)}" ${selP ? 'selected' : ''}>${esc(p.codigo)} - ${esc(p.nome_peca)} (Saldo: ${p.quantidade})</option>`;
+                }).join("")}
 
                 <option value="MANUAL" ${pecaManualAtual || pecaAtual.includes('DIGITADA') ? 'selected':''}>✍️ OUTRA PEÇA (DIGITAR MANUALMENTE)</option>
 
@@ -213771,11 +213581,7 @@ function renderMenuCliTriagem(box) {
 
           
 
-          <button type="button" class="btn btn-outline" onclick="abrirVisualizadorLaudo('${esc(os.id)}')" style="border-color:#64748b;color:#334155;font-weight:700;padding:10px 14px;" title="Visualizar prévia do laudo em PDF">
-
-            📄 Ver PDF
-
-          </button>
+          
 
           <a class="btn btn-outline" href="/api/imprimir/${encodeURIComponent(os.id)}" target="_blank" style="border-color:#0f766e;color:#0f766e;font-weight:700;padding:10px 14px;display:inline-flex;align-items:center;text-decoration:none;" title="Imprimir laudo em formato A4">
 
@@ -214110,6 +213916,7 @@ function renderMenuCliTriagem(box) {
 
 
       carregarChecklistModal();
+      if (typeof renderizarPreviewFotosSalvasModalOS === "function") renderizarPreviewFotosSalvasModalOS();
 
 
 

@@ -136,15 +136,22 @@ def aprovar_triagem_os(db_name: str, os_id: int, dados: Dict[str, Any]) -> Dict[
 
             # 3. BAIXA AUTOMÁTICA NO ALMOXARIFADO & KARDEX (apenas se instalação definitiva, não em follow-up/teste)
             if decisao != "FOLLOWUP_TESTE" and peca_aplicada and peca_aplicada.upper() not in ["NENHUMA", "NENHUMA PEÇA", "SEM PEÇA", ""]:
+                import re as _re_tri
+                p_limpa = _re_tri.sub(r"^\d+X\s+", "", peca_aplicada.strip(), flags=_re_tri.IGNORECASE).strip()
+                p_cod_part = ""
+                p_nome_part = p_limpa
+                if " - " in p_limpa:
+                    p_cod_part, p_nome_part = [x.strip() for x in p_limpa.split(" - ", 1)]
                 # Localizar no estoque_pecas
                 cur.execute("""
                     SELECT id, codigo, nome_peca, quantidade, estoque_minimo, preco_custo
                     FROM estoque_pecas
-                    WHERE UPPER(nome_peca) = UPPER(?) 
+                    WHERE UPPER(nome_peca) = UPPER(?)
+                       OR UPPER(nome_peca) = UPPER(?)
                        OR UPPER(codigo) = UPPER(?)
                        OR UPPER(nome_peca) LIKE ?
                     LIMIT 1
-                """, (peca_aplicada, peca_aplicada, f"%{peca_aplicada[:15]}%"))
+                """, (p_limpa, p_nome_part, p_cod_part or p_limpa, f"%{p_nome_part[:15]}%"))
                 
                 peca_row = cur.fetchone()
                 if peca_row:

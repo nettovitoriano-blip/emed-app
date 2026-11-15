@@ -2575,62 +2575,37 @@ def aplicar_peca_os_idempotente(db_path, nome_peca, qtd_aplicada, ref_anterior="
 
 
     with get_db_connection(db_path) as conn:
-
-
-
         cur = conn.cursor()
-
-
-
-        cur.execute("SELECT quantidade FROM estoque_pecas WHERE UPPER(nome_peca) = ?", (nome_peca.strip().upper(),))
-
-
-
+        alvo_up = nome_peca.strip().upper()
+        cod_part = ""
+        nome_part = alvo_up
+        if " - " in alvo_up:
+            partes = alvo_up.split(" - ", 1)
+            cod_part = partes[0].strip()
+            nome_part = partes[1].strip()
+        cur.execute(
+            """
+            SELECT id, quantidade, nome_peca FROM estoque_pecas
+            WHERE UPPER(nome_peca) = ?
+               OR UPPER(nome_peca) = ?
+               OR (codigo IS NOT NULL AND UPPER(codigo) = ?)
+            LIMIT 1
+            """,
+            (alvo_up, nome_part, cod_part),
+        )
         row = cur.fetchone()
-
-
-
         if not row:
-
-
-
             # Peça aplicada via preenchimento manual (avulsa / fora do estoque formal)
-
-
-
-            # Permite o registro completo na OS e segue o fluxo sem travar o fechamento
-
-
-
             return True, f"[PEÇA MANUAL: {nova_ref}]", nova_ref
 
-
-
+        peca_id_db = row[0]
         # Blindagem Atômica contra Race Condition: UPDATE condicional com trava de saldo
-
-
-
         cur.execute(
-
-
-
-            "UPDATE estoque_pecas SET quantidade = quantidade - ? WHERE UPPER(nome_peca) = ? AND quantidade >= ?",
-
-
-
-            (int(qtd_aplicada), nome_peca.strip().upper(), int(qtd_aplicada))
-
-
-
+            "UPDATE estoque_pecas SET quantidade = quantidade - ? WHERE id = ? AND quantidade >= ?",
+            (int(qtd_aplicada), peca_id_db, int(qtd_aplicada))
         )
-
-
-
         if cur.rowcount == 0:
-
-
-
-            cur.execute("SELECT quantidade FROM estoque_pecas WHERE UPPER(nome_peca) = ?", (nome_peca.strip().upper(),))
+            cur.execute("SELECT quantidade FROM estoque_pecas WHERE id = ?", (peca_id_db,))
 
 
 

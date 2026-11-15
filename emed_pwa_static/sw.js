@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v81-assinatura-x-triagem-gestor';
+const CACHE_NAME = 'emed-pwa-v82-peca-filtro-fotos-estoque';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
