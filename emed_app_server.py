@@ -15984,7 +15984,7 @@ async def api_proposta_publica_html(request: web.Request) -> web.Response:
             row = r.to_dict()
             break
     if not row:
-        return web.Response(status=404, text="Proposta / Ordem de Serviço não encontrada.", content_type="text/plain; charset=utf-8")
+        return web.Response(status=404, text="Proposta / Ordem de Serviço não encontrada.", content_type="text/plain", charset="utf-8")
 
     import html as _h
     cliente = _h.escape(limpar_texto(row.get("cliente"), "CLIENTE"))
@@ -16088,7 +16088,7 @@ async def api_proposta_publica_html(request: web.Request) -> web.Response:
   </script>
 </body>
 </html>"""
-    return web.Response(text=html_doc, content_type="text/html; charset=utf-8")
+    return web.Response(text=html_doc, content_type="text/html", charset="utf-8")
 
 
 async def api_proposta_responder(request: web.Request) -> web.Response:
