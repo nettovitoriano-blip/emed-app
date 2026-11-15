@@ -99828,7 +99828,7 @@ async function efetuarLogout() {
 
 
 
-      if (st.includes("CONCLU") || st.includes("FINALIZ") || st.includes("AGUARDANDO TRIAGEM")) clsBadge = "concluido";
+      if (st.includes("CONCLU") || st.includes("FINALIZ") || st.includes("AGUARDANDO TRIAGEM") || st.includes("APROVAÇÃO DE PROPOSTA")) clsBadge = "concluido";
 
 
 
@@ -100561,7 +100561,7 @@ async function efetuarLogout() {
                   ? `<span class="badge" style="background:#dcfce7;color:#15803d;border:1px solid #86efac;font-weight:800;">💾 Salvo</span>`
                   : `<button type="button" class="badge" onclick="event.stopPropagation();abrirModalOS('${esc(os.id)}')" style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;font-weight:700;cursor:pointer;" title="Abrir OS para preencher e salvar">💾 Salvar</button>`}
 
-                ${st.includes("CAMINHO") ? "" : `<span class="badge ${clsBadge}"><img class="emed-st-ico" onerror="this.style.display='none'" src="/api/app-icon/status-${({concluido:'autorizada_salva',obs:'aviso',ativo:'enviando'})[clsBadge]||'pendente'}" alt="" />${esc(st.includes("AGUARDANDO TRIAGEM") ? "CONCLUÍDA (EM TRIAGEM)" : st)}</span>`}
+                ${st.includes("CAMINHO") ? "" : `<span class="badge ${clsBadge}"><img class="emed-st-ico" onerror="this.style.display='none'" src="/api/app-icon/status-${({concluido:'autorizada_salva',obs:'aviso',ativo:'enviando'})[clsBadge]||'pendente'}" alt="" />${esc(st.includes("AGUARDANDO TRIAGEM") ? "CONCLUÍDA (EM TRIAGEM)" : (st.includes("APROVAÇÃO DE PROPOSTA") ? "PROPOSTA P/ APROVAÇÃO (NF)" : st))}</span>`}
 
               </div>
 
@@ -104220,7 +104220,7 @@ function renderMenuTecOS(box) {
       };
             const osConcluidaParaTecnico = (o) => {
         const st = (o.status || "").toUpperCase();
-        return st.includes("CONCLU") || st.includes("FINALIZ") || st.includes("AGUARDANDO TRIAGEM");
+        return st.includes("CONCLU") || st.includes("FINALIZ") || st.includes("AGUARDANDO TRIAGEM") || st.includes("APROVAÇÃO DE PROPOSTA");
       };
       const osTemPendencia = (o) => {
         const st = (o.status || "").toUpperCase();
@@ -134163,7 +134163,7 @@ function renderMenuGesMural(box) {
       const boxCob = document.getElementById(`triBoxCob_${osId}`);
       if (boxFollow) boxFollow.style.display = dec === "FOLLOWUP_TESTE" ? "block" : "none";
       if (boxPend) boxPend.style.display = dec === "PENDENCIA" ? "block" : "none";
-      if (boxCob) boxCob.style.display = dec === "DEFINITIVA_NF" ? "grid" : "none";
+      if (boxCob) boxCob.style.display = (dec === "DEFINITIVA_NF" || dec === "FORMALIZAR_PROPOSTA") ? "grid" : "none";
     }
 
     async function abrirPainelTriagemPosAtendimento() {
@@ -134224,6 +134224,7 @@ function renderMenuGesMural(box) {
                 <label style="font-size:11px;font-weight:800;color:#0f172a;display:block;margin-bottom:4px;">⚖️ Destino / Classificação na Triagem:</label>
                 <select id="triDec_${o.id}" class="select" style="width:100%;font-size:12px;font-weight:700;" onchange="aoMudarDecisaoTriagem('${o.id}')">
                   <option value="DEFINITIVA_NF" ${defDec==='DEFINITIVA_NF'?'selected':''}>${temPeca ? '🧩 Instalação Definitiva — Liberar para Nota Fiscal / Cobrança' : '✅ Concluir & Homologar OS (Sem Pendências)'}</option>
+                  <option value="FORMALIZAR_PROPOSTA" ${temPeca && !temPend ? '' : (String(o.status||'').toUpperCase().includes('PROPOSTA') ? 'selected' : '')}>📄 Formalizar Proposta p/ Aprovação do Cliente (Peça já Substituída → NF)</option>
                   <option value="FOLLOWUP_TESTE">⏳ Peça em Teste — Aguardar Follow-up de Funcionamento (Observação)</option>
                   <option value="PENDENCIA" ${defDec==='PENDENCIA'?'selected':''}>🚨 Classificar Pendência (Falta de Peça / Ferramenta / Mão de Obra)</option>
                 </select>
@@ -134256,9 +134257,14 @@ function renderMenuGesMural(box) {
                 </select>
               </div>
               <input id="triObs_${o.id}" class="input" placeholder="Observação da triagem / nota fiscal / pendência..." value="${esc(pend)}" style="width:100%;font-size:11.5px;margin-bottom:8px;">
-              <button type="button" onclick="confirmarTriagemOS('${o.id}')" class="btn btn-primary btn-sm" style="width:100%;font-weight:800;">
-                ✅ Confirmar Triagem da OS #${esc(o.id)}
-              </button>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" onclick="confirmarTriagemOS('${o.id}')" class="btn btn-primary btn-sm" style="flex:1;min-width:180px;font-weight:800;">
+                  ✅ Confirmar Triagem da OS #${esc(o.id)}
+                </button>
+                <button type="button" onclick="fecharPainelTriagemPosAtendimento();abrirModalDadosNF('${esc(o.id)}')" class="btn btn-outline btn-sm" style="border-color:#6b21a8;color:#6b21a8;font-weight:800;">
+                  🧾 Emitir Nota Fiscal
+                </button>
+              </div>
             </div>
           `;
         }).join("");

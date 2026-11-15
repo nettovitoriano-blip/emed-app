@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v82-peca-filtro-fotos-estoque';
+const CACHE_NAME = 'emed-pwa-v83-proposta-aprovacao-nf';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

@@ -73,7 +73,14 @@ def aprovar_triagem_os(db_name: str, os_id: int, dados: Dict[str, Any]) -> Dict[
         dias_followup = int(dados.get("dias_followup") or 7)
         gerar_proforma = 1 if (dados.get("gerar_proforma") or decisao == "DEFINITIVA_NF") else 0
 
-        if decisao == "FOLLOWUP_TESTE":
+        if decisao == "FORMALIZAR_PROPOSTA":
+            status_final = "AGUARDANDO APROVAÇÃO DE PROPOSTA"
+            pendencia_obs = (
+                f"[PROPOSTA FORMALIZADA — PEÇA JÁ SUBSTITUÍDA] {pendencia_obs}"
+                if pendencia_obs
+                else "[PROPOSTA FORMALIZADA — PEÇA JÁ SUBSTITUÍDA] Aguardando aprovação do cliente para emissão de Nota Fiscal."
+            )
+        elif decisao == "FOLLOWUP_TESTE":
             status_final = "EM OBSERVAÇÃO (PEÇA TESTE)"
             if not pendencia_obs:
                 pendencia_obs = f"Peça em acompanhamento / follow-up de funcionamento por {dias_followup} dias antes de faturamento."
@@ -103,7 +110,7 @@ def aprovar_triagem_os(db_name: str, os_id: int, dados: Dict[str, Any]) -> Dict[
             cur.execute("""
                 UPDATE clientes_equipamentos
                 SET status = ?,
-                    triagem_concluida = 1,
+                    triagem_concluida = ?,
                     triagem_data = ?,
                     triagem_responsavel = ?,
                     triagem_cobranca_tipo = ?,
@@ -111,12 +118,15 @@ def aprovar_triagem_os(db_name: str, os_id: int, dados: Dict[str, Any]) -> Dict[
                     triagem_pendencia_obs = ?,
                     triagem_proforma_gerada = ?,
                     triagem_laudo_enviado_cliente = 1,
+                    status_proposta = CASE WHEN ? = 'FORMALIZAR_PROPOSTA' THEN 'PROPOSTA_GERADA' ELSE status_proposta END,
                     pendencias = CASE WHEN ? != '' THEN ? ELSE pendencias END,
                     valor_os = CASE WHEN ? > 0 THEN ? ELSE valor_os END
                 WHERE id = ? OR rowid = ?
-            """, (status_final, agora, responsavel, cobranca_tipo, cobranca_valor,
-                  pendencia_obs, gerar_proforma,
-                  pendencia_obs if decisao in ("PENDENCIA", "FOLLOWUP_TESTE") else "",
+            """, (status_final, 0 if decisao == "FORMALIZAR_PROPOSTA" else 1,
+                  agora, responsavel, cobranca_tipo, cobranca_valor,
+                  pendencia_obs, 1 if (gerar_proforma or decisao == "FORMALIZAR_PROPOSTA") else 0,
+                  decisao,
+                  pendencia_obs if decisao in ("PENDENCIA", "FOLLOWUP_TESTE", "FORMALIZAR_PROPOSTA") else "",
                   pendencia_obs,
                   cobranca_valor, cobranca_valor, os_id, os_id))
             
