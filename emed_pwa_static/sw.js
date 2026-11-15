@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v76-raiox-voz-cabecalho';
+const CACHE_NAME = 'emed-pwa-v77-modal-topbar-banner';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

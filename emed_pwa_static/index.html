@@ -55536,9 +55536,7 @@
 
 
 
-        <button class="btn-sync-icon" onclick="sincronizarTudo(true)" title="Atualizar Sistema e OS" style="position:relative; display:inline-flex; align-items:center; justify-content:center; padding:3px; width:34px; height:34px; border-radius:50%;">
-          <img src="/api/logo-circle" alt="EMED" style="width:24px; height:24px; border-radius:50%; object-fit:cover; display:block;" onerror="this.outerHTML='🔄'">
-        </button>
+        
 
 
 
@@ -96797,7 +96795,7 @@ async function efetuarLogout() {
       const headerUserChip = document.getElementById("headerUserChip");
       if (headerUserChip) {
         headerUserChip.innerHTML = `
-          <span style="font-size:13px;">${STATE.perfil === "TECNICO" || !isGestor ? "👷" : "👤"}</span>
+          <span style="font-size:13px;">${isGestor ? "👑" : "👷"}</span>
           <span class="user-name-text" style="font-size:12px;font-weight:800;color:#f8fafc;">${esc(usuarioNome || "Usuário")}</span>
           <span class="user-role-badge" style="font-size:9.5px;background:${isGestor ? '#eab308' : '#0284c7'};color:#fff;padding:1px 6px;border-radius:10px;font-weight:800;">
             ${isGestor ? 'GESTOR' : 'TÉCNICO'}
@@ -96842,20 +96840,23 @@ async function efetuarLogout() {
           bannerSim.style.display = "flex";
           bannerSim.style.alignItems = "center";
           bannerSim.style.justifyContent = "space-between";
-          bannerSim.style.background = "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)";
-          bannerSim.style.border = "1px solid rgba(56, 189, 248, 0.4)";
+          bannerSim.style.flexWrap = "nowrap";
+          bannerSim.style.background = "#0f172a";
+          bannerSim.style.border = "1px solid rgba(56, 189, 248, 0.35)";
           bannerSim.style.borderRadius = "8px";
-          bannerSim.style.padding = "10px 16px";
-          bannerSim.style.margin = "10px 16px 4px 16px";
-          bannerSim.style.boxShadow = "0 4px 12px rgba(0,0,0,0.25)";
-          bannerSim.style.gap = "12px";
+          bannerSim.style.padding = "6px 10px";
+          bannerSim.style.margin = "6px 10px 2px 10px";
+          bannerSim.style.boxShadow = "0 2px 6px rgba(0,0,0,0.18)";
+          bannerSim.style.gap = "8px";
+          bannerSim.style.maxWidth = "calc(100% - 20px)";
+          bannerSim.style.boxSizing = "border-box";
           bannerSim.innerHTML = `
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <span style="background:#0284c7;color:#fff;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:800;letter-spacing:0.5px;">👁️ MODO SIMULAÇÃO DO TÉCNICO</span>
-              <span style="color:#cbd5e1;font-size:13px;">Você está visualizando a tela restrita de campo dos Técnicos (apenas suas demandas e ferramentas liberadas).</span>
-            </div>
-            <button onclick="mudarPerfil('GESTOR', 'GES_MURAL')" style="background:#38bdf8;color:#0f172a;border:none;padding:7px 16px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(56,189,248,0.3);white-space:nowrap;">
-              👑 Voltar para Painel do Gestor
+            <span style="color:#e2e8f0;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              <span style="background:#0284c7;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:800;">👑 GESTOR</span>
+              <span style="color:#94a3b8;font-size:11px;">Visão Técnico</span>
+            </span>
+            <button onclick="mudarPerfil('GESTOR', 'GES_MURAL')" style="background:#38bdf8;color:#0f172a;border:none;padding:5px 10px;border-radius:6px;font-weight:800;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;">
+              👑 Painel Gestor
             </button>
           `;
         } else {
@@ -151586,11 +151587,12 @@ function renderMenuGesMural(box) {
 
 
 
-          alert("✅ " + res.msg);
-
-
-
-          renderMenuGesClientes(document.getElementById("mainContainer"));
+          if (typeof mostrarToast === "function") {
+            mostrarToast("✅ " + (res.msg || "Equipamento salvo com sucesso!"), "success");
+          }
+          if (typeof renderMenuGesClientes === "function" && STATE.menuAtivo === "GES_CLIENTES") {
+            renderMenuGesClientes(document.getElementById("mainContainer"));
+          }
 
 
 
@@ -160652,13 +160654,13 @@ function fecharModalEquipamento() {
 
 
 function fecharModalEditarEquipamento() {
-
-
-
-  fecharModalEquipamento();
-
-
-
+  ["modalGerenciarEquipamento", "modalEquipamento", "modalEditarEquipamento"].forEach(mid => {
+    const el = document.getElementById(mid);
+    if (el) {
+      el.classList.remove("open");
+      el.style.display = "none";
+    }
+  });
 }
 
 

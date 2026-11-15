@@ -438,10 +438,10 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     cabecalho_padrao_html = f"""
   <table style="border-bottom: 2px solid #0284c7; margin-bottom: 8px; padding-bottom: 6px; width: 100%; table-layout: fixed; border-collapse: collapse;">
     <tr>
-      <td style="width: 19%; vertical-align: middle; padding-right: 6px; overflow: hidden;">
-        <img src="{logo_b64}" width="118" style="max-width: 100%; width: 118px; height: auto; max-height: 50px; object-fit: contain; display: block;" alt="EMED Eletromedicina" />
+      <td style="width: 22%; vertical-align: middle; padding-right: 6px;">
+        <img src="{logo_b64}" width="132" style="width: 132px; max-width: 100%; height: auto; max-height: 54px; object-fit: contain; display: block;" alt="EMED Eletromedicina" />
       </td>
-      <td style="width: 63%; vertical-align: middle; text-align: center; border-left: 1.5px solid #e2e8f0; border-right: 1.5px solid #e2e8f0; padding: 0 8px;">
+      <td style="width: 59%; vertical-align: middle; text-align: center; border-left: 1.5px solid #e2e8f0; border-right: 1.5px solid #e2e8f0; padding: 0 8px;">
         <div style="font-size: 10pt; font-weight: 800; color: #0f172a; letter-spacing: 0.2px;">EMED&nbsp;ELETROMEDICINA&nbsp;LTDA.</div>
         <div style="font-size: 7pt; font-weight: 700; color: #0284c7; margin-bottom: 3px;">Manuten&ccedil;&atilde;o em Equipamentos de Diagn&oacute;stico por Imagem</div>
         <div style="font-size: 5.7pt; color: #334155; line-height: 1.3;">
@@ -451,8 +451,8 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
           <b>Filial (DF):</b> CNPJ: 03.611.974/0002-80 &bull; Rua 3, Ch&aacute;cara 46A, Lote 01 - Vicente Pires - Bras&iacute;lia - DF &bull; Fone: (61) 3234-3647 / 99658-5392
         </div>
       </td>
-      <td style="width: 18%; vertical-align: middle; padding-left: 6px;">
-        <table style="border: 1.5px solid {cor_num_borda}; width: 100%; border-collapse: collapse;">
+      <td style="width: 19%; vertical-align: middle; padding-left: 8px; text-align: right;">
+        <table style="border: 1.5px solid {cor_num_borda}; width: 100%; border-collapse: collapse; margin-left: auto;">
           <tr>
             <td style="background: {cor_num_bg}; color: #ffffff; text-align: center; padding: 5px 2px;">
               <div style="font-size: 5.5pt; font-weight: bold; letter-spacing: 0.4px;">ORDEM DE SERVI&Ccedil;O</div>
