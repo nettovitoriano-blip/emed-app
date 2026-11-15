@@ -9130,7 +9130,9 @@ async def api_checkout(request: web.Request) -> web.Response:
     for idx, row in df.iterrows():
         if str(obter_id_os(idx, row)) == os_id:
             df.at[idx, "checkout_hora"] = agora_str
-            df.at[idx, "status"] = "CONCLUÍDO"
+            st_atual_co = limpar_texto(row.get("status"), "").upper()
+            if st_atual_co in ("", "ATIVO", "EM ATENDIMENTO", "EM ROTA", "NO LOCAL"):
+                df.at[idx, "status"] = "CONCLUÍDO (AGUARDANDO TRIAGEM)"
             cin = limpar_texto(row.get("checkin_hora"), "") or agora_str
             duracao = calcular_duracao_os(cin, agora_str)
             df.at[idx, "tempo_atendimento"] = duracao
@@ -12421,85 +12423,19 @@ async def api_orcamento_acao(request: web.Request) -> web.Response:
 
 
 
-    if acao == "CONVERTER_TESTE":
-
-
-
-
-
-
-
-        ok, msg = converter_teste_em_aplicacao_definitiva_e_cobranca(DB_NAME, int(os_id), valor if valor > 0 else None)
-
-
-
-
-
-
-
-        df = _carregar_df_direto()
-
-
-
-
-
-
-
-        _salvar_df_direto(df)
-
-
-
-
-
-
-
+    if acao in ("CONVERTER_TESTE", "RETIRAR_TESTE"):
+        try:
+            os_num = int(os_id)
+        except Exception:
+            return web.json_response({"ok": False, "msg": "ID da OS inválido para operação de teste."}, status=400)
+        if acao == "CONVERTER_TESTE":
+            ok, msg = converter_teste_em_aplicacao_definitiva_e_cobranca(DB_NAME, os_num, valor if valor > 0 else None)
+        else:
+            ok, msg = retirar_peca_teste_e_devolver_estoque(DB_NAME, os_num)
+        if ok:
+            df = _carregar_df_direto()
+            _salvar_df_direto(df)
         return web.json_response({"ok": ok, "msg": msg})
-
-
-
-
-
-
-
-    elif acao == "RETIRAR_TESTE":
-
-
-
-
-
-
-
-        ok, msg = retirar_peca_teste_e_devolver_estoque(DB_NAME, int(os_id))
-
-
-
-
-
-
-
-        df = _carregar_df_direto()
-
-
-
-
-
-
-
-        _salvar_df_direto(df)
-
-
-
-
-
-
-
-        return web.json_response({"ok": ok, "msg": msg})
-
-
-
-
-
-
 
     else:
 
@@ -16070,6 +16006,10 @@ async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
 
+    if quantidade < 1:
+        quantidade = 1
+    if valor_unitario < 0:
+        return web.json_response({"ok": False, "msg": "Valor unitário da proposta não pode ser negativo."}, status=400)
     valor_total = round(quantidade * valor_unitario, 2)
 
 
