@@ -5886,6 +5886,7 @@ async def api_bootstrap(request: web.Request) -> web.Response:
                     "status_medico": st_med,
 
                     "dias_para_vencer": dias_rest,
+                    "rubrica_img": str(r.get("rubrica_img") or "").strip(),
 
                 })
 
@@ -8017,35 +8018,8 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
-    if 5 <= hora_atual < 12:
-
-        saudacao_txt = "Bom dia, Família eMED! ☀️"
-
-        msg_txt = "Que o dia de hoje seja abençoado, iluminado e de muita união e segurança nos atendimentos. O trabalho técnico de cada um de vocês cuida de vidas com precisão e excelência!"
-
-    elif 12 <= hora_atual < 18:
-
-        saudacao_txt = "Boa tarde, Equipe eMED! ⚡"
-
-        msg_txt = "Seguimos firmes com dedicação, respeito e maestria técnica. Cada OS bem executada fortalece nossa missão na saúde!"
-
-    else:
-
-        saudacao_txt = "Boa noite, Guerreiros eMED! ⭐"
-
-        msg_txt = "Gratidão profunda a cada técnico e colaborador que se dedicou hoje. Que a volta para casa seja em paz e com a certeza do dever cumprido com maestria!"
-
-
-
-    msg_dia_obj = {
-
-        "saudacao": saudacao_txt,
-
-        "mensagem": msg_txt,
-
-        "data_formatada": datetime.now().strftime("%d/%m/%Y")
-
-    }
+    from emed_services.briefing_diario import obter_briefing_diario
+    msg_dia_obj = obter_briefing_diario()
 
 
 
@@ -10004,48 +9978,37 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
 
 async def api_tecnico_assinatura_salvar(request: web.Request) -> web.Response:
-
+    global _CACHE_BOOTSTRAP, _CACHE_BOOTSTRAP_TIME
     body = await request.json()
-
     nome = limpar_texto(body.get("nome"), "").strip().upper()
-
     ass_img = str(body.get("assinatura_img") or "").strip()
-
     ass_padrao = limpar_texto(body.get("assinatura_padrao"), "").strip()
 
-
-
     if not nome:
-
         return web.json_response({"ok": False, "msg": "Nome do técnico é obrigatório."})
 
-
+    nomes_alvo = [nome]
+    if "NETTO" in nome:
+        nomes_alvo.extend(["NETTO", "VALFREDO NETTO"])
+    nomes_alvo = list(dict.fromkeys(nomes_alvo))
 
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
-        cur.execute("""
-
-            UPDATE tecnicos
-
-            SET rubrica_img = ?, assinatura_padrao = COALESCE(NULLIF(?, ''), assinatura_padrao)
-
-            WHERE UPPER(nome) = ?
-
-        """, (ass_img, ass_padrao, nome))
-
-        if cur.rowcount == 0:
-
+        for n_item in nomes_alvo:
             cur.execute("""
-
-                INSERT INTO tecnicos (nome, perfil, assinatura_padrao, rubrica_img)
-
-                VALUES (?, 'Técnico', ?, ?)
-
-            """, (nome, ass_padrao, ass_img))
-
+                UPDATE tecnicos
+                SET rubrica_img = ?, assinatura_padrao = COALESCE(NULLIF(?, ''), assinatura_padrao)
+                WHERE UPPER(nome) = ?
+            """, (ass_img, ass_padrao, n_item))
+            if cur.rowcount == 0 and n_item == nome:
+                cur.execute("""
+                    INSERT INTO tecnicos (nome, perfil, assinatura_padrao, rubrica_img)
+                    VALUES (?, 'Técnico', ?, ?)
+                """, (nome, ass_padrao, ass_img))
         conn.commit()
+
+    _CACHE_BOOTSTRAP = None
+    _CACHE_BOOTSTRAP_TIME = 0.0
 
 
 
@@ -11693,6 +11656,9 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
+    global _CACHE_BOOTSTRAP, _CACHE_BOOTSTRAP_TIME
+    _CACHE_BOOTSTRAP = None
+    _CACHE_BOOTSTRAP_TIME = 0.0
     return web.json_response({"ok": True, "os_id": os_id, "status": df.at[idx_alvo, "status"], "msg": msg_final})
 
 
@@ -19405,11 +19371,9 @@ async def api_ferramentas_minhas(request: web.Request) -> web.Response:
 
         cur.execute("""
 
-            SELECT id, codigo_ferramenta, nome_ferramenta, data_saida, destino_cliente, os_id, localizacao
-
+            SELECT id, codigo_ferramenta, nome_ferramenta, data_saida, destino_cliente, os_id, localizacao, numero_serie, data_validade_calibracao, certificado_calibracao
             FROM ferramentas_cautela
-
-            WHERE UPPER(tecnico_responsavel) = ? AND status = 'EM_USO'
+            WHERE (UPPER(tecnico_responsavel) = ? OR UPPER(tecnico_responsavel) = 'NETTO' OR UPPER(tecnico_responsavel) = 'VALFREDO NETTO') AND status = 'EM_USO' 
 
             ORDER BY id DESC
 

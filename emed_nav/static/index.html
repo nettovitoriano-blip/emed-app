@@ -940,7 +940,7 @@
             <div class="modal-title" style="color:#4ade80;">Assumir o Volante</div>
             <div id="prox-detection-sub" class="modal-subtitle">📡 Veículo identificado por proximidade / NFC</div>
           </div>
-          <button onclick="document.getElementById('assume-wheel-modal').style.display='none'" class="btn-close-modal" type="button">✕</button>
+          <button onclick="skipAssumeWheel()" class="btn-close-modal" type="button" title="Consultar sem assumir">✕</button>
         </div>
 
         <div style="margin:10px 0;">
@@ -957,6 +957,11 @@
         <button onclick="confirmAssumeWheel()" class="btn-modal btn-maps" type="button" style="width:100%; justify-content:center; padding:13px; margin-top:6px;">
           <span style="font-size:22px;">🛞</span>
           <div style="font-size:15px; font-weight:900;">ASSUMIR O VOLANTE AGORA</div>
+        </button>
+
+        <button onclick="skipAssumeWheel()" class="btn-modal" type="button" style="width:100%; justify-content:center; padding:11px; margin-top:8px; background:#1e293b; border:1px solid #475569; color:#94a3b8; cursor:pointer;">
+          <span style="font-size:18px;">⚪</span>
+          <div style="font-size:13px; font-weight:800; color:#cbd5e1;">Apenas Consultar Rota (Não Definir Veículo / A Definir)</div>
         </button>
       </div>
     </div>
@@ -2626,7 +2631,8 @@
       if (driversList && driversList.length) {
         const savedDriver = localStorage.getItem('emednav_my_driver') || driversList[0];
         document.getElementById('prox-driver-input').value = savedDriver;
-        document.getElementById('prox-drivers-grid').innerHTML = driversList.slice(0, 8).map(d => `
+        const fullDrivers = ["A DEFINIR", ...driversList.filter(d => d !== "A DEFINIR")];
+        document.getElementById('prox-drivers-grid').innerHTML = fullDrivers.slice(0, 9).map(d => `
           <button type="button" class="chip" style="padding:8px; justify-content:center; font-size:12px;" onclick="document.getElementById('prox-driver-input').value='${d}'">
             👤 ${d}
           </button>
@@ -2643,6 +2649,12 @@
       checkProximityAndWheel(false).then(() => {
         document.getElementById('assume-wheel-modal').style.display = 'flex';
       });
+    };
+
+    window.skipAssumeWheel = function() {
+      sessionStorage.setItem('emednav_wheel_assumed', 'skipped');
+      document.getElementById('assume-wheel-modal').style.display = 'none';
+      showToast('👁️ Modo Consulta: navegando sem vincular condutor ao veículo.');
     };
 
     window.confirmAssumeWheel = async function() {
