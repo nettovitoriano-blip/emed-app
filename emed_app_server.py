@@ -9195,7 +9195,7 @@ async def api_frota_assumir_veiculo(request: web.Request) -> web.Response:
             return web.json_response({"ok": False, "msg": "Veículo não encontrado."}, status=404)
 
         v_id, modelo, v_placa, condutor_ant, km_db = row_v[0], row_v[1], row_v[2], row_v[3], row_v[4]
-        km_usar = km_informado if km_informado > 0 else km_db
+        km_usar = max(km_informado, km_db or 0) if km_informado > 0 else (km_db or 0)
 
         obs_auditoria = (
             f"Troca de condutor registrada via {metodo}. "
@@ -9212,10 +9212,11 @@ async def api_frota_assumir_veiculo(request: web.Request) -> web.Response:
         tag_rfid = f"NFC_{tag_nfc}" if (metodo == "NFC" and tag_nfc) else "APP_CELULAR"
         cur.execute("""
             UPDATE veiculos 
-            SET condutor_atual = ?, tag_rfid_atual = ?, ultima_atualizacao_gps = ?
+            SET condutor_atual = ?, tag_rfid_atual = ?, ultima_atualizacao_gps = ?, km_atual = ?
             WHERE id = ?
-        """, (tecnico, tag_rfid, agora_str, v_id))
+        """, (tecnico, tag_rfid, agora_str, km_usar, v_id))
         conn.commit()
+    invalidar_cache_bootstrap()
 
     return web.json_response({
         "ok": True,
@@ -14858,6 +14859,8 @@ async def api_pix_liquidar(request: web.Request) -> web.Response:
 
 
     os_id = str(body.get("os_id", "")).strip()
+    if not os_id:
+        return web.json_response({"ok": False, "msg": "Informe o número da OS para liquidar o pagamento PIX."}, status=400)
 
 
 
@@ -14874,6 +14877,8 @@ async def api_pix_liquidar(request: web.Request) -> web.Response:
 
 
     ok, msg = liquidar_pagamento_pix(DB_NAME, os_id, txid, metodo="APP_GESTOR_EMED")
+    if ok:
+        invalidar_cache_bootstrap()
 
 
 
@@ -22097,6 +22102,7 @@ async def api_pix_webhook(request: web.Request) -> web.Response:
     
 
     if resultado.get("conciliado"):
+        invalidar_cache_bootstrap()
 
         # Notifica console do servidor e atualiza estado
 
