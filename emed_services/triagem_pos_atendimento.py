@@ -59,20 +59,38 @@ def obter_fila_triagem_pos_atendimento(db_name: str) -> List[Dict[str, Any]]:
     return fila
 
 def aprovar_triagem_os(db_name: str, os_id: int, dados: Dict[str, Any]) -> Dict[str, Any]:
-    """Aprova a OS na triagem, efetua baixa automática no Kardex de estoque e libera o laudo."""
+    """Aprova a OS na triagem, classifica peça (definitiva/NF vs follow-up) ou pendência (peça/ferramenta/mão de obra) e libera o laudo."""
     try:
         agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
         data_hoje = datetime.datetime.now().strftime("%d/%m/%Y")
         hora_hoje = datetime.datetime.now().strftime("%H:%M")
         responsavel = dados.get("responsavel", "GESTOR")
+        decisao = str(dados.get("decisao") or "DEFINITIVA_NF").strip().upper()
         cobranca_tipo = dados.get("cobranca_tipo", "INCLUSO_CONTRATO")
         cobranca_valor = float(dados.get("cobranca_valor", 0.0) or 0.0)
-        pendencia_obs = dados.get("pendencia_obs", "").strip()
-        gerar_proforma = 1 if dados.get("gerar_proforma") else 0
-        
-        status_final = "CONCLUÍDO / LIBERADO AO CLIENTE"
-        if pendencia_obs and "PENDENTE" in pendencia_obs.upper():
+        pendencia_categoria = str(dados.get("pendencia_categoria") or "").strip().upper()
+        pendencia_obs = str(dados.get("pendencia_obs") or "").strip()
+        dias_followup = int(dados.get("dias_followup") or 7)
+        gerar_proforma = 1 if (dados.get("gerar_proforma") or decisao == "DEFINITIVA_NF") else 0
+
+        if decisao == "FOLLOWUP_TESTE":
+            status_final = "EM OBSERVAÇÃO (PEÇA TESTE)"
+            if not pendencia_obs:
+                pendencia_obs = f"Peça em acompanhamento / follow-up de funcionamento por {dias_followup} dias antes de faturamento."
+            else:
+                pendencia_obs = f"[FOLLOW-UP {dias_followup} DIAS] {pendencia_obs}"
+        elif decisao == "PENDENCIA":
             status_final = "CONCLUÍDO COM PENDÊNCIA (RETORNO AGENDADO)"
+            cat_lbl = {
+                "PECA": "FALTA DE PEÇA",
+                "FERRAMENTA": "FERRAMENTA NECESSÁRIA",
+                "MAO_DE_OBRA": "MÃO DE OBRA / RETORNO",
+            }.get(pendencia_categoria, pendencia_categoria or "PENDÊNCIA TÉCNICA")
+            pendencia_obs = f"[{cat_lbl}] {pendencia_obs}" if pendencia_obs else f"[{cat_lbl}] Aguardando resolução."
+        else:
+            status_final = "CONCLUÍDO / LIBERADO AO CLIENTE"
+            if pendencia_obs and "PENDENTE" in pendencia_obs.upper():
+                status_final = "CONCLUÍDO COM PENDÊNCIA (RETORNO AGENDADO)"
 
         alerta_compras = None
         baixa_estoque_info = None
@@ -93,10 +111,14 @@ def aprovar_triagem_os(db_name: str, os_id: int, dados: Dict[str, Any]) -> Dict[
                     triagem_pendencia_obs = ?,
                     triagem_proforma_gerada = ?,
                     triagem_laudo_enviado_cliente = 1,
+                    pendencias = CASE WHEN ? != '' THEN ? ELSE pendencias END,
                     valor_os = CASE WHEN ? > 0 THEN ? ELSE valor_os END
                 WHERE id = ? OR rowid = ?
-            """, (status_final, agora, responsavel, cobranca_tipo, cobranca_valor, 
-                  pendencia_obs, gerar_proforma, cobranca_valor, cobranca_valor, os_id, os_id))
+            """, (status_final, agora, responsavel, cobranca_tipo, cobranca_valor,
+                  pendencia_obs, gerar_proforma,
+                  pendencia_obs if decisao in ("PENDENCIA", "FOLLOWUP_TESTE") else "",
+                  pendencia_obs,
+                  cobranca_valor, cobranca_valor, os_id, os_id))
             
             # 2. Obter dados da OS e peça aplicada
             cur.execute("""
@@ -112,8 +134,8 @@ def aprovar_triagem_os(db_name: str, os_id: int, dados: Dict[str, Any]) -> Dict[
             email = row_cli["email"] or "" if row_cli else ""
             peca_aplicada = (row_cli["peca_baixada_ref"] or "").strip() if row_cli else ""
 
-            # 3. BAIXA AUTOMÁTICA NO ALMOXARIFADO & KARDEX
-            if peca_aplicada and peca_aplicada.upper() not in ["NENHUMA", "NENHUMA PEÇA", "SEM PEÇA", ""]:
+            # 3. BAIXA AUTOMÁTICA NO ALMOXARIFADO & KARDEX (apenas se instalação definitiva, não em follow-up/teste)
+            if decisao != "FOLLOWUP_TESTE" and peca_aplicada and peca_aplicada.upper() not in ["NENHUMA", "NENHUMA PEÇA", "SEM PEÇA", ""]:
                 # Localizar no estoque_pecas
                 cur.execute("""
                     SELECT id, codigo, nome_peca, quantidade, estoque_minimo, preco_custo
