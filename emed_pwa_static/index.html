@@ -84675,7 +84675,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-      const fila = JSON.parse(localStorage.getItem("emed_sync_queue") || "[]");
+      const fila = Array.isArray(window._EMED_MEM_QUEUE) ? window._EMED_MEM_QUEUE : JSON.parse(localStorage.getItem("emed_sync_queue") || "[]");
 
 
 
@@ -86851,7 +86851,125 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-    async function processarFilaOffline() {
+    
+    // ========================================================================
+    // COFRE OFFLINE INDEXEDDB (Capacidade expandida para fotos, assinaturas e cache 3G)
+    // ========================================================================
+    const EMED_IDB = (() => {
+      let _dbPromise = null;
+      function _open() {
+        if (_dbPromise) return _dbPromise;
+        _dbPromise = new Promise((resolve, reject) => {
+          try {
+            if (!window.indexedDB) return reject(new Error("IndexedDB indisponivel"));
+            const req = indexedDB.open("emed_cofre_db", 1);
+            req.onupgradeneeded = (ev) => {
+              const db = ev.target.result;
+              if (!db.objectStoreNames.contains("kv")) db.createObjectStore("kv");
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error || new Error("Erro IDB"));
+          } catch (e) { reject(e); }
+        });
+        return _dbPromise;
+      }
+      async function get(key) {
+        try {
+          const db = await _open();
+          return await new Promise((resolve, reject) => {
+            const tx = db.transaction("kv", "readonly");
+            const req = tx.objectStore("kv").get(key);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+          });
+        } catch (e) { return undefined; }
+      }
+      async function set(key, val) {
+        try {
+          const db = await _open();
+          return await new Promise((resolve, reject) => {
+            const tx = db.transaction("kv", "readwrite");
+            const req = tx.objectStore("kv").put(val, key);
+            req.onsuccess = () => resolve(true);
+            req.onerror = () => reject(req.error);
+          });
+        } catch (e) { return false; }
+      }
+      async function del(key) {
+        try {
+          const db = await _open();
+          return await new Promise((resolve, reject) => {
+            const tx = db.transaction("kv", "readwrite");
+            const req = tx.objectStore("kv").delete(key);
+            req.onsuccess = () => resolve(true);
+            req.onerror = () => reject(req.error);
+          });
+        } catch (e) { return false; }
+      }
+      return { get, set, del };
+    })();
+
+    window._EMED_MEM_QUEUE = null;
+
+    function normalizarDadosBootstrap(d) {
+      if (!d || typeof d !== "object") return d;
+      if (!d.clientes_auvo && Array.isArray(d.clientes)) d.clientes_auvo = d.clientes;
+      if (!d.equipamentos_auvo && Array.isArray(d.equipamentos)) d.equipamentos_auvo = d.equipamentos;
+      return d;
+    }
+
+    async function obterFilaSync() {
+      let fila = await EMED_IDB.get("emed_sync_queue");
+      if (!Array.isArray(fila)) {
+        try {
+          const leg = JSON.parse(localStorage.getItem("emed_sync_queue") || "[]");
+          fila = Array.isArray(leg) ? leg : [];
+          if (fila.length > 0) await EMED_IDB.set("emed_sync_queue", fila);
+        } catch (e) { fila = []; }
+      }
+      window._EMED_MEM_QUEUE = fila;
+      return fila;
+    }
+
+    async function salvarFilaSync(fila) {
+      const arr = Array.isArray(fila) ? fila : [];
+      window._EMED_MEM_QUEUE = arr;
+      await EMED_IDB.set("emed_sync_queue", arr);
+      try {
+        if (arr.length === 0) {
+          localStorage.removeItem("emed_sync_queue");
+        } else {
+          const s = JSON.stringify(arr);
+          if (s.length < 1500000) localStorage.setItem("emed_sync_queue", s);
+        }
+      } catch (e) {}
+    }
+
+    async function aplicarAtualizacaoOtimistaLocal(url, body) {
+      try {
+        if (!STATE.data || !Array.isArray(STATE.data.ordens) || !body) return;
+        const osId = body.os_id || body.id;
+        if (!osId) return;
+        const idx = STATE.data.ordens.findIndex(o => String(o.id) === String(osId));
+        if (idx === -1) return;
+        const os = STATE.data.ordens[idx];
+        if (url === "/api/salvar-os") {
+          if (body.relato !== undefined) os.relato = body.relato;
+          if (body.pendencias !== undefined) os.pendencias = body.pendencias;
+          if (body.observacoes !== undefined) os.observacoes = body.observacoes;
+          if (body.pecas_utilizadas !== undefined) os.pecas_utilizadas = body.pecas_utilizadas;
+          if (body.acao === "concluir") os.status = "CONCLUÍDO (AGUARDANDO TRIAGEM)";
+          else if (body.acao === "observacao") os.status = "EM OBSERVAÇÃO";
+          os._pendente_sync = true;
+        }
+        await EMED_IDB.set("emed_bootstrap_cache", STATE.data);
+        if (typeof renderizarTelaPrincipal === "function") renderizarTelaPrincipal();
+      } catch (e) {}
+    }
+
+    obterFilaSync().then(() => { try { if (typeof atualizarStatusRede === "function") atualizarStatusRede(); } catch(e) {} });
+
+async function processarFilaOffline() {
 
 
 
@@ -86915,7 +87033,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-      const fila = JSON.parse(localStorage.getItem("emed_sync_queue") || "[]");
+      const fila = await obterFilaSync();
 
 
 
@@ -87235,263 +87353,14 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
+          const _ctrl = new AbortController();
+          const _t = setTimeout(() => _ctrl.abort(), 30000);
           const r = await fetch(item.url, {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
             method: "POST",
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
             headers: { "Content-Type": "application/json" },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            body: JSON.stringify(item.body)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          });
+            body: JSON.stringify(item.body),
+            signal: _ctrl.signal
+          }).finally(() => clearTimeout(_t));
 
 
 
@@ -87875,7 +87744,7 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-      localStorage.setItem("emed_sync_queue", JSON.stringify(restantes));
+      await salvarFilaSync(restantes);
 
 
 
@@ -88551,263 +88420,16 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
+        const _bodyStr = JSON.stringify(body);
+        const _timeoutMs = _bodyStr.length > 200000 ? 45000 : 15000;
+        const _ctrl = new AbortController();
+        const _t = setTimeout(() => _ctrl.abort(), _timeoutMs);
         const resp = await fetch(url, {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
           method: "POST",
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
           headers: { "Content-Type": "application/json" },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          body: JSON.stringify(body)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        });
+          body: _bodyStr,
+          signal: _ctrl.signal
+        }).finally(() => clearTimeout(_t));
 
 
 
@@ -89127,135 +88749,10 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-          const fila = JSON.parse(localStorage.getItem("emed_sync_queue") || "[]");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+          const fila = await obterFilaSync();
           fila.push({ url, body, ts: Date.now() });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          localStorage.setItem("emed_sync_queue", JSON.stringify(fila));
+          await salvarFilaSync(fila);
+          await aplicarAtualizacaoOtimistaLocal(url, body);
 
 
 
@@ -90152,6 +89649,22 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
       atualizarStatusRede();
+      if (!STATE.data) {
+        try {
+          let _cached = await EMED_IDB.get("emed_bootstrap_cache");
+          if (!_cached) {
+            const _leg = localStorage.getItem("emed_bootstrap_cache");
+            if (_leg && !_leg.toUpperCase().includes("CLEMIR")) {
+              _cached = JSON.parse(_leg);
+            }
+          }
+          if (_cached && (_cached.ok || _cached.ordens)) {
+            STATE.data = normalizarDadosBootstrap(_cached);
+            if (typeof renderizarTelaPrincipal === "function") renderizarTelaPrincipal();
+            atualizarStatusRede();
+          }
+        } catch (e) {}
+      }
 
 
 
@@ -90279,7 +89792,9 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-        const resp = await fetch("/api/bootstrap");
+        const _bCtrl = new AbortController();
+        const _bTimer = setTimeout(() => _bCtrl.abort(), 12000);
+        const resp = await fetch("/api/bootstrap?slim=1", { signal: _bCtrl.signal }).finally(() => clearTimeout(_bTimer));
 
 
 
@@ -90535,71 +90050,9 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
-            STATE.data = dados;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            localStorage.setItem("emed_bootstrap_cache", JSON.stringify(STATE.data));
+            STATE.data = normalizarDadosBootstrap(dados);
+            await EMED_IDB.set("emed_bootstrap_cache", STATE.data);
+            try { localStorage.setItem("emed_bootstrap_cache", JSON.stringify(STATE.data)); } catch (qe) {}
 
 
 

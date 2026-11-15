@@ -2397,6 +2397,35 @@ async def security_headers_middleware(request: web.Request, handler):
     return resp
 
 
+@web.middleware
+async def gzip_middleware(request: web.Request, handler):
+    import gzip as _gzip
+    resp = await handler(request)
+    try:
+        ae = (request.headers.get("Accept-Encoding") or "").lower()
+        if "gzip" not in ae:
+            return resp
+        if not isinstance(resp, web.Response) or isinstance(resp, web.FileResponse):
+            return resp
+        if "Content-Encoding" in resp.headers:
+            return resp
+        ctype = (resp.content_type or "").lower()
+        if not (ctype.startswith("application/json") or ctype.startswith("text/") or ctype in ("application/javascript", "text/javascript")):
+            return resp
+        body = resp.body
+        if not body or len(body) < 1024:
+            return resp
+        compressed = _gzip.compress(body, compresslevel=6)
+        if len(compressed) < len(body):
+            resp.headers.pop("Content-Length", None)
+            resp.headers["Content-Encoding"] = "gzip"
+            resp.headers["Vary"] = "Accept-Encoding"
+            resp.body = compressed
+    except Exception:
+        pass
+    return resp
+
+
 
 def gerar_token_sessao(user_id: int, nome: str, perfil: str) -> str:
 
@@ -4216,6 +4245,8 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
     if _CACHE_BOOTSTRAP is not None and (agora_ts - _CACHE_BOOTSTRAP_TIME) < 2.0:
 
+        if request.query.get("slim") == "1":
+            return web.json_response({k: v for k, v in _CACHE_BOOTSTRAP.items() if k not in ("clientes_auvo", "equipamentos_auvo")})
         return web.json_response(_CACHE_BOOTSTRAP)
 
 
@@ -8359,6 +8390,8 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
 
+    if request.query.get("slim") == "1":
+        return web.json_response({k: v for k, v in payload.items() if k not in ("clientes_auvo", "equipamentos_auvo")})
     return web.json_response(payload)
 
 
@@ -23004,7 +23037,7 @@ def criar_app() -> web.Application:
 
     garantir_schema_medicina_trabalho(DB_NAME)
 
-    app = web.Application(middlewares=[rate_limiting_middleware, security_headers_middleware, auth_api_middleware], client_max_size=25 * 1024 * 1024)
+    app = web.Application(middlewares=[gzip_middleware, rate_limiting_middleware, security_headers_middleware, auth_api_middleware], client_max_size=25 * 1024 * 1024)
 
 
 

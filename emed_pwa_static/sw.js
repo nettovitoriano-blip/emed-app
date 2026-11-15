@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v83-proposta-aprovacao-nf';
+const CACHE_NAME = 'emed-pwa-v84-3g-gzip-indexeddb-offline';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
