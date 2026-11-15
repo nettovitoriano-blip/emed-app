@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v78-menu-logo-pdf-triagem';
+const CACHE_NAME = 'emed-pwa-v79-logo-esquerda-emed-service';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
