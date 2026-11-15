@@ -761,6 +761,23 @@
       </div>
     </header>
 
+    <!-- BANNER FLUTUANTE DE RETORNO RÁPIDO APÓS SELEÇÃO DE MÚSICA -->
+    <div id="music-return-banner" style="display:none; position:fixed; top:66px; left:50%; transform:translateX(-50%); z-index:2600; background:rgba(15,23,42,0.96); border:2px solid #a855f7; border-radius:30px; padding:6px 14px; box-shadow:0 10px 28px rgba(0,0,0,0.8); align-items:center; gap:8px; white-space:nowrap;">
+      <span style="font-size:12px; color:#c084fc; font-weight:800; display:flex; align-items:center; gap:4px;">
+        <span>🎵</span><span>Tocando</span>
+      </span>
+      <button onclick="hideMusicReturnBanner()" style="background:#0284c7; border:none; color:white; font-size:11px; font-weight:800; padding:5px 10px; border-radius:20px; cursor:pointer;">
+        🗺️ Voltar ao Mapa
+      </button>
+      <button onclick="openExternalNavDirect('maps')" style="background:#22c55e; border:none; color:white; font-size:11px; font-weight:800; padding:5px 10px; border-radius:20px; cursor:pointer;">
+        🧭 Maps
+      </button>
+      <button onclick="openExternalNavDirect('waze')" style="background:#0284c7; border:none; color:white; font-size:11px; font-weight:800; padding:5px 10px; border-radius:20px; cursor:pointer;">
+        🚙 Waze
+      </button>
+      <button onclick="hideMusicReturnBanner()" style="background:none; border:none; color:#94a3b8; font-size:14px; cursor:pointer; padding:0 4px;">✕</button>
+    </div>
+
     <!-- MODAL DE HISTÓRICO DE ROTAS TRAÇADAS E VIAGENS DO GPS J16 -->
     <div id="history-modal" style="display:none; position:absolute; top:70px; right:12px; background:rgba(15,23,42,0.98); border:2px solid #c084fc; border-radius:14px; padding:14px; z-index:2300; box-shadow:0 12px 35px rgba(0,0,0,0.85); width:330px; max-height:75vh; overflow-y:auto;">
       <div style="font-size:13px; font-weight:900; color:#c084fc; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
@@ -1229,21 +1246,22 @@
           <button onclick="closeMusicModal()" class="btn-close-modal" type="button">✕</button>
         </div>
 
+        <!-- BOTÃO DE DESTAQUE: MEUS DOWNLOADS OFFLINE NO CELULAR -->
+        <button onclick="launchMusicApp('yt-downloads')" class="btn-music-app" style="background:linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%); border:1.5px solid #f87171; width:100%; margin:10px 0 8px 0; justify-content:center; padding:12px 14px;">
+          <span style="font-size:22px;">📁</span>
+          <div style="display:flex; flex-direction:column; text-align:left; margin-left:6px;">
+            <span style="font-size:14px; font-weight:900; color:#ffffff;">Meus Downloads Offline (YouTube)</span>
+            <span style="font-size:10.5px; color:#fecaca;">Abrir pasta de músicas salvas para ouvir em 2º plano sem internet</span>
+          </div>
+        </button>
+
         <!-- BOTÕES DE APPS PRINCIPAIS -->
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0 10px 0;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:0 0 10px 0;">
           <button onclick="launchMusicApp('ytmusic')" class="btn-music-app" style="background:linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); border:1px solid #f87171;">
             <span style="font-size:20px;">▶️</span>
             <div style="display:flex; flex-direction:column; text-align:left;">
               <span style="font-size:13px; font-weight:900;">YouTube Music</span>
-              <span style="font-size:9.5px; opacity:0.85;">Abrir App / Web</span>
-            </div>
-          </button>
-
-          <button onclick="launchMusicApp('deezer')" class="btn-music-app" style="background:linear-gradient(135deg, #a855f7 0%, #6b21a8 100%); border:1px solid #c084fc;">
-            <span style="font-size:20px;">🟣</span>
-            <div style="display:flex; flex-direction:column; text-align:left;">
-              <span style="font-size:13px; font-weight:900;">Deezer Music</span>
-              <span style="font-size:9.5px; opacity:0.85;">Flow & Playlists</span>
+              <span style="font-size:9.5px; opacity:0.85;">App Oficial</span>
             </div>
           </button>
 
@@ -1251,17 +1269,29 @@
             <span style="font-size:20px;">🟢</span>
             <div style="display:flex; flex-direction:column; text-align:left;">
               <span style="font-size:13px; font-weight:900;">Spotify</span>
-              <span style="font-size:9.5px; opacity:0.85;">Abrir App</span>
+              <span style="font-size:9.5px; opacity:0.85;">App Oficial</span>
+            </div>
+          </button>
+
+          <button onclick="launchMusicApp('deezer')" class="btn-music-app" style="background:linear-gradient(135deg, #a855f7 0%, #6b21a8 100%); border:1px solid #c084fc;">
+            <span style="font-size:20px;">🟣</span>
+            <div style="display:flex; flex-direction:column; text-align:left;">
+              <span style="font-size:13px; font-weight:900;">Deezer Music</span>
+              <span style="font-size:9.5px; opacity:0.85;">App & Flow</span>
             </div>
           </button>
 
           <button onclick="launchMusicApp('youtube')" class="btn-music-app" style="background:linear-gradient(135deg, #dc2626 0%, #991b1b 100%); border:1px solid #ef4444;">
             <span style="font-size:20px;">🔴</span>
             <div style="display:flex; flex-direction:column; text-align:left;">
-              <span style="font-size:13px; font-weight:900;">YouTube Vídeos</span>
-              <span style="font-size:9.5px; opacity:0.85;">Acesso Direto</span>
+              <span style="font-size:13px; font-weight:900;">YouTube Geral</span>
+              <span style="font-size:9.5px; opacity:0.85;">App Nativo</span>
             </div>
           </button>
+        </div>
+
+        <div style="background:rgba(168,85,247,0.15); border:1px dashed #c084fc; border-radius:8px; padding:7px 10px; margin-bottom:10px; font-size:11px; color:#e9d5ff; line-height:1.4;">
+          💡 <b>Dica de Viagem:</b> Ao selecionar seu app de música, ele abrirá seus downloads. Dê play e o som continuará tocando em segundo plano enquanto você navega no <b>Mapa eMED</b>, <b>Google Maps</b> ou <b>Waze</b>!
         </div>
 
         <!-- MINHA PLAYLIST PERSONALIZADA (SALVA LOCALMENTE) -->
@@ -2403,7 +2433,83 @@
       updateVisibleClientsViewport();
     }
 
+    // ==========================================================================
+    // ALFINETE OFICIAL DA BASE / SEDE eMED (SEMPRE FIXO E DESTACADO NO MAPA)
+    // ==========================================================================
+    const EMED_BASES = [
+      {
+        id: 'sede-matriz',
+        nome: 'Sede eMED Eletromedicina (Matriz)',
+        cidade: 'Eusébio / Fortaleza - CE',
+        lat: -3.8856,
+        lon: -38.4614,
+        tipo: 'MATRIZ',
+        endereco: 'Av. Eusébio de Queiroz - Polo Médico'
+      },
+      {
+        id: 'base-mossoro',
+        nome: 'Base eMED Apoio Técnico (Mossoró)',
+        cidade: 'Mossoró - RN',
+        lat: -5.1895,
+        lon: -37.3456,
+        tipo: 'FILIAL',
+        endereco: 'Região Central Hospitalar, Mossoró - RN'
+      }
+    ];
+
+    let emedBaseLayer = L.layerGroup().addTo(map);
+
+    function renderEmedBases() {
+      emedBaseLayer.clearLayers();
+      EMED_BASES.forEach(b => {
+        const iconHtml = `
+          <div style="background:#0f172a; width:36px; height:36px; border-radius:50%; border:3px solid #f59e0b; display:flex; align-items:center; justify-content:center; box-shadow:0 0 16px rgba(245,158,11,0.85); position:relative; cursor:pointer;" title="${b.nome}">
+            <svg viewBox="0 0 200 200" style="width:20px; height:20px; display:block;">
+              <path d="${EMED_SYMBOL_PATH}" fill="#f59e0b" fill-rule="evenodd" />
+            </svg>
+            <span style="position:absolute; top:-7px; right:-7px; background:#f59e0b; color:#0f172a; font-size:8.5px; font-weight:900; padding:1px 4px; border-radius:4px; box-shadow:0 2px 4px rgba(0,0,0,0.5);">SEDE</span>
+          </div>
+        `;
+        const baseIcon = L.divIcon({
+          className: 'emed-base-pin',
+          html: iconHtml,
+          iconSize: [36, 36],
+          iconAnchor: [18, 18]
+        });
+
+        const safeNome = b.nome.replace(/'/g, "\\'");
+        const popupContent = `
+          <div style="font-size:12px; line-height:1.4; min-width:215px;">
+            <div style="margin-bottom:4px;">
+              <span style="background:rgba(245,158,11,0.25); color:#fbbf24; border:1px solid #f59e0b; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:900;">⭐ BASE OFICIAL eMED</span>
+            </div>
+            <strong style="color:#fbbf24; font-size:13px;">${b.nome}</strong><br>
+            <span style="color:#38bdf8; font-size:11px;">📍 ${b.cidade}</span><br>
+            <span style="color:#94a3b8; font-size:10px;">${b.endereco}</span>
+            <div style="display:flex; gap:6px; margin-top:8px;">
+              <button onclick="setDestination(${b.lat}, ${b.lon}, '${safeNome}', false)" style="flex:1; background:#0284c7; border:none; color:white; font-weight:800; padding:8px 6px; border-radius:6px; cursor:pointer; font-size:11px;">
+                🚀 Retornar à Base
+              </button>
+              <button onclick="addWaypoint(${b.lat}, ${b.lon}, '${safeNome}')" style="flex:1; background:rgba(245,158,11,0.25); border:1px solid #f59e0b; color:#fbbf24; font-weight:800; padding:8px 6px; border-radius:6px; cursor:pointer; font-size:11px;">
+                ➕ + Parada
+              </button>
+            </div>
+          </div>
+        `;
+
+        const marker = L.marker([b.lat, b.lon], { icon: baseIcon, zIndexOffset: 2000 });
+        marker.bindPopup(popupContent, { autoPan: false, closeButton: true });
+        emedBaseLayer.addLayer(marker);
+      });
+    }
+
     function updateVisibleClientsViewport() {
+      // Proteção de estabilidade: se o usuário estiver com um popup aberto no mapa, NÃO recria os marcadores
+      // Isso impede que o popup feche sozinho no primeiro toque
+      if (map._popup && map._popup.isOpen()) {
+        return;
+      }
+
       if (clientFilterMode === 'OCULTO') {
         clientsLayerContrato.clearLayers();
         clientsLayerAvulso.clearLayers();
@@ -2457,7 +2563,6 @@
           zIndexOffset: isContrato ? 500 : 100
         });
 
-
         const safeNome = (cli.nome || '').replace(/'/g, "\'");
         const popupContent = `
           <div style="font-size:12px; line-height:1.4; min-width:200px;">
@@ -2476,7 +2581,7 @@
             </div>
           </div>
         `;
-        marker.bindPopup(popupContent);
+        marker.bindPopup(popupContent, { autoPan: false, closeButton: true });
         if (isContrato) clientsLayerContrato.addLayer(marker);
         else clientsLayerAvulso.addLayer(marker);
       });
@@ -2813,6 +2918,9 @@
     }
 
     function updateVisibleRadarsViewport() {
+      // Protege popups abertos contra fechamento acidental
+      if (map._popup && map._popup.isOpen()) return;
+
       if (radarDisplayMode === 'OFF') {
         radarsLayer.clearLayers();
         return;
@@ -2849,7 +2957,7 @@
         `;
         L.marker([r.lat, r.lon], { icon: getRadarIcon(r.vel) })
           .addTo(radarsLayer)
-          .bindPopup(popupHtml);
+          .bindPopup(popupHtml, { autoPan: false, closeButton: true });
       });
     }
 
@@ -3192,6 +3300,7 @@
     };
 
     // INICIALIZAÇÃO
+    renderEmedBases();
     loadRadars();
     loadFleetVehicles();
     fetchCarTelemetry();
@@ -3895,39 +4004,93 @@
       document.getElementById('music-modal').style.display = 'none';
     }
 
-    function launchMusicApp(app) {
-      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (app === 'ytmusic' || app === 'youtube') {
-        showToast('▶️ Abrindo YouTube...');
-        if (isMobile) {
-          window.location.href = (app === 'ytmusic' ? 'vnd.youtube.music://' : 'vnd.youtube://');
-          setTimeout(() => {
-            window.open(app === 'ytmusic' ? 'https://music.youtube.com' : 'https://www.youtube.com', '_blank');
-          }, 700);
+    function showMusicReturnBanner() {
+      const b = document.getElementById('music-return-banner');
+      if (b) b.style.display = 'flex';
+      setTimeout(() => {
+        if (b && b.style.display === 'flex') b.style.display = 'none';
+      }, 25000);
+    }
+
+    function hideMusicReturnBanner() {
+      const b = document.getElementById('music-return-banner');
+      if (b) b.style.display = 'none';
+    }
+
+    function openExternalNavDirect(navApp) {
+      hideMusicReturnBanner();
+      if (navApp === 'waze') {
+        if (state.destLat && state.destLon) {
+          window.open(`https://www.waze.com/ul?ll=${state.destLat},${state.destLon}&navigate=yes`, '_blank');
         } else {
-          window.open(app === 'ytmusic' ? 'https://music.youtube.com' : 'https://www.youtube.com', '_blank');
+          window.open('https://www.waze.com/ul?navigate=yes', '_blank');
+        }
+      } else {
+        if (state.destLat && state.destLon) {
+          const waypointsParam = (state.waypoints && state.waypoints.length > 0)
+            ? `&waypoints=${state.waypoints.map(w => `${w.lat},${w.lon}`).join('|')}`
+            : '';
+          window.open(`https://www.google.com/maps/dir/?api=1&origin=${state.carLat},${state.carLon}&destination=${state.destLat},${state.destLon}${waypointsParam}&travelmode=driving`, '_blank');
+        } else {
+          window.open('https://maps.google.com', '_blank');
+        }
+      }
+    }
+
+    function launchMusicApp(app) {
+      closeMusicModal();
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const isAndroid = /Android/i.test(navigator.userAgent);
+
+      if (app === 'yt-downloads') {
+        showToast('📁 Abrindo Meus Downloads Offline do YouTube...');
+        if (isAndroid) {
+          window.location.href = 'intent://youtube.com/feed/library#Intent;package=com.google.android.youtube;scheme=https;end';
+        } else if (isMobile) {
+          window.location.href = 'vnd.youtube://feed/library';
+        } else {
+          window.open('https://www.youtube.com/feed/library', '_blank');
+        }
+      } else if (app === 'ytmusic') {
+        showToast('🎵 Abrindo YouTube Music (App Oficial)...');
+        if (isAndroid) {
+          window.location.href = 'intent://music.youtube.com/#Intent;package=com.google.android.apps.youtube.music;scheme=https;end';
+        } else if (isMobile) {
+          window.location.href = 'vnd.youtube.music://';
+        } else {
+          window.open('https://music.youtube.com', '_blank');
+        }
+      } else if (app === 'youtube') {
+        showToast('🔴 Abrindo YouTube...');
+        if (isAndroid) {
+          window.location.href = 'intent://youtube.com/#Intent;package=com.google.android.youtube;scheme=https;end';
+        } else if (isMobile) {
+          window.location.href = 'vnd.youtube://';
+        } else {
+          window.open('https://www.youtube.com', '_blank');
         }
       } else if (app === 'deezer' || app === 'deezer-flow') {
-        showToast('🟣 Abrindo Deezer...');
-        if (isMobile) {
+        showToast('🟣 Abrindo Deezer App...');
+        if (isAndroid) {
+          window.location.href = 'intent://#Intent;package=deezer.android.app;scheme=deezer;end';
+        } else if (isMobile) {
           window.location.href = (app === 'deezer-flow' ? 'deezer://flow' : 'deezer://');
-          setTimeout(() => {
-            window.open('https://www.deezer.com', '_blank');
-          }, 700);
         } else {
           window.open('https://www.deezer.com', '_blank');
         }
       } else if (app === 'spotify') {
-        showToast('🟢 Abrindo Spotify...');
-        if (isMobile) {
+        showToast('🟢 Abrindo Spotify App...');
+        if (isAndroid) {
+          window.location.href = 'intent://#Intent;package=com.spotify.music;scheme=spotify;end';
+        } else if (isMobile) {
           window.location.href = 'spotify://';
-          setTimeout(() => {
-            window.open('https://open.spotify.com', '_blank');
-          }, 700);
         } else {
           window.open('https://open.spotify.com', '_blank');
         }
       }
+
+      // Exibe barra de retorno e atalho para manter o foco na viagem
+      showMusicReturnBanner();
     }
 
     function saveAndPlayCustomPlaylist() {
@@ -4023,11 +4186,13 @@
 
     // Declutter e Viewport Culling dinâmico ao mover ou alterar o zoom do mapa (60 FPS)
     map.on('moveend zoomend', () => {
+      if (map._popup && map._popup.isOpen()) return;
       clearTimeout(_radarCullTimer);
       _radarCullTimer = setTimeout(() => {
+        if (map._popup && map._popup.isOpen()) return;
         if (typeof updateVisibleRadarsViewport === 'function') updateVisibleRadarsViewport();
         if (typeof updateVisibleClientsViewport === 'function') updateVisibleClientsViewport();
-      }, 40);
+      }, 50);
     });
 
     function setMapClientLayer(mode) {

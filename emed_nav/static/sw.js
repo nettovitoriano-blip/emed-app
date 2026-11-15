@@ -1,5 +1,5 @@
-// EmedNav Service Worker - v22 (Adicionar qualquer elemento do mapa à rota: Radares, Pontos, Veículos, Serviços)
-const CACHE_NAME = 'emednav-v22-add-all-map-items-to-route';
+// EmedNav Service Worker - v23 (Alfinete Base eMED, Fix Popup 1-Clique Estável, YouTube Downloads & Retorno ao Mapa)
+const CACHE_NAME = 'emednav-v23-base-pin-popup-fix-music-return';
 
 const ASSETS_TO_CACHE = [
   '/',
