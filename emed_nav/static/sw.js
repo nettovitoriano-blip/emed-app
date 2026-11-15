@@ -1,5 +1,5 @@
-// EmedNav Service Worker - v25 (Alfinete Sede eMED: Rua Gonçalves Pinto, Guaribas - Eusébio)
-const CACHE_NAME = 'emednav-v25-sede-emed-local-exato';
+// EmedNav Service Worker - v26 (Alfinete Sede eMED: Rua Coronel Freire, 16 - Eusébio/CE)
+const CACHE_NAME = 'emednav-v26-sede-coronel-freire-16';
 
 const ASSETS_TO_CACHE = [
   '/',
