@@ -101208,7 +101208,7 @@ async function efetuarLogout() {
 
 
 
-            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();iniciarRotaTecnico('${esc(os.id)}')" style="border-color:#2563eb;color:#2563eb;font-weight:600;" title="Iniciar rota GPS para este chamado">🚗 Rota</button>
+            <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();iniciarRotaTecnico('${esc(os.id)}')" style="border-color:#2563eb;color:#2563eb;font-weight:600;" title="Iniciar rota GPS para este chamado" style="padding:6px 10px;font-size:15px;">🚗</button>
 
 
 
@@ -101472,7 +101472,7 @@ async function efetuarLogout() {
 
 
 
-              🖨️ Imprimir A4
+              📄 Gerar Relatório A4
 
 
 
@@ -201042,20 +201042,166 @@ function renderMenuCliTriagem(box) {
         alert(`🛡️ Protocolo de portaria (${tecnico || "Técnico"}) registrado para OS #${osId}.`);
       }
     }
+    function htmlSeletorHoraMobile(idInput, horaInicial) {
+      const partes = String(horaInicial || "08:00").trim().split(":");
+      const hh = String(parseInt(partes[0], 10) >= 0 && parseInt(partes[0], 10) <= 23 ? parseInt(partes[0], 10) : 8).padStart(2, "0");
+      const mm = String(parseInt(partes[1], 10) >= 0 && parseInt(partes[1], 10) <= 59 ? parseInt(partes[1], 10) : 0).padStart(2, "0");
+      const optsH = Array.from({length: 24}, (_, i) => {
+        const v = String(i).padStart(2, "0");
+        return `<option value="${v}" ${v===hh?'selected':''}>${v}</option>`;
+      }).join("");
+      const optsM = Array.from({length: 60}, (_, i) => {
+        const v = String(i).padStart(2, "0");
+        return `<option value="${v}" ${v===mm?'selected':''}>${v}</option>`;
+      }).join("");
+      return `
+        <span style="display:inline-flex;align-items:center;gap:4px;background:#fff;border:2px solid #94a3b8;border-radius:8px;padding:4px 8px;">
+          <input type="hidden" id="${idInput}" value="${hh}:${mm}" />
+          <select id="${idInput}_H" aria-label="Hora" onchange="sincronizarHoraMobile('${idInput}')" style="font-size:15px;font-weight:800;border:none;background:transparent;color:#0f172a;outline:none;cursor:pointer;">${optsH}</select>
+          <span style="font-weight:900;color:#475569;">:</span>
+          <select id="${idInput}_M" aria-label="Minuto" onchange="sincronizarHoraMobile('${idInput}')" style="font-size:15px;font-weight:800;border:none;background:transparent;color:#0f172a;outline:none;cursor:pointer;">${optsM}</select>
+          <button type="button" onclick="definirHoraAgoraMobile('${idInput}')" title="Usar hora atual" style="margin-left:4px;background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc;border-radius:6px;padding:3px 7px;font-size:11px;font-weight:800;cursor:pointer;">🕒 Agora</button>
+        </span>
+      `;
+    }
+    function sincronizarHoraMobile(idInput) {
+      const h = document.getElementById(idInput + "_H")?.value || "08";
+      const m = document.getElementById(idInput + "_M")?.value || "00";
+      const hidden = document.getElementById(idInput);
+      if (hidden) hidden.value = `${h}:${m}`;
+    }
+    function definirHoraAgoraMobile(idInput) {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, "0");
+      const m = String(now.getMinutes()).padStart(2, "0");
+      const selH = document.getElementById(idInput + "_H");
+      const selM = document.getElementById(idInput + "_M");
+      if (selH) selH.value = h;
+      if (selM) selM.value = m;
+      sincronizarHoraMobile(idInput);
+    }
+    function normTxtOS(s) {
+      return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+    }
+    function selecionarPecaSugeridaOS(valorExato) {
+      const sel = document.getElementById("osPecaSel");
+      const filtro = document.getElementById("filtroPecaOS");
+      if (filtro) { filtro.value = ""; filtrarPecasModalOS(""); }
+      if (sel) {
+        sel.value = valorExato;
+        if (typeof alternarPecaManual === "function") alternarPecaManual();
+        if (typeof autoSalvarRascunho === "function") autoSalvarRascunho();
+        sel.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      if (typeof mostrarToast === "function") mostrarToast("✅ Peça selecionada: " + valorExato, "success");
+    }
+    function abrirAtalhoEstoqueOS(contexto) {
+      if (typeof mostrarToast === "function") {
+        mostrarToast(contexto === "INSTALACAO"
+          ? "📦 Selecione o kit / peça necessária na seção de Peças ou acione o Almoxarifado!"
+          : "🧰 Confira os instrumentos de aferição necessários na seção de Almoxarifado/Ferramentas!", "info");
+      }
+      const alvo = document.getElementById("filtroPecaOS") || document.getElementById("osPecaSel");
+      if (alvo) alvo.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    function atualizarGuiaModalidadeDinamica() {
+      const box = document.getElementById("boxGuiaModalidadeDinamica");
+      if (!box || !STATE.osAberta) return;
+      const os = STATE.osAberta;
+      const tipoSrv = normTxtOS(document.getElementById("osTipoSrv")?.value || os.tipo_servico || "PREVENTIVA");
+      const modEq = detectarModalidadeEquipamento(os.equipamento);
+      const nomeEq = modEq.isTomo ? "Tomógrafo" : (modEq.isMamo ? "Mamógrafo" : (modEq.isRx ? "Raio-X" : (os.equipamento || "Equipamento")));
+
+      // Telemetria da ampola SOMENTE quando for Manutenção Preventiva de Tomógrafo
+      const boxTel = document.getElementById("boxTelemetriaTuboOS");
+      if (boxTel) {
+        boxTel.style.display = (modEq.isTomo && tipoSrv.includes("PREVENTIVA")) ? "" : "none";
+      }
+
+      if (tipoSrv.includes("INSTAL")) {
+        const kitItens = modEq.isTomo
+          ? "Cabos de alta tensão / PDU, chumbadores parabolt, nível a laser, dinamômetro, pasta térmica e kit de aterramento"
+          : (modEq.isRx || modEq.isMamo)
+            ? "Chumbadores de piso/parede, nível a laser, kit de cabos/terminais, dinamômetro e ferramentas de alinhamento de colimador"
+            : "Kit de fixação/ancoragem, cabos de interligação, multímetro e ferramentas de montagem";
+        box.innerHTML = `
+          <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+            <div style="font-weight:900;color:#166534;font-size:12.5px;margin-bottom:4px;">🏗️ MÓDULO DE INSTALAÇÃO — ${esc(nomeEq)}</div>
+            <div style="font-size:11.5px;color:#14532d;line-height:1.45;margin-bottom:8px;"><b>Kit de Instalação Necessário:</b> ${kitItens}.</div>
+            <button type="button" class="btn btn-xs" onclick="abrirAtalhoEstoqueOS('INSTALACAO')" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-weight:800;cursor:pointer;">📦 Acionar Estoque / Separar Kit de Instalação</button>
+          </div>`;
+      } else if (tipoSrv.includes("AFERI") || tipoSrv.includes("CALIB")) {
+        const inst = (modEq.isTomo || modEq.isRx || modEq.isMamo)
+          ? "Medidor Radiométrico Calibrado (kVp / Dose / Tempo / CSR), Phantom/Simulador, Trena Laser e Multímetro True RMS"
+          : "Instrumentos de Aferição / Analisador Calibrado e Multímetro True RMS com certificado vigente";
+        box.innerHTML = `
+          <div style="background:#fefce8;border:1.5px solid #fde047;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+            <div style="font-weight:900;color:#854d0e;font-size:12.5px;margin-bottom:4px;">📐 MÓDULO DE AFERIÇÃO — ${esc(nomeEq)}</div>
+            <div style="font-size:11.5px;color:#713f12;line-height:1.45;margin-bottom:8px;"><b>Levar Instrumento para Aferição:</b> ${inst}.</div>
+            <button type="button" class="btn btn-xs" onclick="abrirAtalhoEstoqueOS('AFERICAO')" style="background:#ca8a04;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-weight:800;cursor:pointer;">🧰 Conferir Instrumento / Estoque</button>
+          </div>`;
+      } else if (tipoSrv.includes("CORRET")) {
+        const defTxt = normTxtOS(document.getElementById("osDefeito")?.value || os.defeito_relatado || "");
+        const termos = defTxt.split(/[^A-Z0-9]+/).filter(w => w.length >= 4 && !["PARA","COM","SEM","NAO","ESTA","DEFEITO","FALHA","ERRO","EQUIPAMENTO","CLIENTE","RELATA"].includes(w));
+        const lista = window._estoquePecasModal || [];
+        let sugestoes = [];
+        if (termos.length) {
+          sugestoes = lista.filter(p => {
+            const alvo = normTxtOS((p.codigo || "") + " " + (p.nome_peca || ""));
+            return termos.some(t => alvo.includes(t));
+          }).slice(0, 6);
+        }
+        const chips = sugestoes.length
+          ? sugestoes.map(p => {
+              const valOpt = `${p.codigo} - ${p.nome_peca}`;
+              return `<button type="button" onclick="selecionarPecaSugeridaOS('${esc(valOpt).replace(/'/g, "\\'")}' )" style="background:#fff;border:1px solid #fca5a5;color:#991b1b;border-radius:999px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;">🔩 ${esc(p.codigo)} - ${esc(p.nome_peca)} (Saldo: ${p.quantidade})</button>`;
+            }).join(" ")
+          : `<span style="font-size:11px;color:#7f1d1d;">Digite o defeito (ex: fusível, teclado, cabo, placa, fonte) para sugerir peças do estoque automaticamente.</span>`;
+        box.innerHTML = `
+          <div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+            <div style="font-weight:900;color:#991b1b;font-size:12.5px;margin-bottom:4px;">🛠️ MÓDULO CORRETIVO — PEÇAS SUGERIDAS PELO DEFEITO</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">${chips}</div>
+          </div>`;
+      } else if (tipoSrv.includes("TREIN")) {
+        box.innerHTML = `
+          <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+            <div style="font-weight:900;color:#1e40af;font-size:12.5px;">🎓 MÓDULO DE TREINAMENTO OPERACIONAL — ${esc(nomeEq)}</div>
+            <div style="font-size:11.5px;color:#1e3a8a;margin-top:2px;">Checklist de capacitação da equipe clínica carregado abaixo.</div>
+          </div>`;
+      } else {
+        box.innerHTML = `
+          <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+            <div style="font-weight:900;color:#0369a1;font-size:12.5px;">🛡️ MÓDULO PREVENTIVO — ${esc(nomeEq)}</div>
+            <div style="font-size:11.5px;color:#0c4a6e;margin-top:2px;">Checklists modulares carregados abaixo${modEq.isTomo ? " + Telemetria do Tubo de Tomógrafo ativa." : "."}</div>
+          </div>`;
+      }
+    }
     function filtrarPecasModalOS(q) {
       const sel = document.getElementById("osPecaSel");
       if (!sel) return;
-      const termo = String(q || "").trim().toUpperCase();
-      Array.from(sel.options).forEach(opt => {
-        if (opt.value === "NENHUMA PEÇA" || opt.value === "MANUAL" || opt.selected) {
-          opt.hidden = false;
-          opt.style.display = "";
-          return;
-        }
-        const match = !termo || opt.text.toUpperCase().includes(termo);
-        opt.hidden = !match;
-        opt.style.display = match ? "" : "none";
+      const lista = window._estoquePecasModal || [];
+      const termo = normTxtOS(q);
+      const valAtual = sel.value;
+      const matches = lista.filter(p => {
+        if (!termo) return true;
+        const alvo = normTxtOS(`${p.codigo || ""} ${p.nome_peca || ""} ${p.categoria || ""}`);
+        return alvo.includes(termo);
       });
+      let html = `<option value="NENHUMA PEÇA">-- Nenhuma Peça Baixada (${matches.length} itens) --</option>`;
+      html += matches.map(p => {
+        const v = `${p.codigo} - ${p.nome_peca}`;
+        return `<option value="${esc(v)}">${esc(p.codigo)} - ${esc(p.nome_peca)} (Saldo: ${p.quantidade})</option>`;
+      }).join("");
+      html += `<option value="MANUAL">✍️ OUTRA PEÇA (DIGITAR MANUALMENTE)</option>`;
+      sel.innerHTML = html;
+      if (termo && matches.length > 0) {
+        sel.value = `${matches[0].codigo} - ${matches[0].nome_peca}`;
+      } else if (Array.from(sel.options).some(o => o.value === valAtual)) {
+        sel.value = valAtual;
+      }
+      const info = document.getElementById("lblFiltroPecaCount");
+      if (info) info.innerText = termo ? `${matches.length} peça(s) encontrada(s) no inventário` : `${lista.length} itens do inventário carregados`;
+      if (typeof alternarPecaManual === "function") alternarPecaManual();
     }
 
     function abrirFotoAmpliadaModal(src) {
@@ -201860,7 +202006,7 @@ function renderMenuCliTriagem(box) {
 
 
 
-      window._assinaturaDataUrl = val('assinatura_cliente_img', os.assinatura_cliente_img || "");
+      window._assinaturaDataUrl = val('assinatura_cliente_img') || os.assinatura_cliente_img || "";
 
 
 
@@ -202500,7 +202646,7 @@ function renderMenuCliTriagem(box) {
 
 
 
-        return (cat.includes("PEÇA") || cat.includes("PEC") || cod.startsWith("PEC-")) && !cod.startsWith("FER-") && !cod.startsWith("KIT-");
+        return !cat.includes("FERRAMENTA") && !cat.includes("IMOBILIZADO") && !cat.includes("INSTRUMENTO") && !cod.startsWith("FER-") && !cod.startsWith("KIT-");
 
 
 
@@ -204205,7 +204351,7 @@ function renderMenuCliTriagem(box) {
 
                 <label style="font-size:12.5px; font-weight:800; color:#334155;">Horário Real:</label>
 
-                <input type="time" id="inputCheckinHoraReal" value="${horaPadrao}" class="form-control" style="font-size:15px; font-weight:800; padding:6px 10px; border:2px solid #94a3b8; border-radius:8px; width:115px; text-align:center; background:#ffffff;">
+                ${htmlSeletorHoraMobile("inputCheckinHoraReal", horaPadrao)}
 
                 <button type="button" class="btn btn-sm" onclick="executarCheckinHoraDireto('${esc(os.id)}')" style="background:${isPend ? '#2563eb' : '#16a34a'}; color:#ffffff; font-weight:800; padding:8px 16px; border-radius:8px; border:none; cursor:pointer;" id="btnSalvarCheckinDireto">
 
@@ -205581,11 +205727,13 @@ function renderMenuCliTriagem(box) {
 
                 ${(() => {
           const modEq = detectarModalidadeEquipamento(os.equipamento);
-          if (!modEq.isTomo && !modEq.isRx && !modEq.isMamo) return "";
-          const isTomoMod = modEq.isTomo;
+          if (!modEq.isTomo) return "";
+          const isTomoMod = true;
+          const tipoAtualTel = String(os.tipo_servico || "PREVENTIVA").toUpperCase();
+          const showTel = tipoAtualTel.includes("PREVENTIVA");
           return `
-        <!-- ITEM B: MONITORAMENTO DE VIDA ÚTIL DO EMISSOR / AMPOLA DE RX & TC -->
-        <div class="section-box" style="background:#0b1329;border:1px solid #1e3a8a;border-radius:10px;padding:14px;margin-bottom:14px;">
+        <!-- ITEM B: MONITORAMENTO DE VIDA ÚTIL DO EMISSOR / AMPOLA DE TOMÓGRAFO (SOMENTE PREVENTIVA) -->
+        <div id="boxTelemetriaTuboOS" class="section-box" style="display:${showTel ? 'block' : 'none'};background:#0b1329;border:1px solid #1e3a8a;border-radius:10px;padding:14px;margin-bottom:14px;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;border-bottom:1px solid #1e293b;padding-bottom:8px;">
             <div style="font-weight:900;color:#38bdf8;font-size:13px;display:flex;align-items:center;gap:6px;">
               ${isTomoMod ? "🔬 TELEMETRIA DO TUBO / TOMÓGRAFO (VIDA ÚTIL)" : "⚡ TELEMETRIA DA AMPOLA DE RAIOS-X (VIDA ÚTIL)"}
@@ -205698,6 +205846,8 @@ function renderMenuCliTriagem(box) {
 
 
 
+        ${(() => { window._estoquePecasModal = estoquePecas; return ""; })()}
+        <div id="boxGuiaModalidadeDinamica"></div>
                 <div class="section-box">
 
 
@@ -206310,7 +206460,7 @@ function renderMenuCliTriagem(box) {
 
 
             <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569;margin:2px 0 6px;cursor:pointer;"><input type="checkbox" id="osImprimirDefeito" ${impDefAtual!=='NAO'?'checked':''} onchange="autoSalvarRascunho()" /><span>🖨️ Exibir Defeito no Laudo / PDF</span></label>
-            <textarea id="osDefeito" class="textarea" rows="3" style="text-transform:uppercase;" oninput="ajustarTextoEmCaixaAlta(this);" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('defeito_relatado', os.pendencia_limpa))}</textarea>
+            <textarea id="osDefeito" class="textarea" rows="3" style="text-transform:uppercase;" oninput="ajustarTextoEmCaixaAlta(this);if(typeof atualizarGuiaModalidadeDinamica==='function')atualizarGuiaModalidadeDinamica();" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('defeito_relatado', os.pendencia_limpa))}</textarea>
 
 
 
@@ -207002,7 +207152,8 @@ function renderMenuCliTriagem(box) {
 
                             <label class="field-label">Peça Aplicada do Estoque (Apenas Peças)</label>
 
-              <input id="filtroPecaOS" type="text" class="input" placeholder="🔍 Filtrar peça por código ou nome..." oninput="filtrarPecasModalOS(this.value)" style="margin-bottom:6px;font-size:12px;" />
+              <input id="filtroPecaOS" type="text" class="input" placeholder="🔍 Filtrar peça por código ou nome..." oninput="filtrarPecasModalOS(this.value)" style="margin-bottom:3px;font-size:12px;" />
+<div id="lblFiltroPecaCount" style="font-size:10.5px;color:#64748b;margin-bottom:5px;font-weight:600;">${estoquePecas.length} itens do inventário carregados</div>
 
               <select id="osPecaSel" class="select" onchange="alternarPecaManual();autoSalvarRascunho();">
 
@@ -208950,7 +209101,7 @@ function renderMenuCliTriagem(box) {
 
 
 
-        <div class="section-box" style="background:#faf5ff;border:1.5px solid #d8b4fe;">
+        <div class="section-box" style="display:none;background:#faf5ff;border:1.5px solid #d8b4fe;">
 
 
 
@@ -213084,7 +213235,7 @@ function renderMenuCliTriagem(box) {
 
           <a class="btn btn-outline" href="/api/imprimir/${encodeURIComponent(os.id)}" target="_blank" style="border-color:#0f766e;color:#0f766e;font-weight:700;padding:10px 14px;display:inline-flex;align-items:center;text-decoration:none;" title="Imprimir laudo em formato A4">
 
-            🖨️ Imprimir A4
+            📄 Gerar Relatório / Imprimir A4
 
           </a>
 
@@ -217179,6 +217330,7 @@ function renderMenuCliTriagem(box) {
       }
 
       renderizarItensChecklistEditaveis();
+      if (typeof atualizarGuiaModalidadeDinamica === "function") atualizarGuiaModalidadeDinamica();
     }
 
     function aoMudarModalidadeServico(novaMod) {
@@ -229646,13 +229798,7 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
             <div style="display:flex; gap:8px; align-items:center;">
 
-              <input type="time" id="inputHoraChegadaReal" value="${horaAtual}" class="form-control" style="font-size:17px; font-weight:800; padding:8px 12px; border:2px solid #cbd5e1; border-radius:8px; width:140px; text-align:center;">
-
-              <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('inputHoraChegadaReal').value = '${horaAtual}'" style="font-size:11.5px; font-weight:700;">
-
-                ⏱️ Agora (${horaAtual})
-
-              </button>
+              ${htmlSeletorHoraMobile("inputHoraChegadaReal", horaAtual)}
 
             </div>
 
@@ -231203,6 +231349,28 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
     async function finalizarOS(acao) {
+      if (acao === "CONCLUIR" || acao === "EQUIPAMENTO_EM_USO") {
+        const faltas = [];
+        const ass = (typeof obterAssinaturaBase64 === "function") ? obterAssinaturaBase64() : (window._assinaturaDataUrl || "");
+        const respH = (document.getElementById("osRespHosp")?.value || "").trim();
+        const srvExec = (document.getElementById("osSrvExec")?.value || "").trim();
+        const defTxt = (document.getElementById("osDefeito")?.value || "").trim();
+        const diagTxt = (document.getElementById("osProb")?.value || "").trim();
+        const condF = (document.getElementById("osCondFinal")?.value || "").trim();
+        if (!ass) faltas.push("✍️ Assinatura digital do cliente / responsável");
+        if (respH.length < 3) faltas.push("👤 Nome completo do responsável da unidade");
+        if (srvExec.length < 10) faltas.push("📝 Descrição dos serviços executados (mín. 10 caracteres)");
+        if (!defTxt && !diagTxt) faltas.push("⚠️ Defeito relatado ou diagnóstico técnico");
+        if (!condF) faltas.push("📋 Condição final do equipamento");
+        if (faltas.length > 0) {
+          const msgFalta = "⚖️ VALIDAÇÃO JURÍDICA PARA FECHAMENTO DA OS:\n\nPreencha os itens obrigatórios antes de concluir:\n• " + faltas.join("\n• ");
+          alert(msgFalta);
+          if (typeof mostrarToast === "function") mostrarToast("❌ Preencha assinatura e campos obrigatórios para concluir.", "error");
+          const foco = !respH || respH.length < 3 ? document.getElementById("osRespHosp") : (!srvExec || srvExec.length < 10 ? document.getElementById("osSrvExec") : document.getElementById("osDefeito"));
+          if (foco) foco.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
+      }
 
 
 
