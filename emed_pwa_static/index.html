@@ -134113,6 +134113,156 @@ function renderMenuGesMural(box) {
 
 
 
+    function fecharPainelTriagemPosAtendimento() {
+      const m = document.getElementById("modalTriagemPosAtendimento");
+      if (m) m.remove();
+    }
+
+    async function confirmarTriagemOS(osId) {
+      const dec = document.getElementById(`triDec_${osId}`)?.value || "DEFINITIVA_NF";
+      const cob = document.getElementById(`triCob_${osId}`)?.value || "INCLUSO_CONTRATO";
+      const val = parseFloat(document.getElementById(`triVal_${osId}`)?.value || "0") || 0;
+      const dias = parseInt(document.getElementById(`triDias_${osId}`)?.value || "7", 10) || 7;
+      const cat = document.getElementById(`triCat_${osId}`)?.value || "PECA";
+      const obs = (document.getElementById(`triObs_${osId}`)?.value || "").trim();
+      const resp = (localStorage.getItem("emed_tecnico_selecionado") || "NETTO").toUpperCase();
+
+      try {
+        const res = await apiPost("/api/triagem/aprovar", {
+          os_id: osId,
+          responsavel: resp,
+          decisao: dec,
+          cobranca_tipo: cob,
+          cobranca_valor: val,
+          dias_followup: dias,
+          pendencia_categoria: cat,
+          pendencia_obs: obs,
+          gerar_proforma: dec === "DEFINITIVA_NF"
+        });
+        if (res.ok) {
+          mostrarToast("✅ " + (res.msg || `OS #${osId} triada com sucesso!`), "success");
+          await sincronizarTudo(false);
+          abrirPainelTriagemPosAtendimento();
+        } else {
+          alert("Erro na triagem: " + (res.msg || "Falha ao aprovar."));
+        }
+      } catch (e) {
+        alert("Erro de conexão na triagem: " + e.message);
+      }
+    }
+
+    function aoMudarDecisaoTriagem(osId) {
+      const dec = document.getElementById(`triDec_${osId}`)?.value || "DEFINITIVA_NF";
+      const boxFollow = document.getElementById(`triBoxFollow_${osId}`);
+      const boxPend = document.getElementById(`triBoxPend_${osId}`);
+      const boxCob = document.getElementById(`triBoxCob_${osId}`);
+      if (boxFollow) boxFollow.style.display = dec === "FOLLOWUP_TESTE" ? "block" : "none";
+      if (boxPend) boxPend.style.display = dec === "PENDENCIA" ? "block" : "none";
+      if (boxCob) boxCob.style.display = dec === "DEFINITIVA_NF" ? "grid" : "none";
+    }
+
+    async function abrirPainelTriagemPosAtendimento() {
+      fecharPainelTriagemPosAtendimento();
+      const overlay = document.createElement("div");
+      overlay.id = "modalTriagemPosAtendimento";
+      overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,0.72);z-index:99999;display:flex;align-items:center;justify-content:center;padding:12px;";
+      overlay.innerHTML = `
+        <div style="background:#fff;border-radius:14px;width:100%;max-width:780px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,0.35);">
+          <div style="background:linear-gradient(135deg,#0f172a,#0369a1);color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:15px;font-weight:900;">📋 Triagem Pós-Atendimento (Gestão & Faturamento)</div>
+              <div style="font-size:11px;color:#bae6fd;">Separe peças (definitiva/NF vs follow-up) e pendências (peça, ferramenta, mão de obra)</div>
+            </div>
+            <button type="button" onclick="fecharPainelTriagemPosAtendimento()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;width:30px;height:30px;border-radius:50%;font-weight:900;cursor:pointer;">✕</button>
+          </div>
+          <div id="bodyTriagemGestor" style="padding:14px;overflow-y:auto;flex:1;background:#f8fafc;">
+            <div style="text-align:center;padding:24px;color:#64748b;font-weight:700;">⏳ Carregando fila de triagem...</div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      try {
+        const resp = await fetch("/api/triagem/fila");
+        const data = await resp.json();
+        const fila = data.fila || [];
+        const body = document.getElementById("bodyTriagemGestor");
+        if (!body) return;
+        if (!fila.length) {
+          body.innerHTML = `<div style="text-align:center;padding:30px;background:#fff;border-radius:10px;border:1px solid #e2e8f0;color:#15803d;font-weight:800;">✅ Nenhuma OS aguardando triagem no momento!</div>`;
+          return;
+        }
+        body.innerHTML = fila.map(o => {
+          const pec = String(o.peca_aplicada || "").trim();
+          const temPeca = pec && !["NENHUMA", "NENHUMA PEÇA", "SEM PEÇA", "-"].includes(pec.toUpperCase());
+          const pend = String(o.pendencias || "").trim();
+          const temPend = pend && !pend.toUpperCase().includes("NENHUMA") && !pend.toUpperCase().includes("SEM PEND") && pend !== "-";
+          const defDec = temPend ? "PENDENCIA" : "DEFINITIVA_NF";
+          return `
+            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:12px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.04);">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+                <div>
+                  <span style="font-size:14px;font-weight:900;color:#0f172a;">OS #${esc(o.id)}</span>
+                  <span style="font-size:12px;font-weight:700;color:#0369a1;"> • ${esc(o.cliente)}</span>
+                  <div style="font-size:11.5px;color:#475569;">🔬 ${esc(o.equipamento)} • 👷 ${esc(o.tecnico)} • 📅 ${esc(o.data)}</div>
+                </div>
+                <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                  ${temPeca ? `<span style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;padding:2px 8px;border-radius:12px;font-size:10.5px;font-weight:800;">🧩 Peça: ${esc(pec)}</span>` : ""}
+                  ${temPend ? `<span style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:2px 8px;border-radius:12px;font-size:10.5px;font-weight:800;">🚨 Pendência</span>` : ""}
+                </div>
+              </div>
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px;font-size:11.5px;color:#334155;margin-bottom:10px;">
+                <b>📝 Executado:</b> ${esc((o.servico_executado || "Sem relato").slice(0, 220))}
+                ${temPend ? `<div style="color:#991b1b;margin-top:4px;"><b>⚠️ Pendência relatada:</b> ${esc(pend)}</div>` : ""}
+              </div>
+              <div style="margin-bottom:8px;">
+                <label style="font-size:11px;font-weight:800;color:#0f172a;display:block;margin-bottom:4px;">⚖️ Destino / Classificação na Triagem:</label>
+                <select id="triDec_${o.id}" class="select" style="width:100%;font-size:12px;font-weight:700;" onchange="aoMudarDecisaoTriagem('${o.id}')">
+                  <option value="DEFINITIVA_NF" ${defDec==='DEFINITIVA_NF'?'selected':''}>${temPeca ? '🧩 Instalação Definitiva — Liberar para Nota Fiscal / Cobrança' : '✅ Concluir & Homologar OS (Sem Pendências)'}</option>
+                  <option value="FOLLOWUP_TESTE">⏳ Peça em Teste — Aguardar Follow-up de Funcionamento (Observação)</option>
+                  <option value="PENDENCIA" ${defDec==='PENDENCIA'?'selected':''}>🚨 Classificar Pendência (Falta de Peça / Ferramenta / Mão de Obra)</option>
+                </select>
+              </div>
+              <div id="triBoxCob_${o.id}" style="display:${defDec==='DEFINITIVA_NF'?'grid':'none'};grid-template-columns:1fr 120px;gap:8px;margin-bottom:8px;">
+                <select id="triCob_${o.id}" class="select" style="font-size:11.5px;">
+                  <option value="INCLUSO_CONTRATO">📄 Incluso em Contrato</option>
+                  <option value="FATURAR_NF">🧾 Emitir Nota Fiscal (Peça/Serviço)</option>
+                  <option value="PIX_BOLETO">💳 Cobrança Avulsa (PIX / Boleto)</option>
+                  <option value="GARANTIA">🛡️ Garantia</option>
+                </select>
+                <input id="triVal_${o.id}" type="number" step="0.01" class="input" placeholder="R$ Valor" value="${esc(o.valor_os || '')}" style="font-size:11.5px;">
+              </div>
+              <div id="triBoxFollow_${o.id}" style="display:none;margin-bottom:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:8px;">
+                <label style="font-size:11px;font-weight:800;color:#92400e;">⏳ Prazo de Follow-up antes de faturar/emitir NF:</label>
+                <select id="triDias_${o.id}" class="select" style="width:100%;margin-top:4px;font-size:12px;">
+                  <option value="3">3 dias de acompanhamento</option>
+                  <option value="7" selected>7 dias de acompanhamento</option>
+                  <option value="15">15 dias de acompanhamento</option>
+                  <option value="30">30 dias de acompanhamento</option>
+                </select>
+              </div>
+              <div id="triBoxPend_${o.id}" style="display:${defDec==='PENDENCIA'?'block':'none'};margin-bottom:8px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px;">
+                <label style="font-size:11px;font-weight:800;color:#991b1b;">🚨 Categoria da Pendência (Encaminhar para aba correspondente):</label>
+                <select id="triCat_${o.id}" class="select" style="width:100%;margin-top:4px;font-size:12px;">
+                  <option value="PECA">🧩 Falta de Peça / Orçamento</option>
+                  <option value="FERRAMENTA">🧰 Ferramenta / Instrumento Necessário</option>
+                  <option value="MAO_DE_OBRA">👷 Mão de Obra / Retorno Técnico</option>
+                  <option value="OUTRA">📋 Outra Pendência Operacional</option>
+                </select>
+              </div>
+              <input id="triObs_${o.id}" class="input" placeholder="Observação da triagem / nota fiscal / pendência..." value="${esc(pend)}" style="width:100%;font-size:11.5px;margin-bottom:8px;">
+              <button type="button" onclick="confirmarTriagemOS('${o.id}')" class="btn btn-primary btn-sm" style="width:100%;font-weight:800;">
+                ✅ Confirmar Triagem da OS #${esc(o.id)}
+              </button>
+            </div>
+          `;
+        }).join("");
+      } catch (e) {
+        const body = document.getElementById("bodyTriagemGestor");
+        if (body) body.innerHTML = `<div style="color:#b91c1c;padding:16px;">Erro ao carregar fila de triagem: ${esc(e.message)}</div>`;
+      }
+    }
+
     function interativaDispararZapOS(osId) {
 
       const ordens = STATE.data?.ordens || [];
@@ -232479,6 +232629,14 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
+          try {
+            const oLoc = (STATE.data?.ordens || []).find(x => String(x.id) === String(payload.os_id));
+            if (oLoc) {
+              oLoc.status = acao === "OBSERVACAO" ? "EM OBSERVAÇÃO" : (acao === "SALVAR_ABERTA" ? "ATIVO" : "AGUARDANDO TRIAGEM / LIBERAÇÃO");
+              if (payload.peca_selecionada) oLoc.peca_selecionada = payload.peca_selecionada;
+              if (payload.pendencia_limpa !== undefined) oLoc.pendencia_limpa = payload.pendencia_limpa;
+            }
+          } catch(e) {}
           if (acao === "CONCLUIR") {
 
 
@@ -250907,582 +251065,13 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
-          <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <div style="display:flex;align-items:center;gap:10px;">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <img src="${dataUrl}" style="height:44px;width:130px;object-fit:contain;background:#fff;border-radius:4px;border:1px solid #bbf7d0;padding:2px;" alt="Rubrica"/>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              <div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                <div style="font-size:12px;font-weight:bold;color:#15803d;">✅ Assinatura Registrada (Horizontal)</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                <div style="font-size:11px;color:#166534;">Pronta para o laudo e PDF</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-              </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                    <div style="position:relative;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 36px 10px 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <button type="button" onclick="limparAssinaturaColetada()" title="Remover assinatura" style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;cursor:pointer;padding:0;line-height:1;">✕</button>
+            <img src="${dataUrl}" style="height:44px;width:120px;object-fit:contain;background:#fff;border-radius:4px;border:1px solid #bbf7d0;padding:2px;flex-shrink:0;" alt="Rubrica"/>
+            <div style="min-width:0;flex:1;">
+              <div style="font-size:12px;font-weight:bold;color:#15803d;">✅ Assinatura Registrada (Horizontal)</div>
+              <div style="font-size:11px;color:#166534;">Pronta para o laudo e PDF</div>
             </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            <button type="button" class="btn btn-outline btn-sm" onclick="limparAssinaturaColetada()" style="color:#b91c1c;border-color:#fca5a5;padding:4px 8px;">🗑️ Refazer</button>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
           </div>
 
 
