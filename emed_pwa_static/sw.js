@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v80-assinatura-pecas-briefing';
+const CACHE_NAME = 'emed-pwa-v81-assinatura-x-triagem-gestor';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
