@@ -945,12 +945,20 @@
           const icon = createVehicleIcon(v);
           vehicleMarkers[v.placa] = L.marker([offsetLat, offsetLon], { icon }).addTo(map)
             .bindPopup(`
-              <div style="font-family:sans-serif; min-width:190px;">
+              <div style="font-family:sans-serif; min-width:200px;">
                 <div style="font-weight:900; font-size:14px; color:#0f172a;">${getVehicleEmoji(v.tipo_veiculo)} ${v.modelo} (${v.placa})</div>
                 <div style="font-size:12px; margin-top:4px;">👤 Condutor: <b>${v.condutor}</b></div>
                 <div style="font-size:12px;">🛣️ Hodômetro: <b>${Number(v.km_atual).toLocaleString('pt-BR')} km</b></div>
                 <div style="font-size:11px; color:#0284c7; font-weight:700; margin-top:4px;">📱 ${v.chip_operadora}: ${v.chip_label}</div>
                 <div style="font-size:10px; color:#64748b; margin-top:3px;">Atualizado: ${v.updated_at}</div>
+                <div style="display:flex; gap:6px; margin-top:8px;">
+                  <a href="/gps?destLat=${v.lat}&destLon=${v.lon}&destNome=${encodeURIComponent('Encontro ' + v.modelo + ' - ' + v.condutor)}" style="flex:1; background:#0284c7; color:white; text-decoration:none; font-weight:800; padding:6px 4px; border-radius:6px; text-align:center; font-size:11px;">
+                    🚀 Abrir GPS
+                  </a>
+                  <a href="https://www.waze.com/ul?ll=${v.lat},${v.lon}&navigate=yes" target="_blank" style="flex:1; background:#0f172a; border:1px solid #38bdf8; color:#38bdf8; text-decoration:none; font-weight:800; padding:6px 4px; border-radius:6px; text-align:center; font-size:11px;">
+                    🚙 Waze
+                  </a>
+                </div>
               </div>
             `);
         });
@@ -1236,6 +1244,9 @@
               <button onclick="openClientModalByIndex(${idx})" style="width:100%; background:#0284c7; color:#fff; border:none; padding:6px 10px; border-radius:6px; font-weight:800; font-size:11px; cursor:pointer;">
                 ✏️ Editar (Contrato / Avulso / Remover)
               </button>
+              <a href="/gps?destLat=${c.lat}&destLon=${c.lon}&destNome=${encodeURIComponent(c.nome)}" style="display:block; text-align:center; background:#22c55e; color:#fff; text-decoration:none; padding:6px 10px; border-radius:6px; font-weight:800; font-size:11px; margin-top:6px;">
+                🚀 Abrir no Navegador GPS
+              </a>
             </div>
           `);
       });

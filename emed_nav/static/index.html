@@ -778,15 +778,33 @@
     </div>
 
     <!-- MENU POPUP DE SERVIÇOS NA ROTA (POSTO, RESTAURANTE, HOTEL) -->
-    <div id="services-modal" style="display:none; position:absolute; top:70px; right:12px; background:rgba(15,23,42,0.96); border:2px solid #38bdf8; border-radius:14px; padding:12px; z-index:2200; box-shadow:0 10px 30px rgba(0,0,0,0.8); min-width:230px;">
+    <div id="services-modal" style="display:none; position:absolute; top:70px; right:12px; background:rgba(15,23,42,0.96); border:2px solid #38bdf8; border-radius:14px; padding:12px; z-index:2200; box-shadow:0 10px 30px rgba(0,0,0,0.8); min-width:260px;">
       <div style="font-size:12px; font-weight:800; color:#38bdf8; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
         <span>SERVIÇOS NA ROTA</span>
         <button onclick="document.getElementById('services-modal').style.display='none'" style="background:none; border:none; color:#94a3b8; font-size:14px; cursor:pointer;">✕</button>
       </div>
-      <div style="display:flex; flex-direction:column; gap:6px;">
-        <button class="chip" onclick="searchNearServices('posto de combustivel')" style="text-align:left; border-radius:8px; padding:10px 12px; font-size:13px; background:#1e293b;">⛽ Postos de Combustível</button>
-        <button class="chip" onclick="searchNearServices('restaurante churrascaria')" style="text-align:left; border-radius:8px; padding:10px 12px; font-size:13px; background:#1e293b;">🍽️ Restaurantes / Almoço</button>
-        <button class="chip" onclick="searchNearServices('hotel pousada')" style="text-align:left; border-radius:8px; padding:10px 12px; font-size:13px; background:#1e293b;">🏨 Hotéis & Pousadas</button>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div style="background:#1e293b; border-radius:8px; padding:8px; display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:13px; font-weight:600; color:#f8fafc;">⛽ Posto</span>
+          <div style="display:flex; gap:5px;">
+            <button onclick="searchNearServices('posto de combustivel', 'waypoint')" style="background:rgba(245,158,11,0.25); border:1px solid #f59e0b; color:#fbbf24; font-weight:800; padding:5px 8px; border-radius:6px; cursor:pointer; font-size:11px;">➕ + Parada</button>
+            <button onclick="searchNearServices('posto de combustivel', 'waze')" style="background:#0284c7; border:none; color:white; font-weight:800; padding:5px 8px; border-radius:6px; cursor:pointer; font-size:11px;">🚀 Waze</button>
+          </div>
+        </div>
+        <div style="background:#1e293b; border-radius:8px; padding:8px; display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:13px; font-weight:600; color:#f8fafc;">🍽️ Restaurante</span>
+          <div style="display:flex; gap:5px;">
+            <button onclick="searchNearServices('restaurante churrascaria', 'waypoint')" style="background:rgba(245,158,11,0.25); border:1px solid #f59e0b; color:#fbbf24; font-weight:800; padding:5px 8px; border-radius:6px; cursor:pointer; font-size:11px;">➕ + Parada</button>
+            <button onclick="searchNearServices('restaurante churrascaria', 'waze')" style="background:#0284c7; border:none; color:white; font-weight:800; padding:5px 8px; border-radius:6px; cursor:pointer; font-size:11px;">🚀 Waze</button>
+          </div>
+        </div>
+        <div style="background:#1e293b; border-radius:8px; padding:8px; display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:13px; font-weight:600; color:#f8fafc;">🏨 Hotel</span>
+          <div style="display:flex; gap:5px;">
+            <button onclick="searchNearServices('hotel pousada', 'waypoint')" style="background:rgba(245,158,11,0.25); border:1px solid #f59e0b; color:#fbbf24; font-weight:800; padding:5px 8px; border-radius:6px; cursor:pointer; font-size:11px;">➕ + Parada</button>
+            <button onclick="searchNearServices('hotel pousada', 'waze')" style="background:#0284c7; border:none; color:white; font-weight:800; padding:5px 8px; border-radius:6px; cursor:pointer; font-size:11px;">🚀 Waze</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -2021,8 +2039,9 @@
       showToast('❌ Rota encerrada. Modo livre.');
     }
 
-    // 🎯 RECURSO CONTROLADO: TOQUE NO MAPA SÓ CRIA DESTINO SE O MODO PIN ESTIVER ATIVO!
+    // 🎯 RECURSO CONTROLADO: TOQUE NO MAPA OU MODO PIN PARA ADICIONAR QUALQUER PONTO À ROTA
     let pinModeActive = false;
+    let clickTempMarker = null;
     const btnPinMode = document.getElementById('btn-pin-mode');
 
     btnPinMode.addEventListener('click', () => {
@@ -2030,41 +2049,93 @@
       if (pinModeActive) {
         btnPinMode.style.borderColor = '#22c55e';
         btnPinMode.style.background = 'rgba(34, 197, 94, 0.3)';
-        showToast('📍 Modo Destino ATIVO: Toque no mapa onde deseja ir');
+        showToast('📍 Toque em qualquer local do mapa para Traçar Destino ou Adicionar Parada!');
       } else {
         btnPinMode.style.borderColor = 'rgba(56, 189, 248, 0.5)';
         btnPinMode.style.background = 'rgba(15, 23, 42, 0.92)';
-        showToast('✋ Modo Livre: Mapa protegido contra toques acidentais');
+        showToast('✋ Modo Livre: Toques no mapa protegidos');
       }
     });
 
-    map.on('click', async (e) => {
-      // Se o modo pin não estiver ativo, o clique no mapa NÃO gera rota acidental!
-      if (!pinModeActive) return;
+    // Função universal para abrir seletor inteligente em qualquer coordenada tocada no mapa
+    async function handleMapPointSelection(lat, lon) {
+      if (clickTempMarker) map.removeLayer(clickTempMarker);
 
-      // Desativa o modo pin após o clique para segurança
-      pinModeActive = false;
-      btnPinMode.style.borderColor = 'rgba(56, 189, 248, 0.5)';
-      btnPinMode.style.background = 'rgba(15, 23, 42, 0.92)';
+      const pinIcon = L.divIcon({
+        className: 'custom-pin-point',
+        html: `<div style="background:#0284c7; width:30px; height:30px; border-radius:50%; border:3px solid white; box-shadow:0 0 12px rgba(2,132,199,0.9); display:flex; align-items:center; justify-content:center; font-size:16px;">📍</div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 30]
+      });
 
-      const lat = e.latlng.lat;
-      const lon = e.latlng.lng;
-      let labelPonto = `Ponto no Mapa (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+      const labelPonto = `Ponto (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+      const popupHtml = `
+        <div style="font-size:12px; line-height:1.4; min-width:205px;">
+          <strong style="color:#38bdf8; font-size:13px;">📍 Ponto Selecionado</strong><br>
+          <span id="popup-click-addr" style="color:#94a3b8; font-size:11px;">Buscando endereço...</span>
+          <div style="display:flex; gap:6px; margin-top:8px;">
+            <button id="btn-popup-godirect" style="flex:1; background:#0284c7; border:none; color:white; font-weight:800; padding:8px 6px; border-radius:6px; cursor:pointer; font-size:11px;">
+              🚀 Ir Direto
+            </button>
+            <button id="btn-popup-addstop" style="flex:1; background:rgba(245,158,11,0.25); border:1px solid #f59e0b; color:#fbbf24; font-weight:800; padding:8px 6px; border-radius:6px; cursor:pointer; font-size:11px;">
+              ➕ + Parada
+            </button>
+          </div>
+        </div>
+      `;
 
-      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-      setDestination(lat, lon, labelPonto, true);
+      clickTempMarker = L.marker([lat, lon], { icon: pinIcon })
+        .addTo(map)
+        .bindPopup(popupHtml)
+        .openPopup();
 
+      let resolvedName = labelPonto;
       try {
         const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
         const geoData = await geoRes.json();
         if (geoData && geoData.display_name) {
-          const parts = geoData.display_name.split(',').slice(0, 2).join(', ');
-          state.destName = parts;
-          document.getElementById('input-destination').value = parts;
-          document.getElementById('modal-dest-name').innerText = parts;
-          if (state.destMarker) state.destMarker.bindPopup(`<strong>🏁 Destino:</strong><br>${parts}`).openPopup();
+          const parts = geoData.display_name.split(',').slice(0, 3).join(', ');
+          resolvedName = parts;
+          const addrEl = document.getElementById('popup-click-addr');
+          if (addrEl) addrEl.innerText = parts;
         }
-      } catch (err) {}
+      } catch (err) {
+        const addrEl = document.getElementById('popup-click-addr');
+        if (addrEl) addrEl.innerText = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+      }
+
+      setTimeout(() => {
+        const bDirect = document.getElementById('btn-popup-godirect');
+        const bStop = document.getElementById('btn-popup-addstop');
+        if (bDirect) {
+          bDirect.onclick = () => {
+            if (clickTempMarker) map.removeLayer(clickTempMarker);
+            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+            setDestination(lat, lon, resolvedName, true);
+          };
+        }
+        if (bStop) {
+          bStop.onclick = () => {
+            if (clickTempMarker) map.removeLayer(clickTempMarker);
+            addWaypoint(lat, lon, resolvedName);
+            showToast(`✅ Parada adicionada: ${resolvedName}`);
+          };
+        }
+      }, 100);
+    }
+
+    map.on('click', async (e) => {
+      // Se o modo pin não estiver ativo, o clique simples não abre menu para evitar acidentes durante scroll
+      if (!pinModeActive) return;
+      pinModeActive = false;
+      btnPinMode.style.borderColor = 'rgba(56, 189, 248, 0.5)';
+      btnPinMode.style.background = 'rgba(15, 23, 42, 0.92)';
+      handleMapPointSelection(e.latlng.lat, e.latlng.lng);
+    });
+
+    // Toque longo no celular / clique com botão direito no PC abre o seletor diretamente!
+    map.on('contextmenu', (e) => {
+      handleMapPointSelection(e.latlng.lat, e.latlng.lng);
     });
 
     // BUSCA RÁPIDA DE SERVIÇOS NA ROTA (POSTO, RESTAURANTE, HOTEL)
@@ -2074,13 +2145,33 @@
       modalServices.style.display = modalServices.style.display === 'none' ? 'block' : 'none';
     });
 
-    window.searchNearServices = function(tipo) {
+    window.searchNearServices = function(tipo, mode = 'waze') {
       modalServices.style.display = 'none';
       const termo = `${tipo} proximo a ${state.destName || 'Mossoró RN'}`;
-      showToast(`🔍 Buscando ${tipo}...`);
-      // Dispara busca no Waze / Google Maps para pontos ao redor
-      const wazeQueryUrl = `https://www.waze.com/ul?q=${encodeURIComponent(tipo)}&navigate=yes`;
-      window.open(wazeQueryUrl, '_blank');
+      if (mode === 'waypoint') {
+        showToast(`🔍 Buscando ${tipo} para adicionar como parada...`);
+        const searchCity = state.destName ? state.destName.split(',')[0] : 'Mossoró';
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(tipo + ' ' + searchCity)}&limit=1`)
+          .then(r => r.json())
+          .then(data => {
+            if (data && data.length > 0) {
+              const p = data[0];
+              const shortName = `${tipo.split(' ')[0].toUpperCase()} - ${p.display_name.split(',')[0]}`;
+              addWaypoint(parseFloat(p.lat), parseFloat(p.lon), shortName);
+              showToast(`✅ Parada adicionada: ${shortName}`);
+            } else {
+              showToast(`⚠️ Não localizamos ${tipo} com precisão. Abrindo no Waze...`);
+              window.open(`https://www.waze.com/ul?q=${encodeURIComponent(tipo)}&navigate=yes`, '_blank');
+            }
+          })
+          .catch(() => {
+            window.open(`https://www.waze.com/ul?q=${encodeURIComponent(tipo)}&navigate=yes`, '_blank');
+          });
+      } else {
+        showToast(`🔍 Abrindo ${tipo} no Waze...`);
+        const wazeQueryUrl = `https://www.waze.com/ul?q=${encodeURIComponent(tipo)}&navigate=yes`;
+        window.open(wazeQueryUrl, '_blank');
+      }
     };
 
     // HISTÓRICO DE ROTAS GERADAS E TRAJETOS GRAVADOS PELO J16
@@ -2109,15 +2200,25 @@
           container.innerHTML = `<div style="color:#64748b; font-style:italic;">Nenhuma rota clicada ainda nesta sessão.</div>`;
           return;
         }
-        container.innerHTML = list.map((item, idx) => `
-          <div onclick="reopenTracedRoute(${item.lat}, ${item.lon}, '${item.nome.replace(/'/g, "\\'")}')" style="background:#1e293b; border:1px solid #334155; border-radius:8px; padding:8px 10px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
-            <div>
-              <strong style="color:#f8fafc;">${item.nome}</strong><br>
-              <span style="color:#94a3b8; font-size:10px;">🕒 ${item.hora} • ${item.km} km</span>
+        container.innerHTML = list.map((item, idx) => {
+          const safeNome = item.nome.replace(/'/g, "\\'");
+          return `
+            <div style="background:#1e293b; border:1px solid #334155; border-radius:8px; padding:8px 10px; display:flex; justify-content:space-between; align-items:center;">
+              <div style="flex:1; margin-right:8px; overflow:hidden;">
+                <strong style="color:#f8fafc; font-size:12px; display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${item.nome}</strong>
+                <span style="color:#94a3b8; font-size:10px;">🕒 ${item.hora} • ${item.km} km</span>
+              </div>
+              <div style="display:flex; gap:5px;">
+                <button onclick="reopenTracedRoute(${item.lat}, ${item.lon}, '${safeNome}')" style="background:#0284c7; border:none; color:white; font-weight:800; padding:6px 8px; border-radius:6px; cursor:pointer; font-size:11px;">
+                  🚀 Ir
+                </button>
+                <button onclick="addWaypointFromHistory(${item.lat}, ${item.lon}, '${safeNome}')" style="background:rgba(245,158,11,0.25); border:1px solid #f59e0b; color:#fbbf24; font-weight:800; padding:6px 8px; border-radius:6px; cursor:pointer; font-size:11px;">
+                  ➕ + Parada
+                </button>
+              </div>
             </div>
-            <span style="color:#38bdf8; font-weight:800;">Ver ▶</span>
-          </div>
-        `).join('');
+          `;
+        }).join('');
       } catch (e) {
         container.innerHTML = '';
       }
@@ -2127,6 +2228,12 @@
       modalHistory.style.display = 'none';
       setDestination(lat, lon, nome, false);
       showToast(`📍 Reabrindo rota: ${nome}`);
+    };
+
+    window.addWaypointFromHistory = function(lat, lon, nome) {
+      modalHistory.style.display = 'none';
+      addWaypoint(lat, lon, nome);
+      showToast(`✅ Parada adicionada: ${nome}`);
     };
 
     async function loadGpsHistoryDays() {
@@ -2171,10 +2278,32 @@
           const pStart = data.points[0];
           const pEnd = data.points[data.points.length - 1];
 
+          const safeStartName = `Início ${dia} (${pStart.condutor})`.replace(/'/g, "\\'");
+          const safeEndName = (pEnd.destino || `Fim ${dia}`).replace(/'/g, "\\'");
+
           const startMarker = L.circleMarker([pStart.lat, pStart.lon], { radius: 8, color: '#fff', fillColor: '#22c55e', fillOpacity: 1, weight: 2 })
-            .bindPopup(`<strong>🟢 Início (${dia})</strong><br>Horário: ${pStart.hora}<br>Condutor: ${pStart.condutor}`);
+            .bindPopup(`
+              <div style="font-size:12px; line-height:1.4; min-width:180px;">
+                <strong style="color:#22c55e;">🟢 Início (${dia})</strong><br>
+                Horário: ${pStart.hora}<br>Condutor: ${pStart.condutor}
+                <div style="display:flex; gap:6px; margin-top:8px;">
+                  <button onclick="setDestination(${pStart.lat}, ${pStart.lon}, '${safeStartName}', false)" style="flex:1; background:#0284c7; border:none; color:white; font-weight:800; padding:6px 4px; border-radius:6px; cursor:pointer; font-size:11px;">🚀 Ir Direto</button>
+                  <button onclick="addWaypoint(${pStart.lat}, ${pStart.lon}, '${safeStartName}')" style="flex:1; background:rgba(245,158,11,0.25); border:1px solid #f59e0b; color:#fbbf24; font-weight:800; padding:6px 4px; border-radius:6px; cursor:pointer; font-size:11px;">➕ + Parada</button>
+                </div>
+              </div>
+            `);
+
           const endMarker = L.circleMarker([pEnd.lat, pEnd.lon], { radius: 8, color: '#fff', fillColor: '#ef4444', fillOpacity: 1, weight: 2 })
-            .bindPopup(`<strong>🏁 Fim (${dia})</strong><br>Horário: ${pEnd.hora}<br>Destino: ${pEnd.destino}`);
+            .bindPopup(`
+              <div style="font-size:12px; line-height:1.4; min-width:180px;">
+                <strong style="color:#ef4444;">🏁 Fim (${dia})</strong><br>
+                Horário: ${pEnd.hora}<br>Destino: ${pEnd.destino || 'Destino'}
+                <div style="display:flex; gap:6px; margin-top:8px;">
+                  <button onclick="setDestination(${pEnd.lat}, ${pEnd.lon}, '${safeEndName}', false)" style="flex:1; background:#0284c7; border:none; color:white; font-weight:800; padding:6px 4px; border-radius:6px; cursor:pointer; font-size:11px;">🚀 Ir Direto</button>
+                  <button onclick="addWaypoint(${pEnd.lat}, ${pEnd.lon}, '${safeEndName}')" style="flex:1; background:rgba(245,158,11,0.25); border:1px solid #f59e0b; color:#fbbf24; font-weight:800; padding:6px 4px; border-radius:6px; cursor:pointer; font-size:11px;">➕ + Parada</button>
+                </div>
+              </div>
+            `);
 
           gpsHistoryLayer.addLayer(startMarker);
           gpsHistoryLayer.addLayer(endMarker);
@@ -2187,6 +2316,65 @@
         showToast('❌ Erro ao carregar trajeto.');
       }
     };
+
+    // ==========================================================================
+    // CAMADA DE VEÍCULOS DA FROTA NO MAPA (ENCONTRO DE TÉCNICOS / PARADA)
+    // ==========================================================================
+    let fleetVehiclesLayer = L.layerGroup().addTo(map);
+
+    async function loadFleetVehicles() {
+      try {
+        const res = await fetch('/api/fleet');
+        const data = await res.json();
+        if (!data.success || !data.vehicles) return;
+
+        fleetVehiclesLayer.clearLayers();
+        data.vehicles.forEach(v => {
+          // Não duplica marcador do próprio carro assumido
+          if (v.placa === state.vehiclePlate && state.vehicleAssumed) return;
+          if (!v.lat || !v.lon) return;
+
+          const vEmoji = v.tipo_veiculo === 'MOTO' ? '🏍️' : '🚗';
+          const isOnline = v.is_online;
+          const statusBg = isOnline ? '#22c55e' : '#64748b';
+
+          const vIcon = L.divIcon({
+            className: 'fleet-vehicle-marker',
+            html: `
+              <div style="background:#0f172a; border:2px solid ${isOnline ? '#22c55e' : '#38bdf8'}; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; box-shadow:0 0 10px rgba(0,0,0,0.7); position:relative;">
+                <span style="font-size:17px;">${vEmoji}</span>
+                <span style="position:absolute; bottom:-1px; right:-1px; width:10px; height:10px; background:${statusBg}; border:1.5px solid white; border-radius:50%;"></span>
+              </div>
+            `,
+            iconSize: [36, 36],
+            iconAnchor: [18, 18]
+          });
+
+          const safeVName = `${v.modelo} (${v.placa}) - ${v.condutor}`.replace(/'/g, "\\'");
+          const popupHtml = `
+            <div style="font-size:12px; line-height:1.4; min-width:200px;">
+              <strong style="color:#38bdf8; font-size:13px;">${vEmoji} ${v.modelo} (${v.placa})</strong><br>
+              <span style="color:#f8fafc;">👤 Condutor: <b>${v.condutor}</b></span><br>
+              <span style="color:${isOnline ? '#4ade80' : '#94a3b8'}; font-size:11px;">${v.status_label || (isOnline ? 'Online 4G' : 'Offline')}</span>
+              <div style="display:flex; gap:6px; margin-top:8px;">
+                <button onclick="setDestination(${v.lat}, ${v.lon}, '${safeVName}', false)" style="flex:1; background:#0284c7; border:none; color:white; font-weight:800; padding:7px 5px; border-radius:6px; cursor:pointer; font-size:11px;">
+                  🚀 Ir até Veículo
+                </button>
+                <button onclick="addWaypoint(${v.lat}, ${v.lon}, '${safeVName}')" style="flex:1; background:rgba(245,158,11,0.25); border:1px solid #f59e0b; color:#fbbf24; font-weight:800; padding:7px 5px; border-radius:6px; cursor:pointer; font-size:11px;">
+                  ➕ + Parada
+                </button>
+              </div>
+            </div>
+          `;
+
+          L.marker([v.lat, v.lon], { icon: vIcon })
+            .addTo(fleetVehiclesLayer)
+            .bindPopup(popupHtml);
+        });
+      } catch (err) {
+        console.warn('Erro ao carregar veículos da frota:', err);
+      }
+    }
 
     btnHistory.addEventListener('click', () => {
       const isHidden = modalHistory.style.display === 'none';
@@ -2642,9 +2830,26 @@
 
       radarsLayer.clearLayers();
       limited.forEach(r => {
+        const radarName = `Radar ${r.vel}km/h - ${r.via || r.municipio}`;
+        const safeRadarName = radarName.replace(/'/g, "\\'");
+        const popupHtml = `
+          <div style="font-size:12px; line-height:1.4; min-width:185px;">
+            <strong style="color:#f59e0b; font-size:13px;">📷 Radar: ${r.vel} km/h</strong><br>
+            <span style="color:#38bdf8;">🛣️ ${r.via || 'Via Monitorada'}</span><br>
+            <span style="color:#94a3b8; font-size:11px;">📍 ${r.municipio || ''}/${r.uf || ''}</span>
+            <div style="display:flex; gap:6px; margin-top:8px;">
+              <button onclick="setDestination(${r.lat}, ${r.lon}, '${safeRadarName}', false)" style="flex:1; background:#0284c7; border:none; color:white; font-weight:800; padding:7px 5px; border-radius:6px; cursor:pointer; font-size:11px;">
+                🚀 Ir Direto
+              </button>
+              <button onclick="addWaypoint(${r.lat}, ${r.lon}, '${safeRadarName}')" style="flex:1; background:rgba(245,158,11,0.25); border:1px solid #f59e0b; color:#fbbf24; font-weight:800; padding:7px 5px; border-radius:6px; cursor:pointer; font-size:11px;">
+                ➕ + Parada
+              </button>
+            </div>
+          </div>
+        `;
         L.marker([r.lat, r.lon], { icon: getRadarIcon(r.vel) })
           .addTo(radarsLayer)
-          .bindPopup(`<div style='font-size:12px; line-height:1.4;'><strong>📷 Radar: ${r.vel} km/h</strong><br><span style='color:#38bdf8;'>🛣️ ${r.via}</span><br><span style='color:#94a3b8;'>📍 ${r.municipio}/${r.uf}</span></div>`);
+          .bindPopup(popupHtml);
       });
     }
 
@@ -2988,9 +3193,11 @@
 
     // INICIALIZAÇÃO
     loadRadars();
+    loadFleetVehicles();
     fetchCarTelemetry();
     checkProximityAndWheel(true);
     setInterval(fetchCarTelemetry, 2500);
+    setInterval(loadFleetVehicles, 15000);
   
     // ==========================================================================
     // CONTROLE DO PAINEL INFERIOR RECOLHÍVEL (MOBILE FLUIDO - 90% MAPA LIVRE)

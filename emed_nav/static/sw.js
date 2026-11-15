@@ -1,5 +1,5 @@
-// EmedNav Service Worker - v21 (Opção de Edição da Rota Selecionada & Paradas)
-const CACHE_NAME = 'emednav-v21-route-editor-stops';
+// EmedNav Service Worker - v22 (Adicionar qualquer elemento do mapa à rota: Radares, Pontos, Veículos, Serviços)
+const CACHE_NAME = 'emednav-v22-add-all-map-items-to-route';
 
 const ASSETS_TO_CACHE = [
   '/',
