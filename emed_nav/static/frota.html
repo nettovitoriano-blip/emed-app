@@ -320,6 +320,25 @@
       box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
     }
 
+    .btn-music-app {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-radius: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      color: white;
+      text-decoration: none;
+      transition: transform 0.15s ease, filter 0.2s ease;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+      border: 1px solid rgba(255,255,255,0.15);
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .btn-music-app:active {
+      transform: scale(0.96);
+    }
+
     /* MODAIS */
     .modal-backdrop {
       display: none; position: fixed; inset: 0;
@@ -479,6 +498,7 @@
           <button id="btn-fleet-mypos" class="map-fab" onclick="syncMyRealLocation()" title="Atualizar Posição / Centralizar Meu GPS" style="border-color:#22c55e; background:linear-gradient(135deg, #15803d 0%, #0f172a 100%); color:#4ade80;">🎯</button>
           <button id="btn-fleet-clients" class="map-fab active" onclick="toggleMapClients()" title="Filtro de Clientes (@ Contrato / Todos / Oculto)" style="border-color:#38bdf8; background:#0f172a; color:#38bdf8;">🏥</button>
           <button id="btn-fleet-sat" class="map-fab" onclick="toggleSatellite()" title="Satélite / Mapa Ruas">🛰️</button>
+          <button id="btn-fleet-music" class="map-fab" onclick="openMusicModal()" title="Música na Viagem (YouTube, Deezer, Spotify)" style="border-color:#f472b6; background:linear-gradient(135deg, #a855f7 0%, #ec4899 100%); color:#ffffff; font-size:18px;">🎵</button>
           <button id="btn-fleet-gestor" class="map-fab" onclick="toggleMobileFleetSidebar()" title="Painel Gestor (Veículos, Chips, Histórico, Clientes)" style="border-color:#c084fc; background:linear-gradient(135deg, #7e22ce 0%, #1e1b4b 100%); color:#e9d5ff;">📋</button>
         </div>
 
@@ -675,6 +695,55 @@
           <button class="btn-top" onclick="closeClientModal()">Cancelar</button>
           <button class="btn-top primary" onclick="saveClient()">💾 Salvar</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE MÚSICA & ENTRETENIMENTO (YOUTUBE, DEEZER, SPOTIFY) -->
+  <div id="music-modal" class="modal-backdrop">
+    <div class="modal-box" style="border-color:#a855f7;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:24px;">🎵</span>
+          <div>
+            <h3 style="font-size:15px; color:#c084fc; font-weight:900;">Música & Entretenimento na Viagem</h3>
+            <div style="font-size:11px; color:#94a3b8;">Acesso rápido com 1 toque ao seu streaming favorito</div>
+          </div>
+        </div>
+        <button onclick="closeMusicModal()" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer;">✕</button>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+        <!-- OPÇÃO 1: YOUTUBE -->
+        <button type="button" onclick="launchMusicApp('youtube')" class="btn-music-app" style="background:linear-gradient(135deg, #dc2626 0%, #991b1b 100%); border-color:#ef4444;">
+          <span style="font-size:28px;">▶️</span>
+          <div style="text-align:left;">
+            <div style="font-size:14px; font-weight:900; color:#ffffff;">YouTube & YouTube Music</div>
+            <div style="font-size:11px; opacity:0.85;">Abrir app do YouTube / Playlists</div>
+          </div>
+        </button>
+
+        <!-- OPÇÃO 2: DEEZER -->
+        <button type="button" onclick="launchMusicApp('deezer')" class="btn-music-app" style="background:linear-gradient(135deg, #9333ea 0%, #6b21a8 100%); border-color:#c084fc;">
+          <span style="font-size:28px;">🟣</span>
+          <div style="text-align:left;">
+            <div style="font-size:14px; font-weight:900; color:#ffffff;">Deezer Music & Flow</div>
+            <div style="font-size:11px; opacity:0.85;">Flow infinito & suas playlists Deezer</div>
+          </div>
+        </button>
+
+        <!-- OPÇÃO 3: SPOTIFY -->
+        <button type="button" onclick="launchMusicApp('spotify')" class="btn-music-app" style="background:linear-gradient(135deg, #10b981 0%, #047857 100%); border-color:#34d399;">
+          <span style="font-size:28px;">🟢</span>
+          <div style="text-align:left;">
+            <div style="font-size:14px; font-weight:900; color:#ffffff;">Spotify</div>
+            <div style="font-size:11px; opacity:0.85;">Abrir aplicativo Spotify / Podcasts</div>
+          </div>
+        </button>
+      </div>
+
+      <div style="margin-top:16px; text-align:center;">
+        <button type="button" class="btn-top" onclick="closeMusicModal()" style="width:100%; justify-content:center;">Voltar ao Mapa</button>
       </div>
     </div>
   </div>
@@ -1375,11 +1444,48 @@
       setTimeout(() => map.invalidateSize(), 220);
     }
 
+    function openMusicModal() {
+      document.getElementById('music-modal').style.display = 'flex';
+    }
+
+    function closeMusicModal() {
+      document.getElementById('music-modal').style.display = 'none';
+    }
+
+    function launchMusicApp(app) {
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (app === 'youtube' || app === 'ytmusic') {
+        showToast('▶️ Abrindo YouTube...');
+        if (isMobile) {
+          window.location.href = app === 'ytmusic' ? 'vnd.youtube.music://' : 'vnd.youtube://';
+          setTimeout(() => { window.open(app === 'ytmusic' ? 'https://music.youtube.com' : 'https://www.youtube.com', '_blank'); }, 700);
+        } else {
+          window.open(app === 'ytmusic' ? 'https://music.youtube.com' : 'https://www.youtube.com', '_blank');
+        }
+      } else if (app === 'deezer') {
+        showToast('🟣 Abrindo Deezer...');
+        if (isMobile) {
+          window.location.href = 'deezer://';
+          setTimeout(() => { window.open('https://www.deezer.com', '_blank'); }, 700);
+        } else {
+          window.open('https://www.deezer.com', '_blank');
+        }
+      } else if (app === 'spotify') {
+        showToast('🟢 Abrindo Spotify...');
+        if (isMobile) {
+          window.location.href = 'spotify://';
+          setTimeout(() => { window.open('https://open.spotify.com', '_blank'); }, 700);
+        } else {
+          window.open('https://open.spotify.com', '_blank');
+        }
+      }
+    }
+
     loadFleetOverview();
     loadClients();
     setInterval(loadFleetOverview, 6000);
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/static/sw.js?v=17').catch(() => {});
+      navigator.serviceWorker.register('/static/sw.js?v=18').catch(() => {});
     }
   </script>
 </body>

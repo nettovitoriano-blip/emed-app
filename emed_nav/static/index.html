@@ -808,6 +808,7 @@
         <button id="btn-toggle-clients" class="map-fab" title="Filtro de Clientes (Todos / Contrato / Avulso / Oculto)" style="border-color:#38bdf8; background:#0f172a; color:#38bdf8;">🏥</button>
         <button id="btn-toggle-radars" class="map-fab" title="Radares e Velocidade" style="border-color:#f59e0b; background:#1e293b; color:#fbbf24;">📷</button>
         <button id="btn-toggle-layers" class="map-fab" title="Satélite / Vias">🛰️</button>
+        <button id="btn-fab-music" class="map-fab" onclick="openMusicModal()" title="Música na Viagem (YouTube, Deezer, Spotify)" style="border-color:#f472b6; background:linear-gradient(135deg, #a855f7 0%, #ec4899 100%); color:#ffffff; font-size:18px; box-shadow:0 0 12px rgba(236,72,153,0.35);">🎵</button>
         <button id="btn-fab-more" class="map-fab" onclick="toggleFabMoreMenu()" title="Mais Ferramentas" style="border-color:#94a3b8; background:rgba(30,41,59,0.85); color:#e2e8f0; font-size:18px;">⋯</button>
         
         <!-- POPOVER MINIMALISTA DE FERRAMENTAS EXTRAS -->
@@ -870,6 +871,13 @@
             <span>🚀</span> WAZE
           </button>
         </div>
+
+        <!-- ATALHO RÁPIDO DE MÚSICA AO VOLANTE (YOUTUBE, DEEZER, SPOTIFY) -->
+        <button type="button" onclick="openMusicModal()" style="height:36px; width:100%; border-radius:8px; background:linear-gradient(135deg, rgba(168,85,247,0.25) 0%, rgba(236,72,153,0.25) 100%); border:1.5px solid rgba(244,114,182,0.5); color:#f5d0fe; font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; margin-top:6px; box-shadow:0 3px 10px rgba(0,0,0,0.3);">
+          <span style="font-size:15px;">🎵</span>
+          <span>Música na Viagem:</span>
+          <span style="color:#f87171; font-weight:900;">▶️ YouTube</span> • <span style="color:#c084fc; font-weight:900;">🟣 Deezer</span> • <span style="color:#4ade80; font-weight:900;">🟢 Spotify</span>
+        </button>
 
         <!-- MODO TRABALHO DO TÉCNICO (ETAPAS DA ROTA) -->
         <div id="cockpit-tech-actions" style="display:none; gap:6px; align-items:center; flex-wrap:wrap; margin-top:2px;">
@@ -2743,7 +2751,7 @@
 
     // REGISTRO DE SERVICE WORKER
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/static/sw.js?v=17').catch(() => {});
+      navigator.serviceWorker.register('/static/sw.js?v=18').catch(() => {});
     }
 
     // IDENTIFICAÇÃO AUTOMÁTICA DE VEÍCULO POR PROXIMIDADE / NFC + ASSUMIR O VOLANTE
@@ -3392,26 +3400,37 @@
     }
 
     function launchMusicApp(app) {
-      if (app === 'ytmusic') {
-        showToast('▶️ Abrindo YouTube Music...');
-        window.location.href = 'vnd.youtube.music://';
-        setTimeout(() => { window.open('https://music.youtube.com', '_system'); }, 600);
-      } else if (app === 'deezer') {
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (app === 'ytmusic' || app === 'youtube') {
+        showToast('▶️ Abrindo YouTube...');
+        if (isMobile) {
+          window.location.href = (app === 'ytmusic' ? 'vnd.youtube.music://' : 'vnd.youtube://');
+          setTimeout(() => {
+            window.open(app === 'ytmusic' ? 'https://music.youtube.com' : 'https://www.youtube.com', '_blank');
+          }, 700);
+        } else {
+          window.open(app === 'ytmusic' ? 'https://music.youtube.com' : 'https://www.youtube.com', '_blank');
+        }
+      } else if (app === 'deezer' || app === 'deezer-flow') {
         showToast('🟣 Abrindo Deezer...');
-        window.location.href = 'deezer://';
-        setTimeout(() => { window.open('https://www.deezer.com', '_system'); }, 600);
-      } else if (app === 'deezer-flow') {
-        showToast('🟣 Iniciando Deezer Flow...');
-        window.location.href = 'deezer://flow';
-        setTimeout(() => { window.open('https://www.deezer.com/flow', '_system'); }, 600);
+        if (isMobile) {
+          window.location.href = (app === 'deezer-flow' ? 'deezer://flow' : 'deezer://');
+          setTimeout(() => {
+            window.open('https://www.deezer.com', '_blank');
+          }, 700);
+        } else {
+          window.open('https://www.deezer.com', '_blank');
+        }
       } else if (app === 'spotify') {
         showToast('🟢 Abrindo Spotify...');
-        window.location.href = 'spotify://';
-        setTimeout(() => { window.open('https://open.spotify.com', '_system'); }, 600);
-      } else if (app === 'youtube') {
-        showToast('🔴 Abrindo YouTube...');
-        window.location.href = 'vnd.youtube://';
-        setTimeout(() => { window.open('https://www.youtube.com', '_system'); }, 600);
+        if (isMobile) {
+          window.location.href = 'spotify://';
+          setTimeout(() => {
+            window.open('https://open.spotify.com', '_blank');
+          }, 700);
+        } else {
+          window.open('https://open.spotify.com', '_blank');
+        }
       }
     }
 

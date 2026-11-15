@@ -1,5 +1,5 @@
-// EmedNav Service Worker - v17 (Logo Oficial Arroba + Botões Verticais Frota + Modo Consulta Celular)
-const CACHE_NAME = 'emednav-v17-arroba-frota-vertical';
+// EmedNav Service Worker - v18 (Botão Música YouTube, Deezer e Spotify)
+const CACHE_NAME = 'emednav-v18-music-streaming';
 
 const ASSETS_TO_CACHE = [
   '/',
