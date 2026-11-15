@@ -1,5 +1,5 @@
-// EmedNav Service Worker - v10 (Full Offline PWA + Cache-First Assets + Multi-Stop Routing)
-const CACHE_NAME = 'emednav-v16-compact-pins';
+// EmedNav Service Worker - v17 (Logo Oficial Arroba + Botões Verticais Frota + Modo Consulta Celular)
+const CACHE_NAME = 'emednav-v17-arroba-frota-vertical';
 
 const ASSETS_TO_CACHE = [
   '/',
@@ -7,6 +7,7 @@ const ASSETS_TO_CACHE = [
   '/static/index.html',
   '/static/frota.html',
   '/static/manifest.json',
+  '/static/logo_emed_arroba.png',
   '/static/simbolo_emed_clean.svg',
   '/static/simbolo_emed_red.svg',
   '/static/logo_emed_oficial.png',

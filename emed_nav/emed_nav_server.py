@@ -143,6 +143,83 @@ def calcular_status_chip(data_validade_str: str):
         return {"dias": 30, "status": "OK", "label": f"Validade: {data_validade_str}"}
 
 
+def calcular_status_rastreador(updated_at_str, ignicao=False, speed=0.0):
+    """
+    Avalia se o rastreador J16/GPS está de fato online ou offline/desligado na empresa.
+    Se o último pacote tiver mais de 10 minutos ou for de dias atrás, marca como OFFLINE.
+    """
+    if not updated_at_str or "Ao Vivo" in str(updated_at_str):
+        return {
+            "online": False,
+            "status": "OFFLINE",
+            "badge_color": "#ef4444",
+            "label": "🔴 J16 DESLIGADO"
+        }
+    try:
+        s = str(updated_at_str).strip()
+        agora = datetime.datetime.now()
+        dt = None
+        for fmt in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+            try:
+                dt = datetime.datetime.strptime(s, fmt)
+                break
+            except Exception:
+                pass
+        if not dt:
+            return {
+                "online": False,
+                "status": "OFFLINE",
+                "badge_color": "#ef4444",
+                "label": "🔴 J16 DESLIGADO"
+            }
+        diff_seg = (agora - dt).total_seconds()
+        if diff_seg <= 600:
+            if speed > 3:
+                return {
+                    "online": True,
+                    "status": "MOVIMENTO",
+                    "badge_color": "#22c55e",
+                    "label": f"🟢 EM MOVIMENTO ({int(speed)} km/h)"
+                }
+            elif ignicao:
+                return {
+                    "online": True,
+                    "status": "LIGADO",
+                    "badge_color": "#22c55e",
+                    "label": "🟢 IGNIÇÃO LIGADA (PARADO)"
+                }
+            else:
+                return {
+                    "online": True,
+                    "status": "REPOUSO_ONLINE",
+                    "badge_color": "#f59e0b",
+                    "label": "🟡 REPOUSO RECENTE"
+                }
+        else:
+            dias_atras = int(diff_seg // 86400)
+            horas_atras = int((diff_seg % 86400) // 3600)
+            if dias_atras > 0:
+                tempo_str = f"há {dias_atras}d"
+            elif horas_atras > 0:
+                tempo_str = f"há {horas_atras}h"
+            else:
+                tempo_str = f"há {int(diff_seg // 60)}min"
+            return {
+                "online": False,
+                "status": "OFFLINE",
+                "badge_color": "#94a3b8",
+                "label": f"🔴 J16 DESLIGADO ({tempo_str})"
+            }
+    except Exception:
+        return {
+            "online": False,
+            "status": "OFFLINE",
+            "badge_color": "#ef4444",
+            "label": "🔴 J16 DESLIGADO"
+        }
+
+
+
 @app.route("/")
 @app.route("/emedcar")
 @app.route("/gps")
@@ -195,7 +272,9 @@ def get_car():
 
             lat = float(v["ultima_lat"]) if (v and v["ultima_lat"] and round(float(v["ultima_lat"]), 3) != -5.187 and round(float(v["ultima_lat"]), 4) != -3.7319) else DEFAULT_LAT
             lon = float(v["ultima_lon"]) if (v and v["ultima_lon"] and round(float(v["ultima_lon"]), 3) != -37.372 and round(float(v["ultima_lon"]), 4) != -38.5267) else DEFAULT_LON
-            hora = v["ultima_atualizacao_gps"] if (v and v["ultima_atualizacao_gps"]) else "Ao Vivo (Fortaleza)"
+            hora = v["ultima_atualizacao_gps"] if (v and v["ultima_atualizacao_gps"]) else "Sem sinal recente"
+            ign = bool(v["ignicao_ligada"]) if v else False
+            rastreador_status = calcular_status_rastreador(hora, ign, 0.0)
 
             return jsonify({
                 "success": True,
@@ -207,8 +286,12 @@ def get_car():
                 "lon": lon,
                 "speed": 0.0,
                 "updated_at": hora,
-                "condutor": v["condutor_atual"] if v else "ANTONIO",
-                "ignicao": bool(v["ignicao_ligada"]) if v else False
+                "condutor": v["condutor_atual"] if v else "A DEFINIR",
+                "ignicao": ign,
+                "is_online": rastreador_status["online"],
+                "status_code": rastreador_status["status"],
+                "status_label": rastreador_status["label"],
+                "badge_color": rastreador_status["badge_color"]
             })
     except Exception as e:
         return jsonify({
@@ -218,7 +301,9 @@ def get_car():
             "lat": DEFAULT_LAT,
             "lon": DEFAULT_LON,
             "speed": 0.0,
-            "updated_at": "Ao Vivo"
+            "updated_at": "Sem sinal",
+            "is_online": False,
+            "status_label": "🔴 J16 DESLIGADO"
         })
 
 
@@ -725,6 +810,10 @@ def get_fleet_overview():
                 if chip_info["status"] in ("VENCIDO", "ALERTA"):
                     chips_alerta += 1
 
+                up_gps = vd.get("ultima_atualizacao_gps") or ""
+                ign_v = bool(vd.get("ignicao_ligada"))
+                rastreador_info = calcular_status_rastreador(up_gps, ign_v, 0.0)
+
                 vehicles.append({
                     "id": vd.get("id"),
                     "placa": vd.get("placa") or "EMD-2026",
@@ -746,8 +835,12 @@ def get_fleet_overview():
                     "lat": raw_lat,
                     "lon": raw_lon,
                     "speed": 0.0,
-                    "ignicao": bool(vd.get("ignicao_ligada")),
-                    "updated_at": vd.get("ultima_atualizacao_gps") or "Ao Vivo (Fortaleza)"
+                    "ignicao": ign_v,
+                    "updated_at": up_gps or "Sem sinal recente",
+                    "is_online": rastreador_info["online"],
+                    "status_code": rastreador_info["status"],
+                    "status_label": rastreador_info["label"],
+                    "badge_color": rastreador_info["badge_color"]
                 })
 
             cur.execute("SELECT COUNT(*) FROM frota_viagens_gps")
@@ -763,13 +856,15 @@ def get_fleet_overview():
             cur.execute("SELECT COUNT(*) FROM frota_banco_radares")
             total_radars = cur.fetchone()[0]
 
+            online_count = sum(1 for v in vehicles if v.get("is_online"))
+
             return jsonify({
                 "success": True,
                 "vehicles": vehicles,
                 "drivers": drivers,
                 "stats": {
                     "total_vehicles": len(vehicles),
-                    "online_vehicles": len(vehicles),
+                    "online_vehicles": online_count,
                     "chips_alerta": chips_alerta,
                     "total_gps_points": total_gps_points,
                     "total_clients": total_clients,

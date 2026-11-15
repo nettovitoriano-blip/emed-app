@@ -292,23 +292,32 @@
       display: none;
     }
 
-    /* BOTÕES FLUTUANTES DO MAPA */
-    .map-floating-tools {
-      position: absolute; top: 16px; right: 16px;
+    /* BOTÕES FLUTUANTES DO MAPA (COLUNA VERTICAL À DIREITA - PADRÃO COCKPIT GPS) */
+    .map-fab-stack {
+      position: absolute; top: 14px; right: 14px;
       display: flex; flex-direction: column; gap: 8px;
       z-index: 1050;
     }
-    .btn-float {
-      background: rgba(15, 23, 42, 0.92);
-      border: 1.5px solid #334155;
+    .map-fab {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.94);
+      border: 2px solid #334155;
       color: #f8fafc;
-      padding: 9px 12px; border-radius: 10px;
-      font-size: 12px; font-weight: 800; cursor: pointer;
-      display: flex; align-items: center; gap: 6px;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+      font-size: 19px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.55);
+      transition: all 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
     }
-    .btn-float.active {
+    .map-fab:active {
+      transform: scale(0.92);
+    }
+    .map-fab.active {
       border-color: #38bdf8; color: #38bdf8;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
     }
 
     /* MODAIS */
@@ -364,7 +373,7 @@
     <header class="fleet-header">
       <div class="brand-box">
         <div class="brand-logo-wrap">
-          <img src="/static/logo_emed_oficial.png" alt="eMED Eletromedicina" onerror="this.src='/static/simbolo_emed_clean.svg'" />
+          <img src="/static/logo_emed_arroba.png" alt="eMED Eletromedicina" onerror="this.src='/static/simbolo_emed_clean.svg'" />
         </div>
         <div class="brand-titles">
           <div class="brand-main">
@@ -465,14 +474,12 @@
       <main class="fleet-map-area">
         <div id="map"></div>
 
-        <!-- BOTÕES FLUTUANTES SUPERIORES DIREITOS -->
-        <div class="map-floating-tools">
-          <button class="btn-float active" id="btn-toggle-map-clients" onclick="toggleMapClients()">
-            <img src="/static/simbolo_emed_clean.svg" style="width:18px; height:18px;" />
-            <span id="lbl-clients-btn">Clientes: Todos</span>
-          </button>
-          <button class="btn-float" onclick="toggleSatellite()">🛰️ Alternar Satélite / Mapa</button>
-          <button class="btn-float" onclick="syncMyRealLocation()">📍 Atualizar Posição p/ Meu GPS Atual</button>
+        <!-- BOTÕES VERTICAIS DO MAPA (PADRÃO COCKPIT GPS) -->
+        <div class="map-fab-stack">
+          <button id="btn-fleet-mypos" class="map-fab" onclick="syncMyRealLocation()" title="Atualizar Posição / Centralizar Meu GPS" style="border-color:#22c55e; background:linear-gradient(135deg, #15803d 0%, #0f172a 100%); color:#4ade80;">🎯</button>
+          <button id="btn-fleet-clients" class="map-fab active" onclick="toggleMapClients()" title="Filtro de Clientes (@ Contrato / Todos / Oculto)" style="border-color:#38bdf8; background:#0f172a; color:#38bdf8;">🏥</button>
+          <button id="btn-fleet-sat" class="map-fab" onclick="toggleSatellite()" title="Satélite / Mapa Ruas">🛰️</button>
+          <button id="btn-fleet-gestor" class="map-fab" onclick="toggleMobileFleetSidebar()" title="Painel Gestor (Veículos, Chips, Histórico, Clientes)" style="border-color:#c084fc; background:linear-gradient(135deg, #7e22ce 0%, #1e1b4b 100%); color:#e9d5ff;">📋</button>
         </div>
 
         <!-- BARRA LIMPA DE RESUMO DA ROTA SELECIONADA + INDICAR CONDUTOR -->
@@ -686,7 +693,7 @@
     let fleetVehicles = [];
     let fleetDrivers = ["ANTONIO", "NETTO", "ARQUIMEDES", "GABRIEL", "SÉRGIO", "FELIPE"];
     let allClients = [];
-    let clientFilterMode = 'ALL';
+    let clientFilterMode = 'CONTRATO'; // Padrão rápido e leve: carrega apenas clientes em contrato
     const clientsLayer = L.layerGroup().addTo(map);
     const routeLayerGroup = L.layerGroup().addTo(map);
 
@@ -787,7 +794,7 @@
         }
 
         const st = data.stats || {};
-        document.getElementById('kpi-vehicles').textContent = `${st.total_vehicles || 1} Veículos Ativos`;
+        document.getElementById('kpi-vehicles').textContent = `${st.online_vehicles || 0} Online • ${st.total_vehicles || 2} Cadastrados`;
         document.getElementById('kpi-radars').textContent = `${(st.total_radars || 16480).toLocaleString('pt-BR')} radares`;
         document.getElementById('kpi-clients').textContent = `${st.total_clients || 504} clientes`;
         document.getElementById('kpi-db').textContent = `${st.db_size_mb || 1.6} MB (+10 anos)`;
@@ -795,16 +802,22 @@
         const container = document.getElementById('vehicles-list');
         container.innerHTML = fleetVehicles.map((v, idx) => {
           const emoji = getVehicleEmoji(v.tipo_veiculo);
+          const isOnline = !!v.is_online;
+          const statusText = v.status_label || (isOnline ? 'ONLINE 4G' : 'DESLIGADO');
+          const pillBg = isOnline ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.18)';
+          const pillBorder = isOnline ? '#22c55e' : '#ef4444';
+          const pillColor = isOnline ? '#4ade80' : '#f87171';
+
           return `
-            <div class="vehicle-card">
+            <div class="vehicle-card" style="${isOnline ? '' : 'border-color:#475569;'}">
               <div class="v-card-top">
                 <div onclick="focusVehicle(${idx})" style="cursor:pointer;">
                   <span class="v-plate-badge">${emoji} ${v.placa}</span>
                   <div class="v-model">${v.modelo}</div>
                 </div>
-                <div class="v-status-pill">
-                  <span class="pulse-dot"></span>
-                  <span>ONLINE 4G</span>
+                <div class="v-status-pill" style="background:${pillBg}; border:1px solid ${pillBorder}; color:${pillColor};">
+                  ${isOnline ? '<span class="pulse-dot"></span>' : '<span style="width:8px; height:8px; border-radius:50%; background:#ef4444; display:inline-block; margin-right:4px;"></span>'}
+                  <span style="font-size:10px; font-weight:800;">${statusText}</span>
                 </div>
               </div>
 
@@ -1085,6 +1098,24 @@
       } catch (e) {}
     }
 
+    function showToast(msg) {
+      let t = document.getElementById('toast-fleet-msg');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = 'toast-fleet-msg';
+        t.style.cssText = 'position:fixed; top:75px; left:50%; transform:translateX(-50%); background:rgba(15,23,42,0.96); border:1.5px solid #38bdf8; color:#38bdf8; font-weight:800; font-size:12px; padding:7px 16px; border-radius:20px; z-index:3000; box-shadow:0 6px 20px rgba(0,0,0,0.7); pointer-events:none; transition:opacity 0.2s;';
+        document.body.appendChild(t);
+      }
+      t.innerText = msg;
+      t.style.display = 'block';
+      t.style.opacity = '1';
+      clearTimeout(window._toastFleetTimer);
+      window._toastFleetTimer = setTimeout(() => {
+        t.style.opacity = '0';
+        setTimeout(() => { t.style.display = 'none'; }, 250);
+      }, 2500);
+    }
+
     function renderMapClients() {
       clientsLayer.clearLayers();
       if (clientFilterMode === 'NONE') return;
@@ -1094,20 +1125,20 @@
         if (clientFilterMode === 'CONTRATO' && !isContrato) return;
         if (clientFilterMode === 'AVULSO' && isContrato) return;
 
-        const svgFile = isContrato ? '/static/simbolo_emed_clean.svg' : '/static/simbolo_emed_red.svg';
         const borderCol = isContrato ? '#0284c7' : '#dc2626';
         const badgeBg = isContrato ? '#0284c7' : '#dc2626';
         const badgeTxt = isContrato ? 'CONTRATO eMED' : 'CLIENTE AVULSO';
+        const arrobaColor = isContrato ? '#0284c7' : '#dc2626';
 
         const icon = L.divIcon({
           className: 'emed-fleet-client-pin',
           html: `
-            <div style="width:28px; height:28px; background:#ffffff; border:2px solid ${borderCol}; border-radius:50% 50% 50% 4px; transform:rotate(-45deg); display:flex; align-items:center; justify-content:center; box-shadow:0 3px 8px rgba(0,0,0,0.45);">
-              <img src="${svgFile}" style="width:20px; height:20px; transform:rotate(45deg);" />
+            <div style="width:26px; height:26px; background:#ffffff; border:2.5px solid ${borderCol}; border-radius:50% 50% 50% 3px; transform:rotate(-45deg); display:flex; align-items:center; justify-content:center; box-shadow:0 3px 10px rgba(0,0,0,0.5);">
+              <div style="transform:rotate(45deg); font-size:14px; font-weight:900; color:${arrobaColor}; font-family:-apple-system, sans-serif; line-height:1;">@</div>
             </div>
           `,
-          iconSize: [28, 28],
-          iconAnchor: [14, 28]
+          iconSize: [26, 26],
+          iconAnchor: [13, 26]
         });
 
         L.marker([c.lat, c.lon], { icon }).addTo(clientsLayer)
@@ -1126,17 +1157,26 @@
 
     function setClientFilter(mode) {
       clientFilterMode = mode;
-      const lbl = document.getElementById('lbl-clients-btn');
-      if (mode === 'ALL') lbl.textContent = 'Clientes: Todos';
-      else if (mode === 'CONTRATO') lbl.textContent = 'Clientes: Contrato (Azul)';
-      else if (mode === 'AVULSO') lbl.textContent = 'Clientes: Avulso (Verm.)';
-      else lbl.textContent = 'Clientes: Ocultos';
+      const btn = document.getElementById('btn-fleet-clients');
+      if (mode === 'CONTRATO') {
+        if (btn) { btn.classList.add('active'); btn.style.borderColor = '#0284c7'; btn.style.color = '#38bdf8'; }
+        showToast('🔵 Exibindo Clientes em CONTRATO (Modo Rápido)');
+      } else if (mode === 'ALL') {
+        if (btn) { btn.classList.add('active'); btn.style.borderColor = '#4ade80'; btn.style.color = '#4ade80'; }
+        showToast('👥 Exibindo TODOS os Clientes e Hospitais (500+)');
+      } else if (mode === 'AVULSO') {
+        if (btn) { btn.classList.add('active'); btn.style.borderColor = '#ef4444'; btn.style.color = '#f87171'; }
+        showToast('🔴 Exibindo Clientes AVULSOS');
+      } else {
+        if (btn) { btn.classList.remove('active'); btn.style.borderColor = '#334155'; btn.style.color = '#94a3b8'; }
+        showToast('🚫 Clientes Ocultados do Mapa');
+      }
       renderMapClients();
       renderClientsList();
     }
 
     function toggleMapClients() {
-      const order = ['ALL', 'CONTRATO', 'AVULSO', 'NONE'];
+      const order = ['CONTRATO', 'ALL', 'NONE'];
       const next = order[(order.indexOf(clientFilterMode) + 1) % order.length];
       setClientFilter(next);
     }
@@ -1338,6 +1378,9 @@
     loadFleetOverview();
     loadClients();
     setInterval(loadFleetOverview, 6000);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/static/sw.js?v=17').catch(() => {});
+    }
   </script>
 </body>
 </html>
