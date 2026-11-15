@@ -231446,13 +231446,14 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
       if (acao === "CONCLUIR" || acao === "EQUIPAMENTO_EM_USO") {
         const faltas = [];
         const ass = (typeof obterAssinaturaBase64 === "function") ? obterAssinaturaBase64() : (window._assinaturaDataUrl || "");
-        const respH = (document.getElementById("osRespHosp")?.value || "").trim();
+        const respH = (document.getElementById("osAssNome")?.value || "").trim();
+        const palavrasResp = respH.split(/\s+/).filter(Boolean);
         const srvExec = (document.getElementById("osSrvExec")?.value || "").trim();
         const defTxt = (document.getElementById("osDefeito")?.value || "").trim();
         const diagTxt = (document.getElementById("osProb")?.value || "").trim();
         const condF = (document.getElementById("osCondFinal")?.value || "").trim();
         if (!ass) faltas.push("✍️ Assinatura digital do cliente / responsável");
-        if (respH.length < 3) faltas.push("👤 Nome completo do responsável da unidade");
+        if (palavrasResp.length < 2 || respH.length < 5) faltas.push("👤 Nome e sobrenome do responsável da unidade");
         if (srvExec.length < 10) faltas.push("📝 Descrição dos serviços executados (mín. 10 caracteres)");
         if (!defTxt && !diagTxt) faltas.push("⚠️ Defeito relatado ou diagnóstico técnico");
         if (!condF) faltas.push("📋 Condição final do equipamento");
@@ -231460,7 +231461,7 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
           const msgFalta = "⚖️ VALIDAÇÃO JURÍDICA PARA FECHAMENTO DA OS:\n\nPreencha os itens obrigatórios antes de concluir:\n• " + faltas.join("\n• ");
           alert(msgFalta);
           if (typeof mostrarToast === "function") mostrarToast("❌ Preencha assinatura e campos obrigatórios para concluir.", "error");
-          const foco = !respH || respH.length < 3 ? document.getElementById("osRespHosp") : (!srvExec || srvExec.length < 10 ? document.getElementById("osSrvExec") : document.getElementById("osDefeito"));
+          const foco = (palavrasResp.length < 2 || respH.length < 5) ? document.getElementById("osAssNome") : (!srvExec || srvExec.length < 10 ? document.getElementById("osSrvExec") : document.getElementById("osDefeito"));
           if (foco) foco.scrollIntoView({ behavior: "smooth", block: "center" });
           return;
         }
