@@ -380,14 +380,28 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
 
     rubrica_tec = ""
     try:
+        tokens_tec = [t.strip() for t in _re.split(r"\s+", str(tec_princ or "").upper()) if len(t.strip()) >= 3]
         with sqlite3.connect(db_file) as conn:
             cur = conn.cursor()
-            cur.execute("SELECT rubrica_img FROM tecnicos WHERE UPPER(nome) LIKE UPPER(?)", (f"%{tec_princ.split()[0]}%",))
-            r_tec = cur.fetchone()
-            if r_tec and r_tec[0]:
-                rubrica_tec = r_tec[0]
+            rows_sig = cur.execute(
+                "SELECT nome, rubrica_img FROM tecnicos WHERE rubrica_img IS NOT NULL AND TRIM(rubrica_img) != '' ORDER BY LENGTH(rubrica_img) DESC"
+            ).fetchall()
+            # 1) Match exato
+            for n_db, img_db in rows_sig:
+                if str(n_db or "").strip().upper() == str(tec_princ or "").strip().upper():
+                    rubrica_tec = img_db
+                    break
+            # 2) Match por qualquer parte do nome (ex: VALFREDO NETTO -> NETTO)
+            if not rubrica_tec and tokens_tec:
+                for n_db, img_db in rows_sig:
+                    n_up = str(n_db or "").strip().upper()
+                    if any(tok == n_up or tok in n_up or n_up in tok for tok in tokens_tec):
+                        rubrica_tec = img_db
+                        break
     except Exception:
         pass
+    if not rubrica_tec and isinstance(equipa_tecnica, dict):
+        rubrica_tec = str((equipa_tecnica.get(tec_princ) or {}).get("rubrica_img") or "").strip()
 
     rubrica_cli = str(row_c.get("assinatura_cliente_img") or "").strip()
     if not rubrica_cli:
