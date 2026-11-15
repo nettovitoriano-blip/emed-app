@@ -22264,32 +22264,57 @@ async def api_carga_simular_aeroporto(request: web.Request) -> web.Response:
 
 
 async def handle_simbolo_emed(request: web.Request) -> web.Response:
-
     """Serve o símbolo/logo oficial em alta resolução e fundo transparente da EMED."""
+    # Se for requisitado o SVG limpo oficial, entrega diretamente o SVG do EmedNav
+    path = request.path
+    if "simbolo_emed_clean.svg" in path or path.endswith(".svg"):
+        svg_path = os.path.join(BASE_DIR, "emed_nav", "static", "simbolo_emed_clean.svg")
+        if os.path.exists(svg_path):
+            with open(svg_path, "rb") as f:
+                return web.Response(body=f.read(), content_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
 
     candidatos = [
-
+        os.path.join(BASE_DIR, "emed_pwa_static", "logo_emed_arroba.png"),
         os.path.join(BASE_DIR, "emed_pwa_static", "simbolo_emed_transparente.png"),
-
         os.path.join(BASE_DIR, "emed_pwa_static", "simbolo_emed_oficial.png"),
-
         os.path.join(BASE_DIR, "emed_pwa_static", "simbolo_emed.png"),
-
         os.path.join(BASE_DIR, "emed1.jpg")
-
     ]
-
     for c in candidatos:
-
         if os.path.exists(c):
-
             with open(c, "rb") as f:
-
                 content_type = "image/png" if c.endswith(".png") else "image/jpeg"
-
-                return web.Response(body=f.read(), content_type=content_type)
-
+                return web.Response(body=f.read(), content_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
     return web.Response(status=404)
+
+
+async def handle_static_nav(request: web.Request) -> web.Response:
+    """Serve arquivos estáticos para o EmedNav (SVGs, PNGs, ícones, sons, etc)."""
+    tail = request.match_info.get("tail", "")
+    candidatos = [
+        os.path.join(BASE_DIR, "emed_nav", "static", tail),
+        os.path.join(BASE_DIR, "emed_pwa_static", tail),
+    ]
+    for c in candidatos:
+        if os.path.exists(c) and os.path.isfile(c):
+            ext = os.path.splitext(c)[1].lower()
+            cts = {
+                ".svg": "image/svg+xml",
+                ".png": "image/png",
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".ico": "image/x-icon",
+                ".css": "text/css; charset=utf-8",
+                ".js": "application/javascript; charset=utf-8",
+                ".json": "application/json; charset=utf-8",
+                ".mp3": "audio/mpeg",
+                ".wav": "audio/wav"
+            }
+            ct = cts.get(ext, "application/octet-stream")
+            with open(c, "rb") as f:
+                return web.Response(body=f.read(), content_type=ct, headers={"Cache-Control": "public, max-age=86400"})
+    return web.Response(status=404)
+
 
 
 
@@ -23150,6 +23175,7 @@ def criar_app() -> web.Application:
     app.router.add_route("*", "/api/clients/{tail:.*}", handle_proxy_nav)
     app.router.add_get("/static/simbolo_emed_clean.svg", handle_simbolo_emed)
     app.router.add_get("/static/simbolo_emed_red.svg", handle_simbolo_emed)
+    app.router.add_get("/static/{tail:.*}", handle_static_nav)
 
     app.router.add_get("/", handle_index)
     app.router.add_get("/login", handle_index)

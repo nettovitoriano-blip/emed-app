@@ -1,5 +1,5 @@
-// EmedNav Service Worker - v18 (Botão Música YouTube, Deezer e Spotify)
-const CACHE_NAME = 'emednav-v18-music-streaming';
+// EmedNav Service Worker - v20 (Símbolo Oficial eMED SVG, Velocímetro Estável Sem Carro e Maps/Waze Inteligente)
+const CACHE_NAME = 'emednav-v20-symbol-svg-clean-speed-maps';
 
 const ASSETS_TO_CACHE = [
   '/',
