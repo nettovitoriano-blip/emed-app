@@ -23113,6 +23113,10 @@ def criar_app() -> web.Application:
     app.router.add_route("*", "/api/fleet", handle_proxy_nav)
 
     app.router.add_route("*", "/api/fleet/{tail:.*}", handle_proxy_nav)
+    app.router.add_route("*", "/api/clients", handle_proxy_nav)
+    app.router.add_route("*", "/api/clients/{tail:.*}", handle_proxy_nav)
+    app.router.add_get("/static/simbolo_emed_clean.svg", handle_simbolo_emed)
+    app.router.add_get("/static/simbolo_emed_red.svg", handle_simbolo_emed)
 
     app.router.add_get("/", handle_index)
     app.router.add_get("/login", handle_index)

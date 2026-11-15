@@ -822,82 +822,56 @@
 
       <!-- PAINEL DE BUSCA & CONFIGURAÇÃO (MODO LIVRE) -->
       <div id="panel-search-and-chips">
-      <!-- ATALHOS REGIONAIS 1-TOQUE -->
-      <div class="quick-chips">
-        <div class="chip" data-dest="Hospital Wilson Rosado, Mossoró, RN" data-lat="-5.1884" data-lon="-37.3486">🏥 Wilson Rosado</div>
-        <div class="chip" data-dest="Hospital Regional Tarcísio Maia, Mossoró, RN" data-lat="-5.1963" data-lon="-37.3619">🏥 Tarcísio Maia</div>
-        <div class="chip" data-dest="Hospital de Olhos de Mossoró, RN" data-lat="-5.1842" data-lon="-37.3491">🏥 Hosp. Olhos</div>
-        <div class="chip" data-dest="Hospital Maternidade Almeida Castro, Mossoró, RN" data-lat="-5.1873" data-lon="-37.3421">🏥 Almeida Castro</div>
-        <div class="chip" data-dest="Hospital São Camilo, Apodi, RN" data-lat="-5.6601" data-lon="-37.7974">🏥 Apodi</div>
-        <div class="chip" data-dest="Praia de Tibau, Tibau, RN" data-lat="-4.8391" data-lon="-37.2531">🏖️ Tibau</div>
-        <div class="chip" data-dest="Hospital Regional Nelson Inácio dos Santos, Assú, RN" data-lat="-5.5768" data-lon="-36.9102">🏥 Assú</div>
-        <div class="chip" data-dest="Hospital Regional Dr. Cleodon Carlos, Pau dos Ferros, RN" data-lat="-6.1132" data-lon="-38.2045">🏥 Pau dos Ferros</div>
-        <div class="chip" data-dest="Hospital Walfredo Gurgel, Natal, RN" data-lat="-5.8115" data-lon="-35.2082">🏥 Natal (HRWG)</div>
-        <div class="chip" data-dest="Sede EMED, Eusébio, CE" data-lat="-3.8856" data-lon="-38.4614">🏢 Sede EMED</div>
-      </div>
-
-      <!-- SELEÇÃO / DIGITAÇÃO DE DESTINO COM AUTOCOMPLETE -->
-      <div class="search-wrapper">
-        <div id="search-suggestions"></div>
-        <div class="destination-row">
-          <input type="text" id="input-destination" class="dest-input" placeholder="Buscar destino, hospital ou cidade..." autocomplete="off" />
-          <button id="btn-calc-route" class="btn-rocket-go" title="Iniciar Navegação">
-            <span>IR</span> 🚀
-          </button>
-        </div>
-      </div>
-
-      <!-- SEÇÃO DE PARADAS INTERMEDIÁRIAS (WAYPOINTS) -->
-      <div id="waypoints-section">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div style="display:flex; align-items:center; gap:6px;">
-            <button id="btn-toggle-add-stop" class="btn-add-stop-toggle" type="button" onclick="toggleAddStopInput()">
-              <span>➕</span> <span>Adicionar Parada</span>
+        <!-- BARRA COMPACTA E FLUIDA DE TRAÇAR ROTAS (COM BOTÃO + DE PARADAS) -->
+        <div class="search-wrapper" style="margin-bottom:0;">
+          <div id="search-suggestions"></div>
+          <div class="destination-row" style="display:flex; gap:6px; align-items:center;">
+            <input type="text" id="input-destination" class="dest-input" placeholder="🔍 Buscar destino, hospital ou cidade..." autocomplete="off" style="flex:1; height:44px; font-size:13.5px;" />
+            <button type="button" id="btn-toggle-add-stop" onclick="toggleAddStopInput()" class="btn-rocket-go" style="background:#1e293b; border:1.5px solid #38bdf8; color:#38bdf8; width:44px; height:44px; padding:0; font-size:18px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Adicionar parada intermediária na rota">
+              <span>➕</span>
             </button>
-            <button id="btn-optimize-stops" onclick="optimizeRouteOrder()" type="button" style="display:none; background:rgba(245,158,11,0.2); border:1px solid #f59e0b; color:#fbbf24; font-size:11px; font-weight:800; padding:4px 8px; border-radius:6px; cursor:pointer; align-items:center; gap:4px;">
-              <span>⚡</span> Otimizar Ordem
+            <button id="btn-calc-route" class="btn-rocket-go" title="Iniciar Navegação" style="height:44px; padding:0 14px; font-size:13px; font-weight:900;">
+              <span>IR</span> 🚀
             </button>
           </div>
-          <span id="lbl-stops-summary" style="font-size:11px; font-weight:700; color:#38bdf8; display:none;">0 parada(s)</span>
         </div>
 
-        <!-- INPUT RECOLHÍVEL DE NOVA PARADA -->
-        <div id="add-stop-box" style="display:none; gap:6px; align-items:center; background:#1e293b; padding:8px; border-radius:10px; border:1px solid #38bdf8;">
-          <input type="text" id="input-new-stop" class="dest-input" placeholder="Buscar parada (posto, cliente, endereço)..." style="font-size:13px; padding:8px 10px;" />
-          <button type="button" onclick="confirmAddStop()" class="btn-rocket-go" style="height:38px; padding:0 12px; font-size:12px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-color:#fbbf24; flex-shrink:0;">
-            Adicionar
-          </button>
-          <button type="button" onclick="toggleAddStopInput(false)" style="background:none; border:none; color:#94a3b8; font-size:16px; cursor:pointer; padding:0 4px;">✕</button>
+        <!-- SEÇÃO DE PARADAS INTERMEDIÁRIAS (WAYPOINTS) - SÓ EXIBIDA QUANDO CLICAR NO + OU HOUVER PARADAS -->
+        <div id="waypoints-section" style="margin-top:6px;">
+          <!-- INPUT RECOLHÍVEL DE NOVA PARADA -->
+          <div id="add-stop-box" style="display:none; gap:6px; align-items:center; background:#1e293b; padding:8px 10px; border-radius:10px; border:1px solid #38bdf8; margin-bottom:6px;">
+            <input type="text" id="input-new-stop" class="dest-input" placeholder="Digite parada (posto, hospital, endereço)..." style="font-size:12.5px; height:36px; padding:0 8px; flex:1;" />
+            <button type="button" onclick="confirmAddStop()" class="btn-rocket-go" style="height:36px; padding:0 12px; font-size:11.5px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-color:#fbbf24; flex-shrink:0;">
+              Adicionar
+            </button>
+            <button type="button" onclick="toggleAddStopInput(false)" style="background:none; border:none; color:#94a3b8; font-size:16px; cursor:pointer; padding:0 4px;">✕</button>
+          </div>
+
+          <!-- LISTA DE PARADAS ATIVAS (COMPACTA) -->
+          <div id="waypoints-list" style="display:none; flex-direction:column; gap:4px; max-height:100px; overflow-y:auto;"></div>
+
+          <div id="waypoints-maps-tip" style="display:none; font-size:11px; background:rgba(30, 58, 138, 0.45); border:1px solid #38bdf8; color:#93c5fd; padding:5px 8px; border-radius:6px; align-items:center; gap:6px; margin-top:4px;">
+            <span>🧭 Para mais de 1 parada, utilize o Maps. O Waze só aceita 1 destino por vez.</span>
+          </div>
         </div>
 
-        <!-- LISTA DE PARADAS ATIVAS -->
-        <div id="waypoints-list" style="display:none; flex-direction:column; gap:4px; max-height:120px; overflow-y:auto;"></div>
-
-        <!-- OBSERVAÇÃO INTELIGENTE DE MÚLTIPLAS PARADAS -->
-        <div id="waypoints-maps-tip" style="display:none; font-size:11.5px; background:rgba(30, 58, 138, 0.45); border:1px solid #38bdf8; color:#93c5fd; padding:7px 10px; border-radius:8px; align-items:center; gap:8px; margin-top:4px;">
-          <span style="font-size:16px; flex-shrink:0;">🧭</span>
-          <span><strong>Observação:</strong> Para mais de 1 parada, <strong>utilize o Maps</strong> (traça todas as etapas juntas a partir do GPS do carro). O Waze só aceita 1 parada por vez.</span>
+        <!-- RESUMO DA ROTA TRAÇADA: BARRA ULTRA-FINA COM ATALHOS MAPS E WAZE -->
+        <div id="route-summary-bar" style="display:none; align-items:center; justify-content:space-between; margin-top:6px; padding:6px 10px; background:#1e293b; border-radius:8px; border:1px solid #38bdf8; flex-wrap:wrap; gap:6px;">
+          <div style="font-size:12px; color:#f8fafc; font-weight:800; display:flex; align-items:center; gap:6px;">
+            <span id="lbl-route-km" style="color:#38bdf8;">-- km</span>
+            <span>•</span>
+            <span id="lbl-route-min" style="color:#4ade80;">-- min</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button id="btn-launch-maps" class="btn-nav btn-maps" type="button" style="padding:6px 12px; font-size:11.5px; height:auto; border-radius:6px;">
+              <span>🧭</span> MAPS
+            </button>
+            <button id="btn-launch-waze" class="btn-nav btn-waze" type="button" style="padding:6px 12px; font-size:11.5px; height:auto; border-radius:6px;">
+              <span>🚀</span> WAZE
+            </button>
+            <button id="btn-clear-inline" style="background:transparent; border:none; color:#ef4444; font-size:13px; font-weight:bold; cursor:pointer; padding:0 4px;" title="Cancelar rota">✖</button>
+          </div>
         </div>
-      </div>
-
-      <div class="hint-tap-map" id="hint-tap-text">👆 <strong>Dica:</strong> Clique em <strong>📍</strong> no topo direito para marcar um ponto no mapa sem toques acidentais.</div>
-
-      <!-- RESUMO DA ROTA -->
-      <div id="route-summary-bar">
-        <span>Distância: <strong id="lbl-route-km" class="route-stat">-- km</strong></span>
-        <span>Tempo: <strong id="lbl-route-min" class="route-stat">-- min</strong></span>
-        <button id="btn-clear-inline" style="background:transparent; border:none; color:#ef4444; font-size:12px; font-weight:bold; cursor:pointer;">Limpar ✖</button>
-      </div>
-
-      <!-- BOTÕES NAVEGAR NO WAZE E GOOGLE MAPS -->
-      <div class="nav-buttons-grid">
-        <button id="btn-launch-waze" class="btn-nav btn-waze" type="button">
-          <span>🚀</span> NAVEGAR NO WAZE
-        </button>
-        <button id="btn-launch-maps" class="btn-nav btn-maps" type="button">
-          <span>🧭</span> NAVEGAR NO MAPS
-        </button>
-      </div>
       </div> <!-- /#panel-search-and-chips -->
     </footer>
 
@@ -2113,9 +2087,8 @@
       if (!_allClientsCache || !_allClientsCache.length) return;
 
       const bounds = map.getBounds().pad(0.35);
-      const z = map.getZoom();
-      const maxCount = z < 11 ? 50 : 120;
 
+      // Filtra clientes dentro do campo de visão (Contrato E Avulso)
       const visible = _allClientsCache.filter(cli => {
         if (!cli.lat || !cli.lon) return false;
         if (!bounds.contains([cli.lat, cli.lon])) return false;
@@ -2123,26 +2096,30 @@
         if (clientFilterMode === 'CONTRATO' && !isContrato) return false;
         if (clientFilterMode === 'AVULSO' && isContrato) return false;
         return true;
-      }).slice(0, maxCount);
+      });
 
       clientsLayerContrato.clearLayers();
       clientsLayerAvulso.clearLayers();
 
       visible.forEach(cli => {
         const isContrato = (cli.tipo_contrato || 'CONTRATO').toUpperCase() === 'CONTRATO';
-        const borderColor = isContrato ? '#0095d9' : '#ef4444';
-        const shadowColor = isContrato ? 'rgba(0,149,217,0.65)' : 'rgba(239,68,68,0.55)';
-        const pinLogo = isContrato ? '/static/simbolo_emed_clean.svg' : '/static/simbolo_emed_red.svg';
-        const badgeHtml = isContrato
-          ? `<span style="background:rgba(0,149,217,0.2); color:#38bdf8; border:1px solid #0095d9; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:800;">🔵 CONTRATO</span>`
-          : `<span style="background:rgba(239,68,68,0.2); color:#f87171; border:1px solid #ef4444; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:800;">🔴 AVULSO</span>`;
+        const bgCor = isContrato ? '#0284c7' : '#dc2626';
+        const shadowCor = isContrato ? 'rgba(2,132,199,0.7)' : 'rgba(220,38,38,0.7)';
+        const badgeTxt = isContrato ? '🔵 CONTRATO' : '🔴 AVULSO';
+        const badgeColor = isContrato ? '#38bdf8' : '#f87171';
+        const badgeBg = isContrato ? 'rgba(0,149,217,0.2)' : 'rgba(239,68,68,0.2)';
 
-        const iconHtml = `<div style="background:#ffffff; width:28px; height:28px; border-radius:50%; border:2px solid ${borderColor}; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px ${shadowColor}; cursor:pointer;"><img src="${pinLogo}" style="width:18px; height:18px; object-fit:contain;" alt="eMED" /></div>`;
+        // Ícone CSS Puro e Vetorial: NUNCA corrompe, ZERO requisições de rede, visível em celular e PC
+        const iconHtml = `
+          <div style="background:${bgCor}; width:26px; height:26px; border-radius:50%; border:2px solid #ffffff; display:flex; align-items:center; justify-content:center; box-shadow:0 3px 8px ${shadowCor}; cursor:pointer;" title="${cli.nome} (${isContrato ? 'CONTRATO' : 'AVULSO'})">
+            <span style="color:#ffffff; font-size:12px; font-weight:900; line-height:1; font-family:-apple-system, sans-serif;">@</span>
+          </div>
+        `;
         const customMarkerIcon = L.divIcon({
           className: '',
           html: iconHtml,
-          iconSize: [28, 28],
-          iconAnchor: [14, 14]
+          iconSize: [26, 26],
+          iconAnchor: [13, 13]
         });
 
         const marker = L.marker([cli.lat, cli.lon], {
@@ -2152,12 +2129,14 @@
 
         const safeNome = (cli.nome || '').replace(/'/g, "\'");
         const popupContent = `
-          <div style="font-size:12px; line-height:1.4; min-width:190px;">
-            <div style="margin-bottom:4px;">${badgeHtml}</div>
+          <div style="font-size:12px; line-height:1.4; min-width:200px;">
+            <div style="margin-bottom:4px;">
+              <span style="background:${badgeBg}; color:${badgeColor}; border:1px solid ${bgCor}; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:800;">${badgeTxt}</span>
+            </div>
             <strong style="color:${isContrato ? '#38bdf8' : '#f87171'}; font-size:13px;">${cli.nome}</strong><br>
             <span style="color:#94a3b8;">${cli.cidade || ''}</span><br>
             <div style="display:flex; gap:6px; margin-top:8px;">
-              <button onclick="setDestination(${cli.lat}, ${cli.lon}, '${safeNome}', false)" style="flex:1; background:${isContrato ? '#0284c7' : '#dc2626'}; border:none; color:white; font-weight:800; padding:8px 6px; border-radius:6px; cursor:pointer; font-size:11px;">
+              <button onclick="setDestination(${cli.lat}, ${cli.lon}, '${safeNome}', false)" style="flex:1; background:${bgCor}; border:none; color:white; font-weight:800; padding:8px 6px; border-radius:6px; cursor:pointer; font-size:11px;">
                 🚀 Ir Direto
               </button>
               <button onclick="addWaypoint(${cli.lat}, ${cli.lon}, '${safeNome}')" style="flex:1; background:rgba(245,158,11,0.25); border:1px solid #f59e0b; color:#fbbf24; font-weight:800; padding:8px 6px; border-radius:6px; cursor:pointer; font-size:11px;">
