@@ -10065,6 +10065,9 @@ async def api_tecnico_assinatura_salvar(request: web.Request) -> web.Response:
 
 
 
+import threading as _threading
+_DF_WRITE_LOCK = _threading.Lock()
+
 _OS_IDEM_CACHE = {}
 
 def _verificar_e_registrar_idempotencia(req_id: str, os_id: str):
@@ -11835,67 +11838,68 @@ async def api_nova_os(request: web.Request) -> web.Response:
 
 
 
-    df = _carregar_df_direto()
+    with _DF_WRITE_LOCK:
+        df = _carregar_df_direto()
 
-    novo_id = int(df['id'].max() + 1) if ('id' in df.columns and not df.empty and pd.notna(df['id'].max())) else (len(df) + 1)
+        novo_id = int(df['id'].max() + 1) if ('id' in df.columns and not df.empty and pd.notna(df['id'].max())) else (len(df) + 1)
 
 
 
-    # OS 100% LIMPA: Discrição absoluta. Relato e campos operacionais sem nenhuma marcação para o técnico/cliente
+        # OS 100% LIMPA: Discrição absoluta. Relato e campos operacionais sem nenhuma marcação para o técnico/cliente
 
-    nova_linha = {
+        nova_linha = {
 
-        'id': novo_id,
+            'id': novo_id,
 
-        'cliente': cliente,
+            'cliente': cliente,
 
-        'cnpj': cnpj,
+            'cnpj': cnpj,
 
-        'cidade': cidade,
+            'cidade': cidade,
 
-        'estado': 'CE',
+            'estado': 'CE',
 
-        'equipamento': equipamento,
+            'equipamento': equipamento,
 
-        'endereco': endereco,
+            'endereco': endereco,
 
-        'tipo_servico': tipo_srv,
+            'tipo_servico': tipo_srv,
 
-        'data_agendamento': data_ag,
+            'data_agendamento': data_ag,
 
-        'tecnico_responsavel': tec_resp,
+            'tecnico_responsavel': tec_resp,
 
-        'tecnico_auxiliar': tec_aux,
+            'tecnico_auxiliar': tec_aux,
 
-        'responsavel_hospital': resp_hosp,
+            'responsavel_hospital': resp_hosp,
 
-        'contato_responsavel': contato if contato != 'N/D' else '',
+            'contato_responsavel': contato if contato != 'N/D' else '',
 
-        'whatsapp': contato if contato != 'N/D' else '',
+            'whatsapp': contato if contato != 'N/D' else '',
 
-        'confirmado': 'SIM',
+            'confirmado': 'SIM',
 
-        'pendencias': f'[CHAMADO ABERTO] {defeito}',
+            'pendencias': f'[CHAMADO ABERTO] {defeito}',
 
-        'status': 'ATIVO',
+            'status': 'ATIVO',
 
-        'defeito_relatado': defeito,
+            'defeito_relatado': defeito,
 
-        'pre_atendimento': respostas_triagem,
+            'pre_atendimento': respostas_triagem,
 
-        'instrumento_necessario': itens_mat_str,
+            'instrumento_necessario': itens_mat_str,
 
-        'condicao_inicial': limpar_texto(body.get('condicao_inicial'), 'OPERANDO COM FALHA').upper(),
+            'condicao_inicial': limpar_texto(body.get('condicao_inicial'), 'OPERANDO COM FALHA').upper(),
 
-        'condicao_final': 'LIBERADO PARA USO NORMAL',
+            'condicao_final': 'LIBERADO PARA USO NORMAL',
 
-        'valor_os': 0.0,
+            'valor_os': 0.0,
 
-    }
+        }
 
-    df_novo = pd.concat([df, pd.DataFrame([nova_linha])], ignore_index=True)
+        df_novo = pd.concat([df, pd.DataFrame([nova_linha])], ignore_index=True)
 
-    _salvar_df_direto(df_novo)
+        _salvar_df_direto(df_novo)
 
 
 
@@ -12590,6 +12594,8 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
     instrumentos = limpar_texto(body.get("instrumentos"), "KIT PADRÃO").upper()
+    if not itens and tipo == "CONSUMIVEL":
+        return web.json_response({"ok": False, "msg": "Informe o item consumível para registrar a baixa."}, status=400)
 
 
 
@@ -14433,7 +14439,7 @@ async def api_almox_status(request: web.Request) -> web.Response:
 
 
 
-    id_ped = int(body.get("id", 0))
+    id_ped = int(limpar_float(body.get("id"), 0))
 
 
 
@@ -14470,6 +14476,8 @@ async def api_almox_status(request: web.Request) -> web.Response:
 
 
     ok, msg = atualizar_status_solicitacao_peca(DB_NAME, id_ped, novo_status, tecnico=tecnico, tipo_origem=tipo_origem, motivo_recusa=motivo_recusa)
+    if ok:
+        invalidar_cache_bootstrap()
 
 
 
