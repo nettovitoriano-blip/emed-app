@@ -822,11 +822,11 @@
 
         </p>
 
-        <div style="display:flex;gap:8px;">
+        <div style="display:flex;flex-direction:column;gap:10px;">
 
-          <input type="text" id="inputCodigoLiberacao" placeholder="Ex: 454 848" maxlength="12" style="text-align:center;font-size:17px;font-weight:900;letter-spacing:3px;background:#0d1b2a;border:1.5px solid #00b4d8;border-radius:10px;color:#ffffff;height:44px;flex:1;outline:none;" onkeypress="if(event.key==='Enter')validarCodigoLiberacao()">
+          <input type="text" inputmode="numeric" autocomplete="one-time-code" id="inputCodigoLiberacao" placeholder="Ex: 454 848" maxlength="12" style="width:100%;min-width:0;box-sizing:border-box;text-align:center;font-size:20px;font-weight:900;letter-spacing:4px;background:#0d1b2a;border:1.5px solid #00b4d8;border-radius:10px;color:#ffffff;height:46px;outline:none;" onkeypress="if(event.key==='Enter')validarCodigoLiberacao()">
 
-          <button type="button" onclick="validarCodigoLiberacao()" style="background:linear-gradient(135deg,#00b4d8,#0077b6);color:#fff;border:none;border-radius:10px;padding:0 18px;font-weight:800;font-size:13.5px;cursor:pointer;white-space:nowrap;box-shadow:0 4px 12px rgba(0,180,216,0.35);">
+          <button type="button" onclick="validarCodigoLiberacao()" style="width:100%;height:44px;background:linear-gradient(135deg,#00b4d8,#0077b6);color:#fff;border:none;border-radius:10px;padding:0 18px;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap;box-shadow:0 4px 12px rgba(0,180,216,0.35);">
 
             Liberar Já 🚀
 

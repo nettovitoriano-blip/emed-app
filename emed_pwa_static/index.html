@@ -54790,35 +54790,7 @@
 
 
 
-        <button class="btn-drawer-symbol" onclick="abrirDrawer()" title="Abrir Menu Completo de Módulos (18 Menus)" aria-label="Menu Principal" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.15);border:1.5px solid rgba(56,189,248,0.7);border-radius:10px;padding:6px 10px;color:#fff;cursor:pointer;">
-
-
-
-          <svg class="topbar-symbol-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;display:block;">
-
-
-
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-
-
-
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-
-
-
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-
-
-
-          </svg>
-
-
-
-          <span style="font-size:12px;font-weight:900;letter-spacing:0.5px;" class="hide-mobile">MENU</span>
-
-
-
-        </button>
+        
 
 
 
@@ -54890,7 +54862,7 @@
 
 
 
-      <div class="brand-center" onclick="irMenuRapido('TECNICO','TEC_OS')">
+      <div class="brand-center" onclick="abrirDrawer()" style="cursor:pointer;" title="Abrir Menu Principal">
 
 
 
@@ -99918,7 +99890,7 @@ async function efetuarLogout() {
 
 
 
-      if (st.includes("CONCLU")) clsBadge = "concluido";
+      if (st.includes("CONCLU") || st.includes("FINALIZ") || st.includes("AGUARDANDO TRIAGEM")) clsBadge = "concluido";
 
 
 
@@ -100651,7 +100623,7 @@ async function efetuarLogout() {
                   ? `<span class="badge" style="background:#dcfce7;color:#15803d;border:1px solid #86efac;font-weight:800;">💾 Salvo</span>`
                   : `<button type="button" class="badge" onclick="event.stopPropagation();abrirModalOS('${esc(os.id)}')" style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;font-weight:700;cursor:pointer;" title="Abrir OS para preencher e salvar">💾 Salvar</button>`}
 
-                ${st.includes("CAMINHO") ? "" : `<span class="badge ${clsBadge}"><img class="emed-st-ico" onerror="this.style.display='none'" src="/api/app-icon/status-${({concluido:'autorizada_salva',obs:'aviso',ativo:'enviando'})[clsBadge]||'pendente'}" alt="" />${esc(st)}</span>`}
+                ${st.includes("CAMINHO") ? "" : `<span class="badge ${clsBadge}"><img class="emed-st-ico" onerror="this.style.display='none'" src="/api/app-icon/status-${({concluido:'autorizada_salva',obs:'aviso',ativo:'enviando'})[clsBadge]||'pendente'}" alt="" />${esc(st.includes("AGUARDANDO TRIAGEM") ? "CONCLUÍDA (EM TRIAGEM)" : st)}</span>`}
 
               </div>
 
@@ -104253,333 +104225,24 @@ function renderMenuTecOS(box) {
         if (!usuarioNome) return true;
         return String(o.tecnico_responsavel || "").toUpperCase().includes(usuarioNome);
       };
+            const osConcluidaParaTecnico = (o) => {
+        const st = (o.status || "").toUpperCase();
+        return st.includes("CONCLU") || st.includes("FINALIZ") || st.includes("AGUARDANDO TRIAGEM");
+      };
       const osTemPendencia = (o) => {
         const st = (o.status || "").toUpperCase();
-        if (st.includes("CONCLU")) return false;
+        if (st.includes("CONCLU") && !st.includes("PEND")) return false;
         const p = String(o.pendencia_limpa || "").trim().toUpperCase();
-        return st.includes("OBSERVA") || st.includes("PEND") || (Boolean(p) && !p.includes("NENHUMA PEND") && !p.includes("SEM PEND") && p !== "-");
+        const pec = String(o.peca_selecionada || "").trim().toUpperCase();
+        const temPecaCobrar = Boolean(pec && pec !== "NENHUMA PEÇA" && pec !== "NENHUMA PECA" && pec !== "-");
+        return st.includes("OBSERVA") || st.includes("PEND") || temPecaCobrar || (Boolean(p) && !p.includes("NENHUMA PEND") && !p.includes("SEM PEND") && p !== "-");
       };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
       const filtradas = ordens.filter(o => {
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         if (!osPertenceAoTecnico(o)) return false;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        const st = (o.status || "").toUpperCase();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        if (STATE.abaStatusOS === "ATIVAS" && st.includes("CONCLU")) return false;
+        if (STATE.abaStatusOS === "ATIVAS" && osConcluidaParaTecnico(o)) return false;
 
 
 
@@ -104707,7 +104370,7 @@ function renderMenuTecOS(box) {
 
 
 
-        if (STATE.abaStatusOS === "CONCLUIDAS" && !st.includes("CONCLU")) return false;
+        if (STATE.abaStatusOS === "CONCLUIDAS" && !osConcluidaParaTecnico(o)) return false;
 
 
 
@@ -105284,16 +104947,9 @@ function renderMenuTecOS(box) {
 
 
                   const ordensBase = ordens.filter(osPertenceAoTecnico);
-      const ativasCount = ordensBase.filter(o => !(o.status || "").toUpperCase().includes("CONCLU")).length;
+            const ativasCount = ordensBase.filter(o => !osConcluidaParaTecnico(o)).length;
       const pendCount = ordensBase.filter(osTemPendencia).length;
-
-
-
-
-
-
-
-      const concCount = ordensBase.filter(o => (o.status || "").toUpperCase().includes("CONCLU")).length;
+      const concCount = ordensBase.filter(osConcluidaParaTecnico).length;
 
 
 

@@ -436,23 +436,25 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
         status_label = status_os.upper()
 
     cabecalho_padrao_html = f"""
-  <table style="border-bottom: 2px solid #0284c7; margin-bottom: 8px; padding-bottom: 6px; width: 100%; table-layout: fixed; border-collapse: collapse;">
+  <table width="100%" style="border-bottom: 2px solid #0284c7; margin-bottom: 8px; padding-bottom: 6px; width: 100%; table-layout: fixed; border-collapse: collapse;">
     <tr>
-      <td style="width: 22%; vertical-align: middle; padding-right: 6px;">
-        <img src="{logo_b64}" width="132" style="width: 132px; max-width: 100%; height: auto; max-height: 54px; object-fit: contain; display: block;" alt="EMED Eletromedicina" />
+      <td width="23%" style="width: 23%; vertical-align: middle; padding-right: 6px;">
+        <img src="{logo_b64}" width="128" style="width: 128px; max-width: 100%; height: auto; max-height: 54px; display: block;" alt="EMED Eletromedicina" />
       </td>
-      <td style="width: 59%; vertical-align: middle; text-align: center; border-left: 1.5px solid #e2e8f0; border-right: 1.5px solid #e2e8f0; padding: 0 8px;">
-        <div style="font-size: 10pt; font-weight: 800; color: #0f172a; letter-spacing: 0.2px;">EMED&nbsp;ELETROMEDICINA&nbsp;LTDA.</div>
-        <div style="font-size: 7pt; font-weight: 700; color: #0284c7; margin-bottom: 3px;">Manuten&ccedil;&atilde;o em Equipamentos de Diagn&oacute;stico por Imagem</div>
-        <div style="font-size: 5.7pt; color: #334155; line-height: 1.3;">
-          <b>Matriz (CE):</b> CNPJ: 03.611.974/0001-08 &bull; Rua Coronel Freire, 16 - Centro - Eus&eacute;bio - CE &bull; CEP: 61760-000 &bull; Fone: (85) 3254-2929
+      <td width="57%" style="width: 57%; vertical-align: middle; text-align: center; border-left: 1.5px solid #e2e8f0; border-right: 1.5px solid #e2e8f0; padding: 0 6px;">
+        <div style="font-size: 9.8pt; font-weight: 800; color: #0f172a; letter-spacing: 0.2px;">EMED&nbsp;ELETROMEDICINA&nbsp;LTDA.</div>
+        <div style="font-size: 6.8pt; font-weight: 700; color: #0284c7; margin-bottom: 3px;">Manuten&ccedil;&atilde;o em Equipamentos de Diagn&oacute;stico por Imagem</div>
+        <div style="font-size: 5.5pt; color: #334155; line-height: 1.25;">
+          <b>Matriz (CE):</b> CNPJ: 03.611.974/0001-08 &bull; Fone: (85) 3254-2929<br/>
+          Rua Coronel Freire, 16 - Centro - Eus&eacute;bio - CE &bull; CEP: 61760-000
         </div>
-        <div style="font-size: 5.7pt; color: #334155; line-height: 1.3; margin-top: 1px;">
-          <b>Filial (DF):</b> CNPJ: 03.611.974/0002-80 &bull; Rua 3, Ch&aacute;cara 46A, Lote 01 - Vicente Pires - Bras&iacute;lia - DF &bull; Fone: (61) 3234-3647 / 99658-5392
+        <div style="font-size: 5.5pt; color: #334155; line-height: 1.25; margin-top: 2px;">
+          <b>Filial (DF):</b> CNPJ: 03.611.974/0002-80 &bull; Fone: (61) 3234-3647 / 99658-5392<br/>
+          Rua 3, Ch&aacute;cara 46A, Lote 01 - Vicente Pires - Bras&iacute;lia - DF
         </div>
       </td>
-      <td style="width: 19%; vertical-align: middle; padding-left: 8px; text-align: right;">
-        <table style="border: 1.5px solid {cor_num_borda}; width: 100%; border-collapse: collapse; margin-left: auto;">
+      <td width="20%" style="width: 20%; vertical-align: middle; padding-left: 8px; text-align: right;">
+        <table width="100%" style="border: 1.5px solid {cor_num_borda}; width: 100%; border-collapse: collapse; margin-left: auto;">
           <tr>
             <td style="background: {cor_num_bg}; color: #ffffff; text-align: center; padding: 5px 2px;">
               <div style="font-size: 5.5pt; font-weight: bold; letter-spacing: 0.4px;">ORDEM DE SERVI&Ccedil;O</div>
