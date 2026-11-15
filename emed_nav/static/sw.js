@@ -1,5 +1,5 @@
-// EmedNav Service Worker - v24 (Alfinete Único: Sede eMED Fortaleza/Eusébio)
-const CACHE_NAME = 'emednav-v24-sede-emed-matriz-only';
+// EmedNav Service Worker - v25 (Alfinete Sede eMED: Rua Gonçalves Pinto, Guaribas - Eusébio)
+const CACHE_NAME = 'emednav-v25-sede-emed-local-exato';
 
 const ASSETS_TO_CACHE = [
   '/',

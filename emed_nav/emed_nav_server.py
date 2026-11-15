@@ -37,7 +37,7 @@ DEFAULT_LAT = -3.7965
 DEFAULT_LON = -38.5678
 
 DESTINOS_HOSPITAIS = [
-    {"id": -1, "nome": "Sede EMED Eletromedicina", "cidade": "Eusébio / CE", "lat": -3.8856, "lon": -38.4614, "tipo_contrato": "CONTRATO"},
+    {"id": -1, "nome": "Sede EMED Eletromedicina", "cidade": "Eusébio / CE", "lat": -3.87456, "lon": -38.46225, "tipo_contrato": "CONTRATO"},
     {"id": -2, "nome": "Hospital Wilson Rosado", "cidade": "Mossoró / RN", "lat": -5.1884, "lon": -37.3486, "tipo_contrato": "CONTRATO"},
     {"id": -3, "nome": "Hospital Regional Tarcísio Maia (HRTM)", "cidade": "Mossoró / RN", "lat": -5.1963, "lon": -37.3619, "tipo_contrato": "CONTRATO"},
     {"id": -4, "nome": "Hospital de Olhos de Mossoró", "cidade": "Mossoró / RN", "lat": -5.1842, "lon": -37.3491, "tipo_contrato": "CONTRATO"},
