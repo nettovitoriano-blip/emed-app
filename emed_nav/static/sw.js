@@ -1,5 +1,5 @@
-// EmedNav Service Worker - v23 (Alfinete Base eMED, Fix Popup 1-Clique Estável, YouTube Downloads & Retorno ao Mapa)
-const CACHE_NAME = 'emednav-v23-base-pin-popup-fix-music-return';
+// EmedNav Service Worker - v24 (Alfinete Único: Sede eMED Fortaleza/Eusébio)
+const CACHE_NAME = 'emednav-v24-sede-emed-matriz-only';
 
 const ASSETS_TO_CACHE = [
   '/',
