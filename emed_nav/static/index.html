@@ -850,6 +850,7 @@
             <span id="sheet-mini-text" style="font-size:12.5px; font-weight:800; color:#f8fafc; overflow:hidden; text-overflow:ellipsis;">Para onde vamos? (Toque para abrir)</span>
           </div>
           <div id="sheet-mini-actions" style="display:flex; align-items:center; gap:6px;">
+            <button id="mini-btn-edit" onclick="event.stopPropagation(); expandAndEditRoute()" style="display:none; background:#0284c7; border:none; color:white; font-size:11px; font-weight:900; padding:4px 8px; border-radius:6px; cursor:pointer;">✏️ EDITAR</button>
             <button id="mini-btn-waze" onclick="event.stopPropagation(); launchWaze()" style="display:none; background:#00b4d8; border:none; color:white; font-size:11px; font-weight:900; padding:4px 8px; border-radius:6px; cursor:pointer;">WAZE</button>
             <button id="mini-btn-maps" onclick="event.stopPropagation(); launchGoogleMaps()" style="display:none; background:#16a34a; border:none; color:white; font-size:11px; font-weight:900; padding:4px 8px; border-radius:6px; cursor:pointer;">MAPS</button>
             <span id="sheet-toggle-icon" style="font-size:11px; color:#38bdf8; background:rgba(56,189,248,0.2); padding:3px 8px; border-radius:8px; font-weight:900;">EXPANDIR 🔼</span>
@@ -869,7 +870,12 @@
               Destino
             </div>
           </div>
-          <button onclick="clearRoute()" title="Cancelar Rota" style="background:rgba(239,68,68,0.2); border:1px solid #ef4444; color:#f87171; border-radius:8px; width:34px; height:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:14px; flex-shrink:0;">✕</button>
+          <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
+            <button id="btn-cockpit-edit-toggle" onclick="toggleEditRouteMode()" title="Editar Rota e Adicionar Paradas" style="background:rgba(56,189,248,0.22); border:1.5px solid #38bdf8; color:#38bdf8; border-radius:8px; padding:0 10px; height:34px; display:flex; align-items:center; gap:5px; cursor:pointer; font-size:12px; font-weight:800;">
+              <span>✏️</span> <span>Editar Rota</span>
+            </button>
+            <button onclick="clearRoute()" title="Cancelar Rota" style="background:rgba(239,68,68,0.2); border:1px solid #ef4444; color:#f87171; border-radius:8px; width:34px; height:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:14px; flex-shrink:0;">✕</button>
+          </div>
         </div>
 
         <!-- BOTÕES GRANDES DE NAVEGAÇÃO DIRETA AO VOLANTE -->
@@ -881,6 +887,50 @@
             <span>🚀</span> WAZE
           </button>
         </div>
+
+        <!-- PAINEL RETRÁTIL DE EDIÇÃO DA ROTA ATIVA (ABERTO COM 1 TOQUE NO BOTÃO 'EDITAR ROTA') -->
+        <div id="cockpit-edit-panel" style="display:none; flex-direction:column; gap:8px; background:rgba(15, 23, 42, 0.98); border:1.5px solid #38bdf8; border-radius:10px; padding:10px; margin-top:4px; box-shadow:0 6px 18px rgba(0,0,0,0.6);">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:12px; font-weight:900; color:#38bdf8; display:flex; align-items:center; gap:6px;">
+              <span>✏️</span> EDITAR ROTA (PARADAS & DESTINO)
+            </span>
+            <button type="button" onclick="toggleEditRouteMode(false)" style="background:none; border:none; color:#94a3b8; font-size:12px; font-weight:800; cursor:pointer; padding:2px 6px;">✕ Recolher</button>
+          </div>
+
+          <!-- INPUT DE NOVA PARADA OU ALTERAÇÃO DE DESTINO -->
+          <div style="display:flex; gap:6px; align-items:center;">
+            <input type="text" id="input-edit-stop" class="dest-input" placeholder="🔍 Digite parada, hospital ou cliente..." autocomplete="off" style="flex:1; height:40px; font-size:13px; padding:0 10px;" />
+            <button type="button" onclick="confirmAddStopFromEdit()" style="height:40px; padding:0 12px; background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border:1px solid #38bdf8; color:#ffffff; font-weight:900; font-size:12px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:4px; flex-shrink:0;">
+              <span>➕</span> Parada
+            </button>
+            <button type="button" onclick="changeActiveDestination()" style="height:40px; padding:0 10px; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border:1px solid #fbbf24; color:#0f172a; font-weight:900; font-size:11.5px; border-radius:8px; cursor:pointer; flex-shrink:0;" title="Troca o destino final da rota pelo digitado">
+              Trocar Destino
+            </button>
+          </div>
+
+          <!-- LISTA DE PARADAS ATIVAS NA ROTA -->
+          <div id="cockpit-waypoints-list" style="display:flex; flex-direction:column; gap:5px; max-height:160px; overflow-y:auto; margin-top:2px;"></div>
+
+          <!-- ATALHOS RÁPIDOS PARA ADICIONAR PARADA DE HOSPITAIS PRINCIPAIS -->
+          <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Atalhos rápidos para adicionar na rota:</div>
+          <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:4px;">
+            <button type="button" onclick="quickAddStopPreset('Wilson Rosado')" style="background:#1e293b; border:1px solid #475569; color:#cbd5e1; font-size:11px; font-weight:700; padding:4px 8px; border-radius:6px; white-space:nowrap; cursor:pointer;">+ Wilson Rosado</button>
+            <button type="button" onclick="quickAddStopPreset('Tarcísio Maia')" style="background:#1e293b; border:1px solid #475569; color:#cbd5e1; font-size:11px; font-weight:700; padding:4px 8px; border-radius:6px; white-space:nowrap; cursor:pointer;">+ Tarcísio Maia</button>
+            <button type="button" onclick="quickAddStopPreset('Hosp. Olhos')" style="background:#1e293b; border:1px solid #475569; color:#cbd5e1; font-size:11px; font-weight:700; padding:4px 8px; border-radius:6px; white-space:nowrap; cursor:pointer;">+ Hosp. Olhos</button>
+            <button type="button" onclick="quickAddStopPreset('Sede EMED')" style="background:#1e293b; border:1px solid #475569; color:#cbd5e1; font-size:11px; font-weight:700; padding:4px 8px; border-radius:6px; white-space:nowrap; cursor:pointer;">+ Sede EMED</button>
+          </div>
+
+          <!-- BOTÕES DE CONTROLE -->
+          <div style="display:flex; gap:6px; align-items:center; margin-top:4px;">
+            <button type="button" onclick="optimizeRouteOrder()" style="flex:1; height:36px; background:rgba(245,158,11,0.2); border:1px solid #f59e0b; color:#fbbf24; border-radius:8px; font-weight:800; font-size:11.5px; display:flex; align-items:center; justify-content:center; gap:4px; cursor:pointer;">
+              <span>⚡</span> Otimizar Ordem
+            </button>
+            <button type="button" onclick="toggleEditRouteMode(false)" style="flex:1; height:36px; background:linear-gradient(135deg, #16a34a 0%, #15803d 100%); border:1px solid #4ade80; color:#ffffff; border-radius:8px; font-weight:900; font-size:12px; display:flex; align-items:center; justify-content:center; gap:4px; cursor:pointer;">
+              <span>✔️</span> Concluir Edição
+            </button>
+          </div>
+        </div>
+
 
         <!-- ATALHO RÁPIDO DE MÚSICA AO VOLANTE (YOUTUBE, DEEZER, SPOTIFY) -->
         <button type="button" onclick="openMusicModal()" style="height:36px; width:100%; border-radius:8px; background:linear-gradient(135deg, rgba(168,85,247,0.25) 0%, rgba(236,72,153,0.25) 100%); border:1.5px solid rgba(244,114,182,0.5); color:#f5d0fe; font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; margin-top:6px; box-shadow:0 3px 10px rgba(0,0,0,0.3);">
@@ -2974,6 +3024,7 @@
     function updateMiniSheetHeader() {
       const miniText = document.getElementById('sheet-mini-text');
       const miniIcon = document.getElementById('sheet-mini-icon');
+      const miniEdit = document.getElementById('mini-btn-edit');
       const miniWaze = document.getElementById('mini-btn-waze');
       const miniMaps = document.getElementById('mini-btn-maps');
 
@@ -2982,23 +3033,27 @@
         const min = document.getElementById('lbl-route-min').innerText || '';
         miniIcon.innerText = '🏁';
         miniText.innerHTML = `<strong style="color:#38bdf8;">${state.destName}</strong> • ${km} (${min})`;
-        miniWaze.style.display = 'block';
-        miniMaps.style.display = 'block';
+        if (miniEdit) miniEdit.style.display = 'block';
+        if (miniWaze) miniWaze.style.display = 'block';
+        if (miniMaps) miniMaps.style.display = 'block';
       } else if (state.waypoints && state.waypoints.length > 0) {
         const km = document.getElementById('lbl-route-km').innerText || '';
         const min = document.getElementById('lbl-route-min').innerText || '';
         const last = state.waypoints[state.waypoints.length - 1];
         miniIcon.innerText = '🚩';
         miniText.innerHTML = `<strong style="color:#f59e0b;">${state.waypoints.length} Parada(s):</strong> ${last.name} • ${km} (${min})`;
-        miniWaze.style.display = 'block';
-        miniMaps.style.display = 'block';
+        if (miniEdit) miniEdit.style.display = 'block';
+        if (miniWaze) miniWaze.style.display = 'block';
+        if (miniMaps) miniMaps.style.display = 'block';
       } else {
         miniIcon.innerText = '🗺️';
         miniText.innerText = 'Para onde vamos? (Toque para abrir)';
-        miniWaze.style.display = 'none';
-        miniMaps.style.display = 'none';
+        if (miniEdit) miniEdit.style.display = 'none';
+        if (miniWaze) miniWaze.style.display = 'none';
+        if (miniMaps) miniMaps.style.display = 'none';
       }
     }
+
 
     // Auto-recolhe o painel em celulares ao clicar no mapa
     map.on('click', () => {
@@ -3123,14 +3178,17 @@
 
     function renderWaypointsList() {
       const listEl = document.getElementById('waypoints-list');
+      const cockpitListEl = document.getElementById('cockpit-waypoints-list');
       const summaryEl = document.getElementById('lbl-stops-summary');
       const tipEl = document.getElementById('waypoints-maps-tip');
       const btnOptimize = document.getElementById('btn-optimize-stops');
       const btnCockpitOpt = document.getElementById('btn-cockpit-optimize');
 
       if (!state.waypoints || state.waypoints.length === 0) {
-        listEl.style.display = 'none';
-        listEl.innerHTML = '';
+        if (listEl) { listEl.style.display = 'none'; listEl.innerHTML = ''; }
+        if (cockpitListEl) {
+          cockpitListEl.innerHTML = '<div style="font-size:12px; color:#94a3b8; text-align:center; padding:10px 4px; background:rgba(30,41,59,0.5); border-radius:6px; border:1px dashed #475569;">Nenhuma parada intermediária adicionada ainda. Digite acima ou clique nos atalhos rápidos para adicionar paradas à rota.</div>';
+        }
         if (summaryEl) summaryEl.style.display = 'none';
         if (tipEl) tipEl.style.display = 'none';
         if (btnOptimize) btnOptimize.style.display = 'none';
@@ -3150,22 +3208,30 @@
         btnCockpitOpt.style.display = state.waypoints.length >= 2 ? 'inline-flex' : 'none';
       }
 
-      listEl.style.display = 'flex';
-      listEl.innerHTML = state.waypoints.map((wp, idx) => `
-        <div class="waypoint-item" style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:rgba(15,23,42,0.7); border-radius:8px; border:1px solid rgba(56,189,248,0.2); gap:6px;">
+      const itemsHtml = state.waypoints.map((wp, idx) => `
+        <div class="waypoint-item" style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:rgba(15,23,42,0.85); border-radius:8px; border:1px solid rgba(56,189,248,0.3); gap:6px;">
           <div style="display:flex; align-items:center; gap:8px; overflow:hidden; flex:1;">
-            <span class="waypoint-badge" style="background:#f59e0b; color:#0f172a; font-weight:900; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0;">${idx + 1}</span>
-            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; font-weight:600; color:#e2e8f0;">${wp.name}</span>
+            <span class="waypoint-badge" style="background:#f59e0b; color:#0f172a; font-weight:900; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0;">${idx + 1}</span>
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12.5px; font-weight:700; color:#f8fafc;">${wp.name}</span>
           </div>
           <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
-            ${idx > 0 ? `<button onclick="moveWaypoint(${idx}, -1)" title="Subir parada" style="background:rgba(255,255,255,0.1); border:none; color:#cbd5e1; border-radius:4px; width:22px; height:22px; cursor:pointer; font-size:10px;">▲</button>` : ''}
-            ${idx < state.waypoints.length - 1 ? `<button onclick="moveWaypoint(${idx}, 1)" title="Descer parada" style="background:rgba(255,255,255,0.1); border:none; color:#cbd5e1; border-radius:4px; width:22px; height:22px; cursor:pointer; font-size:10px;">▼</button>` : ''}
-            <button class="btn-stop-nav" onclick="launchWazeSingle(${wp.lat}, ${wp.lon}, '${wp.name.replace(/'/g, "\\'")}')" title="Navegar no Waze para esta parada" style="background:rgba(0,180,216,0.2); border:1px solid #00b4d8; color:#38bdf8; border-radius:4px; padding:3px 7px; font-size:10.5px; font-weight:800; cursor:pointer;">Waze</button>
-            <button class="btn-remove-stop" onclick="removeWaypoint(${idx})" title="Remover parada" style="background:rgba(239,68,68,0.2); border:none; color:#f87171; border-radius:4px; width:22px; height:22px; cursor:pointer; font-size:11px; font-weight:bold;">✕</button>
+            ${idx > 0 ? `<button onclick="moveWaypoint(${idx}, -1)" title="Subir parada" style="background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:#cbd5e1; border-radius:4px; width:24px; height:24px; cursor:pointer; font-size:10px;">▲</button>` : ''}
+            ${idx < state.waypoints.length - 1 ? `<button onclick="moveWaypoint(${idx}, 1)" title="Descer parada" style="background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:#cbd5e1; border-radius:4px; width:24px; height:24px; cursor:pointer; font-size:10px;">▼</button>` : ''}
+            <button class="btn-stop-nav" onclick="launchWazeSingle(${wp.lat}, ${wp.lon}, '${wp.name.replace(/'/g, "\\'")}')" title="Navegar no Waze para esta parada" style="background:rgba(0,180,216,0.25); border:1px solid #00b4d8; color:#38bdf8; border-radius:4px; padding:3px 7px; font-size:10.5px; font-weight:800; cursor:pointer;">Waze</button>
+            <button class="btn-remove-stop" onclick="removeWaypoint(${idx})" title="Remover parada" style="background:rgba(239,68,68,0.25); border:1px solid rgba(239,68,68,0.4); color:#f87171; border-radius:4px; width:24px; height:24px; cursor:pointer; font-size:11px; font-weight:bold;">✕</button>
           </div>
         </div>
       `).join('');
+
+      if (listEl) {
+        listEl.style.display = 'flex';
+        listEl.innerHTML = itemsHtml;
+      }
+      if (cockpitListEl) {
+        cockpitListEl.innerHTML = itemsHtml;
+      }
     }
+
 
     // ==========================================================================
     // SISTEMA MODERNO DE ROTA FLUIDA: OTIMIZAÇÃO (TSP), CONCLUIR ETAPA & COCKPIT
@@ -3279,11 +3345,144 @@
       showToast('Ordem das paradas atualizada');
     }
 
-    function toggleEditRouteMode() {
-      const panel = document.getElementById('panel-search-and-chips');
-      const isHidden = panel.style.display === 'none';
-      panel.style.display = isHidden ? 'block' : 'none';
+    function toggleEditRouteMode(forceState) {
+      const editPanel = document.getElementById('cockpit-edit-panel');
+      if (!editPanel) return;
+      const isVisible = editPanel.style.display === 'flex';
+      const shouldOpen = (typeof forceState === 'boolean') ? forceState : !isVisible;
+      editPanel.style.display = shouldOpen ? 'flex' : 'none';
+      if (shouldOpen) {
+        renderWaypointsList();
+        expandBottomSheet();
+        const inputEdit = document.getElementById('input-edit-stop');
+        if (inputEdit) {
+          setTimeout(() => { inputEdit.focus(); }, 150);
+        }
+      }
     }
+
+    function expandAndEditRoute() {
+      expandBottomSheet();
+      toggleEditRouteMode(true);
+    }
+
+    async function confirmAddStopFromEdit() {
+      const input = document.getElementById('input-edit-stop');
+      const val = (input ? input.value : '').trim();
+      if (!val) {
+        showToast('⚠️ Digite o nome ou endereço da parada');
+        return;
+      }
+
+      // 1. Procura na base de hospitais/clientes conhecidos
+      const known = [
+        { nome: 'Wilson Rosado', lat: -5.1912, lon: -37.3486 },
+        { nome: 'Tarcísio Maia', lat: -5.1963, lon: -37.3551 },
+        { nome: 'Hosp. Olhos', lat: -5.1945, lon: -37.3467 },
+        { nome: 'Almeida Castro', lat: -5.1878, lon: -37.3432 },
+        { nome: 'Sede EMED', lat: -5.1895, lon: -37.3456 },
+        { nome: 'Apodi', lat: -5.6610, lon: -37.7980 },
+        { nome: 'Tibau', lat: -4.8380, lon: -37.2520 },
+        { nome: 'Assú', lat: -5.5760, lon: -36.9110 },
+        { nome: 'Pau dos Ferros', lat: -6.1110, lon: -38.2070 },
+        { nome: 'Natal (HRWG)', lat: -5.8115, lon: -35.2155 }
+      ];
+
+      // Busca nos clientes carregados
+      if (_allClientsCache && _allClientsCache.length) {
+        for (const c of _allClientsCache) {
+          if (c.lat && c.lon && (c.nome.toLowerCase().includes(val.toLowerCase()) || (c.cidade && c.cidade.toLowerCase().includes(val.toLowerCase())))) {
+            addWaypoint(c.lat, c.lon, c.nome);
+            if (input) input.value = '';
+            showToast(`✅ Parada adicionada: ${c.nome}`);
+            renderWaypointsList();
+            return;
+          }
+        }
+      }
+
+      const match = known.find(k => k.nome.toLowerCase().includes(val.toLowerCase()));
+      if (match) {
+        addWaypoint(match.lat, match.lon, match.nome);
+        if (input) input.value = '';
+        showToast(`✅ Parada adicionada: ${match.nome}`);
+        renderWaypointsList();
+        return;
+      }
+
+      // 2. Busca geocodificada caso não esteja na lista conhecida
+      try {
+        showToast('🔍 Localizando parada...');
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val + ', Ceará, Brasil')}&limit=1`);
+        const data = await res.json();
+        if (data && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lon = parseFloat(data[0].lon);
+          const shortName = val.length > 25 ? val.substring(0, 25) + '...' : val;
+          addWaypoint(lat, lon, shortName);
+          if (input) input.value = '';
+          showToast(`✅ Parada adicionada: ${shortName}`);
+          renderWaypointsList();
+        } else {
+          showToast('⚠️ Local não encontrado. Tente ser mais específico.');
+        }
+      } catch (e) {
+        showToast('⚠️ Erro ao buscar endereço.');
+      }
+    }
+
+    function quickAddStopPreset(name) {
+      const known = [
+        { nome: 'Wilson Rosado', lat: -5.1912, lon: -37.3486 },
+        { nome: 'Tarcísio Maia', lat: -5.1963, lon: -37.3551 },
+        { nome: 'Hosp. Olhos', lat: -5.1945, lon: -37.3467 },
+        { nome: 'Almeida Castro', lat: -5.1878, lon: -37.3432 },
+        { nome: 'Sede EMED', lat: -5.1895, lon: -37.3456 }
+      ];
+      const match = known.find(k => k.nome.toLowerCase().includes(name.toLowerCase()));
+      if (match) {
+        addWaypoint(match.lat, match.lon, match.nome);
+        showToast(`✅ Parada adicionada: ${match.nome}`);
+        renderWaypointsList();
+      }
+    }
+
+    async function changeActiveDestination() {
+      const input = document.getElementById('input-edit-stop');
+      const val = (input ? input.value : '').trim();
+      if (!val) {
+        showToast('⚠️ Digite o novo destino final');
+        return;
+      }
+      showToast(`🔄 Alterando destino final para: ${val}...`);
+      const known = [
+        { nome: 'Wilson Rosado', lat: -5.1912, lon: -37.3486 },
+        { nome: 'Tarcísio Maia', lat: -5.1963, lon: -37.3551 },
+        { nome: 'Hosp. Olhos', lat: -5.1945, lon: -37.3467 },
+        { nome: 'Almeida Castro', lat: -5.1878, lon: -37.3432 },
+        { nome: 'Sede EMED', lat: -5.1895, lon: -37.3456 }
+      ];
+      const match = known.find(k => k.nome.toLowerCase().includes(val.toLowerCase()));
+      if (match) {
+        setDestination(match.lat, match.lon, match.nome, false);
+      } else {
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val + ', Ceará, Brasil')}&limit=1`);
+          const data = await res.json();
+          if (data && data.length > 0) {
+            setDestination(parseFloat(data[0].lat), parseFloat(data[0].lon), val, false);
+          } else {
+            setDestination(state.carLat + 0.05, state.carLon + 0.05, val, false);
+          }
+        } catch(e) {
+          setDestination(state.carLat + 0.05, state.carLon + 0.05, val, false);
+        }
+      }
+      if (input) input.value = '';
+      toggleEditRouteMode(false);
+      showToast('Destino final atualizado');
+    }
+
 
     function toggleFabMoreMenu() {
       const popover = document.getElementById('fab-more-popover');

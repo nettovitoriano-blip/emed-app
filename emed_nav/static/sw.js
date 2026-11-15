@@ -1,5 +1,5 @@
-// EmedNav Service Worker - v20 (Símbolo Oficial eMED SVG, Velocímetro Estável Sem Carro e Maps/Waze Inteligente)
-const CACHE_NAME = 'emednav-v20-symbol-svg-clean-speed-maps';
+// EmedNav Service Worker - v21 (Opção de Edição da Rota Selecionada & Paradas)
+const CACHE_NAME = 'emednav-v21-route-editor-stops';
 
 const ASSETS_TO_CACHE = [
   '/',
