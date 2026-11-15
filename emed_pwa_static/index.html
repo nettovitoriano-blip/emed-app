@@ -88420,6 +88420,9 @@ async function processarFilaOffline() {
 
 
 
+        if (url === "/api/salvar-os" && body && typeof body === "object" && !body.request_id) {
+          body.request_id = "req_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+        }
         const _bodyStr = JSON.stringify(body);
         const _timeoutMs = _bodyStr.length > 200000 ? 45000 : 15000;
         const _ctrl = new AbortController();

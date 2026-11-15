@@ -10062,6 +10062,45 @@ async def api_tecnico_assinatura_salvar(request: web.Request) -> web.Response:
 
 
 
+
+_OS_IDEM_CACHE = {}
+
+def _verificar_e_registrar_idempotencia(req_id: str, os_id: str):
+    """Evita reprocessamento duplicado de /api/salvar-os em reenvios da fila offline/3G."""
+    if not req_id:
+        return None
+    now = time.time()
+    # Limpa entradas antigas (> 24h)
+    for k in list(_OS_IDEM_CACHE.keys()):
+        if now - _OS_IDEM_CACHE[k][0] > 86400:
+            _OS_IDEM_CACHE.pop(k, None)
+    if req_id in _OS_IDEM_CACHE:
+        return _OS_IDEM_CACHE[req_id][1]
+    try:
+        with get_db_connection(DB_NAME) as conn:
+            conn.execute("CREATE TABLE IF NOT EXISTS os_idempotency (req_id TEXT PRIMARY KEY, os_id TEXT, resp_json TEXT, criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+            row = conn.execute("SELECT resp_json FROM os_idempotency WHERE req_id = ?", (req_id,)).fetchone()
+            if row and row[0]:
+                resp_obj = json.loads(row[0])
+                _OS_IDEM_CACHE[req_id] = (now, resp_obj)
+                return resp_obj
+    except Exception:
+        pass
+    return None
+
+def _salvar_idempotencia(req_id: str, os_id: str, resp_obj: dict):
+    if not req_id or not isinstance(resp_obj, dict) or not resp_obj.get("ok"):
+        return
+    _OS_IDEM_CACHE[req_id] = (time.time(), resp_obj)
+    try:
+        with get_db_connection(DB_NAME) as conn:
+            conn.execute("CREATE TABLE IF NOT EXISTS os_idempotency (req_id TEXT PRIMARY KEY, os_id TEXT, resp_json TEXT, criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+            conn.execute("INSERT OR IGNORE INTO os_idempotency (req_id, os_id, resp_json) VALUES (?, ?, ?)", (req_id, str(os_id), json.dumps(resp_obj, ensure_ascii=False)))
+            conn.commit()
+    except Exception:
+        pass
+
+
 async def api_salvar_os(request: web.Request) -> web.Response:
 
 
@@ -10087,6 +10126,11 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
     acao = str(body.get("acao", "CONCLUIR")).upper()
+    req_id_idem = str(body.get("request_id", "")).strip()
+    if req_id_idem:
+        _cached_resp = _verificar_e_registrar_idempotencia(req_id_idem, os_id)
+        if _cached_resp is not None:
+            return web.json_response(_cached_resp)
 
 
 
@@ -11943,7 +11987,7 @@ async def api_nova_os(request: web.Request) -> web.Response:
 
 
 
-    return web.json_response({
+    _resp_final_os = {
 
         'ok': True,
 
@@ -11961,7 +12005,9 @@ async def api_nova_os(request: web.Request) -> web.Response:
 
         'msg': msg_retorno,
 
-    })
+    }
+    _salvar_idempotencia(req_id_idem, os_id, _resp_final_os)
+    return web.json_response(_resp_final_os)
 
 
 
@@ -12031,7 +12077,23 @@ async def api_reabrir_os(request: web.Request) -> web.Response:
 
 
 
-            return web.json_response({"ok": True, "msg": f"🔓 OS #{os_id} reaberta e devolvida para a fila de OS Ativas!"})
+            avisos = []
+            try:
+                sess_r = getattr(request, "emed_user", None) or getattr(request, "_emed_user", None)
+                usr_r = sess_r.get("nome") if isinstance(sess_r, dict) and sess_r.get("nome") else "GESTOR"
+                with get_db_connection(DB_NAME) as conn_r:
+                    nf_r = conn_r.execute("SELECT numero_nf, status_fiscal FROM notas_fiscais WHERE os_id = ?", (os_id,)).fetchone()
+                    if nf_r and str(nf_r[1] or "").upper() == "EMITIDA":
+                        avisos.append(f"NF {nf_r[0]} já emitida")
+                    mov_r = conn_r.execute("SELECT COUNT(*) FROM movimentacoes_estoque WHERE os_id = ? OR motivo LIKE ?", (os_id, f"%OS #{os_id}%")).fetchone()
+                    if mov_r and int(mov_r[0] or 0) > 0:
+                        avisos.append(f"{int(mov_r[0])} movimentação(ões) de estoque já registrada(s)")
+                    conn_r.execute("INSERT INTO auditoria_exclusoes (tabela_alvo, registro_id, usuario, motivo, dados_snapshot) VALUES (?, ?, ?, ?, ?)", ("ordens_servico", os_id, usr_r, "REABERTURA_OS", json.dumps({"avisos": avisos}, ensure_ascii=False)))
+                    conn_r.commit()
+            except Exception:
+                pass
+            extra = f" (⚠️ Atenção: {'; '.join(avisos)})" if avisos else ""
+            return web.json_response({"ok": True, "msg": f"🔓 OS #{os_id} reaberta e devolvida para a fila de OS Ativas!{extra}", "avisos": avisos})
 
 
 
@@ -13120,6 +13182,10 @@ async def api_veiculo_km(request: web.Request) -> web.Response:
 
 
         cur = conn.cursor()
+        row_km = cur.execute("SELECT km_atual FROM veiculos WHERE id = ?", (vid,)).fetchone()
+        km_ant = int(row_km[0] or 0) if row_km else 0
+        if km_ant > 0 and km_atual < km_ant and not bool(body.get("forcar_ajuste", False)):
+            return web.json_response({"ok": False, "msg": f"⚠️ Hodômetro informado ({km_atual} km) é menor que o atual ({km_ant} km). Confira o valor antes de salvar."})
 
 
 
@@ -15695,13 +15761,7 @@ async def api_os_nf_salvar(request: web.Request) -> web.Response:
 
 
 
-    if idx_alvo is not None:
-
-        df.at[idx_alvo, "numero_nf"] = numero_nf
-
-        df.at[idx_alvo, "status_fiscal"] = status_fiscal
-
-        _salvar_df_direto(df)
+    # Atualizacao na OS sera feita somente apos validar duplicidade e gravar NF
 
 
 
@@ -15856,6 +15916,17 @@ async def api_os_nf_salvar(request: web.Request) -> web.Response:
 
 
         conn.commit()
+
+    if idx_alvo is not None:
+        df.at[idx_alvo, "numero_nf"] = numero_nf
+        df.at[idx_alvo, "status_fiscal"] = status_fiscal
+        if status_fiscal == "EMITIDA":
+            st_cur = str(df.at[idx_alvo, "status"] if "status" in df.columns else "").upper()
+            if any(k in st_cur for k in ("AGUARDANDO APROVAÇÃO", "AGUARDANDO APROVACAO", "AGUARDANDO EMISSÃO", "AGUARDANDO EMISSAO", "EMISSÃO NF", "EMISSAO NF")):
+                df.at[idx_alvo, "status"] = "CONCLUÍDO (NF EMITIDA)"
+            if "triagem_concluida" in df.columns:
+                df.at[idx_alvo, "triagem_concluida"] = 1
+        _salvar_df_direto(df)
 
 
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v84-3g-gzip-indexeddb-offline';
+const CACHE_NAME = 'emed-pwa-v85-blindagem-nf-os-km-idempotencia';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
