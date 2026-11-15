@@ -1,5 +1,5 @@
 // EmedNav Service Worker - v10 (Full Offline PWA + Cache-First Assets + Multi-Stop Routing)
-const CACHE_NAME = 'emednav-v14-skip-assume';
+const CACHE_NAME = 'emednav-v15-google-maps-fluid';
 
 const ASSETS_TO_CACHE = [
   '/',
