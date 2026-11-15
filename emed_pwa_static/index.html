@@ -101537,6 +101537,7 @@ async function efetuarLogout() {
 
 
             </a>
+            ${(String(os.pendencias || "").toUpperCase().includes("PROPOSTA") || String(os.status_proposta || "").trim()) ? `<button type="button" class="btn btn-outline btn-sm" onclick="event.stopPropagation();abrirModalPropostaRapidaOS('${esc(os.id)}')" style="border-color:#d97706;color:#b45309;background:#fffbeb;font-weight:800;">💼 Proposta p/ Cliente</button>` : ""}
 
 
 
@@ -201176,6 +201177,99 @@ function renderMenuCliTriagem(box) {
           </div>`;
       }
     }
+
+    function abrirModalPropostaRapidaOS(osId) {
+      const ordens = STATE.data?.ordens || [];
+      const os = ordens.find(x => String(x.id) === String(osId));
+      if (!os) return;
+      let ov = document.getElementById("emedModalPropRapida");
+      if (!ov) {
+        ov = document.createElement("div");
+        ov.id = "emedModalPropRapida";
+        ov.style = "position:fixed;inset:0;z-index:99998;background:rgba(15,23,42,0.75);display:flex;align-items:center;justify-content:center;padding:14px;";
+        ov.onclick = (e) => { if (e.target === ov) ov.style.display = "none"; };
+        document.body.appendChild(ov);
+      }
+      const valAtual = Number(os.valor_os || 0) > 0 ? Number(os.valor_os).toFixed(2) : "";
+      const pecaAtual = os.peca_selecionada || os.peca_aplicada || "";
+      const stProp = os.status_proposta || "AGUARDANDO ENVIO / APROVAÇÃO";
+      const linkProp = `${window.location.origin}/proposta/${encodeURIComponent(os.id)}`;
+      ov.innerHTML = `
+        <div style="background:#fff;border-radius:14px;max-width:500px;width:100%;max-height:90vh;overflow-y:auto;padding:18px;box-shadow:0 16px 40px rgba(0,0,0,0.25);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div style="font-size:16px;font-weight:900;color:#002b54;">💼 Proposta Comercial — OS #${esc(os.id)}</div>
+            <button type="button" onclick="document.getElementById('emedModalPropRapida').style.display='none'" style="background:#f1f5f9;border:none;border-radius:999px;width:30px;height:30px;font-weight:800;cursor:pointer;">✕</button>
+          </div>
+          <div style="font-size:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:10px;">
+            <div><b>🏥 Cliente:</b> ${esc(os.cliente)}</div>
+            <div><b>🔬 Equipamento:</b> ${esc(os.equipamento)}</div>
+            <div><b>📌 Status Proposta:</b> <span style="color:#b45309;font-weight:800;">${esc(stProp)}</span></div>
+          </div>
+          <label class="field-label">Peça / Serviço da Proposta</label>
+          <input id="propRapidaPeca" class="input" value="${esc(pecaAtual)}" placeholder="Ex: 6503 - TECLADO RAIOS X..." style="margin-bottom:8px;" />
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+            <div>
+              <label class="field-label">Valor Total (R$)</label>
+              <input id="propRapidaValor" type="number" step="0.01" class="input" value="${esc(valAtual)}" placeholder="0.00" />
+            </div>
+            <div>
+              <label class="field-label">Prazo de Entrega</label>
+              <input id="propRapidaPrazo" class="input" value="${esc(os.prazo_entrega || 'IMEDIATO / A COMBINAR')}" />
+            </div>
+          </div>
+          <label class="field-label">Condição de Pagamento</label>
+          <input id="propRapidaCond" class="input" value="${esc(os.condicao_pagamento || 'FATURAMENTO 28 DDL / PIX')}" style="margin-bottom:12px;" />
+          <div style="display:grid;gap:8px;">
+            <button type="button" class="btn btn-primary" onclick="salvarPropostaRapidaOS('${esc(os.id)}')">💾 Salvar Proposta na OS</button>
+            <a href="/proposta/${encodeURIComponent(os.id)}" target="_blank" class="btn btn-outline" style="text-align:center;border-color:#0284c7;color:#0284c7;font-weight:800;">👁️ Abrir Página de Aprovação do Cliente</a>
+            <button type="button" class="btn" onclick="enviarPropostaWhatsAppCliente('${esc(os.id)}', '${esc(linkProp)}')" style="background:#16a34a;color:#fff;font-weight:800;">📲 Enviar Link p/ Cliente Aprovar (WhatsApp)</button>
+          </div>
+        </div>
+      `;
+      ov.style.display = "flex";
+    }
+    async function salvarPropostaRapidaOS(osId) {
+      const ordens = STATE.data?.ordens || [];
+      const os = ordens.find(x => String(x.id) === String(osId)) || {};
+      const peca = (document.getElementById("propRapidaPeca")?.value || "").trim();
+      const val = parseFloat(document.getElementById("propRapidaValor")?.value || "0") || 0;
+      const prazo = (document.getElementById("propRapidaPrazo")?.value || "IMEDIATO").trim();
+      const cond = (document.getElementById("propRapidaCond")?.value || "FATURAMENTO 28 DDL").trim();
+      const res = await apiPost("/api/propostas", {
+        os_id: osId,
+        cliente: os.cliente || "CLIENTE",
+        equipamento: os.equipamento || "EQUIPAMENTO",
+        peca_nome: peca,
+        quantidade: 1,
+        valor_unitario: val,
+        condicao_pagamento: cond,
+        prazo_entrega: prazo,
+        solicitar_compra: false
+      });
+      if (res && res.ok) {
+        if (typeof mostrarToast === "function") mostrarToast("✅ Proposta salva! Agora envie o link para o cliente aprovar.", "success");
+        await sincronizarTudo(false);
+        abrirModalPropostaRapidaOS(osId);
+      } else {
+        alert(res?.msg || "Erro ao salvar proposta.");
+      }
+    }
+    function enviarPropostaWhatsAppCliente(osId, linkProp) {
+      const ordens = STATE.data?.ordens || [];
+      const os = ordens.find(x => String(x.id) === String(osId)) || {};
+      const peca = (document.getElementById("propRapidaPeca")?.value || os.peca_selecionada || "Serviço / Peça Técnica").trim();
+      const valNum = parseFloat(document.getElementById("propRapidaValor")?.value || os.valor_os || "0") || 0;
+      const valTxt = valNum > 0 ? `R$ ${valNum.toFixed(2).replace(".", ",")}` : "Sob consulta";
+      const msg = `Olá! Segue a *Proposta Comercial da OS #${osId}* (${os.cliente || ''} — ${os.equipamento || ''}):
+
+🔩 *Item/Serviço:* ${peca}
+💰 *Valor:* ${valTxt}
+
+👉 *Clique no link abaixo para visualizar e APROVAR online:*
+${linkProp}`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+    }
+
     function filtrarPecasModalOS(q) {
       const sel = document.getElementById("osPecaSel");
       if (!sel) return;

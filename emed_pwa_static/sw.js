@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v93-ux-regras-os';
+const CACHE_NAME = 'emed-pwa-v94-proposta-aprovacao-cliente';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

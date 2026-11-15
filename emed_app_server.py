@@ -3649,6 +3649,8 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/api/instalacao/")
 
         or path.startswith("/api/imprimir/")
+        or path.startswith("/proposta/")
+        or path == "/api/proposta/responder"
 
         or path.startswith("/api/triagem/")
 
@@ -15971,6 +15973,159 @@ async def api_os_nf_salvar(request: web.Request) -> web.Response:
 
 
 
+
+async def api_proposta_publica_html(request: web.Request) -> web.Response:
+    """Pagina publica mobile-first para o cliente visualizar e aprovar/recusar a Proposta Comercial da OS."""
+    os_id = request.match_info.get("os_id", "").strip()
+    df = _carregar_df_direto()
+    row = None
+    for idx, r in df.iterrows():
+        if str(obter_id_os(idx, r)) == os_id:
+            row = r.to_dict()
+            break
+    if not row:
+        return web.Response(status=404, text="Proposta / Ordem de Serviço não encontrada.", content_type="text/plain; charset=utf-8")
+
+    import html as _h
+    cliente = _h.escape(limpar_texto(row.get("cliente"), "CLIENTE"))
+    equip = _h.escape(limpar_texto(row.get("equipamento"), "EQUIPAMENTO"))
+    defeito = _h.escape(limpar_texto(row.get("defeito_relatado"), "-"))
+    peca = _h.escape(limpar_texto(row.get("peca_selecionada") or row.get("peca_aplicada"), "A definir / Conforme laudo técnico"))
+    pend = _h.escape(limpar_texto(row.get("pendencias"), ""))
+    cond_pag = _h.escape(limpar_texto(row.get("condicao_pagamento"), "FATURAMENTO 28 DDL"))
+    prazo = _h.escape(limpar_texto(row.get("prazo_entrega"), "IMEDIATO / A COMBINAR"))
+    st_prop = limpar_texto(row.get("status_proposta"), "AGUARDANDO APROVAÇÃO").upper()
+    val_num = limpar_float(row.get("valor_os"), 0.0)
+    val_fmt = f"R$ {val_num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    ja_aprovada = "APROVAD" in st_prop
+    ja_recusada = "RECUSAD" in st_prop
+
+    banner_status = ""
+    if ja_aprovada:
+        banner_status = f'<div style="background:#dcfce7;border:2px solid #22c55e;color:#166534;border-radius:10px;padding:14px;font-weight:800;text-align:center;margin-bottom:14px;">✅ PROPOSTA { _h.escape(st_prop) }</div>'
+    elif ja_recusada:
+        banner_status = f'<div style="background:#fee2e2;border:2px solid #ef4444;color:#991b1b;border-radius:10px;padding:14px;font-weight:800;text-align:center;margin-bottom:14px;">❌ PROPOSTA { _h.escape(st_prop) }</div>'
+
+    bloco_acao = "" if (ja_aprovada or ja_recusada) else f"""
+      <div id="boxAcaoProposta" style="margin-top:16px;border-top:1.5px solid #e2e8f0;padding-top:14px;">
+        <label style="display:block;font-size:12px;font-weight:800;color:#334155;margin-bottom:6px;">👤 Nome completo do responsável pela aprovação:</label>
+        <input id="inpAprovadorNome" type="text" placeholder="Ex: Dr. João Silva / Gerência" style="width:100%;box-sizing:border-box;padding:11px 12px;border:2px solid #cbd5e1;border-radius:8px;font-size:14px;margin-bottom:10px;" />
+        <label style="display:block;font-size:12px;font-weight:800;color:#334155;margin-bottom:6px;">📝 Observação opcional (ou motivo de revisão):</label>
+        <input id="inpAprovadorObs" type="text" placeholder="Opcional..." style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:12px;" />
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button onclick="enviarRespostaProposta('APROVAR')" style="flex:2;min-width:180px;background:#16a34a;color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:900;cursor:pointer;">✅ APROVAR PROPOSTA</button>
+          <button onclick="enviarRespostaProposta('RECUSAR')" style="flex:1;min-width:130px;background:#fff;color:#dc2626;border:2px solid #fca5a5;border-radius:10px;padding:13px;font-size:13px;font-weight:800;cursor:pointer;">❌ Solicitar Revisão</button>
+        </div>
+      </div>
+    """
+
+    html_doc = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Proposta Comercial OS #{_h.escape(os_id)} — EMED Eletromedicina</title>
+</head>
+<body style="margin:0;padding:16px;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+  <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,0.08);overflow:hidden;border:1px solid #cbd5e1;">
+    <div style="background:#002b54;color:#fff;padding:18px 20px;">
+      <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#38bdf8;font-weight:800;">EMED ELETROMEDICINA LTDA</div>
+      <div style="font-size:20px;font-weight:900;margin-top:2px;">💼 Proposta Comercial — OS #{_h.escape(os_id)}</div>
+    </div>
+    <div style="padding:18px 20px;">
+      {banner_status}
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:12px;font-size:13.5px;line-height:1.55;">
+        <div><b>🏥 Cliente:</b> {cliente}</div>
+        <div><b>🔬 Equipamento:</b> {equip}</div>
+        <div><b>⚠️ Solicitação / Defeito:</b> {defeito}</div>
+      </div>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px;margin-bottom:12px;font-size:13.5px;line-height:1.55;">
+        <div><b>🔩 Peça / Serviço Proposto:</b> {peca}</div>
+        {f'<div style="margin-top:4px;font-size:12px;color:#92400e;"><b>Detalhes:</b> {pend}</div>' if pend else ''}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:8px;">
+        <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:#166534;font-weight:800;">💰 VALOR TOTAL</div>
+          <div style="font-size:20px;font-weight:900;color:#15803d;">{val_fmt if val_num > 0 else 'Sob Consulta / A Confirmar'}</div>
+        </div>
+        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:12px;font-size:12.5px;">
+          <div><b>💳 Pagamento:</b> {cond_pag}</div>
+          <div style="margin-top:4px;"><b>⏱️ Prazo:</b> {prazo}</div>
+        </div>
+      </div>
+      {bloco_acao}
+      <div id="boxFeedbackProp" style="display:none;margin-top:12px;padding:12px;border-radius:8px;font-weight:800;text-align:center;"></div>
+    </div>
+  </div>
+  <script>
+    async function enviarRespostaProposta(decisao) {{
+      const nome = (document.getElementById('inpAprovadorNome')?.value || '').trim();
+      const obs = (document.getElementById('inpAprovadorObs')?.value || '').trim();
+      if (nome.length < 3) {{
+        alert('Informe seu nome completo para registrar a resposta.');
+        return;
+      }}
+      const res = await fetch('/api/proposta/responder', {{
+        method: 'POST',
+        headers: {{'Content-Type': 'application/json'}},
+        body: JSON.stringify({{ os_id: '{_h.escape(os_id)}', decisao, aprovador_nome: nome, observacao: obs }})
+      }});
+      const data = await res.json();
+      const fb = document.getElementById('boxFeedbackProp');
+      fb.style.display = 'block';
+      if (data.ok) {{
+        fb.style.background = decisao === 'APROVAR' ? '#dcfce7' : '#fef3c7';
+        fb.style.color = decisao === 'APROVAR' ? '#166534' : '#92400e';
+        fb.innerText = data.msg;
+        const box = document.getElementById('boxAcaoProposta');
+        if (box) box.style.display = 'none';
+      }} else {{
+        fb.style.background = '#fee2e2';
+        fb.style.color = '#991b1b';
+        fb.innerText = data.msg || 'Erro ao registrar resposta.';
+      }}
+    }}
+  </script>
+</body>
+</html>"""
+    return web.Response(text=html_doc, content_type="text/html; charset=utf-8")
+
+
+async def api_proposta_responder(request: web.Request) -> web.Response:
+    """Registra aprovacao ou recusa da Proposta Comercial diretamente pelo cliente."""
+    body = await request.json()
+    os_id = str(body.get("os_id", "")).strip()
+    decisao = limpar_texto(body.get("decisao"), "").upper()
+    aprovador = limpar_texto(body.get("aprovador_nome"), "").upper()
+    obs = limpar_texto(body.get("observacao"), "").upper()
+    if not os_id or decisao not in ("APROVAR", "RECUSAR") or len(aprovador) < 3:
+        return web.json_response({"ok": False, "msg": "Informe OS, decisão e nome completo do responsável."}, status=400)
+
+    agora = obter_agora_brasil().strftime("%d/%m/%Y %H:%M")
+    with _DF_WRITE_LOCK:
+        df = carregar_base()
+        idx_alvo = None
+        for idx, r in df.iterrows():
+            if str(obter_id_os(idx, r)) == os_id:
+                idx_alvo = idx
+                break
+        if idx_alvo is None:
+            return web.json_response({"ok": False, "msg": f"OS #{os_id} não localizada."}, status=404)
+
+        pend_atual = limpar_texto(df.at[idx_alvo, "pendencias"], "")
+        if decisao == "APROVAR":
+            df.at[idx_alvo, "status_proposta"] = f"APROVADA PELO CLIENTE ({aprovador} em {agora})"
+            df.at[idx_alvo, "pendencias"] = f"[PROPOSTA APROVADA POR {aprovador} EM {agora}] " + pend_atual.replace("[FINANCEIRO: GERAR PROPOSTA COMERCIAL]", "").strip()
+            msg_ret = f"✅ Proposta da OS #{os_id} APROVADA por {aprovador} em {agora}! A equipe EMED foi notificada."
+        else:
+            df.at[idx_alvo, "status_proposta"] = f"REVISÃO SOLICITADA ({aprovador} em {agora})"
+            df.at[idx_alvo, "pendencias"] = f"[PROPOSTA EM REVISÃO POR {aprovador}: {obs or 'SEM OBS'}] " + pend_atual
+            msg_ret = f"📝 Solicitação de revisão da OS #{os_id} registrada em {agora}."
+        salvar_base(df)
+    _invalidar_cache_bootstrap()
+    return web.json_response({"ok": True, "msg": msg_ret})
+
+
 async def api_proposta_salvar(request: web.Request) -> web.Response:
 
 
@@ -23752,6 +23907,8 @@ def criar_app() -> web.Application:
 
 
     app.router.add_post("/api/proposta/salvar", api_proposta_salvar)
+    app.router.add_get("/proposta/{os_id}", api_proposta_publica_html)
+    app.router.add_post("/api/proposta/responder", api_proposta_responder)
 
 
 
