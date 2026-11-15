@@ -9383,6 +9383,15 @@ def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
 
 
 
+def _obter_base_url_publica(request: web.Request) -> str:
+    """Resolve a URL publica real (Cloudflare/HTTPS) em vez de localhost:8502 para links enviados a clientes/contabilidade."""
+    host = (request.headers.get("X-Forwarded-Host") or request.headers.get("Host") or "").strip()
+    if host and not host.startswith(("127.0.0.1", "localhost")):
+        proto = (request.headers.get("X-Forwarded-Proto") or ("https" if "emedservice.med.br" in host else request.scheme or "https")).split(",")[0].strip()
+        return f"{proto}://{host}"
+    return "https://app.emedservice.med.br"
+
+
 async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
     os_id = request.match_info.get("os_id", "").strip()
@@ -9509,7 +9518,8 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
 
 
-    whats_msg = f"Olá, segue o espelho oficial da Nota Fiscal Eletrônica {num_nf} (OS #{os_id}) emitida pela EMED Eletromedicina: http://localhost:8502/api/fiscal/danfe/{os_id}"
+    base_pub = _obter_base_url_publica(request)
+    whats_msg = f"Olá, segue o espelho oficial da Nota Fiscal Eletrônica {num_nf} (OS #{os_id}) emitida pela EMED Eletromedicina: {base_pub}/api/fiscal/danfe/{os_id}"
 
     whats_msg_enc = urllib.parse.quote(whats_msg)
 
@@ -9669,7 +9679,7 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
             </button>
 
-            <a id="btnMailto" href="mailto:{email_cli}?subject=Nota%20Fiscal%20Eletronica%20{num_nf}%20-%20EMED&body=Segue%20espelho%20da%20Nota%20Fiscal%20Eletronica%20{num_nf}%20referente%20a%20OS%20#{os_id}:%20http://localhost:8502/api/fiscal/danfe/{os_id}" target="_blank"
+            <a id="btnMailto" href="mailto:{email_cli}?subject=Nota%20Fiscal%20Eletronica%20{num_nf}%20-%20EMED&body=Segue%20espelho%20da%20Nota%20Fiscal%20Eletronica%20{num_nf}%20referente%20a%20OS%20#{os_id}:%20{base_pub}/api/fiscal/danfe/{os_id}" target="_blank"
 
                style="background:#fff;color:#1d4ed8;border:1.5px solid #93c5fd;padding:7px 12px;border-radius:6px;font-weight:bold;font-size:11.5px;text-decoration:none;">
 
@@ -15670,6 +15680,10 @@ async def api_os_nf_salvar(request: web.Request) -> web.Response:
     valor_pecas = limpar_float(body.get("valor_pecas"), 0.0)
 
     data_emissao = limpar_texto(body.get("data_emissao"), obter_agora_brasil_str("%d/%m/%Y"))
+    if valor_servicos < 0 or valor_pecas < 0:
+        return web.json_response({"ok": False, "msg": "Valores de serviço e peças da NF não podem ser negativos."}, status=400)
+    if status_fiscal == "EMITIDA" and not numero_nf:
+        return web.json_response({"ok": False, "msg": "Informe o número da Nota Fiscal para registrar como EMITIDA."}, status=400)
 
     motivo_retificacao = str(body.get("motivo_retificacao", "")).strip()
 
@@ -20518,7 +20532,7 @@ async def api_fiscal_enviar_cliente(request: web.Request) -> web.Response:
 
         f"📅 Emitida em: {agora_brasil}\n\n"
 
-        f"🔗 Visualizar DANFE Oficial: http://localhost:8502/api/fiscal/danfe/{os_id}\n\n"
+        f"🔗 Visualizar DANFE Oficial: {_obter_base_url_publica(request)}/api/fiscal/danfe/{os_id}\n\n"
 
         f"Agradecemos a parceria!\n"
 
@@ -20664,7 +20678,7 @@ async def api_fiscal_enviar_contabilidade(request: web.Request) -> web.Response:
 
         f"🔗 Dossiê Contábil Completo: http://localhost:8502/api/financeiro/relatorio-contabil/imprimir?mes={int(mes)}&ano={ano}\n"
 
-        f"📥 Planilha CSV para Importação: http://localhost:8502/api/fiscal/relatorio-contabil-csv?mes={int(mes)}&ano={ano}\n\n"
+        f"📥 Planilha CSV para Importação: {_obter_base_url_publica(request)}/api/fiscal/relatorio-contabil-csv?mes={int(mes)}&ano={ano}\n\n"
 
         f"EMED Eletromedicina Ltda. - CNPJ: 03.611.974/0001-08\n"
 
@@ -21069,6 +21083,24 @@ async def api_fiscal_cancelar_nota(request: web.Request) -> web.Response:
                 
 
         conn.commit()
+
+    if os_id:
+        try:
+            df_c = _carregar_df_direto()
+            alterado_c = False
+            for idx_c, row_c in df_c.iterrows():
+                if str(obter_id_os(idx_c, row_c)) == str(os_id).strip():
+                    df_c.at[idx_c, "status_fiscal"] = "CANCELADA"
+                    alterado_c = True
+                    break
+            if alterado_c:
+                _salvar_df_direto(df_c)
+            else:
+                invalidar_cache_bootstrap()
+        except Exception:
+            invalidar_cache_bootstrap()
+    else:
+        invalidar_cache_bootstrap()
 
         
 
