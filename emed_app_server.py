@@ -16616,6 +16616,18 @@ async def api_pdf_os(request: web.Request) -> web.Response:
 
 
 
+async def api_foto_os(request: web.Request) -> web.Response:
+    """Serve fotos/evidencias salvas em uploads_os com protecao contra path traversal."""
+    nome_raw = request.match_info.get("nome", "").strip()
+    nome = os.path.basename(nome_raw.replace("\\", "/"))
+    if not nome or nome in (".", ".."):
+        return web.Response(status=404, text="Foto nao encontrada")
+    caminho = os.path.join(BASE_DIR, "uploads_os", nome)
+    if not os.path.isfile(caminho):
+        return web.Response(status=404, text="Foto nao encontrada")
+    return web.FileResponse(caminho, headers={"Cache-Control": "public, max-age=86400"})
+
+
 async def api_html_os(request: web.Request) -> web.Response:
 
 
@@ -23707,6 +23719,7 @@ def criar_app() -> web.Application:
 
 
 
+    app.router.add_get("/api/foto/{nome}", api_foto_os)
     app.router.add_get("/api/html/{os_id}", api_html_os)
 
 

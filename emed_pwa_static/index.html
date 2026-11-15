@@ -201058,6 +201058,24 @@ function renderMenuCliTriagem(box) {
       });
     }
 
+    function abrirFotoAmpliadaModal(src) {
+      let ov = document.getElementById("emedFotoZoomOverlay");
+      if (!ov) {
+        ov = document.createElement("div");
+        ov.id = "emedFotoZoomOverlay";
+        ov.style = "position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;";
+        ov.onclick = (e) => { if (e.target === ov) ov.style.display = "none"; };
+        ov.innerHTML = `
+          <button type="button" onclick="document.getElementById('emedFotoZoomOverlay').style.display='none'" style="position:absolute;top:16px;right:16px;background:#ef4444;color:#fff;border:none;border-radius:999px;padding:8px 14px;font-weight:700;font-size:13px;cursor:pointer;">✕ Fechar</button>
+          <img id="emedFotoZoomImg" src="" style="max-width:96vw;max-height:84vh;border-radius:10px;border:2px solid #38bdf8;object-fit:contain;background:#000;" />
+        `;
+        document.body.appendChild(ov);
+      }
+      const img = document.getElementById("emedFotoZoomImg");
+      if (img) img.src = src;
+      ov.style.display = "flex";
+    }
+
     function renderizarPreviewFotosSalvasModalOS() {
       const grid = document.getElementById("previewFotosGrid");
       if (!grid) return;
@@ -201066,13 +201084,26 @@ function renderMenuCliTriagem(box) {
       fotos.forEach((raw, idx) => {
         if (!raw) return;
         const s = String(raw).trim();
-        const src = (s.startsWith("data:") || s.startsWith("http") || s.startsWith("/")) ? s : `/api/foto/${encodeURIComponent(s)}`;
+        let src = s;
+        if (!(s.startsWith("data:") || s.startsWith("http") || s.startsWith("/api/"))) {
+          const fname = s.split(/[\\/]/).pop();
+          src = `/api/foto/${encodeURIComponent(fname)}`;
+        }
         const div = document.createElement("div");
         div.style = "position:relative;display:inline-block;";
-        div.innerHTML = `
-          <img src="${src}" style="width:68px;height:68px;object-fit:cover;border-radius:6px;border:1.5px solid #0284c7;display:block;" onerror="this.style.opacity='0.35'" />
-          <button type="button" onclick="removerFotoEvidencia(this, ${idx})" style="position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
-        `;
+        const img = document.createElement("img");
+        img.src = src;
+        img.style = "width:68px;height:68px;object-fit:cover;border-radius:6px;border:1.5px solid #0284c7;display:block;cursor:pointer;";
+        img.title = "Toque para ampliar foto";
+        img.onclick = () => abrirFotoAmpliadaModal(src);
+        img.onerror = function() { this.style.opacity = "0.35"; };
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = "✕";
+        btn.style = "position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;";
+        btn.onclick = function() { removerFotoEvidencia(this, idx); };
+        div.appendChild(img);
+        div.appendChild(btn);
         grid.appendChild(div);
       });
     }

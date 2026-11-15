@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v85-blindagem-nf-os-km-idempotencia';
+const CACHE_NAME = 'emed-pwa-v88-fotos-os-laudo-esquadro';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

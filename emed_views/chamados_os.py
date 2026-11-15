@@ -516,7 +516,7 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=820, initial-scale=0.45, maximum-scale=3.0, user-scalable=yes"/>
 <title>Relatório Técnico OS #{id_os_c} - EMED Eletromedicina</title>
 <style>
   @page {{ size: A4; margin: 6mm 8mm; }}
@@ -530,7 +530,9 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     line-height: 1.32;
   }}
   .page-container {{
+    width: 760px;
     max-width: 790px;
+    box-sizing: border-box;
     margin: 0 auto;
     background: #ffffff;
     border: 1px solid #cbd5e1;
