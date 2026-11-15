@@ -11126,6 +11126,9 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
 
+    df.at[idx_alvo, "imprimir_defeito"] = limpar_texto(body.get("imprimir_defeito"), "SIM").upper()
+    df.at[idx_alvo, "imprimir_diagnostico"] = limpar_texto(body.get("imprimir_diagnostico"), "SIM").upper()
+    df.at[idx_alvo, "imprimir_servicos"] = limpar_texto(body.get("imprimir_servicos"), "SIM").upper()
     df.at[idx_alvo, "imprimir_observacoes"] = limpar_texto(body.get("imprimir_observacoes"), "SIM").upper()
 
 
@@ -11785,6 +11788,12 @@ async def api_nova_os(request: web.Request) -> web.Response:
 
     body = await request.json()
 
+    req_id_idem = str(body.get("request_id", "")).strip()
+    if req_id_idem:
+        _cached_resp = _verificar_e_registrar_idempotencia(req_id_idem, "NOVA_OS")
+        if _cached_resp is not None:
+            return web.json_response(_cached_resp)
+
     cliente = limpar_texto(body.get('cliente'), '').upper()
 
     equipamento = limpar_texto(body.get('equipamento'), '').upper()
@@ -12023,7 +12032,8 @@ async def api_nova_os(request: web.Request) -> web.Response:
         'msg': msg_retorno,
 
     }
-    _salvar_idempotencia(req_id_idem, os_id, _resp_final_os)
+    if req_id_idem:
+        _salvar_idempotencia(req_id_idem, "NOVA_OS", _resp_final_os)
     return web.json_response(_resp_final_os)
 
 

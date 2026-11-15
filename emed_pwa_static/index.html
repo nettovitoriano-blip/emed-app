@@ -203012,6 +203012,9 @@ function renderMenuCliTriagem(box) {
 
 
 
+      const impDefAtual = val('imprimir_defeito', 'SIM');
+      const impDiagAtual = val('imprimir_diagnostico', 'SIM');
+      const impSrvAtual = val('imprimir_servicos', 'SIM');
       const impObsAtual = val('imprimir_observacoes', 'SIM');
 
 
@@ -206306,6 +206309,7 @@ function renderMenuCliTriagem(box) {
 
 
 
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569;margin:2px 0 6px;cursor:pointer;"><input type="checkbox" id="osImprimirDefeito" ${impDefAtual!=='NAO'?'checked':''} onchange="autoSalvarRascunho()" /><span>🖨️ Exibir Defeito no Laudo / PDF</span></label>
             <textarea id="osDefeito" class="textarea" rows="3" style="text-transform:uppercase;" oninput="ajustarTextoEmCaixaAlta(this);" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('defeito_relatado', os.pendencia_limpa))}</textarea>
 
 
@@ -206370,6 +206374,7 @@ function renderMenuCliTriagem(box) {
 
 
 
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569;margin:2px 0 6px;cursor:pointer;"><input type="checkbox" id="osImprimirDiag" ${impDiagAtual!=='NAO'?'checked':''} onchange="autoSalvarRascunho()" /><span>🖨️ Exibir Diagnóstico no Laudo / PDF</span></label>
             <textarea id="osProb" class="textarea" rows="3" style="text-transform:uppercase;" oninput="ajustarTextoEmCaixaAlta(this);" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('problemas_encontrados'))}</textarea>
 
 
@@ -206530,6 +206535,7 @@ function renderMenuCliTriagem(box) {
 
 
 
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569;margin:2px 0 6px;cursor:pointer;"><input type="checkbox" id="osImprimirSrvExec" ${impSrvAtual!=='NAO'?'checked':''} onchange="autoSalvarRascunho()" /><span>🖨️ Exibir Serviços Executados no Laudo / PDF</span></label>
           <textarea id="osSrvExec" class="textarea" rows="5" style="text-transform:uppercase;" placeholder="DESCREVA AQUI OS PROCEDIMENTOS, MEDIÇÕES E AJUSTES REALIZADOS OU EDITE O TEXTO SUGERIDO..." oninput="ajustarTextoEmCaixaAlta(this);" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('servico_executado'))}</textarea>
 
 
@@ -208816,7 +208822,7 @@ function renderMenuCliTriagem(box) {
 
 
 
-              <input type="checkbox" id="osImprimirObs" ${impObsAtual==='SIM'?'checked':''} onchange="autoSalvarRascunho()" />
+              <input type="checkbox" id="osImprimirObs" ${impObsAtual!=='NAO'?'checked':''} onchange="autoSalvarRascunho()" />
 
 
 
@@ -226595,6 +226601,9 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
+        imprimir_defeito: document.getElementById("osImprimirDefeito")?.checked ? "SIM" : "NAO",
+        imprimir_diagnostico: document.getElementById("osImprimirDiag")?.checked ? "SIM" : "NAO",
+        imprimir_servicos: document.getElementById("osImprimirSrvExec")?.checked ? "SIM" : "NAO",
         imprimir_observacoes: document.getElementById("osImprimirObs")?.checked ? "SIM" : "NAO",
 
 

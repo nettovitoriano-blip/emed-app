@@ -288,9 +288,23 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     inicio_fmt = f"{dt_agend} {cin}".strip() if dt_agend and dt_agend not in cin else cin
     fim_fmt = f"{dt_agend} {cout}".strip() if dt_agend and dt_agend not in cout else cout
 
+    imp_defeito = limpar_texto(row_c.get("imprimir_defeito"), "SIM").upper() != "NAO"
+    imp_diag = limpar_texto(row_c.get("imprimir_diagnostico"), "SIM").upper() != "NAO"
+    imp_srv = limpar_texto(row_c.get("imprimir_servicos"), "SIM").upper() != "NAO"
+    imp_obs = limpar_texto(row_c.get("imprimir_observacoes"), "SIM").upper() != "NAO"
     defeito_informado = limpar_texto(row_c.get("defeito_relatado"), "-")
+    diag_txt = limpar_texto(row_c.get("problemas_encontrados"), "")
     if defeito_informado == "-" or not defeito_informado:
-        defeito_informado = limpar_texto(row_c.get("problemas_encontrados"), "Manutenção preventiva / corretiva programada pelo cliente.")
+        if imp_diag and diag_txt and diag_txt != "-":
+            defeito_informado = diag_txt
+        else:
+            defeito_informado = "Manutenção preventiva / corretiva programada pelo cliente."
+    partes_sec3 = []
+    if imp_defeito:
+        partes_sec3.append(f"<div>{defeito_informado}</div>")
+    if imp_diag and diag_txt and diag_txt != "-" and (not imp_defeito or diag_txt.strip().upper() != defeito_informado.strip().upper()):
+        partes_sec3.append(f"<div style='margin-top:3px;font-weight:normal;'><b>Diagnóstico Técnico:</b> {diag_txt}</div>")
+    bloco_sec3_html = "".join(partes_sec3)
 
     raw_srv = limpar_texto(row_c.get("servico_executado"), "")
     raw_srv = _re.sub(r"\s*\|\s*\[PE[ÇC]A[^\]]*\]", "", raw_srv, flags=_re.I)
@@ -683,21 +697,21 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
   </div>
 
   <!-- 3. PROBLEMA / SOLICITAÇÃO RELATADA -->
-  <div class="sec-box">
+  {f'''<div class="sec-box">
     <div class="sec-title" style="background: #334155;">3. PROBLEMA / SOLICITAÇÃO RELATADA</div>
     <div style="padding: 6px 9px; background: #fffbeb; color: #78350f; font-size: 7.8pt; font-weight: bold;">
-      {defeito_informado}
+      {bloco_sec3_html}
     </div>
-  </div>
+  </div>''' if bloco_sec3_html else ''}
 
   <!-- 4. RELATÓRIO TÉCNICO & SERVIÇOS EXECUTADOS -->
-  <div class="sec-box">
+  {f'''<div class="sec-box">
     <div class="sec-title-blue">4. RELATÓRIO TÉCNICO — SERVIÇOS EXECUTADOS</div>
     <div style="padding: 7px 9px; background: #ffffff;">
-      {''.join(f'<div style="padding: 2.2px 0; font-size: 7.8pt; color: #1e293b;">{a}</div>' for a in linhas_acoes)}
+      {"".join(f'<div style="padding: 2.2px 0; font-size: 7.8pt; color: #1e293b;">{a}</div>' for a in linhas_acoes)}
       {espacador_srv_html}
     </div>
-  </div>
+  </div>''' if imp_srv else ''}
 
   <!-- 5. PEÇAS & COMPONENTES APLICADOS / MANUTENÇÃO PREVENTIVA -->
   <div class="sec-box">
@@ -751,9 +765,9 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
       <b>{'PENDÊNCIA REGISTRADA:' if is_pendencia else 'HISTÓRICO DA PENDÊNCIA:'}</b> {pendencias_txt} {'' if is_pendencia else '— Solucionada no atendimento.'}
     </div>
     ''' if pendencias_txt else ''}
-    <div style="padding: 4px 9px; font-size: 7.4pt; border-top: 1px solid #e2e8f0; color: #1e293b;">
+    {f'''<div style="padding: 4px 9px; font-size: 7.4pt; border-top: 1px solid #e2e8f0; color: #1e293b;">
       <b>OBSERVAÇÕES TÉCNICAS:</b> {obs_ger if obs_ger else "Equipamento revisado, testado e liberado dentro dos padrões operacionais especificados pelo fabricante."}
-    </div>
+    </div>''' if imp_obs else ''}
     <table style="border-top: 1px solid #e2e8f0; background: #f8fafc;">
       <tr>
         <td style="width: 34%; padding: 4px 9px; font-size: 7.2pt; color: #334155;"><b>Início:</b> {inicio_fmt}</td>

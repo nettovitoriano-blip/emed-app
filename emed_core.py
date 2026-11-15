@@ -307,6 +307,10 @@ SCHEMA_COLUNAS_OS = [
     ("requer_calibracao_anual", "TEXT DEFAULT 'SIM'"),
     ("latitude", "REAL"),
     ("longitude", "REAL"),
+    ("imprimir_defeito", "TEXT DEFAULT 'SIM'"),
+    ("imprimir_diagnostico", "TEXT DEFAULT 'SIM'"),
+    ("imprimir_servicos", "TEXT DEFAULT 'SIM'"),
+    ("imprimir_observacoes", "TEXT DEFAULT 'SIM'"),
 
 
 

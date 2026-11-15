@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v88-fotos-os-laudo-esquadro';
+const CACHE_NAME = 'emed-pwa-v92-campos-opcionais-laudo';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
