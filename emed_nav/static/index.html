@@ -15,9 +15,15 @@
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="/static/icon-192.png">
 
-  <!-- Leaflet CSS & JS Local e 100% Offline Resiliente -->
+  <!-- Leaflet CSS & JS com Dupla Resiliência (Local Offline + Fallback CDN Automático) -->
   <link rel="stylesheet" href="/static/leaflet.css" />
   <script src="/static/leaflet.js"></script>
+  <script>
+    if (typeof L === 'undefined') {
+      document.write('<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">');
+      document.write('<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\\/script>');
+    }
+  </script>
 
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
