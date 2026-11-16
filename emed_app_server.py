@@ -16209,12 +16209,15 @@ async def api_proposta_responder(request: web.Request) -> web.Response:
         if decisao == "APROVAR":
             texto_busca = (pend_atual + " " + status_atual).upper()
             peca_ja_instalada = bool(body.get("peca_ja_instalada")) or any(
-                k in texto_busca for k in ("APLICADA NO CLIENTE", "JA APLICADA", "JÁ APLICADA", "JA INSTALADA", "JÁ INSTALADA", "PECA TESTE", "PEÇA TESTE", "EM OBSERVA", "SUBSTITUIDA", "SUBSTITUÍDA")
+                k in texto_busca for k in ("APLICADA NO CLIENTE", "JA APLICADA", "JÁ APLICADA", "JA INSTALADA", "JÁ INSTALADA", "PECA TESTE", "PEÇA TESTE", "EM OBSERVA", "SUBSTITUIDA", "SUBSTITUÍDA", "AGUARDANDO TRIAGEM", "CONCLU")
             )
             df.at[idx_alvo, "status_proposta"] = f"APROVADA PELO CLIENTE ({aprovador} em {agora})"
             if peca_ja_instalada:
                 df.at[idx_alvo, "status"] = "CONCLUÍDO"
-                df.at[idx_alvo, "status_fiscal"] = "LIBERADO PARA EMISSÃO DE NOTA FISCAL"
+                df.at[idx_alvo, "triagem_concluida"] = 1
+                df.at[idx_alvo, "triagem_cobranca_tipo"] = "DEFINITIVA_NF"
+                df.at[idx_alvo, "triagem_data"] = agora
+                df.at[idx_alvo, "triagem_responsavel"] = aprovador
                 df.at[idx_alvo, "pendencias"] = f"[CONCLUÍDO - PROPOSTA APROVADA POR {aprovador} EM {agora}] Peça já instalada no equipamento e liberada para emissão de Nota Fiscal."
                 msg_ret = f"✅ Proposta aprovada por {aprovador} em {agora}! Como a peça já foi instalada, a OS #{os_id} foi CONCLUÍDA e liberada para Nota Fiscal."
             else:
