@@ -15996,7 +15996,7 @@ async def api_os_nf_salvar(request: web.Request) -> web.Response:
 
 
 async def api_proposta_publica_html(request: web.Request) -> web.Response:
-    """Pagina publica mobile-first para o cliente visualizar e aprovar/recusar a Proposta Comercial da OS."""
+    """Pagina oficial em papel timbrado EMED para o cliente assinar exclusivamente e aprovar/recusar a Proposta Comercial."""
     os_id = request.match_info.get("os_id", "").strip()
     df = _carregar_df_direto()
     row = None
@@ -16007,11 +16007,21 @@ async def api_proposta_publica_html(request: web.Request) -> web.Response:
     if not row:
         return web.Response(status=404, text="Proposta / Ordem de Serviço não encontrada.", content_type="text/plain", charset="utf-8")
 
+    import base64
     import html as _h
     cliente = _h.escape(limpar_texto(row.get("cliente"), "CLIENTE"))
+    cnpj = _h.escape(limpar_texto(row.get("cnpj"), "-"))
+    endereco = _h.escape(limpar_texto(row.get("endereco"), "-"))
+    cidade = _h.escape(limpar_texto(row.get("cidade"), "-"))
+    estado = _h.escape(limpar_texto(row.get("estado"), "CE"))
+    contato = _h.escape(limpar_texto(row.get("whatsapp") or row.get("contato_responsavel"), "-"))
+    resp_local = _h.escape(limpar_texto(row.get("assinatura_cliente") or row.get("responsavel_hospital"), "Coordenação Local"))
     equip = _h.escape(limpar_texto(row.get("equipamento"), "EQUIPAMENTO"))
+    tipo_srv = _h.escape(limpar_texto(row.get("tipo_servico"), "CORRETIVA"))
+    tec_resp = _h.escape(limpar_texto(row.get("tecnico_responsavel"), "-"))
+    data_os = _h.escape(limpar_texto(row.get("data_agendamento"), obter_agora_brasil().strftime("%d/%m/%Y")))
     defeito = _h.escape(limpar_texto(row.get("defeito_relatado"), "-"))
-    peca = _h.escape(limpar_texto(row.get("peca_selecionada") or row.get("peca_aplicada"), "A definir / Conforme laudo técnico"))
+    peca = _h.escape(limpar_texto(row.get("peca_selecionada") or row.get("peca_aplicada") or row.get("peca_baixada_ref"), "A definir / Conforme laudo técnico"))
     pend = _h.escape(limpar_texto(row.get("pendencias"), ""))
     cond_pag = _h.escape(limpar_texto(row.get("condicao_pagamento"), "FATURAMENTO 28 DDL"))
     prazo = _h.escape(limpar_texto(row.get("prazo_entrega"), "IMEDIATO / A COMBINAR"))
@@ -16020,31 +16030,83 @@ async def api_proposta_publica_html(request: web.Request) -> web.Response:
     val_fmt = f"R$ {val_num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     ja_aprovada = "APROVAD" in st_prop
     ja_recusada = "RECUSAD" in st_prop
-    ass_prop_img = limpar_texto(row.get("assinatura_proposta_img") or row.get("assinatura_cliente_img"), "")
+
+    # NUNCA reutilizar assinatura_cliente_img da OS (evita falsificacao/ma interpretacao): usar SOMENTE assinatura_proposta_img!
+    ass_prop_img = limpar_texto(row.get("assinatura_proposta_img"), "")
+
+    logo_b64 = ""
+    for logo_cand in ("emed_logo_oficial.png", "emed_logo_clean_white_bg.png"):
+        lp = os.path.join(BASE_DIR, logo_cand)
+        if os.path.isfile(lp):
+            with open(lp, "rb") as lf:
+                logo_b64 = f"data:image/png;base64,{base64.b64encode(lf.read()).decode('utf-8')}"
+            break
+
+    cabecalho_html = f"""
+  <table width="100%" style="border-bottom: 2px solid #0284c7; margin-bottom: 10px; padding-bottom: 6px; width: 100%; table-layout: fixed; border-collapse: collapse;">
+    <tr>
+      <td width="23%" style="width: 23%; vertical-align: middle; padding-right: 6px;">
+        {f'<img src="{logo_b64}" width="128" style="width: 128px; max-width: 100%; height: auto; max-height: 54px; display: block;" alt="EMED Eletromedicina" />' if logo_b64 else '<b style="color:#002b54;font-size:14pt;">EMED</b>'}
+      </td>
+      <td width="55%" style="width: 55%; vertical-align: middle; text-align: center; border-left: 1.5px solid #e2e8f0; border-right: 1.5px solid #e2e8f0; padding: 0 6px;">
+        <div style="font-size: 10pt; font-weight: 800; color: #0f172a;">EMED ELETROMEDICINA LTDA.</div>
+        <div style="font-size: 7pt; font-weight: 700; color: #0284c7; margin-bottom: 3px;">Manutenção em Equipamentos de Diagnóstico por Imagem</div>
+        <div style="font-size: 6pt; color: #334155; line-height: 1.25;">
+          <b>Matriz (CE):</b> CNPJ: 03.611.974/0001-08 &bull; Fone: (85) 3254-2929<br/>
+          Rua Coronel Freire, 16 - Centro - Eusébio - CE &bull; CEP: 61760-000
+        </div>
+        <div style="font-size: 6pt; color: #334155; line-height: 1.25; margin-top: 2px;">
+          <b>Filial (DF):</b> CNPJ: 03.611.974/0002-80 &bull; Fone: (61) 3234-3647 / 99658-5392<br/>
+          Rua 3, Chácara 46A, Lote 01 - Vicente Pires - Brasília - DF
+        </div>
+      </td>
+      <td width="22%" style="width: 22%; vertical-align: middle; padding-left: 8px; text-align: right;">
+        <table width="100%" style="border: 1.5px solid #002b54; width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="background: #002b54; color: #ffffff; text-align: center; padding: 5px 3px;">
+              <div style="font-size: 5.5pt; font-weight: bold; letter-spacing: 0.4px;">PROPOSTA COMERCIAL</div>
+              <div style="font-size: 10.5pt; font-weight: 900; line-height: 1.15;">OS Nº {_h.escape(os_id)}</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="background: #f8fafc; color: #334155; text-align: center; font-size: 6.5pt; font-weight: bold; padding: 3px 2px; border-top: 1px solid #002b54;">
+              {data_os}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>"""
 
     banner_status = ""
     if ja_aprovada:
-        img_ass_html = f'<div style="margin-top:8px;"><img src="{ass_prop_img}" style="max-height:70px;background:#fff;border:1px solid #86efac;border-radius:6px;padding:4px;" alt="Assinatura Cliente"/></div>' if ass_prop_img.startswith("data:image/") else ""
-        banner_status = f'<div style="background:#dcfce7;border:2px solid #22c55e;color:#166534;border-radius:10px;padding:14px;font-weight:800;text-align:center;margin-bottom:14px;">✅ PROPOSTA { _h.escape(st_prop) }{img_ass_html}<div style="margin-top:8px;"><button type="button" onclick="window.print()" style="background:#15803d;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;">🖨️ Imprimir / Salvar PDF</button></div></div>'
+        img_ass_html = (
+            f'<div style="margin-top:8px;"><img src="{ass_prop_img}" style="max-height:68px;background:#fff;border:1px solid #86efac;border-radius:6px;padding:4px;" alt="Assinatura Exclusiva da Proposta"/></div>'
+            if ass_prop_img.startswith("data:image/")
+            else '<div style="margin-top:6px;font-size:11px;color:#92400e;">(Necessária nova assinatura exclusiva da proposta abaixo para validade jurídica e anexação à OS)</div>'
+        )
+        banner_status = f'<div style="background:#dcfce7;border:2px solid #22c55e;color:#166534;border-radius:8px;padding:12px;font-weight:800;text-align:center;margin-bottom:10px;font-size:12px;">✅ PROPOSTA {_h.escape(st_prop)}{img_ass_html}<div class="no-print" style="margin-top:8px;"><button type="button" onclick="window.print()" style="background:#15803d;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;">🖨️ Imprimir / Salvar PDF A4</button></div></div>'
     elif ja_recusada:
-        banner_status = f'<div style="background:#fee2e2;border:2px solid #ef4444;color:#991b1b;border-radius:10px;padding:14px;font-weight:800;text-align:center;margin-bottom:14px;">❌ PROPOSTA { _h.escape(st_prop) }</div>'
+        banner_status = f'<div style="background:#fee2e2;border:2px solid #ef4444;color:#991b1b;border-radius:8px;padding:12px;font-weight:800;text-align:center;margin-bottom:10px;font-size:12px;">❌ PROPOSTA {_h.escape(st_prop)}</div>'
 
-    bloco_acao = "" if (ja_aprovada or ja_recusada) else f"""
-      <div id="boxAcaoProposta" style="margin-top:16px;border-top:1.5px solid #e2e8f0;padding-top:14px;">
-        <label style="display:block;font-size:12px;font-weight:800;color:#334155;margin-bottom:6px;">👤 Nome e sobrenome do responsável pela aprovação:</label>
-        <input id="inpAprovadorNome" type="text" placeholder="Ex: João Silva / Gerência" style="width:100%;box-sizing:border-box;padding:11px 12px;border:2px solid #cbd5e1;border-radius:8px;font-size:14px;margin-bottom:10px;" />
-        <label style="display:block;font-size:12px;font-weight:800;color:#334155;margin-bottom:6px;">✍️ Assinatura Digital do Cliente (assine com o dedo ou mouse abaixo):</label>
-        <div style="border:2px dashed #94a3b8;border-radius:10px;background:#f8fafc;padding:6px;margin-bottom:6px;">
-          <canvas id="canvasAssProp" width="540" height="150" style="width:100%;height:140px;background:#fff;border-radius:6px;touch-action:none;display:block;cursor:crosshair;"></canvas>
+    bloco_acao = "" if (ja_aprovada and ass_prop_img.startswith("data:image/")) or ja_recusada else f"""
+      <div id="boxAcaoProposta" style="margin-top:14px;border:1.5px solid #cbd5e1;border-radius:8px;padding:12px;background:#f8fafc;">
+        <div style="font-size:11px;font-weight:900;color:#002b54;text-transform:uppercase;margin-bottom:8px;">4. ACEITE FORMAL E ASSINATURA EXCLUSIVA DA PROPOSTA (ANTIFRAUDE)</div>
+        <div style="font-size:11px;color:#475569;margin-bottom:10px;">Por segurança jurídica, a aprovação desta proposta exige uma <b>nova assinatura presencial/digital exclusiva</b> neste documento (não reutiliza assinaturas anteriores da OS). Ao aprovar, este documento fica anexado à OS #{_h.escape(os_id)} para faturamento/NF.</div>
+        <label style="display:block;font-size:11.5px;font-weight:800;color:#334155;margin-bottom:4px;">👤 Nome e sobrenome do responsável pelo aceite:</label>
+        <input id="inpAprovadorNome" type="text" placeholder="Ex: João Silva / Diretoria" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #94a3b8;border-radius:7px;font-size:13.5px;margin-bottom:8px;background:#fff;" />
+        <label style="display:block;font-size:11.5px;font-weight:800;color:#334155;margin-bottom:4px;">✍️ Assinatura Digital Exclusiva da Proposta (dedo ou mouse):</label>
+        <div style="border:2px dashed #64748b;border-radius:8px;background:#fff;padding:4px;margin-bottom:6px;">
+          <canvas id="canvasAssProp" width="540" height="145" style="width:100%;height:135px;background:#fff;border-radius:6px;touch-action:none;display:block;cursor:crosshair;"></canvas>
         </div>
-        <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
-          <button type="button" onclick="limparAssProp()" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:6px;padding:4px 10px;font-size:11.5px;font-weight:700;cursor:pointer;">🗑️ Limpar Assinatura</button>
+        <div class="no-print" style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+          <button type="button" onclick="limparAssProp()" style="background:#e2e8f0;color:#334155;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">🗑️ Limpar Assinatura</button>
         </div>
-        <label style="display:block;font-size:12px;font-weight:800;color:#334155;margin-bottom:6px;">📝 Observação opcional (ou motivo de revisão):</label>
-        <input id="inpAprovadorObs" type="text" placeholder="Opcional..." style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:12px;" />
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button type="button" onclick="enviarRespostaProposta('APROVAR')" style="flex:2;min-width:180px;background:#16a34a;color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:900;cursor:pointer;">✅ APROVAR PROPOSTA</button>
-          <button type="button" onclick="enviarRespostaProposta('RECUSAR')" style="flex:1;min-width:130px;background:#fff;color:#dc2626;border:2px solid #fca5a5;border-radius:10px;padding:13px;font-size:13px;font-weight:800;cursor:pointer;">❌ Solicitar Revisão</button>
+        <label style="display:block;font-size:11.5px;font-weight:800;color:#334155;margin-bottom:4px;">📝 Observação opcional (ou motivo de revisão):</label>
+        <input id="inpAprovadorObs" type="text" placeholder="Opcional..." style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #cbd5e1;border-radius:7px;font-size:12.5px;margin-bottom:10px;background:#fff;" />
+        <div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button type="button" onclick="enviarRespostaProposta('APROVAR')" style="flex:2;min-width:190px;background:#16a34a;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:900;cursor:pointer;">✅ ASSINAR E APROVAR PROPOSTA</button>
+          <button type="button" onclick="enviarRespostaProposta('RECUSAR')" style="flex:1;min-width:130px;background:#fff;color:#dc2626;border:1.5px solid #fca5a5;border-radius:8px;padding:11px;font-size:12.5px;font-weight:800;cursor:pointer;">❌ Solicitar Revisão</button>
         </div>
       </div>
     """
@@ -16055,39 +16117,65 @@ async def api_proposta_publica_html(request: web.Request) -> web.Response:
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Proposta Comercial OS #{_h.escape(os_id)} — EMED Eletromedicina</title>
+<style>
+  body {{ margin:0; padding:14px; background:#f1f5f9; font-family:'Segoe UI',Arial,sans-serif; color:#0f172a; }}
+  .page-a4 {{ max-width:780px; margin:0 auto; background:#fff; border:1px solid #cbd5e1; border-radius:10px; padding:18px 20px; box-shadow:0 6px 22px rgba(15,23,42,0.08); }}
+  .sec-box {{ border:1px solid #cbd5e1; border-radius:6px; margin-bottom:10px; overflow:hidden; }}
+  .sec-title {{ background:#002b54; color:#fff; font-size:8pt; font-weight:800; padding:5px 8px; text-transform:uppercase; letter-spacing:0.3px; }}
+  .sec-title-blue {{ background:#0284c7; color:#fff; font-size:8pt; font-weight:800; padding:5px 8px; text-transform:uppercase; }}
+  table.tgrid {{ width:100%; border-collapse:collapse; }}
+  .lbl {{ font-size:7.2pt; font-weight:700; color:#475569; text-transform:uppercase; width:20%; padding:5px 6px; background:#f8fafc; border-bottom:1px solid #e2e8f0; border-right:1px solid #e2e8f0; }}
+  .val {{ font-size:8.2pt; color:#0f172a; padding:5px 7px; border-bottom:1px solid #e2e8f0; border-right:1px solid #e2e8f0; }}
+  @media print {{
+    @page {{ size: A4; margin: 8mm; }}
+    body {{ background:#fff !important; padding:0 !important; }}
+    .page-a4 {{ border:none !important; box-shadow:none !important; padding:0 !important; max-width:100% !important; }}
+    .no-print {{ display:none !important; }}
+  }}
+</style>
 </head>
-<body style="margin:0;padding:16px;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
-  <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:14px;box-shadow:0 8px 24px rgba(15,23,42,0.08);overflow:hidden;border:1px solid #cbd5e1;">
-    <div style="background:#002b54;color:#fff;padding:18px 20px;">
-      <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#38bdf8;font-weight:800;">EMED ELETROMEDICINA LTDA</div>
-      <div style="font-size:20px;font-weight:900;margin-top:2px;">💼 Proposta Comercial — OS #{_h.escape(os_id)}</div>
+<body>
+  <div class="page-a4">
+    {cabecalho_html}
+    {banner_status}
+    <div class="sec-box">
+      <div class="sec-title">1. IDENTIFICAÇÃO DO CLIENTE / UNIDADE</div>
+      <table class="tgrid">
+        <tr><td class="lbl">CLIENTE:</td><td class="val"><b>{cliente}</b></td><td class="lbl">CNPJ / CPF:</td><td class="val">{cnpj}</td></tr>
+        <tr><td class="lbl">ENDEREÇO:</td><td class="val">{endereco}</td><td class="lbl">CIDADE / UF:</td><td class="val">{cidade} - {estado}</td></tr>
+        <tr><td class="lbl">RESPONSÁVEL:</td><td class="val">{resp_local}</td><td class="lbl">CONTATO:</td><td class="val">{contato}</td></tr>
+      </table>
     </div>
-    <div style="padding:18px 20px;">
-      {banner_status}
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:12px;font-size:13.5px;line-height:1.55;">
-        <div><b>🏥 Cliente:</b> {cliente}</div>
-        <div><b>🔬 Equipamento:</b> {equip}</div>
-        <div><b>⚠️ Solicitação / Defeito:</b> {defeito}</div>
-      </div>
-      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px;margin-bottom:12px;font-size:13.5px;line-height:1.55;">
-        <div><b>🔩 Peça / Serviço Proposto:</b> {peca}</div>
-        {f'<div style="margin-top:4px;font-size:12px;color:#92400e;"><b>Detalhes:</b> {pend}</div>' if pend else ''}
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:8px;">
-        <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:12px;">
-          <div style="font-size:11px;color:#166534;font-weight:800;">💰 VALOR TOTAL</div>
-          <div style="font-size:20px;font-weight:900;color:#15803d;">{val_fmt if val_num > 0 else 'Sob Consulta / A Confirmar'}</div>
-        </div>
-        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:12px;font-size:12.5px;">
-          <div><b>💳 Pagamento:</b> {cond_pag}</div>
-          <div style="margin-top:4px;"><b>⏱️ Prazo:</b> {prazo}</div>
-        </div>
-      </div>
-      {bloco_acao}
-      <div id="boxFeedbackProp" style="display:none;margin-top:12px;padding:12px;border-radius:8px;font-weight:800;text-align:center;"></div>
+    <div class="sec-box">
+      <div class="sec-title-blue">2. EQUIPAMENTO E ORDEM DE SERVIÇO VINCULADA</div>
+      <table class="tgrid">
+        <tr><td class="lbl">EQUIPAMENTO:</td><td class="val"><b>{equip}</b></td><td class="lbl">TIPO DE SERVIÇO:</td><td class="val">{tipo_srv}</td></tr>
+        <tr><td class="lbl">TÉCNICO EMED:</td><td class="val">{tec_resp}</td><td class="lbl">OS REFERÊNCIA:</td><td class="val"><b>OS #{_h.escape(os_id)} ({data_os})</b></td></tr>
+        <tr><td class="lbl">SOLICITAÇÃO / LAUDO:</td><td class="val" colspan="3">{defeito}</td></tr>
+      </table>
     </div>
+    <div class="sec-box">
+      <div class="sec-title" style="background:#334155;">3. ESCOPO COMERCIAL, PEÇAS E CONDIÇÕES</div>
+      <table class="tgrid">
+        <tr><td class="lbl">PEÇA / SERVIÇO:</td><td class="val" colspan="3"><b>{peca}</b></td></tr>
+        {f'<tr><td class="lbl">DETALHES / FLUXO:</td><td class="val" colspan="3">{pend}</td></tr>' if pend else ''}
+        <tr>
+          <td class="lbl">VALOR TOTAL:</td>
+          <td class="val" style="font-size:10.5pt;font-weight:900;color:#15803d;">{val_fmt if val_num > 0 else 'Sob Consulta / A Confirmar'}</td>
+          <td class="lbl">PRAZO:</td>
+          <td class="val"><b>{prazo}</b></td>
+        </tr>
+        <tr><td class="lbl">CONDIÇÃO PAGAMENTO:</td><td class="val" colspan="3"><b>{cond_pag}</b></td></tr>
+      </table>
+    </div>
+    {bloco_acao}
+    <div id="boxFeedbackProp" style="display:none;margin-top:12px;padding:12px;border-radius:8px;font-weight:800;text-align:center;"></div>
   </div>
   <script>
+    function voltarParaOS() {{
+      try {{ if (window.opener && !window.opener.closed) {{ if (typeof window.opener.sincronizarTudo === 'function') window.opener.sincronizarTudo(false); window.close(); }} }} catch(e) {{}}
+      window.location.href = '/?modo=tecnico';
+    }}
     let _assPropDesenhada = false;
     (function initCanvasProp() {{
       const cv = document.getElementById('canvasAssProp');
@@ -16134,10 +16222,6 @@ async def api_proposta_publica_html(request: web.Request) -> web.Response:
       cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
       _assPropDesenhada = false;
     }}
-    function voltarParaOS() {{
-      try {{ if (window.opener && !window.opener.closed) {{ if (typeof window.opener.sincronizarTudo === 'function') window.opener.sincronizarTudo(false); window.close(); }} }} catch(e) {{}}
-      window.location.href = '/?modo=tecnico';
-    }}
     async function enviarRespostaProposta(decisao) {{
       const nome = (document.getElementById('inpAprovadorNome')?.value || '').trim();
       const obs = (document.getElementById('inpAprovadorObs')?.value || '').trim();
@@ -16147,7 +16231,7 @@ async def api_proposta_publica_html(request: web.Request) -> web.Response:
       }}
       const cv = document.getElementById('canvasAssProp');
       if (decisao === 'APROVAR' && cv && !_assPropDesenhada) {{
-        alert('Por favor, assine no quadro acima antes de aprovar a proposta.');
+        alert('Por favor, colete uma nova assinatura exclusiva no quadro acima antes de aprovar a proposta.');
         return;
       }}
       const assinatura_img = (cv && _assPropDesenhada) ? cv.toDataURL('image/png') : '';
@@ -16162,7 +16246,7 @@ async def api_proposta_publica_html(request: web.Request) -> web.Response:
       if (data.ok) {{
         fb.style.background = decisao === 'APROVAR' ? '#dcfce7' : '#fef3c7';
         fb.style.color = decisao === 'APROVAR' ? '#166534' : '#92400e';
-        fb.innerHTML = data.msg + '<br/><br/><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;"><button type="button" onclick="voltarParaOS()" style="background:#002b54;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:800;cursor:pointer;">⬅️ Voltar para as OS</button><button type="button" onclick="window.location.reload()" style="background:#fff;color:#002b54;border:1.5px solid #002b54;border-radius:8px;padding:10px 14px;font-weight:800;cursor:pointer;">📄 Ver Comprovante</button></div>';
+        fb.innerHTML = data.msg + '<br/><br/><div class="no-print" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;"><button type="button" onclick="voltarParaOS()" style="background:#002b54;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:800;cursor:pointer;">⬅️ Voltar para as OS</button><button type="button" onclick="window.location.reload()" style="background:#fff;color:#002b54;border:1.5px solid #002b54;border-radius:8px;padding:10px 14px;font-weight:800;cursor:pointer;">📄 Ver Proposta Assinada</button></div>';
         const box = document.getElementById('boxAcaoProposta');
         if (box) box.style.display = 'none';
         try {{ if (window.opener && typeof window.opener.sincronizarTudo === 'function') window.opener.sincronizarTudo(false); }} catch(e) {{}}
@@ -16181,6 +16265,86 @@ async def api_proposta_publica_html(request: web.Request) -> web.Response:
     return web.Response(text=html_doc, content_type="text/html", charset="utf-8")
 
 
+async def api_proposta_triagem(request: web.Request) -> web.Response:
+    """Botoes de triagem pos-aprovacao da proposta: instalada->NF, aguardar peca, peca diagnostica/aluguel, ou distribuir tecnico+instrumento."""
+    body = await request.json()
+    os_id = str(body.get("os_id", "")).strip()
+    modo = limpar_texto(body.get("modo"), "").upper()
+    tecnico_dest = limpar_texto(body.get("tecnico"), "").upper()
+    instrumento = limpar_texto(body.get("instrumento"), "").upper()
+    valor_aluguel = limpar_float(body.get("valor_aluguel"), 0.0)
+    obs = limpar_texto(body.get("obs"), "").upper()
+    if not os_id or modo not in ("INSTALADA_NF", "AGUARDAR_PECA", "EMED_DIAGNOSTICO_ALUGUEL", "PECA_CHEGOU_DISTRIBUIR"):
+        return web.json_response({"ok": False, "msg": "Informe OS e modo de triagem válido."}, status=400)
+
+    agora = obter_agora_brasil().strftime("%d/%m/%Y %H:%M")
+    with _DF_WRITE_LOCK:
+        df = _carregar_df_direto()
+        idx_alvo = None
+        for idx, r in df.iterrows():
+            if str(obter_id_os(idx, r)) == os_id:
+                idx_alvo = idx
+                break
+        if idx_alvo is None:
+            return web.json_response({"ok": False, "msg": f"OS #{os_id} não localizada."}, status=404)
+
+        cliente_os = limpar_texto(df.at[idx_alvo, "cliente"], "CLIENTE")
+        equip_os = limpar_texto(df.at[idx_alvo, "equipamento"], "EQUIPAMENTO")
+        peca_ref = limpar_texto(df.at[idx_alvo, "peca_baixada_ref"] if "peca_baixada_ref" in df.columns else "", "PEÇA DA PROPOSTA")
+
+        if modo == "INSTALADA_NF":
+            df.at[idx_alvo, "status"] = "CONCLUÍDO"
+            df.at[idx_alvo, "triagem_concluida"] = 1
+            df.at[idx_alvo, "triagem_cobranca_tipo"] = "DEFINITIVA_NF"
+            df.at[idx_alvo, "triagem_data"] = agora
+            df.at[idx_alvo, "pendencias"] = f"[CONCLUÍDO - TRIAGEM NF {agora}] Peça instalada e liberada ao Financeiro para Nota Fiscal. {obs}".strip()
+            msg_ret = f"✅ OS #{os_id} finalizada e liberada ao Financeiro para Nota Fiscal!"
+        elif modo == "AGUARDAR_PECA":
+            df.at[idx_alvo, "status"] = "AGUARDANDO PEÇA"
+            df.at[idx_alvo, "pendencias"] = f"[AGUARDANDO PEÇA ({agora})] Peça solicitada/adquirida. Quando chegar, distribuir técnico para instalação. {obs}".strip()
+            try:
+                with get_db_connection(DB_NAME) as conn_e:
+                    conn_e.execute(
+                        "INSERT INTO solicitacoes_pecas (tecnico, destino_cliente, itens_solicitados, status_pedido, data_pedido, os_id) VALUES (?, ?, ?, ?, ?, ?)",
+                        ("COMPRAS / ALMOXARIFADO", f"{cliente_os} ({equip_os}) [OS #{os_id}]", peca_ref, "AGUARDANDO PEÇA CHEGAR", agora, str(os_id))
+                    )
+                    conn_e.commit()
+            except Exception:
+                pass
+            msg_ret = f"⏳ OS #{os_id} movida para AGUARDANDO PEÇA!"
+        elif modo == "EMED_DIAGNOSTICO_ALUGUEL":
+            alug_txt = f"ALUGUEL PROVISÓRIO R$ {valor_aluguel:,.2f}" if valor_aluguel > 0 else "PEÇA DIAGNÓSTICA EMED EM COMODATO"
+            df.at[idx_alvo, "status"] = "EM OBSERVAÇÃO"
+            df.at[idx_alvo, "pendencias"] = f"[PEÇA EMED EM DIAGNÓSTICO / {alug_txt} ({agora})] Cliente funcionando até chegada da peça definitiva. {obs}".strip()
+            try:
+                with get_db_connection(DB_NAME) as conn_e:
+                    conn_e.execute(
+                        "INSERT INTO solicitacoes_pecas (tecnico, destino_cliente, itens_solicitados, status_pedido, data_pedido, os_id) VALUES (?, ?, ?, ?, ?, ?)",
+                        ("PLANEJAMENTO / ALMOXARIFADO", f"{cliente_os} ({equip_os}) [OS #{os_id}]", f"{peca_ref} ({alug_txt})", "PROVISÓRIA EM USO — AGUARDANDO PEÇA DEFINITIVA", agora, str(os_id))
+                    )
+                    conn_e.commit()
+            except Exception:
+                pass
+            msg_ret = f"🔬 OS #{os_id} configurada com peça EMED provisória ({alug_txt}) até chegada da peça!"
+        else:
+            df.at[idx_alvo, "status"] = "ATIVO"
+            if tecnico_dest:
+                df.at[idx_alvo, "tecnico_responsavel"] = tecnico_dest
+            inst_txt = f" | Instrumento: {instrumento}" if instrumento else ""
+            df.at[idx_alvo, "pendencias"] = f"[PEÇA CONFIRMADA — DISTRIBUÍDA EM {agora}{inst_txt}] Técnico {tecnico_dest or 'A DEFINIR'} direcionado para instalar peça e finalizar OS. {obs}".strip()
+            try:
+                with get_db_connection(DB_NAME) as conn_e:
+                    conn_e.execute(
+                        "INSERT INTO solicitacoes_pecas (tecnico, destino_cliente, itens_solicitados, instrumentos_solicitados, status_pedido, data_pedido, os_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (tecnico_dest or "PLANEJAMENTO", f"{cliente_os} ({equip_os}) [OS #{os_id}]", peca_ref, instrumento or "CONFORME MODALIDADE", "PEÇA CONFIRMADA — SEPARAR P/ INSTALAÇÃO", agora, str(os_id))
+                    )
+                    conn_e.commit()
+            except Exception:
+                pass
+            msg_ret = f"🚚 Peça confirmada! OS #{os_id} distribuída para {tecnico_dest or 'fila ATIVA'} instalar e finalizar."
+        _salvar_df_direto(df)
+    invalidar_cache_bootstrap()
+    return web.json_response({"ok": True, "msg": msg_ret})
 async def api_proposta_responder(request: web.Request) -> web.Response:
     """Registra aprovacao ou recusa da Proposta Comercial diretamente pelo cliente."""
     body = await request.json()
@@ -16259,10 +16423,7 @@ async def api_proposta_responder(request: web.Request) -> web.Response:
                 msg_ret = f"✅ Proposta aprovada por {aprovador} em {agora}! OS #{os_id} retornou para ATIVO (Planejamento: {info_est})."
             if ass_img.startswith("data:image/"):
                 df.at[idx_alvo, "assinatura_proposta_img"] = ass_img
-                if not limpar_texto(df.at[idx_alvo, "assinatura_cliente_img"], ""):
-                    df.at[idx_alvo, "assinatura_cliente_img"] = ass_img
-                if not limpar_texto(df.at[idx_alvo, "assinatura_cliente"], ""):
-                    df.at[idx_alvo, "assinatura_cliente"] = aprovador
+            df.at[idx_alvo, "formulario_anexo"] = f"/proposta/{os_id}"
         else:
             df.at[idx_alvo, "status_proposta"] = f"REVISÃO SOLICITADA ({aprovador} em {agora})"
             df.at[idx_alvo, "pendencias"] = f"[PROPOSTA EM REVISÃO POR {aprovador}: {obs or 'SEM OBS'}] " + pend_atual
@@ -24059,6 +24220,7 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/proposta/salvar", api_proposta_salvar)
     app.router.add_get("/proposta/{os_id}", api_proposta_publica_html)
     app.router.add_post("/api/proposta/responder", api_proposta_responder)
+    app.router.add_post("/api/proposta/triagem", api_proposta_triagem)
 
 
 

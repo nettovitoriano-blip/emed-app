@@ -199663,6 +199663,28 @@ function renderMenuCliTriagem(box) {
             <a href="/proposta/${encodeURIComponent(os.id)}" target="_blank" class="btn btn-outline" style="text-align:center;border-color:#0284c7;color:#0284c7;font-weight:800;">👁️ Abrir Página de Aprovação do Cliente</a>
             <button type="button" class="btn" onclick="enviarPropostaWhatsAppCliente('${esc(os.id)}', '${esc(linkProp)}')" style="background:#16a34a;color:#fff;font-weight:800;">📲 Enviar Link p/ Cliente Aprovar (WhatsApp)</button>
           </div>
+          <div style="margin-top:14px;border-top:1.5px solid #e2e8f0;padding-top:12px;">
+            <div style="font-size:12px;font-weight:900;color:#002b54;margin-bottom:8px;">⚖️ Triagem &amp; Destino da OS / Peça</div>
+            <div style="display:grid;gap:6px;">
+              <button type="button" class="btn btn-sm" onclick="executarTriagemPropostaOS('${esc(os.id)}','INSTALADA_NF')" style="background:#15803d;color:#fff;font-weight:800;">✅ Peça Já Instalada → Concluir &amp; Liberar NF</button>
+              <button type="button" class="btn btn-sm" onclick="executarTriagemPropostaOS('${esc(os.id)}','AGUARDAR_PECA')" style="background:#d97706;color:#fff;font-weight:800;">⏳ Aguardar Peça Chegar (Compras/Estoque)</button>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <input id="triAluguelVal" type="number" step="0.01" class="input" placeholder="Aluguel R$ (0=cortesia)" style="width:140px;font-size:11.5px;" />
+                <button type="button" class="btn btn-sm" onclick="executarTriagemPropostaOS('${esc(os.id)}','EMED_DIAGNOSTICO_ALUGUEL')" style="flex:1;background:#0284c7;color:#fff;font-weight:800;">🔬 Peça EMED Diagnóstico / Aluguel</button>
+              </div>
+              <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:8px;margin-top:2px;">
+                <div style="font-size:11px;font-weight:800;color:#334155;margin-bottom:4px;">🚚 Peça Chegou? Distribuir Técnico + Instrumento:</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
+                  <select id="triTecDest" class="select" style="font-size:11.5px;">
+                    <option value="">-- Técnico --</option>
+                    ${(STATE.data?.tecnicos || []).map(t => `<option value="${esc(t.nome)}">${esc(t.nome)}</option>`).join("")}
+                  </select>
+                  <input id="triInstDest" class="input" placeholder="Instrumento (ex: Medidor kVp)" style="font-size:11.5px;" />
+                </div>
+                <button type="button" class="btn btn-sm" onclick="executarTriagemPropostaOS('${esc(os.id)}','PECA_CHEGOU_DISTRIBUIR')" style="width:100%;background:#002b54;color:#fff;font-weight:800;">🚚 Peça Chegou → Distribuir p/ Instalar</button>
+              </div>
+            </div>
+          </div>
         </div>
       `;
       ov.style.display = "flex";
@@ -199691,6 +199713,21 @@ function renderMenuCliTriagem(box) {
         abrirModalPropostaRapidaOS(osId);
       } else {
         alert(res?.msg || "Erro ao salvar proposta.");
+      }
+    }
+    async function executarTriagemPropostaOS(osId, modo) {
+      const valor_aluguel = parseFloat(document.getElementById("triAluguelVal")?.value || "0") || 0;
+      const tecnico = document.getElementById("triTecDest")?.value || "";
+      const instrumento = document.getElementById("triInstDest")?.value || "";
+      const res = await apiPost("/api/proposta/triagem", { os_id: osId, modo, valor_aluguel, tecnico, instrumento });
+      if (res && res.ok) {
+        if (typeof mostrarToast === "function") mostrarToast(res.msg, "success");
+        const ov = document.getElementById("emedModalPropRapida");
+        if (ov) ov.style.display = "none";
+        await sincronizarTudo(false);
+        if (typeof renderizarTelaPrincipal === "function") renderizarTelaPrincipal();
+      } else {
+        alert(res?.msg || "Erro ao aplicar triagem.");
       }
     }
     function enviarPropostaWhatsAppCliente(osId, linkProp) {

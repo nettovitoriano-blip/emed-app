@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v1-0-1-portal-cliente-proposta';
+const CACHE_NAME = 'emed-pwa-v1-0-4-proposta-timbrada-triagem';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
