@@ -22627,15 +22627,19 @@ async def handle_static_nav(request: web.Request) -> web.Response:
                 ".jpg": "image/jpeg",
                 ".jpeg": "image/jpeg",
                 ".ico": "image/x-icon",
-                ".css": "text/css; charset=utf-8",
-                ".js": "application/javascript; charset=utf-8",
-                ".json": "application/json; charset=utf-8",
+                ".css": "text/css",
+                ".js": "application/javascript",
+                ".json": "application/json",
                 ".mp3": "audio/mpeg",
                 ".wav": "audio/wav"
             }
             ct = cts.get(ext, "application/octet-stream")
+            headers = {"Cache-Control": "public, max-age=86400"}
+            if tail == "sw.js" or tail.endswith("/sw.js"):
+                headers["Service-Worker-Allowed"] = "/"
+                headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
             with open(c, "rb") as f:
-                return web.Response(body=f.read(), content_type=ct, headers={"Cache-Control": "public, max-age=86400"})
+                return web.Response(body=f.read(), content_type=ct, charset="utf-8" if ext in (".css", ".js", ".json") else None, headers=headers)
     return web.Response(status=404)
 
 
