@@ -23998,7 +23998,15 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/almoxarifado/cautela-registrar", api_almoxarifado_cautela_registrar)
     app.router.add_get("/api/pmp/grade-anual", api_pmp_grade_anual)
 
+    try:
+        from emed_views.portal_fiscal_web import registrar_rotas_portal_fiscal
+        registrar_rotas_portal_fiscal(app)
+    except Exception as _ef:
+        print(f"Aviso ao registrar portal fiscal nativo: {_ef}")
 
+    async def _on_startup_keepalive(_app):
+        asyncio.create_task(_background_keep_alive_task())
+    app.on_startup.append(_on_startup_keepalive)
 
     return app
 
