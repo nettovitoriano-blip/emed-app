@@ -314,6 +314,7 @@ SCHEMA_COLUNAS_OS = [
     ("fotos_adicionais", "TEXT DEFAULT ''"),
     ("status_proposta", "TEXT DEFAULT ''"),
     ("prazo_entrega", "TEXT DEFAULT ''"),
+    ("assinatura_proposta_img", "TEXT DEFAULT ''"),
 
 
 

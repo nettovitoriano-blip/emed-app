@@ -16020,22 +16020,31 @@ async def api_proposta_publica_html(request: web.Request) -> web.Response:
     val_fmt = f"R$ {val_num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     ja_aprovada = "APROVAD" in st_prop
     ja_recusada = "RECUSAD" in st_prop
+    ass_prop_img = limpar_texto(row.get("assinatura_proposta_img") or row.get("assinatura_cliente_img"), "")
 
     banner_status = ""
     if ja_aprovada:
-        banner_status = f'<div style="background:#dcfce7;border:2px solid #22c55e;color:#166534;border-radius:10px;padding:14px;font-weight:800;text-align:center;margin-bottom:14px;">✅ PROPOSTA { _h.escape(st_prop) }</div>'
+        img_ass_html = f'<div style="margin-top:8px;"><img src="{ass_prop_img}" style="max-height:70px;background:#fff;border:1px solid #86efac;border-radius:6px;padding:4px;" alt="Assinatura Cliente"/></div>' if ass_prop_img.startswith("data:image/") else ""
+        banner_status = f'<div style="background:#dcfce7;border:2px solid #22c55e;color:#166534;border-radius:10px;padding:14px;font-weight:800;text-align:center;margin-bottom:14px;">✅ PROPOSTA { _h.escape(st_prop) }{img_ass_html}<div style="margin-top:8px;"><button type="button" onclick="window.print()" style="background:#15803d;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;">🖨️ Imprimir / Salvar PDF</button></div></div>'
     elif ja_recusada:
         banner_status = f'<div style="background:#fee2e2;border:2px solid #ef4444;color:#991b1b;border-radius:10px;padding:14px;font-weight:800;text-align:center;margin-bottom:14px;">❌ PROPOSTA { _h.escape(st_prop) }</div>'
 
     bloco_acao = "" if (ja_aprovada or ja_recusada) else f"""
       <div id="boxAcaoProposta" style="margin-top:16px;border-top:1.5px solid #e2e8f0;padding-top:14px;">
-        <label style="display:block;font-size:12px;font-weight:800;color:#334155;margin-bottom:6px;">👤 Nome completo do responsável pela aprovação:</label>
-        <input id="inpAprovadorNome" type="text" placeholder="Ex: Dr. João Silva / Gerência" style="width:100%;box-sizing:border-box;padding:11px 12px;border:2px solid #cbd5e1;border-radius:8px;font-size:14px;margin-bottom:10px;" />
+        <label style="display:block;font-size:12px;font-weight:800;color:#334155;margin-bottom:6px;">👤 Nome e sobrenome do responsável pela aprovação:</label>
+        <input id="inpAprovadorNome" type="text" placeholder="Ex: João Silva / Gerência" style="width:100%;box-sizing:border-box;padding:11px 12px;border:2px solid #cbd5e1;border-radius:8px;font-size:14px;margin-bottom:10px;" />
+        <label style="display:block;font-size:12px;font-weight:800;color:#334155;margin-bottom:6px;">✍️ Assinatura Digital do Cliente (assine com o dedo ou mouse abaixo):</label>
+        <div style="border:2px dashed #94a3b8;border-radius:10px;background:#f8fafc;padding:6px;margin-bottom:6px;">
+          <canvas id="canvasAssProp" width="540" height="150" style="width:100%;height:140px;background:#fff;border-radius:6px;touch-action:none;display:block;cursor:crosshair;"></canvas>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+          <button type="button" onclick="limparAssProp()" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:6px;padding:4px 10px;font-size:11.5px;font-weight:700;cursor:pointer;">🗑️ Limpar Assinatura</button>
+        </div>
         <label style="display:block;font-size:12px;font-weight:800;color:#334155;margin-bottom:6px;">📝 Observação opcional (ou motivo de revisão):</label>
         <input id="inpAprovadorObs" type="text" placeholder="Opcional..." style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;margin-bottom:12px;" />
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button onclick="enviarRespostaProposta('APROVAR')" style="flex:2;min-width:180px;background:#16a34a;color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:900;cursor:pointer;">✅ APROVAR PROPOSTA</button>
-          <button onclick="enviarRespostaProposta('RECUSAR')" style="flex:1;min-width:130px;background:#fff;color:#dc2626;border:2px solid #fca5a5;border-radius:10px;padding:13px;font-size:13px;font-weight:800;cursor:pointer;">❌ Solicitar Revisão</button>
+          <button type="button" onclick="enviarRespostaProposta('APROVAR')" style="flex:2;min-width:180px;background:#16a34a;color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:900;cursor:pointer;">✅ APROVAR PROPOSTA</button>
+          <button type="button" onclick="enviarRespostaProposta('RECUSAR')" style="flex:1;min-width:130px;background:#fff;color:#dc2626;border:2px solid #fca5a5;border-radius:10px;padding:13px;font-size:13px;font-weight:800;cursor:pointer;">❌ Solicitar Revisão</button>
         </div>
       </div>
     """
@@ -16079,17 +16088,69 @@ async def api_proposta_publica_html(request: web.Request) -> web.Response:
     </div>
   </div>
   <script>
+    let _assPropDesenhada = false;
+    (function initCanvasProp() {{
+      const cv = document.getElementById('canvasAssProp');
+      if (!cv) return;
+      const ctx = cv.getContext('2d');
+      ctx.lineWidth = 2.6;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#0f172a';
+      let desenhando = false;
+      function getPos(e) {{
+        const rect = cv.getBoundingClientRect();
+        const t = e.touches && e.touches[0] ? e.touches[0] : e;
+        return {{
+          x: (t.clientX - rect.left) * (cv.width / rect.width),
+          y: (t.clientY - rect.top) * (cv.height / rect.height)
+        }};
+      }}
+      function start(e) {{
+        desenhando = true;
+        _assPropDesenhada = true;
+        const p = getPos(e);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        if (e.cancelable) e.preventDefault();
+      }}
+      function move(e) {{
+        if (!desenhando) return;
+        const p = getPos(e);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        if (e.cancelable) e.preventDefault();
+      }}
+      function end() {{ desenhando = false; }}
+      cv.addEventListener('mousedown', start);
+      cv.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', end);
+      cv.addEventListener('touchstart', start, {{ passive: false }});
+      cv.addEventListener('touchmove', move, {{ passive: false }});
+      cv.addEventListener('touchend', end);
+    }})();
+    function limparAssProp() {{
+      const cv = document.getElementById('canvasAssProp');
+      if (!cv) return;
+      cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+      _assPropDesenhada = false;
+    }}
     async function enviarRespostaProposta(decisao) {{
       const nome = (document.getElementById('inpAprovadorNome')?.value || '').trim();
       const obs = (document.getElementById('inpAprovadorObs')?.value || '').trim();
       if (nome.length < 3) {{
-        alert('Informe seu nome completo para registrar a resposta.');
+        alert('Informe seu nome e sobrenome para registrar a resposta.');
         return;
       }}
+      const cv = document.getElementById('canvasAssProp');
+      if (decisao === 'APROVAR' && cv && !_assPropDesenhada) {{
+        alert('Por favor, assine no quadro acima antes de aprovar a proposta.');
+        return;
+      }}
+      const assinatura_img = (cv && _assPropDesenhada) ? cv.toDataURL('image/png') : '';
       const res = await fetch('/api/proposta/responder', {{
         method: 'POST',
         headers: {{'Content-Type': 'application/json'}},
-        body: JSON.stringify({{ os_id: '{_h.escape(os_id)}', decisao, aprovador_nome: nome, observacao: obs }})
+        body: JSON.stringify({{ os_id: '{_h.escape(os_id)}', decisao, aprovador_nome: nome, observacao: obs, assinatura_img }})
       }});
       const data = await res.json();
       const fb = document.getElementById('boxFeedbackProp');
@@ -16097,7 +16158,7 @@ async def api_proposta_publica_html(request: web.Request) -> web.Response:
       if (data.ok) {{
         fb.style.background = decisao === 'APROVAR' ? '#dcfce7' : '#fef3c7';
         fb.style.color = decisao === 'APROVAR' ? '#166534' : '#92400e';
-        fb.innerText = data.msg;
+        fb.innerHTML = data.msg + '<br/><br/><button type="button" onclick="window.location.reload()" style="background:#002b54;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:800;cursor:pointer;">📄 Ver Comprovante Assinado</button>';
         const box = document.getElementById('boxAcaoProposta');
         if (box) box.style.display = 'none';
       }} else {{
@@ -16123,8 +16184,9 @@ async def api_proposta_responder(request: web.Request) -> web.Response:
         return web.json_response({"ok": False, "msg": "Informe OS, decisão e nome completo do responsável."}, status=400)
 
     agora = obter_agora_brasil().strftime("%d/%m/%Y %H:%M")
+    ass_img = limpar_texto(body.get("assinatura_img"), "")
     with _DF_WRITE_LOCK:
-        df = carregar_base()
+        df = _carregar_df_direto()
         idx_alvo = None
         for idx, r in df.iterrows():
             if str(obter_id_os(idx, r)) == os_id:
@@ -16137,13 +16199,19 @@ async def api_proposta_responder(request: web.Request) -> web.Response:
         if decisao == "APROVAR":
             df.at[idx_alvo, "status_proposta"] = f"APROVADA PELO CLIENTE ({aprovador} em {agora})"
             df.at[idx_alvo, "pendencias"] = f"[PROPOSTA APROVADA POR {aprovador} EM {agora}] " + pend_atual.replace("[FINANCEIRO: GERAR PROPOSTA COMERCIAL]", "").strip()
-            msg_ret = f"✅ Proposta da OS #{os_id} APROVADA por {aprovador} em {agora}! A equipe EMED foi notificada."
+            if ass_img.startswith("data:image/"):
+                df.at[idx_alvo, "assinatura_proposta_img"] = ass_img
+                if not limpar_texto(df.at[idx_alvo, "assinatura_cliente_img"], ""):
+                    df.at[idx_alvo, "assinatura_cliente_img"] = ass_img
+                if not limpar_texto(df.at[idx_alvo, "assinatura_cliente"], ""):
+                    df.at[idx_alvo, "assinatura_cliente"] = aprovador
+            msg_ret = f"✅ Proposta da OS #{os_id} APROVADA e assinada por {aprovador} em {agora}!"
         else:
             df.at[idx_alvo, "status_proposta"] = f"REVISÃO SOLICITADA ({aprovador} em {agora})"
             df.at[idx_alvo, "pendencias"] = f"[PROPOSTA EM REVISÃO POR {aprovador}: {obs or 'SEM OBS'}] " + pend_atual
             msg_ret = f"📝 Solicitação de revisão da OS #{os_id} registrada em {agora}."
-        salvar_base(df)
-    _invalidar_cache_bootstrap()
+        _salvar_df_direto(df)
+    invalidar_cache_bootstrap()
     return web.json_response({"ok": True, "msg": msg_ret})
 
 

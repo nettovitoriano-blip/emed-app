@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v100-dicionario-tecnico-aprendivel';
+const CACHE_NAME = 'emed-pwa-v1-0-0-proposta-assinatura';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
