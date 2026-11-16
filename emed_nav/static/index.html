@@ -1554,6 +1554,29 @@
 
     tileGoogleRoads.addTo(map);
 
+    // Fallback automático de contingência: se a rede Wi-Fi bloquear Google Tiles, alterna para OpenStreetMap
+    let googleTileFailures = 0;
+    tileGoogleRoads.on('tileerror', () => {
+      googleTileFailures++;
+      if (googleTileFailures === 4) {
+        console.warn('Google Tiles com falha. Alternando para OpenStreetMap...');
+        if (state.mapMode === 'ROADS') {
+          map.removeLayer(tileGoogleRoads);
+          tileOSM.addTo(map);
+          showToast('🌐 Rede com restrição Google: mapa alternado para OpenStreetMap');
+        }
+      }
+    });
+
+    // Invalidação de tamanho garantida no carregamento do mapa para evitar tela preta em celulares
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => { if (typeof map !== 'undefined' && map) map.invalidateSize(); }, 200);
+      setTimeout(() => { if (typeof map !== 'undefined' && map) map.invalidateSize(); }, 700);
+    });
+    window.addEventListener('load', () => {
+      setTimeout(() => { if (typeof map !== 'undefined' && map) map.invalidateSize(); }, 300);
+    });
+
     // ÍCONE DO VEÍCULO (CAPTUR EMD-2026)
     const carIconHtml = `
       <div style="position: relative; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center;">
@@ -1562,248 +1585,6 @@
           🚗
         </div>
       </div>
-      <style>
-        @keyframes pulseRadar {
-          0% { transform: scale(0.6); opacity: 1; }
-          100% { transform: scale(1.6); opacity: 0; }
-        }
-      
-    /* --- OTIMIZAÇÃO MOBILE: BOTTOM SHEET RECOLHÍVEL & EXPANSÍVEL (85-90% MAPA LIVRE) --- */
-    .sheet-handle-bar {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      padding: 3px 0 6px 0;
-      margin-top: -6px;
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .sheet-handle-pill {
-      width: 44px;
-      height: 5px;
-      border-radius: 3px;
-      background: rgba(148, 163, 184, 0.6);
-      margin-bottom: 4px;
-      transition: background 0.2s, width 0.2s;
-    }
-    .sheet-handle-bar:hover .sheet-handle-pill {
-      background: #38bdf8;
-      width: 52px;
-    }
-    .sheet-collapsed-quick {
-      display: none;
-      align-items: center;
-      justify-content: space-between;
-      width: 100%;
-      padding: 2px 4px 0 4px;
-    }
-
-    #bottom-sheet {
-      transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), padding 0.28s ease;
-      max-height: 85vh;
-      overflow-y: auto;
-    }
-    #bottom-sheet.sheet-collapsed {
-      max-height: 52px !important;
-      padding: 6px 14px 8px 14px !important;
-      overflow: hidden !important;
-      gap: 0 !important;
-    }
-    #bottom-sheet.sheet-collapsed .quick-chips,
-    #bottom-sheet.sheet-collapsed .search-wrapper,
-    #bottom-sheet.sheet-collapsed #waypoints-section,
-    #bottom-sheet.sheet-collapsed #hint-tap-text,
-    #bottom-sheet.sheet-collapsed #route-summary-bar,
-    #bottom-sheet.sheet-collapsed .nav-buttons-grid {
-      display: none !important;
-    }
-    #bottom-sheet.sheet-collapsed .sheet-collapsed-quick {
-      display: flex !important;
-    }
-
-    /* --- PARADAS INTERMEDIÁRIAS (WAYPOINTS) --- */
-    #waypoints-section {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px dashed rgba(56, 189, 248, 0.35);
-      border-radius: 10px;
-      padding: 8px 10px;
-    }
-    .waypoint-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      padding: 6px 10px;
-      font-size: 12px;
-      font-weight: 700;
-      color: #f1f5f9;
-      gap: 6px;
-    }
-    .waypoint-badge {
-      background: #f59e0b;
-      color: #0f172a;
-      font-weight: 900;
-      border-radius: 50%;
-      width: 22px;
-      height: 22px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      flex-shrink: 0;
-    }
-    .btn-remove-stop {
-      background: rgba(239, 68, 68, 0.2);
-      border: 1px solid #ef4444;
-      color: #fca5a5;
-      border-radius: 6px;
-      width: 24px;
-      height: 24px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      flex-shrink: 0;
-    }
-    .btn-add-stop-toggle {
-      background: rgba(56, 189, 248, 0.15);
-      border: 1px solid rgba(56, 189, 248, 0.5);
-      color: #38bdf8;
-      border-radius: 8px;
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 800;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      width: fit-content;
-    }
-    .btn-add-stop-toggle:hover {
-      background: rgba(56, 189, 248, 0.3);
-    }
-
-    /* --- CENTRAL DE MÚSICA & SUGESTÕES --- */
-    .btn-music-app {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      border-radius: 12px;
-      padding: 10px 12px;
-      cursor: pointer;
-      color: white;
-      text-decoration: none;
-      transition: transform 0.15s ease, filter 0.2s ease;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    }
-    .btn-music-app:active {
-      transform: scale(0.96);
-    }
-    .music-suggestion-card {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 10px;
-      padding: 8px 10px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      cursor: pointer;
-      transition: background 0.2s, border-color 0.2s, transform 0.15s;
-    }
-    .music-suggestion-card:hover {
-      background: #27354a;
-      border-color: #a855f7;
-    }
-    .music-suggestion-card:active {
-      transform: scale(0.97);
-    }
-    .music-card-title {
-      font-size: 12px;
-      font-weight: 800;
-      color: #f8fafc;
-    }
-    .music-card-sub {
-      font-size: 10px;
-      color: #94a3b8;
-    }
-
-    /* --- RESPONSIVIDADE TOTAL PARA TELAS DE CELULAR (< 680px) --- */
-    @media (max-width: 680px) {
-      #hud-topbar {
-        padding: 5px 8px;
-        gap: 6px;
-      }
-      .hud-plate {
-        font-size: 12.5px;
-        gap: 4px;
-      }
-      .hud-status-badge {
-        font-size: 8.5px;
-        padding: 1px 4px;
-      }
-      .hud-sub {
-        display: none !important;
-      }
-      .speedo-box {
-        min-width: 68px;
-        padding: 2px 6px;
-        border-radius: 10px;
-      }
-      .speedo-val {
-        font-size: 24px;
-      }
-      .speedo-unit {
-        font-size: 8.5px;
-      }
-      .hud-actions {
-        gap: 4px;
-      }
-      .btn-hud-icon {
-        width: 31px;
-        height: 31px;
-        font-size: 12.5px;
-      }
-      .quick-chips {
-        gap: 4px;
-      }
-      .chip {
-        padding: 5px 9px;
-        font-size: 11px;
-      }
-      .dest-input {
-        padding: 10px 12px;
-        font-size: 13px;
-      }
-      .btn-rocket-go {
-        height: 40px;
-        padding: 0 12px;
-        font-size: 13px;
-      }
-      .btn-nav {
-        padding: 10px 6px;
-        font-size: 12px;
-      }
-      .map-fab-stack {
-        right: 8px;
-        top: 8px;
-        gap: 6px;
-      }
-      .map-fab {
-        width: 38px;
-        height: 38px;
-        font-size: 17px;
-      }
-    }
-
-  </style>
     `;
     const carIcon = L.divIcon({ html: carIconHtml, className: 'car-marker-icon', iconSize: [46, 46], iconAnchor: [23, 23] });
     state.carMarker = L.marker([state.carLat, state.carLon], { icon: carIcon }).addTo(map)
@@ -3287,7 +3068,7 @@
 
     // REGISTRO DE SERVICE WORKER & SUPORTE PWA STANDALONE
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=28', { scope: '/' })
+      navigator.serviceWorker.register('/sw.js?v=30', { scope: '/' })
         .then((reg) => {
           reg.update().catch(() => {});
         })

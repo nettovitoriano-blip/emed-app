@@ -1,6 +1,5 @@
-// EmedNav Service Worker - v28 (Arquitetura 100% Offline: Leaflet Local, Cache de Tiles OSM e Rotas Resilientes)
-const CACHE_NAME = 'emednav-v28-offline-ultimate';
-const TILE_CACHE_NAME = 'emednav-tiles-offline-v1';
+// EmedNav Service Worker - v30 (Alta Performance, Tiles Nativo Direto e Zero Bloqueios)
+const CACHE_NAME = 'emednav-v30-direct-tiles';
 
 const ASSETS_TO_CACHE = [
   '/',
@@ -8,6 +7,7 @@ const ASSETS_TO_CACHE = [
   '/emedcar',
   '/frota',
   '/admin',
+  '/manifest.json',
   '/static/index.html',
   '/static/frota.html',
   '/static/manifest.json',
@@ -17,6 +17,7 @@ const ASSETS_TO_CACHE = [
   '/static/simbolo_emed_clean.svg',
   '/static/simbolo_emed_red.svg',
   '/static/logo_emed_oficial.png',
+  '/static/apple-touch-icon.png',
   '/static/icon-192.png',
   '/static/icon-512.png'
 ];
@@ -35,7 +36,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((k) => {
-          if (k !== CACHE_NAME && k !== TILE_CACHE_NAME) return caches.delete(k);
+          if (k !== CACHE_NAME) return caches.delete(k);
         })
       );
     }).then(() => self.clients.claim())
@@ -46,24 +47,15 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // 1. Cache automático de ladrilhos de mapa (OpenStreetMap e CartoDB) para visualização offline nas viagens
-  if (url.hostname.includes('tile.openstreetmap.org') || url.hostname.includes('basemaps.cartocdn.com')) {
-    event.respondWith(
-      caches.open(TILE_CACHE_NAME).then((tileCache) => {
-        return tileCache.match(req).then((cached) => {
-          return fetch(req).then((networkRes) => {
-            if (networkRes && networkRes.status === 200) {
-              tileCache.put(req, networkRes.clone());
-            }
-            return networkRes;
-          }).catch(() => cached);
-        });
-      })
-    );
+  // REGRA DE OURO PWA:
+  // NUNCA interceptar requisições cross-origin (fora do domínio do app)
+  // Isso garante que Google Maps Tiles (mt0..mt3.google.com), OpenStreetMap e YouTube
+  // sejam carregados diretamente pela rede nativa sem bloqueios de CORS, headers ou Service Worker!
+  if (url.origin !== self.location.origin) {
     return;
   }
 
-  // 2. APIs do GPS e telemetria: tenta rede primeiro; se offline, recorre ao cache local
+  // 1. APIs do GPS e telemetria: tenta rede primeiro; se offline, recorre ao cache local
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(req).catch(() => caches.match(req))
@@ -71,11 +63,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. Arquivos estáticos (HTML, CSS, JS, Imagens): Cache-first com revalidação
+  // 2. Arquivos estáticos locais (HTML, CSS, JS, Imagens da mesma origem)
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) {
-        // Busca versão atualizada em background
+        // Revalidação assíncrona em background
         fetch(req).then((networkRes) => {
           if (networkRes && networkRes.status === 200) {
             caches.open(CACHE_NAME).then((cache) => cache.put(req, networkRes));
@@ -90,6 +82,11 @@ self.addEventListener('fetch', (event) => {
         }
         return networkRes;
       });
-    }).catch(() => caches.match('/static/index.html'))
+    }).catch(() => {
+      // APENAS redireciona para index.html se for NAVEGAÇÃO de página completa
+      if (req.mode === 'navigate') {
+        return caches.match('/static/index.html');
+      }
+    })
   );
 });
