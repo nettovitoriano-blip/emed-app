@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v94-2-nome-sobrenome';
+const CACHE_NAME = 'emed-pwa-v95-offline-resiliente-dedup';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
@@ -7,6 +7,12 @@ const ASSETS_TO_CACHE = [
   '/api/logo',
   '/api/icone-autosave'
 ];
+
+function fetchWithTimeout(req, ms) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return fetch(req, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -27,10 +33,10 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Para chamadas de API GET (/api/bootstrap), tenta rede primeiro com timeout e salva cache para uso offline
+  // /api/bootstrap: tenta rede com timeout de 4s; se travar (4G morto) ou estiver offline, entrega cache na hora
   if (url.pathname.startsWith('/api/bootstrap')) {
     event.respondWith(
-      fetch(event.request)
+      fetchWithTimeout(event.request, 4000)
         .then((response) => {
           if (response && response.status === 200) {
             const clone = response.clone();
@@ -49,13 +55,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Para o App Shell (HTML/JS/CSS), tenta rede primeiro para manter sempre atualizado e cai para o cache se estiver sem sinal
+  // App Shell (HTML/JS/CSS): timeout curto de 2.2s para nunca travar tela branca sem rede
   if (event.request.method === 'GET' && !url.pathname.startsWith('/api/')) {
     event.respondWith(
-      fetch(event.request)
+      fetchWithTimeout(event.request, 2200)
         .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
           return response;
         })
         .catch(() => caches.match(event.request).then((res) => res || caches.match('/')))

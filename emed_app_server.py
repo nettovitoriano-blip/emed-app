@@ -11870,6 +11870,28 @@ async def api_nova_os(request: web.Request) -> web.Response:
     with _DF_WRITE_LOCK:
         df = _carregar_df_direto()
 
+        # Deduplicacao semantica: mesma demanda/cliente/equipamento/servico/data ja aberta -> retorna OS existente
+        for _idx_ex, _r_ex in df.iterrows():
+            _st_ex = limpar_texto(_r_ex.get('status'), '').upper()
+            if any(k in _st_ex for k in ('CONCLU', 'FINALIZ', 'CANCEL')):
+                continue
+            _cli_ex = limpar_texto(_r_ex.get('cliente'), '').upper()
+            _eq_ex = limpar_texto(_r_ex.get('equipamento'), '').upper()
+            _def_ex = limpar_texto(_r_ex.get('defeito_relatado'), '').upper()
+            _tipo_ex = limpar_texto(_r_ex.get('tipo_servico'), '').upper()
+            _dt_ex = limpar_texto(_r_ex.get('data_agendamento'), '').strip()
+            if _cli_ex == cliente and _eq_ex == equipamento and _def_ex == defeito and _tipo_ex == tipo_srv and _dt_ex == str(data_ag).strip():
+                _id_ex = str(obter_id_os(_idx_ex, _r_ex))
+                _resp_dup = {
+                    'ok': True,
+                    'os_id': _id_ex,
+                    'duplicada_evitada': True,
+                    'msg': f'✅ OS #{_id_ex} já estava aberta para esta mesma demanda (duplicidade evitada).'
+                }
+                if req_id_idem:
+                    _salvar_idempotencia(req_id_idem, "NOVA_OS", _resp_dup)
+                return web.json_response(_resp_dup)
+
         novo_id = int(df['id'].max() + 1) if ('id' in df.columns and not df.empty and pd.notna(df['id'].max())) else (len(df) + 1)
 
 
