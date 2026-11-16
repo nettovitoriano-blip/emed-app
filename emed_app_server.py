@@ -16204,18 +16204,62 @@ async def api_proposta_responder(request: web.Request) -> web.Response:
             return web.json_response({"ok": False, "msg": f"OS #{os_id} não localizada."}, status=404)
 
         pend_atual = limpar_texto(df.at[idx_alvo, "pendencias"], "")
+        status_atual = limpar_texto(df.at[idx_alvo, "status"], "").upper()
+        peca_ref = limpar_texto(df.at[idx_alvo, "peca_baixada_ref"] if "peca_baixada_ref" in df.columns else df.at[idx_alvo, "peca_selecionada"] if "peca_selecionada" in df.columns else "", "")
         if decisao == "APROVAR":
-            df.at[idx_alvo, "status"] = "CONCLUÍDO"
-            df.at[idx_alvo, "status_fiscal"] = "LIBERADO PARA EMISSÃO DE NOTA FISCAL"
+            texto_busca = (pend_atual + " " + status_atual).upper()
+            peca_ja_instalada = bool(body.get("peca_ja_instalada")) or any(
+                k in texto_busca for k in ("APLICADA NO CLIENTE", "JA APLICADA", "JÁ APLICADA", "JA INSTALADA", "JÁ INSTALADA", "PECA TESTE", "PEÇA TESTE", "EM OBSERVA", "SUBSTITUIDA", "SUBSTITUÍDA")
+            )
             df.at[idx_alvo, "status_proposta"] = f"APROVADA PELO CLIENTE ({aprovador} em {agora})"
-            df.at[idx_alvo, "pendencias"] = f"[CONCLUÍDO - PROPOSTA APROVADA POR {aprovador} EM {agora}] Peça instalada e liberada para emissão de Nota Fiscal."
+            if peca_ja_instalada:
+                df.at[idx_alvo, "status"] = "CONCLUÍDO"
+                df.at[idx_alvo, "status_fiscal"] = "LIBERADO PARA EMISSÃO DE NOTA FISCAL"
+                df.at[idx_alvo, "pendencias"] = f"[CONCLUÍDO - PROPOSTA APROVADA POR {aprovador} EM {agora}] Peça já instalada no equipamento e liberada para emissão de Nota Fiscal."
+                msg_ret = f"✅ Proposta aprovada por {aprovador} em {agora}! Como a peça já foi instalada, a OS #{os_id} foi CONCLUÍDA e liberada para Nota Fiscal."
+            else:
+                # Peca ainda precisa ser confirmada no estoque / adquirida e instalada -> volta para ATIVO (Planejamento)
+                cliente_os = limpar_texto(df.at[idx_alvo, "cliente"], "CLIENTE")
+                equip_os = limpar_texto(df.at[idx_alvo, "equipamento"], "EQUIPAMENTO")
+                tem_estoque = False
+                saldo_est = 0
+                try:
+                    with get_db_connection(DB_NAME) as conn_est:
+                        cur_est = conn_est.cursor()
+                        if peca_ref and peca_ref != "NENHUMA PEÇA":
+                            cod_busc = peca_ref.split(" - ")[0].strip()
+                            row_est = cur_est.execute(
+                                "SELECT quantidade FROM estoque_pecas WHERE UPPER(codigo) = UPPER(?) OR UPPER(nome_peca) LIKE UPPER(?) LIMIT 1",
+                                (cod_busc, f"%{peca_ref[:40]}%")
+                            ).fetchone()
+                            if row_est:
+                                saldo_est = int(float(row_est[0] or 0))
+                                tem_estoque = saldo_est > 0
+                        status_ped = "SEPARAR P/ INSTALAÇÃO (ESTOQUE OK)" if tem_estoque else "AGUARDANDO AQUISIÇÃO / COMPRA"
+                        cur_est.execute(
+                            "INSERT INTO solicitacoes_pecas (tecnico, destino_cliente, itens_solicitados, status_pedido, data_pedido, os_id) VALUES (?, ?, ?, ?, ?, ?)",
+                            (
+                                "PLANEJAMENTO / ALMOXARIFADO",
+                                f"{cliente_os} ({equip_os}) [OS #{os_id}]",
+                                peca_ref or pend_atual or "PEÇA DE PROPOSTA APROVADA",
+                                status_ped,
+                                agora,
+                                str(os_id),
+                            )
+                        )
+                        conn_est.commit()
+                except Exception:
+                    pass
+                info_est = f"ESTOQUE OK ({saldo_est} un.) — Separar peça" if tem_estoque else "VERIFICAR ESTOQUE / ADQUIRIR PEÇA"
+                df.at[idx_alvo, "status"] = "ATIVO"
+                df.at[idx_alvo, "pendencias"] = f"[PLANEJAMENTO - PROPOSTA APROVADA POR {aprovador} EM {agora} | {info_est}] Confirmar peça e direcionar técnico para instalação."
+                msg_ret = f"✅ Proposta aprovada por {aprovador} em {agora}! OS #{os_id} retornou para ATIVO (Planejamento: {info_est})."
             if ass_img.startswith("data:image/"):
                 df.at[idx_alvo, "assinatura_proposta_img"] = ass_img
                 if not limpar_texto(df.at[idx_alvo, "assinatura_cliente_img"], ""):
                     df.at[idx_alvo, "assinatura_cliente_img"] = ass_img
                 if not limpar_texto(df.at[idx_alvo, "assinatura_cliente"], ""):
                     df.at[idx_alvo, "assinatura_cliente"] = aprovador
-            msg_ret = f"✅ Proposta aprovada por {aprovador} em {agora}! OS #{os_id} concluída e liberada para emissão de Nota Fiscal."
         else:
             df.at[idx_alvo, "status_proposta"] = f"REVISÃO SOLICITADA ({aprovador} em {agora})"
             df.at[idx_alvo, "pendencias"] = f"[PROPOSTA EM REVISÃO POR {aprovador}: {obs or 'SEM OBS'}] " + pend_atual
