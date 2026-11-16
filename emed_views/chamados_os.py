@@ -257,7 +257,7 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     cidade = limpar_texto(row_c.get("cidade"), "FORTALEZA")
     estado = limpar_texto(row_c.get("estado"), "CE")
     whats_cli = _limpar_telefone_exibicao(row_c.get("whatsapp") or row_c.get("contato_responsavel"))
-    resp_hosp = limpar_texto(row_c.get("responsavel_hospital"), "Coordenação Local")
+    resp_hosp = limpar_texto(row_c.get("assinatura_cliente"), "") or limpar_texto(row_c.get("responsavel_hospital"), "Coordenação Local")
 
     raw_eq = limpar_texto(row_c.get("equipamento"), "-")
     ns_embutido = ""

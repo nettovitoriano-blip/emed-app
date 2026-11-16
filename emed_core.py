@@ -311,6 +311,9 @@ SCHEMA_COLUNAS_OS = [
     ("imprimir_diagnostico", "TEXT DEFAULT 'SIM'"),
     ("imprimir_servicos", "TEXT DEFAULT 'SIM'"),
     ("imprimir_observacoes", "TEXT DEFAULT 'SIM'"),
+    ("fotos_adicionais", "TEXT DEFAULT ''"),
+    ("status_proposta", "TEXT DEFAULT ''"),
+    ("prazo_entrega", "TEXT DEFAULT ''"),
 
 
 

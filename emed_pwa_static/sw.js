@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v96-2-sw-nao-interceptar-rotas';
+const CACHE_NAME = 'emed-pwa-v97-assinatura-fotos-preservadas';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

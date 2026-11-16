@@ -5502,6 +5502,8 @@ async def api_bootstrap(request: web.Request) -> web.Response:
             "foto_evidencia": f_ant,
             "foto_depois": f_dep,
             "fotos_adicionais": limpar_texto(row.get("fotos_adicionais"), ""),
+            "assinatura_cliente": limpar_texto(row.get("assinatura_cliente"), ""),
+            "assinatura_cliente_img": limpar_texto(row.get("assinatura_cliente_img"), ""),
 
 
 
