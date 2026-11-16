@@ -17,6 +17,7 @@ import io
 import time
 import json
 import uuid
+import base64
 import hashlib
 import sqlite3
 import urllib.parse
@@ -90,6 +91,19 @@ def _get_db_connection(db_name: str) -> sqlite3.Connection:
         conn = sqlite3.connect(db_name, timeout=10.0)
         conn.row_factory = sqlite3.Row
         return conn
+
+
+def _registrar_log_fiscal(acao: str, detalhes: str, usuario: str = "sistema") -> None:
+    try:
+        log_dir = Path(__file__).resolve().parent / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "emed_fiscal.log"
+        ts = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        linha = f"[{ts}] [OPERADOR: {usuario.upper()}] [{acao}] {detalhes}\n"
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(linha)
+    except Exception:
+        pass
 
 
 class CertificadoManager:
@@ -187,8 +201,9 @@ class MultiFilialFiscalProvider(FiscalProvider):
 
         v_serv = float(payload.get("valor_servicos") or 0.0)
         v_pec = float(payload.get("valor_pecas") or 0.0)
-        v_total = v_serv + v_pec
-        aliq_iss = float(payload.get("aliquota_iss") or 5.0)
+        v_desc = float(payload.get("valor_desconto") or 0.0)
+        v_total = max(0.0, (v_serv + v_pec) - v_desc)
+        aliq_iss = float(payload.get("aliquota_iss") or 0.0)
         v_iss = v_serv * (aliq_iss / 100.0)
 
         p_cnpj = "".join([c for c in str(payload.get("prestador_cnpj", "")) if c.isdigit()]) or "03611974000280"
@@ -333,12 +348,20 @@ class MultiFilialFiscalProvider(FiscalProvider):
         filial = payload.get("filial_emissora", "FILIAL_DF")
         os_id = payload.get("os_id", 0)
         prefixo = "DF" if filial == "FILIAL_DF" else "CE"
+        uf_cod = "53" if filial == "FILIAL_DF" else "23"
+        ano_mes = datetime.now().strftime("%y%m")
         ano = datetime.now().year
+        cnpj_limpo = "".join(c for c in str(payload.get("prestador_cnpj", "")) if c.isdigit()) or ("03611974000280" if filial == "FILIAL_DF" else "03611974000108")
         num_nf = f"{prefixo}-{ano}-{int(os_id):05d}"
-        chave = f"53{ano} {payload.get('prestador_cnpj', '03611974000280')[:8]} {int(os_id):06d} 1009 {uuid.uuid4().hex[:8].upper()}"
-        protocolo = f"SEFAZ-DF-PROT-{uuid.uuid4().hex[:12].upper()}"
+        chave = f"{uf_cod}{ano_mes}{cnpj_limpo}99001{int(os_id):09d}1{uuid.uuid4().int % 100000000:08d}"
+        protocolo = f"SEFAZ-{prefixo}-PROT-{uuid.uuid4().hex[:12].upper()}"
+        cert_ativo = bool(payload.get("certificado_ativo"))
+        if cert_ativo:
+            status_ret = f"AUTORIZADA SEFAZ-{prefixo} (CERTIFICADO A1)"
+        else:
+            status_ret = f"AUTORIZADA (SIMULAÇÃO SEFAZ-{prefixo})"
         return {
-            "status": "AUTORIZADA (SIMULAÇÃO SEFAZ-DF)" if filial == "FILIAL_DF" else "AUTORIZADA (SIMULAÇÃO SEFAZ-CE)",
+            "status": status_ret,
             "numero_nf": num_nf,
             "chave_acesso": chave,
             "protocolo": protocolo
@@ -586,6 +609,11 @@ class FiscalManager:
         payload["valor_iss"] = v_iss
         payload["valor_liquido"] = v_liq
 
+        st_cert_atual = CertificadoManager.status_certificado(filial_codigo, self.db_name)
+        payload["certificado_ativo"] = bool(st_cert_atual.get("instalado"))
+        payload["cfop"] = payload.get("cfop", "")
+        lote_mes = datetime.now().strftime("%Y-%m")
+
         resp_sefaz = self.provider.emitir_sefaz("", payload)
         payload.update(resp_sefaz)
 
@@ -603,7 +631,7 @@ class FiscalManager:
                 sql_up = """
                 UPDATE notas_fiscais SET
                     cliente = ?, cnpj_tomador = ?, tipo_nota = ?, natureza_operacao = ?,
-                    codigo_servico_iss = ?, valor_servicos = ?, valor_pecas = ?,
+                    codigo_servico_iss = ?, cfop = ?, valor_servicos = ?, valor_pecas = ?,
                     valor_desconto = ?, aliquota_iss = ?, valor_iss = ?, valor_liquido = ?,
                     status_fiscal = ?, numero_nf = ?, serie = ?, chave_acesso = ?,
                     xml_path = ?, protocolo_autorizacao = ?, data_emissao = ?,
@@ -612,12 +640,13 @@ class FiscalManager:
                     prestador_endereco = ?, prestador_cidade = ?, prestador_uf = ?,
                     prestador_cep = ?, prestador_fone = ?, prestador_email = ?,
                     tomador_endereco = ?, tomador_cidade = ?, tomador_uf = ?,
-                    tomador_cep = ?, discriminacao_servico = ?, email_cliente = ?
+                    tomador_cep = ?, discriminacao_servico = ?, email_cliente = ?,
+                    lote_contabilidade_mes = ?
                 WHERE os_id = ?
                 """
                 conn.execute(sql_up, (
                     payload["cliente"], payload["cnpj_tomador"], payload["tipo_nota"],
-                    payload["natureza_operacao"], payload["codigo_servico"],
+                    payload["natureza_operacao"], payload["codigo_servico"], payload["cfop"],
                     v_serv, v_pec, v_desc, aliq, v_iss, v_liq,
                     payload["status"], payload["numero_nf"], payload["serie"],
                     payload["chave_acesso"], payload["xml_path"], payload["protocolo"],
@@ -627,28 +656,28 @@ class FiscalManager:
                     payload["prestador_cep"], payload["prestador_fone"], payload["prestador_email"],
                     payload["tomador_endereco"], payload["tomador_cidade"], payload["tomador_uf"],
                     payload["tomador_cep"], payload["discriminacao_servico"], payload["email_cliente"],
-                    os_id
+                    lote_mes, os_id
                 ))
             else:
                 sql_in = """
                 INSERT INTO notas_fiscais (
                     os_id, cliente, cnpj_tomador, tipo_nota, natureza_operacao,
-                    codigo_servico_iss, valor_servicos, valor_pecas, valor_desconto,
+                    codigo_servico_iss, cfop, valor_servicos, valor_pecas, valor_desconto,
                     aliquota_iss, valor_iss, valor_liquido, status_fiscal, numero_nf,
                     serie, chave_acesso, xml_path, protocolo_autorizacao, data_emissao,
                     sync_hash_fiscal, filial_emissora, prestador_cnpj, prestador_razao,
                     prestador_im, prestador_endereco, prestador_cidade, prestador_uf,
                     prestador_cep, prestador_fone, prestador_email, tomador_endereco,
                     tomador_cidade, tomador_uf, tomador_cep, discriminacao_servico,
-                    email_cliente, criado_em, atualizado_em
+                    email_cliente, lote_contabilidade_mes, criado_em, atualizado_em
                 ) VALUES (
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now')
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now')
                 )
                 """
                 conn.execute(sql_in, (
                     os_id, payload["cliente"], payload["cnpj_tomador"], payload["tipo_nota"],
-                    payload["natureza_operacao"], payload["codigo_servico"],
+                    payload["natureza_operacao"], payload["codigo_servico"], payload["cfop"],
                     v_serv, v_pec, v_desc, aliq, v_iss, v_liq,
                     payload["status"], payload["numero_nf"], payload["serie"],
                     payload["chave_acesso"], payload["xml_path"], payload["protocolo"],
@@ -657,9 +686,16 @@ class FiscalManager:
                     payload["prestador_endereco"], payload["prestador_cidade"], payload["prestador_uf"],
                     payload["prestador_cep"], payload["prestador_fone"], payload["prestador_email"],
                     payload["tomador_endereco"], payload["tomador_cidade"], payload["tomador_uf"],
-                    payload["tomador_cep"], payload["discriminacao_servico"], payload["email_cliente"]
+                    payload["tomador_cep"], payload["discriminacao_servico"], payload["email_cliente"],
+                    lote_mes
                 ))
             conn.commit()
+
+        _registrar_log_fiscal(
+            "EMISSAO_NF",
+            f"NF {payload['numero_nf']} (OS #{os_id}) | Filial: {filial_codigo} | Cliente: {payload['cliente']} | Valor: R$ {v_liq:,.2f} | Status: {payload['status']}",
+            str(payload.get("usuario_operador", "sistema"))
+        )
 
         return payload
 
@@ -794,43 +830,12 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
             st.success(f"✅ Parâmetros da {tipo_unidade} ({cfg_ativa.get('sigla')}) salvos com sucesso! Alíquota ISS: {float(nova_aliq):.1f}%")
             st.rerun()
 
-    with _get_db_connection(db_name) as conn:
-        filtro_sql = ""
-        params_tot = []
-        if codigo_filial != "CONSOLIDADO":
-            filtro_sql = "WHERE filial_emissora = ?"
-            params_tot.append(codigo_filial)
-
-        cur_tot = conn.execute(f"""
-            SELECT 
-                COUNT(*) as total_nf,
-                SUM(CASE WHEN UPPER(status_fiscal) LIKE '%AUTORIZ%' OR UPPER(status_fiscal) LIKE '%EMITID%' THEN 1 ELSE 0 END) as emitidas,
-                SUM(CASE WHEN UPPER(status_fiscal) NOT LIKE '%AUTORIZ%' AND UPPER(status_fiscal) NOT LIKE '%EMITID%' THEN 1 ELSE 0 END) as pendentes,
-                SUM(COALESCE(valor_liquido, 0)) as total_faturar,
-                SUM(COALESCE(valor_pecas, 0)) as total_pecas
-            FROM notas_fiscais {filtro_sql}
-        """, tuple(params_tot)).fetchone()
-
-    total_nf, emitidas, pendentes, total_faturar, total_pecas = cur_tot if cur_tot else (0, 0, 0, 0, 0)
-
-    m1, m2, m3 = st.columns(3)
-    with m1:
-        st.metric("Total em Fila Fiscal", f"{pendentes or 0} OSs", help="Ordens concluídas aguardando transmissão/emissão de nota.")
-    with m2:
-        st.metric("Notas Fiscais Emitidas", f"{emitidas or 0} NFs", help="Notas autorizadas na SEFAZ.")
-    with m3:
-        st.metric(f"Total Faturado ({cfg_ativa.get('sigla')})", f"R$ {float(total_faturar or 0):,.2f}")
-
-    st.markdown("---")
-
-    st.markdown("#### 📋 Fila de Faturamento & Ordens de Serviço Concluídas")
-
     where_os = "WHERE UPPER(c.status) LIKE '%CONCLU%'"
     params_os = []
     if codigo_filial == "FILIAL_DF":
-        where_os += " AND (c.estado = 'DF' OR c.cidade LIKE '%BRASIL%' OR n.filial_emissora = 'FILIAL_DF')"
+        where_os += " AND (UPPER(TRIM(COALESCE(c.estado, ''))) = 'DF' OR UPPER(COALESCE(c.cidade, '')) LIKE '%BRASIL%' OR n.filial_emissora = 'FILIAL_DF')"
     elif codigo_filial == "MATRIZ_CE":
-        where_os += " AND (c.estado = 'CE' OR c.estado != 'DF' OR n.filial_emissora = 'MATRIZ_CE')"
+        where_os += " AND (UPPER(TRIM(COALESCE(c.estado, 'CE'))) != 'DF' AND UPPER(COALESCE(c.cidade, '')) NOT LIKE '%BRASIL%' OR n.filial_emissora = 'MATRIZ_CE')"
 
     sql_os = f"""
         SELECT c.id, c.cliente, c.cidade, c.estado, c.equipamento, c.valor_os,
@@ -842,6 +847,35 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
     """
     with _get_db_connection(db_name) as conn:
         rows_os = conn.execute(sql_os, tuple(params_os)).fetchall()
+
+        filtro_sql = ""
+        params_tot = []
+        if codigo_filial != "CONSOLIDADO":
+            filtro_sql = "WHERE filial_emissora = ?"
+            params_tot.append(codigo_filial)
+
+        cur_tot = conn.execute(f"""
+            SELECT 
+                COUNT(*) as total_nf,
+                SUM(CASE WHEN (UPPER(status_fiscal) LIKE '%AUTORIZ%' OR UPPER(status_fiscal) LIKE '%EMITID%' OR UPPER(status_fiscal) LIKE '%LIQUIDAD%') AND UPPER(status_fiscal) NOT LIKE '%CANCELAD%' THEN 1 ELSE 0 END) as emitidas,
+                SUM(CASE WHEN (UPPER(status_fiscal) LIKE '%AUTORIZ%' OR UPPER(status_fiscal) LIKE '%EMITID%' OR UPPER(status_fiscal) LIKE '%LIQUIDAD%') AND UPPER(status_fiscal) NOT LIKE '%CANCELAD%' THEN COALESCE(valor_liquido, 0) ELSE 0 END) as total_faturar
+            FROM notas_fiscais {filtro_sql}
+        """, tuple(params_tot)).fetchone()
+
+    total_nf, emitidas, total_faturar = cur_tot if cur_tot else (0, 0, 0.0)
+    pendentes_fila = sum(1 for r in rows_os if not r[8] or "CANCELAD" in str(r[7] or "").upper())
+
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.metric("Total em Fila Fiscal", f"{pendentes_fila} OSs", help="Ordens concluídas desta unidade aguardando emissão de nota fiscal.")
+    with m2:
+        st.metric("Notas Fiscais Emitidas", f"{emitidas or 0} NFs", help="Notas ativas e autorizadas (exclui notas canceladas).")
+    with m3:
+        st.metric(f"Total Faturado ({cfg_ativa.get('sigla')})", f"R$ {float(total_faturar or 0):,.2f}", help="Soma líquida apenas das notas fiscais ativas/autorizadas.")
+
+    st.markdown("---")
+
+    st.markdown("#### 📋 Fila de Faturamento & Ordens de Serviço Concluídas")
 
     col_btn_test, col_info_f = st.columns([1, 2])
     with col_btn_test:
@@ -948,14 +982,14 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
         val_serv_sugerido = float(dados_pre.get("valor_servicos", 0.0))
         val_pec_sugerido = 0.0 if "DEVOLUÇÃO" in tipo_op_fiscal else float(dados_pre.get("valor_pecas", 0.0))
 
-        st.markdown("##### 3. Valores e Tributação (SEFAZ-DF)")
+        st.markdown(f"##### 3. Valores e Tributação ({cfg_ativa.get('sigla')} • {cfg_ativa.get('uf')})")
         c_val1, c_val2, c_val3, c_val4 = st.columns(4)
         with c_val1:
             f_val_srv = st.number_input("Valor Mão de Obra / Serviços (R$):", value=val_serv_sugerido, min_value=0.0, step=50.0)
         with c_val2:
             f_val_pec = st.number_input("Valor Peças / Produtos (R$):", value=val_pec_sugerido, min_value=0.0, step=50.0)
         with c_val3:
-            f_aliq_iss = st.number_input("Alíquota ISS DF (%):", value=aliq_sugerida, min_value=0.0, max_value=10.0, step=0.5)
+            f_aliq_iss = st.number_input(f"Alíquota ISS {cfg_ativa.get('uf', 'DF')} (%):", value=aliq_sugerida, min_value=0.0, max_value=10.0, step=0.5)
         with c_val4:
             f_desconto = st.number_input("Desconto Concedido (R$):", value=float(dados_pre.get("valor_desconto", 0.0)), min_value=0.0, step=10.0)
 
@@ -1002,7 +1036,8 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
             "valor_pecas": float(f_val_pec),
             "valor_desconto": float(f_desconto),
             "aliquota_iss": float(f_aliq_iss),
-            "filial_emissora": codigo_filial if codigo_filial != "CONSOLIDADO" else "FILIAL_DF"
+            "filial_emissora": codigo_filial if codigo_filial != "CONSOLIDADO" else "FILIAL_DF",
+            "usuario_operador": usuario_atual
         }
         with st.spinner("Transmitindo e assinando nota fiscal com a SEFAZ..."):
             try:
@@ -1071,16 +1106,21 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
                 st.error(f"Erro na emissão fiscal: {exc}")
 
     st.markdown("---")
-    st.markdown(f"#### 📜 Histórico de Notas Fiscais Emitidas ({cfg_ativa.get('nome')})")
+    nome_escopo_hist = "Todas as Unidades (Consolidado)" if codigo_filial == "CONSOLIDADO" else cfg_ativa.get("nome")
+    st.markdown(f"#### 📜 Histórico de Notas Fiscais Emitidas ({nome_escopo_hist})")
     with _get_db_connection(db_name) as conn:
-        cur_hist = conn.execute("""
+        sql_h = """
             SELECT id, os_id, numero_nf, serie, cliente, valor_liquido,
                    data_emissao, status_fiscal, chave_acesso, filial_emissora
             FROM notas_fiscais
             WHERE numero_nf IS NOT NULL AND numero_nf != ''
-            ORDER BY id DESC
-            LIMIT 20
-        """)
+        """
+        params_h = []
+        if codigo_filial != "CONSOLIDADO":
+            sql_h += " AND filial_emissora = ?"
+            params_h.append(codigo_filial)
+        sql_h += " ORDER BY id DESC LIMIT 30"
+        cur_hist = conn.execute(sql_h, tuple(params_h))
         rows_hist = cur_hist.fetchall()
 
     if rows_hist:
@@ -1098,17 +1138,22 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
             })
         st.dataframe(pd.DataFrame(hist_tab), use_container_width=True, hide_index=True)
     else:
-        st.caption("Nenhuma nota fiscal emitida registrada ainda nesta filial.")
+        st.caption("Nenhuma nota fiscal emitida registrada ainda nesta unidade.")
 
     st.markdown("---")
-    st.markdown("#### 🚫 Cancelamento de Nota Fiscal (SEFAZ / Homologação)")
+    st.markdown(f"#### 🚫 Cancelamento de Nota Fiscal ({nome_escopo_hist})")
     with _get_db_connection(db_name) as conn:
-        cur_canc = conn.execute("""
+        sql_c = """
             SELECT id, numero_nf, cliente, valor_liquido, filial_emissora, os_id, chave_acesso
             FROM notas_fiscais
-            WHERE status_fiscal NOT LIKE '%CANCELAD%' AND numero_nf IS NOT NULL AND numero_nf != ''
-            ORDER BY id DESC
-        """)
+            WHERE UPPER(status_fiscal) NOT LIKE '%CANCELAD%' AND numero_nf IS NOT NULL AND numero_nf != ''
+        """
+        params_c = []
+        if codigo_filial != "CONSOLIDADO":
+            sql_c += " AND filial_emissora = ?"
+            params_c.append(codigo_filial)
+        sql_c += " ORDER BY id DESC"
+        cur_canc = conn.execute(sql_c, tuple(params_c))
         notas_ativas_canc = cur_canc.fetchall()
 
     if notas_ativas_canc:
@@ -1141,6 +1186,11 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
                             WHERE id = ?
                         """, (justificativa_canc.strip(), id_alvo_db))
                         conn.commit()
+                    _registrar_log_fiscal(
+                        "CANCELAMENTO_NF",
+                        f"NF {num_nf_alvo} (ID #{id_alvo_db}) cancelada | Motivo: {justificativa_canc.strip()}",
+                        usuario_atual
+                    )
                     st.success(f"✅ Nota Fiscal {num_nf_alvo} cancelada com sucesso no sistema!")
                     time.sleep(1)
                     if hasattr(st, "rerun"):

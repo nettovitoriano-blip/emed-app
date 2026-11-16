@@ -20846,7 +20846,7 @@ async def api_fiscal_enviar_contabilidade(request: web.Request) -> web.Response:
 
         f"{f'📝 Observações: {obs}' if obs else ''}\n\n"
 
-        f"🔗 Dossiê Contábil Completo: http://localhost:8502/api/financeiro/relatorio-contabil/imprimir?mes={int(mes)}&ano={ano}\n"
+        f"🔗 Dossiê Contábil Completo: https://emedservice.med.br/api/financeiro/relatorio-contabil/imprimir?mes={int(mes)}&ano={ano}\n"
 
         f"📥 Planilha CSV para Importação: {_obter_base_url_publica(request)}/api/fiscal/relatorio-contabil-csv?mes={int(mes)}&ano={ano}\n\n"
 
