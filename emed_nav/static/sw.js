@@ -1,12 +1,18 @@
-// EmedNav Service Worker - v26 (Alfinete Sede eMED: Rua Coronel Freire, 16 - Eusébio/CE)
-const CACHE_NAME = 'emednav-v26-sede-coronel-freire-16';
+// EmedNav Service Worker - v28 (Arquitetura 100% Offline: Leaflet Local, Cache de Tiles OSM e Rotas Resilientes)
+const CACHE_NAME = 'emednav-v28-offline-ultimate';
+const TILE_CACHE_NAME = 'emednav-tiles-offline-v1';
 
 const ASSETS_TO_CACHE = [
   '/',
+  '/gps',
+  '/emedcar',
   '/frota',
+  '/admin',
   '/static/index.html',
   '/static/frota.html',
   '/static/manifest.json',
+  '/static/leaflet.css',
+  '/static/leaflet.js',
   '/static/logo_emed_arroba.png',
   '/static/simbolo_emed_clean.svg',
   '/static/simbolo_emed_red.svg',
@@ -29,7 +35,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((k) => {
-          if (k !== CACHE_NAME) return caches.delete(k);
+          if (k !== CACHE_NAME && k !== TILE_CACHE_NAME) return caches.delete(k);
         })
       );
     }).then(() => self.clients.claim())
@@ -40,7 +46,24 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // APIs do GPS e telemetria: tenta rede primeiro; se offline, cai no cache ou segue o app
+  // 1. Cache automático de ladrilhos de mapa (OpenStreetMap e CartoDB) para visualização offline nas viagens
+  if (url.hostname.includes('tile.openstreetmap.org') || url.hostname.includes('basemaps.cartocdn.com')) {
+    event.respondWith(
+      caches.open(TILE_CACHE_NAME).then((tileCache) => {
+        return tileCache.match(req).then((cached) => {
+          return fetch(req).then((networkRes) => {
+            if (networkRes && networkRes.status === 200) {
+              tileCache.put(req, networkRes.clone());
+            }
+            return networkRes;
+          }).catch(() => cached);
+        });
+      })
+    );
+    return;
+  }
+
+  // 2. APIs do GPS e telemetria: tenta rede primeiro; se offline, recorre ao cache local
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(req).catch(() => caches.match(req))
@@ -48,7 +71,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Arquivos estáticos (HTML, CSS, JS, Imagens): Cache-first com revalidação
+  // 3. Arquivos estáticos (HTML, CSS, JS, Imagens): Cache-first com revalidação
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) {

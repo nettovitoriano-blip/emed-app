@@ -778,6 +778,16 @@
       <button onclick="hideMusicReturnBanner()" style="background:none; border:none; color:#94a3b8; font-size:14px; cursor:pointer; padding:0 4px;">✕</button>
     </div>
 
+    <!-- BANNER FLUTUANTE DE STATUS DE CONEXÃO (ONLINE / OFFLINE) -->
+    <div id="offline-connection-banner" style="display:none; position:fixed; top:66px; left:50%; transform:translateX(-50%); z-index:2550; background:rgba(15,23,42,0.96); border:2px solid #f59e0b; border-radius:30px; padding:6px 14px; box-shadow:0 10px 28px rgba(0,0,0,0.85); align-items:center; gap:8px; white-space:nowrap; max-width:92vw;">
+      <span style="font-size:11.5px; color:#fbbf24; font-weight:800; display:flex; align-items:center; gap:5px; overflow:hidden; text-overflow:ellipsis;">
+        <span>📡</span><span>Modo Offline Ativo (GPS e Clientes locais funcionando sem 4G)</span>
+      </span>
+      <button onclick="openOfflineGuideModal()" style="background:#0284c7; border:none; color:white; font-size:11px; font-weight:800; padding:4px 10px; border-radius:16px; cursor:pointer; flex-shrink:0;">
+        ℹ️ Guia Offline
+      </button>
+    </div>
+
     <!-- MODAL DE HISTÓRICO DE ROTAS TRAÇADAS E VIAGENS DO GPS J16 -->
     <div id="history-modal" style="display:none; position:absolute; top:70px; right:12px; background:rgba(15,23,42,0.98); border:2px solid #c084fc; border-radius:14px; padding:14px; z-index:2300; box-shadow:0 12px 35px rgba(0,0,0,0.85); width:330px; max-height:75vh; overflow-y:auto;">
       <div style="font-size:13px; font-weight:900; color:#c084fc; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
@@ -1089,6 +1099,10 @@
               <div id="modal-waze-sub" style="font-size: 11px; opacity: 0.95;">Navegação da próxima parada com alertas ao vivo</div>
             </div>
           </button>
+
+          <button onclick="openOfflineGuideModal()" type="button" style="background:rgba(2,132,199,0.18); border:1.5px solid #38bdf8; color:#e0f2fe; border-radius:12px; padding:10px 14px; font-size:12px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
+            <span style="font-size:16px;">📶</span><span>Sem sinal 4G na estrada? Veja como navegar 100% Offline</span>
+          </button>
         </div>
 
         <button id="btn-modal-stay" class="btn-modal-cancel" type="button">🗺️ Ver Rota no Mapa do EmedNav</button>
@@ -1361,6 +1375,59 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- MODAL EDUCATIVO: GUIA COMPLETO DE NAVEGAÇÃO 100% OFFLINE -->
+    <div id="offline-guide-modal" class="modal-overlay" style="z-index:2900;">
+      <div class="modal-card" style="max-width:460px; border-color:#0284c7;">
+        <div class="modal-header">
+          <div style="font-size:26px;">📶</div>
+          <div style="flex:1;">
+            <div class="modal-title" style="color:#38bdf8;">Como Navegar 100% Offline</div>
+            <div class="modal-subtitle">Guia oficial eMED para viagens e estradas sem sinal 4G</div>
+          </div>
+          <button onclick="closeOfflineGuideModal()" class="btn-close-modal" type="button">✕</button>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:12px; margin:14px 0 10px 0; max-height:68vh; overflow-y:auto; padding-right:4px; font-size:12.5px; line-height:1.5;">
+          
+          <div style="background:#0f172a; border:1px solid #0284c7; border-radius:10px; padding:12px;">
+            <div style="font-weight:900; color:#38bdf8; font-size:13px; margin-bottom:4px;">1. O App eMED já é 100% Offline! 🚀</div>
+            <div style="color:#cbd5e1;">
+              Todos os clientes, hospitais, clínicas, sede oficial e 16.480 radares já estão gravados no seu aparelho. O GPS do celular usa sinal direto de satélite (não gasta internet nem precisa de chip).
+            </div>
+          </div>
+
+          <div style="background:#0f172a; border:1px solid #16a34a; border-radius:10px; padding:12px;">
+            <div style="font-weight:900; color:#4ade80; font-size:13px; margin-bottom:6px;">2. Como ter Voz e Curvas na Estrada Sem Sinal 🧭</div>
+            <div style="color:#cbd5e1; margin-bottom:8px;">
+              O <b>Waze não funciona sem internet</b>. Já o <b>Google Maps</b> tem o recurso oficial de <b>Área Offline</b>:
+            </div>
+            <ol style="padding-left:18px; color:#e2e8f0; display:flex; flex-direction:column; gap:6px;">
+              <li>Abra o aplicativo <b>Google Maps</b> no celular (conectado ao Wi-Fi da sede ou de casa).</li>
+              <li>Toque na sua <b>foto de perfil</b> (canto superior direito).</li>
+              <li>Toque em <b>"Mapas off-line"</b> ➔ <b>"Selecionar seu próprio mapa"</b>.</li>
+              <li>Enquadre todo o Ceará e Rio Grande do Norte no retângulo e toque em <b>"Baixar"</b> (~150 MB).</li>
+            </ol>
+            <div style="margin-top:8px; background:rgba(34,197,94,0.15); border:1px dashed #22c55e; border-radius:8px; padding:8px; font-size:11.5px; color:#bbf7d0;">
+              ✓ Pronto! Feito isso uma única vez, o Google Maps fala instruções de voz e calcula curvas mesmo em modo avião ou sem sinal de operadora.
+            </div>
+          </div>
+
+          <div style="background:#0f172a; border:1px solid #f59e0b; border-radius:10px; padding:12px;">
+            <div style="font-weight:900; color:#fbbf24; font-size:13px; margin-bottom:4px;">3. No Dia a Dia na Rodovia 🚗</div>
+            <div style="color:#cbd5e1;">
+              Basta abrir o app eMED GPS, localizar o cliente ou hospital no mapa e clicar no botão verde <b>[ 🧭 MAPS ]</b>. Ele abrirá o Google Maps já posicionado e começará a navegação por voz offline imediatamente!
+            </div>
+          </div>
+
+        </div>
+
+        <button onclick="closeOfflineGuideModal()" class="btn-modal btn-maps" type="button" style="width:100%; justify-content:center; padding:12px; margin-top:8px;">
+          <span style="font-size:18px;">👍</span>
+          <div style="font-size:14px; font-weight:900;">ENTENDI! FECHAR GUIA</div>
+        </button>
       </div>
     </div>
 
@@ -2034,7 +2101,13 @@
             map.fitBounds(state.routePolyline.getBounds(), { padding: [50, 50] });
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          // OFFLINE FALLBACK: Em falta de sinal 4G, mantém linha sólida e orienta navegação offline
+          if (state.routePolyline) {
+            state.routePolyline.setStyle({ color: '#00b4d8', weight: 5, dashArray: null, opacity: 0.95 });
+          }
+          showToast('📡 Sem sinal 4G. Linha direta traçada! Toque em [MAPS] para navegação por voz offline.');
+        });
     }
 
     // LIMPAR ROTA ATIVA
@@ -3977,8 +4050,50 @@
             } catch(e) {}
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          // Multi-stop Contingência Offline
+          if (state.routePolyline) {
+            state.routePolyline.setStyle({ color: '#00b4d8', weight: 5, dashArray: null, opacity: 0.95 });
+          }
+          showToast('📡 Sem sinal 4G. Paradas conectadas por linha direta! Toque em [MAPS] para navegar offline.');
+        });
     }
+
+    // ==========================================================================
+    // GUIA OFFLINE & DETECÇÃO DE CONEXÃO INTELIGENTE
+    // ==========================================================================
+    function openOfflineGuideModal() {
+      const modal = document.getElementById('offline-guide-modal');
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeOfflineGuideModal() {
+      const modal = document.getElementById('offline-guide-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function updateOnlineOfflineIndicator() {
+      const banner = document.getElementById('offline-connection-banner');
+      if (!banner) return;
+      if (!navigator.onLine) {
+        banner.style.display = 'flex';
+      } else {
+        banner.style.display = 'none';
+      }
+    }
+
+    window.addEventListener('online', () => {
+      updateOnlineOfflineIndicator();
+      showToast('⚡ Sinal 4G restaurado!');
+    });
+
+    window.addEventListener('offline', () => {
+      updateOnlineOfflineIndicator();
+      showToast('📡 Modo Offline Ativo (GPS e Clientes locais continuam funcionando!)');
+    });
+
+    // Verificação inicial no carregamento
+    setTimeout(updateOnlineOfflineIndicator, 1500);
 
     // ==========================================================================
     // CENTRAL DE MÚSICA & ENTRETENIMENTO (YOUTUBE, DEEZER, SPOTIFY & SUGESTÕES)
