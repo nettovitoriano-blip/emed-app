@@ -4021,13 +4021,14 @@ async def handle_app_icon(request: web.Request) -> web.Response:
         "180": "app_icon_180.png",
         "maskable": "app_icon_maskable_512.png",
         "favicon": "favicon_64.png",
+        "status-enviando": "favicon_64.png",
     }
-    nome = arquivos.get(request.match_info.get("tamanho", ""))
-    if nome:
-        caminho = os.path.join(BASE_DIR, "emed_pwa_static", nome)
-        if os.path.exists(caminho):
-            with open(caminho, "rb") as f:
-                return web.Response(body=f.read(), content_type="image/png", headers={"Cache-Control": "no-cache"})
+    chave = request.match_info.get("tamanho", "")
+    nome = arquivos.get(chave, "favicon_64.png")
+    caminho = os.path.join(BASE_DIR, "emed_pwa_static", nome)
+    if os.path.exists(caminho):
+        with open(caminho, "rb") as f:
+            return web.Response(body=f.read(), content_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
     return web.Response(status=404)
 
 
@@ -24348,14 +24349,6 @@ async def iniciar_app_com_keepalive():
 
 
 
-
-    app.router.add_post("/api/equipamento/salvar", api_equipamento_salvar)
-
-    app.router.add_post("/api/equipamento/status", api_equipamento_status)
-
-    app.router.add_post("/api/sistema/backup-onedrive", api_fazer_backup_onedrive)
-
-    app.router.add_get("/api/sistema/backup-onedrive", api_fazer_backup_onedrive)
 
     return app
 

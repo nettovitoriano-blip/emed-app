@@ -192,9 +192,11 @@ if token_val and not st.session_state.get("authenticated"):
         decoded = base64.urlsafe_b64decode(str(token_val).encode()).decode()
         data = json.loads(decoded)
         username = data.get("username")
-        ts = data.get("ts")
-        if time.time() - ts > 1800:
-            st.error("Token expirado (validade de 30 minutos excedida).")
+        ts = data.get("ts", 0)
+        is_perm = bool(data.get("perm"))
+        validade_seg = int(data.get("ttl", 1800))
+        if (not is_perm) and (time.time() - ts > validade_seg):
+            st.error("Token expirado. Solicite um novo QR Code ao administrador.")
         else:
             user_obj = next((u for u in USERS if u["username"].lower() == str(username).lower()), None)
             if user_obj:
@@ -276,16 +278,24 @@ elif selected_tab == "🔑 Gerar Acesso QR (Novo Dispositivo)" and is_admin():
     st.title("🔑 Autorização de Dispositivos Móveis via QR Code")
     st.caption("Gere um QR Code temporário de 30 minutos para autorizar o acesso de um operador do Financeiro ou Faturamento sem precisar digitar senha no celular/tablet.")
 
-    contas_financeiro = [u["username"] for u in USERS if u.get("role") != "admin"]
-    if not contas_financeiro:
+    contas_disponiveis = [u["username"] for u in USERS]
+    if not contas_disponiveis:
         st.info("Nenhuma conta de operador cadastrada.")
     else:
-        user_alvo = st.selectbox("Selecione o operador a autorizar:", contas_financeiro)
+        c_qr1, c_qr2 = st.columns(2)
+        with c_qr1:
+            user_alvo = st.selectbox("Selecione o usuário/perfil a autorizar:", contas_disponiveis)
+        with c_qr2:
+            tipo_val = st.selectbox("Validade do QR Code:", ["Permanente (Dispositivo Oficial EMED)", "24 Horas", "30 Minutos"])
         if st.button("📲 Gerar QR Code de Acesso Seguro", type="primary"):
             try:
+                is_perm = "Permanente" in tipo_val
+                ttl_val = 86400 if "24" in tipo_val else 1800
                 token_dict = {
                     "username": user_alvo,
                     "ts": int(time.time()),
+                    "perm": is_perm,
+                    "ttl": ttl_val,
                     "device_id": uuid.uuid4().hex,
                 }
                 token_json = json.dumps(token_dict)
