@@ -16134,6 +16134,10 @@ async def api_proposta_publica_html(request: web.Request) -> web.Response:
       cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
       _assPropDesenhada = false;
     }}
+    function voltarParaOS() {{
+      try {{ if (window.opener && !window.opener.closed) {{ if (typeof window.opener.sincronizarTudo === 'function') window.opener.sincronizarTudo(false); window.close(); }} }} catch(e) {{}}
+      window.location.href = '/?modo=tecnico';
+    }}
     async function enviarRespostaProposta(decisao) {{
       const nome = (document.getElementById('inpAprovadorNome')?.value || '').trim();
       const obs = (document.getElementById('inpAprovadorObs')?.value || '').trim();
@@ -16158,9 +16162,13 @@ async def api_proposta_publica_html(request: web.Request) -> web.Response:
       if (data.ok) {{
         fb.style.background = decisao === 'APROVAR' ? '#dcfce7' : '#fef3c7';
         fb.style.color = decisao === 'APROVAR' ? '#166534' : '#92400e';
-        fb.innerHTML = data.msg + '<br/><br/><button type="button" onclick="window.location.reload()" style="background:#002b54;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:800;cursor:pointer;">📄 Ver Comprovante Assinado</button>';
+        fb.innerHTML = data.msg + '<br/><br/><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;"><button type="button" onclick="voltarParaOS()" style="background:#002b54;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-weight:800;cursor:pointer;">⬅️ Voltar para as OS</button><button type="button" onclick="window.location.reload()" style="background:#fff;color:#002b54;border:1.5px solid #002b54;border-radius:8px;padding:10px 14px;font-weight:800;cursor:pointer;">📄 Ver Comprovante</button></div>';
         const box = document.getElementById('boxAcaoProposta');
         if (box) box.style.display = 'none';
+        try {{ if (window.opener && typeof window.opener.sincronizarTudo === 'function') window.opener.sincronizarTudo(false); }} catch(e) {{}}
+        if (decisao === 'APROVAR') {{
+          setTimeout(voltarParaOS, 1800);
+        }}
       }} else {{
         fb.style.background = '#fee2e2';
         fb.style.color = '#991b1b';
@@ -16197,15 +16205,17 @@ async def api_proposta_responder(request: web.Request) -> web.Response:
 
         pend_atual = limpar_texto(df.at[idx_alvo, "pendencias"], "")
         if decisao == "APROVAR":
+            df.at[idx_alvo, "status"] = "CONCLUÍDO"
+            df.at[idx_alvo, "status_fiscal"] = "LIBERADO PARA EMISSÃO DE NOTA FISCAL"
             df.at[idx_alvo, "status_proposta"] = f"APROVADA PELO CLIENTE ({aprovador} em {agora})"
-            df.at[idx_alvo, "pendencias"] = f"[PROPOSTA APROVADA POR {aprovador} EM {agora}] " + pend_atual.replace("[FINANCEIRO: GERAR PROPOSTA COMERCIAL]", "").strip()
+            df.at[idx_alvo, "pendencias"] = f"[CONCLUÍDO - PROPOSTA APROVADA POR {aprovador} EM {agora}] Peça instalada e liberada para emissão de Nota Fiscal."
             if ass_img.startswith("data:image/"):
                 df.at[idx_alvo, "assinatura_proposta_img"] = ass_img
                 if not limpar_texto(df.at[idx_alvo, "assinatura_cliente_img"], ""):
                     df.at[idx_alvo, "assinatura_cliente_img"] = ass_img
                 if not limpar_texto(df.at[idx_alvo, "assinatura_cliente"], ""):
                     df.at[idx_alvo, "assinatura_cliente"] = aprovador
-            msg_ret = f"✅ Proposta da OS #{os_id} APROVADA e assinada por {aprovador} em {agora}!"
+            msg_ret = f"✅ Proposta aprovada por {aprovador} em {agora}! OS #{os_id} concluída e liberada para emissão de Nota Fiscal."
         else:
             df.at[idx_alvo, "status_proposta"] = f"REVISÃO SOLICITADA ({aprovador} em {agora})"
             df.at[idx_alvo, "pendencias"] = f"[PROPOSTA EM REVISÃO POR {aprovador}: {obs or 'SEM OBS'}] " + pend_atual
