@@ -241,6 +241,23 @@ def fleet_portal():
     return resp
 
 
+@app.route("/sw.js")
+def service_worker_root():
+    resp = send_from_directory(STATIC_DIR, "sw.js")
+    resp.headers["Content-Type"] = "application/javascript; charset=utf-8"
+    resp.headers["Service-Worker-Allowed"] = "/"
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
+
+
+@app.route("/manifest.json")
+def pwa_manifest_root():
+    resp = send_from_directory(STATIC_DIR, "manifest.json")
+    resp.headers["Content-Type"] = "application/manifest+json; charset=utf-8"
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
+
+
 @app.route("/static/<path:filename>")
 def serve_static(filename):
     resp = send_from_directory(STATIC_DIR, filename)

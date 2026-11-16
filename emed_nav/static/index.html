@@ -15,9 +15,9 @@
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="/static/icon-192.png">
 
-  <!-- Leaflet CSS & JS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet CSS & JS Local e 100% Offline Resiliente -->
+  <link rel="stylesheet" href="/static/leaflet.css" />
+  <script src="/static/leaflet.js"></script>
 
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
@@ -877,6 +877,9 @@
           <button id="btn-customize-map" onclick="openMapCustomizeModal()" style="background:rgba(255,255,255,0.08); border:none; color:#f8fafc; font-size:12px; font-weight:700; padding:6px 10px; border-radius:6px; text-align:left; cursor:pointer; display:flex; align-items:center; gap:8px;">
             <span>🎨</span> Personalizar Visual
           </button>
+          <button id="btn-pwa-install-menu" onclick="triggerPWAInstall()" style="background:rgba(56,189,248,0.18); border:1px solid #38bdf8; color:#38bdf8; font-size:12px; font-weight:800; padding:6px 10px; border-radius:6px; text-align:left; cursor:pointer; display:flex; align-items:center; gap:8px;">
+            <span>📲</span> Instalar App no Celular
+          </button>
           <button id="btn-clear-route" onclick="clearRoute()" style="background:rgba(239,68,68,0.2); border:1px solid #ef4444; color:#f87171; font-size:12px; font-weight:700; padding:6px 10px; border-radius:6px; text-align:left; cursor:pointer; display:flex; align-items:center; gap:8px;">
             <span>❌</span> Cancelar Rota
           </button>
@@ -1427,6 +1430,65 @@
         <button onclick="closeOfflineGuideModal()" class="btn-modal btn-maps" type="button" style="width:100%; justify-content:center; padding:12px; margin-top:8px;">
           <span style="font-size:18px;">👍</span>
           <div style="font-size:14px; font-weight:900;">ENTENDI! FECHAR GUIA</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- MODAL EDUCATIVO: COMO INSTALAR O APP NO CELULAR (CRIAR ÍCONE NA TELA INICIAL) -->
+    <div id="pwa-install-modal" class="modal-overlay" style="z-index:2950;">
+      <div class="modal-card" style="max-width:440px; border-color:#38bdf8;">
+        <div class="modal-header">
+          <div style="font-size:28px;">📲</div>
+          <div style="flex:1;">
+            <div class="modal-title" style="color:#38bdf8;">Instalar EmedNav no Celular</div>
+            <div class="modal-subtitle">Crie o ícone oficial na tela inicial sem gastar memória</div>
+          </div>
+          <button onclick="closePWAInstallModal()" class="btn-close-modal" type="button">✕</button>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:12px; margin:14px 0 10px 0; max-height:68vh; overflow-y:auto; padding-right:4px; font-size:12.5px; line-height:1.5;">
+          
+          <!-- BOTÃO DIRETO (QUANDO SUPORTADO PELO CHROME NO ANDROID) -->
+          <div id="box-native-install-prompt" style="display:none; background:rgba(56,189,248,0.15); border:1.5px solid #38bdf8; border-radius:12px; padding:12px; text-align:center;">
+            <button onclick="executeNativePWAInstall()" class="btn-modal btn-maps" type="button" style="width:100%; justify-content:center; padding:12px; font-size:14px; font-weight:900;">
+              <span>📲</span> INSTALAR AGORA (1-TOQUE)
+            </button>
+            <div style="font-size:11px; color:#94a3b8; margin-top:6px;">Instalação direta pelo navegador</div>
+          </div>
+
+          <!-- GUIA ANDROID (CHROME) -->
+          <div style="background:#0f172a; border:1px solid #334155; border-radius:10px; padding:12px;">
+            <div style="font-weight:900; color:#38bdf8; font-size:13px; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+              <span>🤖</span> No Android (Google Chrome):
+            </div>
+            <ol style="padding-left:18px; color:#e2e8f0; display:flex; flex-direction:column; gap:6px;">
+              <li>Toque no menu de <b>três pontinhos (⋮)</b> no canto superior direito do Chrome.</li>
+              <li>Procure e toque em <b>"Instalar aplicativo"</b> (ou <b>"Adicionar à tela inicial"</b>).</li>
+              <li>Confirme tocando em <b>"Instalar"</b>.</li>
+            </ol>
+            <div style="margin-top:8px; font-size:11px; color:#4ade80;">
+              ✓ O ícone do <b>EmedNav</b> aparecerá na sua tela inicial como um app normal da Google Play Store, abrindo em tela cheia!
+            </div>
+          </div>
+
+          <!-- GUIA IPHONE (SAFARI) -->
+          <div style="background:#0f172a; border:1px solid #334155; border-radius:10px; padding:12px;">
+            <div style="font-weight:900; color:#f8fafc; font-size:13px; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+              <span>🍏</span> No iPhone / iPad (Safari):
+            </div>
+            <ol style="padding-left:18px; color:#e2e8f0; display:flex; flex-direction:column; gap:6px;">
+              <li>Abra o link no <b>Safari</b>.</li>
+              <li>Toque no botão <b>Compartilhar (quadrado com seta para cima ⎋)</b> na barra inferior.</li>
+              <li>Role para baixo e selecione <b>"Adicionar à Tela de Início (+)"</b>.</li>
+              <li>Toque em <b>"Adicionar"</b> no canto superior.</li>
+            </ol>
+          </div>
+
+        </div>
+
+        <button onclick="closePWAInstallModal()" class="btn-modal btn-maps" type="button" style="width:100%; justify-content:center; padding:12px; margin-top:8px;">
+          <span style="font-size:18px;">👍</span>
+          <div style="font-size:14px; font-weight:900;">FECHAR GUIA</div>
         </button>
       </div>
     </div>
@@ -3223,9 +3285,64 @@
       });
     });
 
-    // REGISTRO DE SERVICE WORKER
+    // REGISTRO DE SERVICE WORKER & SUPORTE PWA STANDALONE
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/static/sw.js?v=18').catch(() => {});
+      navigator.serviceWorker.register('/sw.js?v=28', { scope: '/' })
+        .then((reg) => {
+          reg.update().catch(() => {});
+        })
+        .catch(() => {});
+    }
+
+    // CAPTURA DO EVENTO DE INSTALAÇÃO PWA (BOTÃO NATIVO 1-CLIQUE)
+    let deferredInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      const box = document.getElementById('box-native-install-prompt');
+      if (box) box.style.display = 'block';
+      const btnMenu = document.getElementById('btn-pwa-install-menu');
+      if (btnMenu) {
+        btnMenu.style.background = 'rgba(34,197,94,0.25)';
+        btnMenu.style.borderColor = '#22c55e';
+      }
+    });
+
+    window.addEventListener('appinstalled', () => {
+      deferredInstallPrompt = null;
+      showToast('🎉 EmedNav instalado com sucesso no seu celular!');
+    });
+
+    function triggerPWAInstall() {
+      openPWAInstallModal();
+    }
+
+    async function executeNativePWAInstall() {
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        const { outcome } = await deferredInstallPrompt.userChoice;
+        if (outcome === 'accepted') {
+          showToast('📲 Instalando EmedNav na sua tela inicial...');
+          closePWAInstallModal();
+        }
+        deferredInstallPrompt = null;
+      }
+    }
+
+    function openPWAInstallModal() {
+      const modal = document.getElementById('pwa-install-modal');
+      if (modal) {
+        modal.style.display = 'flex';
+        const box = document.getElementById('box-native-install-prompt');
+        if (box) {
+          box.style.display = deferredInstallPrompt ? 'block' : 'none';
+        }
+      }
+    }
+
+    function closePWAInstallModal() {
+      const modal = document.getElementById('pwa-install-modal');
+      if (modal) modal.style.display = 'none';
     }
 
     // IDENTIFICAÇÃO AUTOMÁTICA DE VEÍCULO POR PROXIMIDADE / NFC + ASSUMIR O VOLANTE
