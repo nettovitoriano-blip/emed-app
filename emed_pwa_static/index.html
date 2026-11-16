@@ -62075,7 +62075,58 @@
 
 
 
-function corrigirTextoInteligenteOS(textoRaw) {
+    function obterDicionarioPessoalEMED() {
+      try {
+        const raw = localStorage.getItem("emed_dicionario_tecnico_v1");
+        const obj = raw ? JSON.parse(raw) : null;
+        if (obj && typeof obj === "object") {
+          return {
+            termos: Array.isArray(obj.termos) ? obj.termos : [],
+            regras: (obj.regras && typeof obj.regras === "object") ? obj.regras : {}
+          };
+        }
+      } catch (e) {}
+      return { termos: [], regras: {} };
+    }
+    function salvarDicionarioPessoalEMED(dic) {
+      try { localStorage.setItem("emed_dicionario_tecnico_v1", JSON.stringify(dic)); } catch (e) {}
+      try { if (typeof EMED_IDB !== "undefined") EMED_IDB.set("emed_dicionario_tecnico_v1", dic); } catch (e) {}
+    }
+    function adicionarPalavraDicionarioEMED(idCampo) {
+      const el = document.getElementById(idCampo);
+      let sug = "";
+      if (el) {
+        const s = el.selectionStart || 0;
+        const e = el.selectionEnd || 0;
+        if (e > s) sug = el.value.slice(s, e).trim();
+      }
+      const entrada = prompt(
+        "📖 DICIONÁRIO TÉCNICO EMED (OFFLINE)\n\n" +
+        "• Digite uma palavra técnica para o sistema aprender e nunca acusar erro (ex: BUCKY, SAWAE, DEGAS)\n" +
+        "• OU ensine uma correção automática usando '=' (ex: BUKI = BUCKY):",
+        sug
+      );
+      if (!entrada || !entrada.trim()) return;
+      const dic = obterDicionarioPessoalEMED();
+      const txt = entrada.trim();
+      if (txt.includes("=")) {
+        const partes = txt.split("=");
+        const errado = (partes[0] || "").trim().toUpperCase();
+        const certo = (partes.slice(1).join("=") || "").trim().toUpperCase();
+        if (!errado || !certo) return;
+        dic.regras[errado] = certo;
+        if (!dic.termos.includes(certo)) dic.termos.push(certo);
+        salvarDicionarioPessoalEMED(dic);
+        if (typeof mostrarToast === "function") mostrarToast(`📖 Aprendido: "${errado}" → "${certo}"`, "success");
+      } else {
+        const termo = txt.toUpperCase();
+        if (!dic.termos.includes(termo)) dic.termos.push(termo);
+        salvarDicionarioPessoalEMED(dic);
+        if (typeof mostrarToast === "function") mostrarToast(`📖 "${termo}" adicionado ao seu dicionário técnico (${dic.termos.length} termos)!`, "success");
+      }
+      if (el && typeof corrigirTextoCampoOS === "function") corrigirTextoCampoOS(idCampo);
+    }
+    function corrigirTextoInteligenteOS(textoRaw) {
       let s = String(textoRaw || "");
       if (!s.trim()) return s;
       const mapaCorrecoes = {
@@ -62120,8 +62171,13 @@ function corrigirTextoInteligenteOS(textoRaw) {
         "POSICAO": "POSIÇÃO", "SOLUCAO": "SOLUÇÃO", "PROBLEMA": "PROBLEMA", "DEFEITO": "DEFEITO",
         "POSSIVEL": "POSSÍVEL", "IMPOSSIVEL": "IMPOSSÍVEL", "INICIAL": "INICIAL"
       };
+      const dicPessoal = obterDicionarioPessoalEMED();
+      const termosProtegidos = new Set((dicPessoal.termos || []).map(t => String(t).toUpperCase()));
+      const regrasUsuario = dicPessoal.regras || {};
       s = s.replace(/\b([A-Za-zÀ-ÿ-]+)\b/g, (m) => {
         const up = m.toUpperCase();
+        if (regrasUsuario[up]) return regrasUsuario[up];
+        if (termosProtegidos.has(up)) return up;
         return mapaCorrecoes[up] || up;
       });
       s = s.replace(/\s+([,.;:!?])/g, "$1");
@@ -62496,6 +62552,9 @@ function corrigirTextoInteligenteOS(textoRaw) {
 
             <button type="button" class="toolbar-btn-mini" onclick="corrigirTextoCampoOS('${idCampo}')" title="Corrigir ortografia e acentuação técnica (funciona offline)" style="border-color:#8b5cf6;color:#6d28d9;background:#f5f3ff;">
               <span>✨</span> Corrigir
+            </button>
+            <button type="button" class="toolbar-btn-mini" onclick="adicionarPalavraDicionarioEMED('${idCampo}')" title="Adicionar termo técnico ao dicionário pessoal offline" style="border-color:#0ea5e9;color:#0369a1;background:#f0f9ff;">
+              <span>📖</span> +Dic
             </button>
             <button type="button" class="toolbar-btn-mini" onclick="formatarTextoBullets('${idCampo}')" title="Formatar em tópicos técnicos">
 

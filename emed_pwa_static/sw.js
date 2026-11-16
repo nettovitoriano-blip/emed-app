@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v99-corretor-ortografico';
+const CACHE_NAME = 'emed-pwa-v100-dicionario-tecnico-aprendivel';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
