@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v96-webapk-offline-real';
+const CACHE_NAME = 'emed-pwa-v96-2-sw-nao-interceptar-rotas';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
@@ -84,8 +84,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Navegacao / App Shell (abre o PWA instantaneamente offline sem tela "Você está off-line")
-  if (req.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
+  // 2. Navegacao / App Shell (somente raiz / e /index.html; nunca interceptar /api/imprimir, /proposta/, /nav etc.)
+  if (url.pathname === '/' || url.pathname === '/index.html') {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
         const cached =
