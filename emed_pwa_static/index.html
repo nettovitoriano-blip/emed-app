@@ -62075,7 +62075,74 @@
 
 
 
-function htmlToolbarCampo(idCampo, categoria, label) {
+function corrigirTextoInteligenteOS(textoRaw) {
+      let s = String(textoRaw || "");
+      if (!s.trim()) return s;
+      const mapaCorrecoes = {
+        "MANUTENCAO": "MANUTENÇÃO", "MANUTENSAO": "MANUTENÇÃO", "MANUTENCOES": "MANUTENÇÕES",
+        "PREVENTIBA": "PREVENTIVA", "PREVENTIA": "PREVENTIVA",
+        "CORRETIBA": "CORRETIVA", "CORRECAO": "CORREÇÃO",
+        "CALIBRACAO": "CALIBRAÇÃO", "CALIBRASSAO": "CALIBRAÇÃO",
+        "AFERICAO": "AFERIÇÃO", "AFERISAO": "AFERIÇÃO",
+        "INSTALACAO": "INSTALAÇÃO", "INSTALASSAO": "INSTALAÇÃO",
+        "DIAGNOSTICO": "DIAGNÓSTICO", "DIAGINOSTICO": "DIAGNÓSTICO",
+        "TOMOGRAFO": "TOMÓGRAFO", "TOMOGRAFOO": "TOMÓGRAFO",
+        "MAMOGRAFO": "MAMÓGRAFO", "RAIOX": "RAIOS-X", "RAIO-X": "RAIOS-X",
+        "ANPOLA": "AMPOLA", "FUSIVEL": "FUSÍVEL", "FUZIVEL": "FUSÍVEL", "FUZIVEIS": "FUSÍVEIS", "FUSIVEIS": "FUSÍVEIS",
+        "NAO": "NÃO", "TAMBEM": "TAMBÉM", "JA": "JÁ", "ATE": "ATÉ", "SO": "SÓ",
+        "CONCLUIDO": "CONCLUÍDO", "CONCLUIDA": "CONCLUÍDA",
+        "OBSERVACAO": "OBSERVAÇÃO", "OBSERVACOES": "OBSERVAÇÕES",
+        "PECA": "PEÇA", "PESSA": "PEÇA", "PECAS": "PEÇAS", "PESSAS": "PEÇAS",
+        "SUBSTITUICAO": "SUBSTITUIÇÃO", "SUBSTITUIDO": "SUBSTITUÍDO", "SUBSTITUIDA": "SUBSTITUÍDA",
+        "VERIFICACAO": "VERIFICAÇÃO", "MEDICAO": "MEDIÇÃO", "MEDICOES": "MEDIÇÕES",
+        "TENSAO": "TENSÃO", "TENSOES": "TENSÕES", "PRESSAO": "PRESSÃO",
+        "RADIACAO": "RADIAÇÃO", "RADIOLOGICO": "RADIOLÓGICO", "RADIOLOGICA": "RADIOLÓGICA",
+        "EQUIPAMETO": "EQUIPAMENTO", "EQUPAMENTO": "EQUIPAMENTO",
+        "FUNCIONAMETO": "FUNCIONAMENTO", "ATERAMENTO": "ATERRAMENTO",
+        "ESTATIBA": "ESTATIVA", "TECRADO": "TECLADO", "MENBRANA": "MEMBRANA",
+        "TECNICO": "TÉCNICO", "TECNICA": "TÉCNICA", "RELATORIO": "RELATÓRIO",
+        "SERVICO": "SERVIÇO", "SERVICOS": "SERVIÇOS",
+        "ELETRICO": "ELÉTRICO", "ELETRICA": "ELÉTRICA", "ELETRONICO": "ELETRÔNICO", "ELETRONICA": "ELETRÔNICA",
+        "PARAMETRO": "PARÂMETRO", "PARAMETROS": "PARÂMETROS", "PADRAO": "PADRÃO", "PADROES": "PADRÕES",
+        "OPERACAO": "OPERAÇÃO", "OPERACOES": "OPERACÕES", "SEGURANCA": "SEGURANÇA",
+        "EXPOSICAO": "EXPOSIÇÃO", "CONEXAO": "CONEXÃO", "CONEXOES": "CONEXÕES",
+        "CODIGO": "CÓDIGO", "USUARIO": "USUÁRIO", "CONDICAO": "CONDIÇÃO", "CONDICOES": "CONDIÇÕES",
+        "AVALIACAO": "AVALIAÇÃO", "INSPECAO": "INSPEÇÃO", "PROTECAO": "PROTEÇÃO",
+        "CRITICO": "CRÍTICO", "CRITICA": "CRÍTICA", "NECESSARIO": "NECESSÁRIO", "NECESSARIA": "NECESSÁRIA",
+        "POS": "PÓS", "PRE": "PRÉ", "REVISAO": "REVISÃO", "LUBRIFICACAO": "LUBRIFICAÇÃO",
+        "REGULAGEM": "REGULAGEM", "COLIMACAO": "COLIMAÇÃO", "REPRODUTIBILIDADE": "REPRODUTIBILIDADE",
+        "EXATIDAO": "EXATIDÃO", "LINEARIDADE": "LINEARIDADE", "BALANCA": "BALANÇA",
+        "MEMORIA": "MEMÓRIA", "BATERIA": "BATERIA", "PROXIMA": "PRÓXIMA", "PROXIMO": "PRÓXIMO",
+        "NUMERO": "NÚMERO", "SERIE": "SÉRIE", "VALIDO": "VÁLIDO", "INVALIDO": "INVÁLIDO",
+        "HORARIO": "HORÁRIO", "PERIODICA": "PERIÓDICA", "PERIODICO": "PERIÓDICO",
+        "SOLICITACAO": "SOLICITAÇÃO", "APROVACAO": "APROVAÇÃO", "LIBERACAO": "LIBERAÇÃO",
+        "PENDENCIA": "PENDÊNCIA", "PENDENCIAS": "PENDÊNCIAS", "RESPONSAVEL": "RESPONSÁVEL",
+        "POSICAO": "POSIÇÃO", "SOLUCAO": "SOLUÇÃO", "PROBLEMA": "PROBLEMA", "DEFEITO": "DEFEITO",
+        "POSSIVEL": "POSSÍVEL", "IMPOSSIVEL": "IMPOSSÍVEL", "INICIAL": "INICIAL"
+      };
+      s = s.replace(/\b([A-Za-zÀ-ÿ-]+)\b/g, (m) => {
+        const up = m.toUpperCase();
+        return mapaCorrecoes[up] || up;
+      });
+      s = s.replace(/\s+([,.;:!?])/g, "$1");
+      s = s.replace(/([,;:])([^\s\n])/g, "$1 $2");
+      s = s.replace(/\.{2,}/g, ".");
+      s = s.replace(/[ \t]{2,}/g, " ");
+      return s.trim();
+    }
+    function corrigirTextoCampoOS(idCampo) {
+      const el = document.getElementById(idCampo);
+      if (!el) return;
+      const antes = el.value || "";
+      const depois = corrigirTextoInteligenteOS(antes);
+      el.value = depois;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      if (typeof autoSalvarRascunho === "function") autoSalvarRascunho();
+      if (typeof mostrarToast === "function") {
+        mostrarToast(antes.trim() !== depois.trim() ? "✨ Texto corrigido e ortografia ajustada!" : "✅ Texto já está padronizado e revisado.", "success");
+      }
+    }
+    function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
@@ -62427,6 +62494,9 @@ function htmlToolbarCampo(idCampo, categoria, label) {
 
 
 
+            <button type="button" class="toolbar-btn-mini" onclick="corrigirTextoCampoOS('${idCampo}')" title="Corrigir ortografia e acentuação técnica (funciona offline)" style="border-color:#8b5cf6;color:#6d28d9;background:#f5f3ff;">
+              <span>✨</span> Corrigir
+            </button>
             <button type="button" class="toolbar-btn-mini" onclick="formatarTextoBullets('${idCampo}')" title="Formatar em tópicos técnicos">
 
 
@@ -146226,8 +146296,9 @@ function renderMenuGesMural(box) {
             }
           }
           if (finalChunk.trim()) {
-            const fmt = finalChunk.trim().charAt(0).toUpperCase() + finalChunk.trim().slice(1);
-            acumuladoFinal = (acumuladoFinal ? acumuladoFinal + " " : "") + fmt + ".";
+            const rawF = finalChunk.trim();
+            const fmt = (typeof corrigirTextoInteligenteOS === "function") ? corrigirTextoInteligenteOS(rawF) : (rawF.charAt(0).toUpperCase() + rawF.slice(1));
+            acumuladoFinal = (acumuladoFinal ? acumuladoFinal + " " : "") + fmt.replace(/\.+$/, "") + ".";
           }
           const partes = [baseTexto, acumuladoFinal, interimChunk.trim()].filter(Boolean);
           campo.value = partes.join(baseTexto ? "\n" : " ");
@@ -204858,7 +204929,7 @@ ${linkProp}`;
 
 
             <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569;margin:2px 0 6px;cursor:pointer;"><input type="checkbox" id="osImprimirDefeito" ${impDefAtual!=='NAO'?'checked':''} onchange="autoSalvarRascunho()" /><span>🖨️ Exibir Defeito no Laudo / PDF</span></label>
-            <textarea id="osDefeito" class="textarea" rows="3" style="text-transform:uppercase;" oninput="ajustarTextoEmCaixaAlta(this);if(typeof atualizarGuiaModalidadeDinamica==='function')atualizarGuiaModalidadeDinamica();" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('defeito_relatado', os.pendencia_limpa))}</textarea>
+            <textarea id="osDefeito" class="textarea" rows="3" spellcheck="true" lang="pt-BR" style="text-transform:uppercase;" oninput="ajustarTextoEmCaixaAlta(this);if(typeof atualizarGuiaModalidadeDinamica==='function')atualizarGuiaModalidadeDinamica();" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('defeito_relatado', os.pendencia_limpa))}</textarea>
 
 
 
@@ -204923,7 +204994,7 @@ ${linkProp}`;
 
 
             <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569;margin:2px 0 6px;cursor:pointer;"><input type="checkbox" id="osImprimirDiag" ${impDiagAtual!=='NAO'?'checked':''} onchange="autoSalvarRascunho()" /><span>🖨️ Exibir Diagnóstico no Laudo / PDF</span></label>
-            <textarea id="osProb" class="textarea" rows="3" style="text-transform:uppercase;" oninput="ajustarTextoEmCaixaAlta(this);" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('problemas_encontrados'))}</textarea>
+            <textarea id="osProb" class="textarea" rows="3" spellcheck="true" lang="pt-BR" style="text-transform:uppercase;" oninput="ajustarTextoEmCaixaAlta(this);" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('problemas_encontrados'))}</textarea>
 
 
 
@@ -205084,7 +205155,7 @@ ${linkProp}`;
 
 
           <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569;margin:2px 0 6px;cursor:pointer;"><input type="checkbox" id="osImprimirSrvExec" ${impSrvAtual!=='NAO'?'checked':''} onchange="autoSalvarRascunho()" /><span>🖨️ Exibir Serviços Executados no Laudo / PDF</span></label>
-          <textarea id="osSrvExec" class="textarea" rows="5" style="text-transform:uppercase;" placeholder="DESCREVA AQUI OS PROCEDIMENTOS, MEDIÇÕES E AJUSTES REALIZADOS OU EDITE O TEXTO SUGERIDO..." oninput="ajustarTextoEmCaixaAlta(this);" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('servico_executado'))}</textarea>
+          <textarea id="osSrvExec" class="textarea" rows="5" spellcheck="true" lang="pt-BR" style="text-transform:uppercase;" placeholder="DESCREVA AQUI OS PROCEDIMENTOS, MEDIÇÕES E AJUSTES REALIZADOS OU EDITE O TEXTO SUGERIDO..." oninput="ajustarTextoEmCaixaAlta(this);" onblur="this.value=this.value.toUpperCase();autoSalvarRascunho();">${esc(val('servico_executado'))}</textarea>
 
 
 

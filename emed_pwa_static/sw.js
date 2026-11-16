@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v98-auditoria-offline-total';
+const CACHE_NAME = 'emed-pwa-v99-corretor-ortografico';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
