@@ -3629,6 +3629,7 @@ async def auth_api_middleware(request: web.Request, handler):
         path in ("/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping", "/api/logo", "/api/icone-autosave", "/api/logo-circle", "/api/app-icon/192", "/api/app-icon/512", "/api/app-icon/180", "/api/app-icon/maskable", "/api/app-icon/favicon", "/nav", "/gps", "/frota", "/api/bootstrap", "/api/v1/veiculos", "/api/respostas-tecnicas", "/api/iniciar-rota", "/api/checkin", "/api/checkout", "/api/frota/assumir-veiculo", "/api/frota/troca-condutores-historico")
 
         or path == "/fiscal"
+        or path.startswith("/api/fiscal/danfe/")
         or path.startswith("/api/fiscal/v2/")
         or path.startswith("/api/app-icon/")
         or path.startswith("/static/")
