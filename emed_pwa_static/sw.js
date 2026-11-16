@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v97-assinatura-fotos-preservadas';
+const CACHE_NAME = 'emed-pwa-v98-auditoria-offline-total';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

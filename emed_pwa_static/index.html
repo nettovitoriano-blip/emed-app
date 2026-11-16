@@ -88096,6 +88096,9 @@ async function processarFilaOffline() {
 
 
 
+        if (navigator.onLine && typeof processarFilaOffline === "function") {
+          await processarFilaOffline();
+        }
         const _bCtrl = new AbortController();
         const _bTimer = setTimeout(() => _bCtrl.abort(), 12000);
         const resp = await fetch("/api/bootstrap?slim=1", { signal: _bCtrl.signal }).finally(() => clearTimeout(_bTimer));
@@ -275937,10 +275940,20 @@ Solicitamos a autorização de entrada na guarita predial.
     window.addEventListener("load", () => {
       EmedModoViagem.init();
     });
-    window.addEventListener("online", () => {
-      mostrarToast("📶 Sinal de internet detectado! Sincronizando dados pendentes do Modo Viagem...");
-      EmedModoViagem.sincronizarFila();
+    window.addEventListener("online", async () => {
+      mostrarToast("📶 Sinal de internet detectado! Sincronizando dados pendentes do Cofre...");
+      if (typeof atualizarStatusRede === "function") atualizarStatusRede();
+      try { if (typeof processarFilaOffline === "function") await processarFilaOffline(); } catch(e) {}
+      try { EmedModoViagem.sincronizarFila(); } catch(e) {}
+      try { if (typeof sincronizarTudo === "function") await sincronizarTudo(false); } catch(e) {}
     });
+    setInterval(async () => {
+      try {
+        if (navigator.onLine && window._EMED_MEM_QUEUE && window._EMED_MEM_QUEUE.length > 0 && typeof processarFilaOffline === "function") {
+          await processarFilaOffline();
+        }
+      } catch(e) {}
+    }, 30000);
 
 
     // =========================================================================

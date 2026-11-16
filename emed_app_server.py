@@ -5504,6 +5504,10 @@ async def api_bootstrap(request: web.Request) -> web.Response:
             "fotos_adicionais": limpar_texto(row.get("fotos_adicionais"), ""),
             "assinatura_cliente": limpar_texto(row.get("assinatura_cliente"), ""),
             "assinatura_cliente_img": limpar_texto(row.get("assinatura_cliente_img"), ""),
+            "imprimir_defeito": limpar_texto(row.get("imprimir_defeito"), "SIM").upper() or "SIM",
+            "imprimir_diagnostico": limpar_texto(row.get("imprimir_diagnostico"), "SIM").upper() or "SIM",
+            "imprimir_servicos": limpar_texto(row.get("imprimir_servicos"), "SIM").upper() or "SIM",
+            "imprimir_observacoes": limpar_texto(row.get("imprimir_observacoes"), "SIM").upper() or "SIM",
 
 
 
@@ -10826,29 +10830,15 @@ async def api_salvar_os(request: web.Request) -> web.Response:
 
 
         if f_b64 and len(str(f_b64)) > 50:
-
-
-
-
-
-
-
+            s_f = str(f_b64).strip()
+            if not s_f.startswith("data:") and (".jpg" in s_f.lower() or ".jpeg" in s_f.lower() or ".png" in s_f.lower() or ".webp" in s_f.lower()):
+                cand_nome = os.path.basename(s_f.replace("\\", "/"))
+                cand_path = os.path.join(BASE_DIR, "uploads_os", cand_nome)
+                if os.path.isfile(cand_path):
+                    caminhos_fotos_salvas.append(cand_path)
+                    continue
             c_salvo = _salvar_base64_em_arquivo(f_b64, f"EVIDENCIA_{idx_f+1}", os_id)
-
-
-
-
-
-
-
             if c_salvo:
-
-
-
-
-
-
-
                 caminhos_fotos_salvas.append(c_salvo)
 
 
