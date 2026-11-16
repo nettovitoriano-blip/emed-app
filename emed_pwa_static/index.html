@@ -198423,6 +198423,11 @@ function renderMenuCliTriagem(box) {
 
 
                   </a>
+                  ${(String(o.pendencias || '').toUpperCase().includes('PROPOSTA') || (o.status_proposta && String(o.status_proposta).toUpperCase() !== 'SEM_PROPOSTA')) ? (
+                    String(o.status_proposta || '').toUpperCase().includes('APROVAD')
+                      ? `<a class="btn btn-outline btn-sm" style="border-color:#16a34a;color:#15803d;font-weight:800;" href="/proposta/${encodeURIComponent(o.id)}" target="_blank">✅ Ver Proposta Assinada</a>`
+                      : `<a class="btn btn-sm" style="background:#16a34a;color:#fff;font-weight:800;" href="/proposta/${encodeURIComponent(o.id)}" target="_blank">✍️ Assinar &amp; Aprovar Proposta</a>`
+                  ) : ''}
 
 
 
