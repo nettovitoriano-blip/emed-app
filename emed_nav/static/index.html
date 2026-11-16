@@ -3068,7 +3068,7 @@
 
     // REGISTRO DE SERVICE WORKER & SUPORTE PWA STANDALONE
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=30', { scope: '/' })
+      navigator.serviceWorker.register('/static/sw.js?v=30', { scope: '/' })
         .then((reg) => {
           reg.update().catch(() => {});
         })

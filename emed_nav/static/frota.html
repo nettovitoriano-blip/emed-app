@@ -1551,7 +1551,7 @@
     loadClients();
     setInterval(loadFleetOverview, 6000);
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=30', { scope: '/' }).catch(() => {});
+      navigator.serviceWorker.register('/static/sw.js?v=30', { scope: '/' }).catch(() => {});
     }
   </script>
 </body>
