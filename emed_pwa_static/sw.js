@@ -5,7 +5,6 @@ const ASSETS_TO_CACHE = [
   '/?modo=gestor',
   '/manifest.json',
   '/api/logo',
-  '/api/icone-autosave',
   '/api/app-icon/192',
   '/api/app-icon/512'
 ];
