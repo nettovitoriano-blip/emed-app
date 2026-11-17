@@ -11,6 +11,7 @@ import json
 import time
 import uuid
 import base64
+from datetime import datetime
 from pathlib import Path
 from aiohttp import web
 
@@ -137,7 +138,7 @@ async def api_fiscal_v2_dados(request: web.Request) -> web.Response:
         rows_hist = conn.execute(sql_h, tuple(params_h)).fetchall()
 
         # Peças disponíveis no almoxarifado (Estoque Físico & Estoque Fiscal)
-        cur_p = conn.execute("SELECT id, codigo, nome_peca, quantidade, COALESCE(saldo_fiscal, quantidade), preco_custo, unidade FROM estoque_pecas ORDER BY nome_peca ASC LIMIT 100")
+        cur_p = conn.execute("SELECT id, codigo, nome_peca, quantidade, COALESCE(saldo_fiscal, quantidade), preco_custo, unidade FROM estoque_pecas ORDER BY nome_peca ASC LIMIT 2000")
         rows_p = cur_p.fetchall()
         pecas_almox = [{"id": rp[0], "codigo": rp[1] or "", "nome": rp[2] or "", "qtd": rp[3] or 0, "qtd_fiscal": float(rp[4] if rp[4] is not None else (rp[3] or 0)), "preco": float(rp[5] or 0.0), "unidade": rp[6] or "UN"} for rp in rows_p]
 
@@ -585,6 +586,120 @@ async def api_fiscal_v2_ajuste_estoque(request: web.Request) -> web.Response:
     })
 
 
+async def api_fiscal_v2_inventario_ajuste_direto(request: web.Request) -> web.Response:
+    """Atualiza diretamente os saldos absoluto físico e fiscal de um item no inventário."""
+    body = await request.json()
+    db_name = request.app.get("db_path", "emed.db")
+    peca_id = int(body.get("peca_id", 0))
+    usuario = str(body.get("usuario", "netto")).strip()
+    motivo = str(body.get("motivo", "Ajuste manual de inventário / Reconciliação direta")).strip()
+
+    if peca_id <= 0:
+        return web.json_response({"ok": False, "msg": "Selecione uma peça válida."}, status=400)
+
+    novo_fisico = body.get("quantidade_fisica")
+    novo_fiscal = body.get("saldo_fiscal")
+
+    if novo_fisico is None and novo_fiscal is None:
+        return web.json_response({"ok": False, "msg": "Informe ao menos um saldo para ajuste."}, status=400)
+
+    with _get_db_connection(db_name) as conn:
+        row = conn.execute("SELECT codigo, nome_peca, quantidade, COALESCE(saldo_fiscal, quantidade) FROM estoque_pecas WHERE id = ?", (peca_id,)).fetchone()
+        if not row:
+            return web.json_response({"ok": False, "msg": "Peça não encontrada."}, status=404)
+
+        cod_p, nome_p, fis_ant, fisc_ant = row
+        fis_ant = float(fis_ant or 0)
+        fisc_ant = float(fisc_ant or 0)
+
+        fis_final = max(0.0, float(novo_fisico)) if novo_fisico is not None else fis_ant
+        fisc_final = max(0.0, float(novo_fiscal)) if novo_fiscal is not None else fisc_ant
+
+        conn.execute("UPDATE estoque_pecas SET quantidade = ?, saldo_fiscal = ? WHERE id = ?", (fis_final, fisc_final, peca_id))
+
+        delta_fis = fis_final - fis_ant
+        delta_fisc = fisc_final - fisc_ant
+        tipo_mov = "AJUSTE_INVENTARIO_DIRETO"
+        obs = f"{motivo} | Físico: {fis_ant:.1f} ➔ {fis_final:.1f} (Δ {delta_fis:+.1f}) | Fiscal: {fisc_ant:.1f} ➔ {fisc_final:.1f} (Δ {delta_fisc:+.1f}) | Op: {usuario}"
+
+        conn.execute("""
+            INSERT INTO movimentacoes_estoque (
+                estabelecimento, centro_estoque, codigo_item, descricao,
+                data_mov, hora_mov, tipo_mov, qtd_entrada, qtd_saida, saldo, observacao
+            ) VALUES ('MATRIZ_CE', 'ALMOXARIFADO CENTRAL', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            str(cod_p or ""), str(nome_p or ""),
+            datetime.now().strftime("%Y-%m-%d"), datetime.now().strftime("%H:%M:%S"),
+            tipo_mov,
+            max(0.0, delta_fis) if delta_fis > 0 else 0.0,
+            abs(delta_fis) if delta_fis < 0 else 0.0,
+            fis_final, obs
+        ))
+        conn.commit()
+
+    _registrar_log_fiscal("INVENTARIO_AJUSTE", f"Ajuste direto em '{nome_p}' [{cod_p}]: Físico {fis_ant:.1f}->{fis_final:.1f}, Fiscal {fisc_ant:.1f}->{fisc_final:.1f} | {motivo}", usuario)
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"✅ Saldo de '{nome_p}' atualizado! Físico: {fis_final:.1f} • Fiscal: {fisc_final:.1f}",
+        "peca_id": peca_id,
+        "quantidade_fisica": fis_final,
+        "saldo_fiscal": fisc_final
+    })
+
+
+async def api_fiscal_v2_inventario_novo_item(request: web.Request) -> web.Response:
+    """Cadastra um novo item diretamente a partir da tela de inventário."""
+    body = await request.json()
+    db_name = request.app.get("db_path", "emed.db")
+    codigo = str(body.get("codigo", "")).strip().upper()
+    nome = str(body.get("nome", "")).strip().upper()
+    qtd_fis = max(0.0, float(body.get("quantidade_fisica", 0)))
+    qtd_fisc = max(0.0, float(body.get("saldo_fiscal", qtd_fis)))
+    preco = max(0.0, float(body.get("preco_custo", 0.0)))
+    unidade = str(body.get("unidade", "UN")).strip().upper() or "UN"
+    usuario = str(body.get("usuario", "netto")).strip()
+
+    if not nome:
+        return web.json_response({"ok": False, "msg": "Informe a descrição ou nome da peça."}, status=400)
+
+    with _get_db_connection(db_name) as conn:
+        if not codigo:
+            max_c = conn.execute("SELECT MAX(CAST(codigo AS INTEGER)) FROM estoque_pecas WHERE codigo GLOB '[0-9]*'").fetchone()[0] or 0
+            codigo = str(max_c + 1)
+
+        conn.execute("""
+            INSERT INTO estoque_pecas (
+                codigo, nome_peca, quantidade, saldo_fiscal, preco_custo, preco_unitario,
+                unidade, categoria, localizacao, estoque_minimo
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'PEÇA DE REPOSIÇÃO', 'ALMOXARIFADO CENTRAL', 1)
+        """, (codigo, nome, qtd_fis, qtd_fisc, preco, preco * 1.5, unidade))
+        novo_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+        conn.execute("""
+            INSERT INTO movimentacoes_estoque (
+                estabelecimento, centro_estoque, codigo_item, descricao,
+                data_mov, hora_mov, tipo_mov, qtd_entrada, saldo, observacao
+            ) VALUES ('MATRIZ_CE', 'ALMOXARIFADO CENTRAL', ?, ?, ?, ?, 'CADASTRO_INVENTARIO', ?, ?, ?)
+        """, (
+            codigo, nome,
+            datetime.now().strftime("%Y-%m-%d"), datetime.now().strftime("%H:%M:%S"),
+            qtd_fis, qtd_fis, f"Novo item cadastrado via Inventário Fiscal por {usuario} (Fiscal: {qtd_fisc})"
+        ))
+        conn.commit()
+
+    _registrar_log_fiscal("INVENTARIO_NOVO_ITEM", f"Cadastro de item [{codigo}] {nome} | Físico: {qtd_fis} | Fiscal: {qtd_fisc}", usuario)
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"✅ Item '[{codigo}] {nome}' adicionado com sucesso ao inventário!",
+        "item": {
+            "id": novo_id, "codigo": codigo, "nome": nome,
+            "qtd": qtd_fis, "qtd_fiscal": qtd_fisc, "preco": preco, "unidade": unidade
+        }
+    })
+
+
 async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     icon_b64 = _obter_icone_azul_b64()
     logo_b64 = _obter_logo_b64()
@@ -979,17 +1094,95 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         </div>
       </details>
 
-      <!-- GESTÃO DE ESTOQUE: FÍSICO VS. FISCAL -->
-      <details class="card" id="expanderEstoqueFiscal" style="cursor:pointer;margin-bottom:16px;">
-        <summary style="font-weight:800;color:#38bdf8;font-size:14px;">📊 Gestão de Estoque: Físico vs. Fiscal (Auditoria Bloco K &amp; Ajustes)</summary>
+      <!-- INVENTÁRIO GERAL & CONCILIAÇÃO: FÍSICO VS. FISCAL -->
+      <details class="card" id="expanderEstoqueFiscal" open style="cursor:pointer;margin-bottom:16px;">
+        <summary style="font-weight:800;color:#38bdf8;font-size:14px;">📋 Inventário Geral &amp; Conciliação: Físico vs. Fiscal (Ajuste Direto em 1 Clique)</summary>
         <div style="cursor:default;margin-top:14px;">
           <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
-            Permite acompanhar e harmonizar as diferenças entre o <b>Estoque Físico Real</b> (o que está na prateleira) e o <b>Estoque Fiscal Escriturado</b> (o que está registrado perante a Receita/SEFAZ), possibilitando ajustes manuais independentes.
+            Audite e ajuste diretamente os saldos do <b>Estoque Físico Real</b> (prateleira/hospital) e do <b>Estoque Fiscal Escriturado</b> (SPED/Receita). Em caso de contagem de inventário ou <b>falha de baixa do sistema</b>, você pode alterar os números diretamente na tabela ou sincronizá-los com 1 clique.
           </div>
 
-          <!-- FORMULÁRIO DE AJUSTE DIRETO -->
-          <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:12px;margin-bottom:14px;">
-            <div style="font-weight:bold;font-size:12.5px;color:#38bdf8;margin-bottom:8px;">⚡ Ajuste Rápido de Estoque Físico / Fiscal</div>
+          <!-- CARDS DE ESTATÍSTICA RÁPIDA DO INVENTÁRIO -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:14px;">
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
+              <div style="font-size:11px;color:#94a3b8;font-weight:700;">TOTAL DE ITENS CADASTRADOS</div>
+              <div id="invKpiTotal" style="font-size:22px;font-weight:900;color:#38bdf8;">0</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
+              <div style="font-size:11px;color:#94a3b8;font-weight:700;">ITENS 100% CONFORMES</div>
+              <div id="invKpiConformes" style="font-size:22px;font-weight:900;color:#34d399;">0</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
+              <div style="font-size:11px;color:#94a3b8;font-weight:700;">COM DIVERGÊNCIA (FÍS ≠ FISC)</div>
+              <div id="invKpiDivergentes" style="font-size:22px;font-weight:900;color:#f87171;">0</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
+              <div style="font-size:11px;color:#94a3b8;font-weight:700;">TOTAL DE PEÇAS FÍSICAS</div>
+              <div id="invKpiTotalQtd" style="font-size:22px;font-weight:900;color:#fbbf24;">0 un</div>
+            </div>
+          </div>
+
+          <!-- BARRA DE BUSCA & FILTROS -->
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 12px;margin-bottom:14px;">
+            <div style="flex:1;min-width:260px;">
+              <input id="inpFiltroInventario" placeholder="🔍 Buscar peça por código, descrição ou modelo..." oninput="aoFiltrarInventario()" style="margin:0;padding:8px 12px;font-size:12.5px;" />
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button type="button" class="btn btn-outline" id="btnFiltroInvTodos" onclick="definirFiltroInventario('TODOS')" style="padding:6px 11px;font-size:12px;background:#1e293b;border-color:var(--cyan);color:var(--cyan);">Todos (<span id="cntInvTodos">0</span>)</button>
+              <button type="button" class="btn btn-outline" id="btnFiltroInvDivergentes" onclick="definirFiltroInventario('DIVERGENTES')" style="padding:6px 11px;font-size:12px;">⚠️ Divergências (<span id="cntInvDivergentes">0</span>)</button>
+              <button type="button" class="btn btn-outline" id="btnFiltroInvZerados" onclick="definirFiltroInventario('ZERADOS')" style="padding:6px 11px;font-size:12px;">📦 Físico Zerado (<span id="cntInvZerados">0</span>)</button>
+              <button type="button" class="btn btn-blue" onclick="toggleFormNovoItemInventario()" style="padding:6px 12px;font-size:12px;">➕ Cadastrar Nova Peça</button>
+              <button type="button" class="btn btn-outline" onclick="toggleFormAjusteRelativo()" style="padding:6px 10px;font-size:12px;" title="Ajuste de movimentação por Entrada/Saída com histórico">⚡ Movimentação Avulsa</button>
+            </div>
+          </div>
+
+          <!-- FORMULÁRIO DE CADASTRO DE NOVO ITEM (EXPANSÍVEL) -->
+          <div id="boxNovoItemInventario" style="display:none;background:#132338;border:1.5px solid #0284c7;border-radius:8px;padding:14px;margin-bottom:14px;">
+            <div style="font-weight:900;font-size:13px;color:#38bdf8;margin-bottom:10px;">➕ Cadastrar Novo Item no Almoxarifado &amp; Inventário Fiscal</div>
+            <div class="grid-4" style="margin-bottom:10px;">
+              <div>
+                <label>Código do Item (ou deixe vazio para gerar):</label>
+                <input id="novoInvCodigo" placeholder="Ex: 981" />
+              </div>
+              <div style="grid-column:span 2;">
+                <label>Descrição Completa da Peça / Instrumento:</label>
+                <input id="novoInvNome" placeholder="Ex: BATERIA 12V 7AH SELADA" />
+              </div>
+              <div>
+                <label>Unidade de Medida:</label>
+                <select id="novoInvUnidade">
+                  <option value="UN">UN - Unidade</option>
+                  <option value="PC">PC - Peça</option>
+                  <option value="MT">MT - Metro</option>
+                  <option value="KG">KG - Quilo</option>
+                  <option value="LT">LT - Litro</option>
+                  <option value="CX">CX - Caixa</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid-3" style="margin-bottom:12px;">
+              <div>
+                <label>Saldo Físico Inicial (Prateleira):</label>
+                <input id="novoInvQtdFisica" type="number" step="1" min="0" value="1" />
+              </div>
+              <div>
+                <label>Saldo Fiscal Inicial (Escriturado):</label>
+                <input id="novoInvQtdFiscal" type="number" step="1" min="0" value="1" />
+              </div>
+              <div>
+                <label>Preço de Custo (R$):</label>
+                <input id="novoInvPrecoCusto" type="number" step="0.01" min="0" value="0.00" />
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;">
+              <button type="button" class="btn btn-outline" onclick="toggleFormNovoItemInventario()">Cancelar</button>
+              <button type="button" class="btn btn-primary" style="width:auto;" onclick="salvarNovoItemInventario()">💾 Gravar Peça no Inventário</button>
+            </div>
+          </div>
+
+          <!-- FORMULÁRIO DE MOVIMENTAÇÃO AVULSA (ENTRADA/SAÍDA) -->
+          <div id="boxAjusteRelativo" style="display:none;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:12px;margin-bottom:14px;">
+            <div style="font-weight:bold;font-size:12.5px;color:#38bdf8;margin-bottom:8px;">⚡ Movimentação Avulsa de Entrada / Saída</div>
             <div class="grid-4" style="margin-bottom:10px;">
               <div style="grid-column:span 2;">
                 <label>Selecione a Peça / Componente:</label>
@@ -1024,18 +1217,36 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             </div>
 
             <div style="text-align:right;">
-              <button class="btn btn-blue" id="btnSalvarAjusteEstoque" onclick="executarAjusteEstoque()">⚡ Aplicar Movimentação no Estoque</button>
+              <button class="btn btn-blue" id="btnSalvarAjusteEstoque" onclick="executarAjusteEstoque()">⚡ Aplicar Movimentação</button>
             </div>
           </div>
 
-          <!-- TABELA COMPARATIVA -->
+          <!-- TABELA DO INVENTÁRIO COM EDIÇÃO DIRETA -->
           <div style="overflow-x:auto;">
             <table>
               <thead>
-                <tr><th>Cód</th><th>Descrição da Peça</th><th>Estoque Físico</th><th>Estoque Fiscal</th><th>Divergência</th><th>Situação</th><th>Custo Unit.</th></tr>
+                <tr>
+                  <th style="width:55px;">Cód</th>
+                  <th>Descrição da Peça</th>
+                  <th style="min-width:140px;text-align:center;">📦 Estoque Físico</th>
+                  <th style="min-width:140px;text-align:center;">📜 Estoque Fiscal</th>
+                  <th style="width:100px;text-align:center;">Divergência</th>
+                  <th style="width:130px;text-align:center;">Situação</th>
+                  <th style="min-width:220px;text-align:center;">⚡ Ações de Ajuste Direto</th>
+                </tr>
               </thead>
               <tbody id="tbodyComparativoEstoque"></tbody>
             </table>
+          </div>
+
+          <!-- PAGINAÇÃO DO INVENTÁRIO -->
+          <div id="paginacaoInventario" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid #334155;font-size:12px;color:#94a3b8;">
+            <div id="lblInfoPaginacaoInventario">Mostrando 0 de 0 peças</div>
+            <div style="display:flex;gap:6px;">
+              <button type="button" class="btn btn-outline" id="btnInvPagAnt" onclick="mudarPaginaInventario(-1)" style="padding:4px 10px;font-size:11.5px;">◀ Anterior</button>
+              <span id="lblPaginaAtualInventario" style="display:flex;align-items:center;padding:0 8px;font-weight:700;color:#fff;">Pág 1 de 1</span>
+              <button type="button" class="btn btn-outline" id="btnInvPagProx" onclick="mudarPaginaInventario(1)" style="padding:4px 10px;font-size:11.5px;">Próxima ▶</button>
+            </div>
           </div>
         </div>
       </details>
@@ -1069,6 +1280,11 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     let DADOS_ATUAIS = null;
     let USUARIO_FISCAL = null;
     let ITENS_TRANSFERENCIA = [];
+    let INVENTARIO_ITENS = [];
+    let INVENTARIO_FILTRO_TIPO = "TODOS";
+    let INVENTARIO_FILTRO_TEXTO = "";
+    let INVENTARIO_PAGINA = 1;
+    const INVENTARIO_POR_PAGINA = 40;
 
     async function initPortalFiscal() {{
       const params = new URLSearchParams(window.location.search);
@@ -1266,31 +1482,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         ).join("") || `<option value="">Nenhuma peça cadastrada</option>`;
       }}
 
-      const tbComp = document.getElementById("tbodyComparativoEstoque");
-      if (tbComp && res.pecas_almox) {{
-        tbComp.innerHTML = res.pecas_almox.map(p => {{
-          const diff = Number(p.qtd) - Number(p.qtd_fiscal);
-          let badge = '';
-          if (Math.abs(diff) < 0.001) {{
-            badge = '<span class="badge" style="background:#065f46;color:#a7f3d0;">Conforme (0)</span>';
-          }} else if (diff > 0) {{
-            badge = `<span class="badge" style="background:#1e3a8a;color:#93c5fd;">Excedente Físico (+${{diff.toFixed(1)}})</span>`;
-          }} else {{
-            badge = `<span class="badge" style="background:#7f1d1d;color:#fca5a5;">Déficit Físico (${{diff.toFixed(1)}})</span>`;
-          }}
-          return `
-            <tr>
-              <td><b>${{p.codigo || '-'}}</b></td>
-              <td>${{p.nome}}</td>
-              <td><b>${{p.qtd}}</b> ${{p.unidade}}</td>
-              <td><b style="color:#38bdf8;">${{p.qtd_fiscal}}</b> ${{p.unidade}}</td>
-              <td style="font-weight:700;color:${{diff === 0 ? '#34d399' : (diff > 0 ? '#60a5fa' : '#f87171')}};">${{diff > 0 ? '+' : ''}}${{diff.toFixed(1)}}</td>
-              <td>${{badge}}</td>
-              <td>R$ ${{Number(p.preco).toFixed(2)}}</td>
-            </tr>
-          `;
-        }}).join("") || `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:8px;">Nenhuma peça encontrada.</td></tr>`;
-      }}
+      INVENTARIO_ITENS = res.pecas_almox || [];
+      renderizarInventario();
     }}
 
     function preencherFormularioComOs(d, cfg) {{
@@ -1709,6 +1902,312 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       }}
     }}
 
+    function definirFiltroInventario(tipo) {{
+      INVENTARIO_FILTRO_TIPO = tipo;
+      INVENTARIO_PAGINA = 1;
+      const bTodos = document.getElementById("btnFiltroInvTodos");
+      const bDiv = document.getElementById("btnFiltroInvDivergentes");
+      const bZer = document.getElementById("btnFiltroInvZerados");
+      [bTodos, bDiv, bZer].forEach(b => {{
+        if (b) {{
+          b.style.background = "transparent";
+          b.style.color = "#e2e8f0";
+          b.style.borderColor = "#475569";
+        }}
+      }});
+      const ativo = tipo === 'TODOS' ? bTodos : (tipo === 'DIVERGENTES' ? bDiv : bZer);
+      if (ativo) {{
+        ativo.style.background = "#1e293b";
+        ativo.style.color = "var(--cyan)";
+        ativo.style.borderColor = "var(--cyan)";
+      }}
+      renderizarInventario();
+    }}
+
+    function aoFiltrarInventario() {{
+      INVENTARIO_FILTRO_TEXTO = (document.getElementById("inpFiltroInventario").value || "").trim().toUpperCase();
+      INVENTARIO_PAGINA = 1;
+      renderizarInventario();
+    }}
+
+    function toggleFormNovoItemInventario() {{
+      const bx = document.getElementById("boxNovoItemInventario");
+      bx.style.display = bx.style.display === "none" ? "block" : "none";
+    }}
+
+    function toggleFormAjusteRelativo() {{
+      const bx = document.getElementById("boxAjusteRelativo");
+      bx.style.display = bx.style.display === "none" ? "block" : "none";
+    }}
+
+    function mudarPaginaInventario(delta) {{
+      const totalFiltrados = obterItensInventarioFiltrados().length;
+      const totalPaginas = Math.max(1, Math.ceil(totalFiltrados / INVENTARIO_POR_PAGINA));
+      const novaPagina = INVENTARIO_PAGINA + delta;
+      if (novaPagina >= 1 && novaPagina <= totalPaginas) {{
+        INVENTARIO_PAGINA = novaPagina;
+        renderizarInventario();
+      }}
+    }}
+
+    function obterItensInventarioFiltrados() {{
+      return INVENTARIO_ITENS.filter(p => {{
+        const txt = INVENTARIO_FILTRO_TEXTO;
+        if (txt) {{
+          const matchCod = String(p.codigo || "").toUpperCase().includes(txt);
+          const matchNome = String(p.nome || "").toUpperCase().includes(txt);
+          if (!matchCod && !matchNome) return false;
+        }}
+        const diff = Math.abs(Number(p.qtd) - Number(p.qtd_fiscal));
+        if (INVENTARIO_FILTRO_TIPO === "DIVERGENTES" && diff < 0.001) return false;
+        if (INVENTARIO_FILTRO_TIPO === "ZERADOS" && Number(p.qtd) > 0) return false;
+        return true;
+      }});
+    }}
+
+    function renderizarInventario() {{
+      const total = INVENTARIO_ITENS.length;
+      let conformes = 0;
+      let divergentes = 0;
+      let zerados = 0;
+      let totalQtdFis = 0;
+
+      INVENTARIO_ITENS.forEach(p => {{
+        const diff = Math.abs(Number(p.qtd) - Number(p.qtd_fiscal));
+        if (diff < 0.001) conformes++;
+        else divergentes++;
+        if (Number(p.qtd) <= 0) zerados++;
+        totalQtdFis += Number(p.qtd || 0);
+      }});
+
+      const elTot = document.getElementById("invKpiTotal"); if (elTot) elTot.textContent = total;
+      const elConf = document.getElementById("invKpiConformes"); if (elConf) elConf.textContent = conformes;
+      const elDiv = document.getElementById("invKpiDivergentes"); if (elDiv) elDiv.textContent = divergentes;
+      const elQtd = document.getElementById("invKpiTotalQtd"); if (elQtd) elQtd.textContent = `${{totalQtdFis.toLocaleString('pt-BR', {{minimumFractionDigits:0}})}} un`;
+
+      const elCntTot = document.getElementById("cntInvTodos"); if (elCntTot) elCntTot.textContent = total;
+      const elCntDiv = document.getElementById("cntInvDivergentes"); if (elCntDiv) elCntDiv.textContent = divergentes;
+      const elCntZer = document.getElementById("cntInvZerados"); if (elCntZer) elCntZer.textContent = zerados;
+
+      const filtrados = obterItensInventarioFiltrados();
+      const totalPaginas = Math.max(1, Math.ceil(filtrados.length / INVENTARIO_POR_PAGINA));
+      if (INVENTARIO_PAGINA > totalPaginas) INVENTARIO_PAGINA = totalPaginas;
+
+      const inicio = (INVENTARIO_PAGINA - 1) * INVENTARIO_POR_PAGINA;
+      const itensPagina = filtrados.slice(inicio, inicio + INVENTARIO_POR_PAGINA);
+
+      const tb = document.getElementById("tbodyComparativoEstoque");
+      if (!itensPagina.length) {{
+        tb.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:18px;">Nenhuma peça encontrada com os filtros aplicados.</td></tr>`;
+      }} else {{
+        tb.innerHTML = itensPagina.map(p => {{
+          const diff = Number(p.qtd) - Number(p.qtd_fiscal);
+          let badge = '';
+          if (Math.abs(diff) < 0.001) {{
+            badge = '<span class="badge" style="background:#065f46;color:#a7f3d0;">Conforme</span>';
+          }} else if (diff > 0) {{
+            badge = `<span class="badge" style="background:#1e3a8a;color:#93c5fd;">Excedente Físico (+${{diff.toFixed(1)}})</span>`;
+          }} else {{
+            badge = `<span class="badge" style="background:#7f1d1d;color:#fca5a5;">Déficit Físico (${{diff.toFixed(1)}})</span>`;
+          }}
+          const corDiff = Math.abs(diff) < 0.001 ? '#34d399' : (diff > 0 ? '#60a5fa' : '#f87171');
+          const txtDiff = diff > 0 ? `+${{diff.toFixed(1)}}` : diff.toFixed(1);
+
+          return `
+            <tr id="linhaInv_${{p.id}}">
+              <td><b>${{p.codigo || '-'}}</b></td>
+              <td>
+                <div style="font-weight:700;color:#fff;">${{p.nome}}</div>
+                <div style="font-size:11px;color:#94a3b8;">Custo: R$ ${{Number(p.preco||0).toFixed(2)}} • Un: ${{p.unidade || 'UN'}}</div>
+              </td>
+              <td style="text-align:center;">
+                <div style="display:inline-flex;align-items:center;gap:3px;">
+                  <button type="button" onclick="ajustarPassoInventario(${{p.id}}, 'fis', -1)" class="btn btn-outline" style="padding:2px 6px;font-size:11px;min-width:24px;">-1</button>
+                  <input type="number" step="1" min="0" id="inpFis_${{p.id}}" value="${{p.qtd}}" oninput="marcarLinhaModificada(${{p.id}})" style="width:62px;padding:4px 3px;text-align:center;font-weight:800;font-size:12.5px;background:#022c22;border:1px solid #059669;color:#34d399;border-radius:4px;" />
+                  <button type="button" onclick="ajustarPassoInventario(${{p.id}}, 'fis', +1)" class="btn btn-outline" style="padding:2px 6px;font-size:11px;min-width:24px;">+1</button>
+                </div>
+              </td>
+              <td style="text-align:center;">
+                <div style="display:inline-flex;align-items:center;gap:3px;">
+                  <button type="button" onclick="ajustarPassoInventario(${{p.id}}, 'fisc', -1)" class="btn btn-outline" style="padding:2px 6px;font-size:11px;min-width:24px;">-1</button>
+                  <input type="number" step="1" min="0" id="inpFisc_${{p.id}}" value="${{p.qtd_fiscal}}" oninput="marcarLinhaModificada(${{p.id}})" style="width:62px;padding:4px 3px;text-align:center;font-weight:800;font-size:12.5px;background:#082f49;border:1px solid #0284c7;color:#38bdf8;border-radius:4px;" />
+                  <button type="button" onclick="ajustarPassoInventario(${{p.id}}, 'fisc', +1)" class="btn btn-outline" style="padding:2px 6px;font-size:11px;min-width:24px;">+1</button>
+                </div>
+              </td>
+              <td style="text-align:center;font-weight:800;color:${{corDiff}};" id="spDiff_${{p.id}}">${{txtDiff}}</td>
+              <td style="text-align:center;" id="spBadge_${{p.id}}">${{badge}}</td>
+              <td style="text-align:center;">
+                <div style="display:inline-flex;gap:4px;flex-wrap:wrap;justify-content:center;">
+                  <button id="btnSalvarInv_${{p.id}}" onclick="salvarInventarioLinhaDireto(${{p.id}})" class="btn btn-blue" style="padding:3px 8px;font-size:11px;font-weight:800;" title="Salvar diretamente o saldo físico e fiscal">💾 Salvar</button>
+                  <button type="button" onclick="igualarFiscalAoFisico(${{p.id}})" class="btn btn-outline" style="padding:3px 6px;font-size:10.5px;color:#38bdf8;border-color:#0284c7;" title="Falha de baixa fiscal: Iguala Fiscal ao Físico">⚖️ Fiscal=Físico</button>
+                  <button type="button" onclick="igualarFisicoAoFiscal(${{p.id}})" class="btn btn-outline" style="padding:3px 6px;font-size:10.5px;color:#34d399;border-color:#059669;" title="Falha de baixa física: Iguala Físico ao Fiscal">⚖️ Físico=Fiscal</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }}).join("");
+      }}
+
+      const infoPag = document.getElementById("lblInfoPaginacaoInventario");
+      if (infoPag) {{
+        const fim = Math.min(inicio + INVENTARIO_POR_PAGINA, filtrados.length);
+        infoPag.innerHTML = filtrados.length
+          ? `Mostrando <b>${{inicio + 1}}</b> a <b>${{fim}}</b> de <b>${{filtrados.length}}</b> peças`
+          : `0 peças encontradas`;
+      }}
+      const lblPag = document.getElementById("lblPaginaAtualInventario");
+      if (lblPag) lblPag.textContent = `Pág ${{INVENTARIO_PAGINA}} de ${{totalPaginas}}`;
+
+      const btnAnt = document.getElementById("btnInvPagAnt");
+      if (btnAnt) btnAnt.disabled = INVENTARIO_PAGINA <= 1;
+      const btnProx = document.getElementById("btnInvPagProx");
+      if (btnProx) btnProx.disabled = INVENTARIO_PAGINA >= totalPaginas;
+    }}
+
+    function marcarLinhaModificada(pecaId) {{
+      const inpFis = document.getElementById(`inpFis_${{pecaId}}`);
+      const inpFisc = document.getElementById(`inpFisc_${{pecaId}}`);
+      if (!inpFis || !inpFisc) return;
+      const fis = parseFloat(inpFis.value || 0);
+      const fisc = parseFloat(inpFisc.value || 0);
+      const diff = fis - fisc;
+      const spDiff = document.getElementById(`spDiff_${{pecaId}}`);
+      const spBadge = document.getElementById(`spBadge_${{pecaId}}`);
+      if (spDiff) {{
+        spDiff.textContent = diff > 0 ? `+${{diff.toFixed(1)}}` : diff.toFixed(1);
+        spDiff.style.color = Math.abs(diff) < 0.001 ? '#34d399' : (diff > 0 ? '#60a5fa' : '#f87171');
+      }}
+      if (spBadge) {{
+        if (Math.abs(diff) < 0.001) {{
+          spBadge.innerHTML = '<span class="badge" style="background:#065f46;color:#a7f3d0;">Conforme</span>';
+        }} else if (diff > 0) {{
+          spBadge.innerHTML = `<span class="badge" style="background:#1e3a8a;color:#93c5fd;">Excedente Físico (+${{diff.toFixed(1)}})</span>`;
+        }} else {{
+          spBadge.innerHTML = `<span class="badge" style="background:#7f1d1d;color:#fca5a5;">Déficit Físico (${{diff.toFixed(1)}})</span>`;
+        }}
+      }}
+      const btn = document.getElementById(`btnSalvarInv_${{pecaId}}`);
+      if (btn) {{
+        btn.style.background = "#16a34a";
+        btn.textContent = "💾 Salvar *";
+      }}
+    }}
+
+    function ajustarPassoInventario(pecaId, tipo, passo) {{
+      const inp = document.getElementById(tipo === 'fis' ? `inpFis_${{pecaId}}` : `inpFisc_${{pecaId}}`);
+      if (!inp) return;
+      let val = parseFloat(inp.value || 0) + passo;
+      if (val < 0) val = 0;
+      inp.value = val;
+      marcarLinhaModificada(pecaId);
+    }}
+
+    async function salvarInventarioLinhaDireto(pecaId) {{
+      const inpFis = document.getElementById(`inpFis_${{pecaId}}`);
+      const inpFisc = document.getElementById(`inpFisc_${{pecaId}}`);
+      const btn = document.getElementById(`btnSalvarInv_${{pecaId}}`);
+      if (!inpFis || !inpFisc) return;
+
+      const fis = parseFloat(inpFis.value || 0);
+      const fisc = parseFloat(inpFisc.value || 0);
+      if (btn) {{
+        btn.disabled = true;
+        btn.textContent = "Gravando...";
+      }}
+
+      try {{
+        const res = await fetch("/api/fiscal/v2/inventario/ajuste-direto", {{
+          method: "POST",
+          headers: {{"Content-Type": "application/json"}},
+          body: JSON.stringify({{
+            peca_id: pecaId,
+            quantidade_fisica: fis,
+            saldo_fiscal: fisc,
+            motivo: "Ajuste direto pelo painel de inventário (reconciliação/correção de baixa)",
+            usuario: USUARIO_FISCAL?.username || "netto"
+          }})
+        }}).then(r => r.json());
+
+        if (res.ok) {{
+          const item = INVENTARIO_ITENS.find(i => i.id === pecaId);
+          if (item) {{
+            item.qtd = fis;
+            item.qtd_fiscal = fisc;
+          }}
+          if (btn) {{
+            btn.style.background = "#0284c7";
+            btn.textContent = "✅ Salvo";
+            setTimeout(() => {{ if (btn) btn.textContent = "💾 Salvar"; }}, 1600);
+          }}
+          renderizarInventario();
+        }} else {{
+          alert("⚠️ " + (res.msg || "Erro ao salvar inventário."));
+          if (btn) btn.textContent = "💾 Salvar *";
+        }}
+      }} catch (err) {{
+        alert("Falha de conexão: " + err.message);
+        if (btn) btn.textContent = "💾 Salvar *";
+      }} finally {{
+        if (btn) btn.disabled = false;
+      }}
+    }}
+
+    async function igualarFiscalAoFisico(pecaId) {{
+      const inpFis = document.getElementById(`inpFis_${{pecaId}}`);
+      const inpFisc = document.getElementById(`inpFisc_${{pecaId}}`);
+      if (!inpFis || !inpFisc) return;
+      inpFisc.value = inpFis.value;
+      marcarLinhaModificada(pecaId);
+      await salvarInventarioLinhaDireto(pecaId);
+    }}
+
+    async function igualarFisicoAoFiscal(pecaId) {{
+      const inpFis = document.getElementById(`inpFis_${{pecaId}}`);
+      const inpFisc = document.getElementById(`inpFisc_${{pecaId}}`);
+      if (!inpFis || !inpFisc) return;
+      inpFis.value = inpFisc.value;
+      marcarLinhaModificada(pecaId);
+      await salvarInventarioLinhaDireto(pecaId);
+    }}
+
+    async function salvarNovoItemInventario() {{
+      const cod = document.getElementById("novoInvCodigo").value.trim();
+      const nome = document.getElementById("novoInvNome").value.trim();
+      const un = document.getElementById("novoInvUnidade").value;
+      const qFis = parseFloat(document.getElementById("novoInvQtdFisica").value || 0);
+      const qFisc = parseFloat(document.getElementById("novoInvQtdFiscal").value || 0);
+      const preco = parseFloat(document.getElementById("novoInvPrecoCusto").value || 0);
+
+      if (!nome) {{
+        alert("Informe o nome da peça / instrumento.");
+        return;
+      }}
+
+      const res = await fetch("/api/fiscal/v2/inventario/novo-item", {{
+        method: "POST",
+        headers: {{"Content-Type": "application/json"}},
+        body: JSON.stringify({{
+          codigo: cod,
+          nome: nome,
+          quantidade_fisica: qFis,
+          saldo_fiscal: qFisc,
+          preco_custo: preco,
+          unidade: un,
+          usuario: USUARIO_FISCAL?.username || "netto"
+        }})
+      }}).then(r => r.json());
+
+      if (res.ok) {{
+        alert(res.msg);
+        document.getElementById("novoInvCodigo").value = "";
+        document.getElementById("novoInvNome").value = "";
+        document.getElementById("boxNovoItemInventario").style.display = "none";
+        carregarDadosFiscais();
+      }} else {{
+        alert("⚠️ " + (res.msg || "Erro ao cadastrar peça."));
+      }}
+    }}
+
     initPortalFiscal();
   </script>
 </body>
@@ -1727,4 +2226,6 @@ def registrar_rotas_portal_fiscal(app: web.Application) -> None:
     app.router.add_post("/api/fiscal/v2/transferir-filiais", api_fiscal_v2_transferir_filiais)
     app.router.add_post("/api/fiscal/v2/lancar-consumivel", api_fiscal_v2_lancar_consumivel)
     app.router.add_post("/api/fiscal/v2/ajuste-estoque", api_fiscal_v2_ajuste_estoque)
+    app.router.add_post("/api/fiscal/v2/inventario/ajuste-direto", api_fiscal_v2_inventario_ajuste_direto)
+    app.router.add_post("/api/fiscal/v2/inventario/novo-item", api_fiscal_v2_inventario_novo_item)
     app.router.add_get("/api/fiscal/v2/xml/{os_id}", api_fiscal_v2_xml_download)

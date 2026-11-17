@@ -12888,6 +12888,14 @@ async def api_estoque_salvar(request: web.Request) -> web.Response:
 
 
 
+    saldo_fiscal_val = body.get("saldo_fiscal")
+
+
+
+    saldo_fiscal = float(limpar_float(saldo_fiscal_val, quantidade)) if saldo_fiscal_val is not None else float(quantidade)
+
+
+
     preco = limpar_float(body.get("preco_unitario"), 0.0)
 
 
@@ -12968,7 +12976,7 @@ async def api_estoque_salvar(request: web.Request) -> web.Response:
 
 
 
-                SET nome_peca = ?, categoria = ?, quantidade = ?, preco_unitario = ?, preco_custo = ?,
+                SET nome_peca = ?, categoria = ?, quantidade = ?, saldo_fiscal = ?, preco_unitario = ?, preco_custo = ?,
 
 
 
@@ -12984,7 +12992,7 @@ async def api_estoque_salvar(request: web.Request) -> web.Response:
 
 
 
-            """, (nome_peca, categoria, quantidade, preco, preco_custo, m_contrato, m_avulso, m_avista, m_desestimulo, localizacao, validade_cal, cert_cal, codigo))
+            """, (nome_peca, categoria, quantidade, saldo_fiscal, preco, preco_custo, m_contrato, m_avulso, m_avista, m_desestimulo, localizacao, validade_cal, cert_cal, codigo))
 
 
 
@@ -13000,7 +13008,7 @@ async def api_estoque_salvar(request: web.Request) -> web.Response:
 
 
 
-                (codigo, nome_peca, categoria, quantidade, estoque_minimo, preco_unitario, preco_custo,
+                (codigo, nome_peca, categoria, quantidade, saldo_fiscal, estoque_minimo, preco_unitario, preco_custo,
 
 
 
@@ -13012,11 +13020,11 @@ async def api_estoque_salvar(request: web.Request) -> web.Response:
 
 
 
-                VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
 
 
-            """, (codigo, nome_peca, categoria, quantidade, preco, preco_custo, m_contrato, m_avulso, m_avista, m_desestimulo, localizacao, validade_cal, cert_cal))
+            """, (codigo, nome_peca, categoria, quantidade, saldo_fiscal, preco, preco_custo, m_contrato, m_avulso, m_avista, m_desestimulo, localizacao, validade_cal, cert_cal))
 
 
 
