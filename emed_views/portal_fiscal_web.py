@@ -136,6 +136,22 @@ async def api_fiscal_v2_dados(request: web.Request) -> web.Response:
         sql_h += " ORDER BY id DESC LIMIT 30"
         rows_hist = conn.execute(sql_h, tuple(params_h)).fetchall()
 
+        # Peças disponíveis no almoxarifado para transferências
+        cur_p = conn.execute("SELECT id, codigo, nome_peca, quantidade, preco_custo, unidade FROM estoque_pecas WHERE quantidade > 0 ORDER BY nome_peca ASC LIMIT 100")
+        rows_p = cur_p.fetchall()
+        if not rows_p:
+            cur_p2 = conn.execute("SELECT id, codigo, nome_peca, quantidade, preco_custo, unidade FROM estoque_pecas ORDER BY nome_peca ASC LIMIT 30")
+            rows_p = cur_p2.fetchall()
+        pecas_almox = [{"id": rp[0], "codigo": rp[1] or "", "nome": rp[2] or "", "qtd": rp[3] or 0, "preco": float(rp[4] or 0.0), "unidade": rp[5] or "UN"} for rp in rows_p]
+
+        # Veículos da frota
+        cur_v = conn.execute("SELECT placa, modelo FROM veiculos ORDER BY modelo ASC")
+        veiculos_frota = [{"placa": rv[0] or "", "modelo": rv[1] or ""} for rv in cur_v.fetchall()]
+
+        # Histórico recente de baixas de consumíveis operacionais
+        cur_c = conn.execute("SELECT id, tecnico_setor, nome_item, quantidade, finalidade, data_baixa FROM baixas_consumiveis ORDER BY id DESC LIMIT 10")
+        consumiveis_recentes = [{"id": rc[0], "setor": rc[1] or "", "item": rc[2] or "", "qtd": rc[3] or 0, "finalidade": rc[4] or "", "data": rc[5] or ""} for rc in cur_c.fetchall()]
+
     total_nf, emitidas, total_faturar = cur_tot if cur_tot else (0, 0, 0.0)
     pendentes_fila = sum(1 for r in rows_os if not r[8] or "CANCELAD" in str(r[7] or "").upper())
 
@@ -196,6 +212,9 @@ async def api_fiscal_v2_dados(request: web.Request) -> web.Response:
         "fila_os": fila_os,
         "os_selecionada": dados_os_sel,
         "historico": historico,
+        "pecas_almox": pecas_almox,
+        "veiculos_frota": veiculos_frota,
+        "consumiveis_recentes": consumiveis_recentes,
     })
 
 
@@ -254,6 +273,13 @@ async def api_fiscal_v2_emitir(request: web.Request) -> web.Response:
         nat_op = "REMESSA DE BEM PARA CONSERTO/REPARO"
         cfop = "5915" if uf_tom in ("DF", "CE") else "6915"
 
+    deduzir_pecas = bool(body.get("deduzir_pecas_fisco", True))
+    val_pecas_raw = float(body.get("valor_pecas") or 0.0)
+    val_pecas_efetivo = val_pecas_raw if deduzir_pecas else 0.0
+    disc_serv = str(body.get("discriminacao_servico", "")).strip()
+    if not deduzir_pecas and val_pecas_raw > 0:
+        disc_serv += "\n\n[OBSERVAÇÃO FISCAL: Peças e consumíveis aplicados nesta manutenção encontram-se inclusos na cobertura contratual (sem incidência de faturamento fiscal avulso de mercadoria).]"
+
     payload_salvar = {
         "cliente": str(body.get("cliente", "")).strip(),
         "cnpj_tomador": str(body.get("cnpj_tomador", "")).strip(),
@@ -264,9 +290,9 @@ async def api_fiscal_v2_emitir(request: web.Request) -> web.Response:
         "tipo_nota": tipo_op,
         "natureza_operacao": nat_op,
         "cfop": cfop,
-        "discriminacao_servico": str(body.get("discriminacao_servico", "")).strip(),
+        "discriminacao_servico": disc_serv,
         "valor_servicos": float(body.get("valor_servicos") or 0.0),
-        "valor_pecas": float(body.get("valor_pecas") or 0.0),
+        "valor_pecas": val_pecas_efetivo,
         "valor_desconto": float(body.get("valor_desconto") or 0.0),
         "aliquota_iss": float(body.get("aliquota_iss") or 0.0),
         "filial_emissora": filial,
@@ -333,6 +359,151 @@ async def api_fiscal_v2_xml_download(request: web.Request) -> web.Response:
             headers={"Content-Disposition": f'attachment; filename="NFS_{num}.xml"'},
         )
     return web.Response(text="Arquivo XML não encontrado para esta OS.", status=404)
+
+
+async def api_fiscal_v2_transferir_filiais(request: web.Request) -> web.Response:
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    body = await request.json()
+    origem = str(body.get("origem", "MATRIZ_CE")).upper()
+    destino = str(body.get("destino", "FILIAL_DF")).upper()
+    if origem == destino:
+        return web.json_response({"ok": False, "msg": "A filial de origem deve ser diferente da filial de destino."}, status=400)
+
+    natureza_cod = str(body.get("natureza_op", "TRANSFERENCIA_ESTOQUE"))
+    cfop = str(body.get("cfop", "6152" if ("CE" in origem and "DF" in destino) or ("DF" in origem and "CE" in destino) else "5152"))
+    veiculo = str(body.get("veiculo_transporte", "TRANSPORTE EM VEÍCULO PRÓPRIO EMED")).strip()
+    obs_extra = str(body.get("observacoes", "")).strip()
+    usuario = str(body.get("usuario", "netto")).strip()
+    itens = body.get("itens", [])
+
+    if not itens:
+        return web.json_response({"ok": False, "msg": "Selecione ao menos 1 peça/item para transferir."}, status=400)
+
+    manager = FiscalManager(db_name)
+    cfg_origem = manager.get_filial_config(origem)
+    cfg_destino = manager.get_filial_config(destino)
+
+    nat_descr = "TRANSFERÊNCIA DE MERCADORIA ADQUIRIDA OU RECEBIDA DE TERCEIROS (CFOP " + cfop + ")"
+    if "USO" in natureza_cod or "CONSUMO" in natureza_cod:
+        nat_descr = "REMESSA DE BEM PARA USO/CONSUMO EM ESTABELECIMENTO DA MESMA EMPRESA (CFOP " + cfop + ")"
+    elif "CONSERTO" in natureza_cod:
+        nat_descr = "REMESSA DE BEM PARA CONSERTO/REPARO EM LABORATÓRIO (CFOP " + cfop + ")"
+
+    valor_total = sum(float(it.get("quantidade", 1)) * float(it.get("valor_unitario", 0.0)) for it in itens)
+
+    detalhe_itens_txt = []
+    for it in itens:
+        detalhe_itens_txt.append(f"• Item: {it.get('nome', '')} (Cód: {it.get('codigo', '')}) | Qtd: {it.get('quantidade', 1)} | Unit: R$ {float(it.get('valor_unitario', 0.0)):.2f}")
+
+    discriminacao = f"""TRANSFERÊNCIA ENTRE ESTABELECIMENTOS DA MESMA EMPRESA
+ORIGEM: {cfg_origem.get('razao_social')} (CNPJ: {cfg_origem.get('cnpj')})
+DESTINO: {cfg_destino.get('razao_social')} (CNPJ: {cfg_destino.get('cnpj')})
+NATUREZA FISCAL: {nat_descr}
+TRANSPORTE / LOGÍSTICA: {veiculo}
+
+ITENS TRANSFERIDOS:
+""" + "\n".join(detalhe_itens_txt) + f"""
+
+OBSERVAÇÃO LEGAL TRIBUTÁRIA:
+Operação de transferência de mercadorias entre estabelecimentos do mesmo titular sem incidência de ICMS, em estrita conformidade com a decisão do Supremo Tribunal Federal (STF - ADC 49) e Lei Complementar nº 204/2023.
+{f'Observações Complementares: {obs_extra}' if obs_extra else ''}"""
+
+    sigla = "DF" if origem == "FILIAL_DF" else "CE"
+    num_seq = uuid.uuid4().hex[:6].upper()
+    ano = datetime.now().year
+    num_nf = f"TRF-{sigla}-{ano}-{num_seq}"
+    chave_acesso = f"53{datetime.now().strftime('%y%m')}{''.join(c for c in cfg_origem.get('cnpj', '') if c.isdigit())}55001{int(time.time()) % 1000000000:09d}1{uuid.uuid4().int % 100000000:08d}"
+    agora_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+    with _get_db_connection(db_name) as conn:
+        cur = conn.execute("""
+            INSERT INTO notas_fiscais (
+                os_id, cliente, cnpj_tomador, tomador_endereco, tomador_cidade, tomador_uf,
+                tipo_nota, natureza_operacao, cfop, valor_servicos, valor_pecas, valor_desconto,
+                aliquota_iss, valor_iss, valor_liquido, status_fiscal, numero_nf, serie, chave_acesso,
+                data_emissao, filial_emissora, prestador_cnpj, prestador_razao, prestador_im,
+                prestador_endereco, prestador_cidade, prestador_uf, prestador_fone, prestador_email,
+                discriminacao_servico, criado_em, atualizado_em
+            ) VALUES (
+                0, ?, ?, ?, ?, ?,
+                'TRANSFERÊNCIA ENTRE FILIAIS', ?, ?, 0.0, ?, 0.0,
+                0.0, 0.0, ?, 'AUTORIZADA (TRANSFERÊNCIA ENTRE FILIAIS)', ?, 'TRF-1', ?,
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, ?, ?
+            )
+        """, (
+            cfg_destino.get("razao_social"), cfg_destino.get("cnpj"), cfg_destino.get("endereco"),
+            cfg_destino.get("cidade"), cfg_destino.get("uf"),
+            nat_descr, cfop, valor_total, valor_total,
+            num_nf, chave_acesso, agora_str, origem,
+            cfg_origem.get("cnpj"), cfg_origem.get("razao_social"), cfg_origem.get("inscricao_municipal"),
+            cfg_origem.get("endereco"), cfg_origem.get("cidade"), cfg_origem.get("uf"),
+            cfg_origem.get("telefone"), cfg_origem.get("email"),
+            discriminacao, agora_str, agora_str
+        ))
+        id_nf = cur.lastrowid
+
+        # Atualizar estoque: deduz da origem
+        for it in itens:
+            pid = it.get("peca_id")
+            qtd = float(it.get("quantidade", 1))
+            if pid:
+                conn.execute("UPDATE estoque_pecas SET quantidade = MAX(0, quantidade - ?) WHERE id = ?", (qtd, pid))
+                conn.execute("""
+                    INSERT INTO movimentacoes_estoque (
+                        estabelecimento, centro_estoque, codigo_item, descricao,
+                        data_mov, hora_mov, tipo_mov, qtd_saida, documento, observacao
+                    ) VALUES (?, ?, ?, ?, ?, ?, 'TRANSFERENCIA_FILIAL_SAIDA', ?, ?, ?)
+                """, (
+                    origem, f"ALMOXARIFADO {origem}", str(it.get("codigo", "")), str(it.get("nome", "")),
+                    datetime.now().strftime("%Y-%m-%d"), datetime.now().strftime("%H:%M:%S"),
+                    qtd, num_nf, f"Transferência para {destino} ({veiculo})"
+                ))
+
+        conn.commit()
+
+    _registrar_log_fiscal("TRANSFERENCIA_FILIAIS", f"NF-e {num_nf} emitida ({origem} -> {destino}) - Total: R$ {valor_total:.2f} ({len(itens)} itens)", usuario)
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"✅ Nota de Transferência {num_nf} emitida com sucesso! {len(itens)} item(ns) movimentado(s) de {origem} para {destino}.",
+        "numero_nf": num_nf,
+        "id_nf": id_nf
+    })
+
+
+async def api_fiscal_v2_lancar_consumivel(request: web.Request) -> web.Response:
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    body = await request.json()
+    descricao = str(body.get("descricao", "")).strip()
+    fornecedor = str(body.get("fornecedor", "Supermercado / Fornecedor Local")).strip()
+    numero_nf = str(body.get("numero_nf", "")).strip() or f"CUPOM-{uuid.uuid4().hex[:6].upper()}"
+    unidade_setor = str(body.get("unidade_setor", "Matriz Eusébio/CE - Copa & Administrativo")).strip()
+    quantidade = float(body.get("quantidade") or 1.0)
+    valor_total = float(body.get("valor_total") or 0.0)
+    usuario = str(body.get("usuario", "netto")).strip()
+
+    if not descricao:
+        return web.json_response({"ok": False, "msg": "Informe a descrição do material (ex: Café, Papel Higiênico, etc.)."}, status=400)
+
+    agora_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    nome_composto = f"{descricao} (NF: {numero_nf} • Fornec: {fornecedor} • R$ {valor_total:.2f})"
+
+    with _get_db_connection(db_name) as conn:
+        conn.execute("""
+            INSERT INTO baixas_consumiveis (
+                tecnico_setor, nome_item, quantidade, finalidade, data_baixa
+            ) VALUES (?, ?, ?, 'CONSUMO IMEDIATO / DESPESA OPERACIONAL', ?)
+        """, (unidade_setor, nome_composto, quantidade, agora_str))
+        conn.commit()
+
+    _registrar_log_fiscal("CONSUMIVEL_ADMINISTRATIVO", f"NF {numero_nf} ({descricao}) - R$ {valor_total:.2f} lançada para {unidade_setor}. Fisco registrado e estoque físico mantido em zero.", usuario)
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"✅ NF {numero_nf} ({descricao}) registrada no Fisco como Despesa Operacional! O estoque físico de peças clínicas foi mantido em zero (consumo imediato)."
+    })
 
 
 async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
@@ -528,11 +699,185 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           <div><label>Desconto Concedido (R$):</label><input id="nfDesconto" type="number" step="0.01" value="0" oninput="recalcularTotaisFormNf()" /></div>
         </div>
 
+        <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;margin-bottom:10px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin:0;">
+            <input type="checkbox" id="chkDeduzirPecasFisco" checked onchange="aoAlternarDeduzirPecasFisco()" />
+            <span><b>Deduzir / Faturar Peças no Fisco</b> (Desmarque se as peças estiverem cobertas pelo escopo do contrato ou forem insumos sem faturamento avulso)</span>
+          </label>
+        </div>
+
         <div id="barraResumoIss" style="background:#0f172a;padding:10px 14px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:13px;"></div>
 
         <button class="btn btn-primary" id="btnEmitirNf" onclick="emitirNotaFiscalAgora()">🚀 EMITIR NOTA FISCAL EM 1 CLIQUE</button>
         <div id="boxResultadoEmissao" style="margin-top:14px;"></div>
       </div>
+
+      <!-- TRANSFERÊNCIA AVULSA ENTRE FILIAIS (CE <-> DF) -->
+      <details class="card" id="expanderTransferencia" style="cursor:pointer;margin-bottom:16px;">
+        <summary style="font-weight:800;color:var(--cyan);font-size:14px;">📦 Transferência Avulsa de Peças &amp; Insumos entre Filiais (CE ⇄ DF — Sem OS)</summary>
+        <div style="cursor:default;margin-top:14px;">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+            Utilize para transferir peças, insumos ou ferramentas entre a Matriz (Eusébio/CE) e a Filial Brasília (DF) por necessidade logística, reposição ou conserto em bancada, sem depender de uma OS de cliente.
+          </div>
+
+          <div class="grid-3" style="margin-bottom:12px;">
+            <div>
+              <label>Unidade de Origem (Remetente):</label>
+              <select id="selOrigemTransferencia" onchange="aoTrocarOrigemTransferencia()">
+                <option value="MATRIZ_CE">Matriz (Eusébio / CE)</option>
+                <option value="FILIAL_DF">Filial Brasília (DF)</option>
+              </select>
+            </div>
+            <div>
+              <label>Unidade de Destino (Destinatário):</label>
+              <select id="selDestinoTransferencia">
+                <option value="FILIAL_DF">Filial Brasília (DF)</option>
+                <option value="MATRIZ_CE">Matriz (Eusébio / CE)</option>
+              </select>
+            </div>
+            <div>
+              <label>Finalidade / Natureza Fiscal:</label>
+              <select id="selNaturezaTransferencia" onchange="aoTrocarNaturezaTransferencia()">
+                <option value="TRANSFERENCIA_ESTOQUE">Transferência de Mercadoria para Reposição (CFOP 6152)</option>
+                <option value="REMESSA_USO_CONSUMO">Remessa de Bem / Insumos para Uso em Filial (CFOP 6949)</option>
+                <option value="REMESSA_CONSERTO">Remessa para Conserto em Laboratório Matriz (CFOP 6915)</option>
+              </select>
+              <input type="hidden" id="selCfopTransferencia" value="6152" />
+            </div>
+          </div>
+
+          <!-- SELEÇÃO DE ITENS -->
+          <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:12px;margin-bottom:12px;">
+            <div style="font-weight:bold;font-size:12.5px;color:#a5f3fc;margin-bottom:8px;">➕ Adicionar Itens à Remessa</div>
+            <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+              <div style="flex:2;min-width:240px;">
+                <label>Selecione a Peça / Insumo do Almoxarifado:</label>
+                <select id="selPecaTransferencia" style="width:100%;"></select>
+              </div>
+              <div style="width:100px;">
+                <label>Qtd:</label>
+                <input id="inpQtdTransferencia" type="number" min="1" step="1" value="1" />
+              </div>
+              <div>
+                <button type="button" class="btn btn-blue" onclick="adicionarItemTransferencia()">+ Adicionar Item</button>
+              </div>
+            </div>
+
+            <!-- TABELA DE ITENS ADICIONADOS -->
+            <div style="overflow-x:auto;margin-top:10px;">
+              <table>
+                <thead>
+                  <tr><th>Cód</th><th>Descrição da Peça</th><th>Qtd</th><th>Custo Unit.</th><th>Subtotal</th><th>Ação</th></tr>
+                </thead>
+                <tbody id="tbodyItensTransferencia">
+                  <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:8px;">Nenhum item adicionado à remessa ainda.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;margin-top:8px;font-size:14px;font-weight:900;color:var(--cyan);">
+              <span>VALOR TOTAL DA CARGA: <span id="lblTotalTransferencia">R$ 0,00</span></span>
+            </div>
+          </div>
+
+          <div class="grid-2" style="margin-bottom:12px;">
+            <div>
+              <label>Veículo / Modal de Transporte:</label>
+              <select id="selVeiculoTransferencia">
+                <option value="TRANSPORTE EM VEÍCULO PRÓPRIO EMED (CONDUTOR TÉCNICO)">Transporte em Veículo Próprio EMED (Técnico / Frota)</option>
+                <option value="TRANSPORTADORA PARCEIRA (RODOVIÁRIO)">Transportadora Parceira (Rodoviário)</option>
+                <option value="TRANSPORTE AÉREO / CARGA URGENTE">Transporte Aéreo / Carga Urgente</option>
+              </select>
+            </div>
+            <div>
+              <label>Observações Adicionais / Justificativa:</label>
+              <input id="inpObsTransferencia" placeholder="ex: Reposição de peças para base Brasília" />
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div style="font-size:11px;color:#94a3b8;">
+              ⚖️ <b>Isenção Legal de ICMS:</b> STF ADC 49 e LC 204/2023 (Transferência entre estabelecimentos do mesmo titular sem fato gerador de ICMS).
+            </div>
+            <button class="btn btn-primary" id="btnEmitirTransferencia" onclick="emitirTransferenciaFiliais()">🚀 Emitir NF-e de Transferência (Modelo 55)</button>
+          </div>
+          <div id="boxResultadoTransferencia"></div>
+        </div>
+      </details>
+
+      <!-- CONSUMÍVEIS ADMINISTRATIVOS (CAFÉ, LIMPEZA, COPA — BAIXA DIRETA) -->
+      <details class="card" id="expanderConsumiveis" style="cursor:pointer;margin-bottom:16px;">
+        <summary style="font-weight:800;color:#fde047;font-size:14px;">☕ Lançamento de Consumíveis Administrativos (Café, Copa, Limpeza — Baixa Direta)</summary>
+        <div style="cursor:default;margin-top:14px;">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+            Permite escriturar a Nota Fiscal de compra de materiais de uso/consumo da empresa no Fisco e na Despesa Operacional, enquanto o <b>estoque físico de peças de engenharia permanece em zero</b> (consumo imediato), sem poluir a lista técnica dos hospitais.
+          </div>
+
+          <div class="grid-3" style="margin-bottom:10px;">
+            <div>
+              <label>Descrição do Material:</label>
+              <input id="consDescricao" placeholder="ex: Café em Pó 500g, Papel Higiênico (Fardo)" />
+            </div>
+            <div>
+              <label>Fornecedor / Estabelecimento:</label>
+              <input id="consFornecedor" placeholder="ex: Atacadão, Assaí, Kalunga, Mercadinho" />
+            </div>
+            <div>
+              <label>Número da NF / Cupom de Compra:</label>
+              <input id="consNf" placeholder="ex: NFC-e 45892" />
+            </div>
+          </div>
+
+          <div class="grid-4" style="margin-bottom:12px;">
+            <div>
+              <label>Unidade &amp; Setor de Consumo:</label>
+              <select id="consSetor">
+                <option value="Matriz Eusébio/CE - Copa &amp; Cozinha">Matriz Eusébio/CE - Copa &amp; Cozinha</option>
+                <option value="Matriz Eusébio/CE - Higiene &amp; Limpeza">Matriz Eusébio/CE - Higiene &amp; Limpeza</option>
+                <option value="Matriz Eusébio/CE - Administrativo &amp; Recepção">Matriz Eusébio/CE - Administrativo &amp; Recepção</option>
+                <option value="Filial Brasília/DF - Copa &amp; Higiene">Filial Brasília/DF - Copa &amp; Higiene</option>
+                <option value="Filial Brasília/DF - Escritório &amp; Apoio">Filial Brasília/DF - Escritório &amp; Apoio</option>
+              </select>
+            </div>
+            <div>
+              <label>Categoria:</label>
+              <select id="consCategoria">
+                <option value="Alimentação &amp; Copa">Alimentação &amp; Copa</option>
+                <option value="Higiene &amp; Limpeza">Higiene &amp; Limpeza</option>
+                <option value="Material de Escritório &amp; Expediente">Material de Escritório &amp; Expediente</option>
+                <option value="Insumo Operacional Geral">Insumo Operacional Geral</option>
+              </select>
+            </div>
+            <div>
+              <label>Quantidade:</label>
+              <input id="consQtd" type="number" min="1" step="1" value="1" />
+            </div>
+            <div>
+              <label>Valor Total da Nota (R$):</label>
+              <input id="consValor" type="number" step="0.01" placeholder="0,00" />
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div style="font-size:11px;color:#fde047;">
+              💡 <b>Regra Automática:</b> O valor é lançado na despesa fiscal e contábil, e a baixa do saldo físico ocorre instantaneamente no ato do registro.
+            </div>
+            <button class="btn btn-primary" style="background:#ca8a04;" id="btnLancarConsumivel" onclick="lancarConsumivelAdministrativo()">☕ Lançar no Fisco &amp; Baixar Estoque Imediatamente (Saldo 0)</button>
+          </div>
+
+          <div style="margin-top:14px;border-top:1px solid #334155;padding-top:10px;">
+            <div style="font-size:12px;font-weight:bold;color:var(--muted);margin-bottom:6px;">Últimos Consumíveis Lançados (Despesa Direta):</div>
+            <div style="overflow-x:auto;">
+              <table>
+                <thead>
+                  <tr><th>Setor</th><th>Descrição / NF</th><th>Qtd</th><th>Finalidade</th><th>Data do Registro</th></tr>
+                </thead>
+                <tbody id="tbodyConsumiveisRecentes"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </details>
 
       <!-- HISTÓRICO & CANCELAMENTO -->
       <div class="card">
@@ -562,6 +907,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     let FILIAL_ATIVA = "FILIAL_DF";
     let DADOS_ATUAIS = null;
     let USUARIO_FISCAL = null;
+    let ITENS_TRANSFERENCIA = [];
 
     async function initPortalFiscal() {{
       const params = new URLSearchParams(window.location.search);
@@ -722,6 +1068,35 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       const ativas = (res.historico || []).filter(h => !String(h.status_fiscal).toUpperCase().includes("CANCELAD"));
       selCanc.innerHTML = ativas.map(h => `<option value="${{h.id}}">NFS-e Nº ${{h.numero_nf}} — ${{h.cliente}} (R$ ${{Number(h.valor_liquido).toFixed(2)}})</option>`).join("")
         || `<option value="">-- Nenhuma nota ativa para cancelar --</option>`;
+
+      const selPecaTrf = document.getElementById("selPecaTransferencia");
+      if (selPecaTrf && res.pecas_almox) {{
+        selPecaTrf.innerHTML = res.pecas_almox.map(p =>
+          `<option value="${{p.id}}" data-codigo="${{p.codigo}}" data-nome="${{p.nome.replace(/"/g, '&quot;')}}" data-preco="${{p.preco}}">${{p.codigo ? '[' + p.codigo + '] ' : ''}}${{p.nome}} (Saldo: ${{p.qtd}} ${{p.unidade}} • Custo: R$ ${{Number(p.preco).toFixed(2)}})</option>`
+        ).join("") || `<option value="">Nenhuma peça cadastrada</option>`;
+      }}
+
+      const selVeic = document.getElementById("selVeiculoTransferencia");
+      if (selVeic && res.veiculos_frota && res.veiculos_frota.length) {{
+        const veicsOpts = res.veiculos_frota.map(v => `<option value="${{v.modelo}} - ${{v.placa}}">${{v.modelo}} (${{v.placa}}) - Frota EMED</option>`).join("");
+        selVeic.innerHTML = veicsOpts + `
+          <option value="TRANSPORTADORA PARCEIRA (RODOVIÁRIO)">Transportadora Parceira (Rodoviário)</option>
+          <option value="TRANSPORTE AÉREO / CARGA URGENTE">Transporte Aéreo / Carga Urgente</option>
+        `;
+      }}
+
+      const tbCons = document.getElementById("tbodyConsumiveisRecentes");
+      if (tbCons) {{
+        tbCons.innerHTML = (res.consumiveis_recentes || []).map(c => `
+          <tr>
+            <td><b>${{c.setor}}</b></td>
+            <td>${{c.item}}</td>
+            <td>${{c.qtd}}</td>
+            <td><span class="badge" style="background:#065f46;color:#a7f3d0;">${{c.finalidade}}</span></td>
+            <td style="font-size:11px;">${{c.data}}</td>
+          </tr>
+        `).join("") || `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:8px;">Nenhum consumível lançado recentemente.</td></tr>`;
+      }}
     }}
 
     function preencherFormularioComOs(d, cfg) {{
@@ -833,6 +1208,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           discriminacao_servico: document.getElementById("nfDiscriminacao").value,
           valor_servicos: document.getElementById("nfValSrv").value,
           valor_pecas: document.getElementById("nfValPec").value,
+          deduzir_pecas_fisco: document.getElementById("chkDeduzirPecasFisco") ? document.getElementById("chkDeduzirPecasFisco").checked : true,
           aliquota_iss: document.getElementById("nfAliqIss").value,
           valor_desconto: document.getElementById("nfDesconto").value,
           usuario: USUARIO_FISCAL?.username || "netto"
@@ -879,6 +1255,209 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       if (res.ok) carregarDadosFiscais(String(res.os_id));
     }}
 
+    function aoAlternarDeduzirPecasFisco() {{
+      const chk = document.getElementById("chkDeduzirPecasFisco");
+      const inpPec = document.getElementById("nfValPec");
+      if (!chk.checked) {{
+        if (!inpPec.hasAttribute("data-original")) {{
+          inpPec.setAttribute("data-original", inpPec.value || "0");
+        }}
+        inpPec.value = "0.00";
+        inpPec.disabled = true;
+        inpPec.style.opacity = "0.5";
+      }} else {{
+        inpPec.disabled = false;
+        inpPec.style.opacity = "1";
+        if (inpPec.hasAttribute("data-original")) {{
+          inpPec.value = inpPec.getAttribute("data-original");
+        }}
+      }}
+      recalcularTotaisFormNf();
+    }}
+
+    function aoTrocarOrigemTransferencia() {{
+      const ori = document.getElementById("selOrigemTransferencia").value;
+      const des = document.getElementById("selDestinoTransferencia");
+      des.value = ori === "MATRIZ_CE" ? "FILIAL_DF" : "MATRIZ_CE";
+      aoTrocarNaturezaTransferencia();
+    }}
+
+    function aoTrocarNaturezaTransferencia() {{
+      const nat = document.getElementById("selNaturezaTransferencia").value;
+      const ori = document.getElementById("selOrigemTransferencia").value;
+      const des = document.getElementById("selDestinoTransferencia").value;
+      const isInter = (ori === "MATRIZ_CE" && des === "FILIAL_DF") || (ori === "FILIAL_DF" && des === "MATRIZ_CE");
+      let cfop = isInter ? "6152" : "5152";
+      if (nat.includes("USO_CONSUMO")) cfop = isInter ? "6949" : "5949";
+      else if (nat.includes("CONSERTO")) cfop = isInter ? "6915" : "5915";
+      document.getElementById("selCfopTransferencia").value = cfop;
+    }}
+
+    function renderizarItensTransferencia() {{
+      const tb = document.getElementById("tbodyItensTransferencia");
+      if (!ITENS_TRANSFERENCIA.length) {{
+        tb.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:8px;">Nenhum item adicionado à remessa ainda.</td></tr>`;
+        document.getElementById("lblTotalTransferencia").textContent = "R$ 0,00";
+        return;
+      }}
+      let total = 0;
+      tb.innerHTML = ITENS_TRANSFERENCIA.map((it, idx) => {{
+        const subtotal = it.quantidade * it.valor_unitario;
+        total += subtotal;
+        return `
+          <tr>
+            <td><b>${{it.codigo || '-'}}</b></td>
+            <td>${{it.nome}}</td>
+            <td><input type="number" min="1" step="1" value="${{it.quantidade}}" style="width:70px;padding:4px;font-size:12px;" onchange="alterarQtdItemTransferencia(${{idx}}, this.value)" /></td>
+            <td>R$ ${{Number(it.valor_unitario).toFixed(2)}}</td>
+            <td><b>R$ ${{Number(subtotal).toFixed(2)}}</b></td>
+            <td><button class="btn btn-outline" style="padding:2px 6px;color:#f87171;border-color:#f87171;" onclick="removerItemTransferencia(${{idx}})">✕</button></td>
+          </tr>
+        `;
+      }}).join("");
+      document.getElementById("lblTotalTransferencia").textContent = `R$ ${{total.toLocaleString('pt-BR', {{minimumFractionDigits:2}})}}`;
+    }}
+
+    function adicionarItemTransferencia() {{
+      const sel = document.getElementById("selPecaTransferencia");
+      const opt = sel.options[sel.selectedIndex];
+      if (!opt || !opt.value) {{ alert("Selecione uma peça da lista."); return; }}
+      const pecaId = parseInt(opt.value);
+      const nome = opt.getAttribute("data-nome") || opt.text;
+      const codigo = opt.getAttribute("data-codigo") || "";
+      const preco = parseFloat(opt.getAttribute("data-preco") || 0);
+      const qtdInp = parseFloat(document.getElementById("inpQtdTransferencia").value || 1);
+
+      const existente = ITENS_TRANSFERENCIA.find(i => i.peca_id === pecaId);
+      if (existente) {{
+        existente.quantidade += qtdInp;
+      }} else {{
+        ITENS_TRANSFERENCIA.push({{
+          peca_id: pecaId,
+          nome: nome,
+          codigo: codigo,
+          quantidade: qtdInp,
+          valor_unitario: preco
+        }});
+      }}
+      renderizarItensTransferencia();
+    }}
+
+    function removerItemTransferencia(idx) {{
+      ITENS_TRANSFERENCIA.splice(idx, 1);
+      renderizarItensTransferencia();
+    }}
+
+    function alterarQtdItemTransferencia(idx, val) {{
+      const q = parseFloat(val);
+      if (q > 0 && ITENS_TRANSFERENCIA[idx]) {{
+        ITENS_TRANSFERENCIA[idx].quantidade = q;
+        renderizarItensTransferencia();
+      }}
+    }}
+
+    async function emitirTransferenciaFiliais() {{
+      if (!ITENS_TRANSFERENCIA.length) {{
+        alert("Adicione ao menos 1 peça na remessa de transferência.");
+        return;
+      }}
+      const origem = document.getElementById("selOrigemTransferencia").value;
+      const destino = document.getElementById("selDestinoTransferencia").value;
+      if (origem === destino) {{
+        alert("A unidade de origem não pode ser igual à de destino.");
+        return;
+      }}
+      const btn = document.getElementById("btnEmitirTransferencia");
+      btn.disabled = true;
+      btn.textContent = "Emitindo NF-e de Transferência...";
+      try {{
+        const res = await fetch("/api/fiscal/v2/transferir-filiais", {{
+          method: "POST",
+          headers: {{"Content-Type": "application/json"}},
+          body: JSON.stringify({{
+            origem,
+            destino,
+            natureza_op: document.getElementById("selNaturezaTransferencia").value,
+            cfop: document.getElementById("selCfopTransferencia").value,
+            itens: ITENS_TRANSFERENCIA,
+            veiculo_transporte: document.getElementById("selVeiculoTransferencia").value,
+            observacoes: document.getElementById("inpObsTransferencia").value,
+            usuario: USUARIO_FISCAL?.username || "netto"
+          }})
+        }}).then(r => r.json());
+        if (res.ok) {{
+          alert(res.msg);
+          ITENS_TRANSFERENCIA = [];
+          renderizarItensTransferencia();
+          document.getElementById("boxResultadoTransferencia").innerHTML = `
+            <div style="background:#14532d;border:1.5px solid #22c55e;border-radius:8px;padding:12px;color:#fff;margin-top:10px;">
+              <b>🎉 NF-e DE TRANSFERÊNCIA AUTORIZADA!</b><br/>
+              Número: <b>${{res.numero_nf}}</b> &bull; Estoque físico baixado na unidade de origem.<br/>
+              <div style="margin-top:8px;">
+                <a href="/api/fiscal/danfe/${{res.numero_nf}}" target="_blank" class="btn btn-blue" style="display:inline-block;">🖨️ Imprimir DANFE de Transferência</a>
+              </div>
+            </div>
+          `;
+          carregarDadosFiscais();
+        }} else {{
+          alert("⚠️ " + (res.msg || "Erro ao emitir transferência."));
+        }}
+      }} catch (err) {{
+        alert("Falha de conexão: " + err.message);
+      }} finally {{
+        btn.disabled = false;
+        btn.textContent = "🚀 Emitir NF-e de Transferência (Modelo 55)";
+      }}
+    }}
+
+    async function lancarConsumivelAdministrativo() {{
+      const desc = document.getElementById("consDescricao").value.trim();
+      const forn = document.getElementById("consFornecedor").value.trim();
+      const nf = document.getElementById("consNf").value.trim();
+      const setor = document.getElementById("consSetor").value;
+      const qtd = parseFloat(document.getElementById("consQtd").value || 1);
+      const val = parseFloat(document.getElementById("consValor").value || 0);
+      const cat = document.getElementById("consCategoria").value;
+
+      if (!desc) {{ alert("Informe a descrição do material (ex: Café Torrado, Papel Higiênico)."); return; }}
+      if (val <= 0) {{ alert("Informe o valor total da nota/despesa."); return; }}
+
+      const btn = document.getElementById("btnLancarConsumivel");
+      btn.disabled = true;
+      btn.textContent = "Registrando Despesa...";
+      try {{
+        const res = await fetch("/api/fiscal/v2/lancar-consumivel", {{
+          method: "POST",
+          headers: {{"Content-Type": "application/json"}},
+          body: JSON.stringify({{
+            descricao: desc,
+            fornecedor: forn,
+            numero_nf: nf,
+            unidade_setor: setor,
+            quantidade: qtd,
+            valor_total: val,
+            categoria: cat,
+            usuario: USUARIO_FISCAL?.username || "netto"
+          }})
+        }}).then(r => r.json());
+        if (res.ok) {{
+          alert(res.msg);
+          document.getElementById("consDescricao").value = "";
+          document.getElementById("consFornecedor").value = "";
+          document.getElementById("consNf").value = "";
+          document.getElementById("consValor").value = "";
+          carregarDadosFiscais();
+        }} else {{
+          alert("⚠️ " + (res.msg || "Erro ao lançar consumível."));
+        }}
+      }} catch (err) {{
+        alert("Falha de comunicação: " + err.message);
+      }} finally {{
+        btn.disabled = false;
+        btn.textContent = "☕ Lançar no Fisco & Baixar Estoque Imediatamente (Saldo 0)";
+      }}
+    }}
+
     initPortalFiscal();
   </script>
 </body>
@@ -894,4 +1473,6 @@ def registrar_rotas_portal_fiscal(app: web.Application) -> None:
     app.router.add_post("/api/fiscal/v2/emitir", api_fiscal_v2_emitir)
     app.router.add_post("/api/fiscal/v2/cancelar", api_fiscal_v2_cancelar)
     app.router.add_post("/api/fiscal/v2/criar-os-teste", api_fiscal_v2_criar_os_teste)
+    app.router.add_post("/api/fiscal/v2/transferir-filiais", api_fiscal_v2_transferir_filiais)
+    app.router.add_post("/api/fiscal/v2/lancar-consumivel", api_fiscal_v2_lancar_consumivel)
     app.router.add_get("/api/fiscal/v2/xml/{os_id}", api_fiscal_v2_xml_download)

@@ -9433,7 +9433,9 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
         cur = conn.cursor()
 
-        cur.execute("SELECT * FROM notas_fiscais WHERE os_id = ?", (os_id,))
+        id_num = int(os_id) if os_id.isdigit() else 0
+
+        cur.execute("SELECT * FROM notas_fiscais WHERE os_id = ? OR numero_nf = ? OR (id = ? AND ? > 0)", (os_id, os_id, id_num, id_num))
 
         r = cur.fetchone()
 
@@ -9451,17 +9453,19 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
     cnpj_cli = limpar_texto(row_os.get("cnpj") if row_os is not None else dados_nf.get("cnpj_tomador", ""), "00.000.000/0000-00")
 
-    end_cli = limpar_texto(row_os.get("endereco") if row_os is not None else "", "UNIDADE HOSPITALAR")
+    end_cli = limpar_texto(row_os.get("endereco") if row_os is not None else dados_nf.get("tomador_endereco", ""), "UNIDADE HOSPITALAR")
 
-    cid_cli = limpar_texto(row_os.get("cidade") if row_os is not None else "", "FORTALEZA")
+    cid_cli = limpar_texto(row_os.get("cidade") if row_os is not None else dados_nf.get("tomador_cidade", ""), "FORTALEZA")
 
-    uf_cli = limpar_texto(row_os.get("estado") if row_os is not None else "", "CE")
+    uf_cli = limpar_texto(row_os.get("estado") if row_os is not None else dados_nf.get("tomador_uf", ""), "CE")
 
-    equip_nome = limpar_texto(row_os.get("equipamento") if row_os is not None else "", "EQUIPAMENTO HOSPITALAR")
+    is_trf = "TRANSFER" in str(dados_nf.get("tipo_nota", "")).upper()
 
-    tec_nome = limpar_texto(row_os.get("tecnico_responsavel") if row_os is not None else "", "MARCOS")
+    equip_nome = "TRANSPORTE / CARGA DE PEÇAS & INSUMOS" if is_trf else limpar_texto(row_os.get("equipamento") if row_os is not None else "", "EQUIPAMENTO HOSPITALAR")
 
-    srv_tipo = limpar_texto(row_os.get("tipo_servico") if row_os is not None else "", "CORRETIVA (GERAL)")
+    tec_nome = "CONDUTOR DA FROTA / LOGÍSTICA" if is_trf else limpar_texto(row_os.get("tecnico_responsavel") if row_os is not None else "", "MARCOS")
+
+    srv_tipo = "TRANSFERÊNCIA DE ESTOQUE ENTRE FILIAIS" if is_trf else limpar_texto(row_os.get("tipo_servico") if row_os is not None else "", "CORRETIVA (GERAL)")
 
 
 
@@ -9573,6 +9577,10 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
     orgao_emissor = "SECRETARIA DE FAZENDA DO DISTRITO FEDERAL (SEFAZ-DF)" if filial_emissora == "FILIAL_DF" else "PREFEITURA MUNICIPAL DE EUSÉBIO - CE"
 
     doc_aux_titulo = "DOCUMENTO AUXILIAR DA NFS-e DF" if filial_emissora == "FILIAL_DF" else "DOCUMENTO AUXILIAR DA NFS-e / NF-e"
+
+    if is_trf:
+        doc_aux_titulo = "DANFE • NOTA FISCAL ELETRÔNICA DE TRANSFERÊNCIA"
+        orgao_emissor = "SECRETARIA DA FAZENDA (SEFAZ • TRANSFERÊNCIA ENTRE ESTABELECIMENTOS)"
 
     sub_titulo_unidade = "Unidade Brasília (DF)" if filial_emissora == "FILIAL_DF" else "Matriz Ceará"
 
