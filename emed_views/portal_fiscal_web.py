@@ -2124,21 +2124,49 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       }}).then(r => r.json());
       if (res.ok) {{
         const n = res.nota;
-        const msgWpp = encodeURIComponent(`🧾 *EMED ELETROMEDICINA • NOTA FISCAL EMITIDA*\\n🏥 *Cliente:* ${{n.cliente}}\\n📋 *NFS-e Nº:* ${{n.numero_nf}} (OS #${{osId}})\\n💰 *Valor:* R$ ${{Number(n.valor_liquido||0).toFixed(2)}}\\n🔐 *Chave:* ${{n.chave_acesso}}`);
+        const basePub = window.location.origin;
+        const linkDanfe = `${{basePub}}/api/fiscal/danfe/${{osId}}`;
+        const linkPdf = `${{basePub}}/api/fiscal/danfe/${{osId}}?formato=pdf`;
+        const filialLabel = FILIAL_ATIVA === 'MATRIZ_CE' ? 'EMED-CE' : 'EMED-DF';
+        const msgWpp = encodeURIComponent(
+          `🧾 *EMED ELETROMEDICINA • NOTA FISCAL EMITIDA (${{filialLabel}})*\\n\\n` +
+          `🏥 *Cliente:* ${{n.cliente}}\\n` +
+          `📋 *NFS-e Nº:* ${{n.numero_nf}} (OS #${{osId}})\\n` +
+          `💰 *Valor Total:* R$ ${{Number(n.valor_liquido||0).toFixed(2)}}\\n` +
+          `🔐 *Chave de Acesso:* ${{n.chave_acesso}}\\n` +
+          `✅ *Status:* AUTORIZADA SEFAZ\\n\\n` +
+          `📄 *Visualizar / Baixar PDF Oficial da Nota:*\\n${{linkDanfe}}`
+        );
         document.getElementById("boxResultadoEmissao").innerHTML = `
-          <div style="background:#14532d;border:1.5px solid #22c55e;border-radius:8px;padding:14px;color:#fff;">
-            <div style="font-weight:900;font-size:15px;margin-bottom:6px;">🎉 NOTA FISCAL AUTORIZADA COM SUCESSO!</div>
-            <b>Número da NFS-e:</b> ${{n.numero_nf}} &bull; <b>Série:</b> ${{n.serie}}<br/>
-            <b>Chave de Acesso:</b> <span style="font-family:monospace;">${{n.chave_acesso}}</span><br/>
-            <b>Protocolo SEFAZ:</b> ${{n.protocolo}} &bull; <b>Status:</b> ${{n.status}}
-            <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
-              <a href="/api/fiscal/danfe/${{osId}}" target="_blank" class="btn btn-blue">🖨️ Abrir / Imprimir Espelho DANFE</a>
-              <a href="/api/fiscal/v2/xml/${{osId}}" class="btn btn-outline">📥 Baixar Arquivo XML (SEFAZ)</a>
-              <a href="https://wa.me/?text=${{msgWpp}}" target="_blank" class="btn" style="background:#16a34a;color:#fff;">📲 Enviar via WhatsApp</a>
+          <div style="background:#14532d;border:2px solid #22c55e;border-radius:8px;padding:16px;color:#fff;margin-top:14px;box-shadow:0 4px 15px rgba(0,0,0,0.3);">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+              <div style="font-weight:900;font-size:16px;">🎉 NOTA FISCAL AUTORIZADA COM SUCESSO!</div>
+              <span class="badge" style="background:#22c55e;color:#052e16;font-size:12px;font-weight:900;">STATUS: ${{n.status || 'AUTORIZADA'}}</span>
+            </div>
+            <div style="margin-top:8px;font-size:13px;line-height:1.6;color:#dcfce7;">
+              <b>Número da NFS-e:</b> <span style="font-size:15px;font-weight:900;color:#fff;">${{n.numero_nf}}</span> &bull; <b>Série:</b> ${{n.serie}} &bull; <b>OS:</b> #${{osId}}<br/>
+              <b>Cliente:</b> ${{n.cliente}} &bull; <b>Valor Líquido:</b> R$ ${{Number(n.valor_liquido||0).toFixed(2)}}<br/>
+              <b>Chave de Acesso:</b> <span style="font-family:monospace;letter-spacing:0.5px;color:#fff;">${{n.chave_acesso}}</span><br/>
+              <b>Protocolo SEFAZ:</b> ${{n.protocolo || 'HOMOLOGADO'}}
+            </div>
+            <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center;">
+              <a href="${{linkDanfe}}" target="_blank" class="btn btn-blue" style="font-weight:800;">🖨️ Abrir DANFE Oficial Completo</a>
+              <a href="${{linkPdf}}" download="DANFE_NFS_${{n.numero_nf}}.pdf" class="btn" style="background:#0284c7;color:#fff;font-weight:800;">📥 Baixar Arquivo PDF (.pdf)</a>
+              <a href="https://api.whatsapp.com/send?text=${{msgWpp}}" target="_blank" class="btn" style="background:#16a34a;color:#fff;font-weight:800;">📲 Enviar WhatsApp com Link do PDF</a>
+              <button type="button" onclick="compartilharPdfWhatsAppDirect('${{osId}}', '${{n.numero_nf}}', '${{msgWpp}}')" class="btn" style="background:#25d366;color:#000;font-weight:900;">📎 Compartilhar PDF no WhatsApp</button>
+              <a href="/api/fiscal/v2/xml/${{osId}}" class="btn btn-outline" style="font-weight:800;">📥 Baixar XML SEFAZ</a>
+            </div>
+            <div style="margin-top:14px;background:#fff;border-radius:6px;overflow:hidden;border:1px solid #cbd5e1;">
+              <div style="background:#0f172a;color:#fff;padding:8px 12px;font-size:12px;font-weight:800;display:flex;justify-content:space-between;align-items:center;">
+                <span>📄 Visualização do Espelho Oficial da Nota (DANFE Oficial Completo)</span>
+                <a href="${{linkDanfe}}" target="_blank" style="color:#38bdf8;font-size:11px;text-decoration:none;">↗️ Abrir em Nova Aba</a>
+              </div>
+              <iframe src="${{linkDanfe}}" style="width:100%;height:560px;border:none;background:#fff;"></iframe>
             </div>
           </div>
         `;
-        carregarDadosFiscais(osId);
+        document.getElementById("boxResultadoEmissao").scrollIntoView({{ behavior: 'smooth' }});
+        atualizarApenasHistoricoSemReset(osId, n.numero_nf);
       }} else {{
         alert("Erro ao emitir: " + (res.msg || "Falha interna"));
       }}

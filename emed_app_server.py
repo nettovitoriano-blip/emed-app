@@ -9564,7 +9564,16 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
 
     base_pub = _obter_base_url_publica(request)
-    whats_msg = f"Olá, segue o espelho oficial da Nota Fiscal Eletrônica {num_nf} (OS #{os_id}) emitida pela EMED Eletromedicina: {base_pub}/api/fiscal/danfe/{os_id}"
+    whats_msg = (
+        f"🧾 *EMED ELETROMEDICINA • NOTA FISCAL EMITIDA*\n\n"
+        f"🏥 *Cliente:* {cli_nome}\n"
+        f"📋 *NFS-e Nº:* {num_nf} (OS #{os_id})\n"
+        f"💰 *Valor Total:* R$ {val_total:,.2f}\n"
+        f"🔐 *Chave de Acesso:* {chave}\n"
+        f"✅ *Status:* AUTORIZADA SEFAZ\n\n"
+        f"📄 *Visualizar / Baixar PDF Oficial da Nota:*\n"
+        f"{base_pub}/api/fiscal/danfe/{os_id}"
+    )
 
     whats_msg_enc = urllib.parse.quote(whats_msg)
 
@@ -9689,7 +9698,8 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
       <div style="display:flex;gap:6px;align-items:center;">
 
-        <button class="btn-print" onclick="window.print()">🖨️ Imprimir / PDF</button>
+        <button class="btn-print" onclick="window.print()">🖨️ Imprimir</button>
+        <a href="/api/fiscal/danfe/{os_id}?formato=pdf" download="DANFE_NFS_{num_nf}.pdf" class="btn-print" style="background:#0284c7;text-decoration:none;display:inline-flex;align-items:center;">📥 Baixar PDF</a>
 
         <button class="btn-print" style="background:#059669;" onclick="document.getElementById('painelEnvioCliente').scrollIntoView({{behavior:'smooth'}})">📧 Enviar p/ Cliente</button>
 
@@ -10094,6 +10104,22 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 </body>
 
 </html>"""
+
+    formato = request.query.get("formato", "").lower()
+    if formato == "pdf" or request.path.endswith("/pdf"):
+        try:
+            from emed_services import converter_html_para_pdf_bytes
+            pdf_bytes = converter_html_para_pdf_bytes(html_danfe)
+            if pdf_bytes:
+                return web.Response(
+                    body=pdf_bytes,
+                    content_type="application/pdf",
+                    headers={
+                        "Content-Disposition": f'inline; filename="DANFE_NFS_{num_nf}.pdf"'
+                    }
+                )
+        except Exception as _e_pdf:
+            print(f"Erro ao converter DANFE para PDF: {_e_pdf}")
 
     return web.Response(body=html_danfe, content_type="text/html", charset="utf-8")
 
@@ -24235,6 +24261,7 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/os/nf-salvar", api_os_nf_salvar)
 
     app.router.add_get("/api/fiscal/danfe/{os_id}", api_fiscal_danfe)
+    app.router.add_get("/api/fiscal/danfe/{os_id}/pdf", api_fiscal_danfe)
 
     app.router.add_post("/api/fiscal/enviar-cliente", api_fiscal_enviar_cliente)
 
