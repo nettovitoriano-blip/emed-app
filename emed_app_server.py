@@ -9556,9 +9556,22 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
 
 
-    filial_emissora = dados_nf.get("filial_emissora") or ("FILIAL_DF" if uf_cli == "DF" else "MATRIZ_CE")
+    # Geração do QR Code oficial de validação SEFAZ/DANFE
+    url_danfe_val = f"{base_pub}/api/fiscal/danfe/{os_id}"
+    try:
+        from emed_services.equipamento_qrcode import gerar_qrcode_base64
+        qr_b64 = gerar_qrcode_base64(url_danfe_val)
+    except Exception:
+        qr_b64 = ""
 
-    prestador_razao = dados_nf.get("prestador_razao") or ("EMED ELETROMEDICINA LTDA. - FILIAL BRASÍLIA" if filial_emissora == "FILIAL_DF" else "EMED ELETROMEDICINA LTDA.")
+    qr_html = f'''<div style="text-align: center; flex-shrink: 0;">
+                <img src="data:image/png;base64,{qr_b64}" alt="QR Code Oficial" style="width: 76px; height: 76px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px; background: #fff; display: block;" />
+                <div style="font-size: 7.5px; color: #0284c7; font-weight: 800; margin-top: 2px; text-transform: uppercase;">Validação Digital</div>
+              </div>''' if qr_b64 else ""
+
+    filial_emissora = dados_nf.get("filial_emissora") or ("FILIAL_DF" if uf_cli == "DF" else "MATRIZ_CE")
+    filial_badge = "FILIAL BRASÍLIA - DF" if filial_emissora == "FILIAL_DF" else "MATRIZ EUSÉBIO - CE"
+    prestador_razao = "EMED ELETROMEDICINA LTDA."
 
     prestador_cnpj = dados_nf.get("prestador_cnpj") or ("03.611.974/0002-80" if filial_emissora == "FILIAL_DF" else "03.611.974/0001-08")
 
@@ -9768,9 +9781,9 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
         <td style="vertical-align: middle;">
 
-          <div class="title-danfe">{prestador_razao}</div>
+          <div class="title-danfe">{prestador_razao} <span style="font-size: 11.5px; font-weight: 800; color: #0284c7; letter-spacing: 0;">&bull; {filial_badge}</span></div>
 
-          <div style="font-size: 11px; color: #0077b6; font-weight: bold; margin-top: 1px;">Eletromedicina • Manutenção em Equipamentos de Diagnóstico por Imagem • {sub_titulo_unidade}</div>
+          <div style="font-size: 11.5px; color: #0077b6; font-weight: 800; margin-top: 3px; margin-bottom: 3px;">Manutenção em Equipamentos de Diagnóstico por Imagem</div>
 
           <div style="font-size: 10px; color: #475569; margin-top: 3px; line-height: 1.35;">
 
@@ -9784,17 +9797,27 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
         </td>
 
-        <td style="width: 230px; vertical-align: middle; text-align: right;">
+        <td style="width: 290px; vertical-align: middle; text-align: right;">
 
-          <div style="border: 2px solid #002b54; border-radius: 6px; padding: 8px; background: #f8fafc; text-align: center;">
+          <div style="border: 2px solid #002b54; border-radius: 6px; padding: 8px 10px; background: #f8fafc; text-align: center;">
 
-            <div style="font-size: 10px; font-weight: 800; color: #002b54;">{doc_aux_titulo}</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
 
-            <div style="font-size: 16px; font-weight: 900; color: #0b132b; margin: 3px 0;">{num_nf}</div>
+              <div style="flex: 1; text-align: left;">
 
-            <div class="badge-nf">STATUS: {st_fiscal}</div>
+                <div style="font-size: 9.5px; font-weight: 800; color: #002b54; text-transform: uppercase;">{doc_aux_titulo}</div>
 
-            <div style="font-size: 9.5px; color: #64748b; margin-top: 4px;">Emissão: <b>{dt_emissao}</b></div>
+                <div style="font-size: 15px; font-weight: 900; color: #0b132b; margin: 2px 0;">{num_nf}</div>
+
+                <div class="badge-nf" style="display: inline-block;">STATUS: {st_fiscal}</div>
+
+                <div style="font-size: 9px; color: #64748b; margin-top: 4px;">Emissão: <b>{dt_emissao}</b></div>
+
+              </div>
+
+              {qr_html}
+
+            </div>
 
           </div>
 
@@ -9806,9 +9829,11 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
 
 
-    <div style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 4px; font-size: 10px; margin-bottom: 8px;">
+    <div style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 4px; font-size: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;">
 
-      <b>Chave de Autenticação / Protocolo Digital:</b> <span style="font-family: monospace; letter-spacing: 0.5px;">{chave}</span>
+      <div><b>Chave de Autenticação / Protocolo Digital:</b> <span style="font-family: monospace; letter-spacing: 0.5px;">{chave}</span></div>
+
+      <div style="font-size: 9.5px; color: #0284c7; font-weight: 700;">📱 Validação Digital via QR Code</div>
 
     </div>
 
