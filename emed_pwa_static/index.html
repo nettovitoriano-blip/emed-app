@@ -87639,6 +87639,17 @@ async function processarFilaOffline() {
         return { ok: false, erro: err.message };
       }
     }
+    async function renomearDispositivo(id, deviceId, atual) {
+      const novo = prompt("🏷️ Identificação / Apelido deste aparelho para auditoria (ex: PC Escritório, Celular S24 Netto):", atual || "");
+      if (novo === null) return;
+      const res = await apiPost("/api/dispositivos/gerenciar", { id, device_id: deviceId, acao: "RENOMEAR", observacoes: novo.trim(), aprovador: (localStorage.getItem("emed_tecnico_selecionado") || "GESTOR") });
+      if (res && res.ok) {
+        if (typeof mostrarToast === "function") mostrarToast("🏷️ Aparelho identificado com sucesso!", "success");
+        if (typeof renderizarTelaPrincipal === "function") renderizarTelaPrincipal();
+      } else {
+        alert(res?.msg || "Erro ao renomear aparelho.");
+      }
+    }
     async function apiPost(url, body, permitirFilaOffline = true) {
       if (body && typeof body === "object" && !body.request_id && (url === "/api/salvar-os" || url === "/api/nova-os" || url === "/api/reabrir-os")) {
         body.request_id = "req_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
@@ -192619,6 +192630,10 @@ function renderizarCardsDispositivos() {
 
               ${statusBadge}
 
+              <span style="font-size:10.5px;font-weight:800;background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:999px;">🆔 #${esc(String(d.device_id || '').slice(-6).toUpperCase())}</span>
+
+              ${d.observacoes ? `<span style="font-size:11px;font-weight:800;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:999px;">🏷️ ${esc(d.observacoes)}</span>` : ''}
+
             </div>
 
             <div style="font-size:13px;font-weight:700;color:#0284c7;margin-top:2px;">
@@ -192668,6 +192683,10 @@ function renderizarCardsDispositivos() {
 
 
           ${isAutorizado ? `
+
+            <button class="btn btn-outline btn-sm" onclick="renomearDispositivo(${d.id}, '${esc(d.device_id)}', '${esc(d.observacoes || '')}')" style="color:#0369a1;border-color:#7dd3fc;padding:6px 10px;font-weight:700;">
+              ✏️ Nomear
+            </button>
 
             <button class="btn btn-outline btn-sm" onclick="executarAcaoDispositivo(${d.id}, '${esc(d.device_id)}', 'BLOQUEAR', '${esc(d.tecnico_nome)}')" style="color:#dc2626;border-color:#fca5a5;padding:6px 12px;font-weight:600;">
 

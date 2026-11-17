@@ -2606,6 +2606,12 @@ async def api_auth_login(request: web.Request) -> web.Response:
             perfil_usr = str(row["perfil"]).upper()
 
             agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            ip_origem = (
+                request.headers.get("CF-Connecting-IP")
+                or request.headers.get("X-Real-IP")
+                or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+                or ip_origem
+            )
 
 
 
@@ -2630,16 +2636,22 @@ async def api_auth_login(request: web.Request) -> web.Response:
                     tip = str(device_info.get("tipo") or "Computador").strip()
 
                     if not d_exist:
-
-                        cur.execute("""
-
-                            INSERT INTO dispositivos_autorizados
-
-                            (tecnico_id, tecnico_nome, device_id, modelo_dispositivo, sistema_operacional, navegador, tipo_dispositivo, ip_origem, status, criado_em, aprovado_em, aprovado_por, ultimo_acesso)
-
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'AUTORIZADO', ?, ?, 'SISTEMA_MASTER', ?)
-
-                        """, (row["id"], row["nome"], device_id, mod, so, nav, tip, ip_origem, agora_str, agora_str, agora_str))
+                        cur.execute(
+                            "SELECT id FROM dispositivos_autorizados WHERE UPPER(tecnico_nome)=UPPER(?) AND modelo_dispositivo=? AND sistema_operacional=? AND navegador=? AND status!='BLOQUEADO' ORDER BY id DESC LIMIT 1",
+                            (row["nome"], mod, so, nav)
+                        )
+                        d_same = cur.fetchone()
+                        if d_same:
+                            cur.execute(
+                                "UPDATE dispositivos_autorizados SET status='AUTORIZADO', ultimo_acesso=?, ip_origem=?, device_id=? WHERE id=?",
+                                (agora_str, ip_origem, device_id, d_same[0])
+                            )
+                        else:
+                            cur.execute("""
+                                INSERT INTO dispositivos_autorizados
+                                (tecnico_id, tecnico_nome, device_id, modelo_dispositivo, sistema_operacional, navegador, tipo_dispositivo, ip_origem, status, criado_em, aprovado_em, aprovado_por, ultimo_acesso)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'AUTORIZADO', ?, ?, 'SISTEMA_MASTER', ?)
+                            """, (row["id"], row["nome"], device_id, mod, so, nav, tip, ip_origem, agora_str, agora_str, agora_str))
 
                     else:
 
@@ -3055,6 +3067,12 @@ async def api_dispositivos_acao(request: web.Request) -> web.Response:
                 else:
 
                     cur.execute("DELETE FROM dispositivos_autorizados WHERE device_id=?", (device_id,))
+
+            elif acao == "RENOMEAR":
+                if disp_id:
+                    cur.execute("UPDATE dispositivos_autorizados SET observacoes=? WHERE id=?", (obs, disp_id))
+                else:
+                    cur.execute("UPDATE dispositivos_autorizados SET observacoes=? WHERE device_id=?", (obs, device_id))
 
             else:
 

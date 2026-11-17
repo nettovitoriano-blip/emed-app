@@ -863,27 +863,21 @@
     /* Geração e persistência do ID único deste Aparelho */
 
     function obterOuCriarDeviceId() {
-
       let devId = localStorage.getItem('emed_device_id');
-
       if (!devId) {
-
-        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-
-          devId = 'EMED-' + crypto.randomUUID();
-
-        } else {
-
-          devId = 'EMED-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 9);
-
-        }
-
-        localStorage.setItem('emed_device_id', devId);
-
+        const m = document.cookie.match(/(?:^|;\s*)emed_device_id=([^;]+)/);
+        if (m && m[1]) devId = decodeURIComponent(m[1]);
       }
-
+      if (!devId) {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+          devId = 'EMED-' + crypto.randomUUID();
+        } else {
+          devId = 'EMED-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 9);
+        }
+      }
+      try { localStorage.setItem('emed_device_id', devId); } catch(e) {}
+      try { document.cookie = 'emed_device_id=' + encodeURIComponent(devId) + '; path=/; max-age=315360000; SameSite=Lax'; } catch(e) {}
       return devId;
-
     }
 
 
