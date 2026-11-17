@@ -918,7 +918,7 @@ Para fins de escrituração fiscal mensal, apuração de tributos e cumprimento 
 obrigações acessórias (SPED Fiscal, EFD-Reinf, Bloco K, Livro Eletrônico DF / ISS),
 seguem as orientações operacionais da EMED Eletromedicina:
 
-1. SERVIÇOS TÉCNICOS & ENGENHARIA CLÍNICA (NFS-e):
+1. SERVIÇOS TÉCNICOS DE MANUTENÇÃO & REPARAÇÃO (NFS-e):
    - Atividade: Manutenção preventiva e corretiva de equipamentos médico-hospitalares.
    - Enquadramento: Subitem 14.01 / 14.02 da Lei Complementar nº 116/2003.
    - Base de Cálculo do ISS: Valor da mão de obra/serviços técnicos destacados na nota.
@@ -935,8 +935,8 @@ seguem as orientações operacionais da EMED Eletromedicina:
 3. CONSUMÍVEIS ADMINISTRATIVOS & COPA/LIMPEZA (CFOP 1556 / 2556):
    - As compras de insumos administrativos (café, açúcar, papel toalha, itens de limpeza)
      são lançadas para registro de despesa operacional direta (Uso e Consumo).
-   - O estoque físico no almoxarifado de engenharia clínica é baixado IMEDIATAMENTE a ZERO
-     para não contaminar o inventário de peças e componentes clínicos.
+   - O estoque físico no almoxarifado operacional é baixado IMEDIATAMENTE a ZERO
+     para não contaminar o inventário de peças e componentes técnicos.
 
 4. ARQUIVOS ANEXOS NESTE PACOTE:
    - 01_LIVRO_REGISTRO_SAIDAS: Relação completa de NFS-e emitidas com valores e retenções.

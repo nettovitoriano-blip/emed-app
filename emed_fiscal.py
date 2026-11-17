@@ -233,7 +233,7 @@ class MultiFilialFiscalProvider(FiscalProvider):
       </Valores>
       <ItemListaServico>{payload.get('codigo_servico', '14.01')}</ItemListaServico>
       <CodigoCnae>3313999</CodigoCnae>
-      <Discriminacao><![CDATA[{payload.get('discriminacao_servico', 'Serviços de Engenharia Clínica')}]]></Discriminacao>
+      <Discriminacao><![CDATA[{payload.get('discriminacao_servico', 'Serviços de Manutenção e Reparação Técnica')}]]></Discriminacao>
       <CodigoMunicipio>{'5300108' if payload.get('prestador_uf') == 'DF' else '2304285'}</CodigoMunicipio>
     </Servico>
     <Prestador>
@@ -306,7 +306,7 @@ class MultiFilialFiscalProvider(FiscalProvider):
     </div>
 
     <div style="margin-top: 15px;">
-      <h4 style="margin: 0 0 5px 0; color: #64dfdf;">2. Discriminação dos Serviços de Engenharia Clínica</h4>
+      <h4 style="margin: 0 0 5px 0; color: #64dfdf;">2. Discriminação dos Serviços de Manutenção & Peças</h4>
       <div style="background: #0b132b; border: 1px solid #334155; padding: 10px; border-radius: 4px; font-size: 12px; line-height: 1.4;">
         {payload.get('discriminacao_servico')}
       </div>
@@ -567,12 +567,18 @@ class FiscalManager:
             disc_srv = row_nf[3]
         else:
             disc_srv = (
-                f"Prestação de serviços técnicos especializados de Engenharia Clínica e Manutenção "
+                f"Prestação de serviços técnicos especializados de Manutenção e Reparação "
                 f"({tipo_srv or 'CORRETIVA / PREVENTIVA'}) no equipamento {equip or 'MÉDICO-HOSPITALAR'}. "
                 f"Atendimento referente à Ordem de Serviço #{os_id}. "
                 f"Serviço Realizado: {srv_exec or def_rel or 'Revisão, ajustes e testes funcionais operacionais'}. "
                 f"Local da Prestação: {cli} ({cid or 'Brasília'} - {uf or 'DF'})."
             )
+        disc_srv = (
+            disc_srv.replace("Engenharia Clínica e Manutenção", "Manutenção e Reparação Técnica")
+            .replace("engenharia clínica e manutenção técnica", "manutenção e reparação técnica")
+            .replace("Engenharia Clínica", "Manutenção e Reparação Técnica")
+            .replace("engenharia clínica", "manutenção e reparação técnica")
+        )
 
         dados.update({
             "cliente": cli or "CLIENTE NÃO INFORMADO",

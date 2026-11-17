@@ -9509,7 +9509,13 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
     val_total = val_srv + val_pec
 
-    descr = dados_nf.get("discriminacao_servico") or f"Prestação de serviços especializados de engenharia clínica e manutenção técnica no equipamento {equip_nome}. Atendimento OS #{os_id}."
+    descr = dados_nf.get("discriminacao_servico") or f"Prestação de serviços especializados de manutenção e reparação técnica no equipamento {equip_nome}. Atendimento OS #{os_id}."
+    descr = (
+        descr.replace("Engenharia Clínica e Manutenção", "Manutenção e Reparação Técnica")
+        .replace("engenharia clínica e manutenção técnica", "manutenção e reparação técnica")
+        .replace("Engenharia Clínica", "Manutenção e Reparação Técnica")
+        .replace("engenharia clínica", "manutenção e reparação técnica")
+    )
 
 
 
@@ -9907,7 +9913,7 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
     <!-- DISCRIMINAÇÃO DOS SERVIÇOS & PEÇAS -->
 
-    <div class="sec-header">3. Discriminação dos Serviços de Engenharia Clínica & Peças</div>
+    <div class="sec-header">3. Discriminação dos Serviços de Manutenção & Peças</div>
 
     <div style="border: 1px solid #cbd5e1; padding: 10px; border-radius: 4px; font-size: 11.5px; background: #fafafa; min-height: 80px; line-height: 1.5; margin-bottom: 8px;">
 
@@ -9915,7 +9921,7 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
       {descr}<br/><br/>
 
-      {"<b>Peças Aplicadas no Atendimento:</b><br/>" + "".join([f"&bull; [{p['origem']}] {p['item']} (Cód: {p['codigo']})<br/>" for p in pecas]) if pecas else "<i>Nenhuma peça faturada separadamente (mão de obra e insumos inclusos no serviço clínico).</i>"}
+      {"<b>Peças Aplicadas no Atendimento:</b><br/>" + "".join([f"&bull; [{p['origem']}] {p['item']} (Cód: {p['codigo']})<br/>" for p in pecas]) if pecas else "<i>Nenhuma peça faturada separadamente (mão de obra e insumos inclusos no serviço técnico).</i>"}
 
     </div>
 
