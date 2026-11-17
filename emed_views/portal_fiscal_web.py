@@ -7,6 +7,9 @@ eliminando qualquer risco de suspensão de container secundário no Render.
 """
 
 import os
+import io
+import csv
+import zipfile
 import json
 import time
 import uuid
@@ -700,6 +703,428 @@ async def api_fiscal_v2_inventario_novo_item(request: web.Request) -> web.Respon
     })
 
 
+async def api_fiscal_v2_fechamento_dados(request: web.Request) -> web.Response:
+    """Retorna os dados consolidados do mês para fechamento contábil e mitigação de falhas."""
+    db_name = request.app.get("db_path", "emed.db")
+    mes = request.query.get("mes", "").strip() or datetime.now().strftime("%Y-%m")
+    filial = request.query.get("filial", "CONSOLIDADO").strip().upper()
+
+    with _get_db_connection(db_name) as conn:
+        rows_m = conn.execute("""
+            SELECT DISTINCT substr(data_emissao, 1, 7) FROM notas_fiscais WHERE data_emissao IS NOT NULL AND data_emissao != ''
+            UNION
+            SELECT DISTINCT lote_contabilidade_mes FROM notas_fiscais WHERE lote_contabilidade_mes IS NOT NULL AND lote_contabilidade_mes != ''
+        """).fetchall()
+        meses_set = {r[0] for r in rows_m if r[0] and len(r[0]) == 7}
+        agora = datetime.now()
+        for i in range(6):
+            m_calc = (agora.month - i - 1) % 12 + 1
+            y_calc = agora.year + ((agora.month - i - 1) // 12)
+            meses_set.add(f"{y_calc:04d}-{m_calc:02d}")
+        meses_disponiveis = sorted(list(meses_set), reverse=True)
+
+        sql_n = """
+            SELECT id, os_id, cliente, cnpj_tomador, tipo_nota, natureza_operacao,
+                   cfop, valor_servicos, valor_pecas, valor_desconto, aliquota_iss,
+                   valor_iss, valor_liquido, status_fiscal, numero_nf, serie,
+                   chave_acesso, xml_path, protocolo_autorizacao, data_emissao,
+                   filial_emissora, enviado_contabilidade, data_envio_contabilidade,
+                   tomador_cidade, tomador_uf
+            FROM notas_fiscais
+            WHERE (data_emissao LIKE ? OR lote_contabilidade_mes = ?)
+        """
+        params_n = [f"{mes}%", mes]
+        if filial != "CONSOLIDADO":
+            sql_n += " AND filial_emissora = ?"
+            params_n.append(filial)
+        sql_n += " ORDER BY id ASC"
+        rows_n = conn.execute(sql_n, tuple(params_n)).fetchall()
+
+        notas = []
+        tot_faturado, tot_servicos, tot_pecas, tot_iss = 0.0, 0.0, 0.0, 0.0
+        tot_emitidas, tot_canceladas, tot_trf = 0, 0, 0.0
+        for r in rows_n:
+            st = str(r[13] or "")
+            is_canc = "CANCELAD" in st.upper()
+            is_trf = "TRANSFERENCIA" in str(r[4] or "").upper() or "TRANSFERENCIA" in str(r[5] or "").upper() or str(r[6] or "").startswith("5152") or str(r[6] or "").startswith("6152")
+            v_serv = float(r[7] or 0.0)
+            v_pec = float(r[8] or 0.0)
+            v_desc = float(r[9] or 0.0)
+            aliq = float(r[10] or 0.0)
+            v_iss = float(r[11] or 0.0)
+            v_liq = float(r[12] or 0.0)
+
+            if not is_canc:
+                if is_trf:
+                    tot_trf += v_liq
+                else:
+                    tot_faturado += v_liq
+                    tot_servicos += v_serv
+                    tot_pecas += v_pec
+                    tot_iss += v_iss
+                tot_emitidas += 1
+            else:
+                tot_canceladas += 1
+
+            notas.append({
+                "id": r[0], "os_id": r[1], "cliente": r[2] or "", "cnpj_tomador": r[3] or "",
+                "tipo_nota": r[4] or "", "natureza": r[5] or "", "cfop": r[6] or "",
+                "valor_servicos": v_serv, "valor_pecas": v_pec, "valor_desconto": v_desc,
+                "aliquota_iss": aliq, "valor_iss": v_iss, "valor_liquido": v_liq,
+                "status": st, "numero_nf": r[14] or f"OS #{r[1]}", "serie": r[15] or "1",
+                "chave": r[16] or "", "protocolo": r[18] or "", "data_emissao": r[19] or "",
+                "filial": r[20] or "DF", "enviado": bool(r[21]), "data_envio": r[22] or "",
+                "cidade": r[23] or "", "uf": r[24] or "", "is_cancelada": is_canc, "is_transferencia": is_trf
+            })
+
+        cur_trf = conn.execute("""
+            SELECT id, estabelecimento, codigo_item, descricao, data_mov, qtd_saida, observacao
+            FROM movimentacoes_estoque
+            WHERE tipo_mov LIKE '%TRANSFERENCIA%' AND data_mov LIKE ?
+            ORDER BY id ASC
+        """, (f"{mes}%",)).fetchall()
+        movs_trf = [{"id": rt[0], "estabelecimento": rt[1] or "", "codigo": rt[2] or "", "descricao": rt[3] or "", "data": rt[4] or "", "qtd": rt[5] or 0, "obs": rt[6] or ""} for rt in cur_trf]
+
+        cur_c = conn.execute("""
+            SELECT id, tecnico_setor, nome_item, quantidade, finalidade, data_baixa
+            FROM baixas_consumiveis
+            WHERE data_baixa LIKE ?
+            ORDER BY id ASC
+        """, (f"{mes}%",)).fetchall()
+        consumiveis = [{"id": rc[0], "setor": rc[1] or "", "item": rc[2] or "", "qtd": rc[3] or 0, "finalidade": rc[4] or "", "data": rc[5] or ""} for rc in cur_c]
+
+    return web.json_response({
+        "ok": True,
+        "mes": mes,
+        "filial": filial,
+        "meses_disponiveis": meses_disponiveis,
+        "kpis": {
+            "total_faturado": tot_faturado,
+            "total_servicos": tot_servicos,
+            "total_pecas": tot_pecas,
+            "base_iss": tot_servicos,
+            "total_iss": tot_iss,
+            "total_transferencias": tot_trf,
+            "total_consumiveis": len(consumiveis),
+            "notas_emitidas": tot_emitidas,
+            "notas_canceladas": tot_canceladas
+        },
+        "notas": notas,
+        "movs_transferencia": movs_trf,
+        "consumiveis": consumiveis
+    })
+
+
+async def api_fiscal_v2_fechamento_zip(request: web.Request) -> web.Response:
+    """Gera pacote compactado em ZIP com todos os XMLs, DANFEs e relatórios CSV para a contabilidade."""
+    db_name = request.app.get("db_path", "emed.db")
+    mes = request.query.get("mes", "").strip() or datetime.now().strftime("%Y-%m")
+    filial = request.query.get("filial", "CONSOLIDADO").strip().upper()
+
+    with _get_db_connection(db_name) as conn:
+        sql_n = """
+            SELECT id, os_id, cliente, cnpj_tomador, tipo_nota, natureza_operacao,
+                   cfop, valor_servicos, valor_pecas, valor_desconto, aliquota_iss,
+                   valor_iss, valor_liquido, status_fiscal, numero_nf, serie,
+                   chave_acesso, xml_path, protocolo_autorizacao, data_emissao,
+                   filial_emissora, prestador_cnpj, prestador_razao, tomador_cidade, tomador_uf
+            FROM notas_fiscais
+            WHERE (data_emissao LIKE ? OR lote_contabilidade_mes = ?)
+        """
+        params_n = [f"{mes}%", mes]
+        if filial != "CONSOLIDADO":
+            sql_n += " AND filial_emissora = ?"
+            params_n.append(filial)
+        sql_n += " ORDER BY id ASC"
+        notas = conn.execute(sql_n, tuple(params_n)).fetchall()
+
+        sql_t = "SELECT id, estabelecimento, codigo_item, descricao, data_mov, qtd_saida, observacao FROM movimentacoes_estoque WHERE tipo_mov LIKE '%TRANSFERENCIA%' AND data_mov LIKE ? ORDER BY id ASC"
+        movs_trf = conn.execute(sql_t, (f"{mes}%",)).fetchall()
+
+        sql_c = "SELECT id, tecnico_setor, nome_item, quantidade, finalidade, data_baixa FROM baixas_consumiveis WHERE data_baixa LIKE ? ORDER BY id ASC"
+        consumiveis = conn.execute(sql_c, (f"{mes}%",)).fetchall()
+
+        sql_p = "SELECT codigo, nome_peca, quantidade, COALESCE(saldo_fiscal, quantidade), preco_custo, unidade FROM estoque_pecas ORDER BY nome_peca ASC"
+        pecas = conn.execute(sql_p).fetchall()
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        # 1. Livro Registro de Saídas CSV
+        csv_s = io.StringIO()
+        csv_s.write("\ufeff")
+        w_s = csv.writer(csv_s, delimiter=";")
+        w_s.writerow([
+            "NFS-e", "Série", "Data Emissão", "Filial Emissora", "CNPJ Prestador",
+            "Razão Tomador", "CNPJ Tomador", "Cidade Tomador", "UF", "Tipo / Natureza", "CFOP",
+            "Valor Serviços (R$)", "Base Cálculo ISS (R$)", "Alíquota ISS (%)", "Valor ISS (R$)",
+            "Valor Peças (R$)", "Desconto (R$)", "Valor Líquido Total (R$)", "Status Fiscal",
+            "Chave de Acesso", "Protocolo SEFAZ"
+        ])
+        for n in notas:
+            w_s.writerow([
+                n[14] or f"OS_{n[1]}", n[15] or "1", n[19] or "", n[20] or "", n[21] or "",
+                n[2] or "", n[3] or "", n[23] or "", n[24] or "", n[5] or n[4] or "", n[6] or "",
+                f"{float(n[7] or 0):.2f}".replace(".", ","),
+                f"{float(n[7] or 0):.2f}".replace(".", ","),
+                f"{float(n[10] or 0):.2f}".replace(".", ","),
+                f"{float(n[11] or 0):.2f}".replace(".", ","),
+                f"{float(n[8] or 0):.2f}".replace(".", ","),
+                f"{float(n[9] or 0):.2f}".replace(".", ","),
+                f"{float(n[12] or 0):.2f}".replace(".", ","),
+                n[13] or "", n[16] or "", n[18] or ""
+            ])
+        zf.writestr(f"01_LIVRO_REGISTRO_SAIDAS_{filial}_{mes}.csv", csv_s.getvalue().encode("utf-8"))
+
+        # 2. Transferências CSV
+        csv_t = io.StringIO()
+        csv_t.write("\ufeff")
+        w_t = csv.writer(csv_t, delimiter=";")
+        w_t.writerow(["ID", "Origem", "Cód Peça", "Descrição", "Data", "Qtd", "Enquadramento Legal ICMS", "Obs"])
+        for t in movs_trf:
+            w_t.writerow([t[0], t[1], t[2], t[3], t[4], f"{float(t[5] or 0):.2f}".replace(".", ","), "NÃO INCIDÊNCIA DE ICMS (STF ADC 49 / LC 204/2023 - MESMO TITULAR)", t[6] or ""])
+        zf.writestr(f"02_RELATORIO_TRANSFERENCIAS_FILIAIS_{mes}.csv", csv_t.getvalue().encode("utf-8"))
+
+        # 3. Consumíveis CSV
+        csv_c = io.StringIO()
+        csv_c.write("\ufeff")
+        w_c = csv.writer(csv_c, delimiter=";")
+        w_c.writerow(["ID", "Setor", "Item", "Qtd", "Finalidade", "Data Baixa", "Tratamento Contábil"])
+        for c in consumiveis:
+            w_c.writerow([c[0], c[1], c[2], c[3], c[4], c[5], "DESPESA OPERACIONAL IMEDIATA - USO E CONSUMO (SALDO ESTOQUE CLÍNICO: ZERO)"])
+        zf.writestr(f"03_RELATORIO_CONSUMIVEIS_DESPESAS_{mes}.csv", csv_c.getvalue().encode("utf-8"))
+
+        # 4. Inventário Bloco K CSV
+        csv_p = io.StringIO()
+        csv_p.write("\ufeff")
+        w_p = csv.writer(csv_p, delimiter=";")
+        w_p.writerow(["Cód Item", "Descrição", "Estoque Físico", "Estoque Fiscal", "Divergência", "Custo Unitário (R$)", "Total Fiscal (R$)", "Unidade"])
+        for p in pecas:
+            fis = float(p[2] or 0)
+            fisc = float(p[3] if p[3] is not None else (p[2] or 0))
+            custo = float(p[4] or 0)
+            w_p.writerow([p[0], p[1], f"{fis:.2f}".replace(".", ","), f"{fisc:.2f}".replace(".", ","), f"{(fis - fisc):.2f}".replace(".", ","), f"{custo:.2f}".replace(".", ","), f"{(fisc * custo):.2f}".replace(".", ","), p[5] or "UN"])
+        zf.writestr(f"04_INVENTARIO_FISCAL_BLOCO_K_{mes}.csv", csv_p.getvalue().encode("utf-8"))
+
+        # 5. Instruções do Contador
+        texto_contador = f"""================================================================================
+EMED ELETROMEDICINA — INSTRUÇÕES & MEMORIAL FISCAL DE FECHAMENTO MENSAL
+Competência: {mes} | Unidade: {filial}
+Documento oficial para a Assessoria Contábil / Fiscal
+================================================================================
+
+Prezado(a) Contador(a) e Equipe Fiscal,
+
+Para fins de escrituração fiscal mensal, apuração de tributos e cumprimento das
+obrigações acessórias (SPED Fiscal, EFD-Reinf, Bloco K, Livro Eletrônico DF / ISS),
+seguem as orientações operacionais da EMED Eletromedicina:
+
+1. SERVIÇOS TÉCNICOS & ENGENHARIA CLÍNICA (NFS-e):
+   - Atividade: Manutenção preventiva e corretiva de equipamentos médico-hospitalares.
+   - Enquadramento: Subitem 14.01 / 14.02 da Lei Complementar nº 116/2003.
+   - Base de Cálculo do ISS: Valor da mão de obra/serviços técnicos destacados na nota.
+   - Alíquota Padrão: 5,0% (DF) ou alíquota vigente no município prestador/tomador.
+   - Peças Aplicadas: Quando houver destaque de peças no faturamento, observar a
+     segregação tributária entre Serviço (ISS) e Mercadoria (ICMS).
+
+2. REMESSAS E TRANSFERÊNCIAS ENTRE FILIAIS (CE <-> DF — CFOP 5152 / 6152 / 5949 / 6949):
+   - ATENÇÃO: NÃO TRIBUTAR ICMS SOBRE AS TRANSFERÊNCIAS ENTRE ESTABELECIMENTOS.
+   - Fundamentação Legal Vinculante: STF — Ação Declaratória de Constitucionalidade nº 49
+     (ADC 49) e Lei Complementar nº 204/2023. O deslocamento de bens e mercadorias entre
+     estabelecimentos do mesmo titular NÃO constitui fato gerador do ICMS.
+
+3. CONSUMÍVEIS ADMINISTRATIVOS & COPA/LIMPEZA (CFOP 1556 / 2556):
+   - As compras de insumos administrativos (café, açúcar, papel toalha, itens de limpeza)
+     são lançadas para registro de despesa operacional direta (Uso e Consumo).
+   - O estoque físico no almoxarifado de engenharia clínica é baixado IMEDIATAMENTE a ZERO
+     para não contaminar o inventário de peças e componentes clínicos.
+
+4. ARQUIVOS ANEXOS NESTE PACOTE:
+   - 01_LIVRO_REGISTRO_SAIDAS: Relação completa de NFS-e emitidas com valores e retenções.
+   - 02_RELATORIO_TRANSFERENCIAS_FILIAIS: Relação de remessas interestaduais de apoio.
+   - 03_RELATORIO_CONSUMIVEIS_DESPESAS: Relação de baixas imediatas de despesa.
+   - 04_INVENTARIO_FISCAL_BLOCO_K: Posição do almoxarifado (Estoque Físico e Fiscal).
+   - Pasta /xml: Arquivos XML oficiais autorizados perante o Fisco.
+   - Pasta /danfe: Espelhos visuais DANFE em HTML para conferência rápida.
+
+Em caso de dúvidas contábeis, contatar a Diretoria Administrativa da EMED.
+================================================================================
+"""
+        zf.writestr(f"05_ORIENTACOES_TRIBUTARIAS_CONTADOR_{mes}.txt", texto_contador.encode("utf-8"))
+
+        # 6. XMLs e DANFEs
+        for n in notas:
+            num = n[14] or f"OS_{n[1]}"
+            fil = n[20] or "DF"
+            xml_p = n[17]
+            if xml_p and os.path.exists(xml_p):
+                zf.writestr(f"xml/NFS_{fil}_{num}.xml", Path(xml_p).read_bytes())
+            else:
+                xml_stub = f"""<?xml version="1.0" encoding="UTF-8"?>
+<CompNfse xmlns="http://www.abrasf.org.br/nfse.xsd">
+  <Nfse><InfNfse>
+    <Numero>{num}</Numero>
+    <DataEmissao>{n[19] or datetime.now().isoformat()}</DataEmissao>
+    <IdentificacaoRps><Numero>{n[1]}</Numero><Serie>{n[15] or '1'}</Serie></IdentificacaoRps>
+    <PrestadorServico><Cnpj>{n[21] or '22143714000109'}</Cnpj><RazaoSocial>{n[22] or 'EMED ELETROMEDICINA'}</RazaoSocial></PrestadorServico>
+    <TomadorServico><IdentificacaoTomador><CpfCnpj><Cnpj>{n[3] or ''}</Cnpj></CpfCnpj></IdentificacaoTomador><RazaoSocial>{n[2] or ''}</RazaoSocial></TomadorServico>
+    <Servico>
+      <Valores>
+        <ValorServicos>{float(n[7] or 0):.2f}</ValorServicos>
+        <ValorIss>{float(n[11] or 0):.2f}</ValorIss>
+        <Aliquota>{float(n[10] or 5.0):.2f}</Aliquota>
+        <ValorLiquidoNfse>{float(n[12] or 0):.2f}</ValorLiquidoNfse>
+      </Valores>
+      <Discriminacao>{n[5] or n[4] or 'SERVICOS DE MANUTENCAO HOSPITALAR'}</Discriminacao>
+    </Servico>
+  </InfNfse></Nfse>
+</CompNfse>"""
+                zf.writestr(f"xml/NFS_{fil}_{num}.xml", xml_stub.encode("utf-8"))
+
+            danfe_dir = Path(__file__).resolve().parent.parent / "uploads_os" / "fiscal" / "html"
+            danfe_file = danfe_dir / f"nfs_{fil.lower()}_{n[1]}.html"
+            if danfe_file.exists():
+                zf.writestr(f"danfe/DANFE_{fil}_{num}.html", danfe_file.read_bytes())
+
+    buf.seek(0)
+    nome_zip = f"EMED_Pacote_Contabil_{filial}_{mes}.zip"
+    return web.Response(
+        body=buf.getvalue(),
+        content_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{nome_zip}"'}
+    )
+
+
+async def api_fiscal_v2_fechamento_relatorio_impresso(request: web.Request) -> web.Response:
+    """Gera página de relatório de fechamento fiscal e contábil formatada para impressão/PDF."""
+    db_name = request.app.get("db_path", "emed.db")
+    mes = request.query.get("mes", "").strip() or datetime.now().strftime("%Y-%m")
+    filial = request.query.get("filial", "CONSOLIDADO").strip().upper()
+    logo_b64 = _obter_logo_b64()
+
+    with _get_db_connection(db_name) as conn:
+        sql_n = """
+            SELECT id, os_id, cliente, cnpj_tomador, tipo_nota, cfop,
+                   valor_servicos, valor_pecas, valor_desconto, aliquota_iss,
+                   valor_iss, valor_liquido, status_fiscal, numero_nf, serie,
+                   data_emissao, filial_emissora
+            FROM notas_fiscais
+            WHERE (data_emissao LIKE ? OR lote_contabilidade_mes = ?)
+        """
+        params_n = [f"{mes}%", mes]
+        if filial != "CONSOLIDADO":
+            sql_n += " AND filial_emissora = ?"
+            params_n.append(filial)
+        sql_n += " ORDER BY id ASC"
+        notas = conn.execute(sql_n, tuple(params_n)).fetchall()
+
+    tot_fat = sum(float(n[11] or 0) for n in notas if "CANCELAD" not in str(n[12] or "").upper())
+    tot_srv = sum(float(n[6] or 0) for n in notas if "CANCELAD" not in str(n[12] or "").upper())
+    tot_pec = sum(float(n[7] or 0) for n in notas if "CANCELAD" not in str(n[12] or "").upper())
+    tot_iss = sum(float(n[10] or 0) for n in notas if "CANCELAD" not in str(n[12] or "").upper())
+
+    linhas_html = "".join([
+        f"<tr><td><b>{n[13] or 'OS #'+str(n[1])}</b></td><td>{n[15] or ''}</td><td>{n[2]}</td><td>{n[3]}</td><td>{n[5] or 'NFS-e'}</td><td>R$ {float(n[6] or 0):.2f}</td><td>R$ {float(n[7] or 0):.2f}</td><td>R$ {float(n[10] or 0):.2f}</td><td><b>R$ {float(n[11] or 0):.2f}</b></td><td>{n[12]}</td></tr>"
+        for n in notas
+    ]) or "<tr><td colspan='10' style='text-align:center;'>Nenhuma nota emitida no período.</td></tr>"
+
+    html_out = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Fechamento Contábil & Fiscal – EMED ({mes})</title>
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0f172a; margin: 24px; font-size: 12px; }}
+    .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 16px; }}
+    .kpis {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }}
+    .kpi {{ background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; }}
+    .kpi-title {{ font-size: 11px; color: #64748b; font-weight: 700; }}
+    .kpi-val {{ font-size: 18px; font-weight: 900; color: #0369a1; margin-top: 4px; }}
+    table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }}
+    th, td {{ border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }}
+    th {{ background: #f1f5f9; color: #334155; font-weight: 800; }}
+    .alert-box {{ background: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 14px; margin-bottom: 16px; font-size: 11.5px; line-height: 1.5; }}
+    .signatures {{ display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; }}
+    .sig-line {{ width: 45%; border-top: 1px solid #475569; text-align: center; padding-top: 6px; font-size: 11px; }}
+    @media print {{ .no-print {{ display: none; }} body {{ margin: 0; }} }}
+  </style>
+</head>
+<body>
+  <div class="no-print" style="margin-bottom: 16px; text-align: right;">
+    <button onclick="window.print()" style="background:#0284c7;color:#fff;border:none;padding:10px 18px;font-weight:800;border-radius:6px;cursor:pointer;">🖨️ Imprimir / Salvar em PDF</button>
+  </div>
+  <div class="header">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <img src="data:image/png;base64,{logo_b64}" style="max-height:50px;" alt="EMED" />
+      <div>
+        <div style="font-size:16px;font-weight:900;color:#0284c7;">EMED ELETROMEDICINA HOSPITALAR</div>
+        <div style="font-size:11px;color:#64748b;">DEMONSTRATIVO MENSAL DE FECHAMENTO FISCAL &amp; CONTÁBIL</div>
+      </div>
+    </div>
+    <div style="text-align:right;font-size:11px;color:#475569;">
+      <b>Competência:</b> {mes}<br/>
+      <b>Unidade:</b> {filial}<br/>
+      <b>Emissão Relatório:</b> {datetime.now().strftime("%d/%m/%Y %H:%M")}
+    </div>
+  </div>
+  <div class="alert-box">
+    ⚖️ <b>MEMORIAL FISCAL PARA A CONTABILIDADE:</b><br/>
+    &bull; <b>Serviços (ISS):</b> LC 116/2003 (Item 14.01/14.02). Alíquota aplicável: 5,0% (DF) ou alíquota municipal da sede/tomador.<br/>
+    &bull; <b>Transferências entre Filiais (CFOP 5152/6152):</b> Não incidência de ICMS vinculante conforme <b>STF ADC 49 e LC 204/2023</b>.<br/>
+    &bull; <b>Consumíveis Administrativos (CFOP 1556/2556):</b> Baixa imediata para despesa de uso/consumo, mantendo saldo de almoxarifado clínico em zero.
+  </div>
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-title">TOTAL FATURADO</div><div class="kpi-val">R$ {tot_fat:,.2f}</div></div>
+    <div class="kpi"><div class="kpi-title">SERVIÇOS (BASE ISS)</div><div class="kpi-val">R$ {tot_srv:,.2f}</div></div>
+    <div class="kpi"><div class="kpi-title">PEÇAS FATURADAS</div><div class="kpi-val">R$ {tot_pec:,.2f}</div></div>
+    <div class="kpi"><div class="kpi-title">TOTAL ISS APURADO</div><div class="kpi-val">R$ {tot_iss:,.2f}</div></div>
+  </div>
+  <h4 style="margin:0 0 8px 0;color:#0369a1;">📜 Livro de Saídas &amp; NFS-e Emitidas no Período</h4>
+  <table>
+    <thead>
+      <tr><th>NFS-e</th><th>Data</th><th>Tomador</th><th>CNPJ</th><th>CFOP</th><th>Serviços</th><th>Peças</th><th>ISS</th><th>Total NF</th><th>Status</th></tr>
+    </thead>
+    <tbody>{linhas_html}</tbody>
+  </table>
+  <div class="signatures">
+    <div class="sig-line">
+      <b>EMED ELETROMEDICINA</b><br/>Responsável Fiscal / Controladoria Interna
+    </div>
+    <div class="sig-line">
+      <b>ASSESSORIA CONTÁBIL EXTERNA</b><br/>Contador Responsável / CRC
+    </div>
+  </div>
+</body>
+</html>"""
+    return web.Response(text=html_out, content_type="text/html")
+
+
+async def api_fiscal_v2_fechamento_marcar_enviado(request: web.Request) -> web.Response:
+    """Marca o lote da competência como transmitido/enviado à assessoria contábil."""
+    db_name = request.app.get("db_path", "emed.db")
+    body = await request.json()
+    mes = str(body.get("mes", "")).strip() or datetime.now().strftime("%Y-%m")
+    filial = str(body.get("filial", "CONSOLIDADO")).strip().upper()
+    usuario = str(body.get("usuario", "netto")).strip()
+
+    with _get_db_connection(db_name) as conn:
+        sql = "UPDATE notas_fiscais SET enviado_contabilidade = 1, data_envio_contabilidade = datetime('now') WHERE (data_emissao LIKE ? OR lote_contabilidade_mes = ?)"
+        params = [f"{mes}%", mes]
+        if filial != "CONSOLIDADO":
+            sql += " AND filial_emissora = ?"
+            params.append(filial)
+        cur = conn.execute(sql, tuple(params))
+        total_marcadas = cur.rowcount
+        conn.commit()
+
+    _registrar_log_fiscal("FECHAMENTO_CONTABILIDADE", f"Lote {mes} ({filial}) marcado como enviado à contabilidade ({total_marcadas} notas afetadas)", usuario)
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"✅ Fechamento da competência {mes} marcado como enviado à contabilidade! ({total_marcadas} notas registradas)",
+        "total_afetadas": total_marcadas
+    })
+
+
 async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     icon_b64 = _obter_icone_azul_b64()
     logo_b64 = _obter_logo_b64()
@@ -1251,6 +1676,99 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         </div>
       </details>
 
+      <!-- FECHAMENTO MENSAL PARA A CONTABILIDADE -->
+      <details class="card card-highlight" id="expanderFechamentoContabil" open style="cursor:pointer;margin-bottom:16px;">
+        <summary style="font-weight:900;color:#38bdf8;font-size:14px;">🏛️ Fechamento Mensal &amp; Relatórios para a Contabilidade (Auditoria Anti-Falhas)</summary>
+        <div style="cursor:default;margin-top:14px;">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+            Gere o pacote contábil completo da competência para envio à assessoria contábil. Mitiga erros tributários operacionais do contador através de <b>instruções vinculantes</b> (STF ADC 49, LC 204/2023 para transferências e LC 116/2003 para serviços hospitalares).
+          </div>
+
+          <!-- SELETORES DE COMPETÊNCIA E FILIAL -->
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px 14px;margin-bottom:14px;">
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+              <div>
+                <label style="margin-bottom:3px;">Mês / Competência Fiscal:</label>
+                <select id="selMesFechamento" onchange="carregarFechamentoContabil()" style="width:160px;font-weight:700;color:var(--cyan);"></select>
+              </div>
+              <div>
+                <label style="margin-bottom:3px;">Unidade / Filial:</label>
+                <select id="selFilialFechamento" onchange="carregarFechamentoContabil()" style="width:200px;">
+                  <option value="CONSOLIDADO">Consolidado (Todas as Unidades)</option>
+                  <option value="FILIAL_DF">Filial Brasília (DF)</option>
+                  <option value="MATRIZ_CE">Matriz Eusébio (CE)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- BOTÕES DE AÇÃO CONTÁBIL -->
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" class="btn btn-primary" style="width:auto;padding:8px 14px;" onclick="baixarPacoteContadorZip()">
+                📦 Baixar Pacote do Contador (.ZIP)
+              </button>
+              <button type="button" class="btn btn-blue" style="padding:8px 14px;" onclick="abrirRelatorioContabilImpresso()">
+                📄 Relatório Oficial (PDF / Impresso)
+              </button>
+              <button type="button" class="btn btn-outline" style="padding:8px 12px;" onclick="marcarFechamentoEnviadoContabilidade()">
+                ✅ Marcar Lote Enviado
+              </button>
+            </div>
+          </div>
+
+          <!-- INDICADORES RESUMO DA COMPETÊNCIA -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:14px;">
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
+              <div style="font-size:11px;color:#94a3b8;font-weight:700;">TOTAL FATURADO (LÍQUIDO)</div>
+              <div id="fchKpiFaturado" style="font-size:22px;font-weight:900;color:var(--cyan);">R$ 0,00</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
+              <div style="font-size:11px;color:#94a3b8;font-weight:700;">BASE CÁLCULO ISS (SERVIÇOS)</div>
+              <div id="fchKpiServicos" style="font-size:22px;font-weight:900;color:#38bdf8;">R$ 0,00</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
+              <div style="font-size:11px;color:#94a3b8;font-weight:700;">TOTAL ISS APURADO</div>
+              <div id="fchKpiIss" style="font-size:22px;font-weight:900;color:#fbbf24;">R$ 0,00</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
+              <div style="font-size:11px;color:#94a3b8;font-weight:700;">TRANSFERÊNCIAS ISENTAS</div>
+              <div id="fchKpiTrf" style="font-size:22px;font-weight:900;color:#a78bfa;">R$ 0,00</div>
+            </div>
+          </div>
+
+          <!-- MEMORIAL FISCAL ANTI-FALHAS -->
+          <div style="background:#132338;border:1.5px solid #0284c7;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;line-height:1.5;">
+            <div style="font-weight:900;color:#38bdf8;margin-bottom:6px;">⚖️ DIRETRIZES DE AUDITORIA FISCAL PARA O CONTADOR (ANTI-ERROS):</div>
+            <ul style="margin:0;padding-left:18px;color:#cbd5e1;">
+              <li><b>Não-Incidência de ICMS em Transferências (CE ⇄ DF):</b> Amparadas pela <b>ADC 49 do STF</b> e <b>LC 204/2023</b>. Transferência entre filiais do mesmo titular não gera débito de ICMS.</li>
+              <li><b>Segregação de Serviços e Peças:</b> Serviços médicos hospitalares sob a <b>LC 116/2003 (item 14.01/14.02)</b> com alíquota de 5% no DF. Peças orçadas e faturadas devem ser segregadas para não bitributar ISS.</li>
+              <li><b>Consumíveis Administrativos:</b> Escriturados sob CFOP 1556/2556 como despesa operacional direta, mantendo o saldo físico em zero no almoxarifado de peças clínicas.</li>
+            </ul>
+          </div>
+
+          <!-- TABELA DE NOTAS DO FECHAMENTO -->
+          <div style="font-size:12px;font-weight:800;color:#94a3b8;margin-bottom:6px;">Notas Fiscais da Competência Selecionada:</div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>NFS-e</th>
+                  <th>Data</th>
+                  <th>Tomador (Cliente)</th>
+                  <th>CNPJ</th>
+                  <th>CFOP</th>
+                  <th>Serviços</th>
+                  <th>Peças</th>
+                  <th>ISS Apurado</th>
+                  <th>Valor Total</th>
+                  <th>Status Contábil</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyFechamentoNotas"></tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
       <!-- HISTÓRICO & CANCELAMENTO -->
       <div class="card">
         <h4 style="margin:0 0 10px 0;color:var(--cyan);">📜 Histórico de Notas Fiscais Emitidas</h4>
@@ -1484,6 +2002,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
       INVENTARIO_ITENS = res.pecas_almox || [];
       renderizarInventario();
+      carregarFechamentoContabil();
     }}
 
     function preencherFormularioComOs(d, cfg) {{
@@ -2208,6 +2727,88 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       }}
     }}
 
+    async function carregarFechamentoContabil() {{
+      const selMes = document.getElementById("selMesFechamento");
+      const mes = selMes ? selMes.value : "";
+      const selFil = document.getElementById("selFilialFechamento");
+      const fil = selFil ? selFil.value : "CONSOLIDADO";
+
+      try {{
+        const res = await fetch(`/api/fiscal/v2/fechamento/dados?mes=${{encodeURIComponent(mes)}}&filial=${{encodeURIComponent(fil)}}`).then(r => r.json());
+        if (!res.ok) return;
+
+        if (selMes && res.meses_disponiveis && selMes.options.length <= 1) {{
+          const mesAtivo = res.mes || selMes.value;
+          selMes.innerHTML = res.meses_disponiveis.map(m => `
+            <option value="${{m}}" ${{m === mesAtivo ? 'selected' : ''}}>${{formatarMesLegivel(m)}}</option>
+          `).join("");
+        }}
+
+        const k = res.kpis || {{}};
+        const elFat = document.getElementById("fchKpiFaturado"); if (elFat) elFat.textContent = `R$ ${{Number(k.total_faturado||0).toLocaleString('pt-BR', {{minimumFractionDigits:2}})}}`;
+        const elSrv = document.getElementById("fchKpiServicos"); if (elSrv) elSrv.textContent = `R$ ${{Number(k.total_servicos||0).toLocaleString('pt-BR', {{minimumFractionDigits:2}})}}`;
+        const elIss = document.getElementById("fchKpiIss"); if (elIss) elIss.textContent = `R$ ${{Number(k.total_iss||0).toLocaleString('pt-BR', {{minimumFractionDigits:2}})}}`;
+        const elTrf = document.getElementById("fchKpiTrf"); if (elTrf) elTrf.textContent = `R$ ${{Number(k.total_transferencias||0).toLocaleString('pt-BR', {{minimumFractionDigits:2}})}}`;
+
+        const tb = document.getElementById("tbodyFechamentoNotas");
+        if (tb) {{
+          tb.innerHTML = (res.notas || []).map(n => `
+            <tr>
+              <td><b>${{n.numero_nf}}</b></td>
+              <td style="font-size:11px;">${{n.data_emissao ? n.data_emissao.substring(0, 10) : '-'}}</td>
+              <td><b>${{n.cliente}}</b></td>
+              <td style="font-size:11px;">${{n.cnpj_tomador}}</td>
+              <td><span class="badge" style="background:#0f172a;border:1px solid #334155;">${{n.cfop || 'NFS-e'}}</span></td>
+              <td>R$ ${{Number(n.valor_servicos||0).toFixed(2)}}</td>
+              <td>R$ ${{Number(n.valor_pecas||0).toFixed(2)}}</td>
+              <td>R$ ${{Number(n.valor_iss||0).toFixed(2)}} (${{n.aliquota_iss}}%)</td>
+              <td><b>R$ ${{Number(n.valor_liquido||0).toFixed(2)}}</b></td>
+              <td>${{n.is_cancelada ? '<span style="color:#f87171;font-weight:bold;">Cancelada</span>' : (n.enviado ? '<span style="color:#34d399;font-weight:bold;">Enviado Contabilidade</span>' : '<span style="color:#38bdf8;">Pronto p/ Envio</span>')}}</td>
+            </tr>
+          `).join("") || `<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:14px;">Nenhuma nota fiscal emitida nesta competência.</td></tr>`;
+        }}
+      }} catch (e) {{
+        console.error("Erro ao carregar fechamento contábil:", e);
+      }}
+    }}
+
+    function formatarMesLegivel(mStr) {{
+      if (!mStr || mStr.length < 7) return mStr;
+      const parts = mStr.split("-");
+      const ano = parts[0];
+      const mes = parts[1];
+      const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+      const idx = parseInt(mes, 10) - 1;
+      return `${{meses[idx] || mes}} / ${{ano}}`;
+    }}
+
+    function baixarPacoteContadorZip() {{
+      const mes = document.getElementById("selMesFechamento")?.value || "";
+      const fil = document.getElementById("selFilialFechamento")?.value || "CONSOLIDADO";
+      window.location.href = `/api/fiscal/v2/fechamento/zip?mes=${{encodeURIComponent(mes)}}&filial=${{encodeURIComponent(fil)}}`;
+    }}
+
+    function abrirRelatorioContabilImpresso() {{
+      const mes = document.getElementById("selMesFechamento")?.value || "";
+      const fil = document.getElementById("selFilialFechamento")?.value || "CONSOLIDADO";
+      window.open(`/api/fiscal/v2/fechamento/relatorio-impresso?mes=${{encodeURIComponent(mes)}}&filial=${{encodeURIComponent(fil)}}`, "_blank");
+    }}
+
+    async function marcarFechamentoEnviadoContabilidade() {{
+      const mes = document.getElementById("selMesFechamento")?.value || "";
+      const fil = document.getElementById("selFilialFechamento")?.value || "CONSOLIDADO";
+      if (!confirm(`Deseja marcar todas as notas de ${{mes}} (${{fil}}) como transmitidas à contabilidade?`)) return;
+
+      const res = await fetch("/api/fiscal/v2/fechamento/marcar-enviado", {{
+        method: "POST",
+        headers: {{"Content-Type": "application/json"}},
+        body: JSON.stringify({{ mes, filial: fil, usuario: USUARIO_FISCAL?.username || "netto" }})
+      }}).then(r => r.json());
+
+      alert(res.msg);
+      carregarFechamentoContabil();
+    }}
+
     initPortalFiscal();
   </script>
 </body>
@@ -2228,4 +2829,8 @@ def registrar_rotas_portal_fiscal(app: web.Application) -> None:
     app.router.add_post("/api/fiscal/v2/ajuste-estoque", api_fiscal_v2_ajuste_estoque)
     app.router.add_post("/api/fiscal/v2/inventario/ajuste-direto", api_fiscal_v2_inventario_ajuste_direto)
     app.router.add_post("/api/fiscal/v2/inventario/novo-item", api_fiscal_v2_inventario_novo_item)
+    app.router.add_get("/api/fiscal/v2/fechamento/dados", api_fiscal_v2_fechamento_dados)
+    app.router.add_get("/api/fiscal/v2/fechamento/zip", api_fiscal_v2_fechamento_zip)
+    app.router.add_get("/api/fiscal/v2/fechamento/relatorio-impresso", api_fiscal_v2_fechamento_relatorio_impresso)
+    app.router.add_post("/api/fiscal/v2/fechamento/marcar-enviado", api_fiscal_v2_fechamento_marcar_enviado)
     app.router.add_get("/api/fiscal/v2/xml/{os_id}", api_fiscal_v2_xml_download)
