@@ -83524,7 +83524,14 @@
 
 
 
-      navigator.serviceWorker.register("/sw.js?v=v62").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=1.0.5").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      let _swReloaded = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!_swReloaded && navigator.onLine && !STATE.osAberta) {
+          _swReloaded = true;
+          window.location.reload();
+        }
+      });
 
 
 

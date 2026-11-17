@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v1-0-4-proposta-timbrada-triagem';
+const CACHE_NAME = 'emed-pwa-v1-0-5-auto-update';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
