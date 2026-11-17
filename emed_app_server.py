@@ -20898,6 +20898,17 @@ def garantir_schema_fiscal_contabil(db_path: str):
 
                 pass
 
+            # Garantir coluna de Estoque Fiscal em estoque_pecas
+            try:
+
+                cur.execute("ALTER TABLE estoque_pecas ADD COLUMN saldo_fiscal REAL DEFAULT NULL")
+
+                cur.execute("UPDATE estoque_pecas SET saldo_fiscal = quantidade WHERE saldo_fiscal IS NULL")
+
+            except Exception:
+
+                pass
+
             conn.commit()
 
     except Exception as e:

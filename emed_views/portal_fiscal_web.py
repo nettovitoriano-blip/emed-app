@@ -136,13 +136,10 @@ async def api_fiscal_v2_dados(request: web.Request) -> web.Response:
         sql_h += " ORDER BY id DESC LIMIT 30"
         rows_hist = conn.execute(sql_h, tuple(params_h)).fetchall()
 
-        # Peças disponíveis no almoxarifado para transferências
-        cur_p = conn.execute("SELECT id, codigo, nome_peca, quantidade, preco_custo, unidade FROM estoque_pecas WHERE quantidade > 0 ORDER BY nome_peca ASC LIMIT 100")
+        # Peças disponíveis no almoxarifado (Estoque Físico & Estoque Fiscal)
+        cur_p = conn.execute("SELECT id, codigo, nome_peca, quantidade, COALESCE(saldo_fiscal, quantidade), preco_custo, unidade FROM estoque_pecas ORDER BY nome_peca ASC LIMIT 100")
         rows_p = cur_p.fetchall()
-        if not rows_p:
-            cur_p2 = conn.execute("SELECT id, codigo, nome_peca, quantidade, preco_custo, unidade FROM estoque_pecas ORDER BY nome_peca ASC LIMIT 30")
-            rows_p = cur_p2.fetchall()
-        pecas_almox = [{"id": rp[0], "codigo": rp[1] or "", "nome": rp[2] or "", "qtd": rp[3] or 0, "preco": float(rp[4] or 0.0), "unidade": rp[5] or "UN"} for rp in rows_p]
+        pecas_almox = [{"id": rp[0], "codigo": rp[1] or "", "nome": rp[2] or "", "qtd": rp[3] or 0, "qtd_fiscal": float(rp[4] if rp[4] is not None else (rp[3] or 0)), "preco": float(rp[5] or 0.0), "unidade": rp[6] or "UN"} for rp in rows_p]
 
         # Veículos da frota
         cur_v = conn.execute("SELECT placa, modelo FROM veiculos ORDER BY modelo ASC")
@@ -301,6 +298,24 @@ async def api_fiscal_v2_emitir(request: web.Request) -> web.Response:
 
     manager = FiscalManager(db_name)
     res_nota = manager.emitir_nota(os_id, filial, payload_salvar)
+
+    mov_fiscal = bool(body.get("movimentar_estoque_fiscal", True))
+    mov_fisico = bool(body.get("movimentar_estoque_fisico", True))
+    if mov_fiscal or mov_fisico:
+        try:
+            with _get_db_connection(db_name) as conn:
+                cur_pec = conn.execute("SELECT codigo_peca, id FROM solicitacoes_pecas WHERE os_id = ?", (os_id,)).fetchall()
+                for r_p in cur_pec:
+                    cod_p = r_p[0]
+                    if cod_p:
+                        if mov_fiscal:
+                            conn.execute("UPDATE estoque_pecas SET saldo_fiscal = MAX(0, COALESCE(saldo_fiscal, quantidade) - 1) WHERE codigo = ? OR id = ?", (cod_p, cod_p))
+                        if mov_fisico:
+                            conn.execute("UPDATE estoque_pecas SET quantidade = MAX(0, quantidade - 1) WHERE codigo = ? OR id = ?", (cod_p, cod_p))
+                conn.commit()
+        except Exception:
+            pass
+
     danfe_html = ""
     hp = res_nota.get("html_path")
     if hp and os.path.exists(hp):
@@ -374,6 +389,8 @@ async def api_fiscal_v2_transferir_filiais(request: web.Request) -> web.Response
     veiculo = str(body.get("veiculo_transporte", "TRANSPORTE EM VEÍCULO PRÓPRIO EMED")).strip()
     obs_extra = str(body.get("observacoes", "")).strip()
     usuario = str(body.get("usuario", "netto")).strip()
+    mov_fisico = bool(body.get("movimentar_estoque_fisico", True))
+    mov_fiscal = bool(body.get("movimentar_estoque_fiscal", True))
     itens = body.get("itens", [])
 
     if not itens:
@@ -444,21 +461,25 @@ Operação de transferência de mercadorias entre estabelecimentos do mesmo titu
         ))
         id_nf = cur.lastrowid
 
-        # Atualizar estoque: deduz da origem
+        # Atualizar estoque: deduz da origem conforme opções de Físico / Fiscal
         for it in itens:
             pid = it.get("peca_id")
             qtd = float(it.get("quantidade", 1))
             if pid:
-                conn.execute("UPDATE estoque_pecas SET quantidade = MAX(0, quantidade - ?) WHERE id = ?", (qtd, pid))
+                if mov_fisico:
+                    conn.execute("UPDATE estoque_pecas SET quantidade = MAX(0, quantidade - ?) WHERE id = ?", (qtd, pid))
+                if mov_fiscal:
+                    conn.execute("UPDATE estoque_pecas SET saldo_fiscal = MAX(0, COALESCE(saldo_fiscal, quantidade) - ?) WHERE id = ?", (qtd, pid))
+                mov_tipo = 'TRANSFERENCIA_FILIAL_SAIDA' if (mov_fisico and mov_fiscal) else ('TRANSFERENCIA_APENAS_FISCAL' if mov_fiscal else 'TRANSFERENCIA_APENAS_FISICO')
                 conn.execute("""
                     INSERT INTO movimentacoes_estoque (
                         estabelecimento, centro_estoque, codigo_item, descricao,
                         data_mov, hora_mov, tipo_mov, qtd_saida, documento, observacao
-                    ) VALUES (?, ?, ?, ?, ?, ?, 'TRANSFERENCIA_FILIAL_SAIDA', ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     origem, f"ALMOXARIFADO {origem}", str(it.get("codigo", "")), str(it.get("nome", "")),
                     datetime.now().strftime("%Y-%m-%d"), datetime.now().strftime("%H:%M:%S"),
-                    qtd, num_nf, f"Transferência para {destino} ({veiculo})"
+                    mov_tipo, qtd, num_nf, f"Transferência para {destino} ({veiculo}) [Físico: {'SIM' if mov_fisico else 'NÃO'} | Fiscal: {'SIM' if mov_fiscal else 'NÃO'}]"
                 ))
 
         conn.commit()
@@ -503,6 +524,64 @@ async def api_fiscal_v2_lancar_consumivel(request: web.Request) -> web.Response:
     return web.json_response({
         "ok": True,
         "msg": f"✅ NF {numero_nf} ({descricao}) registrada no Fisco como Despesa Operacional! O estoque físico de peças clínicas foi mantido em zero (consumo imediato)."
+    })
+
+
+async def api_fiscal_v2_ajuste_estoque(request: web.Request) -> web.Response:
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    body = await request.json()
+    peca_id = int(body.get("peca_id", 0))
+    tipo_mov = str(body.get("tipo_mov", "SAIDA")).upper()
+    qtd = float(body.get("quantidade", 1.0))
+    afeta_fisico = bool(body.get("afeta_fisico", True))
+    afeta_fiscal = bool(body.get("afeta_fiscal", True))
+    motivo = str(body.get("motivo", "Ajuste de inventário / Auditoria")).strip()
+    usuario = str(body.get("usuario", "netto")).strip()
+
+    if peca_id <= 0:
+        return web.json_response({"ok": False, "msg": "Selecione uma peça válida da lista."}, status=400)
+    if qtd <= 0:
+        return web.json_response({"ok": False, "msg": "Informe uma quantidade maior que zero."}, status=400)
+    if not afeta_fisico and not afeta_fiscal:
+        return web.json_response({"ok": False, "msg": "Selecione ao menos um estoque para movimentar (Físico ou Fiscal)."}, status=400)
+
+    fator = 1 if tipo_mov == "ENTRADA" else -1
+
+    with _get_db_connection(db_name) as conn:
+        row = conn.execute("SELECT codigo, nome_peca, quantidade, COALESCE(saldo_fiscal, quantidade) FROM estoque_pecas WHERE id = ?", (peca_id,)).fetchone()
+        if not row:
+            return web.json_response({"ok": False, "msg": "Peça não encontrada no banco."}, status=404)
+
+        cod_p, nome_p, qtd_ant, fisc_ant = row
+        nova_qtd = max(0.0, float(qtd_ant or 0) + (fator * qtd)) if afeta_fisico else float(qtd_ant or 0)
+        novo_fisc = max(0.0, float(fisc_ant or 0) + (fator * qtd)) if afeta_fiscal else float(fisc_ant or 0)
+
+        if afeta_fisico and afeta_fiscal:
+            conn.execute("UPDATE estoque_pecas SET quantidade = ?, saldo_fiscal = ? WHERE id = ?", (nova_qtd, novo_fisc, peca_id))
+        elif afeta_fisico:
+            conn.execute("UPDATE estoque_pecas SET quantidade = ? WHERE id = ?", (nova_qtd, peca_id))
+        elif afeta_fiscal:
+            conn.execute("UPDATE estoque_pecas SET saldo_fiscal = ? WHERE id = ?", (novo_fisc, peca_id))
+
+        desc_mov = f"AJUSTE_{tipo_mov}_" + ("FISICO_E_FISCAL" if (afeta_fisico and afeta_fiscal) else ("FISICO" if afeta_fisico else "FISCAL"))
+        col_qtd = "qtd_entrada" if tipo_mov == "ENTRADA" else "qtd_saida"
+        conn.execute(f"""
+            INSERT INTO movimentacoes_estoque (
+                estabelecimento, centro_estoque, codigo_item, descricao,
+                data_mov, hora_mov, tipo_mov, {col_qtd}, saldo, observacao
+            ) VALUES ('MATRIZ_CE', 'ALMOXARIFADO CENTRAL', ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            str(cod_p or ""), str(nome_p or ""),
+            datetime.now().strftime("%Y-%m-%d"), datetime.now().strftime("%H:%M:%S"),
+            desc_mov, qtd, nova_qtd, f"{motivo} (Op: {usuario} | Físico: {nova_qtd:.1f} | Fiscal: {novo_fisc:.1f})"
+        ))
+        conn.commit()
+
+    _registrar_log_fiscal("AJUSTE_ESTOQUE", f"Ajuste {tipo_mov} ({qtd} un) em {nome_p} | Afeta Físico: {afeta_fisico} | Afeta Fiscal: {afeta_fiscal} | Motivo: {motivo}", usuario)
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"✅ Movimentação de estoque concluída! Peça: {nome_p} • Saldo Físico: {nova_qtd:.1f} • Saldo Fiscal: {novo_fisc:.1f}"
     })
 
 
@@ -700,10 +779,20 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         </div>
 
         <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 12px;margin-bottom:10px;">
-          <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin:0;">
-            <input type="checkbox" id="chkDeduzirPecasFisco" checked onchange="aoAlternarDeduzirPecasFisco()" />
-            <span><b>Deduzir / Faturar Peças no Fisco</b> (Desmarque se as peças estiverem cobertas pelo escopo do contrato ou forem insumos sem faturamento avulso)</span>
-          </label>
+          <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin:0;">
+              <input type="checkbox" id="chkDeduzirPecasFisco" checked onchange="aoAlternarDeduzirPecasFisco()" />
+              <span><b>Deduzir no Fisco (Faturar Peças)</b></span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin:0;">
+              <input type="checkbox" id="chkMovimentarEstoqueFiscal" checked />
+              <span><b>Movimentar Estoque Fiscal (Livro/SPED)</b></span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin:0;">
+              <input type="checkbox" id="chkMovimentarEstoqueFisico" checked />
+              <span><b>Movimentar Estoque Físico (Prateleira)</b></span>
+            </label>
+          </div>
         </div>
 
         <div id="barraResumoIss" style="background:#0f172a;padding:10px 14px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:13px;"></div>
@@ -795,6 +884,17 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             </div>
           </div>
 
+          <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin:0;">
+              <input type="checkbox" id="chkTrfMovimentarFiscal" checked />
+              <span><b>Movimenta Estoque Fiscal (Livro de Saída / Escrituração)</b></span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin:0;">
+              <input type="checkbox" id="chkTrfMovimentarFisico" checked />
+              <span><b>Movimenta Estoque Físico (Baixa do Almoxarifado)</b></span>
+            </label>
+          </div>
+
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
             <div style="font-size:11px;color:#94a3b8;">
               ⚖️ <b>Isenção Legal de ICMS:</b> STF ADC 49 e LC 204/2023 (Transferência entre estabelecimentos do mesmo titular sem fato gerador de ICMS).
@@ -875,6 +975,67 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
                 <tbody id="tbodyConsumiveisRecentes"></tbody>
               </table>
             </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- GESTÃO DE ESTOQUE: FÍSICO VS. FISCAL -->
+      <details class="card" id="expanderEstoqueFiscal" style="cursor:pointer;margin-bottom:16px;">
+        <summary style="font-weight:800;color:#38bdf8;font-size:14px;">📊 Gestão de Estoque: Físico vs. Fiscal (Auditoria Bloco K &amp; Ajustes)</summary>
+        <div style="cursor:default;margin-top:14px;">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+            Permite acompanhar e harmonizar as diferenças entre o <b>Estoque Físico Real</b> (o que está na prateleira) e o <b>Estoque Fiscal Escriturado</b> (o que está registrado perante a Receita/SEFAZ), possibilitando ajustes manuais independentes.
+          </div>
+
+          <!-- FORMULÁRIO DE AJUSTE DIRETO -->
+          <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:12px;margin-bottom:14px;">
+            <div style="font-weight:bold;font-size:12.5px;color:#38bdf8;margin-bottom:8px;">⚡ Ajuste Rápido de Estoque Físico / Fiscal</div>
+            <div class="grid-4" style="margin-bottom:10px;">
+              <div style="grid-column:span 2;">
+                <label>Selecione a Peça / Componente:</label>
+                <select id="selPecaAjuste" style="width:100%;"></select>
+              </div>
+              <div>
+                <label>Operação:</label>
+                <select id="selTipoAjuste">
+                  <option value="SAIDA">Saída / Baixa (-)</option>
+                  <option value="ENTRADA">Entrada / Adição (+)</option>
+                </select>
+              </div>
+              <div>
+                <label>Qtd:</label>
+                <input id="inpQtdAjuste" type="number" min="0.1" step="0.1" value="1" />
+              </div>
+            </div>
+
+            <div class="grid-2" style="margin-bottom:10px;">
+              <div>
+                <label>Qual Estoque Movimentar?</label>
+                <select id="selAlvoAjuste">
+                  <option value="AMBOS">Ambos (Movimenta Estoque Físico e Fiscal)</option>
+                  <option value="APENAS_FISCAL">Apenas Estoque Fiscal (Ajuste Contábil / Livro)</option>
+                  <option value="APENAS_FISICO">Apenas Estoque Físico (Inventário / Prateleira)</option>
+                </select>
+              </div>
+              <div>
+                <label>Motivo do Ajuste / Documento:</label>
+                <input id="inpMotivoAjuste" placeholder="ex: Contagem física periódica / NF de acerto" />
+              </div>
+            </div>
+
+            <div style="text-align:right;">
+              <button class="btn btn-blue" id="btnSalvarAjusteEstoque" onclick="executarAjusteEstoque()">⚡ Aplicar Movimentação no Estoque</button>
+            </div>
+          </div>
+
+          <!-- TABELA COMPARATIVA -->
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr><th>Cód</th><th>Descrição da Peça</th><th>Estoque Físico</th><th>Estoque Fiscal</th><th>Divergência</th><th>Situação</th><th>Custo Unit.</th></tr>
+              </thead>
+              <tbody id="tbodyComparativoEstoque"></tbody>
+            </table>
           </div>
         </div>
       </details>
@@ -1097,6 +1258,39 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </tr>
         `).join("") || `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:8px;">Nenhum consumível lançado recentemente.</td></tr>`;
       }}
+
+      const selPecaAjuste = document.getElementById("selPecaAjuste");
+      if (selPecaAjuste && res.pecas_almox) {{
+        selPecaAjuste.innerHTML = res.pecas_almox.map(p =>
+          `<option value="${{p.id}}" data-codigo="${{p.codigo}}" data-nome="${{p.nome.replace(/"/g, '&quot;')}}">${{p.codigo ? '[' + p.codigo + '] ' : ''}}${{p.nome}} (Físico: ${{p.qtd}} ${{p.unidade}} | Fiscal: ${{p.qtd_fiscal}} ${{p.unidade}})</option>`
+        ).join("") || `<option value="">Nenhuma peça cadastrada</option>`;
+      }}
+
+      const tbComp = document.getElementById("tbodyComparativoEstoque");
+      if (tbComp && res.pecas_almox) {{
+        tbComp.innerHTML = res.pecas_almox.map(p => {{
+          const diff = Number(p.qtd) - Number(p.qtd_fiscal);
+          let badge = '';
+          if (Math.abs(diff) < 0.001) {{
+            badge = '<span class="badge" style="background:#065f46;color:#a7f3d0;">Conforme (0)</span>';
+          }} else if (diff > 0) {{
+            badge = `<span class="badge" style="background:#1e3a8a;color:#93c5fd;">Excedente Físico (+${{diff.toFixed(1)}})</span>`;
+          }} else {{
+            badge = `<span class="badge" style="background:#7f1d1d;color:#fca5a5;">Déficit Físico (${{diff.toFixed(1)}})</span>`;
+          }}
+          return `
+            <tr>
+              <td><b>${{p.codigo || '-'}}</b></td>
+              <td>${{p.nome}}</td>
+              <td><b>${{p.qtd}}</b> ${{p.unidade}}</td>
+              <td><b style="color:#38bdf8;">${{p.qtd_fiscal}}</b> ${{p.unidade}}</td>
+              <td style="font-weight:700;color:${{diff === 0 ? '#34d399' : (diff > 0 ? '#60a5fa' : '#f87171')}};">${{diff > 0 ? '+' : ''}}${{diff.toFixed(1)}}</td>
+              <td>${{badge}}</td>
+              <td>R$ ${{Number(p.preco).toFixed(2)}}</td>
+            </tr>
+          `;
+        }}).join("") || `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:8px;">Nenhuma peça encontrada.</td></tr>`;
+      }}
     }}
 
     function preencherFormularioComOs(d, cfg) {{
@@ -1209,6 +1403,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           valor_servicos: document.getElementById("nfValSrv").value,
           valor_pecas: document.getElementById("nfValPec").value,
           deduzir_pecas_fisco: document.getElementById("chkDeduzirPecasFisco") ? document.getElementById("chkDeduzirPecasFisco").checked : true,
+          movimentar_estoque_fiscal: document.getElementById("chkMovimentarEstoqueFiscal") ? document.getElementById("chkMovimentarEstoqueFiscal").checked : true,
+          movimentar_estoque_fisico: document.getElementById("chkMovimentarEstoqueFisico") ? document.getElementById("chkMovimentarEstoqueFisico").checked : true,
           aliquota_iss: document.getElementById("nfAliqIss").value,
           valor_desconto: document.getElementById("nfDesconto").value,
           usuario: USUARIO_FISCAL?.username || "netto"
@@ -1382,6 +1578,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             itens: ITENS_TRANSFERENCIA,
             veiculo_transporte: document.getElementById("selVeiculoTransferencia").value,
             observacoes: document.getElementById("inpObsTransferencia").value,
+            movimentar_estoque_fiscal: document.getElementById("chkTrfMovimentarFiscal") ? document.getElementById("chkTrfMovimentarFiscal").checked : true,
+            movimentar_estoque_fisico: document.getElementById("chkTrfMovimentarFisico") ? document.getElementById("chkTrfMovimentarFisico").checked : true,
             usuario: USUARIO_FISCAL?.username || "netto"
           }})
         }}).then(r => r.json());
@@ -1458,6 +1656,59 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       }}
     }}
 
+    async function executarAjusteEstoque() {{
+      const selPeca = document.getElementById("selPecaAjuste");
+      const opt = selPeca.options[selPeca.selectedIndex];
+      if (!opt || !opt.value) {{
+        alert("Selecione uma peça para efetuar o ajuste.");
+        return;
+      }}
+      const peca_id = parseInt(opt.value);
+      const codigo = opt.getAttribute("data-codigo") || "";
+      const nome = opt.getAttribute("data-nome") || opt.text;
+      const tipo_ajuste = document.getElementById("selTipoAjuste").value;
+      const quantidade = parseFloat(document.getElementById("inpQtdAjuste").value || 1);
+      const alvo = document.getElementById("selAlvoAjuste").value;
+      const motivo = document.getElementById("inpMotivoAjuste").value.trim();
+
+      if (quantidade <= 0) {{
+        alert("A quantidade deve ser maior que zero.");
+        return;
+      }}
+
+      const btn = document.getElementById("btnSalvarAjusteEstoque");
+      btn.disabled = true;
+      btn.textContent = "Aplicando Ajuste...";
+
+      try {{
+        const res = await fetch("/api/fiscal/v2/ajuste-estoque", {{
+          method: "POST",
+          headers: {{"Content-Type": "application/json"}},
+          body: JSON.stringify({{
+            peca_id,
+            codigo,
+            nome,
+            tipo_ajuste,
+            quantidade,
+            alvo,
+            motivo,
+            usuario: USUARIO_FISCAL?.username || "netto"
+          }})
+        }}).then(r => r.json());
+
+        alert(res.msg || (res.ok ? "Ajuste aplicado com sucesso!" : "Erro ao aplicar ajuste"));
+        if (res.ok) {{
+          document.getElementById("inpMotivoAjuste").value = "";
+          carregarDadosFiscais();
+        }}
+      }} catch (err) {{
+        alert("Falha de conexão: " + err.message);
+      }} finally {{
+        btn.disabled = false;
+        btn.textContent = "⚡ Aplicar Movimentação no Estoque";
+      }}
+    }}
+
     initPortalFiscal();
   </script>
 </body>
@@ -1475,4 +1726,5 @@ def registrar_rotas_portal_fiscal(app: web.Application) -> None:
     app.router.add_post("/api/fiscal/v2/criar-os-teste", api_fiscal_v2_criar_os_teste)
     app.router.add_post("/api/fiscal/v2/transferir-filiais", api_fiscal_v2_transferir_filiais)
     app.router.add_post("/api/fiscal/v2/lancar-consumivel", api_fiscal_v2_lancar_consumivel)
+    app.router.add_post("/api/fiscal/v2/ajuste-estoque", api_fiscal_v2_ajuste_estoque)
     app.router.add_get("/api/fiscal/v2/xml/{os_id}", api_fiscal_v2_xml_download)

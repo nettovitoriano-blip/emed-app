@@ -463,6 +463,12 @@ class FiscalManager:
                     conn.execute(f"ALTER TABLE notas_fiscais ADD COLUMN {col} {ctype}")
                 except Exception:
                     pass
+            # Garantir coluna de Estoque Fiscal em estoque_pecas
+            try:
+                conn.execute("ALTER TABLE estoque_pecas ADD COLUMN saldo_fiscal REAL DEFAULT NULL")
+                conn.execute("UPDATE estoque_pecas SET saldo_fiscal = quantidade WHERE saldo_fiscal IS NULL")
+            except Exception:
+                pass
             conn.commit()
 
     def _seed_default_configs(self) -> None:
