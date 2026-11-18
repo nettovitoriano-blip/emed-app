@@ -1388,11 +1388,27 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
           <!-- SELEÇÃO DE ITENS -->
           <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:12px;margin-bottom:12px;">
-            <div style="font-weight:bold;font-size:12.5px;color:#a5f3fc;margin-bottom:8px;">➕ Adicionar Itens à Remessa</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+              <div style="font-weight:bold;font-size:12.5px;color:#a5f3fc;">➕ Adicionar Itens à Remessa</div>
+              <div style="font-size:11px;color:#94a3b8;">Filtro rápido ativado por código ou nome</div>
+            </div>
+
+            <!-- FILTRO DE BUSCA RÁPIDA -->
+            <div style="background:#1e293b;border:1px solid #0284c7;border-radius:6px;padding:8px 10px;margin-bottom:10px;">
+              <label style="font-size:11.5px;font-weight:700;color:#38bdf8;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;">
+                <span>🔍 Filtro Rápido (Código ou Nome da Peça):</span>
+                <span id="lblCountFiltroTrf" style="color:#7dd3fc;font-weight:800;font-size:11px;"></span>
+              </label>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <input type="text" id="inpFiltroPecaTrf" placeholder="Digite para filtrar (ex: 001, placa, tubo, cabo, colimador, sensor)..." oninput="filtrarPecasTransferencia()" style="flex:1;padding:7px 10px;font-size:12px;border-radius:5px;border:1.5px solid #0284c7;background:#0f172a;color:#fff;font-weight:600;outline:none;" />
+                <button type="button" class="btn btn-outline" onclick="limparFiltroPecasTransferencia()" style="padding:6px 10px;font-size:11px;color:#94a3b8;border-color:#475569;" title="Limpar busca">✕ Limpar</button>
+              </div>
+            </div>
+
             <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
               <div style="flex:2;min-width:240px;">
                 <label>Selecione a Peça / Insumo do Almoxarifado:</label>
-                <select id="selPecaTransferencia" style="width:100%;"></select>
+                <select id="selPecaTransferencia" style="width:100%;font-weight:600;"></select>
               </div>
               <div style="width:100px;">
                 <label>Qtd:</label>
@@ -1809,6 +1825,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     let DADOS_ATUAIS = null;
     let USUARIO_FISCAL = null;
     let ITENS_TRANSFERENCIA = [];
+    let TODAS_PECAS_TRANSFERENCIA = [];
     let INVENTARIO_ITENS = [];
     let INVENTARIO_FILTRO_TIPO = "TODOS";
     let INVENTARIO_FILTRO_TEXTO = "";
@@ -1977,9 +1994,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
       const selPecaTrf = document.getElementById("selPecaTransferencia");
       if (selPecaTrf && res.pecas_almox) {{
-        selPecaTrf.innerHTML = res.pecas_almox.map(p =>
-          `<option value="${{p.id}}" data-codigo="${{p.codigo}}" data-nome="${{p.nome.replace(/"/g, '&quot;')}}" data-preco="${{p.preco}}">${{p.codigo ? '[' + p.codigo + '] ' : ''}}${{p.nome}} (Saldo: ${{p.qtd}} ${{p.unidade}} • Custo: R$ ${{Number(p.preco).toFixed(2)}})</option>`
-        ).join("") || `<option value="">Nenhuma peça cadastrada</option>`;
+        TODAS_PECAS_TRANSFERENCIA = res.pecas_almox || [];
+        filtrarPecasTransferencia();
       }}
 
       const selVeic = document.getElementById("selVeiculoTransferencia");
@@ -2256,6 +2272,47 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         }}
       }}
       recalcularTotaisFormNf();
+    }}
+
+    function popularSelectPecasTransferencia(lista) {{
+      const selPecaTrf = document.getElementById("selPecaTransferencia");
+      if (!selPecaTrf) return;
+      if (!lista || !lista.length) {{
+        selPecaTrf.innerHTML = `<option value="">⚠️ Nenhuma peça encontrada com este filtro</option>`;
+        return;
+      }}
+      selPecaTrf.innerHTML = lista.map(p =>
+        `<option value="${{p.id}}" data-codigo="${{p.codigo || ''}}" data-nome="${{p.nome.replace(/"/g, '&quot;')}}" data-preco="${{p.preco}}">${{p.codigo ? '[' + p.codigo + '] ' : ''}}${{p.nome}} (Saldo: ${{p.qtd}} ${{p.unidade || 'UN'}} • Custo: R$ ${{Number(p.preco || 0).toFixed(2)}})</option>`
+      ).join("");
+    }}
+
+    function filtrarPecasTransferencia() {{
+      const inp = document.getElementById("inpFiltroPecaTrf");
+      const termo = (inp?.value || "").trim().toLowerCase();
+      const countLbl = document.getElementById("lblCountFiltroTrf");
+      if (!termo) {{
+        popularSelectPecasTransferencia(TODAS_PECAS_TRANSFERENCIA);
+        if (countLbl) countLbl.textContent = "";
+        return;
+      }}
+      const filtradas = TODAS_PECAS_TRANSFERENCIA.filter(p => {{
+        const cod = String(p.codigo || "").toLowerCase();
+        const nom = String(p.nome || "").toLowerCase();
+        return cod.includes(termo) || nom.includes(termo);
+      }});
+      popularSelectPecasTransferencia(filtradas);
+      if (countLbl) {{
+        countLbl.textContent = `(${{filtradas.length}} de ${{TODAS_PECAS_TRANSFERENCIA.length}} peças)`;
+      }}
+    }}
+
+    function limparFiltroPecasTransferencia() {{
+      const inp = document.getElementById("inpFiltroPecaTrf");
+      if (inp) {{
+        inp.value = "";
+        filtrarPecasTransferencia();
+        inp.focus();
+      }}
     }}
 
     function aoTrocarOrigemTransferencia() {{
