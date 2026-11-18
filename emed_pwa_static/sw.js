@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v1-2-0-lab-qr-rastreio';
+const CACHE_NAME = 'emed-pwa-v1-2-1-otimizado-mobile';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
@@ -41,7 +41,7 @@ self.addEventListener('activate', (event) => {
 
 async function atualizarCacheNavegacao(req, cache) {
   try {
-    const res = await fetchWithTimeout(req, 4000);
+    const res = await fetchWithTimeout(req, 15000);
     if (res && res.ok && !res.redirected) {
       const clone = res.clone();
       const txt = await res.clone().text().catch(() => '');

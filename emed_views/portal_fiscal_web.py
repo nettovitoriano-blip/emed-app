@@ -1001,6 +1001,60 @@ async def api_fiscal_v2_inventario_novo_item(request: web.Request) -> web.Respon
     })
 
 
+
+async def api_fiscal_v2_peca_detalhes(request: web.Request) -> web.Response:
+    """Retorna todos os dados fiscais, tributários, de precificação e engenharia clínica de uma peça."""
+    db_name = request.app.get("db_path", "emed.db")
+    peca_id = int(request.match_info.get("peca_id", 0))
+    with _get_db_connection(db_name) as conn:
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(estoque_pecas)")
+        cols = [c[1] for c in cur.fetchall()]
+        row = conn.execute("SELECT * FROM estoque_pecas WHERE id = ?", (peca_id,)).fetchone()
+        if not row:
+            return web.json_response({"ok": False, "msg": "Peça não encontrada"}, status=404)
+        dados = dict(zip(cols, row))
+        return web.json_response({"ok": True, "peca": dados})
+
+
+async def api_fiscal_v2_peca_salvar(request: web.Request) -> web.Response:
+    """Salva todos os campos estratégicos fiscais, tributários e de precificação de uma peça."""
+    body = await request.json()
+    db_name = request.app.get("db_path", "emed.db")
+    peca_id = int(body.get("id", 0))
+    if peca_id <= 0:
+        return web.json_response({"ok": False, "msg": "ID de peça inválido"}, status=400)
+
+    campos = [
+        "nome_peca", "ncm", "cest", "origem_mercadoria", "cfop_padrao_venda",
+        "cfop_padrao_transferencia", "csosn_icms", "aliquota_icms", "reducao_base_icms",
+        "isencao_icms_motivo", "cst_pis", "aliquota_pis", "cst_cofins", "aliquota_cofins",
+        "cst_ipi", "aliquota_ipi", "preco_custo", "custo_medio", "margem_contrato",
+        "margem_avulso", "margem_avista", "margem_desestimulo", "preco_venda_tabela",
+        "preco_venda_minimo", "markup_percentual", "fabricante", "modelo_compativel",
+        "numero_serie", "lote_fabricacao", "localizacao", "unidade", "categoria",
+        "estoque_minimo", "filial_pertencente"
+    ]
+    set_clauses = []
+    vals = []
+    for c in campos:
+        if c in body:
+            set_clauses.append(f"{c} = ?")
+            vals.append(body[c])
+
+    if not set_clauses:
+        return web.json_response({"ok": False, "msg": "Nenhum campo para atualizar"})
+
+    vals.append(peca_id)
+    with _get_db_connection(db_name) as conn:
+        conn.execute(f"UPDATE estoque_pecas SET {', '.join(set_clauses)} WHERE id = ?", tuple(vals))
+        conn.commit()
+
+    usuario = str(body.get("usuario", "netto"))
+    _registrar_log_fiscal("PECA_UPDATE_FISCAL", f"Peça #{peca_id} atualizada com parâmetros fiscais e precificação por {usuario}", usuario)
+    return web.json_response({"ok": True, "msg": "✅ Parâmetros Fiscais & Precificação Salvos com Sucesso!"})
+
+
 async def api_fiscal_v2_fechamento_dados(request: web.Request) -> web.Response:
     """Retorna os dados consolidados do mês para fechamento contábil e mitigação de falhas."""
     db_name = request.app.get("db_path", "emed.db")
@@ -1417,6 +1471,231 @@ async def api_fiscal_v2_fechamento_relatorio_impresso(request: web.Request) -> w
       </div>
     </div>
   </div>
+
+  <!-- MODAL DE FICHA FISCAL, TRIBUTÁRIA & PRECIFICAÇÃO (PENTE FINO MULTI-ESTADUAL) -->
+  <div id="modalFichaFiscalPeca" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;backdrop-filter:blur(5px);overflow-y:auto;padding:20px;">
+    <div style="max-width:880px;margin:20px auto;background:#0f172a;border:2px solid #0284c7;border-radius:12px;padding:24px;color:#f8fafc;box-shadow:0 10px 40px rgba(2,132,199,0.3);">
+      
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #334155;padding-bottom:12px;margin-bottom:16px;">
+        <div>
+          <div style="font-size:16px;font-weight:900;color:#38bdf8;" id="modalFichaTitulo">⚙️ Ficha Fiscal, Tributária &amp; Precificação</div>
+          <div style="font-size:12px;color:#94a3b8;" id="modalFichaSubtitulo">Configuração avançada para emissão estadual e apuração de margens</div>
+        </div>
+        <button type="button" onclick="fecharModalFichaFiscal()" class="btn btn-outline" style="padding:4px 10px;font-size:13px;color:#94a3b8;">✕ Fechar</button>
+      </div>
+
+      <!-- ABAS DO MODAL -->
+      <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid #1e293b;padding-bottom:8px;overflow-x:auto;">
+        <button type="button" class="btn btn-blue" id="tabBtn_ident" onclick="mudarTabFicha('ident')" style="font-size:12px;padding:6px 12px;">🏷️ Identificação &amp; Engenharia</button>
+        <button type="button" class="btn btn-outline" id="tabBtn_icms" onclick="mudarTabFicha('icms')" style="font-size:12px;padding:6px 12px;">🏛️ ICMS, NCM &amp; Estados</button>
+        <button type="button" class="btn btn-outline" id="tabBtn_fed" onclick="mudarTabFicha('fed')" style="font-size:12px;padding:6px 12px;">🇧🇷 Tributos Federais (PIS/COFINS/IPI)</button>
+        <button type="button" class="btn btn-outline" id="tabBtn_preco" onclick="mudarTabFicha('preco')" style="font-size:12px;padding:6px 12px;">💰 Precificação &amp; Margens</button>
+      </div>
+
+      <input type="hidden" id="fch_id" />
+
+      <!-- ABA 1: IDENTIFICAÇÃO & ENGENHARIA CLÍNICA (RDC 611) -->
+      <div id="tabContent_ident">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
+          <div style="grid-column:1/-1;">
+            <label>Descrição Oficial da Peça / Produto:</label>
+            <input id="fch_nome" type="text" style="width:100%;font-weight:700;" />
+          </div>
+          <div>
+            <label>Código Interno (SKU):</label>
+            <input id="fch_codigo" type="text" disabled style="background:#1e293b;opacity:0.7;" />
+          </div>
+          <div>
+            <label>Código de Barras / GTIN / EAN:</label>
+            <input id="fch_ean" type="text" placeholder="SEM GTIN ou 789..." />
+          </div>
+          <div>
+            <label>Fabricante / Marca:</label>
+            <input id="fch_fabricante" type="text" placeholder="Ex: GE, Philips, Siemens, Dunlee..." />
+          </div>
+          <div>
+            <label>Modelo / Tomógrafo Compatível:</label>
+            <input id="fch_modelo" type="text" placeholder="Ex: Optima CT520, Revolution EVO..." />
+          </div>
+          <div>
+            <label>Número de Série (RDC 611 / Tubos RX):</label>
+            <input id="fch_serie" type="text" placeholder="Nº de Série do Tubo ou Placa" />
+          </div>
+          <div>
+            <label>Lote de Fabricação:</label>
+            <input id="fch_lote" type="text" placeholder="Lote do Fabricante" />
+          </div>
+          <div>
+            <label>Unidade Comercial:</label>
+            <select id="fch_unidade">
+              <option value="UN">UN - Unidade</option>
+              <option value="PC">PC - Peça</option>
+              <option value="JG">JG - Jogo</option>
+              <option value="KIT">KIT - Conjunto/Kit</option>
+              <option value="MT">MT - Metros</option>
+            </select>
+          </div>
+          <div>
+            <label>Localização no Almoxarifado:</label>
+            <input id="fch_local" type="text" placeholder="Ex: Prateleira 2, Base Paulo, Gaveta B" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ABA 2: ICMS, NCM & LEIS ESTADUAIS (DF, CE, INTERESTADUAL) -->
+      <div id="tabContent_icms" style="display:none;">
+        <div style="background:#1e293b;border-left:4px solid #38bdf8;padding:10px 14px;border-radius:4px;font-size:12px;margin-bottom:14px;line-height:1.5;">
+          <b>⚖️ Diretrizes Estaduais &amp; Isenções de Saúde:</b><br/>
+          &bull; <b>Equipamentos Hospitalares:</b> Possuem isenção/desoneração pelo Convênio ICMS 01/99 e 126/10 quando faturados para clínicas e hospitais.<br/>
+          &bull; <b>Transferência de Peças (CE ⇄ DF):</b> Não incidência de ICMS vinculante (STF ADC 49 / LC 204/2023).
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
+          <div>
+            <label>NCM (8 Dígitos - Obrigatório SEFAZ):</label>
+            <input id="fch_ncm" type="text" placeholder="Ex: 9022.90.90 (Tubo/RX)" maxlength="10" style="font-weight:700;color:#38bdf8;" />
+          </div>
+          <div>
+            <label>CEST (Substituição Tributária):</label>
+            <input id="fch_cest" type="text" placeholder="Ex: 01.001.00 ou vazio" maxlength="10" />
+          </div>
+          <div>
+            <label>Origem da Mercadoria:</label>
+            <select id="fch_origem">
+              <option value="0">0 - Nacional</option>
+              <option value="1">1 - Estrangeira (Importação Direta)</option>
+              <option value="2">2 - Estrangeira (Adquirida Mercado Interno)</option>
+              <option value="4">4 - Nacional com Conteúdo de Importação > 40%</option>
+            </select>
+          </div>
+          <div>
+            <label>Regime ICMS / CSOSN (Simples Nacional):</label>
+            <select id="fch_csosn">
+              <option value="102">102 - Tributada pelo Simples sem permissão de crédito</option>
+              <option value="400">400 - Não tributada pelo Simples Nacional (Isenta)</option>
+              <option value="500">500 - ICMS cobrado anteriormente por Substituição Tributária</option>
+              <option value="900">900 - Outros (Com destaque / Operação Especial)</option>
+            </select>
+          </div>
+          <div>
+            <label>Alíquota Interna de ICMS (%):</label>
+            <input id="fch_aliq_icms" type="number" step="0.1" placeholder="Ex: 20.0 (CE) ou 18.0 (DF)" />
+          </div>
+          <div>
+            <label>Redução da Base de Cálculo (%):</label>
+            <input id="fch_red_icms" type="number" step="0.1" placeholder="Ex: 0.0" />
+          </div>
+          <div>
+            <label>CFOP Padrão Venda:</label>
+            <input id="fch_cfop_venda" type="text" value="5102" />
+          </div>
+          <div>
+            <label>CFOP Padrão Transferência:</label>
+            <input id="fch_cfop_trf" type="text" value="5152" />
+          </div>
+          <div style="grid-column:1/-1;">
+            <label>Motivo de Desoneração / Amparo Legal de Isenção:</label>
+            <input id="fch_isencao_motivo" type="text" value="Convênio ICMS 01/99 - Equipamento Médico-Hospitalar" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ABA 3: TRIBUTOS FEDERAIS (PIS, COFINS, IPI) -->
+      <div id="tabContent_fed" style="display:none;">
+        <div style="background:#1e293b;border-left:4px solid #10b981;padding:10px 14px;border-radius:4px;font-size:12px;margin-bottom:14px;line-height:1.5;">
+          <b>🏥 Benefício Fiscal Federal (Alíquota Zero):</b><br/>
+          Dispositivos e peças de imagem e medicina hospitalar contam com enquadramento especial de alíquota zero de PIS/COFINS (Decreto Federal nº 6.426/2008 e Lei 10.865/2004).
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
+          <div>
+            <label>CST PIS:</label>
+            <select id="fch_cst_pis">
+              <option value="49">49 - Outras Operações de Saída</option>
+              <option value="06">06 - Operação Tributável a Alíquota Zero (Hospitalar)</option>
+              <option value="04">04 - Operação Monofásica / Substituição</option>
+              <option value="01">01 - Operação Tributável com Alíquota Básica</option>
+            </select>
+          </div>
+          <div>
+            <label>Alíquota PIS (%):</label>
+            <input id="fch_aliq_pis" type="number" step="0.01" value="0.00" />
+          </div>
+          <div>
+            <label>CST COFINS:</label>
+            <select id="fch_cst_cofins">
+              <option value="49">49 - Outras Operações de Saída</option>
+              <option value="06">06 - Operação Tributável a Alíquota Zero (Hospitalar)</option>
+              <option value="04">04 - Operação Monofásica / Substituição</option>
+              <option value="01">01 - Operação Tributável com Alíquota Básica</option>
+            </select>
+          </div>
+          <div>
+            <label>Alíquota COFINS (%):</label>
+            <input id="fch_aliq_cofins" type="number" step="0.01" value="0.00" />
+          </div>
+          <div>
+            <label>CST IPI:</label>
+            <select id="fch_cst_ipi">
+              <option value="53">53 - Saída Não-Tributada</option>
+              <option value="51">51 - Saída com Alíquota Zero</option>
+              <option value="50">50 - Saída Tributada</option>
+            </select>
+          </div>
+          <div>
+            <label>Alíquota IPI (%):</label>
+            <input id="fch_aliq_ipi" type="number" step="0.1" value="0.0" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ABA 4: PRECIFICAÇÃO & MARGENS DE VENDA -->
+      <div id="tabContent_preco" style="display:none;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+          <div>
+            <label>Preço de Custo Última Compra (R$):</label>
+            <input id="fch_custo" type="number" step="0.01" oninput="recalcularPrecosFicha()" style="font-weight:700;color:#f87171;" />
+          </div>
+          <div>
+            <label>Custo Médio Ponderado (R$):</label>
+            <input id="fch_custo_medio" type="number" step="0.01" />
+          </div>
+          <div>
+            <label>Margem Contrato (%):</label>
+            <input id="fch_mg_contrato" type="number" step="1" oninput="recalcularPrecosFicha()" placeholder="Ex: 30" />
+          </div>
+          <div>
+            <label>Margem Avulso / Emergencial (%):</label>
+            <input id="fch_mg_avulso" type="number" step="1" oninput="recalcularPrecosFicha()" placeholder="Ex: 60" />
+          </div>
+          <div>
+            <label>Margem À Vista (%):</label>
+            <input id="fch_mg_avista" type="number" step="1" placeholder="Ex: 20" />
+          </div>
+          <div>
+            <label>Margem Desestímulo (% - Tubos Raros):</label>
+            <input id="fch_mg_desestimulo" type="number" step="1" placeholder="Ex: 180" />
+          </div>
+          <div>
+            <label>Preço de Venda Sugerido (Tabela R$):</label>
+            <input id="fch_preco_tabela" type="number" step="0.01" style="font-weight:800;color:#4ade80;font-size:14px;" />
+          </div>
+          <div>
+            <label>Preço Mínimo Piso (Segurança R$):</label>
+            <input id="fch_preco_minimo" type="number" step="0.01" style="font-weight:800;color:#fbbf24;" />
+          </div>
+        </div>
+        <div style="font-size:11.5px;color:#94a3b8;margin-top:10px;">
+          💡 <b>Dica de Precificação:</b> Você pode alterar os preços de tabela e piso manualmente a qualquer momento. Eles serão aplicados automaticamente na geração de propostas e remessas.
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;border-top:1px solid #334155;padding-top:14px;">
+        <button type="button" onclick="fecharModalFichaFiscal()" class="btn btn-outline" style="padding:8px 16px;">Cancelar</button>
+        <button type="button" onclick="salvarFichaFiscalPeca()" class="btn btn-blue" id="btnSalvarFichaFiscal" style="padding:8px 20px;font-weight:800;">💾 Salvar Parâmetros Fiscais &amp; Precificação</button>
+      </div>
+
+    </div>
+  </div>
+
 </body>
 </html>"""
     return web.Response(text=html_out, content_type="text/html")
@@ -2418,19 +2697,20 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
     function preencherFormularioComOs(d, cfg) {{
       if (!d) return;
-      document.getElementById("nfCliente").value = d.cliente || "";
-      document.getElementById("nfCnpj").value = d.cnpj_tomador || "";
-      document.getElementById("nfEmail").value = d.email_cliente || "";
-      document.getElementById("nfEnd").value = d.tomador_endereco || "";
-      document.getElementById("nfCid").value = d.tomador_cidade || "";
-      document.getElementById("nfUf").value = d.tomador_uf || "";
-      document.getElementById("nfDiscriminacao").value = d.discriminacao_servico || "";
-      document.getElementById("nfValSrv").value = d.valor_servicos ?? 0;
-      document.getElementById("nfValPec").value = d.valor_pecas ?? 0;
-      document.getElementById("nfAliqIss").value = d.aliquota_iss ?? (cfg?.aliquota_iss_padrao || 5.0);
-      document.getElementById("nfDesconto").value = d.valor_desconto ?? 0;
-      document.getElementById("lblFormAliqIss").textContent = `Alíquota ISS (${{cfg?.uf || 'DF'}}) (%):`;
-      document.getElementById("btnEmitirNf").textContent = `🚀 EMITIR NOTA FISCAL (${{cfg?.sigla || 'EMED'}}) EM 1 CLIQUE`;
+      if (document.getElementById("nfCliente")) document.getElementById("nfCliente").value = d.cliente || "";
+      if (document.getElementById("nfCnpj")) document.getElementById("nfCnpj").value = d.cnpj_tomador || "";
+      if (document.getElementById("nfEmail")) document.getElementById("nfEmail").value = d.email_cliente || "";
+      if (document.getElementById("nfEnd")) document.getElementById("nfEnd").value = d.tomador_endereco || "";
+      if (document.getElementById("nfCid")) document.getElementById("nfCid").value = d.tomador_cidade || "";
+      if (document.getElementById("nfUf")) document.getElementById("nfUf").value = d.tomador_uf || "";
+      if (document.getElementById("nfDiscriminacao")) document.getElementById("nfDiscriminacao").value = d.discriminacao_servico || "";
+      if (document.getElementById("nfValSrv")) document.getElementById("nfValSrv").value = d.valor_servicos ?? 0;
+      if (document.getElementById("nfValPec")) document.getElementById("nfValPec").value = d.valor_pecas ?? 0;
+      if (document.getElementById("nfAliqIss")) document.getElementById("nfAliqIss").value = d.aliquota_iss ?? (cfg?.aliquota_iss_padrao || 5.0);
+      if (document.getElementById("nfDesconto")) document.getElementById("nfDesconto").value = d.valor_desconto ?? 0;
+      if (document.getElementById("lblFormAliqIss")) document.getElementById("lblFormAliqIss").textContent = `Alíquota ISS (${{cfg?.uf || 'DF'}}) (%):`;
+      const btnEm = document.getElementById("btnEmitirRealNf") || document.getElementById("btnEmitirNf");
+      if (btnEm) btnEm.textContent = `🟢 EMITIR NOTA FISCAL REAL (${{cfg?.sigla || 'EMED'}})`;
       recalcularTotaisFormNf();
     }}
 
@@ -2519,23 +2799,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
       if (!forcarDuplicidade) {{
         const confMsg = (modo === 'REAL')
-          ? "⚠️ CONFERÊNCIA OBRIGATÓRIA DOS DADOS DA NOTA FISCAL\\n\\n" +
-            "Você já conferiu todos os dados da nota fiscal (no espelho da nota que aparece abaixo)?\\n\\n" +
-            "• Cliente: " + cliNome + "\\n" +
-            "• Unidade Emissora: " + filialTxt + "\\n" +
-            "• Modalidade: 🟢 EMISSÃO REAL (SEFAZ • CERTIFICADO A1)\\n\\n" +
-            "Esta nota será transmitida oficialmente à SEFAZ e terá valor legal para apuração do DAS e faturamento.\\n\\n" +
-            "Realmente quer emitir a Nota Fiscal agora?\\n\\n" +
-            "[OK] = Sim, emitir nota fiscal agora\\n" +
-            "[Cancelar] = Não, desejo revisar os dados na página"
-          : "🧪 MODO SIMULAÇÃO / DEMONSTRAÇÃO\\n\\n" +
-            "Você já conferiu todos os dados da nota fiscal (no espelho da nota que aparece abaixo)?\\n\\n" +
-            "• Cliente: " + cliNome + "\\n" +
-            "• Unidade: " + filialTxt + "\\n" +
-            "• Modalidade: 🧪 SIMULAÇÃO (Sem efeito fiscal na SEFAZ)\\n\\n" +
-            "Realmente quer emitir o espelho de demonstração?\\n\\n" +
-            "[OK] = Sim, gerar espelho de demonstração\\n" +
-            "[Cancelar] = Não, desejo revisar os dados na página";
+          ? `⚠️ CONFERÊNCIA OBRIGATÓRIA DOS DADOS DA NOTA FISCAL\n\nVocê já conferiu todos os dados da nota fiscal (no espelho da nota que aparece abaixo)?\n\n• Cliente: ${{cliNome}}\n• Unidade Emissora: ${{filialTxt}}\n• Modalidade: 🟢 EMISSÃO REAL (SEFAZ • CERTIFICADO A1)\n\nEsta nota será transmitida oficialmente à SEFAZ e terá valor legal para apuração do DAS e faturamento.\n\nRealmente quer emitir a Nota Fiscal agora?\n\n[OK] = Sim, emitir nota fiscal agora\n[Cancelar] = Não, desejo revisar os dados na página`
+          : `🧪 MODO SIMULAÇÃO / DEMONSTRAÇÃO\n\nVocê já conferiu todos os dados da nota fiscal (no espelho da nota que aparece abaixo)?\n\n• Cliente: ${{cliNome}}\n• Unidade: ${{filialTxt}}\n• Modalidade: 🧪 SIMULAÇÃO (Sem efeito fiscal na SEFAZ)\n\nRealmente quer emitir o espelho de demonstração?\n\n[OK] = Sim, gerar espelho de demonstração\n[Cancelar] = Não, desejo revisar os dados na página`;
 
         const querEmitir = confirm(confMsg);
         if (!querEmitir) {{
@@ -2653,12 +2918,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         box.scrollIntoView({{ behavior: 'smooth' }});
 
         const querOutra = confirm(
-          "⚠️ INTERTRAVAMENTO FISCAL CONTRA DUPLICIDADE:\\n\\n" +
-          "A Nota Fiscal " + ne.numero_nf + " referente à OS #" + ne.os_id + " já foi emitida com sucesso em " + ne.data_emissao + " para este cliente e valor!\\n\\n" +
-          "O espelho da nota já emitida foi carregado na tela abaixo para sua conferência.\\n\\n" +
-          "Deseja realmente emitir OUTRA nota fiscal para este mesmo atendimento?\\n\\n" +
-          "[OK] = Sim, desejo emitir outra nota mesmo assim\\n" +
-          "[Cancelar] = Não, manter a nota existente (não duplicar)"
+          `⚠️ INTERTRAVAMENTO FISCAL CONTRA DUPLICIDADE:\n\nA Nota Fiscal ${{ne.numero_nf}} referente à OS #${{ne.os_id}} já foi emitida com sucesso em ${{ne.data_emissao}} para este cliente e valor!\n\nO espelho da nota já emitida foi carregado na tela abaixo para sua conferência.\n\nDeseja realmente emitir OUTRA nota fiscal para este mesmo atendimento?\n\n[OK] = Sim, desejo emitir outra nota mesmo assim\n[Cancelar] = Não, manter a nota existente (não duplicar)`
         );
         if (querOutra) {{
           emitirNotaFiscalAgora(modo, true);
@@ -2666,13 +2926,13 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       }} else {{
         alert("Erro ao emitir: " + (res.msg || "Falha interna"));
       }}
-      }} catch (err) {{
-        alert("Erro de conexão ao emitir nota fiscal: " + (err && err.message ? err.message : err));
-      }} finally {{
-        if (btnSim) btnSim.disabled = false;
-        if (btnReal) btnReal.disabled = false;
-      }}
+    }} catch (e) {{
+      alert("Erro na transmissão da nota fiscal: " + (e.message || e));
+    }} finally {{
+      if (btnSim) btnSim.disabled = false;
+      if (btnReal) btnReal.disabled = false;
     }}
+  }}
 
     async function cancelarNotaSelecionada() {{
       const id = document.getElementById("selNotaCancelar").value;
@@ -2684,10 +2944,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       }}
 
       const conf = confirm(
-        "⚠️ ATENÇÃO: CONFIRMAÇÃO IRREVERSÍVEL DE CANCELAMENTO\\n\\n" +
-        "Você está prestes a CANCELAR esta Nota Fiscal no sistema e registrar a anulação fiscal.\\n\\n" +
-        "• Justificativa: " + just + "\\n\\n" +
-        "Deseja realmente prosseguir com o cancelamento?"
+        `⚠️ ATENÇÃO: CONFIRMAÇÃO IRREVERSÍVEL DE CANCELAMENTO\n\nVocê está prestes a CANCELAR esta Nota Fiscal no sistema e registrar a anulação fiscal.\n\n• Justificativa: ${{just}}\n\nDeseja realmente prosseguir com o cancelamento?`
       );
       if (!conf) return;
 
@@ -3073,6 +3330,157 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         return true;
       }});
     }}
+
+    
+    function mudarTabFicha(tab) {{
+      ['ident', 'icms', 'fed', 'preco'].forEach(t => {{
+        const btn = document.getElementById('tabBtn_' + t);
+        const cnt = document.getElementById('tabContent_' + t);
+        if (btn) btn.className = t === tab ? 'btn btn-blue' : 'btn btn-outline';
+        if (cnt) cnt.style.display = t === tab ? 'block' : 'none';
+      }});
+    }}
+
+    async function abrirModalFichaFiscalPeca(pecaId) {{
+      mudarTabFicha('ident');
+      document.getElementById('fch_id').value = pecaId;
+      document.getElementById('modalFichaTitulo').textContent = 'Carregando parâmetros da peça #' + pecaId + '...';
+      document.getElementById('modalFichaFiscalPeca').style.display = 'block';
+
+      try {{
+        const res = await fetch('/api/fiscal/v2/peca/' + pecaId).then(r => r.json());
+        if (!res.ok) {{
+          alert('Erro ao carregar detalhes: ' + (res.msg || 'Falha de comunicação'));
+          fecharModalFichaFiscal();
+          return;
+        }}
+        const p = res.peca;
+        document.getElementById('modalFichaTitulo').textContent = '⚙️ Ficha Fiscal & Precificação: [' + (p.codigo || p.id) + '] ' + (p.nome_peca || '');
+        document.getElementById('modalFichaSubtitulo').textContent = 'NCM ' + (p.ncm || '9022.90.90') + ' • Estoque Físico: ' + p.quantidade + ' ' + (p.unidade || 'UN');
+
+        document.getElementById('fch_nome').value = p.nome_peca || '';
+        document.getElementById('fch_codigo').value = p.codigo || '';
+        document.getElementById('fch_ean').value = p.ean_gtin || 'SEM GTIN';
+        document.getElementById('fch_fabricante').value = p.fabricante || '';
+        document.getElementById('fch_modelo').value = p.modelo_compativel || '';
+        document.getElementById('fch_serie').value = p.numero_serie || '';
+        document.getElementById('fch_lote').value = p.lote_fabricacao || '';
+        document.getElementById('fch_unidade').value = p.unidade || 'UN';
+        document.getElementById('fch_local').value = p.localizacao || '';
+
+        document.getElementById('fch_ncm').value = p.ncm || '9022.90.90';
+        document.getElementById('fch_cest').value = p.cest || '';
+        document.getElementById('fch_origem').value = p.origem_mercadoria ?? 0;
+        document.getElementById('fch_csosn').value = p.csosn_icms || '102';
+        document.getElementById('fch_aliq_icms').value = p.aliquota_icms ?? 0.0;
+        document.getElementById('fch_red_icms').value = p.reducao_base_icms ?? 0.0;
+        document.getElementById('fch_cfop_venda').value = p.cfop_padrao_venda || '5102';
+        document.getElementById('fch_cfop_trf').value = p.cfop_padrao_transferencia || '5152';
+        document.getElementById('fch_isencao_motivo').value = p.isencao_icms_motivo || 'Convênio ICMS 01/99 - Equipamento Médico-Hospitalar';
+
+        document.getElementById('fch_cst_pis').value = p.cst_pis || '49';
+        document.getElementById('fch_aliq_pis').value = p.aliquota_pis ?? 0.0;
+        document.getElementById('fch_cst_cofins').value = p.cst_cofins || '49';
+        document.getElementById('fch_aliq_cofins').value = p.aliquota_cofins ?? 0.0;
+        document.getElementById('fch_cst_ipi').value = p.cst_ipi || '53';
+        document.getElementById('fch_aliq_ipi').value = p.aliquota_ipi ?? 0.0;
+
+        document.getElementById('fch_custo').value = p.preco_custo ?? 0.0;
+        document.getElementById('fch_custo_medio').value = p.custo_medio ?? (p.preco_custo ?? 0.0);
+        document.getElementById('fch_mg_contrato').value = p.margem_contrato ?? 30;
+        document.getElementById('fch_mg_avulso').value = p.margem_avulso ?? 60;
+        document.getElementById('fch_mg_avista').value = p.margem_avista ?? 20;
+        document.getElementById('fch_mg_desestimulo').value = p.margem_desestimulo ?? 180;
+        document.getElementById('fch_preco_tabela').value = p.preco_venda_tabela || (Number(p.preco_custo || 0) * 1.5).toFixed(2);
+        document.getElementById('fch_preco_minimo').value = p.preco_venda_minimo || (Number(p.preco_custo || 0) * 1.2).toFixed(2);
+      }} catch (err) {{
+        alert('Erro ao comunicar com o servidor: ' + err.message);
+        fecharModalFichaFiscal();
+      }}
+    }}
+
+    function fecharModalFichaFiscal() {{
+      document.getElementById('modalFichaFiscalPeca').style.display = 'none';
+    }}
+
+    function recalcularPrecosFicha() {{
+      const custo = parseFloat(document.getElementById('fch_custo').value || 0);
+      const mgAvulso = parseFloat(document.getElementById('fch_mg_avulso').value || 60);
+      const precoSug = custo * (1 + mgAvulso / 100);
+      const precoMin = custo * 1.2;
+      document.getElementById('fch_preco_tabela').value = precoSug.toFixed(2);
+      document.getElementById('fch_preco_minimo').value = precoMin.toFixed(2);
+    }}
+
+    async function salvarFichaFiscalPeca() {{
+      const pecaId = parseInt(document.getElementById('fch_id').value);
+      if (!pecaId) return;
+
+      const btn = document.getElementById('btnSalvarFichaFiscal');
+      btn.disabled = true;
+      btn.textContent = 'Salvando...';
+
+      const payload = {{
+        id: pecaId,
+        nome_peca: document.getElementById('fch_nome').value.trim(),
+        ean_gtin: document.getElementById('fch_ean').value.trim(),
+        fabricante: document.getElementById('fch_fabricante').value.trim(),
+        modelo_compativel: document.getElementById('fch_modelo').value.trim(),
+        numero_serie: document.getElementById('fch_serie').value.trim(),
+        lote_fabricacao: document.getElementById('fch_lote').value.trim(),
+        unidade: document.getElementById('fch_unidade').value,
+        localizacao: document.getElementById('fch_local').value.trim(),
+
+        ncm: document.getElementById('fch_ncm').value.trim(),
+        cest: document.getElementById('fch_cest').value.trim(),
+        origem_mercadoria: parseInt(document.getElementById('fch_origem').value || 0),
+        csosn_icms: document.getElementById('fch_csosn').value,
+        aliquota_icms: parseFloat(document.getElementById('fch_aliq_icms').value || 0),
+        reducao_base_icms: parseFloat(document.getElementById('fch_red_icms').value || 0),
+        cfop_padrao_venda: document.getElementById('fch_cfop_venda').value.trim(),
+        cfop_padrao_transferencia: document.getElementById('fch_cfop_trf').value.trim(),
+        isencao_icms_motivo: document.getElementById('fch_isencao_motivo').value.trim(),
+
+        cst_pis: document.getElementById('fch_cst_pis').value,
+        aliquota_pis: parseFloat(document.getElementById('fch_aliq_pis').value || 0),
+        cst_cofins: document.getElementById('fch_cst_cofins').value,
+        aliquota_cofins: parseFloat(document.getElementById('fch_aliq_cofins').value || 0),
+        cst_ipi: document.getElementById('fch_cst_ipi').value,
+        aliquota_ipi: parseFloat(document.getElementById('fch_aliq_ipi').value || 0),
+
+        preco_custo: parseFloat(document.getElementById('fch_custo').value || 0),
+        custo_medio: parseFloat(document.getElementById('fch_custo_medio').value || 0),
+        margem_contrato: parseFloat(document.getElementById('fch_mg_contrato').value || 30),
+        margem_avulso: parseFloat(document.getElementById('fch_mg_avulso').value || 60),
+        margem_avista: parseFloat(document.getElementById('fch_mg_avista').value || 20),
+        margem_desestimulo: parseFloat(document.getElementById('fch_mg_desestimulo').value || 180),
+        preco_venda_tabela: parseFloat(document.getElementById('fch_preco_tabela').value || 0),
+        preco_venda_minimo: parseFloat(document.getElementById('fch_preco_minimo').value || 0),
+        usuario: USUARIO_FISCAL?.username || 'netto'
+      }};
+
+      try {{
+        const res = await fetch('/api/fiscal/v2/peca/salvar', {{
+          method: 'POST',
+          headers: {{'Content-Type': 'application/json'}},
+          body: JSON.stringify(payload)
+        }}).then(r => r.json());
+
+        if (res.ok) {{
+          alert('✅ Parâmetros Fiscais & Precificação Salvos com Sucesso!');
+          fecharModalFichaFiscal();
+          carregarDadosFiscais();
+        }} else {{
+          alert('⚠️ Erro ao salvar: ' + (res.msg || 'Falha'));
+        }}
+      }} catch (err) {{
+        alert('Erro ao salvar ficha fiscal: ' + err.message);
+      }} finally {{
+        btn.disabled = false;
+        btn.textContent = '💾 Salvar Parâmetros Fiscais & Precificação';
+      }}
+    }}
+
 
     function renderizarInventario() {{
       const total = INVENTARIO_ITENS.length;
@@ -3461,7 +3869,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           headers: {{"Content-Type": "application/json"}},
           body: JSON.stringify({{ filial: FILIAL_ATIVA, usuario: USUARIO_FISCAL?.username || "netto" }})
         }}).then(r => r.json());
-        alert(res.msg || res.error || res.erro || "Consulta DF-e concluída.");
+        alert(res.msg);
         carregarNotasRecebidasDFe();
       }} catch (e) {{
         alert("Erro ao consultar SEFAZ.");
@@ -3471,9 +3879,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     async function manifestarNotaDFe(id, tipo) {{
       if (tipo === "DESCONHECER") {{
         const conf = confirm(
-          "⚠️ ATENÇÃO: ALERTA ANTI-FRAUDE / NOTA INDEVIDA\\n\\n" +
-          "Você está prestes a manifestar DESCONHECIMENTO DA OPERAÇÃO perante a SEFAZ (Evento 210220).\\n\\n" +
-          "Deseja realmente registrar que sua empresa NÃO reconhece esta nota fiscal?"
+          `⚠️ ATENÇÃO: ALERTA ANTI-FRAUDE / NOTA INDEVIDA\n\nVocê está prestes a manifestar DESCONHECIMENTO DA OPERAÇÃO perante a SEFAZ (Evento 210220).\n\nDeseja realmente registrar que sua empresa NÃO reconhece esta nota fiscal?`
         );
         if (!conf) return;
       }}
@@ -3488,7 +3894,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             usuario: USUARIO_FISCAL?.username || "netto"
           }})
         }}).then(r => r.json());
-        alert(res.msg || res.error || res.erro || "Consulta DF-e concluída.");
+        alert(res.msg);
         carregarNotasRecebidasDFe();
       }} catch (e) {{
         alert("Erro ao manifestar nota.");
@@ -3509,7 +3915,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           headers: {{"Content-Type": "application/json"}},
           body: JSON.stringify({{ id: id, usuario: USUARIO_FISCAL?.username || "netto" }})
         }}).then(r => r.json());
-        alert(res.msg || res.error || res.erro || "Consulta DF-e concluída.");
+        alert(res.msg);
         carregarNotasRecebidasDFe();
         carregarInventarioAlmoxarifado();
       }} catch (e) {{
@@ -3568,6 +3974,8 @@ def registrar_rotas_portal_fiscal(app: web.Application) -> None:
     app.router.add_post("/api/fiscal/v2/lancar-consumivel", api_fiscal_v2_lancar_consumivel)
     app.router.add_post("/api/fiscal/v2/ajuste-estoque", api_fiscal_v2_ajuste_estoque)
     app.router.add_post("/api/fiscal/v2/inventario/ajuste-direto", api_fiscal_v2_inventario_ajuste_direto)
+    app.router.add_get("/api/fiscal/v2/peca/{peca_id}", api_fiscal_v2_peca_detalhes)
+    app.router.add_post("/api/fiscal/v2/peca/salvar", api_fiscal_v2_peca_salvar)
     app.router.add_post("/api/fiscal/v2/inventario/novo-item", api_fiscal_v2_inventario_novo_item)
     app.router.add_get("/api/fiscal/v2/fechamento/dados", api_fiscal_v2_fechamento_dados)
     app.router.add_get("/api/fiscal/v2/fechamento/zip", api_fiscal_v2_fechamento_zip)
