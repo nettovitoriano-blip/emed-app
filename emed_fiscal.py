@@ -498,7 +498,8 @@ class MultiFilialFiscalProvider(FiscalProvider):
         num_nf = f"{prefixo}-{ano}-{int(os_id):05d}"
         chave = f"{uf_cod}{ano_mes}{cnpj_limpo}99001{int(os_id):09d}1{uuid.uuid4().int % 100000000:08d}"
         protocolo = f"SEFAZ-{prefixo}-PROT-{uuid.uuid4().hex[:12].upper()}"
-        cert_ativo = bool(payload.get("certificado_ativo"))
+        modo_emissao = str(payload.get("modo_emissao") or "").upper()
+        cert_ativo = bool(payload.get("certificado_ativo")) and (modo_emissao != "SIMULACAO")
         if cert_ativo:
             status_ret = f"AUTORIZADA SEFAZ-{prefixo} (CERTIFICADO A1)"
         else:
@@ -765,7 +766,8 @@ class FiscalManager:
         payload["valor_liquido"] = v_liq
 
         st_cert_atual = CertificadoManager.status_certificado(filial_codigo, self.db_name)
-        payload["certificado_ativo"] = bool(st_cert_atual.get("instalado"))
+        modo_emissao = str(payload.get("modo_emissao") or "").upper()
+        payload["certificado_ativo"] = bool(st_cert_atual.get("instalado")) and (modo_emissao != "SIMULACAO")
         payload["cfop"] = payload.get("cfop", "")
         lote_mes = datetime.now().strftime("%Y-%m")
 
@@ -1158,13 +1160,42 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
         </div>
         """, unsafe_allow_html=True)
 
-        btn_emitir = st.form_submit_button(
-            f"🚀 EMITIR NOTA FISCAL ({cfg_ativa.get('sigla')}) EM 1 CLIQUE",
-            type="primary",
-            use_container_width=True
-        )
+        c_btn_sim, c_btn_real = st.columns(2)
+        with c_btn_sim:
+            btn_simular = st.form_submit_button(
+                "🧪 Emitir Simulação / Demonstração (Sem Valor Fiscal)",
+                use_container_width=True
+            )
+        with c_btn_real:
+            btn_real = st.form_submit_button(
+                f"🟢 EMITIR NOTA FISCAL REAL ({cfg_ativa.get('sigla')} • A1)",
+                type="primary",
+                use_container_width=True
+            )
 
-    if btn_emitir:
+    if btn_simular or btn_real:
+        modo_escolhido = "REAL" if btn_real else "SIMULACAO"
+        # INTERTRAVAMENTO FISCAL NO STREAMLIT
+        with _get_db_connection(db_name) as conn_dup:
+            cur_dup = conn_dup.execute("""
+                SELECT id, numero_nf, os_id, cliente, valor_liquido, data_emissao, status_fiscal
+                FROM notas_fiscais
+                WHERE os_id = ?
+                  AND UPPER(status_fiscal) NOT LIKE '%CANCELAD%'
+                  AND numero_nf IS NOT NULL AND numero_nf != ''
+                ORDER BY id DESC LIMIT 1
+            """, (os_id_sel,))
+            dup_exist = cur_dup.fetchone()
+        
+        if dup_exist and not st.session_state.get(f"autorizar_dup_{os_id_sel}"):
+            st.warning(
+                f"⚠️ **INTERTRAVAMENTO CONTRA EMISSÃO DUPLICADA!**\n\n"
+                f"A Nota Fiscal **{dup_exist[1]}** referente à OS **#{dup_exist[2]}** já foi emitida com sucesso em "
+                f"**{dup_exist[5]}** para o cliente **{dup_exist[3]}** (R$ {float(dup_exist[4] or 0):,.2f}).\n\n"
+                f"Verifique o espelho da nota existente na aba de Histórico. Se você realmente precisa emitir uma nota adicional/complementar, marque a autorização abaixo."
+            )
+            st.session_state[f"autorizar_dup_{os_id_sel}"] = st.checkbox("⚡ Confirmar que estou ciente da nota já existente e autorizo emitir outra nota", key=f"chk_dup_{os_id_sel}")
+            st.stop()
         nat_op_calc = "TRIBUTAÇÃO NO MUNICÍPIO / DF"
         cfop_calc = ""
         if "DIAGNÓSTICO" in tipo_op_fiscal:
@@ -1192,7 +1223,8 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
             "valor_desconto": float(f_desconto),
             "aliquota_iss": float(f_aliq_iss),
             "filial_emissora": codigo_filial if codigo_filial != "CONSOLIDADO" else "FILIAL_DF",
-            "usuario_operador": usuario_atual
+            "usuario_operador": usuario_atual,
+            "modo_emissao": modo_escolhido
         }
         with st.spinner("Transmitindo e assinando nota fiscal com a SEFAZ..."):
             try:

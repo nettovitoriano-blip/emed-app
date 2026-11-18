@@ -277,6 +277,60 @@ async def api_fiscal_v2_emitir(request: web.Request) -> web.Response:
     deduzir_pecas = bool(body.get("deduzir_pecas_fisco", True))
     val_pecas_raw = float(body.get("valor_pecas") or 0.0)
     val_pecas_efetivo = val_pecas_raw if deduzir_pecas else 0.0
+    val_srv = float(body.get("valor_servicos") or 0.0)
+    val_desc = float(body.get("valor_desconto") or 0.0)
+    val_tot_calc = max(0.0, (val_srv + val_pecas_efetivo) - val_desc)
+    cliente_informado = str(body.get("cliente", "")).strip()
+    cnpj_informado = str(body.get("cnpj_tomador", "")).strip()
+    forcar_duplicidade = bool(body.get("forcar_emissao_duplicada", False))
+
+    # INTERTRAVAMENTO CONTRA EMISSÃO DUPLICADA
+    if not forcar_duplicidade:
+        with _get_db_connection(db_name) as conn_chk:
+            # 1. Checa se já existe nota ativa com a mesma OS
+            cur_chk = conn_chk.execute("""
+                SELECT id, numero_nf, os_id, cliente, valor_liquido, data_emissao, status_fiscal, chave_acesso, discriminacao_servico
+                FROM notas_fiscais
+                WHERE os_id = ?
+                  AND UPPER(status_fiscal) NOT LIKE '%CANCELAD%'
+                  AND numero_nf IS NOT NULL AND numero_nf != ''
+                ORDER BY id DESC LIMIT 1
+            """, (os_id,))
+            row_chk = cur_chk.fetchone()
+
+            # 2. Checa se já existe nota ativa para mesmo cliente com mesmo valor total aproximado
+            if not row_chk and cliente_informado and val_tot_calc > 0:
+                cur_chk2 = conn_chk.execute("""
+                    SELECT id, numero_nf, os_id, cliente, valor_liquido, data_emissao, status_fiscal, chave_acesso, discriminacao_servico
+                    FROM notas_fiscais
+                    WHERE (UPPER(cliente) = UPPER(?) OR (cnpj_tomador = ? AND cnpj_tomador != '' AND cnpj_tomador != '00.000.000/0000-00'))
+                      AND ABS(COALESCE(valor_liquido, 0) - ?) < 0.05
+                      AND UPPER(status_fiscal) NOT LIKE '%CANCELAD%'
+                      AND numero_nf IS NOT NULL AND numero_nf != ''
+                    ORDER BY id DESC LIMIT 1
+                """, (cliente_informado, cnpj_informado, val_tot_calc))
+                row_chk = cur_chk2.fetchone()
+
+            if row_chk:
+                nid, num_nf, n_os, cli, v_liq, dt_em, st_f, chave, disc = row_chk
+                dt_fmt = str(dt_em).replace("T", " ")[:16]
+                return web.json_response({
+                    "ok": False,
+                    "intertravamento_duplicidade": True,
+                    "nota_existente": {
+                        "id": nid,
+                        "numero_nf": num_nf,
+                        "os_id": n_os,
+                        "cliente": cli,
+                        "valor_liquido": float(v_liq or 0.0),
+                        "data_emissao": dt_fmt,
+                        "status": st_f,
+                        "chave_acesso": chave,
+                        "link_danfe": f"/api/fiscal/danfe/{n_os}",
+                        "link_pdf": f"/api/fiscal/danfe/{n_os}?formato=pdf"
+                    },
+                    "msg": f"⚠️ A Nota Fiscal {num_nf} referente à OS #{n_os} já foi emitida com sucesso em {dt_fmt} para {cli} no valor de R$ {float(v_liq or 0):,.2f}."
+                })
     disc_serv = str(body.get("discriminacao_servico", "")).strip()
     if not deduzir_pecas and val_pecas_raw > 0:
         disc_serv += "\n\n[OBSERVAÇÃO FISCAL: Peças e consumíveis aplicados nesta manutenção encontram-se inclusos na cobertura contratual (sem incidência de faturamento fiscal avulso de mercadoria).]"
@@ -298,6 +352,7 @@ async def api_fiscal_v2_emitir(request: web.Request) -> web.Response:
         "aliquota_iss": float(body.get("aliquota_iss") or 0.0),
         "filial_emissora": filial,
         "usuario_operador": str(body.get("usuario", "netto")),
+        "modo_emissao": str(body.get("modo_emissao", "SIMULACAO")).upper(),
     }
 
     manager = FiscalManager(db_name)
@@ -1337,7 +1392,17 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
         <div id="barraResumoIss" style="background:#0f172a;padding:10px 14px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:13px;"></div>
 
-        <button class="btn btn-primary" id="btnEmitirNf" onclick="emitirNotaFiscalAgora()">🚀 EMITIR NOTA FISCAL EM 1 CLIQUE</button>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:12px;margin-bottom:12px;">
+          <button type="button" class="btn" id="btnSimularNf" onclick="emitirNotaFiscalAgora('SIMULACAO')" style="background:#0284c7;color:#fff;font-weight:800;padding:12px 14px;border-radius:6px;border:none;cursor:pointer;text-align:center;">
+            🧪 EMITIR SIMULAÇÃO / DEMONSTRAÇÃO
+            <div style="font-size:11px;font-weight:normal;opacity:0.9;margin-top:2px;">(Treinamento / Demonstração • Sem Efeito Fiscal)</div>
+          </button>
+
+          <button type="button" class="btn" id="btnEmitirRealNf" onclick="emitirNotaFiscalAgora('REAL')" style="background:#15803d;color:#fff;font-weight:900;padding:12px 14px;border-radius:6px;border:2px solid #86efac;cursor:pointer;text-align:center;box-shadow:0 0 12px rgba(34,197,94,0.3);">
+            🟢 EMITIR NOTA FISCAL REAL (OFICIAL)
+            <div style="font-size:11px;font-weight:normal;opacity:0.9;margin-top:2px;">(Transmissão SEFAZ com Certificado A1 Ativo)</div>
+          </button>
+        </div>
         <div id="boxResultadoEmissao" style="margin-top:14px;"></div>
       </div>
 
@@ -1377,11 +1442,27 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
           <!-- SELEÇÃO DE ITENS -->
           <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:12px;margin-bottom:12px;">
-            <div style="font-weight:bold;font-size:12.5px;color:#a5f3fc;margin-bottom:8px;">➕ Adicionar Itens à Remessa</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+              <div style="font-weight:bold;font-size:12.5px;color:#a5f3fc;">➕ Adicionar Itens à Remessa</div>
+              <div style="font-size:11px;color:#94a3b8;">Filtro rápido ativado por código ou nome</div>
+            </div>
+
+            <!-- FILTRO DE BUSCA RÁPIDA -->
+            <div style="background:#1e293b;border:1px solid #0284c7;border-radius:6px;padding:8px 10px;margin-bottom:10px;">
+              <label style="font-size:11.5px;font-weight:700;color:#38bdf8;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;">
+                <span>🔍 Filtro Rápido (Código ou Nome da Peça):</span>
+                <span id="lblCountFiltroTrf" style="color:#7dd3fc;font-weight:800;font-size:11px;"></span>
+              </label>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <input type="text" id="inpFiltroPecaTrf" placeholder="Digite para filtrar (ex: 001, placa, tubo, cabo, colimador, sensor)..." oninput="filtrarPecasTransferencia()" style="flex:1;padding:7px 10px;font-size:12px;border-radius:5px;border:1.5px solid #0284c7;background:#0f172a;color:#fff;font-weight:600;outline:none;" />
+                <button type="button" class="btn btn-outline" onclick="limparFiltroPecasTransferencia()" style="padding:6px 10px;font-size:11px;color:#94a3b8;border-color:#475569;" title="Limpar busca">✕ Limpar</button>
+              </div>
+            </div>
+
             <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
               <div style="flex:2;min-width:240px;">
                 <label>Selecione a Peça / Insumo do Almoxarifado:</label>
-                <select id="selPecaTransferencia" style="width:100%;"></select>
+                <select id="selPecaTransferencia" style="width:100%;font-weight:600;"></select>
               </div>
               <div style="width:100px;">
                 <label>Qtd:</label>
@@ -1798,6 +1879,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     let DADOS_ATUAIS = null;
     let USUARIO_FISCAL = null;
     let ITENS_TRANSFERENCIA = [];
+    let TODAS_PECAS_TRANSFERENCIA = [];
     let INVENTARIO_ITENS = [];
     let INVENTARIO_FILTRO_TIPO = "TODOS";
     let INVENTARIO_FILTRO_TEXTO = "";
@@ -1966,9 +2048,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
       const selPecaTrf = document.getElementById("selPecaTransferencia");
       if (selPecaTrf && res.pecas_almox) {{
-        selPecaTrf.innerHTML = res.pecas_almox.map(p =>
-          `<option value="${{p.id}}" data-codigo="${{p.codigo}}" data-nome="${{p.nome.replace(/"/g, '&quot;')}}" data-preco="${{p.preco}}">${{p.codigo ? '[' + p.codigo + '] ' : ''}}${{p.nome}} (Saldo: ${{p.qtd}} ${{p.unidade}} • Custo: R$ ${{Number(p.preco).toFixed(2)}})</option>`
-        ).join("") || `<option value="">Nenhuma peça cadastrada</option>`;
+        TODAS_PECAS_TRANSFERENCIA = res.pecas_almox || [];
+        filtrarPecasTransferencia();
       }}
 
       const selVeic = document.getElementById("selVeiculoTransferencia");
@@ -2095,15 +2176,54 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       carregarDadosFiscais();
     }}
 
-    async function emitirNotaFiscalAgora() {{
+    async function emitirNotaFiscalAgora(modo = 'SIMULACAO', forcarDuplicidade = false) {{
       const osId = document.getElementById("selOsEmissao").value;
-      if (!osId) {{ alert("Selecione uma Ordem de Serviço."); return; }}
-      const res = await fetch("/api/fiscal/v2/emitir", {{
-        method: "POST",
-        headers: {{"Content-Type": "application/json"}},
-        body: JSON.stringify({{
-          os_id: osId,
-          filial_emissora: FILIAL_ATIVA,
+      if (!osId) {{ alert("Por favor, selecione uma Ordem de Serviço para emissão."); return; }}
+
+      const cliNome = document.getElementById("nfCliente") ? document.getElementById("nfCliente").value : "Cliente";
+      const filialTxt = FILIAL_ATIVA === 'MATRIZ_CE' ? 'Matriz Eusébio - CE' : 'Filial Brasília - DF';
+
+      if (!forcarDuplicidade) {{
+        const confMsg = (modo === 'REAL')
+          ? "⚠️ CONFERÊNCIA OBRIGATÓRIA DOS DADOS DA NOTA FISCAL\n\n" +
+            "Você já conferiu todos os dados da nota fiscal (no espelho da nota que aparece abaixo)?\n\n" +
+            "• Cliente: " + cliNome + "\n" +
+            "• Unidade Emissora: " + filialTxt + "\n" +
+            "• Modalidade: 🟢 EMISSÃO REAL (SEFAZ • CERTIFICADO A1)\n\n" +
+            "Esta nota será transmitida oficialmente à SEFAZ e terá valor legal para apuração do DAS e faturamento.\n\n" +
+            "Realmente quer emitir a Nota Fiscal agora?\n\n" +
+            "[OK] = Sim, emitir nota fiscal agora\n" +
+            "[Cancelar] = Não, desejo revisar os dados na página"
+          : "🧪 MODO SIMULAÇÃO / DEMONSTRAÇÃO\n\n" +
+            "Você já conferiu todos os dados da nota fiscal (no espelho da nota que aparece abaixo)?\n\n" +
+            "• Cliente: " + cliNome + "\n" +
+            "• Unidade: " + filialTxt + "\n" +
+            "• Modalidade: 🧪 SIMULAÇÃO (Sem efeito fiscal na SEFAZ)\n\n" +
+            "Realmente quer emitir o espelho de demonstração?\n\n" +
+            "[OK] = Sim, gerar espelho de demonstração\n" +
+            "[Cancelar] = Não, desejo revisar os dados na página";
+
+        const querEmitir = confirm(confMsg);
+        if (!querEmitir) {{
+          // Usuário optou por revisar: permanece exatamente na página sem fechar e sem apagar nada
+          return;
+        }}
+      }}
+
+      const btnSim = document.getElementById("btnSimularNf");
+      const btnReal = document.getElementById("btnEmitirRealNf");
+      if (btnSim) btnSim.disabled = true;
+      if (btnReal) btnReal.disabled = true;
+
+      try {{
+        const res = await fetch("/api/fiscal/v2/emitir", {{
+          method: "POST",
+          headers: {{"Content-Type": "application/json"}},
+          body: JSON.stringify({{
+            os_id: osId,
+            modo_emissao: modo,
+            filial_emissora: FILIAL_ATIVA,
+            forcar_emissao_duplicada: forcarDuplicidade,
           tipo_nota: document.getElementById("selTipoOperacao").value,
           cliente: document.getElementById("nfCliente").value,
           cnpj_tomador: document.getElementById("nfCnpj").value,
@@ -2167,6 +2287,48 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         `;
         document.getElementById("boxResultadoEmissao").scrollIntoView({{ behavior: 'smooth' }});
         atualizarApenasHistoricoSemReset(osId, n.numero_nf);
+      }} else if (res.intertravamento_duplicidade) {{
+        const ne = res.nota_existente;
+        const box = document.getElementById("boxResultadoEmissao");
+        box.innerHTML = `
+          <div style="background:#1e293b;border:2px solid #eab308;border-radius:8px;padding:16px;color:#fff;margin-top:14px;box-shadow:0 4px 20px rgba(234,179,8,0.25);">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+              <div style="font-weight:900;font-size:15px;color:#fde047;display:flex;align-items:center;gap:6px;">
+                <span>⚠️ INTERTRAVAMENTO CONTRA EMISSÃO DUPLICADA</span>
+              </div>
+              <span class="badge" style="background:#eab308;color:#000;font-weight:900;">NOTA JÁ AUTORIZADA</span>
+            </div>
+            <div style="margin-top:10px;font-size:13px;line-height:1.6;color:#e2e8f0;">
+              A <b>Nota Fiscal Nº ${{ne.numero_nf}}</b> referente à <b>OS #${{ne.os_id}}</b> já foi emitida com sucesso em <b>${{ne.data_emissao}}</b> para o cliente <b>${{ne.cliente}}</b> no valor de <b>R$ ${{Number(ne.valor_liquido).toFixed(2)}}</b>!
+            </div>
+            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+              <a href="${{ne.link_danfe}}" target="_blank" class="btn btn-blue" style="font-weight:800;">📄 Abrir Espelho da Nota Já Emitida (DANFE)</a>
+              <a href="${{ne.link_pdf}}" download="DANFE_${{ne.numero_nf}}.pdf" class="btn" style="background:#0284c7;color:#fff;font-weight:800;">📥 Baixar PDF Existente</a>
+              <button type="button" onclick="emitirNotaFiscalAgora('${{modo}}', true)" class="btn" style="background:#dc2626;color:#fff;font-weight:900;border:1.5px solid #fca5a5;">⚡ Sim, Desejo Emitir Outra Nota Mesmo Assim</button>
+              <button type="button" onclick="document.getElementById('boxResultadoEmissao').innerHTML=''" class="btn btn-outline" style="color:#94a3b8;">✕ Manter Nota Existente</button>
+            </div>
+            <div style="margin-top:14px;background:#fff;border-radius:6px;overflow:hidden;border:1px solid #cbd5e1;">
+              <div style="background:#0f172a;color:#fff;padding:6px 12px;font-size:11.5px;font-weight:800;display:flex;justify-content:space-between;align-items:center;">
+                <span>📄 Espelho Oficial da Nota Fiscal Já Emitida (OS #${{ne.os_id}} • NFS-e ${{ne.numero_nf}})</span>
+                <a href="${{ne.link_danfe}}" target="_blank" style="color:#38bdf8;font-size:11px;text-decoration:none;">↗️ Abrir em Nova Aba</a>
+              </div>
+              <iframe src="${{ne.link_danfe}}" style="width:100%;height:480px;border:none;background:#fff;"></iframe>
+            </div>
+          </div>
+        `;
+        box.scrollIntoView({{ behavior: 'smooth' }});
+
+        const querOutra = confirm(
+          "⚠️ INTERTRAVAMENTO FISCAL CONTRA DUPLICIDADE:\n\n" +
+          "A Nota Fiscal " + ne.numero_nf + " referente à OS #" + ne.os_id + " já foi emitida com sucesso em " + ne.data_emissao + " para este cliente e valor!\n\n" +
+          "O espelho da nota já emitida foi carregado na tela abaixo para sua conferência.\n\n" +
+          "Deseja realmente emitir OUTRA nota fiscal para este mesmo atendimento?\n\n" +
+          "[OK] = Sim, desejo emitir outra nota mesmo assim\n" +
+          "[Cancelar] = Não, manter a nota existente (não duplicar)"
+        );
+        if (querOutra) {{
+          emitirNotaFiscalAgora(modo, true);
+        }}
       }} else {{
         alert("Erro ao emitir: " + (res.msg || "Falha interna"));
       }}
@@ -2209,6 +2371,47 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         }}
       }}
       recalcularTotaisFormNf();
+    }}
+
+    function popularSelectPecasTransferencia(lista) {{
+      const selPecaTrf = document.getElementById("selPecaTransferencia");
+      if (!selPecaTrf) return;
+      if (!lista || !lista.length) {{
+        selPecaTrf.innerHTML = `<option value="">⚠️ Nenhuma peça encontrada com este filtro</option>`;
+        return;
+      }}
+      selPecaTrf.innerHTML = lista.map(p =>
+        `<option value="${{p.id}}" data-codigo="${{p.codigo || ''}}" data-nome="${{p.nome.replace(/"/g, '&quot;')}}" data-preco="${{p.preco}}">${{p.codigo ? '[' + p.codigo + '] ' : ''}}${{p.nome}} (Saldo: ${{p.qtd}} ${{p.unidade || 'UN'}} • Custo: R$ ${{Number(p.preco || 0).toFixed(2)}})</option>`
+      ).join("");
+    }}
+
+    function filtrarPecasTransferencia() {{
+      const inp = document.getElementById("inpFiltroPecaTrf");
+      const termo = (inp?.value || "").trim().toLowerCase();
+      const countLbl = document.getElementById("lblCountFiltroTrf");
+      if (!termo) {{
+        popularSelectPecasTransferencia(TODAS_PECAS_TRANSFERENCIA);
+        if (countLbl) countLbl.textContent = "";
+        return;
+      }}
+      const filtradas = TODAS_PECAS_TRANSFERENCIA.filter(p => {{
+        const cod = String(p.codigo || "").toLowerCase();
+        const nom = String(p.nome || "").toLowerCase();
+        return cod.includes(termo) || nom.includes(termo);
+      }});
+      popularSelectPecasTransferencia(filtradas);
+      if (countLbl) {{
+        countLbl.textContent = `(${{filtradas.length}} de ${{TODAS_PECAS_TRANSFERENCIA.length}} peças)`;
+      }}
+    }}
+
+    function limparFiltroPecasTransferencia() {{
+      const inp = document.getElementById("inpFiltroPecaTrf");
+      if (inp) {{
+        inp.value = "";
+        filtrarPecasTransferencia();
+        inp.focus();
+      }}
     }}
 
     function aoTrocarOrigemTransferencia() {{
