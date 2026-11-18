@@ -76,7 +76,7 @@ CONFIGURACOES_FILIAIS_PADRAO: Dict[str, Dict[str, Any]] = {
         "serie_padrao": "1",
         "aliquota_iss_padrao": 5.0,
         "codigo_servico_padrao": "14.01",
-        "cnae": "3313-9/99 - Manutenção e reparação de aparelhos eletromédicos",
+        "cnae": "3312-1/03 - Manutenção e reparação de aparelhos eletromédicos e eletroterapêuticos e equipamentos de irradiação",
         "natureza_operacao_padrao": "TRIBUTAÇÃO NO MUNICÍPIO",
         "padrao_nf": "NFS-e Eusébio - CE"
     }
@@ -232,7 +232,7 @@ class MultiFilialFiscalProvider(FiscalProvider):
         <IssRetido>2</IssRetido>
       </Valores>
       <ItemListaServico>{payload.get('codigo_servico', '14.01')}</ItemListaServico>
-      <CodigoCnae>3313999</CodigoCnae>
+      <CodigoCnae>3312103</CodigoCnae>
       <Discriminacao><![CDATA[{payload.get('discriminacao_servico', 'Serviços de Manutenção e Reparação Técnica')}]]></Discriminacao>
       <CodigoMunicipio>{'5300108' if payload.get('prestador_uf') == 'DF' else '2304285'}</CodigoMunicipio>
     </Servico>
@@ -304,85 +304,110 @@ class MultiFilialFiscalProvider(FiscalProvider):
         except Exception:
             qr_b64 = ""
 
-        qr_html = f'''<div style="text-align: center; flex-shrink: 0;">
-                <img src="data:image/png;base64,{qr_b64}" alt="QR Code Oficial" style="width: 76px; height: 76px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px; background: #fff; display: block;" />
+        qr_html = f'''<div style="text-align: center;">
+                <img src="data:image/png;base64,{qr_b64}" alt="QR Code Oficial" style="width: 72px; height: 72px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px; background: #fff; display: block; margin: 0 auto;" />
                 <div style="font-size: 7.5px; color: #0284c7; font-weight: 800; margin-top: 2px; text-transform: uppercase;">Validação Digital</div>
               </div>''' if qr_b64 else ""
+
+        val_total = v_total
+        val_servicos = v_serv
+        val_pecas = v_pec
+        val_desconto = v_desc
 
         html_content = f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DANFE / Espelho da Nota Fiscal — OS #{os_id} ({num_nf})</title>
   <style>
-    @page {{ size: A4 portrait; margin: 10mm; }}
+    @page {{ size: A4 portrait; margin: 6mm; }}
     * {{ box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }}
-    body {{ background: #f8fafc; margin: 0; padding: 20px; color: #0b132b; }}
-    .danfe-box {{ max-width: 820px; margin: 0 auto; background: #fff; border: 2px solid #002b54; border-radius: 8px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }}
-    .no-print {{ background: #002b54; color: #fff; padding: 10px 16px; margin: -20px -20px 20px -20px; border-radius: 6px 6px 0 0; display: flex; justify-content: space-between; align-items: center; }}
-    .btn-print {{ background: #0077b6; color: #fff; border: none; padding: 8px 16px; font-weight: bold; border-radius: 6px; cursor: pointer; text-decoration: none; }}
-    .btn-print:hover {{ background: #023e8a; }}
-    .header-tbl {{ width: 100%; border-bottom: 2px solid #002b54; padding-bottom: 12px; margin-bottom: 12px; }}
-    .title-danfe {{ font-size: 16px; font-weight: 900; color: #002b54; text-transform: uppercase; }}
-    .badge-nf {{ background: #dcfce7; color: #15803d; border: 1.5px solid #86efac; padding: 3px 8px; border-radius: 4px; font-weight: 800; font-size: 11px; }}
-    .sec-header {{ background: #002b54; color: #fff; font-size: 11px; font-weight: 800; padding: 5px 8px; margin: 12px 0 4px 0; border-radius: 4px; text-transform: uppercase; }}
-    .data-tbl {{ width: 100%; border-collapse: collapse; font-size: 11.5px; margin-bottom: 6px; }}
-    .data-tbl td, .data-tbl th {{ border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }}
+    html, body {{ margin: 0; padding: 0; background: #f8fafc; color: #0b132b; }}
+    body {{ padding: 10px; }}
+    .danfe-box {{ max-width: 800px; margin: 0 auto; background: #fff; border: 1.5px solid #002b54; border-radius: 6px; padding: 10px; box-shadow: 0 3px 15px rgba(0,0,0,0.06); }}
+    .no-print {{ background: #002b54; color: #fff; padding: 6px 12px; margin: -10px -10px 10px -10px; border-radius: 4px 4px 0 0; }}
+    .btn-action {{ background: #0077b6; color: #fff; border: none; padding: 5px 12px; font-weight: bold; border-radius: 4px; cursor: pointer; text-decoration: none; font-size: 11px; display: inline-flex; align-items: center; }}
+    .btn-action:hover {{ background: #023e8a; }}
+    .header-tbl {{ width: 100%; border-bottom: 1.5px solid #002b54; padding-bottom: 6px; margin-bottom: 6px; border-collapse: collapse; }}
+    .title-danfe {{ font-size: 13.5px; font-weight: 900; color: #002b54; text-transform: uppercase; }}
+    .badge-nf {{ background: #dcfce7; color: #15803d; border: 1px solid #86efac; padding: 1.5px 5px; border-radius: 3px; font-weight: 800; font-size: 9.5px; }}
+    .sec-header {{ background: #002b54; color: #fff; font-size: 9.5px; font-weight: 800; padding: 3px 6px; margin: 6px 0 2px 0; border-radius: 3px; text-transform: uppercase; }}
+    .data-tbl {{ width: 100%; border-collapse: collapse; font-size: 9px; margin-bottom: 3px; }}
+    .data-tbl td, .data-tbl th {{ border: 1px solid #cbd5e1; padding: 3px 5px; text-align: left; vertical-align: middle; }}
     .data-tbl th {{ background: #f1f5f9; font-weight: 700; color: #334155; }}
-    .val-destaque {{ font-size: 15px; font-weight: 900; color: #059669; }}
+    .val-destaque {{ font-size: 13px; font-weight: 900; color: #059669; }}
     @media print {{
-      body {{ background: #fff; padding: 0; }}
-      .danfe-box {{ border: 1px solid #000; box-shadow: none; max-width: 100%; padding: 12px; }}
+      @page {{ size: A4 portrait; margin: 6mm; }}
+      html, body {{ background: #fff !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }}
+      .danfe-box {{ border: 1.5px solid #002b54 !important; box-shadow: none !important; max-width: 100% !important; width: 100% !important; padding: 6px !important; margin: 0 !important; }}
       .no-print {{ display: none !important; }}
+      tr, td, th {{ page-break-inside: avoid; }}
     }}
   </style>
 </head>
 <body>
   <div class="danfe-box">
+    <!-- BARRA SUPERIOR DE AÇÕES (IMPRESSÃO / PDF) -->
     <div class="no-print">
-      <div style="font-weight: bold; font-size: 14px;">🧾 Sistema Fiscal EMED — Espelho Oficial de Nota Fiscal</div>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <button class="btn-print" onclick="window.print()">🖨️ Imprimir</button>
-        <a href="/api/fiscal/danfe/{os_id}?formato=pdf" download="DANFE_NFS_{num_nf}.pdf" class="btn-print" style="background:#0284c7;text-decoration:none;display:inline-flex;align-items:center;">📥 Baixar PDF</a>
-        <button class="btn-print" style="background:#64748b;margin-left:6px;" onclick="window.close()">✕ Fechar</button>
-      </div>
+      <table style="width: 100%; border-collapse: collapse; border: none;">
+        <tr>
+          <td style="border: none; text-align: left; vertical-align: middle;">
+            <span style="font-weight: bold; font-size: 12px;">🧾 Sistema Fiscal EMED &bull; Espelho Oficial da Nota Fiscal</span>
+          </td>
+          <td style="border: none; text-align: right; vertical-align: middle;">
+            <button class="btn-action" onclick="window.print()">🖨️ Imprimir</button>
+            <a href="/api/fiscal/danfe/{os_id}?formato=pdf" download="DANFE_NFS_{num_nf}.pdf" class="btn-action" style="background:#0284c7; margin-left: 6px;">📥 Baixar PDF</a>
+            <button class="btn-action" style="background:#64748b; margin-left: 6px;" onclick="window.close()">✕ Fechar</button>
+          </td>
+        </tr>
+      </table>
     </div>
 
     <!-- CABEÇALHO EMED -->
     <table class="header-tbl">
       <tr>
-        <td style="width: 125px; vertical-align: middle;">
-          <img src="/api/logo-circle" alt="EMED" style="width: 95px; height: auto;" onerror="this.src=\'/api/logo\'" />
+        <td style="width: 95px; vertical-align: middle; border: none;">
+          <img src="/api/logo-circle" alt="EMED" style="width: 75px; height: auto;" onerror="this.src='/api/logo'" />
         </td>
-        <td style="vertical-align: middle;">
-          <div class="title-danfe">{prestador_razao} <span style="font-size: 11.5px; font-weight: 800; color: #0284c7; letter-spacing: 0;">&bull; {filial_badge}</span></div>
-          <div style="font-size: 11.5px; color: #0077b6; font-weight: 800; margin-top: 3px; margin-bottom: 3px;">Manutenção em Equipamentos de Diagnóstico por Imagem</div>
-          <div style="font-size: 10px; color: #475569; margin-top: 3px; line-height: 1.35;">
+        <td style="vertical-align: middle; border: none; padding-left: 6px;">
+          <div class="title-danfe">{prestador_razao} <span style="font-size: 10px; font-weight: 800; color: #0284c7; letter-spacing: 0;">&bull; {filial_badge}</span></div>
+          <div style="font-size: 10px; color: #0077b6; font-weight: 800; margin-top: 1px; margin-bottom: 1px;">Manutenção em Equipamentos de Diagnóstico por Imagem</div>
+          <div style="font-size: 8.5px; color: #475569; margin-top: 1px; line-height: 1.25;">
             <b>CNPJ:</b> {prestador_cnpj} &bull; <b>{'CF/DF' if filial_emissora == 'FILIAL_DF' else 'Insc. Municipal'}:</b> {prestador_im} &bull; <b>Órgão:</b> {orgao_emissor}<br/>
             <b>Endereço Emissor:</b> {prestador_end}, {prestador_cid} - {prestador_uf} &bull; <b>Fone:</b> {prestador_fone}<br/>
             <b>Site:</b> emed.med.br &bull; <b>E-mail:</b> {prestador_email}
           </div>
         </td>
-        <td style="width: 290px; vertical-align: middle; text-align: right;">
-          <div style="border: 2px solid #002b54; border-radius: 6px; padding: 8px 10px; background: #f8fafc; text-align: center;">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-              <div style="flex: 1; text-align: left;">
-                <div style="font-size: 9.5px; font-weight: 800; color: #002b54; text-transform: uppercase;">{doc_aux_titulo}</div>
-                <div style="font-size: 15px; font-weight: 900; color: #0b132b; margin: 2px 0;">{num_nf}</div>
+        <td style="width: 270px; vertical-align: middle; text-align: right; border: none;">
+          <table style="width: 100%; border: 1.5px solid #002b54; border-radius: 5px; background: #f8fafc; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 4px 6px; text-align: left; vertical-align: middle; border: none;">
+                <div style="font-size: 8px; font-weight: 800; color: #002b54; text-transform: uppercase;">{doc_aux_titulo}</div>
+                <div style="font-size: 13px; font-weight: 900; color: #0b132b; margin: 1px 0;">{num_nf}</div>
                 <div class="badge-nf" style="display: inline-block;">STATUS: {st_fiscal}</div>
-                <div style="font-size: 9px; color: #64748b; margin-top: 4px;">Emissão: <b>{dt_emissao_fmt}</b></div>
-              </div>
-              {qr_html}
-            </div>
-          </div>
+                <div style="font-size: 8px; color: #64748b; margin-top: 2px;">Emissão: <b>{dt_emissao_fmt}</b></div>
+              </td>
+              <td style="width: 65px; padding: 4px 6px; text-align: center; vertical-align: middle; border: none;">
+                {qr_html}
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
     </table>
 
-    <div style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 4px; font-size: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;">
-      <div><b>Chave de Autenticação / Protocolo Digital:</b> <span style="font-family: monospace; letter-spacing: 0.5px;">{chave}</span></div>
-      <div style="font-size: 9.5px; color: #0284c7; font-weight: 700;">📱 Validação Digital via QR Code</div>
-    </div>
+    <!-- BARRA CHAVE DE AUTENTICAÇÃO -->
+    <table style="width: 100%; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; margin-bottom: 4px; border-collapse: collapse;">
+      <tr>
+        <td style="padding: 3px 6px; font-size: 8.5px; border: none; text-align: left;">
+          <b>Chave de Autenticação / Protocolo Digital:</b> <span style="font-family: monospace; letter-spacing: 0.5px; font-weight: 600;">{chave}</span>
+        </td>
+        <td style="padding: 3px 6px; font-size: 8px; color: #0284c7; font-weight: 700; border: none; text-align: right; white-space: nowrap;">
+          📱 Validação Digital via QR Code
+        </td>
+      </tr>
+    </table>
 
     <!-- TOMADOR DOS SERVIÇOS -->
     <div class="sec-header">1. Dados do Tomador / Cliente Hospitalar</div>
@@ -397,23 +422,25 @@ class MultiFilialFiscalProvider(FiscalProvider):
       </tr>
     </table>
 
-    <!-- IDENTIFICAÇÃO DA OS -->
+    <!-- DADOS DA ORDEM DE SERVIÇO -->
     <div class="sec-header">2. Identificação da Ordem de Serviço & Atendimento Técnico</div>
     <table class="data-tbl">
       <tr>
-        <td style="width: 15%;"><span style="color:#64748b;">OS Vinculada:</span><br/><b>#{os_id}</b></td>
-        <td style="width: 55%;"><span style="color:#64748b;">Equipamento:</span><br/><b>{equip_nome}</b></td>
-        <td><span style="color:#64748b;">Tipo de Serviço:</span><br/><b>{srv_tipo}</b></td>
-        <td><span style="color:#64748b;">Técnico Responsável:</span><br/><b>{tec_nome}</b></td>
+        <td style="width: 20%;"><span style="color:#64748b;">OS Vinculada:</span><br/><b>#{os_id}</b></td>
+        <td colspan="3"><span style="color:#64748b;">Equipamento:</span><br/><b>{equip_nome}</b></td>
+      </tr>
+      <tr>
+        <td colspan="2" style="width: 50%;"><span style="color:#64748b;">Tipo de Atendimento:</span> <b>{srv_tipo}</b></td>
+        <td colspan="2" style="width: 50%;"><span style="color:#64748b;">Técnico Responsável:</span> <b>{tec_nome}</b></td>
       </tr>
     </table>
 
-    <!-- DISCRIMINAÇÃO DOS SERVIÇOS & PEÇAS -->
-    <div class="sec-header">3. Discriminação dos Serviços de Manutenção & Peças</div>
-    <div style="border: 1px solid #cbd5e1; padding: 10px; border-radius: 4px; font-size: 11.5px; background: #fafafa; min-height: 80px; line-height: 1.5; margin-bottom: 8px;">
+    <!-- DISCRIMINAÇÃO DOS SERVIÇOS -->
+    <div class="sec-header">3. Discriminação dos Serviços & Peças</div>
+    <div style="border: 1px solid #cbd5e1; padding: 5px 8px; border-radius: 4px; font-size: 9px; background: #fafafa; line-height: 1.25; margin-bottom: 4px;">
       <b>{tipo_nota}</b><br/>
-      {descr}<br/><br/>
-      <i>Nenhuma peça faturada separadamente (mão de obra e insumos inclusos no serviço técnico).</i>
+      {descr}<br/>
+      <span style="font-size: 8px; color: #64748b; font-style: italic;">Nenhuma peça faturada separadamente (mão de obra e insumos inclusos no serviço técnico).</span>
     </div>
 
     <!-- QUADRO DE VALORES -->
@@ -430,25 +457,25 @@ class MultiFilialFiscalProvider(FiscalProvider):
       </thead>
       <tbody>
         <tr>
-          <td style="font-weight: bold; font-size: 13px;">R$ {v_serv:,.2f}</td>
-          <td style="font-weight: bold; font-size: 13px;">R$ {v_pec:,.2f}</td>
-          <td>R$ {v_desc:,.2f}</td>
-          <td>R$ {v_serv:,.2f}</td>
-          <td class="val-destaque">R$ {v_total:,.2f}</td>
+          <td>R$ {val_servicos:,.2f}</td>
+          <td>R$ {val_pecas:,.2f}</td>
+          <td>R$ 0,00</td>
+          <td>R$ {val_servicos:,.2f}</td>
+          <td class="val-destaque">R$ {val_total:,.2f}</td>
         </tr>
       </tbody>
     </table>
 
     <!-- INFORMAÇÕES COMPLEMENTARES -->
     <div class="sec-header">5. Informações Complementares e Fiscais</div>
-    <div style="border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 4px; font-size: 10.5px; background: #fafafa; line-height: 1.45; color: #334155;">
+    <div style="border: 1px solid #cbd5e1; padding: 4px 6px; border-radius: 4px; font-size: 8px; color: #475569; line-height: 1.25; background: #fff;">
       &bull; DOCUMENTO EMITIDO POR ME OU EPP OPTANTE PELO SIMPLES NACIONAL.<br/>
       &bull; NÃO GERA DIREITO A CRÉDITO FISCAL DE IPI / ICMS.<br/>
-      &bull; Valor aproximado dos tributos federais e municipais (IBPT): R$ {(v_total * 0.1345):,.2f} (13,45%).<br/>
+      &bull; Valor aproximado dos tributos federais e municipais (IBPT): R$ {(val_total * 0.1345):,.2f} (13,45%).<br/>
       &bull; Serviços de Manutenção Preventiva/Corretiva e Validação Metrológica de Equipamentos Médicos Hospitalares em conformidade com as normas ANVISA RDC 611 e ABNT NBR IEC 60601.
     </div>
 
-    <div style="text-align: center; font-size: 9.5px; color: #94a3b8; margin-top: 14px; border-top: 1px dashed #cbd5e1; padding-top: 8px;">
+    <div style="margin-top: 5px; text-align: center; font-size: 8px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 3px;">
       EMED Eletromedicina Ltda. &bull; Comprovante Digital de Faturamento Homologado &bull; Emitido pelo Sistema Oficial EMED
     </div>
   </div>
