@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v1-0-7-1-badge';
+const CACHE_NAME = 'emed-pwa-v1-0-7-2-login-versao';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
