@@ -55054,7 +55054,7 @@
 
 
 
-          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.0.7</div></div>
+          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.1.0</div></div>
 
 
 
@@ -83538,7 +83538,7 @@
           window.location.reload(true);
         } catch(e) { window.location.reload(); }
       }
-      navigator.serviceWorker.register("/sw.js?v=1.0.7").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=1.1.0").then(reg => { if(reg) reg.update(); }).catch(() => {});
       let _swReloaded = false;
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         if (!_swReloaded && navigator.onLine && !STATE.osAberta) {
@@ -100830,230 +100830,348 @@ async function efetuarLogout() {
 
 
 
+    let _ferramentasCachePainel = [];
+    let _filtroFerramentaTexto = "";
+    let _filtroFerramentaStatus = "TODOS";
+
     async function renderMenuTecFerramentas(box) {
-
-
-
-      const meuNome = STATE.tecnicoAtual || localStorage.getItem("emed_tecnico_selecionado") || "ANTONIO";
-
-
-
-      box.innerHTML = `<div style="text-align:center;padding:30px;color:#64748b;">⏳ Carregando suas ferramentas em uso...</div>`;
-
-
-
-
-
-
-
+      const meuNome = (STATE.tecnicoAtual || localStorage.getItem("emed_tecnico_selecionado") || "TÉCNICO").toUpperCase();
+      const perfil = (localStorage.getItem("emed_perfil_usuario") || "").toUpperCase();
+      const isAlmoxOuGestor = meuNome === "NETTO" || meuNome === "PAULO" || perfil.includes("GESTOR") || perfil.includes("ALMOX");
+      box.innerHTML = `<div style="text-align:center;padding:30px;color:#64748b;">⏳ Carregando Painel Interativo de Ferramentas &amp; Kits...</div>`;
       try {
+        const [resMinhas, resTodas] = await Promise.all([
+          apiGet(`/api/ferramentas/minhas?tecnico=${encodeURIComponent(meuNome)}`),
+          apiGet("/api/ferramentas")
+        ]);
+        const minhas = resMinhas.ferramentas || [];
+        const todas = resTodas.ferramentas || [];
+        _ferramentasCachePainel = todas;
 
+        const disp = todas.filter(f => f.status === "DISPONIVEL");
+        const pratExt = todas.filter(f => f.status === "DEVOLVIDO_PRATELEIRA_EXTERNA");
+        const emUso = todas.filter(f => f.status === "EM_USO");
+        const emCal = todas.filter(f => f.status === "CALIBRACAO_BANCADA");
 
-
-        const res = await apiGet(`/api/ferramentas/minhas?tecnico=${encodeURIComponent(meuNome)}`);
-
-
-
-        const lista = res.ferramentas || [];
-
-
-
-
-
-
+        const filtradas = todas.filter(f => {
+          if (_filtroFerramentaStatus !== "TODOS" && f.status !== _filtroFerramentaStatus) return false;
+          if (!_filtroFerramentaTexto) return true;
+          const q = _filtroFerramentaTexto.toUpperCase();
+          return `${f.codigo} ${f.patrimonio} ${f.nome} ${f.localizacao} ${f.tecnico}`.toUpperCase().includes(q);
+        });
 
         box.innerHTML = `
-
-
-
           <div class="section-box">
-
-
-
             <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-
-
-
-              <span>🧰 Minhas Ferramentas &amp; Instrumentos em Campo (${lista.length})</span>
-
-
-
+              <span>🧰 Painel Interativo de Ferramentas, Kits &amp; Patrimônio</span>
               <span class="badge ativo">👷 ${esc(meuNome)}</span>
-
-
-
             </div>
 
-
-
-
-
-
-
-            <div style="background:#fffbeb;border:1px solid #fde68a;border-left:3px solid #f59e0b;border-radius:6px;padding:8px 12px;margin-bottom:14px;font-size:12px;color:#92400e;">
-
-
-
-              <b>🔋 Cuidado com as Baterias:</b> Instrumentos com bateria 9V (multímetros e medidores) devem ser desconectados após o uso para não descarregar. Instrumentos recarregáveis devem ser colocados na base/carregador ao retornar ao Almoxarifado.
-
-
-
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+              <button type="button" class="btn btn-primary btn-sm" onclick="abrirScannerFerramentaCamera()" style="display:flex;align-items:center;gap:6px;">
+                📷 Escanear QR / Código de Barras
+              </button>
+              <a href="/api/ferramentas/etiquetas-qr" target="_blank" class="btn btn-outline btn-sm" style="border-color:#0284c7;color:#0284c7;font-weight:700;">
+                🏷️ Imprimir Etiquetas QR (Contagem)
+              </a>
             </div>
 
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px;">
+              <div onclick="_filtroFerramentaStatus='DISPONIVEL';renderMenuTecFerramentas(document.getElementById('mainContent')||document.querySelector('.main-content')||box)" style="cursor:pointer;background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:8px;text-align:center;">
+                <div style="font-size:18px;font-weight:900;color:#15803d;">${disp.length}</div>
+                <div style="font-size:11px;font-weight:700;color:#166534;">🟢 Disponíveis</div>
+              </div>
+              <div onclick="_filtroFerramentaStatus='DEVOLVIDO_PRATELEIRA_EXTERNA';renderMenuTecFerramentas(document.getElementById('mainContent')||document.querySelector('.main-content')||box)" style="cursor:pointer;background:#fffbeb;border:1.5px solid #fde047;border-radius:8px;padding:8px;text-align:center;">
+                <div style="font-size:18px;font-weight:900;color:#b45309;">${pratExt.length}</div>
+                <div style="font-size:11px;font-weight:700;color:#92400e;">🟡 Prat. Externa (Paulo)</div>
+              </div>
+              <div onclick="_filtroFerramentaStatus='EM_USO';renderMenuTecFerramentas(document.getElementById('mainContent')||document.querySelector('.main-content')||box)" style="cursor:pointer;background:#eff6ff;border:1.5px solid #93c5fd;border-radius:8px;padding:8px;text-align:center;">
+                <div style="font-size:18px;font-weight:900;color:#1d4ed8;">${emUso.length}</div>
+                <div style="font-size:11px;font-weight:700;color:#1e40af;">🔵 Em Uso Campo</div>
+              </div>
+              <div onclick="_filtroFerramentaStatus='TODOS';renderMenuTecFerramentas(document.getElementById('mainContent')||document.querySelector('.main-content')||box)" style="cursor:pointer;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:8px;padding:8px;text-align:center;">
+                <div style="font-size:18px;font-weight:900;color:#334155;">${todas.length}</div>
+                <div style="font-size:11px;font-weight:700;color:#475569;">📋 Ver Todos (${emCal.length} cal.)</div>
+              </div>
+            </div>
 
-
-
-
-
-
-            <div style="display:grid;gap:10px;">
-
-
-
-              ${lista.map(f => `
-
-
-
-                <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-
-
-
-                  <div>
-
-
-
-                    <div style="font-weight:700;color:#0b132b;font-size:13.5px;">${esc(f.codigo)} — ${esc(f.nome)}</div>
-
-
-
-                    <div style="font-size:11.5px;color:#64748b;margin-top:2px;">
-
-
-
-                      <span>📅 Retirado em: ${esc(f.data_saida || 'Hoje')}</span>
-
-
-
-                      ${f.cliente ? ` • <span>🏥 Destino: ${esc(f.cliente)}</span>` : ''}
-
-
-
-                      ${f.os_id ? ` • <b>OS #${esc(f.os_id)}</b>` : ''}
-
-
-
-                    </div>
-
-
-
-                    ${f.aviso_entrega ? `
-
-
-
-                      <div style="background:#fffbeb;border:1px solid #fde68a;border-left:3px solid #f59e0b;padding:4px 8px;border-radius:4px;font-size:11.5px;color:#92400e;margin-top:5px;">
-
-
-
-                        <b>⚠️ Aviso Fundamental na Entrega:</b> ${esc(f.aviso_entrega)}
-
-
-
+            ${pratExt.length > 0 ? `
+              <div style="background:#fffbeb;border:1.5px solid #f59e0b;border-radius:10px;padding:10px 12px;margin-bottom:12px;">
+                <div style="font-weight:900;color:#92400e;font-size:12.5px;margin-bottom:6px;">
+                  📥 Prateleira Externa de Devolução — Aguardando Baixa do Paulo (${pratExt.length})
+                </div>
+                <div style="font-size:11px;color:#78350f;margin-bottom:8px;">Ferramentas entregues pelos técnicos na bancada externa. Se outro técnico precisar com urgência, já pode retirar abaixo antes mesmo da conferência final!</div>
+                <div style="display:grid;gap:6px;">
+                  ${pratExt.map(f => `
+                    <div style="background:#fff;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+                      <div>
+                        <b style="font-size:12.5px;">${esc(f.codigo)} (${esc(f.patrimonio)}) — ${esc(f.nome)}</b>
+                        <div style="font-size:11px;color:#64748b;">Devolvido por: <b>${esc(f.tecnico || 'Técnico')}</b> • Prateleira oficial: <b>📍 ${esc(f.localizacao)}</b></div>
                       </div>
-
-
-
-                    ` : ''}
-
-
-
-                  </div>
-
-
-
-                  <div>
-
-
-
-                    <button class="btn btn-sm btn-outline" style="border-color:#0284c7;color:#0284c7;font-weight:700;" onclick="devolverMinhaFerramenta('${esc(f.codigo)}', '${esc(f.aviso_entrega || '')}')">
-
-
-
-                      📥 Devolver ao Almoxarifado
-
-
-
-                    </button>
-
-
-
-                  </div>
-
-
-
+                      <div style="display:flex;gap:6px;">
+                        <button type="button" class="btn btn-sm" onclick="abrirPopupFerramentaInterativa('${esc(f.codigo)}')" style="background:#0284c7;color:#fff;font-weight:700;">📤 Retirar (Urgência)</button>
+                        ${isAlmoxOuGestor ? `<button type="button" class="btn btn-sm" onclick="confirmarBaixaPaulo('${esc(f.codigo)}')" style="background:#16a34a;color:#fff;font-weight:800;">✅ Paulo: Repor no Estoque</button>` : ''}
+                      </div>
+                    </div>
+                  `).join("")}
                 </div>
+              </div>
+            ` : ''}
 
-
-
-              `).join('') || `
-
-
-
-                <div style="text-align:center;padding:35px 20px;color:#64748b;background:#f8fafc;border-radius:8px;border:1px dashed #cbd5e1;">
-
-
-
-                  <div style="font-size:28px;margin-bottom:6px;">🧰</div>
-
-
-
-                  <b>Você não possui nenhuma ferramenta em posse no momento.</b>
-
-
-
-                  <div style="font-size:12px;margin-top:4px;">As ferramentas que você retirar no almoxarifado aparecerão aqui.</div>
-
-
-
+            ${minhas.length > 0 ? `
+              <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:10px;padding:10px 12px;margin-bottom:12px;">
+                <div style="font-weight:900;color:#1e40af;font-size:12.5px;margin-bottom:6px;">👷 Em Minha Posse (${minhas.length})</div>
+                <div style="display:grid;gap:6px;">
+                  ${minhas.map(f => `
+                    <div style="background:#fff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+                      <div>
+                        <b style="font-size:12.5px;">${esc(f.codigo)} — ${esc(f.nome)}</b>
+                        <div style="font-size:11px;color:#64748b;">Destino: <b>${esc(f.cliente || 'Uso Interno')}</b> ${f.os_id ? `• OS #${esc(f.os_id)}` : ''} • Saída: ${esc(f.data_saida || '--')}</div>
+                      </div>
+                      <button type="button" class="btn btn-sm btn-outline" style="border-color:#0284c7;color:#0284c7;font-weight:800;" onclick="devolverMinhaFerramenta('${esc(f.codigo)}', '${esc(f.aviso_entrega || '')}')">📥 Devolver na Prateleira Externa</button>
+                    </div>
+                  `).join("")}
                 </div>
+              </div>
+            ` : ''}
 
-
-
-              `}
-
-
-
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+              <input id="inpBuscaFerramenta" class="input" value="${esc(_filtroFerramentaTexto)}" placeholder="🔍 Buscar por código, patrimônio (EMED-PAT), nome ou prateleira..." oninput="_filtroFerramentaTexto=this.value;renderizarListaFerramentasInline()" style="flex:1;min-width:220px;" />
             </div>
-
-
-
+            <div id="gridTodasFerramentasPainel" style="display:grid;gap:8px;">
+              ${renderCardsFerramentasHtml(filtradas)}
+            </div>
           </div>
-
-
-
         `;
-
-
-
       } catch (e) {
-
-
-
         box.innerHTML = `<div style="color:red;padding:20px;">Erro ao carregar ferramentas: ${e.message}</div>`;
-
-
-
       }
-
-
-
     }
 
+    function renderCardsFerramentasHtml(lista) {
+      if (!lista.length) return `<div style="padding:20px;text-align:center;color:#64748b;">Nenhuma ferramenta encontrada com esse filtro.</div>`;
+      return lista.map(f => {
+        const st = f.status;
+        const badge = st === "DISPONIVEL"
+          ? `<span class="badge concluido">🟢 DISPONÍVEL</span>`
+          : st === "DEVOLVIDO_PRATELEIRA_EXTERNA"
+            ? `<span class="badge obs">🟡 PRATELEIRA EXTERNA (PAULO)</span>`
+            : st === "EM_USO"
+              ? `<span class="badge ativo">🔵 EM USO: ${esc(f.tecnico || 'TÉCNICO')}</span>`
+              : `<span class="badge pendente">🔬 ${esc(st)}</span>`;
+        return `
+          <div onclick="abrirPopupFerramentaInterativa('${esc(f.codigo)}')" style="cursor:pointer;background:#fff;border:1.5px solid #cbd5e1;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <b style="font-size:13px;color:#0f172a;">${esc(f.codigo)} — ${esc(f.nome)}</b>
+                ${badge}
+              </div>
+              <div style="font-size:11.5px;color:#475569;margin-top:3px;">
+                🏷️ Patrimônio: <b>${esc(f.patrimonio)}</b> &bull; 📍 Local: <b style="color:#0369a1;">${esc(f.localizacao || 'ALMOXARIFADO')}</b>
+                ${f.validade_calibracao ? ` &bull; 📅 Calibração: <b>${esc(f.validade_calibracao)}</b>` : ''}
+              </div>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" style="font-weight:700;">🔍 Abrir / Movimentar</button>
+          </div>
+        `;
+      }).join("");
+    }
 
+    function renderizarListaFerramentasInline() {
+      const box = document.getElementById("gridTodasFerramentasPainel");
+      if (!box) return;
+      const q = (_filtroFerramentaTexto || "").toUpperCase();
+      const filtradas = (_ferramentasCachePainel || []).filter(f => {
+        if (_filtroFerramentaStatus !== "TODOS" && f.status !== _filtroFerramentaStatus) return false;
+        if (!q) return true;
+        return `${f.codigo} ${f.patrimonio} ${f.nome} ${f.localizacao} ${f.tecnico}`.toUpperCase().includes(q);
+      });
+      box.innerHTML = renderCardsFerramentasHtml(filtradas);
+    }
 
+    function abrirPopupFerramentaInterativa(codigoOuPat) {
+      const alvo = String(codigoOuPat || "").trim().toUpperCase();
+      const f = (_ferramentasCachePainel || []).find(x =>
+        String(x.codigo).toUpperCase() === alvo ||
+        String(x.patrimonio).toUpperCase() === alvo ||
+        String(x.numero_serie).toUpperCase() === alvo
+      );
+      if (!f) {
+        alert(`Código "${codigoOuPat}" não encontrado na lista de ferramentas.`);
+        return;
+      }
+      let ov = document.getElementById("emedPopupFerramenta");
+      if (!ov) {
+        ov = document.createElement("div");
+        ov.id = "emedPopupFerramenta";
+        ov.style = "position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,0.78);display:flex;align-items:center;justify-content:center;padding:14px;";
+        ov.onclick = (e) => { if (e.target === ov) ov.style.display = "none"; };
+        document.body.appendChild(ov);
+      }
+      const meuNome = (STATE.tecnicoAtual || localStorage.getItem("emed_tecnico_selecionado") || "TÉCNICO").toUpperCase();
+      const perfil = (localStorage.getItem("emed_perfil_usuario") || "").toUpperCase();
+      const isAlmoxOuGestor = meuNome === "NETTO" || meuNome === "PAULO" || perfil.includes("GESTOR") || perfil.includes("ALMOX");
+      const podeRetirar = f.status === "DISPONIVEL" || f.status === "DEVOLVIDO_PRATELEIRA_EXTERNA";
+      const ordensAbertas = (STATE.data?.ordens || []).filter(o => !String(o.status || "").toUpperCase().includes("CONCLU")).slice(0, 25);
 
+      ov.innerHTML = `
+        <div style="background:#fff;border-radius:14px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;padding:18px;box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div style="font-size:15.5px;font-weight:900;color:#002b54;">🧰 ${esc(f.codigo)} — ${esc(f.patrimonio)}</div>
+            <button type="button" onclick="document.getElementById('emedPopupFerramenta').style.display='none'" style="background:#f1f5f9;border:none;border-radius:999px;width:30px;height:30px;font-weight:800;cursor:pointer;">✕</button>
+          </div>
+          <div style="font-weight:800;font-size:14px;color:#0f172a;margin-bottom:8px;">${esc(f.nome)}</div>
+          <div style="background:#f0f9ff;border:1.5px solid #38bdf8;border-radius:10px;padding:10px 12px;margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;">📍 Localização Exata no Estoque</div>
+            <div style="font-size:16px;font-weight:900;color:#0c4a6e;margin-top:2px;">${esc(f.localizacao || 'ALMOXARIFADO CENTRAL')}</div>
+            <div style="font-size:11.5px;color:#334155;margin-top:4px;">Status atual: <b>${esc(f.status)}</b> ${f.tecnico ? `(${esc(f.tecnico)})` : ''}</div>
+          </div>
 
+          ${podeRetirar ? `
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:10px;margin-bottom:10px;">
+              <label class="field-label">Finalidade da Retirada</label>
+              <select id="ferRetDestinoSel" class="select" style="margin-bottom:8px;">
+                <option value="USO_PESSOAL">🛠️ Uso Pessoal / Bancada / Trabalho Interno</option>
+                ${ordensAbertas.map(o => `<option value="${esc(o.id)}">📋 OS #${esc(o.id)} — ${esc(o.cliente)}</option>`).join("")}
+              </select>
+              <button type="button" class="btn btn-primary" style="width:100%;font-weight:800;" onclick="confirmarRetiradaPopupFerramenta('${esc(f.codigo)}')">📤 Confirmar Retirada (${esc(meuNome)})</button>
+            </div>
+          ` : ''}
 
+          ${f.status === "EM_USO" ? `
+            <button type="button" class="btn" style="width:100%;background:#0284c7;color:#fff;font-weight:800;margin-bottom:8px;" onclick="devolverMinhaFerramenta('${esc(f.codigo)}','');document.getElementById('emedPopupFerramenta').style.display='none';">📥 Devolver na Prateleira Externa (Notificar Paulo)</button>
+          ` : ''}
 
+          ${f.status === "DEVOLVIDO_PRATELEIRA_EXTERNA" && isAlmoxOuGestor ? `
+            <button type="button" class="btn" style="width:100%;background:#16a34a;color:#fff;font-weight:800;margin-bottom:8px;" onclick="confirmarBaixaPaulo('${esc(f.codigo)}');document.getElementById('emedPopupFerramenta').style.display='none';">✅ Paulo: Conferir &amp; Repor na Prateleira</button>
+          ` : ''}
+
+          <div style="border-top:1px solid #e2e8f0;padding-top:10px;margin-top:6px;">
+            <label class="field-label">✏️ Atualizar Prateleira / Localização (Contagem)</label>
+            <div style="display:flex;gap:6px;">
+              <input id="ferNovaLocInp" class="input" value="${esc(f.localizacao || '')}" placeholder="Ex: FER-P01-N2" style="flex:1;" />
+              <button type="button" class="btn btn-outline btn-sm" onclick="salvarLocalizacaoFerramenta('${esc(f.codigo)}')">📍 Salvar</button>
+            </div>
+          </div>
+        </div>
+      `;
+      ov.style.display = "flex";
+    }
+
+    async function confirmarRetiradaPopupFerramenta(codigo) {
+      const meuNome = (STATE.tecnicoAtual || localStorage.getItem("emed_tecnico_selecionado") || "TÉCNICO").toUpperCase();
+      const sel = document.getElementById("ferRetDestinoSel")?.value || "USO_PESSOAL";
+      const isPessoal = sel === "USO_PESSOAL";
+      const osObj = !isPessoal ? (STATE.data?.ordens || []).find(o => String(o.id) === String(sel)) : null;
+      const res = await apiPost("/api/ferramentas/acao", {
+        codigo,
+        acao: "RETIRADA",
+        tecnico: meuNome,
+        cliente: isPessoal ? "USO PESSOAL / TRABALHO INTERNO" : (osObj?.cliente || ""),
+        os_id: isPessoal ? "" : sel,
+        operador: meuNome
+      });
+      if (res && res.ok) {
+        if (typeof mostrarToast === "function") mostrarToast(res.msg, "success");
+        const ov = document.getElementById("emedPopupFerramenta");
+        if (ov) ov.style.display = "none";
+        selecionarMenu("TEC_FERRAMENTAS");
+      } else {
+        alert(res?.msg || "Não foi possível retirar a ferramenta.");
+      }
+    }
+
+    async function confirmarBaixaPaulo(codigo) {
+      const operador = (STATE.tecnicoAtual || localStorage.getItem("emed_tecnico_selecionado") || "PAULO").toUpperCase();
+      const res = await apiPost("/api/ferramentas/acao", {
+        codigo,
+        acao: "CONFIRMAR_ESTOQUE_PAULO",
+        operador
+      });
+      if (res && res.ok) {
+        if (typeof mostrarToast === "function") mostrarToast(res.msg, "success");
+        selecionarMenu("TEC_FERRAMENTAS");
+      } else {
+        alert(res?.msg || "Erro ao confirmar baixa.");
+      }
+    }
+
+    async function salvarLocalizacaoFerramenta(codigo) {
+      const novaLoc = (document.getElementById("ferNovaLocInp")?.value || "").trim().toUpperCase();
+      if (!novaLoc) return;
+      const operador = (STATE.tecnicoAtual || localStorage.getItem("emed_tecnico_selecionado") || "ESTOQUE").toUpperCase();
+      const res = await apiPost("/api/ferramentas/acao", {
+        codigo,
+        acao: "ATUALIZAR_LOCAL_CONTAGEM",
+        localizacao: novaLoc,
+        operador
+      });
+      if (res && res.ok) {
+        if (typeof mostrarToast === "function") mostrarToast(res.msg, "success");
+        const ov = document.getElementById("emedPopupFerramenta");
+        if (ov) ov.style.display = "none";
+        selecionarMenu("TEC_FERRAMENTAS");
+      } else {
+        alert(res?.msg || "Erro ao atualizar localização.");
+      }
+    }
+
+    async function abrirScannerFerramentaCamera() {
+      let stream = null;
+      let ov = document.getElementById("emedScannerModal");
+      if (!ov) {
+        ov = document.createElement("div");
+        ov.id = "emedScannerModal";
+        ov.style = "position:fixed;inset:0;z-index:99999;background:rgba(2,6,23,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;";
+        document.body.appendChild(ov);
+      }
+      const fechar = () => {
+        try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch(e){}
+        ov.style.display = "none";
+      };
+      window._fecharScannerFerramenta = fechar;
+      ov.innerHTML = `
+        <div style="background:#fff;border-radius:14px;max-width:440px;width:100%;padding:14px;text-align:center;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <b style="color:#002b54;">📷 Ler QR / Código de Barras</b>
+            <button type="button" onclick="window._fecharScannerFerramenta()" style="background:#ef4444;color:#fff;border:none;border-radius:999px;padding:4px 10px;font-weight:800;cursor:pointer;">✕ Fechar</button>
+          </div>
+          <video id="vidScannerFerramenta" autoplay playsinline style="width:100%;max-height:260px;background:#000;border-radius:10px;object-fit:cover;"></video>
+          <div id="lblStatusScanner" style="font-size:11.5px;color:#475569;margin:8px 0;">Aponte a câmera para o QR Code ou código de barras da ferramenta...</div>
+          <div style="display:flex;gap:6px;margin-top:8px;">
+            <input id="inpCodigoManualScan" class="input" placeholder="Ou digite código / patrimônio (ex: FER-002)" style="flex:1;text-transform:uppercase;" />
+            <button type="button" class="btn btn-primary btn-sm" onclick="const v=document.getElementById('inpCodigoManualScan').value;window._fecharScannerFerramenta();if(v)abrirPopupFerramentaInterativa(v);">Abrir</button>
+          </div>
+        </div>
+      `;
+      ov.style.display = "flex";
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        const vid = document.getElementById("vidScannerFerramenta");
+        vid.srcObject = stream;
+        if ("BarcodeDetector" in window) {
+          const detector = new BarcodeDetector({ formats: ["qr_code", "code_128", "ean_13", "code_39"] });
+          const loop = async () => {
+            if (ov.style.display === "none") return;
+            try {
+              const codes = await detector.detect(vid);
+              if (codes && codes.length > 0 && codes[0].rawValue) {
+                const val = codes[0].rawValue.trim().toUpperCase();
+                fechar();
+                abrirPopupFerramentaInterativa(val);
+                return;
+              }
+            } catch(e){}
+            requestAnimationFrame(loop);
+          };
+          requestAnimationFrame(loop);
+        } else {
+          document.getElementById("lblStatusScanner").innerText = "Câmera aberta. Caso seu navegador não suporte leitura automática, digite o código abaixo:";
+        }
+      } catch (err) {
+        document.getElementById("lblStatusScanner").innerText = "Câmera indisponível neste dispositivo. Digite o código ou patrimônio abaixo:";
+      }
+    }
     async function devolverMinhaFerramenta(codigo, avisoEntrega) {
 
 

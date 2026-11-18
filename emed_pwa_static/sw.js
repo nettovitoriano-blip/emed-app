@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v1-0-7-2-login-versao';
+const CACHE_NAME = 'emed-pwa-v1-1-0-almox-ferramentas-qr';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

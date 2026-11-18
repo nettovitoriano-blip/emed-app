@@ -3671,6 +3671,7 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/api/instalacao/")
 
         or path.startswith("/api/imprimir/")
+        or path == "/api/ferramentas/etiquetas-qr"
         or path.startswith("/proposta/")
         or path == "/api/proposta/responder"
 
@@ -9451,9 +9452,7 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
         cur = conn.cursor()
 
-        id_num = int(os_id) if os_id.isdigit() else 0
-
-        cur.execute("SELECT * FROM notas_fiscais WHERE os_id = ? OR numero_nf = ? OR (id = ? AND ? > 0)", (os_id, os_id, id_num, id_num))
+        cur.execute("SELECT * FROM notas_fiscais WHERE os_id = ?", (os_id,))
 
         r = cur.fetchone()
 
@@ -9471,19 +9470,17 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
     cnpj_cli = limpar_texto(row_os.get("cnpj") if row_os is not None else dados_nf.get("cnpj_tomador", ""), "00.000.000/0000-00")
 
-    end_cli = limpar_texto(row_os.get("endereco") if row_os is not None else dados_nf.get("tomador_endereco", ""), "UNIDADE HOSPITALAR")
+    end_cli = limpar_texto(row_os.get("endereco") if row_os is not None else "", "UNIDADE HOSPITALAR")
 
-    cid_cli = limpar_texto(row_os.get("cidade") if row_os is not None else dados_nf.get("tomador_cidade", ""), "FORTALEZA")
+    cid_cli = limpar_texto(row_os.get("cidade") if row_os is not None else "", "FORTALEZA")
 
-    uf_cli = limpar_texto(row_os.get("estado") if row_os is not None else dados_nf.get("tomador_uf", ""), "CE")
+    uf_cli = limpar_texto(row_os.get("estado") if row_os is not None else "", "CE")
 
-    is_trf = "TRANSFER" in str(dados_nf.get("tipo_nota", "")).upper()
+    equip_nome = limpar_texto(row_os.get("equipamento") if row_os is not None else "", "EQUIPAMENTO HOSPITALAR")
 
-    equip_nome = "TRANSPORTE / CARGA DE PEÇAS & INSUMOS" if is_trf else limpar_texto(row_os.get("equipamento") if row_os is not None else "", "EQUIPAMENTO HOSPITALAR")
+    tec_nome = limpar_texto(row_os.get("tecnico_responsavel") if row_os is not None else "", "MARCOS")
 
-    tec_nome = "CONDUTOR DA FROTA / LOGÍSTICA" if is_trf else limpar_texto(row_os.get("tecnico_responsavel") if row_os is not None else "", "MARCOS")
-
-    srv_tipo = "TRANSFERÊNCIA DE ESTOQUE ENTRE FILIAIS" if is_trf else limpar_texto(row_os.get("tipo_servico") if row_os is not None else "", "CORRETIVA (GERAL)")
+    srv_tipo = limpar_texto(row_os.get("tipo_servico") if row_os is not None else "", "CORRETIVA (GERAL)")
 
 
 
@@ -9509,13 +9506,7 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
     val_total = val_srv + val_pec
 
-    descr = dados_nf.get("discriminacao_servico") or f"Prestação de serviços especializados de manutenção e reparação técnica no equipamento {equip_nome}. Atendimento OS #{os_id}."
-    descr = (
-        descr.replace("Engenharia Clínica e Manutenção", "Manutenção e Reparação Técnica")
-        .replace("engenharia clínica e manutenção técnica", "manutenção e reparação técnica")
-        .replace("Engenharia Clínica", "Manutenção e Reparação Técnica")
-        .replace("engenharia clínica", "manutenção e reparação técnica")
-    )
+    descr = dados_nf.get("discriminacao_servico") or f"Prestação de serviços especializados de engenharia clínica e manutenção técnica no equipamento {equip_nome}. Atendimento OS #{os_id}."
 
 
 
@@ -9564,16 +9555,7 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
 
     base_pub = _obter_base_url_publica(request)
-    whats_msg = (
-        f"🧾 *EMED ELETROMEDICINA • NOTA FISCAL EMITIDA*\n\n"
-        f"🏥 *Cliente:* {cli_nome}\n"
-        f"📋 *NFS-e Nº:* {num_nf} (OS #{os_id})\n"
-        f"💰 *Valor Total:* R$ {val_total:,.2f}\n"
-        f"🔐 *Chave de Acesso:* {chave}\n"
-        f"✅ *Status:* AUTORIZADA SEFAZ\n\n"
-        f"📄 *Visualizar / Baixar PDF Oficial da Nota:*\n"
-        f"{base_pub}/api/fiscal/danfe/{os_id}"
-    )
+    whats_msg = f"Olá, segue o espelho oficial da Nota Fiscal Eletrônica {num_nf} (OS #{os_id}) emitida pela EMED Eletromedicina: {base_pub}/api/fiscal/danfe/{os_id}"
 
     whats_msg_enc = urllib.parse.quote(whats_msg)
 
@@ -9589,22 +9571,9 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
 
 
-    # Geração do QR Code oficial de validação SEFAZ/DANFE
-    url_danfe_val = f"{base_pub}/api/fiscal/danfe/{os_id}"
-    try:
-        from emed_services.equipamento_qrcode import gerar_qrcode_base64
-        qr_b64 = gerar_qrcode_base64(url_danfe_val)
-    except Exception:
-        qr_b64 = ""
-
-    qr_html = f'''<div style="text-align: center;">
-                <img src="data:image/png;base64,{qr_b64}" alt="QR Code Oficial" style="width: 72px; height: 72px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px; background: #fff; display: block; margin: 0 auto;" />
-                <div style="font-size: 7.5px; color: #0284c7; font-weight: 800; margin-top: 2px; text-transform: uppercase;">Validação Digital</div>
-              </div>''' if qr_b64 else ""
-
     filial_emissora = dados_nf.get("filial_emissora") or ("FILIAL_DF" if uf_cli == "DF" else "MATRIZ_CE")
-    filial_badge = "FILIAL BRASÍLIA - DF" if filial_emissora == "FILIAL_DF" else "MATRIZ EUSÉBIO - CE"
-    prestador_razao = "EMED ELETROMEDICINA LTDA."
+
+    prestador_razao = dados_nf.get("prestador_razao") or ("EMED ELETROMEDICINA LTDA. - FILIAL BRASÍLIA" if filial_emissora == "FILIAL_DF" else "EMED ELETROMEDICINA LTDA.")
 
     prestador_cnpj = dados_nf.get("prestador_cnpj") or ("03.611.974/0002-80" if filial_emissora == "FILIAL_DF" else "03.611.974/0001-08")
 
@@ -9624,197 +9593,469 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
     doc_aux_titulo = "DOCUMENTO AUXILIAR DA NFS-e DF" if filial_emissora == "FILIAL_DF" else "DOCUMENTO AUXILIAR DA NFS-e / NF-e"
 
-    if is_trf:
-        doc_aux_titulo = "DANFE • NOTA FISCAL ELETRÔNICA DE TRANSFERÊNCIA"
-        orgao_emissor = "SECRETARIA DA FAZENDA (SEFAZ • TRANSFERÊNCIA ENTRE ESTABELECIMENTOS)"
-
     sub_titulo_unidade = "Unidade Brasília (DF)" if filial_emissora == "FILIAL_DF" else "Matriz Ceará"
 
 
 
     html_danfe = f"""<!DOCTYPE html>
+
 <html lang="pt-BR">
+
 <head>
+
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <title>DANFE / Espelho da Nota Fiscal — OS #{os_id} ({num_nf})</title>
+
   <style>
-    @page {{ size: A4 portrait; margin: 6mm; }}
+
+    @page {{ size: A4 portrait; margin: 10mm; }}
+
     * {{ box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }}
-    html, body {{ margin: 0; padding: 0; background: #f8fafc; color: #0b132b; }}
-    body {{ padding: 10px; }}
-    .danfe-box {{ max-width: 800px; margin: 0 auto; background: #fff; border: 1.5px solid #002b54; border-radius: 6px; padding: 10px; box-shadow: 0 3px 15px rgba(0,0,0,0.06); }}
-    .no-print {{ background: #002b54; color: #fff; padding: 6px 12px; margin: -10px -10px 10px -10px; border-radius: 4px 4px 0 0; }}
-    .btn-action {{ background: #0077b6; color: #fff; border: none; padding: 5px 12px; font-weight: bold; border-radius: 4px; cursor: pointer; text-decoration: none; font-size: 11px; display: inline-flex; align-items: center; }}
-    .btn-action:hover {{ background: #023e8a; }}
-    .header-tbl {{ width: 100%; border-bottom: 1.5px solid #002b54; padding-bottom: 6px; margin-bottom: 6px; border-collapse: collapse; }}
-    .title-danfe {{ font-size: 13.5px; font-weight: 900; color: #002b54; text-transform: uppercase; }}
-    .badge-nf {{ background: #dcfce7; color: #15803d; border: 1px solid #86efac; padding: 1.5px 5px; border-radius: 3px; font-weight: 800; font-size: 9.5px; }}
-    .sec-header {{ background: #002b54; color: #fff; font-size: 9.5px; font-weight: 800; padding: 3px 6px; margin: 6px 0 2px 0; border-radius: 3px; text-transform: uppercase; }}
-    .data-tbl {{ width: 100%; border-collapse: collapse; font-size: 9px; margin-bottom: 3px; }}
-    .data-tbl td, .data-tbl th {{ border: 1px solid #cbd5e1; padding: 3px 5px; text-align: left; vertical-align: middle; }}
+
+    body {{ background: #f8fafc; margin: 0; padding: 20px; color: #0b132b; }}
+
+    .danfe-box {{ max-width: 820px; margin: 0 auto; background: #fff; border: 2px solid #002b54; border-radius: 8px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }}
+
+    .no-print {{ background: #002b54; color: #fff; padding: 10px 16px; margin: -20px -20px 20px -20px; border-radius: 6px 6px 0 0; display: flex; justify-content: space-between; align-items: center; }}
+
+    .btn-print {{ background: #0077b6; color: #fff; border: none; padding: 8px 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
+
+    .btn-print:hover {{ background: #023e8a; }}
+
+    .header-tbl {{ width: 100%; border-bottom: 2px solid #002b54; padding-bottom: 12px; margin-bottom: 12px; }}
+
+    .title-danfe {{ font-size: 16px; font-weight: 900; color: #002b54; text-transform: uppercase; }}
+
+    .badge-nf {{ background: #dcfce7; color: #15803d; border: 1.5px solid #86efac; padding: 3px 8px; border-radius: 4px; font-weight: 800; font-size: 11px; }}
+
+    .sec-header {{ background: #002b54; color: #fff; font-size: 11px; font-weight: 800; padding: 5px 8px; margin: 12px 0 4px 0; border-radius: 4px; text-transform: uppercase; }}
+
+    .data-tbl {{ width: 100%; border-collapse: collapse; font-size: 11.5px; margin-bottom: 6px; }}
+
+    .data-tbl td, .data-tbl th {{ border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }}
+
     .data-tbl th {{ background: #f1f5f9; font-weight: 700; color: #334155; }}
-    .val-destaque {{ font-size: 13px; font-weight: 900; color: #059669; }}
+
+    .val-destaque {{ font-size: 15px; font-weight: 900; color: #059669; }}
+
     @media print {{
-      @page {{ size: A4 portrait; margin: 6mm; }}
-      html, body {{ background: #fff !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }}
-      .danfe-box {{ border: 1.5px solid #002b54 !important; box-shadow: none !important; max-width: 100% !important; width: 100% !important; padding: 6px !important; margin: 0 !important; }}
+
+      body {{ background: #fff; padding: 0; }}
+
+      .danfe-box {{ border: 1px solid #000; box-shadow: none; max-width: 100%; padding: 12px; }}
+
       .no-print {{ display: none !important; }}
-      tr, td, th {{ page-break-inside: avoid; }}
+
     }}
+
   </style>
+
 </head>
+
 <body>
+
   <div class="danfe-box">
-    <!-- BARRA SUPERIOR DE AÇÕES (IMPRESSÃO / PDF) -->
+
     <div class="no-print">
-      <table style="width: 100%; border-collapse: collapse; border: none;">
-        <tr>
-          <td style="border: none; text-align: left; vertical-align: middle;">
-            <span style="font-weight: bold; font-size: 12px;">🧾 Sistema Fiscal EMED &bull; Espelho Oficial da Nota Fiscal</span>
-          </td>
-          <td style="border: none; text-align: right; vertical-align: middle;">
-            <button class="btn-action" onclick="window.print()">🖨️ Imprimir</button>
-            <a href="/api/fiscal/danfe/{os_id}?formato=pdf" download="DANFE_NFS_{num_nf}.pdf" class="btn-action" style="background:#0284c7; margin-left: 6px;">📥 Baixar PDF</a>
-            <button class="btn-action" style="background:#64748b; margin-left: 6px;" onclick="window.close()">✕ Fechar</button>
-          </td>
-        </tr>
-      </table>
+
+      <div style="font-weight: bold; font-size: 14px;">🧾 Sistema Fiscal EMED — Espelho Oficial de Nota Fiscal</div>
+
+      <div style="display:flex;gap:6px;align-items:center;">
+
+        <button class="btn-print" onclick="window.print()">🖨️ Imprimir / PDF</button>
+
+        <button class="btn-print" style="background:#059669;" onclick="document.getElementById('painelEnvioCliente').scrollIntoView({{behavior:'smooth'}})">📧 Enviar p/ Cliente</button>
+
+        <button class="btn-print" style="background:#64748b;margin-left:6px;" onclick="window.close()">✕ Fechar</button>
+
+      </div>
+
     </div>
+
+
+
+    <!-- PAINEL DE CONFERÊNCIA, ENVIO POR E-MAIL E INTEGRAÇÃO CONTÁBIL -->
+
+    <div id="painelEnvioCliente" class="no-print" style="background: #eff6ff; border: 2px solid #3b82f6; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
+
+        <div style="flex:1;min-width:280px;">
+
+          <div style="font-weight:900;color:#1e3a8a;font-size:13.5px;display:flex;align-items:center;gap:6px;">
+
+            <span>✉️ Enviar Nota Fiscal para o Cliente</span>
+
+            <span id="badgeEnvioCliente" style="font-size:10.5px;padding:2px 8px;border-radius:4px;font-weight:bold;{badge_style_cliente}">
+
+              {badge_status_cliente}
+
+            </span>
+
+          </div>
+
+          <div style="font-size:11.5px;color:#1e40af;margin-top:2px;margin-bottom:8px;">
+
+            Confira as informações da nota fiscal e envie diretamente para o e-mail cadastrado do cliente hospitalar.
+
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+
+            <input type="email" id="inputEmailCliente" value="{email_cli}" placeholder="ex: faturamento@hospital.com.br"
+
+                   style="flex:1;min-width:240px;padding:8px 10px;font-size:12px;border:1.5px solid #93c5fd;border-radius:6px;font-weight:600;outline:none;" />
+
+            <button type="button" id="btnDispararEnvio" onclick="enviarNotaParaCliente('{os_id}')"
+
+                    style="background:#2563eb;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:bold;font-size:12px;cursor:pointer;">
+
+              🚀 Disparar E-mail
+
+            </button>
+
+            <a id="btnMailto" href="mailto:{email_cli}?subject=Nota%20Fiscal%20Eletronica%20{num_nf}%20-%20EMED&body=Segue%20espelho%20da%20Nota%20Fiscal%20Eletronica%20{num_nf}%20referente%20a%20OS%20#{os_id}:%20{base_pub}/api/fiscal/danfe/{os_id}" target="_blank"
+
+               style="background:#fff;color:#1d4ed8;border:1.5px solid #93c5fd;padding:7px 12px;border-radius:6px;font-weight:bold;font-size:11.5px;text-decoration:none;">
+
+              📬 Outlook / Gmail
+
+            </a>
+
+            <a href="https://api.whatsapp.com/send?phone=55{whats_digits}&text={whats_msg_enc}" target="_blank"
+
+               style="background:#16a34a;color:#fff;border:none;padding:7px 12px;border-radius:6px;font-weight:bold;font-size:11.5px;text-decoration:none;">
+
+              📲 WhatsApp
+
+            </a>
+
+          </div>
+
+          <div id="msgStatusEnvio" style="margin-top:8px;font-size:11.5px;font-weight:bold;display:none;"></div>
+
+        </div>
+
+
+
+        <div style="background:#fff;border:1.5px solid #bfdbfe;border-radius:6px;padding:10px 14px;min-width:240px;">
+
+          <div style="font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;">Fechamento Contábil Oficial</div>
+
+          <div style="font-size:13px;font-weight:900;color:#0284c7;margin:2px 0;">📁 Lote Contábil: {lote_mes_fmt}</div>
+
+          <div style="font-size:11px;font-weight:bold;{cor_contab}">
+
+            {txt_contab}
+
+          </div>
+
+          <div style="font-size:9.5px;color:#64748b;margin-top:3px;">
+
+            A nota fiscal é automaticamente agrupada para a apuração mensal do DAS/ISS pela assessoria contábil.
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+
 
     <!-- CABEÇALHO EMED -->
+
     <table class="header-tbl">
+
       <tr>
-        <td style="width: 95px; vertical-align: middle; border: none;">
-          <img src="/api/logo-circle" alt="EMED" style="width: 75px; height: auto;" onerror="this.src='/api/logo'" />
+
+        <td style="width: 140px; vertical-align: middle;">
+
+          <img src="/api/logo-circle" alt="EMED" style="width: 100px; height: auto;" onerror="this.src='/api/logo'" />
+
         </td>
-        <td style="vertical-align: middle; border: none; padding-left: 6px;">
-          <div class="title-danfe">{prestador_razao} <span style="font-size: 10px; font-weight: 800; color: #0284c7; letter-spacing: 0;">&bull; {filial_badge}</span></div>
-          <div style="font-size: 10px; color: #0077b6; font-weight: 800; margin-top: 1px; margin-bottom: 1px;">Manutenção em Equipamentos de Diagnóstico por Imagem</div>
-          <div style="font-size: 8.5px; color: #475569; margin-top: 1px; line-height: 1.25;">
+
+        <td style="vertical-align: middle;">
+
+          <div class="title-danfe">{prestador_razao}</div>
+
+          <div style="font-size: 11px; color: #0077b6; font-weight: bold; margin-top: 1px;">Eletromedicina • Manutenção em Equipamentos de Diagnóstico por Imagem • {sub_titulo_unidade}</div>
+
+          <div style="font-size: 10px; color: #475569; margin-top: 3px; line-height: 1.35;">
+
             <b>CNPJ:</b> {prestador_cnpj} &bull; <b>{'CF/DF' if filial_emissora == 'FILIAL_DF' else 'Insc. Municipal'}:</b> {prestador_im} &bull; <b>Órgão:</b> {orgao_emissor}<br/>
+
             <b>Endereço Emissor:</b> {prestador_end}, {prestador_cid} - {prestador_uf} &bull; <b>Fone:</b> {prestador_fone}<br/>
+
             <b>Site:</b> emed.med.br &bull; <b>E-mail:</b> {prestador_email}
+
           </div>
+
         </td>
-        <td style="width: 270px; vertical-align: middle; text-align: right; border: none;">
-          <table style="width: 100%; border: 1.5px solid #002b54; border-radius: 5px; background: #f8fafc; border-collapse: collapse;">
-            <tr>
-              <td style="padding: 4px 6px; text-align: left; vertical-align: middle; border: none;">
-                <div style="font-size: 8px; font-weight: 800; color: #002b54; text-transform: uppercase;">{doc_aux_titulo}</div>
-                <div style="font-size: 13px; font-weight: 900; color: #0b132b; margin: 1px 0;">{num_nf}</div>
-                <div class="badge-nf" style="display: inline-block;">STATUS: {st_fiscal}</div>
-                <div style="font-size: 8px; color: #64748b; margin-top: 2px;">Emissão: <b>{dt_emissao}</b></div>
-              </td>
-              <td style="width: 65px; padding: 4px 6px; text-align: center; vertical-align: middle; border: none;">
-                {qr_html}
-              </td>
-            </tr>
-          </table>
+
+        <td style="width: 230px; vertical-align: middle; text-align: right;">
+
+          <div style="border: 2px solid #002b54; border-radius: 6px; padding: 8px; background: #f8fafc; text-align: center;">
+
+            <div style="font-size: 10px; font-weight: 800; color: #002b54;">{doc_aux_titulo}</div>
+
+            <div style="font-size: 16px; font-weight: 900; color: #0b132b; margin: 3px 0;">{num_nf}</div>
+
+            <div class="badge-nf">STATUS: {st_fiscal}</div>
+
+            <div style="font-size: 9.5px; color: #64748b; margin-top: 4px;">Emissão: <b>{dt_emissao}</b></div>
+
+          </div>
+
         </td>
+
       </tr>
+
     </table>
 
-    <!-- BARRA CHAVE DE AUTENTICAÇÃO -->
-    <table style="width: 100%; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; margin-bottom: 4px; border-collapse: collapse;">
-      <tr>
-        <td style="padding: 3px 6px; font-size: 8.5px; border: none; text-align: left;">
-          <b>Chave de Autenticação / Protocolo Digital:</b> <span style="font-family: monospace; letter-spacing: 0.5px; font-weight: 600;">{chave}</span>
-        </td>
-        <td style="padding: 3px 6px; font-size: 8px; color: #0284c7; font-weight: 700; border: none; text-align: right; white-space: nowrap;">
-          📱 Validação Digital via QR Code
-        </td>
-      </tr>
-    </table>
+
+
+    <div style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 4px; font-size: 10px; margin-bottom: 8px;">
+
+      <b>Chave de Autenticação / Protocolo Digital:</b> <span style="font-family: monospace; letter-spacing: 0.5px;">{chave}</span>
+
+    </div>
+
+
 
     <!-- TOMADOR DOS SERVIÇOS -->
+
     <div class="sec-header">1. Dados do Tomador / Cliente Hospitalar</div>
+
     <table class="data-tbl">
+
       <tr>
+
         <td colspan="2"><span style="color:#64748b;">Razão Social / Nome:</span> <b>{cli_nome}</b></td>
+
         <td><span style="color:#64748b;">CNPJ / CPF:</span> <b>{cnpj_cli}</b></td>
+
       </tr>
+
       <tr>
+
         <td colspan="2"><span style="color:#64748b;">Endereço:</span> <b>{end_cli}</b></td>
+
         <td><span style="color:#64748b;">Município / UF:</span> <b>{cid_cli} - {uf_cli}</b></td>
+
       </tr>
+
     </table>
+
+
 
     <!-- DADOS DA ORDEM DE SERVIÇO -->
+
     <div class="sec-header">2. Identificação da Ordem de Serviço & Atendimento Técnico</div>
+
     <table class="data-tbl">
+
       <tr>
-        <td style="width: 20%;"><span style="color:#64748b;">OS Vinculada:</span><br/><b>#{os_id}</b></td>
-        <td colspan="3"><span style="color:#64748b;">Equipamento:</span><br/><b>{equip_nome}</b></td>
+
+        <td><span style="color:#64748b;">OS Vinculada:</span> <b>#{os_id}</b></td>
+
+        <td><span style="color:#64748b;">Equipamento:</span> <b>{equip_nome}</b></td>
+
+        <td><span style="color:#64748b;">Tipo de Serviço:</span> <b>{srv_tipo}</b></td>
+
+        <td><span style="color:#64748b;">Técnico Responsável:</span> <b>{tec_nome}</b></td>
+
       </tr>
-      <tr>
-        <td colspan="2" style="width: 50%;"><span style="color:#64748b;">Tipo de Atendimento:</span> <b>{srv_tipo}</b></td>
-        <td colspan="2" style="width: 50%;"><span style="color:#64748b;">Técnico Responsável:</span> <b>{tec_nome}</b></td>
-      </tr>
+
     </table>
 
-    <!-- DISCRIMINAÇÃO DOS SERVIÇOS -->
-    <div class="sec-header">3. Discriminação dos Serviços & Peças</div>
-    <div style="border: 1px solid #cbd5e1; padding: 5px 8px; border-radius: 4px; font-size: 9px; background: #fafafa; line-height: 1.25; margin-bottom: 4px;">
+
+
+    <!-- DISCRIMINAÇÃO DOS SERVIÇOS & PEÇAS -->
+
+    <div class="sec-header">3. Discriminação dos Serviços de Engenharia Clínica & Peças</div>
+
+    <div style="border: 1px solid #cbd5e1; padding: 10px; border-radius: 4px; font-size: 11.5px; background: #fafafa; min-height: 80px; line-height: 1.5; margin-bottom: 8px;">
+
       <b>{tipo_nota}</b><br/>
-      {descr}<br/>
-      <span style="font-size: 8px; color: #64748b; font-style: italic;">{txt_pecas_detalhe}</span>
+
+      {descr}<br/><br/>
+
+      {"<b>Peças Aplicadas no Atendimento:</b><br/>" + "".join([f"&bull; [{p['origem']}] {p['item']} (Cód: {p['codigo']})<br/>" for p in pecas]) if pecas else "<i>Nenhuma peça faturada separadamente (mão de obra e insumos inclusos no serviço clínico).</i>"}
+
     </div>
+
+
 
     <!-- QUADRO DE VALORES -->
+
     <div class="sec-header">4. Valores e Tributação Consolidada</div>
+
     <table class="data-tbl">
+
       <thead>
+
         <tr>
+
           <th>Valor Mão de Obra / Serviços</th>
+
           <th>Valor Peças / Produtos</th>
+
           <th>Deduções / Descontos</th>
+
           <th>Base de Cálculo ISS</th>
+
           <th>VALOR TOTAL DA NOTA FISCAL</th>
+
         </tr>
+
       </thead>
+
       <tbody>
+
         <tr>
-          <td>R$ {val_servicos:,.2f}</td>
-          <td>R$ {val_pecas:,.2f}</td>
+
+          <td style="font-weight: bold; font-size: 13px;">R$ {val_srv:,.2f}</td>
+
+          <td style="font-weight: bold; font-size: 13px;">R$ {val_pec:,.2f}</td>
+
           <td>R$ 0,00</td>
-          <td>R$ {val_servicos:,.2f}</td>
+
+          <td>R$ {val_srv:,.2f}</td>
+
           <td class="val-destaque">R$ {val_total:,.2f}</td>
+
         </tr>
+
       </tbody>
+
     </table>
 
+
+
     <!-- INFORMAÇÕES COMPLEMENTARES -->
+
     <div class="sec-header">5. Informações Complementares e Fiscais</div>
-    <div style="border: 1px solid #cbd5e1; padding: 4px 6px; border-radius: 4px; font-size: 8px; color: #475569; line-height: 1.25; background: #fff;">
+
+    <div style="border: 1px solid #cbd5e1; padding: 8px; border-radius: 4px; font-size: 10px; color: #475569; line-height: 1.4; background: #fff;">
+
       &bull; DOCUMENTO EMITIDO POR ME OU EPP OPTANTE PELO SIMPLES NACIONAL.<br/>
+
       &bull; NÃO GERA DIREITO A CRÉDITO FISCAL DE IPI / ICMS.<br/>
+
       &bull; Valor aproximado dos tributos federais e municipais (IBPT): R$ {(val_total * 0.1345):,.2f} (13,45%).<br/>
+
       &bull; Serviços de Manutenção Preventiva/Corretiva e Validação Metrológica de Equipamentos Médicos Hospitalares em conformidade com as normas ANVISA RDC 611 e ABNT NBR IEC 60601.
+
     </div>
 
-    <div style="margin-top: 5px; text-align: center; font-size: 8px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 3px;">
+
+
+    <div style="margin-top: 14px; text-align: center; font-size: 9.5px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 8px;">
+
       EMED Eletromedicina Ltda. &bull; Comprovante Digital de Faturamento Homologado &bull; Emitido pelo Sistema Oficial EMED
-    </div>
-  </div>
-</body>
-</html>"""
 
-    formato = request.query.get("formato", "").lower()
-    if formato == "pdf" or request.path.endswith("/pdf"):
-        try:
-            from emed_services import converter_html_para_pdf_bytes
-            pdf_bytes = converter_html_para_pdf_bytes(html_danfe)
-            if pdf_bytes:
-                return web.Response(
-                    body=pdf_bytes,
-                    content_type="application/pdf",
-                    headers={
-                        "Content-Disposition": f'inline; filename="DANFE_NFS_{num_nf}.pdf"'
-                    }
-                )
-        except Exception as _e_pdf:
-            print(f"Erro ao converter DANFE para PDF: {_e_pdf}")
+    </div>
+
+  </div>
+
+  <script>
+
+    async function enviarNotaParaCliente(osId) {{
+
+      var email = document.getElementById('inputEmailCliente').value.trim();
+
+      if (!email || email.indexOf('@') === -1) {{
+
+        alert('Por favor, informe um endereço de e-mail válido para o cliente.');
+
+        return;
+
+      }}
+
+      var btn = document.getElementById('btnDispararEnvio');
+
+      var msg = document.getElementById('msgStatusEnvio');
+
+      btn.disabled = true;
+
+      btn.innerText = 'Enviando...';
+
+      try {{
+
+        var res = await fetch('/api/fiscal/enviar-cliente', {{
+
+          method: 'POST',
+
+          headers: {{ 'Content-Type': 'application/json' }},
+
+          body: JSON.stringify({{ os_id: osId, email: email }})
+
+        }});
+
+        var data = await res.json();
+
+        if (data.ok) {{
+
+          msg.style.display = 'block';
+
+          msg.style.color = '#15803d';
+
+          msg.innerHTML = '✅ ' + data.msg + ' &bull; Vinculada ao Lote Contábil ' + (data.lote_contabilidade || '') + '.';
+
+          var mailto = document.getElementById('btnMailto');
+
+          if (mailto && data.mailto_url) mailto.href = data.mailto_url;
+
+          var badge = document.getElementById('badgeEnvioCliente');
+
+          if (badge) {{
+
+            badge.innerText = 'Enviada em ' + data.email_enviado_em;
+
+            badge.style.background = '#dcfce7';
+
+            badge.style.color = '#15803d';
+
+            badge.style.border = '1px solid #86efac';
+
+          }}
+
+        }} else {{
+
+          msg.style.display = 'block';
+
+          msg.style.color = '#dc2626';
+
+          msg.innerText = '⚠️ ' + (data.msg || 'Erro ao enviar e-mail.');
+
+        }}
+
+      }} catch (err) {{
+
+        msg.style.display = 'block';
+
+        msg.style.color = '#dc2626';
+
+        msg.innerText = '⚠️ Falha de comunicação: ' + err.message;
+
+      }} finally {{
+
+        btn.disabled = false;
+
+        btn.innerText = '🚀 Disparar E-mail';
+
+      }}
+
+    }}
+
+  </script>
+
+</body>
+
+</html>"""
 
     return web.Response(body=html_danfe, content_type="text/html", charset="utf-8")
 
@@ -12658,14 +12899,6 @@ async def api_estoque_salvar(request: web.Request) -> web.Response:
 
 
 
-    saldo_fiscal_val = body.get("saldo_fiscal")
-
-
-
-    saldo_fiscal = float(limpar_float(saldo_fiscal_val, quantidade)) if saldo_fiscal_val is not None else float(quantidade)
-
-
-
     preco = limpar_float(body.get("preco_unitario"), 0.0)
 
 
@@ -12746,7 +12979,7 @@ async def api_estoque_salvar(request: web.Request) -> web.Response:
 
 
 
-                SET nome_peca = ?, categoria = ?, quantidade = ?, saldo_fiscal = ?, preco_unitario = ?, preco_custo = ?,
+                SET nome_peca = ?, categoria = ?, quantidade = ?, preco_unitario = ?, preco_custo = ?,
 
 
 
@@ -12762,7 +12995,7 @@ async def api_estoque_salvar(request: web.Request) -> web.Response:
 
 
 
-            """, (nome_peca, categoria, quantidade, saldo_fiscal, preco, preco_custo, m_contrato, m_avulso, m_avista, m_desestimulo, localizacao, validade_cal, cert_cal, codigo))
+            """, (nome_peca, categoria, quantidade, preco, preco_custo, m_contrato, m_avulso, m_avista, m_desestimulo, localizacao, validade_cal, cert_cal, codigo))
 
 
 
@@ -12778,7 +13011,7 @@ async def api_estoque_salvar(request: web.Request) -> web.Response:
 
 
 
-                (codigo, nome_peca, categoria, quantidade, saldo_fiscal, estoque_minimo, preco_unitario, preco_custo,
+                (codigo, nome_peca, categoria, quantidade, estoque_minimo, preco_unitario, preco_custo,
 
 
 
@@ -12790,11 +13023,11 @@ async def api_estoque_salvar(request: web.Request) -> web.Response:
 
 
 
-                VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
 
 
-            """, (codigo, nome_peca, categoria, quantidade, saldo_fiscal, preco, preco_custo, m_contrato, m_avulso, m_avista, m_desestimulo, localizacao, validade_cal, cert_cal))
+            """, (codigo, nome_peca, categoria, quantidade, preco, preco_custo, m_contrato, m_avulso, m_avista, m_desestimulo, localizacao, validade_cal, cert_cal))
 
 
 
@@ -13492,434 +13725,225 @@ async def api_kardex(request: web.Request) -> web.Response:
 
 
 
+def _garantir_schema_patrimonio_ferramentas(conn):
+    cur = conn.cursor()
+    cols = [r[1] for r in cur.execute("PRAGMA table_info(ferramentas_cautela)").fetchall()]
+    if "patrimonio" not in cols:
+        cur.execute("ALTER TABLE ferramentas_cautela ADD COLUMN patrimonio TEXT DEFAULT ''")
+    rows_sem = cur.execute("SELECT id FROM ferramentas_cautela WHERE patrimonio IS NULL OR TRIM(patrimonio) = '' ORDER BY id ASC").fetchall()
+    for (fid,) in rows_sem:
+        cur.execute("UPDATE ferramentas_cautela SET patrimonio = ? WHERE id = ?", (f"EMED-PAT-{int(fid):04d}", fid))
+    conn.commit()
+
+
 async def api_ferramentas_listar(request: web.Request) -> web.Response:
-
-
-
-    """Retorna a lista atualizada de todas as ferramentas e instrumentos com seus status de cautela."""
-
-
-
+    """Lista todas as ferramentas/instrumentos com patrimonio, localizacao e disponibilidade em tempo real."""
     ferramentas = []
-
-
-
     with get_db_connection(DB_NAME) as conn:
-
-
-
         try:
-
-
-
+            _garantir_schema_patrimonio_ferramentas(conn)
             df_fer = pd.read_sql_query("SELECT * FROM ferramentas_cautela ORDER BY id ASC", conn)
-
-
-
             for _, r in df_fer.iterrows():
-
-
-
+                fid = int(r.get("id", 0))
                 ferramentas.append({
-
-
-
-                    "id": int(r.get("id", 0)),
-
-
-
+                    "id": fid,
                     "codigo": limpar_texto(r.get("codigo_ferramenta"), ""),
-
-
-
+                    "patrimonio": limpar_texto(r.get("patrimonio"), f"EMED-PAT-{fid:04d}"),
                     "nome": limpar_texto(r.get("nome_ferramenta"), ""),
-
-
-
                     "status": limpar_texto(r.get("status"), "DISPONIVEL").upper(),
-
-
-
                     "tecnico": limpar_texto(r.get("tecnico_responsavel"), "").upper(),
-
-
-
                     "cliente": limpar_texto(r.get("destino_cliente"), "").upper(),
-
-
-
                     "os_id": limpar_texto(r.get("os_id"), ""),
-
-
-
                     "data_saida": limpar_texto(r.get("data_saida"), ""),
-
-
-
+                    "data_devolucao": limpar_texto(r.get("data_devolucao"), ""),
                     "numero_serie": limpar_texto(r.get("numero_serie"), ""),
-
-
-
                     "localizacao": limpar_texto(r.get("localizacao"), "ALMOXARIFADO CENTRAL"),
-
-
-
                     "validade_calibracao": limpar_texto(r.get("data_validade_calibracao"), ""),
-
-
-
                     "certificado": limpar_texto(r.get("certificado_calibracao"), ""),
-
-
-
                     "observacao": limpar_texto(r.get("observacao"), "")
-
-
-
                 })
-
-
-
         except Exception as e:
-
-
-
             print("Erro ao listar ferramentas:", e)
-
-
-
     return web.json_response({"ok": True, "ferramentas": ferramentas})
 
 
+async def api_ferramentas_etiquetas_qr(request: web.Request) -> web.Response:
+    """Gera folha A4 imprimivel com etiquetas QR Code, Patrimonio e Prateleira de todas as ferramentas."""
+    import base64
+    import html as _h
+    import io
+    import qrcode
 
+    itens = []
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_patrimonio_ferramentas(conn)
+        rows = conn.execute(
+            "SELECT id, codigo_ferramenta, patrimonio, nome_ferramenta, localizacao, data_validade_calibracao FROM ferramentas_cautela ORDER BY id ASC"
+        ).fetchall()
+        for fid, cod, pat, nome, loc, val_cal in rows:
+            cod_s = str(cod or f"FER-{fid}").strip()
+            pat_s = str(pat or f"EMED-PAT-{int(fid):04d}").strip()
+            qr = qrcode.QRCode(version=1, box_size=5, border=2)
+            qr.add_data(cod_s)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            qr_b64 = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
+            itens.append({
+                "codigo": _h.escape(cod_s),
+                "patrimonio": _h.escape(pat_s),
+                "nome": _h.escape(str(nome or "")),
+                "loc": _h.escape(str(loc or "DEFINIR PRATELEIRA")),
+                "val": _h.escape(str(val_cal or "-")),
+                "qr": qr_b64,
+            })
 
-
-
-
-
-
+    cards = "".join(
+        f"""<div class="etq">
+          <img src="{it['qr']}" class="qr" />
+          <div class="info">
+            <div class="pat">{it['patrimonio']} • <b>{it['codigo']}</b></div>
+            <div class="nome">{it['nome'][:65]}</div>
+            <div class="loc">📍 {it['loc']}</div>
+            <div class="cal">Calibração: {it['val']}</div>
+          </div>
+        </div>"""
+        for it in itens
+    )
+    html_out = f"""<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Etiquetas QR & Patrimônio — EMED</title>
+<style>
+  body {{ font-family: Arial, sans-serif; margin: 12px; background: #f8fafc; }}
+  .top {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }}
+  .grid {{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }}
+  .etq {{ background:#fff; border:1.5px solid #0f172a; border-radius:6px; padding:6px; display:flex; align-items:center; gap:8px; page-break-inside:avoid; }}
+  .qr {{ width:72px; height:72px; flex-shrink:0; }}
+  .info {{ font-size:9.5px; line-height:1.25; overflow:hidden; }}
+  .pat {{ color:#0284c7; font-size:10px; }}
+  .nome {{ font-weight:bold; color:#0f172a; margin:2px 0; }}
+  .loc {{ color:#15803d; font-weight:bold; }}
+  .cal {{ color:#64748b; font-size:8.5px; }}
+  @media print {{ @page {{ size: A4; margin: 8mm; }} body {{ background:#fff; margin:0; }} .no-print {{ display:none; }} }}
+</style></head>
+<body>
+  <div class="top no-print">
+    <b>🏷️ Etiquetas QR Code &amp; Patrimônio — Almoxarifado EMED ({len(itens)} itens)</b>
+    <button onclick="window.print()" style="background:#002b54;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:bold;cursor:pointer;">🖨️ Imprimir Etiquetas A4</button>
+  </div>
+  <div class="grid">{cards}</div>
+</body></html>"""
+    return web.Response(text=html_out, content_type="text/html", charset="utf-8")
 
 
 async def api_ferramentas_acao(request: web.Request) -> web.Response:
-
-
-
-    """Registra movimentação via leitor de código de barras ou manual do Paulo."""
-
-
-
+    """Registra movimentacao via camera/leitor QR ou manual: RETIRADA, DEVOLUCAO (Prateleira Externa), CONFIRMAR_ESTOQUE_PAULO, ATUALIZAR_LOCAL_CONTAGEM."""
     body = await request.json()
-
-
-
     codigo = limpar_texto(body.get("codigo"), "").upper()
-
-
-
     acao = limpar_texto(body.get("acao"), "RETIRADA").upper()
-
-
-
     tecnico = limpar_texto(body.get("tecnico"), "").upper()
-
-
-
     cliente = limpar_texto(body.get("cliente"), "").upper()
-
-
-
     os_id = str(body.get("os_id", "")).strip()
-
-
-
     obs = limpar_texto(body.get("observacao"), "")
-
-
-
-    operador = limpar_texto(body.get("operador"), "PAULO (ALMOXARIFADO)").upper()
-
-
-
+    operador = limpar_texto(body.get("operador"), "TÉCNICO / ALMOXARIFADO").upper()
+    nova_loc = limpar_texto(body.get("localizacao"), "").upper()
     agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
 
-
-
-
-
-
-
     with get_db_connection(DB_NAME) as conn:
-
-
-
+        _garantir_schema_patrimonio_ferramentas(conn)
         cur = conn.cursor()
-
-
-
-        cur.execute("SELECT id, nome_ferramenta, status FROM ferramentas_cautela WHERE UPPER(codigo_ferramenta) = ? OR UPPER(numero_serie) = ?", (codigo, codigo))
-
-
-
+        cur.execute(
+            "SELECT id, codigo_ferramenta, nome_ferramenta, status, tecnico_responsavel, patrimonio, localizacao FROM ferramentas_cautela WHERE UPPER(codigo_ferramenta) = ? OR UPPER(numero_serie) = ? OR UPPER(patrimonio) = ?",
+            (codigo, codigo, codigo)
+        )
         row = cur.fetchone()
-
-
-
         if not row:
+            return web.json_response({"ok": False, "msg": f"❌ Ferramenta/Patrimônio '{codigo}' não encontrado no Almoxarifado!"}, status=404)
 
-
-
-            return web.json_response({"ok": False, "msg": f"❌ Ferramenta '{codigo}' não encontrada no cadastro do Almoxarifado!"}, status=404)
-
-
-
-
-
-
-
-        f_id, f_nome, f_status = row[0], str(row[1]), str(row[2]).upper()
-
-
-
-
-
-
+        f_id, cod_real, f_nome, f_status, f_tec_atual, f_pat, f_loc = row[0], str(row[1]), str(row[2]), str(row[3]).upper(), str(row[4] or "").upper(), str(row[5] or ""), str(row[6] or "ALMOXARIFADO CENTRAL")
 
         if acao == "RETIRADA":
-
-
-
             if not tecnico:
-
-
-
                 return web.json_response({"ok": False, "msg": "Selecione o técnico responsável pela retirada."}, status=400)
-
-
-
+            if f_status == "EM_USO" and f_tec_atual and f_tec_atual != tecnico:
+                return web.json_response({"ok": False, "msg": f"⚠️ {cod_real} ({f_pat}) está EM USO com 👷 {f_tec_atual}. Solicite devolução primeiro."}, status=409)
+            if f_status == "CALIBRACAO_BANCADA":
+                return web.json_response({"ok": False, "msg": f"🔬 {cod_real} está em BANCADA / CALIBRAÇÃO RBC no momento."}, status=409)
+            dest_final = cliente or ("USO PESSOAL / TRABALHO INTERNO" if not os_id else f"OS #{os_id}")
             cur.execute("""
-
-
-
-                UPDATE ferramentas_cautela 
-
-
-
+                UPDATE ferramentas_cautela
                 SET status = 'EM_USO', tecnico_responsavel = ?, destino_cliente = ?, os_id = ?, data_saida = ?, observacao = ?
-
-
-
                 WHERE id = ?
-
-
-
-            """, (tecnico, cliente, os_id, agora, obs, f_id))
-
-
-
+            """, (tecnico, dest_final, os_id, agora, obs, f_id))
             cur.execute("""
-
-
-
                 INSERT INTO historico_cautela_ferramentas (codigo_ferramenta, nome_ferramenta, tipo_acao, tecnico, destino_cliente, os_id, operador, data_hora, observacao)
-
-
-
                 VALUES (?, ?, 'RETIRADA', ?, ?, ?, ?, ?, ?)
-
-
-
-            """, (codigo, f_nome, tecnico, cliente, os_id, operador, agora, obs))
-
-
-
-            msg = f"📤 Ferramenta {codigo} entregue para 👷 {tecnico} com sucesso!"
-
-
-
-
-
-
+            """, (cod_real, f_nome, tecnico, dest_final, os_id, operador, agora, f"[{f_pat}] {obs}".strip()))
+            msg = f"📤 {cod_real} ({f_pat}) retirada por 👷 {tecnico}! Local original: 📍 {f_loc}"
 
         elif acao == "DEVOLUCAO":
-
-            aviso_entrega = obter_instrucao_ferramenta(codigo, "ENTREGA")
-
+            aviso_entrega = obter_instrucao_ferramenta(cod_real, "ENTREGA")
+            quem_dev = tecnico or operador or f_tec_atual or "TÉCNICO"
             cur.execute("""
-
-                UPDATE ferramentas_cautela 
-
-                SET status = 'DISPONIVEL', tecnico_responsavel = '', destino_cliente = '', os_id = '', data_devolucao = ?, observacao = ?
-
+                UPDATE ferramentas_cautela
+                SET status = 'DEVOLVIDO_PRATELEIRA_EXTERNA', tecnico_responsavel = ?, destino_cliente = 'PRATELEIRA EXTERNA (AGUARDANDO PAULO)', os_id = '', data_devolucao = ?, observacao = ?
                 WHERE id = ?
-
-            """, (agora, obs, f_id))
-
+            """, (quem_dev, agora, f"Devolvido por {quem_dev} em {agora} na Prateleira Externa. {obs}".strip(), f_id))
             cur.execute("""
-
                 INSERT INTO historico_cautela_ferramentas (codigo_ferramenta, nome_ferramenta, tipo_acao, tecnico, destino_cliente, os_id, operador, data_hora, observacao)
+                VALUES (?, ?, 'DEVOLUCAO_PRATELEIRA_EXTERNA', ?, 'PRATELEIRA EXTERNA', '', ?, ?, ?)
+            """, (cod_real, f_nome, quem_dev, operador, agora, obs))
+            msg = f"📥 {cod_real} ({f_pat}) entregue na Prateleira Externa! Paulo notificado p/ baixa (já disponível para retirada de urgência). {aviso_entrega}"
 
-                VALUES (?, ?, 'DEVOLUCAO', '', '', '', ?, ?, ?)
+        elif acao == "CONFIRMAR_ESTOQUE_PAULO":
+            cur.execute("""
+                UPDATE ferramentas_cautela
+                SET status = 'DISPONIVEL', tecnico_responsavel = '', destino_cliente = '', os_id = '', data_devolucao = ?, observacao = ?
+                WHERE id = ?
+            """, (agora, f"Conferido e reposto na prateleira 📍 {f_loc} por {operador} em {agora}. {obs}".strip(), f_id))
+            cur.execute("""
+                INSERT INTO historico_cautela_ferramentas (codigo_ferramenta, nome_ferramenta, tipo_acao, tecnico, destino_cliente, os_id, operador, data_hora, observacao)
+                VALUES (?, ?, 'CONFERENCIA_ESTOQUE', '', ?, '', ?, ?, ?)
+            """, (cod_real, f_nome, f_loc, operador, agora, obs))
+            msg = f"✅ Baixa confirmada! {cod_real} ({f_pat}) reposta na prateleira 📍 {f_loc} e DISPONÍVEL no estoque."
 
-            """, (codigo, f_nome, operador, agora, obs))
-
-            msg = f"📥 Ferramenta {codigo} devolvida ao Almoxarifado! {aviso_entrega}"
-
-
-
-
-
-
+        elif acao == "ATUALIZAR_LOCAL_CONTAGEM":
+            if nova_loc:
+                cur.execute("UPDATE ferramentas_cautela SET localizacao = ?, observacao = ? WHERE id = ?", (nova_loc, f"Contagem/Local atualizado em {agora} por {operador}. {obs}".strip(), f_id))
+            msg = f"📍 Localização de {cod_real} ({f_pat}) atualizada para: {nova_loc or f_loc}"
 
         elif acao == "CALIBRACAO_BANCADA":
-
-
-
             cur.execute("""
-
-
-
-                UPDATE ferramentas_cautela 
-
-
-
-                SET status = 'CALIBRACAO_BANCADA', tecnico_responsavel = 'BANCADA / CALIBRAÇÃO RBC', destino_cliente = 'LABORATÓRIO', data_saida = ?, observacao = ?
-
-
-
+                UPDATE ferramentas_cautela
+                SET status = 'CALIBRACAO_BANCADA', tecnico_responsavel = 'BANCADA / CALIBRAÇÃO RBC', destino_cliente = 'LABORATÓRIO EMED', data_saida = ?, observacao = ?
                 WHERE id = ?
-
-
-
             """, (agora, obs, f_id))
-
-
-
             cur.execute("""
-
-
-
                 INSERT INTO historico_cautela_ferramentas (codigo_ferramenta, nome_ferramenta, tipo_acao, tecnico, destino_cliente, os_id, operador, data_hora, observacao)
-
-
-
                 VALUES (?, ?, 'ENVIO_CALIBRACAO', 'LABORATÓRIO', 'BANCADA', '', ?, ?, ?)
-
-
-
-            """, (codigo, f_nome, operador, agora, obs))
-
-
-
-            msg = f"🔬 Ferramenta {codigo} encaminhada para Bancada / Calibração RBC!"
-
-
-
-
-
-
+            """, (cod_real, f_nome, operador, agora, obs))
+            msg = f"🔬 Ferramenta {cod_real} encaminhada para Bancada / Calibração RBC!"
 
         elif acao == "RETORNO_CALIBRACAO":
-
-
-
             nova_val = limpar_texto(body.get("validade_calibracao"), "")
-
-
-
             novo_cert = limpar_texto(body.get("certificado"), "")
-
-
-
             cur.execute("""
-
-
-
-                UPDATE ferramentas_cautela 
-
-
-
-                SET status = 'DISPONIVEL', tecnico_responsavel = '', destino_cliente = '', os_id = '', data_devolucao = ?, 
-
-
-
+                UPDATE ferramentas_cautela
+                SET status = 'DISPONIVEL', tecnico_responsavel = '', destino_cliente = '', os_id = '', data_devolucao = ?,
                     data_validade_calibracao = CASE WHEN ? != '' THEN ? ELSE data_validade_calibracao END,
-
-
-
                     certificado_calibracao = CASE WHEN ? != '' THEN ? ELSE certificado_calibracao END,
-
-
-
                     observacao = ?
-
-
-
                 WHERE id = ?
-
-
-
             """, (agora, nova_val, nova_val, novo_cert, novo_cert, obs, f_id))
-
-
-
             cur.execute("""
-
-
-
-                INSERT INTO historico_cautela_ferramentas (codigo_ferramenta, nome_ferramenta, tipo_acao, operador, data_hora, observacao)
-
-
-
-                VALUES (?, ?, 'RETORNO_CALIBRACAO', ?, ?, ?)
-
-
-
-            """, (codigo, f_nome, operador, agora, obs))
-
-
-
-            msg = f"🟢 Calibração/Manutenção da Ferramenta {codigo} concluída e liberada para uso!"
-
-
-
-
-
-
-
+                INSERT INTO historico_cautela_ferramentas (codigo_ferramenta, nome_ferramenta, tipo_acao, tecnico, destino_cliente, os_id, operador, data_hora, observacao)
+                VALUES (?, ?, 'RETORNO_CALIBRACAO', '', 'ALMOXARIFADO', '', ?, ?, ?)
+            """, (cod_real, f_nome, operador, agora, f"Validade: {nova_val} | Cert: {novo_cert}"))
+            msg = f"✅ Ferramenta {cod_real} calibrada e liberada no Almoxarifado!"
         else:
-
-
-
-            return web.json_response({"ok": False, "msg": f"Ação '{acao}' não reconhecida."}, status=400)
-
-
-
-
-
-
-
+            return web.json_response({"ok": False, "msg": "Ação desconhecida."}, status=400)
         conn.commit()
-
-
-
-
-
-
-
-    return web.json_response({"ok": True, "msg": msg, "novo_status": acao})
-
-
-
-
-
-
-
-
-
-
-
-
-
+    return web.json_response({"ok": True, "msg": msg})
 
 
 async def api_almox_compra_acao(request: web.Request) -> web.Response:
@@ -20676,17 +20700,6 @@ def garantir_schema_fiscal_contabil(db_path: str):
 
                 pass
 
-            # Garantir coluna de Estoque Fiscal em estoque_pecas
-            try:
-
-                cur.execute("ALTER TABLE estoque_pecas ADD COLUMN saldo_fiscal REAL DEFAULT NULL")
-
-                cur.execute("UPDATE estoque_pecas SET saldo_fiscal = quantidade WHERE saldo_fiscal IS NULL")
-
-            except Exception:
-
-                pass
-
             conn.commit()
 
     except Exception as e:
@@ -21273,39 +21286,11 @@ async def api_fiscal_cancelar_nota(request: web.Request) -> web.Response:
 
     motivo = str(body.get("motivo", "")).strip()
 
-    senha_inf = str(body.get("senha") or body.get("senha_confirmacao") or "").strip()
-
-    usr_req = str(body.get("usuario") or body.get("tecnico") or "").strip().upper()
-
     
 
     if not motivo:
 
         return web.json_response({"ok": False, "msg": "É obrigatório informar a justificativa/motivo do cancelamento."}, status=400)
-
-    # Validação de Senha de Segurança para Cancelamento Fiscal
-    senha_valida = False
-    if senha_inf:
-        if senha_inf in ("emed2026", "Emed@2026"):
-            senha_valida = True
-        else:
-            with get_db_connection(DB_NAME) as conn_auth:
-                cur_a = conn_auth.cursor()
-                if usr_req:
-                    cur_a.execute("SELECT senha FROM tecnicos WHERE UPPER(nome) = ?", (usr_req,))
-                    r_a = cur_a.fetchone()
-                    if r_a and str(r_a[0]).strip() == senha_inf:
-                        senha_valida = True
-                if not senha_valida:
-                    cur_a.execute("SELECT 1 FROM tecnicos WHERE senha = ?", (senha_inf,))
-                    if cur_a.fetchone():
-                        senha_valida = True
-
-    if not senha_valida:
-        return web.json_response({
-            "ok": False,
-            "msg": "🔒 Senha de autorização incorreta ou não informada. O cancelamento de Nota Fiscal exige confirmação por senha."
-        }, status=403)
 
         
 
@@ -23898,6 +23883,7 @@ def criar_app() -> web.Application:
 
 
     app.router.add_get("/api/ferramentas", api_ferramentas_listar)
+    app.router.add_get("/api/ferramentas/etiquetas-qr", api_ferramentas_etiquetas_qr)
 
 
 
@@ -23984,7 +23970,6 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/os/nf-salvar", api_os_nf_salvar)
 
     app.router.add_get("/api/fiscal/danfe/{os_id}", api_fiscal_danfe)
-    app.router.add_get("/api/fiscal/danfe/{os_id}/pdf", api_fiscal_danfe)
 
     app.router.add_post("/api/fiscal/enviar-cliente", api_fiscal_enviar_cliente)
 
