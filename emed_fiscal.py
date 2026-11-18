@@ -1316,7 +1316,7 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
         sel_label_canc = st.selectbox("Selecione a Nota Fiscal que deseja Cancelar:", list(dict_opcoes_canc.keys()), key="sel_canc_nf_drop")
         nota_alvo = dict_opcoes_canc[sel_label_canc]
 
-        col_just1, col_just2 = st.columns([2.5, 1.5])
+        col_just1, col_just2, col_just3 = st.columns([2, 1.5, 1.2])
         with col_just1:
             justificativa_canc = st.text_input(
                 "Justificativa Legal do Cancelamento:",
@@ -1324,11 +1324,20 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
                 key="input_just_cancelamento"
             )
         with col_just2:
+            senha_canc_st = st.text_input(
+                "🔒 Senha de Autorização Fiscal:",
+                type="password",
+                placeholder="Digite sua senha...",
+                key="input_senha_canc_st"
+            )
+        with col_just3:
             st.write("")
             st.write("")
             if st.button("🚫 Cancelar esta Nota Fiscal", type="primary", key="btn_executar_cancelamento"):
                 if len(justificativa_canc.strip()) < 8:
                     st.warning("⚠️ Informe uma justificativa com no mínimo 8 caracteres.")
+                elif not senha_canc_st or senha_canc_st.strip() not in ("emed2026", "Emed@2026"):
+                    st.error("🔒 Senha de autorização incorreta! O cancelamento fiscal foi bloqueado por segurança.")
                 else:
                     id_alvo_db = nota_alvo[0]
                     num_nf_alvo = nota_alvo[1]

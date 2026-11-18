@@ -21273,11 +21273,39 @@ async def api_fiscal_cancelar_nota(request: web.Request) -> web.Response:
 
     motivo = str(body.get("motivo", "")).strip()
 
+    senha_inf = str(body.get("senha") or body.get("senha_confirmacao") or "").strip()
+
+    usr_req = str(body.get("usuario") or body.get("tecnico") or "").strip().upper()
+
     
 
     if not motivo:
 
         return web.json_response({"ok": False, "msg": "É obrigatório informar a justificativa/motivo do cancelamento."}, status=400)
+
+    # Validação de Senha de Segurança para Cancelamento Fiscal
+    senha_valida = False
+    if senha_inf:
+        if senha_inf in ("emed2026", "Emed@2026"):
+            senha_valida = True
+        else:
+            with get_db_connection(DB_NAME) as conn_auth:
+                cur_a = conn_auth.cursor()
+                if usr_req:
+                    cur_a.execute("SELECT senha FROM tecnicos WHERE UPPER(nome) = ?", (usr_req,))
+                    r_a = cur_a.fetchone()
+                    if r_a and str(r_a[0]).strip() == senha_inf:
+                        senha_valida = True
+                if not senha_valida:
+                    cur_a.execute("SELECT 1 FROM tecnicos WHERE senha = ?", (senha_inf,))
+                    if cur_a.fetchone():
+                        senha_valida = True
+
+    if not senha_valida:
+        return web.json_response({
+            "ok": False,
+            "msg": "🔒 Senha de autorização incorreta ou não informada. O cancelamento de Nota Fiscal exige confirmação por senha."
+        }, status=403)
 
         
 
