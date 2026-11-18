@@ -393,23 +393,50 @@ async def api_fiscal_v2_cancelar(request: web.Request) -> web.Response:
     id_nf = int(body.get("id"))
     justificativa = str(body.get("justificativa", "")).strip()
     usuario = str(body.get("usuario", "netto")).strip()
+    senha = str(body.get("senha", "")).strip()
+
+    # Validação de segurança: Senha Mestra Fiscal / Certificado A1 ou senha do usuário admin
+    senhas_validas = {"emed2026", "Emed@2026"}
+    if usuario in USUARIOS_FISCAL and USUARIOS_FISCAL[usuario].get("senha"):
+        senhas_validas.add(USUARIOS_FISCAL[usuario]["senha"])
+
+    if not senha or senha not in senhas_validas:
+        return web.json_response({
+            "ok": False,
+            "msg": "🔒 Senha de autorização incorreta! O cancelamento exige a Senha Mestra Fiscal ou do Certificado Digital A1."
+        }, status=403)
 
     if len(justificativa) < 8:
         return web.json_response({"ok": False, "msg": "Informe uma justificativa legal com no mínimo 8 caracteres."}, status=400)
 
     with _get_db_connection(db_name) as conn:
-        row = conn.execute("SELECT numero_nf FROM notas_fiscais WHERE id = ?", (id_nf,)).fetchone()
-        num_nf = row[0] if row else f"#{id_nf}"
+        row = conn.execute("SELECT os_id, numero_nf FROM notas_fiscais WHERE id = ?", (id_nf,)).fetchone()
+        num_nf = row[1] if row and row[1] else f"#{id_nf}"
+        os_id = row[0] if row else None
+
         conn.execute("""
             UPDATE notas_fiscais
             SET status_fiscal = 'CANCELADA',
-                atualizado_em = datetime('now'),
+                status_quarentena = 'CANCELADA',
+                motivo_cancelamento = ?,
+                data_cancelamento = datetime('now', 'localtime'),
+                atualizado_em = datetime('now', 'localtime'),
                 discriminacao_servico = COALESCE(discriminacao_servico, '') || '\n\n[CANCELADA: ' || ? || ']'
             WHERE id = ?
-        """, (justificativa, id_nf))
+        """, (justificativa, justificativa, id_nf))
+
+        if os_id:
+            try:
+                conn.execute("""
+                    UPDATE clientes_equipamentos
+                    SET observacoes_gerais = COALESCE(observacoes_gerais, '') || ' | [NF ' || ? || ' CANCELADA: ' || ? || ']'
+                    WHERE id = ?
+                """, (str(num_nf), justificativa, os_id))
+            except Exception:
+                pass
         conn.commit()
 
-    _registrar_log_fiscal("CANCELAMENTO_NF", f"NF {num_nf} (ID #{id_nf}) cancelada | Motivo: {justificativa}", usuario)
+    _registrar_log_fiscal("CANCELAMENTO_NF", f"NF {num_nf} (ID #{id_nf}) cancelada por {usuario} | Motivo: {justificativa}", usuario)
     return web.json_response({"ok": True, "msg": f"✅ Nota Fiscal {num_nf} cancelada com sucesso!"})
 
 
@@ -2338,10 +2365,29 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       const id = document.getElementById("selNotaCancelar").value;
       const just = document.getElementById("inpJustificativaCanc").value;
       if (!id) {{ alert("Nenhuma nota ativa selecionada."); return; }}
+      if (!just || just.trim().length < 8) {{
+        alert("Por favor, preencha a justificativa legal do cancelamento (mínimo 8 caracteres).");
+        return;
+      }}
+
+      const conf = confirm(
+        "⚠️ ATENÇÃO: CONFIRMAÇÃO IRREVERSÍVEL DE CANCELAMENTO\n\n" +
+        "Você está prestes a CANCELAR esta Nota Fiscal no sistema e registrar a anulação fiscal.\n\n" +
+        "• Justificativa: " + just + "\n\n" +
+        "Deseja realmente prosseguir com o cancelamento?"
+      );
+      if (!conf) return;
+
+      const senha = prompt("🔒 Digite a SENHA DE AUTORIZAÇÃO FISCAL para confirmar o cancelamento:");
+      if (!senha) {{
+        alert("Operação abortada: Senha de autorização não informada.");
+        return;
+      }}
+
       const res = await fetch("/api/fiscal/v2/cancelar", {{
         method: "POST",
         headers: {{"Content-Type": "application/json"}},
-        body: JSON.stringify({{ id, justificativa: just, usuario: USUARIO_FISCAL?.username || "netto" }})
+        body: JSON.stringify({{ id, justificativa: just, senha: senha, usuario: USUARIO_FISCAL?.username || "netto" }})
       }}).then(r => r.json());
       alert(res.msg || "Operação concluída");
       if (res.ok) carregarDadosFiscais();
