@@ -3471,8 +3471,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     async function manifestarNotaDFe(id, tipo) {{
       if (tipo === "DESCONHECER") {{
         const conf = confirm(
-          "⚠️ ATENÇÃO: ALERTA ANTI-FRAUDE / NOTA INDEVIDA\n\n" +
-          "Você está prestes a manifestar DESCONHECIMENTO DA OPERAÇÃO perante a SEFAZ (Evento 210220).\n\n" +
+          "⚠️ ATENÇÃO: ALERTA ANTI-FRAUDE / NOTA INDEVIDA\\n\\n" +
+          "Você está prestes a manifestar DESCONHECIMENTO DA OPERAÇÃO perante a SEFAZ (Evento 210220).\\n\\n" +
           "Deseja realmente registrar que sua empresa NÃO reconhece esta nota fiscal?"
         );
         if (!conf) return;
