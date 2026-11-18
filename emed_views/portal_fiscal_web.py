@@ -2639,12 +2639,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         box.scrollIntoView({{ behavior: 'smooth' }});
 
         const querOutra = confirm(
-          "⚠️ INTERTRAVAMENTO FISCAL CONTRA DUPLICIDADE:\n\n" +
-          "A Nota Fiscal " + ne.numero_nf + " referente à OS #" + ne.os_id + " já foi emitida com sucesso em " + ne.data_emissao + " para este cliente e valor!\n\n" +
-          "O espelho da nota já emitida foi carregado na tela abaixo para sua conferência.\n\n" +
-          "Deseja realmente emitir OUTRA nota fiscal para este mesmo atendimento?\n\n" +
-          "[OK] = Sim, desejo emitir outra nota mesmo assim\n" +
-          "[Cancelar] = Não, manter a nota existente (não duplicar)"
+          `⚠️ INTERTRAVAMENTO FISCAL CONTRA DUPLICIDADE:\n\nA Nota Fiscal ${{ne.numero_nf}} referente à OS #${{ne.os_id}} já foi emitida com sucesso em ${{ne.data_emissao}} para este cliente e valor!\n\nO espelho da nota já emitida foi carregado na tela abaixo para sua conferência.\n\nDeseja realmente emitir OUTRA nota fiscal para este mesmo atendimento?\n\n[OK] = Sim, desejo emitir outra nota mesmo assim\n[Cancelar] = Não, manter a nota existente (não duplicar)`
         );
         if (querOutra) {{
           emitirNotaFiscalAgora(modo, true);
@@ -2664,10 +2659,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       }}
 
       const conf = confirm(
-        "⚠️ ATENÇÃO: CONFIRMAÇÃO IRREVERSÍVEL DE CANCELAMENTO\n\n" +
-        "Você está prestes a CANCELAR esta Nota Fiscal no sistema e registrar a anulação fiscal.\n\n" +
-        "• Justificativa: " + just + "\n\n" +
-        "Deseja realmente prosseguir com o cancelamento?"
+        `⚠️ ATENÇÃO: CONFIRMAÇÃO IRREVERSÍVEL DE CANCELAMENTO\n\nVocê está prestes a CANCELAR esta Nota Fiscal no sistema e registrar a anulação fiscal.\n\n• Justificativa: ${{just}}\n\nDeseja realmente prosseguir com o cancelamento?`
       );
       if (!conf) return;
 
@@ -3451,9 +3443,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     async function manifestarNotaDFe(id, tipo) {{
       if (tipo === "DESCONHECER") {{
         const conf = confirm(
-          "⚠️ ATENÇÃO: ALERTA ANTI-FRAUDE / NOTA INDEVIDA\n\n" +
-          "Você está prestes a manifestar DESCONHECIMENTO DA OPERAÇÃO perante a SEFAZ (Evento 210220).\n\n" +
-          "Deseja realmente registrar que sua empresa NÃO reconhece esta nota fiscal?"
+          `⚠️ ATENÇÃO: ALERTA ANTI-FRAUDE / NOTA INDEVIDA\n\nVocê está prestes a manifestar DESCONHECIMENTO DA OPERAÇÃO perante a SEFAZ (Evento 210220).\n\nDeseja realmente registrar que sua empresa NÃO reconhece esta nota fiscal?`
         );
         if (!conf) return;
       }}
