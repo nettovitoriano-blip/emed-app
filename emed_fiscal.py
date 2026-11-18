@@ -76,7 +76,7 @@ CONFIGURACOES_FILIAIS_PADRAO: Dict[str, Dict[str, Any]] = {
         "serie_padrao": "1",
         "aliquota_iss_padrao": 5.0,
         "codigo_servico_padrao": "14.01",
-        "cnae": "3313-9/99 - Manutenção e reparação de aparelhos eletromédicos",
+        "cnae": "3312-1/03 - Manutenção e reparação de aparelhos eletromédicos e eletroterapêuticos e equipamentos de irradiação",
         "natureza_operacao_padrao": "TRIBUTAÇÃO NO MUNICÍPIO",
         "padrao_nf": "NFS-e Eusébio - CE"
     }
@@ -232,8 +232,8 @@ class MultiFilialFiscalProvider(FiscalProvider):
         <IssRetido>2</IssRetido>
       </Valores>
       <ItemListaServico>{payload.get('codigo_servico', '14.01')}</ItemListaServico>
-      <CodigoCnae>3313999</CodigoCnae>
-      <Discriminacao><![CDATA[{payload.get('discriminacao_servico', 'Serviços de Engenharia Clínica')}]]></Discriminacao>
+      <CodigoCnae>3312103</CodigoCnae>
+      <Discriminacao><![CDATA[{payload.get('discriminacao_servico', 'Serviços de Manutenção e Reparação Técnica')}]]></Discriminacao>
       <CodigoMunicipio>{'5300108' if payload.get('prestador_uf') == 'DF' else '2304285'}</CodigoMunicipio>
     </Servico>
     <Prestador>
@@ -265,80 +265,223 @@ class MultiFilialFiscalProvider(FiscalProvider):
         xml_path = self.xml_dir / f"nfs_{payload.get('filial_emissora', 'DF').lower()}_{os_id}.xml"
         xml_path.write_text(xml_content, encoding="utf-8")
 
+        filial_emissora = payload.get("filial_emissora", "FILIAL_DF")
+        filial_badge = "FILIAL BRASÍLIA - DF" if filial_emissora == "FILIAL_DF" else "MATRIZ EUSÉBIO - CE"
+        prestador_razao = "EMED ELETROMEDICINA LTDA."
+        prestador_cnpj = payload.get("prestador_cnpj", "03.611.974/0002-80" if filial_emissora == "FILIAL_DF" else "03.611.974/0001-08")
+        prestador_im = payload.get("prestador_im", "61-3234-3647" if filial_emissora == "FILIAL_DF" else "123456-7")
+        prestador_end = payload.get("prestador_endereco", "Rua 3, Chácara 46A, Lote 01 - Vicente Pires, CEP 72007-850" if filial_emissora == "FILIAL_DF" else "Rua Coronel Freire, 16 - Bairro Amador, CEP 61769-470")
+        prestador_cid = payload.get("prestador_cidade", "Brasília" if filial_emissora == "FILIAL_DF" else "Eusébio")
+        prestador_uf = payload.get("prestador_uf", "DF" if filial_emissora == "FILIAL_DF" else "CE")
+        prestador_fone = payload.get("prestador_fone", "(61) 3234-3647 / (61) 99658-5392" if filial_emissora == "FILIAL_DF" else "(85) 3254-2929")
+        prestador_email = payload.get("prestador_email", "brasilia@emed.med.br" if filial_emissora == "FILIAL_DF" else "financeiro@emed.med.br")
+        orgao_emissor = payload.get("orgao_fiscal", "SECRETARIA DE FAZENDA DO DISTRITO FEDERAL (SEFAZ-DF)" if filial_emissora == "FILIAL_DF" else "PREFEITURA MUNICIPAL DE EUSÉBIO - CE")
+        doc_aux_titulo = "DOCUMENTO AUXILIAR DA NFS-e DF" if filial_emissora == "FILIAL_DF" else "DOCUMENTO AUXILIAR DA NFS-e / NF-e"
+        is_trf = "TRANSFER" in str(payload.get("tipo_nota", "")).upper()
+        if is_trf:
+            doc_aux_titulo = "DANFE • NOTA FISCAL ELETRÔNICA DE TRANSFERÊNCIA"
+            orgao_emissor = "SECRETARIA DA FAZENDA (SEFAZ • TRANSFERÊNCIA ENTRE ESTABELECIMENTOS)"
+
+        dt_emissao_fmt = str(payload.get("data_emissao", "")).replace("T", " ")[:19]
+        st_fiscal = payload.get("status", "AUTORIZADA")
+        chave = payload.get("chave_acesso", "")
+        cli_nome = payload.get("cliente", "CLIENTE NÃO INFORMADO")
+        cnpj_cli = payload.get("cnpj_tomador", "00.000.000/0000-00")
+        end_cli = payload.get("tomador_endereco", "UNIDADE HOSPITALAR")
+        cid_cli = payload.get("tomador_cidade", "BRASÍLIA" if filial_emissora == "FILIAL_DF" else "FORTALEZA")
+        uf_cli = payload.get("tomador_uf", "DF" if filial_emissora == "FILIAL_DF" else "CE")
+        equip_nome = payload.get("equipamento", "EQUIPAMENTO HOSPITALAR")
+        srv_tipo = payload.get("tipo_servico", "MANUTENÇÃO / REPARAÇÃO")
+        tec_nome = payload.get("tecnico_responsavel", "NETTO")
+        tipo_nota = payload.get("tipo_nota", "100% NOTA DE SERVIÇO (NFS-e)")
+        descr = payload.get("discriminacao_servico", "")
+        descr = descr.replace("Engenharia Clínica e Manutenção", "Manutenção e Reparação Técnica").replace("Engenharia Clínica", "Manutenção e Reparação Técnica")
+
+        url_danfe = f"https://emedservice.med.br/api/fiscal/danfe/{os_id}"
+        try:
+            from emed_services.equipamento_qrcode import gerar_qrcode_base64
+            qr_b64 = gerar_qrcode_base64(url_danfe)
+        except Exception:
+            qr_b64 = ""
+
+        qr_html = f'''<div style="text-align: center;">
+                <img src="data:image/png;base64,{qr_b64}" alt="QR Code Oficial" style="width: 72px; height: 72px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px; background: #fff; display: block; margin: 0 auto;" />
+                <div style="font-size: 7.5px; color: #0284c7; font-weight: 800; margin-top: 2px; text-transform: uppercase;">Validação Digital</div>
+              </div>''' if qr_b64 else ""
+
+        val_total = v_total
+        val_servicos = v_serv
+        val_pecas = v_pec
+        val_desconto = v_desc
+
         html_content = f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>NFS-e DF - OS #{os_id} ({num_nf})</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DANFE / Espelho da Nota Fiscal — OS #{os_id} ({num_nf})</title>
   <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: #0b132b; color: #f8fafc; padding: 20px; }}
-    .card {{ background: #1c2541; border: 2px solid #64dfdf; border-radius: 8px; padding: 20px; max-width: 780px; margin: 0 auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }}
-    .badge {{ background: #0284c7; color: #fff; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; }}
-    .val-destaque {{ font-size: 18px; font-weight: 900; color: #64dfdf; }}
-    table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
-    td, th {{ border: 1px solid #334155; padding: 8px; font-size: 12px; }}
-    th {{ background: #0b132b; color: #64dfdf; text-align: left; }}
+    @page {{ size: A4 portrait; margin: 6mm; }}
+    * {{ box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }}
+    html, body {{ margin: 0; padding: 0; background: #f8fafc; color: #0b132b; }}
+    body {{ padding: 10px; }}
+    .danfe-box {{ max-width: 800px; margin: 0 auto; background: #fff; border: 1.5px solid #002b54; border-radius: 6px; padding: 10px; box-shadow: 0 3px 15px rgba(0,0,0,0.06); }}
+    .no-print {{ background: #002b54; color: #fff; padding: 6px 12px; margin: -10px -10px 10px -10px; border-radius: 4px 4px 0 0; }}
+    .btn-action {{ background: #0077b6; color: #fff; border: none; padding: 5px 12px; font-weight: bold; border-radius: 4px; cursor: pointer; text-decoration: none; font-size: 11px; display: inline-flex; align-items: center; }}
+    .btn-action:hover {{ background: #023e8a; }}
+    .header-tbl {{ width: 100%; border-bottom: 1.5px solid #002b54; padding-bottom: 6px; margin-bottom: 6px; border-collapse: collapse; }}
+    .title-danfe {{ font-size: 13.5px; font-weight: 900; color: #002b54; text-transform: uppercase; }}
+    .badge-nf {{ background: #dcfce7; color: #15803d; border: 1px solid #86efac; padding: 1.5px 5px; border-radius: 3px; font-weight: 800; font-size: 9.5px; }}
+    .sec-header {{ background: #002b54; color: #fff; font-size: 9.5px; font-weight: 800; padding: 3px 6px; margin: 6px 0 2px 0; border-radius: 3px; text-transform: uppercase; }}
+    .data-tbl {{ width: 100%; border-collapse: collapse; font-size: 9px; margin-bottom: 3px; }}
+    .data-tbl td, .data-tbl th {{ border: 1px solid #cbd5e1; padding: 3px 5px; text-align: left; vertical-align: middle; }}
+    .data-tbl th {{ background: #f1f5f9; font-weight: 700; color: #334155; }}
+    .val-destaque {{ font-size: 13px; font-weight: 900; color: #059669; }}
+    @media print {{
+      @page {{ size: A4 portrait; margin: 6mm; }}
+      html, body {{ background: #fff !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }}
+      .danfe-box {{ border: 1.5px solid #002b54 !important; box-shadow: none !important; max-width: 100% !important; width: 100% !important; padding: 6px !important; margin: 0 !important; }}
+      .no-print {{ display: none !important; }}
+      tr, td, th {{ page-break-inside: avoid; }}
+    }}
   </style>
 </head>
 <body>
-  <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #334155; padding-bottom: 10px;">
-      <div>
-        <h2 style="margin: 0; color: #64dfdf;">{payload.get('prestador_razao')}</h2>
-        <div style="font-size: 11px; color: #cbd5e1;">CNPJ: {payload.get('prestador_cnpj')} • CF/DF: {payload.get('prestador_im')} • {payload.get('orgao_fiscal')}</div>
-        <div style="font-size: 11px; color: #94a3b8;">{payload.get('prestador_endereco')}, {payload.get('prestador_cidade')} - {payload.get('prestador_uf')}</div>
-      </div>
-      <div style="text-align: right;">
-        <span class="badge">NFS-e Nº {num_nf}</span>
-        <div style="font-size: 11px; margin-top: 4px; color: #94a3b8;">Série: {serie}</div>
-        <div style="font-size: 10px; margin-top: 3px; color: #38bdf8; font-weight: bold;">{payload.get('tipo_nota', 'NFS-e')}</div>
-      </div>
-    </div>
-
-    <div style="margin-top: 12px; background: #0f172a; padding: 6px 12px; border-radius: 4px; border: 1px solid #334155; font-size: 11px; color: #cbd5e1;">
-      <b>Operação / Natureza Fiscal:</b> {payload.get('natureza_operacao', 'TRIBUTAÇÃO NO MUNICÍPIO / DF')} {f"&bull; <b>CFOP:</b> {payload.get('cfop')}" if payload.get('cfop') else ""}
-    </div>
-
-    <div style="margin-top: 15px;">
-      <h4 style="margin: 0 0 5px 0; color: #64dfdf;">1. Tomador dos Serviços (Cliente)</h4>
-      <div style="font-size: 13px;"><b>{payload.get('cliente')}</b> (CNPJ: {payload.get('cnpj_tomador')})</div>
-      <div style="font-size: 11px; color: #cbd5e1;">{payload.get('tomador_endereco')}, {payload.get('tomador_cidade')} - {payload.get('tomador_uf')}</div>
-    </div>
-
-    <div style="margin-top: 15px;">
-      <h4 style="margin: 0 0 5px 0; color: #64dfdf;">2. Discriminação dos Serviços de Engenharia Clínica</h4>
-      <div style="background: #0b132b; border: 1px solid #334155; padding: 10px; border-radius: 4px; font-size: 12px; line-height: 1.4;">
-        {payload.get('discriminacao_servico')}
-      </div>
-    </div>
-
-    <div style="margin-top: 15px;">
-      <h4 style="margin: 0 0 5px 0; color: #64dfdf;">3. Quadro Financeiro e Tributário</h4>
-      <table>
+  <div class="danfe-box">
+    <!-- BARRA SUPERIOR DE AÇÕES (IMPRESSÃO / PDF) -->
+    <div class="no-print">
+      <table style="width: 100%; border-collapse: collapse; border: none;">
         <tr>
-          <th>Valor Serviços</th>
-          <th>Valor Peças</th>
-          <th>Alíquota ISS</th>
-          <th>Valor ISS</th>
-          <th>TOTAL NOTA FISCAL</th>
-        </tr>
-        <tr>
-          <td>R$ {v_serv:,.2f}</td>
-          <td>R$ {v_pec:,.2f}</td>
-          <td>{aliq_iss:.1f}%</td>
-          <td>R$ {v_iss:,.2f}</td>
-          <td class="val-destaque">R$ {v_total:,.2f}</td>
+          <td style="border: none; text-align: left; vertical-align: middle;">
+            <span style="font-weight: bold; font-size: 12px;">🧾 Sistema Fiscal EMED &bull; Espelho Oficial da Nota Fiscal</span>
+          </td>
+          <td style="border: none; text-align: right; vertical-align: middle;">
+            <button class="btn-action" onclick="window.print()">🖨️ Imprimir</button>
+            <a href="/api/fiscal/danfe/{os_id}?formato=pdf" download="DANFE_NFS_{num_nf}.pdf" class="btn-action" style="background:#0284c7; margin-left: 6px;">📥 Baixar PDF</a>
+            <button class="btn-action" style="background:#64748b; margin-left: 6px;" onclick="window.close()">✕ Fechar</button>
+          </td>
         </tr>
       </table>
     </div>
 
-    <div style="margin-top: 15px; font-size: 10px; color: #94a3b8; border-top: 1px solid #334155; padding-top: 10px;">
-      <b>Chave de Acesso / Protocolo Digital:</b> {payload.get('chave_acesso')}<br/>
-      Documento auxiliar oficial para conferência e envio contábil.
+    <!-- CABEÇALHO EMED -->
+    <table class="header-tbl">
+      <tr>
+        <td style="width: 95px; vertical-align: middle; border: none;">
+          <img src="/api/logo-circle" alt="EMED" style="width: 75px; height: auto;" onerror="this.src='/api/logo'" />
+        </td>
+        <td style="vertical-align: middle; border: none; padding-left: 6px;">
+          <div class="title-danfe">{prestador_razao} <span style="font-size: 10px; font-weight: 800; color: #0284c7; letter-spacing: 0;">&bull; {filial_badge}</span></div>
+          <div style="font-size: 10px; color: #0077b6; font-weight: 800; margin-top: 1px; margin-bottom: 1px;">Manutenção em Equipamentos de Diagnóstico por Imagem</div>
+          <div style="font-size: 8.5px; color: #475569; margin-top: 1px; line-height: 1.25;">
+            <b>CNPJ:</b> {prestador_cnpj} &bull; <b>{'CF/DF' if filial_emissora == 'FILIAL_DF' else 'Insc. Municipal'}:</b> {prestador_im} &bull; <b>Órgão:</b> {orgao_emissor}<br/>
+            <b>Endereço Emissor:</b> {prestador_end}, {prestador_cid} - {prestador_uf} &bull; <b>Fone:</b> {prestador_fone}<br/>
+            <b>Site:</b> emed.med.br &bull; <b>E-mail:</b> {prestador_email}
+          </div>
+        </td>
+        <td style="width: 270px; vertical-align: middle; text-align: right; border: none;">
+          <table style="width: 100%; border: 1.5px solid #002b54; border-radius: 5px; background: #f8fafc; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 4px 6px; text-align: left; vertical-align: middle; border: none;">
+                <div style="font-size: 8px; font-weight: 800; color: #002b54; text-transform: uppercase;">{doc_aux_titulo}</div>
+                <div style="font-size: 13px; font-weight: 900; color: #0b132b; margin: 1px 0;">{num_nf}</div>
+                <div class="badge-nf" style="display: inline-block;">STATUS: {st_fiscal}</div>
+                <div style="font-size: 8px; color: #64748b; margin-top: 2px;">Emissão: <b>{dt_emissao_fmt}</b></div>
+              </td>
+              <td style="width: 65px; padding: 4px 6px; text-align: center; vertical-align: middle; border: none;">
+                {qr_html}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <!-- BARRA CHAVE DE AUTENTICAÇÃO -->
+    <table style="width: 100%; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; margin-bottom: 4px; border-collapse: collapse;">
+      <tr>
+        <td style="padding: 3px 6px; font-size: 8.5px; border: none; text-align: left;">
+          <b>Chave de Autenticação / Protocolo Digital:</b> <span style="font-family: monospace; letter-spacing: 0.5px; font-weight: 600;">{chave}</span>
+        </td>
+        <td style="padding: 3px 6px; font-size: 8px; color: #0284c7; font-weight: 700; border: none; text-align: right; white-space: nowrap;">
+          📱 Validação Digital via QR Code
+        </td>
+      </tr>
+    </table>
+
+    <!-- TOMADOR DOS SERVIÇOS -->
+    <div class="sec-header">1. Dados do Tomador / Cliente Hospitalar</div>
+    <table class="data-tbl">
+      <tr>
+        <td colspan="2"><span style="color:#64748b;">Razão Social / Nome:</span> <b>{cli_nome}</b></td>
+        <td><span style="color:#64748b;">CNPJ / CPF:</span> <b>{cnpj_cli}</b></td>
+      </tr>
+      <tr>
+        <td colspan="2"><span style="color:#64748b;">Endereço:</span> <b>{end_cli}</b></td>
+        <td><span style="color:#64748b;">Município / UF:</span> <b>{cid_cli} - {uf_cli}</b></td>
+      </tr>
+    </table>
+
+    <!-- DADOS DA ORDEM DE SERVIÇO -->
+    <div class="sec-header">2. Identificação da Ordem de Serviço & Atendimento Técnico</div>
+    <table class="data-tbl">
+      <tr>
+        <td style="width: 20%;"><span style="color:#64748b;">OS Vinculada:</span><br/><b>#{os_id}</b></td>
+        <td colspan="3"><span style="color:#64748b;">Equipamento:</span><br/><b>{equip_nome}</b></td>
+      </tr>
+      <tr>
+        <td colspan="2" style="width: 50%;"><span style="color:#64748b;">Tipo de Atendimento:</span> <b>{srv_tipo}</b></td>
+        <td colspan="2" style="width: 50%;"><span style="color:#64748b;">Técnico Responsável:</span> <b>{tec_nome}</b></td>
+      </tr>
+    </table>
+
+    <!-- DISCRIMINAÇÃO DOS SERVIÇOS -->
+    <div class="sec-header">3. Discriminação dos Serviços & Peças</div>
+    <div style="border: 1px solid #cbd5e1; padding: 5px 8px; border-radius: 4px; font-size: 9px; background: #fafafa; line-height: 1.25; margin-bottom: 4px;">
+      <b>{tipo_nota}</b><br/>
+      {descr}<br/>
+      <span style="font-size: 8px; color: #64748b; font-style: italic;">Nenhuma peça faturada separadamente (mão de obra e insumos inclusos no serviço técnico).</span>
+    </div>
+
+    <!-- QUADRO DE VALORES -->
+    <div class="sec-header">4. Valores e Tributação Consolidada</div>
+    <table class="data-tbl">
+      <thead>
+        <tr>
+          <th>Valor Mão de Obra / Serviços</th>
+          <th>Valor Peças / Produtos</th>
+          <th>Deduções / Descontos</th>
+          <th>Base de Cálculo ISS</th>
+          <th>VALOR TOTAL DA NOTA FISCAL</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>R$ {val_servicos:,.2f}</td>
+          <td>R$ {val_pecas:,.2f}</td>
+          <td>R$ 0,00</td>
+          <td>R$ {val_servicos:,.2f}</td>
+          <td class="val-destaque">R$ {val_total:,.2f}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- INFORMAÇÕES COMPLEMENTARES -->
+    <div class="sec-header">5. Informações Complementares e Fiscais</div>
+    <div style="border: 1px solid #cbd5e1; padding: 4px 6px; border-radius: 4px; font-size: 8px; color: #475569; line-height: 1.25; background: #fff;">
+      &bull; DOCUMENTO EMITIDO POR ME OU EPP OPTANTE PELO SIMPLES NACIONAL.<br/>
+      &bull; NÃO GERA DIREITO A CRÉDITO FISCAL DE IPI / ICMS.<br/>
+      &bull; Valor aproximado dos tributos federais e municipais (IBPT): R$ {(val_total * 0.1345):,.2f} (13,45%).<br/>
+      &bull; Serviços de Manutenção Preventiva/Corretiva e Validação Metrológica de Equipamentos Médicos Hospitalares em conformidade com as normas ANVISA RDC 611 e ABNT NBR IEC 60601.
+    </div>
+
+    <div style="margin-top: 5px; text-align: center; font-size: 8px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 3px;">
+      EMED Eletromedicina Ltda. &bull; Comprovante Digital de Faturamento Homologado &bull; Emitido pelo Sistema Oficial EMED
     </div>
   </div>
 </body>
 </html>"""
+
         html_path = self.html_dir / f"nfs_{payload.get('filial_emissora', 'DF').lower()}_{os_id}.html"
         html_path.write_text(html_content, encoding="utf-8")
 
@@ -567,12 +710,18 @@ class FiscalManager:
             disc_srv = row_nf[3]
         else:
             disc_srv = (
-                f"Prestação de serviços técnicos especializados de Engenharia Clínica e Manutenção "
+                f"Prestação de serviços técnicos especializados de Manutenção e Reparação "
                 f"({tipo_srv or 'CORRETIVA / PREVENTIVA'}) no equipamento {equip or 'MÉDICO-HOSPITALAR'}. "
                 f"Atendimento referente à Ordem de Serviço #{os_id}. "
                 f"Serviço Realizado: {srv_exec or def_rel or 'Revisão, ajustes e testes funcionais operacionais'}. "
                 f"Local da Prestação: {cli} ({cid or 'Brasília'} - {uf or 'DF'})."
             )
+        disc_srv = (
+            disc_srv.replace("Engenharia Clínica e Manutenção", "Manutenção e Reparação Técnica")
+            .replace("engenharia clínica e manutenção técnica", "manutenção e reparação técnica")
+            .replace("Engenharia Clínica", "Manutenção e Reparação Técnica")
+            .replace("engenharia clínica", "manutenção e reparação técnica")
+        )
 
         dados.update({
             "cliente": cli or "CLIENTE NÃO INFORMADO",
@@ -1167,7 +1316,7 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
         sel_label_canc = st.selectbox("Selecione a Nota Fiscal que deseja Cancelar:", list(dict_opcoes_canc.keys()), key="sel_canc_nf_drop")
         nota_alvo = dict_opcoes_canc[sel_label_canc]
 
-        col_just1, col_just2 = st.columns([2.5, 1.5])
+        col_just1, col_just2, col_just3 = st.columns([2, 1.5, 1.2])
         with col_just1:
             justificativa_canc = st.text_input(
                 "Justificativa Legal do Cancelamento:",
@@ -1175,11 +1324,20 @@ def render_modulo_fiscal(db_name: str, usuario_atual: str, perfil_atual: str) ->
                 key="input_just_cancelamento"
             )
         with col_just2:
+            senha_canc_st = st.text_input(
+                "🔒 Senha de Autorização Fiscal:",
+                type="password",
+                placeholder="Digite sua senha...",
+                key="input_senha_canc_st"
+            )
+        with col_just3:
             st.write("")
             st.write("")
             if st.button("🚫 Cancelar esta Nota Fiscal", type="primary", key="btn_executar_cancelamento"):
                 if len(justificativa_canc.strip()) < 8:
                     st.warning("⚠️ Informe uma justificativa com no mínimo 8 caracteres.")
+                elif not senha_canc_st or senha_canc_st.strip() not in ("emed2026", "Emed@2026"):
+                    st.error("🔒 Senha de autorização incorreta! O cancelamento fiscal foi bloqueado por segurança.")
                 else:
                     id_alvo_db = nota_alvo[0]
                     num_nf_alvo = nota_alvo[1]

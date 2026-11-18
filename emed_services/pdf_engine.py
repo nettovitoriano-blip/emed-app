@@ -466,7 +466,15 @@ def converter_html_para_pdf_bytes(html_content: str) -> bytes:
         content_rect = pymupdf.Rect(20, 16, 595 - 20, 842 - 16)
         writer = pymupdf.DocumentWriter(tmp_path)
 
-        if "<!-- PAGE_BREAK_ANEXOS -->" in html_content:
+        is_danfe = "danfe" in html_content.lower() or "documento auxiliar da nfs-e" in html_content.lower()
+        if is_danfe:
+            content_rect = pymupdf.Rect(14, 10, 595 - 14, 842 - 10)
+            story = pymupdf.Story(html=html_content)
+            dev = writer.begin_page(mediabox)
+            story.place(content_rect)
+            story.draw(dev)
+            writer.end_page()
+        elif "<!-- PAGE_BREAK_ANEXOS -->" in html_content:
             m_head = _re.search(r"(<head>.*?</head>)", html_content, flags=_re.S | _re.I)
             head_html = m_head.group(1) if m_head else ""
             partes = html_content.split("<!-- PAGE_BREAK_ANEXOS -->")

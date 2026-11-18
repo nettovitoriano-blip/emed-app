@@ -70614,7 +70614,7 @@
 
 
 
-      if (modal) modal.style.display = "none";
+      if (modal) modal.style.display = "none"; const pwIn = document.getElementById("cancelaSenhaConfirmacao"); if(pwIn) pwIn.value = "";
 
 
 
@@ -164134,16 +164134,23 @@ function fecharModalInsumosViagem() {
 
       if (!motivo || !motivo.trim()) {
 
-
-
         mostrarToast("⚠️ Informe a justificativa formal para o cancelamento.");
-
-
 
         return;
 
+      }
 
+      const campoSenha = document.getElementById("cancelaSenhaConfirmacao");
+      const senhaVal = campoSenha ? campoSenha.value.trim() : "";
+      if (!senhaVal) {
+        mostrarToast("🔒 Digite sua senha de autorização para cancelar a Nota Fiscal.");
+        if (campoSenha) campoSenha.focus();
+        return;
+      }
 
+      const numNfTxt = document.getElementById("cancelaNfNumero") ? document.getElementById("cancelaNfNumero").innerText : "";
+      if (!confirm("⚠️ ATENÇÃO: Confirma o cancelamento definitivo da Nota Fiscal " + numNfTxt + "?\n\nEsta operação é IRREVERSÍVEL na SEFAZ e na contabilidade.")) {
+        return;
       }
 
 
@@ -164156,7 +164163,7 @@ function fecharModalInsumosViagem() {
 
 
 
-        const res = await apiPost("/api/fiscal/cancelar-nota", { nota_id: id, motivo: motivo.trim() });
+        const res = await apiPost("/api/fiscal/cancelar-nota", { nota_id: id, motivo: motivo.trim(), senha: senhaVal, usuario: (typeof usuarioLogado !== "undefined" ? usuarioLogado : "") });
 
 
 
@@ -270269,17 +270276,25 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
 
 
 
-        <div style="margin-bottom:16px;">
-
-
+        <div style="margin-bottom:14px;">
 
           <label class="field-label" style="font-weight:800;color:#0f172a;">Detalhamento da Justificativa para a Contabilidade *:</label>
 
-
-
           <textarea id="cancelaMotivoDetalhe" class="input" rows="2" placeholder="Descreva os detalhes da justificativa..."></textarea>
 
+        </div>
 
+        <div style="margin-bottom:16px;background:#fef2f2;border:1.5px solid #f87171;border-radius:8px;padding:12px;">
+
+          <label class="field-label" style="font-weight:900;color:#991b1b;display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+            <span>🔒 Senha de Autorização Fiscal *:</span>
+          </label>
+
+          <div style="font-size:11px;color:#7f1d1d;margin-bottom:6px;">
+            Por segurança contábil e fiscal, confirme sua senha de usuário para autorizar o cancelamento desta nota:
+          </div>
+
+          <input type="password" id="cancelaSenhaConfirmacao" class="input" placeholder="Digite sua senha..." style="border:1.5px solid #dc2626;font-weight:bold;background:#fff;" />
 
         </div>
 
