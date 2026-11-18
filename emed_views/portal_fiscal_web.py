@@ -298,6 +298,7 @@ async def api_fiscal_v2_emitir(request: web.Request) -> web.Response:
         "aliquota_iss": float(body.get("aliquota_iss") or 0.0),
         "filial_emissora": filial,
         "usuario_operador": str(body.get("usuario", "netto")),
+        "modo_emissao": str(body.get("modo_emissao", "SIMULACAO")).upper(),
     }
 
     manager = FiscalManager(db_name)
@@ -1337,7 +1338,17 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
         <div id="barraResumoIss" style="background:#0f172a;padding:10px 14px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:13px;"></div>
 
-        <button class="btn btn-primary" id="btnEmitirNf" onclick="emitirNotaFiscalAgora()">🚀 EMITIR NOTA FISCAL EM 1 CLIQUE</button>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:12px;margin-bottom:12px;">
+          <button type="button" class="btn" id="btnSimularNf" onclick="emitirNotaFiscalAgora('SIMULACAO')" style="background:#0284c7;color:#fff;font-weight:800;padding:12px 14px;border-radius:6px;border:none;cursor:pointer;text-align:center;">
+            🧪 EMITIR SIMULAÇÃO / DEMONSTRAÇÃO
+            <div style="font-size:11px;font-weight:normal;opacity:0.9;margin-top:2px;">(Treinamento / Demonstração • Sem Efeito Fiscal)</div>
+          </button>
+
+          <button type="button" class="btn" id="btnEmitirRealNf" onclick="emitirNotaFiscalAgora('REAL')" style="background:#15803d;color:#fff;font-weight:900;padding:12px 14px;border-radius:6px;border:2px solid #86efac;cursor:pointer;text-align:center;box-shadow:0 0 12px rgba(34,197,94,0.3);">
+            🟢 EMITIR NOTA FISCAL REAL (OFICIAL)
+            <div style="font-size:11px;font-weight:normal;opacity:0.9;margin-top:2px;">(Transmissão SEFAZ com Certificado A1 Ativo)</div>
+          </button>
+        </div>
         <div id="boxResultadoEmissao" style="margin-top:14px;"></div>
       </div>
 
@@ -2095,15 +2106,35 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       carregarDadosFiscais();
     }}
 
-    async function emitirNotaFiscalAgora() {{
+    async function emitirNotaFiscalAgora(modo = 'SIMULACAO') {{
       const osId = document.getElementById("selOsEmissao").value;
       if (!osId) {{ alert("Selecione uma Ordem de Serviço."); return; }}
-      const res = await fetch("/api/fiscal/v2/emitir", {{
-        method: "POST",
-        headers: {{"Content-Type": "application/json"}},
-        body: JSON.stringify({{
-          os_id: osId,
-          filial_emissora: FILIAL_ATIVA,
+
+      if (modo === 'REAL') {{
+        const cliNome = document.getElementById("nfCliente") ? document.getElementById("nfCliente").value : "Cliente";
+        const conf = confirm(
+          "⚠️ ATENÇÃO: EMISSÃO REAL DE NOTA FISCAL COM CERTIFICADO DIGITAL A1!\n\n" +
+          "Cliente: " + cliNome + "\n" +
+          "Unidade: " + (FILIAL_ATIVA === 'MATRIZ_CE' ? 'Matriz Eusébio - CE' : 'Filial Brasília - DF') + "\n\n" +
+          "Esta nota terá valor legal na SEFAZ e na contabilidade.\n\n" +
+          "Deseja realmente confirmar a EMISSÃO REAL agora?"
+        );
+        if (!conf) return;
+      }}
+
+      const btnSim = document.getElementById("btnSimularNf");
+      const btnReal = document.getElementById("btnEmitirRealNf");
+      if (btnSim) btnSim.disabled = true;
+      if (btnReal) btnReal.disabled = true;
+
+      try {{
+        const res = await fetch("/api/fiscal/v2/emitir", {{
+          method: "POST",
+          headers: {{"Content-Type": "application/json"}},
+          body: JSON.stringify({{
+            os_id: osId,
+            modo_emissao: modo,
+            filial_emissora: FILIAL_ATIVA,
           tipo_nota: document.getElementById("selTipoOperacao").value,
           cliente: document.getElementById("nfCliente").value,
           cnpj_tomador: document.getElementById("nfCnpj").value,
