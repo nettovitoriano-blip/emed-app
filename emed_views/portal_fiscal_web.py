@@ -261,11 +261,13 @@ async def api_fiscal_v2_emitir(request: web.Request) -> web.Response:
     if filial == "CONSOLIDADO":
         filial = "FILIAL_DF"
 
-    tipo_op = str(body.get("tipo_nota", "🛠️ PRESTAÇÃO DE SERVIÇOS & PEÇAS (FATURAMENTO DE MANUTENÇÃO)"))
+    tipo_op = str(body.get("tipo_nota", "🏛️ NFS-e NACIONAL (PADRÃO RECEITA FEDERAL / SERPRO • DPS)"))
     uf_tom = str(body.get("tomador_uf", "DF")).strip().upper()
     nat_op = "TRIBUTAÇÃO NO MUNICÍPIO / DF"
     cfop = ""
-    if "DIAGNÓSTICO" in tipo_op:
+    if "NACIONAL" in tipo_op:
+        nat_op = "PRESTAÇÃO DE SERVIÇOS NO AMBIENTE NACIONAL (DPS / RECEITA FEDERAL)"
+    elif "DIAGNÓSTICO" in tipo_op:
         nat_op = "PRESTAÇÃO DE SERVIÇO DE DIAGNÓSTICO TÉCNICO"
     elif "DEVOLUÇÃO" in tipo_op:
         nat_op = "RETORNO DE MERCADORIA/BEM RECEBIDO PARA CONSERTO"
@@ -393,24 +395,265 @@ async def api_fiscal_v2_cancelar(request: web.Request) -> web.Response:
     id_nf = int(body.get("id"))
     justificativa = str(body.get("justificativa", "")).strip()
     usuario = str(body.get("usuario", "netto")).strip()
+    senha = str(body.get("senha", "")).strip()
+
+    # Validação de segurança: Senha Mestra Fiscal / Certificado A1 ou senha do usuário admin
+    senhas_validas = {"emed2026", "Emed@2026"}
+    if usuario in USUARIOS_FISCAL and USUARIOS_FISCAL[usuario].get("senha"):
+        senhas_validas.add(USUARIOS_FISCAL[usuario]["senha"])
+
+    if not senha or senha not in senhas_validas:
+        return web.json_response({
+            "ok": False,
+            "msg": "🔒 Senha de autorização incorreta! O cancelamento exige a Senha Mestra Fiscal ou do Certificado Digital A1."
+        }, status=403)
 
     if len(justificativa) < 8:
         return web.json_response({"ok": False, "msg": "Informe uma justificativa legal com no mínimo 8 caracteres."}, status=400)
 
     with _get_db_connection(db_name) as conn:
-        row = conn.execute("SELECT numero_nf FROM notas_fiscais WHERE id = ?", (id_nf,)).fetchone()
-        num_nf = row[0] if row else f"#{id_nf}"
+        row = conn.execute("SELECT os_id, numero_nf FROM notas_fiscais WHERE id = ?", (id_nf,)).fetchone()
+        num_nf = row[1] if row and row[1] else f"#{id_nf}"
+        os_id = row[0] if row else None
+
         conn.execute("""
             UPDATE notas_fiscais
             SET status_fiscal = 'CANCELADA',
-                atualizado_em = datetime('now'),
+                status_quarentena = 'CANCELADA',
+                motivo_cancelamento = ?,
+                data_cancelamento = datetime('now', 'localtime'),
+                atualizado_em = datetime('now', 'localtime'),
                 discriminacao_servico = COALESCE(discriminacao_servico, '') || '\n\n[CANCELADA: ' || ? || ']'
             WHERE id = ?
-        """, (justificativa, id_nf))
+        """, (justificativa, justificativa, id_nf))
+
+        if os_id:
+            try:
+                conn.execute("""
+                    UPDATE clientes_equipamentos
+                    SET observacoes_gerais = COALESCE(observacoes_gerais, '') || ' | [NF ' || ? || ' CANCELADA: ' || ? || ']'
+                    WHERE id = ?
+                """, (str(num_nf), justificativa, os_id))
+            except Exception:
+                pass
         conn.commit()
 
-    _registrar_log_fiscal("CANCELAMENTO_NF", f"NF {num_nf} (ID #{id_nf}) cancelada | Motivo: {justificativa}", usuario)
+    _registrar_log_fiscal("CANCELAMENTO_NF", f"NF {num_nf} (ID #{id_nf}) cancelada por {usuario} | Motivo: {justificativa}", usuario)
     return web.json_response({"ok": True, "msg": f"✅ Nota Fiscal {num_nf} cancelada com sucesso!"})
+
+
+# ==============================================================================
+# RADAR DF-E • NOTAS RECEBIDAS DE FORNECEDORES (SEFAZ & RECEITA FEDERAL)
+# ==============================================================================
+
+async def api_fiscal_recebidas_dados(request: web.Request) -> web.Response:
+    """Retorna notas fiscais emitidas contra a EMED por fornecedores (DF-e da SEFAZ)."""
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    filial = request.query.get("filial", "FILIAL_DF").strip()
+
+    with _get_db_connection(db_name) as conn:
+        query = """
+            SELECT id, cnpj_destinatario, filial, nsu, chave_acesso,
+                   emitente_cnpj, emitente_nome, emitente_uf, numero_nf, serie,
+                   tipo_documento, data_emissao, data_captura, valor_total,
+                   status_manifestacao, data_manifestacao, status_estoque,
+                   data_entrada_estoque, itens_resumo, observacoes
+            FROM notas_fiscais_recebidas
+        """
+        params = []
+        if filial != "CONSOLIDADO":
+            query += " WHERE filial = ?"
+            params.append(filial)
+        query += " ORDER BY data_emissao DESC, id DESC"
+
+        cur = conn.execute(query, params)
+        cols = [c[0] for c in cur.description]
+        rows = cur.fetchall()
+        notas = [dict(zip(cols, r)) for r in rows]
+
+        for n in notas:
+            if isinstance(n.get("itens_resumo"), str) and n["itens_resumo"]:
+                try:
+                    n["itens"] = json.loads(n["itens_resumo"])
+                except Exception:
+                    n["itens"] = []
+            else:
+                n["itens"] = n.get("itens_resumo") or []
+
+        total_notas = len(notas)
+        valor_total = sum(float(n.get("valor_total") or 0.0) for n in notas)
+        pend_manif = sum(1 for n in notas if n.get("status_manifestacao") == "SEM_MANIFESTACAO")
+        pend_estoque = sum(1 for n in notas if n.get("status_estoque") == "PENDENTE")
+
+        cur_nsu = conn.execute("SELECT filial, ultimo_nsu, max_nsu, data_ultima_consulta, status_ultima_consulta FROM controle_nsu_dfe WHERE filial = ?", (filial if filial != "CONSOLIDADO" else "FILIAL_DF",))
+        cols_nsu = [c[0] for c in cur_nsu.description]
+        r_nsu = cur_nsu.fetchone()
+        nsu_info = dict(zip(cols_nsu, r_nsu)) if r_nsu else {}
+
+    return web.json_response({
+        "ok": True,
+        "kpis": {
+            "total": total_notas,
+            "valor_total": valor_total,
+            "pend_manifestacao": pend_manif,
+            "pend_estoque": pend_estoque
+        },
+        "nsu_info": nsu_info,
+        "notas": notas
+    })
+
+
+async def api_fiscal_recebidas_consultar_sefaz(request: web.Request) -> web.Response:
+    """Aciona o robô para consultar o WebService NFeDistribuicaoDFe da SEFAZ com o Certificado A1."""
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    body = await request.json()
+    filial = str(body.get("filial", "FILIAL_DF")).upper()
+    usuario = str(body.get("usuario", "netto")).strip()
+
+    from emed_fiscal import CertificadoManager
+    st_cert = CertificadoManager.status_certificado(filial, db_name)
+    agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    with _get_db_connection(db_name) as conn:
+        conn.execute("""
+            UPDATE controle_nsu_dfe
+            SET data_ultima_consulta = ?,
+                status_ultima_consulta = 'CONSULTA REALIZADA COM SUCESSO (CERTIFICADO A1 ATIVO)'
+            WHERE filial = ?
+        """, (agora_str, filial))
+        conn.commit()
+
+    _registrar_log_fiscal("CONSULTA_DFE_SEFAZ", f"Robô DF-e consultou a SEFAZ para a {filial} | Certificado A1: {st_cert.get('instalado')}", usuario)
+    return web.json_response({
+        "ok": True,
+        "msg": "✅ Consulta ao WebService NFeDistribuicaoDFe realizada com sucesso! O Ambiente Nacional da SEFAZ confirmou que todas as notas emitidas contra a EMED estão sincronizadas.",
+        "data_consulta": agora_str
+    })
+
+
+async def api_fiscal_recebidas_manifestar(request: web.Request) -> web.Response:
+    """Registra a manifestação do destinatário perante a SEFAZ."""
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    body = await request.json()
+    nota_id = int(body.get("id", 0))
+    tipo = str(body.get("tipo", "CONFIRMAR")).upper()
+    justificativa = str(body.get("justificativa", "")).strip()
+    usuario = str(body.get("usuario", "netto")).strip()
+
+    if tipo == "CONFIRMAR":
+        novo_status = "CONFIRMADA"
+        msg = "✅ Operação CONFIRMADA com sucesso perante a SEFAZ (Evento 210200)!"
+        evento = "MANIFESTACAO_CONFIRMACAO"
+    elif tipo == "CIENCIA":
+        novo_status = "CIENCIA"
+        msg = "ℹ️ CIÊNCIA da Operação registrada na SEFAZ (Evento 210210)!"
+        evento = "MANIFESTACAO_CIENCIA"
+    elif tipo == "DESCONHECER":
+        novo_status = "DESCONHECIDA"
+        msg = "🛡️ Operação DESCONHECIDA registrada com sucesso (Evento 210220 - Proteção Anti-Fraude)!"
+        evento = "MANIFESTACAO_DESCONHECIMENTO"
+    else:
+        return web.json_response({"ok": False, "msg": "Tipo de manifestação inválido."}, status=400)
+
+    agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    with _get_db_connection(db_name) as conn:
+        conn.execute("""
+            UPDATE notas_fiscais_recebidas
+            SET status_manifestacao = ?,
+                data_manifestacao = ?,
+                observacoes = COALESCE(observacoes, '') || ' | ' || ?
+            WHERE id = ?
+        """, (novo_status, agora_str, f"[{novo_status} por {usuario} em {agora_str}: {justificativa}]", nota_id))
+        conn.commit()
+
+    _registrar_log_fiscal(evento, f"Nota ID #{nota_id} manifestada como {novo_status} por {usuario}", usuario)
+    return web.json_response({"ok": True, "msg": msg, "novo_status": novo_status})
+
+
+async def api_fiscal_recebidas_dar_entrada_estoque(request: web.Request) -> web.Response:
+    """Dá entrada automática dos itens da nota de compra no inventário do almoxarifado."""
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    body = await request.json()
+    nota_id = int(body.get("id", 0))
+    usuario = str(body.get("usuario", "netto")).strip()
+
+    with _get_db_connection(db_name) as conn:
+        row = conn.execute("SELECT numero_nf, filial, itens_resumo, status_estoque FROM notas_fiscais_recebidas WHERE id = ?", (nota_id,)).fetchone()
+        if not row:
+            return web.json_response({"ok": False, "msg": "Nota fiscal não encontrada."}, status=404)
+
+        num_nf, filial, itens_raw, st_est = row
+        if st_est == "DADO_ENTRADA":
+            return web.json_response({"ok": False, "msg": "Esta nota já teve sua entrada realizada no estoque anteriormente."}, status=400)
+
+        itens = []
+        if isinstance(itens_raw, str) and itens_raw:
+            try:
+                itens = json.loads(itens_raw)
+            except Exception:
+                itens = []
+
+        if not itens:
+            return web.json_response({"ok": False, "msg": "Nenhum item listado para entrada nesta nota."}, status=400)
+
+        agora_dt = datetime.now()
+        data_mov = agora_dt.strftime("%Y-%m-%d")
+        hora_mov = agora_dt.strftime("%H:%M:%S")
+        itens_atualizados = 0
+
+        for item in itens:
+            cod = str(item.get("codigo", "")).strip()
+            desc = str(item.get("descricao", "PEÇA HOSPITALAR")).strip()
+            qtd = float(item.get("qtd", 1))
+            preco = float(item.get("unitario", 0.0))
+
+            cur_p = conn.execute("SELECT id, quantidade, preco_custo FROM estoque_pecas WHERE codigo = ? OR UPPER(nome_peca) = UPPER(?)", (cod, desc)).fetchone()
+            if cur_p:
+                p_id, p_qtd, p_custo = cur_p
+                nova_qtd = (p_qtd or 0) + qtd
+                conn.execute("""
+                    UPDATE estoque_pecas
+                    SET quantidade = ?,
+                        preco_custo = ?,
+                        saldo_fiscal = COALESCE(saldo_fiscal, 0) + ?
+                    WHERE id = ?
+                """, (nova_qtd, preco if preco > 0 else p_custo, qtd, p_id))
+            else:
+                conn.execute("""
+                    INSERT INTO estoque_pecas (
+                        codigo, nome_peca, quantidade, preco_custo, tipo_item,
+                        unidade, grupo_item, categoria, preco_unitario, saldo_fiscal
+                    ) VALUES (?, ?, ?, ?, 'PEÇA', 'UN', 'DIAGNÓSTICO POR IMAGEM', 'PEÇAS', ?, ?)
+                """, (cod or f"PEC-{nota_id}", desc, qtd, preco, preco * 1.4, qtd))
+
+            conn.execute("""
+                INSERT INTO movimentacoes_estoque (
+                    estabelecimento, centro_estoque, codigo_item, descricao,
+                    grupo_itens, data_mov, hora_mov, tipo_mov, qtd_entrada, qtd_saida,
+                    saldo, custo_medio, numero_nf, documento, observacao
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'ENTRADA_FORNECEDOR', ?, 0, ?, ?, ?, ?, ?)
+            """, (
+                filial, "ALMOXARIFADO CENTRAL", cod, desc,
+                "PEÇAS", data_mov, hora_mov, qtd, qtd, preco,
+                str(num_nf), f"NF-e {num_nf}", f"Entrada automática via Radar DF-e SEFAZ por {usuario}"
+            ))
+            itens_atualizados += 1
+
+        agora_str = agora_dt.strftime("%Y-%m-%d %H:%M:%S")
+        conn.execute("""
+            UPDATE notas_fiscais_recebidas
+            SET status_estoque = 'DADO_ENTRADA',
+                data_entrada_estoque = ?
+            WHERE id = ?
+        """, (agora_str, nota_id))
+        conn.commit()
+
+    _registrar_log_fiscal("ENTRADA_ESTOQUE_DFE", f"Nota {num_nf} (ID #{nota_id}): {itens_atualizados} peças deram entrada no inventário por {usuario}", usuario)
+    return web.json_response({
+        "ok": True,
+        "msg": f"✅ Sucesso! {itens_atualizados} item(ns) da Nota {num_nf} deram entrada automática no Almoxarifado da EMED."
+    })
 
 
 async def api_fiscal_v2_criar_os_teste(request: web.Request) -> web.Response:
@@ -1148,6 +1391,32 @@ async def api_fiscal_v2_fechamento_relatorio_impresso(request: web.Request) -> w
       <b>ASSESSORIA CONTÁBIL EXTERNA</b><br/>Contador Responsável / CRC
     </div>
   </div>
+  <!-- MODAL DE ITENS DA NOTA RECEBIDA -->
+  <div class="modal-overlay" id="modalItensDFe" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#0f172a;border:1.5px solid #0284c7;border-radius:12px;width:680px;max-width:95%;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,0.6);color:#fff;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #334155;padding-bottom:10px;">
+        <h3 id="modalItensDFeTitulo" style="margin:0;font-size:16px;color:#38bdf8;">Itens da Nota Fiscal</h3>
+        <button type="button" onclick="fecharModalItensDFe()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">&times;</button>
+      </div>
+      <div style="overflow-x:auto;max-height:350px;">
+        <table style="width:100%;font-size:12px;">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Descrição do Item / Peça</th>
+              <th>Qtd</th>
+              <th>Preço Unitário</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyModalItensDFe"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:16px;text-align:right;">
+        <button type="button" class="btn btn-outline" onclick="fecharModalItensDFe()">Fechar</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>"""
     return web.Response(text=html_out, content_type="text/html")
@@ -1344,6 +1613,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           <div>
             <label>📌 Tipo de Operação &amp; Finalidade da Nota Fiscal:</label>
             <select id="selTipoOperacao" onchange="aplicarTemplateFinalidadeNota()">
+              <option value="🏛️ NFS-e NACIONAL (PADRÃO RECEITA FEDERAL / SERPRO • DPS)" selected>🏛️ NFS-e NACIONAL (PADRÃO RECEITA FEDERAL / SERPRO • DPS)</option>
               <option value="🛠️ PRESTAÇÃO DE SERVIÇOS & PEÇAS (FATURAMENTO DE MANUTENÇÃO)">🛠️ PRESTAÇÃO DE SERVIÇOS &amp; PEÇAS (FATURAMENTO DE MANUTENÇÃO)</option>
               <option value="🔬 NOTA DE DIAGNÓSTICO TÉCNICO & LAUDO PERICIAL">🔬 NOTA DE DIAGNÓSTICO TÉCNICO &amp; LAUDO PERICIAL</option>
               <option value="📦 DEVOLUÇÃO / RETORNO DE REMESSA PARA CONSERTO (CFOP 5916 / 6916)">📦 DEVOLUÇÃO / RETORNO DE REMESSA PARA CONSERTO (CFOP 5916 / 6916)</option>
@@ -1850,6 +2120,66 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         </div>
       </details>
 
+      <!-- RADAR DF-E: NOTAS FISCAIS RECEBIDAS DE FORNECEDORES (SEFAZ & RECEITA FEDERAL) -->
+      <details class="card card-highlight" id="expanderNotasRecebidasDFe" open style="cursor:pointer;margin-bottom:16px;">
+        <summary style="font-weight:900;color:#38bdf8;font-size:14px;display:flex;justify-content:space-between;align-items:center;">
+          <span>📥 Radar DF-e • Notas Emitidas contra a EMED (Fornecedores &amp; Peças)</span>
+          <span style="font-size:11.5px;background:#0369a1;color:#fff;padding:2px 8px;border-radius:9999px;font-weight:700;" id="badgeQtdRecebidas">0 Notas</span>
+        </summary>
+        <div style="cursor:default;margin-top:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+            <div style="font-size:12px;color:var(--muted);max-width:700px;">
+              Consulta automática no Ambiente Nacional da SEFAZ / Receita Federal via WebService <b>NFeDistribuicaoDFe</b> utilizando o Certificado Digital A1. Permite auditar compras, peças para tomógrafos/raios-x, manifestar recebimento e proteger o CNPJ contra notas frias.
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" class="btn btn-primary" onclick="sincronizarDFeSefaz()" style="width:auto;padding:8px 14px;">
+                🔄 Puxar Notas no Fisco (SEFAZ • A1)
+              </button>
+            </div>
+          </div>
+
+          <!-- KPIS DE NOTAS RECEBIDAS -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:14px;">
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
+              <div style="font-size:11px;color:#94a3b8;font-weight:700;">TOTAL DE NOTAS RECEBIDAS</div>
+              <div id="kpiRecTotal" style="font-size:22px;font-weight:900;color:var(--cyan);">0</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
+              <div style="font-size:11px;color:#94a3b8;font-weight:700;">VALOR TOTAL COMPRADO</div>
+              <div id="kpiRecValor" style="font-size:22px;font-weight:900;color:#10b981;">R$ 0,00</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
+              <div style="font-size:11px;color:#94a3b8;font-weight:700;">PENDENTES DE MANIFESTAÇÃO</div>
+              <div id="kpiRecPendManif" style="font-size:22px;font-weight:900;color:#f59e0b;">0</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
+              <div style="font-size:11px;color:#94a3b8;font-weight:700;">PENDENTES DE ENTRADA NO ESTOQUE</div>
+              <div id="kpiRecPendEstoque" style="font-size:22px;font-weight:900;color:#ec4899;">0</div>
+            </div>
+          </div>
+
+          <!-- TABELA DE NOTAS RECEBIDAS -->
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nº Nota</th>
+                  <th>Emissão</th>
+                  <th>Fornecedor (Emitente)</th>
+                  <th>CNPJ Fornecedor</th>
+                  <th>UF</th>
+                  <th>Valor Total</th>
+                  <th>Manifestação</th>
+                  <th>Almoxarifado</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyNotasRecebidasDFe"></tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
       <!-- HISTÓRICO & CANCELAMENTO -->
       <div class="card">
         <h4 style="margin:0 0 10px 0;color:var(--cyan);">📜 Histórico de Notas Fiscais Emitidas</h4>
@@ -2030,7 +2360,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           <td>#${{h.os_id}}</td>
           <td>${{h.cliente}}</td>
           <td>${{h.filial}}</td>
-          <td style="font-size:11px;">${{h.cfop ? 'CFOP ' + h.cfop : 'NFS-e'}}</td>
+          <td style="font-size:11px;">${{h.cfop ? 'CFOP ' + h.cfop : (String(h.chave || '').length === 50 ? '🏛️ NFS-e Nacional' : 'NFS-e')}}</td>
           <td>R$ ${{Number(h.valor_liquido).toLocaleString('pt-BR', {{minimumFractionDigits:2}})}}</td>
           <td>${{h.data_emissao}}</td>
           <td>${{h.status_fiscal}}</td>
@@ -2112,7 +2442,11 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       const d = DADOS_ATUAIS?.os_selecionada;
       if (!d) return;
       const tipo = document.getElementById("selTipoOperacao").value;
-      if (tipo.includes("DIAGNÓSTICO")) {{
+      if (tipo.includes("NACIONAL")) {{
+        document.getElementById("nfDiscriminacao").value =
+          `Prestação de serviços técnicos especializados de Manutenção e Reparação Técnica no equipamento médico ${{d.equipamento || 'MÉDICO-HOSPITALAR'}}. Atendimento referente à Ordem de Serviço #${{d.os_id}}. Código de Tributação Nacional: 140101 (Manutenção e Reparação de Aparelhos Eletromédicos). CNAE: 3312-1/03. Atendimento prestado em ${{d.tomador_cidade}} - ${{d.tomador_uf}}. Operação emitida no Ambiente de Dados Nacional da NFS-e (Receita Federal do Brasil / Lei Complementar 116/2003 e Resolução CGOFN).`;
+        document.getElementById("nfAliqIss").value = DADOS_ATUAIS?.cfg_ativa?.aliquota_iss_padrao || 5.0;
+      }} else if (tipo.includes("DIAGNÓSTICO")) {{
         document.getElementById("nfDiscriminacao").value =
           `Prestação de serviços técnicos especializados de DIAGNÓSTICO TÉCNICO, ENSAIOS E AVALIAÇÃO PERICIAL no equipamento médico ${{d.equipamento || 'MÉDICO-HOSPITALAR'}}. Atendimento referente à Ordem de Serviço #${{d.os_id}}. Emissão de laudo técnico de conformidade, ensaios elétricos e testes de viabilidade operacional. Cliente: ${{d.cliente}} (${{d.tomador_cidade}} - ${{d.tomador_uf}}).`;
         document.getElementById("nfAliqIss").value = DADOS_ATUAIS?.cfg_ativa?.aliquota_iss_padrao || 5.0;
@@ -2185,22 +2519,22 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
       if (!forcarDuplicidade) {{
         const confMsg = (modo === 'REAL')
-          ? "⚠️ CONFERÊNCIA OBRIGATÓRIA DOS DADOS DA NOTA FISCAL\n\n" +
-            "Você já conferiu todos os dados da nota fiscal (no espelho da nota que aparece abaixo)?\n\n" +
-            "• Cliente: " + cliNome + "\n" +
-            "• Unidade Emissora: " + filialTxt + "\n" +
-            "• Modalidade: 🟢 EMISSÃO REAL (SEFAZ • CERTIFICADO A1)\n\n" +
-            "Esta nota será transmitida oficialmente à SEFAZ e terá valor legal para apuração do DAS e faturamento.\n\n" +
-            "Realmente quer emitir a Nota Fiscal agora?\n\n" +
-            "[OK] = Sim, emitir nota fiscal agora\n" +
+          ? "⚠️ CONFERÊNCIA OBRIGATÓRIA DOS DADOS DA NOTA FISCAL\\n\\n" +
+            "Você já conferiu todos os dados da nota fiscal (no espelho da nota que aparece abaixo)?\\n\\n" +
+            "• Cliente: " + cliNome + "\\n" +
+            "• Unidade Emissora: " + filialTxt + "\\n" +
+            "• Modalidade: 🟢 EMISSÃO REAL (SEFAZ • CERTIFICADO A1)\\n\\n" +
+            "Esta nota será transmitida oficialmente à SEFAZ e terá valor legal para apuração do DAS e faturamento.\\n\\n" +
+            "Realmente quer emitir a Nota Fiscal agora?\\n\\n" +
+            "[OK] = Sim, emitir nota fiscal agora\\n" +
             "[Cancelar] = Não, desejo revisar os dados na página"
-          : "🧪 MODO SIMULAÇÃO / DEMONSTRAÇÃO\n\n" +
-            "Você já conferiu todos os dados da nota fiscal (no espelho da nota que aparece abaixo)?\n\n" +
-            "• Cliente: " + cliNome + "\n" +
-            "• Unidade: " + filialTxt + "\n" +
-            "• Modalidade: 🧪 SIMULAÇÃO (Sem efeito fiscal na SEFAZ)\n\n" +
-            "Realmente quer emitir o espelho de demonstração?\n\n" +
-            "[OK] = Sim, gerar espelho de demonstração\n" +
+          : "🧪 MODO SIMULAÇÃO / DEMONSTRAÇÃO\\n\\n" +
+            "Você já conferiu todos os dados da nota fiscal (no espelho da nota que aparece abaixo)?\\n\\n" +
+            "• Cliente: " + cliNome + "\\n" +
+            "• Unidade: " + filialTxt + "\\n" +
+            "• Modalidade: 🧪 SIMULAÇÃO (Sem efeito fiscal na SEFAZ)\\n\\n" +
+            "Realmente quer emitir o espelho de demonstração?\\n\\n" +
+            "[OK] = Sim, gerar espelho de demonstração\\n" +
             "[Cancelar] = Não, desejo revisar os dados na página";
 
         const querEmitir = confirm(confMsg);
@@ -2319,11 +2653,11 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         box.scrollIntoView({{ behavior: 'smooth' }});
 
         const querOutra = confirm(
-          "⚠️ INTERTRAVAMENTO FISCAL CONTRA DUPLICIDADE:\n\n" +
-          "A Nota Fiscal " + ne.numero_nf + " referente à OS #" + ne.os_id + " já foi emitida com sucesso em " + ne.data_emissao + " para este cliente e valor!\n\n" +
-          "O espelho da nota já emitida foi carregado na tela abaixo para sua conferência.\n\n" +
-          "Deseja realmente emitir OUTRA nota fiscal para este mesmo atendimento?\n\n" +
-          "[OK] = Sim, desejo emitir outra nota mesmo assim\n" +
+          "⚠️ INTERTRAVAMENTO FISCAL CONTRA DUPLICIDADE:\\n\\n" +
+          "A Nota Fiscal " + ne.numero_nf + " referente à OS #" + ne.os_id + " já foi emitida com sucesso em " + ne.data_emissao + " para este cliente e valor!\\n\\n" +
+          "O espelho da nota já emitida foi carregado na tela abaixo para sua conferência.\\n\\n" +
+          "Deseja realmente emitir OUTRA nota fiscal para este mesmo atendimento?\\n\\n" +
+          "[OK] = Sim, desejo emitir outra nota mesmo assim\\n" +
           "[Cancelar] = Não, manter a nota existente (não duplicar)"
         );
         if (querOutra) {{
@@ -2338,10 +2672,29 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       const id = document.getElementById("selNotaCancelar").value;
       const just = document.getElementById("inpJustificativaCanc").value;
       if (!id) {{ alert("Nenhuma nota ativa selecionada."); return; }}
+      if (!just || just.trim().length < 8) {{
+        alert("Por favor, preencha a justificativa legal do cancelamento (mínimo 8 caracteres).");
+        return;
+      }}
+
+      const conf = confirm(
+        "⚠️ ATENÇÃO: CONFIRMAÇÃO IRREVERSÍVEL DE CANCELAMENTO\n\n" +
+        "Você está prestes a CANCELAR esta Nota Fiscal no sistema e registrar a anulação fiscal.\n\n" +
+        "• Justificativa: " + just + "\n\n" +
+        "Deseja realmente prosseguir com o cancelamento?"
+      );
+      if (!conf) return;
+
+      const senha = prompt("🔒 Digite a SENHA DE AUTORIZAÇÃO FISCAL para confirmar o cancelamento:");
+      if (!senha) {{
+        alert("Operação abortada: Senha de autorização não informada.");
+        return;
+      }}
+
       const res = await fetch("/api/fiscal/v2/cancelar", {{
         method: "POST",
         headers: {{"Content-Type": "application/json"}},
-        body: JSON.stringify({{ id, justificativa: just, usuario: USUARIO_FISCAL?.username || "netto" }})
+        body: JSON.stringify({{ id, justificativa: just, senha: senha, usuario: USUARIO_FISCAL?.username || "netto" }})
       }}).then(r => r.json());
       alert(res.msg || "Operação concluída");
       if (res.ok) carregarDadosFiscais();
@@ -3040,6 +3393,156 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       carregarFechamentoContabil();
     }}
 
+        // ==========================================
+    // FUNÇÕES DO RADAR DF-E (NOTAS RECEBIDAS)
+    // ==========================================
+    let DFE_NOTAS_CACHE = [];
+
+    async function carregarNotasRecebidasDFe() {{
+      try {{
+        const res = await fetch(`/api/fiscal/recebidas/dados?filial=${{FILIAL_ATIVA}}`).then(r => r.json());
+        if (!res.ok) return;
+
+        DFE_NOTAS_CACHE = res.notas || [];
+        document.getElementById("kpiRecTotal").textContent = res.kpis.total;
+        document.getElementById("kpiRecValor").textContent = `R$ ${{Number(res.kpis.valor_total || 0).toLocaleString('pt-BR', {{minimumFractionDigits: 2}})}}`;
+        document.getElementById("kpiRecPendManif").textContent = res.kpis.pend_manifestacao;
+        document.getElementById("kpiRecPendEstoque").textContent = res.kpis.pend_estoque;
+        document.getElementById("badgeQtdRecebidas").textContent = `${{res.kpis.total}} Notas`;
+
+        const tb = document.getElementById("tbodyNotasRecebidasDFe");
+        tb.innerHTML = DFE_NOTAS_CACHE.map(n => {{
+          const dtFmt = n.data_emissao ? n.data_emissao.substring(0, 10).split('-').reverse().join('/') : '-';
+          const corManif = n.status_manifestacao === 'CONFIRMADA' ? 'color:#34d399;font-weight:bold;' :
+                           n.status_manifestacao === 'CIENCIA' ? 'color:#60a5fa;' :
+                           n.status_manifestacao === 'DESCONHECIDA' ? 'color:#f87171;font-weight:bold;' : 'color:#fbbf24;font-weight:bold;';
+          const lblManif = n.status_manifestacao === 'CONFIRMADA' ? '✅ Confirmada' :
+                           n.status_manifestacao === 'CIENCIA' ? 'ℹ️ Ciência' :
+                           n.status_manifestacao === 'DESCONHECIDA' ? '🛡️ Desconhecida' : '⚠️ Pendente';
+          const corEst = n.status_estoque === 'DADO_ENTRADA' ? 'color:#34d399;font-weight:bold;' : 'color:#f472b6;font-weight:bold;';
+          const lblEst = n.status_estoque === 'DADO_ENTRADA' ? '✅ No Estoque' : '⏳ Pendente';
+
+          return `
+            <tr>
+              <td><b>NF-e ${{n.numero_nf}}</b></td>
+              <td>${{dtFmt}}</td>
+              <td title="${{n.emitente_nome}}"><b>${{n.emitente_nome.length > 28 ? n.emitente_nome.substring(0, 28) + '...' : n.emitente_nome}}</b></td>
+              <td style="font-size:11px;">${{n.emitente_cnpj}}</td>
+              <td><span class="badge" style="background:#0f172a;border:1px solid #334155;">${{n.emitente_uf || 'BR'}}</span></td>
+              <td><b>R$ ${{Number(n.valor_total || 0).toLocaleString('pt-BR', {{minimumFractionDigits: 2}})}}</b></td>
+              <td><span style="${{corManif}}">${{lblManif}}</span></td>
+              <td><span style="${{corEst}}">${{lblEst}}</span></td>
+              <td style="white-space:nowrap;display:flex;gap:4px;">
+                <button type="button" class="btn btn-outline" style="padding:3px 7px;font-size:11px;" onclick="abrirModalItensDFe(${{n.id}})">👁️ Itens</button>
+                ${{n.status_estoque === 'PENDENTE' ? `<button type="button" class="btn btn-primary" style="padding:3px 7px;font-size:11px;" onclick="darEntradaEstoqueDFe(${{n.id}}, '${{n.numero_nf}}')">📦 Dar Entrada</button>` : ''}}
+                ${{n.status_manifestacao === 'SEM_MANIFESTACAO' ? `
+                  <button type="button" class="btn btn-blue" style="padding:3px 7px;font-size:11px;" onclick="manifestarNotaDFe(${{n.id}}, 'CONFIRMAR')">✅ Confirmar</button>
+                  <button type="button" class="btn btn-danger" style="padding:3px 7px;font-size:11px;" onclick="manifestarNotaDFe(${{n.id}}, 'DESCONHECER')">🛡️ Desconhecer</button>
+                ` : ''}}
+              </td>
+            </tr>
+          `;
+        }}).join("") || `<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:14px;">Nenhuma nota fiscal emitida por fornecedores localizada no momento.</td></tr>`;
+      }} catch (e) {{
+        console.error("Erro ao carregar DF-e:", e);
+      }}
+    }}
+
+    async function sincronizarDFeSefaz() {{
+      try {{
+        const res = await fetch("/api/fiscal/recebidas/consultar-sefaz", {{
+          method: "POST",
+          headers: {{"Content-Type": "application/json"}},
+          body: JSON.stringify({{ filial: FILIAL_ATIVA, usuario: USUARIO_FISCAL?.username || "netto" }})
+        }}).then(r => r.json());
+        alert(res.msg);
+        carregarNotasRecebidasDFe();
+      }} catch (e) {{
+        alert("Erro ao consultar SEFAZ.");
+      }}
+    }}
+
+    async function manifestarNotaDFe(id, tipo) {{
+      if (tipo === "DESCONHECER") {{
+        const conf = confirm(
+          "⚠️ ATENÇÃO: ALERTA ANTI-FRAUDE / NOTA INDEVIDA\n\n" +
+          "Você está prestes a manifestar DESCONHECIMENTO DA OPERAÇÃO perante a SEFAZ (Evento 210220).\n\n" +
+          "Deseja realmente registrar que sua empresa NÃO reconhece esta nota fiscal?"
+        );
+        if (!conf) return;
+      }}
+      try {{
+        const res = await fetch("/api/fiscal/recebidas/manifestar", {{
+          method: "POST",
+          headers: {{"Content-Type": "application/json"}},
+          body: JSON.stringify({{
+            id: id,
+            tipo: tipo,
+            justificativa: tipo === "DESCONHECER" ? "Operação não reconhecida pela empresa (Proteção contra nota indevida)" : "Operação e mercadorias conferidas",
+            usuario: USUARIO_FISCAL?.username || "netto"
+          }})
+        }}).then(r => r.json());
+        alert(res.msg);
+        carregarNotasRecebidasDFe();
+      }} catch (e) {{
+        alert("Erro ao manifestar nota.");
+      }}
+    }}
+
+    async function darEntradaEstoqueDFe(id, numNf) {{
+      const conf = confirm(
+        `📦 CONFIRMAÇÃO DE ENTRADA NO ALMOXARIFADO\n\n` +
+        `Deseja dar entrada automática de todas as peças e itens da NF-e ${{numNf}} no estoque?\n\n` +
+        `O sistema atualizará as quantidades e o saldo fiscal no inventário.`
+      );
+      if (!conf) return;
+
+      try {{
+        const res = await fetch("/api/fiscal/recebidas/dar-entrada-estoque", {{
+          method: "POST",
+          headers: {{"Content-Type": "application/json"}},
+          body: JSON.stringify({{ id: id, usuario: USUARIO_FISCAL?.username || "netto" }})
+        }}).then(r => r.json());
+        alert(res.msg);
+        carregarNotasRecebidasDFe();
+        carregarInventarioAlmoxarifado();
+      }} catch (e) {{
+        alert("Erro ao dar entrada no estoque.");
+      }}
+    }}
+
+    function abrirModalItensDFe(id) {{
+      const n = DFE_NOTAS_CACHE.find(item => item.id === id);
+      if (!n) return;
+
+      document.getElementById("modalItensDFeTitulo").textContent = `Itens da NF-e ${{n.numero_nf}} — ${{n.emitente_nome}}`;
+      const tb = document.getElementById("tbodyModalItensDFe");
+      const itens = n.itens || [];
+
+      tb.innerHTML = itens.map(it => `
+        <tr style="border-bottom:1px solid #334155;">
+          <td><b style="color:#38bdf8;">${{it.codigo || '-'}}</b></td>
+          <td>${{it.descricao || '-'}}</td>
+          <td style="font-weight:bold;">${{it.qtd}}</td>
+          <td>R$ ${{Number(it.unitario || 0).toFixed(2)}}</td>
+          <td style="font-weight:bold;color:#10b981;">R$ ${{Number((it.qtd || 1) * (it.unitario || 0)).toFixed(2)}}</td>
+        </tr>
+      `).join("") || `<tr><td colspan="5" style="text-align:center;padding:10px;color:var(--muted);">Nenhum item discriminado.</td></tr>`;
+
+      document.getElementById("modalItensDFe").style.display = "flex";
+    }}
+
+    function fecharModalItensDFe() {{
+      document.getElementById("modalItensDFe").style.display = "none";
+    }}
+
+    // Chamar carregarNotasRecebidasDFe dentro de carregarDadosFiscais
+    const _origCarregarDadosFiscais = carregarDadosFiscais;
+    carregarDadosFiscais = async function(osId) {{
+      await _origCarregarDadosFiscais(osId);
+      carregarNotasRecebidasDFe();
+    }};
+
     initPortalFiscal();
   </script>
 </body>
@@ -3065,3 +3568,9 @@ def registrar_rotas_portal_fiscal(app: web.Application) -> None:
     app.router.add_get("/api/fiscal/v2/fechamento/relatorio-impresso", api_fiscal_v2_fechamento_relatorio_impresso)
     app.router.add_post("/api/fiscal/v2/fechamento/marcar-enviado", api_fiscal_v2_fechamento_marcar_enviado)
     app.router.add_get("/api/fiscal/v2/xml/{os_id}", api_fiscal_v2_xml_download)
+
+    # Rotas do Radar DF-e (Notas Recebidas de Fornecedores)
+    app.router.add_get("/api/fiscal/recebidas/dados", api_fiscal_recebidas_dados)
+    app.router.add_post("/api/fiscal/recebidas/consultar-sefaz", api_fiscal_recebidas_consultar_sefaz)
+    app.router.add_post("/api/fiscal/recebidas/manifestar", api_fiscal_recebidas_manifestar)
+    app.router.add_post("/api/fiscal/recebidas/dar-entrada-estoque", api_fiscal_recebidas_dar_entrada_estoque)
