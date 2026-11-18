@@ -2520,23 +2520,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
       if (!forcarDuplicidade) {{
         const confMsg = (modo === 'REAL')
-          ? "⚠️ CONFERÊNCIA OBRIGATÓRIA DOS DADOS DA NOTA FISCAL\n\n" +
-            "Você já conferiu todos os dados da nota fiscal (no espelho da nota que aparece abaixo)?\n\n" +
-            "• Cliente: " + cliNome + "\n" +
-            "• Unidade Emissora: " + filialTxt + "\n" +
-            "• Modalidade: 🟢 EMISSÃO REAL (SEFAZ • CERTIFICADO A1)\n\n" +
-            "Esta nota será transmitida oficialmente à SEFAZ e terá valor legal para apuração do DAS e faturamento.\n\n" +
-            "Realmente quer emitir a Nota Fiscal agora?\n\n" +
-            "[OK] = Sim, emitir nota fiscal agora\n" +
-            "[Cancelar] = Não, desejo revisar os dados na página"
-          : "🧪 MODO SIMULAÇÃO / DEMONSTRAÇÃO\n\n" +
-            "Você já conferiu todos os dados da nota fiscal (no espelho da nota que aparece abaixo)?\n\n" +
-            "• Cliente: " + cliNome + "\n" +
-            "• Unidade: " + filialTxt + "\n" +
-            "• Modalidade: 🧪 SIMULAÇÃO (Sem efeito fiscal na SEFAZ)\n\n" +
-            "Realmente quer emitir o espelho de demonstração?\n\n" +
-            "[OK] = Sim, gerar espelho de demonstração\n" +
-            "[Cancelar] = Não, desejo revisar os dados na página";
+          ? `⚠️ CONFERÊNCIA OBRIGATÓRIA DOS DADOS DA NOTA FISCAL\n\nVocê já conferiu todos os dados da nota fiscal (no espelho da nota que aparece abaixo)?\n\n• Cliente: ${{cliNome}}\n• Unidade Emissora: ${{filialTxt}}\n• Modalidade: 🟢 EMISSÃO REAL (SEFAZ • CERTIFICADO A1)\n\nEsta nota será transmitida oficialmente à SEFAZ e terá valor legal para apuração do DAS e faturamento.\n\nRealmente quer emitir a Nota Fiscal agora?\n\n[OK] = Sim, emitir nota fiscal agora\n[Cancelar] = Não, desejo revisar os dados na página`
+          : `🧪 MODO SIMULAÇÃO / DEMONSTRAÇÃO\n\nVocê já conferiu todos os dados da nota fiscal (no espelho da nota que aparece abaixo)?\n\n• Cliente: ${{cliNome}}\n• Unidade: ${{filialTxt}}\n• Modalidade: 🧪 SIMULAÇÃO (Sem efeito fiscal na SEFAZ)\n\nRealmente quer emitir o espelho de demonstração?\n\n[OK] = Sim, gerar espelho de demonstração\n[Cancelar] = Não, desejo revisar os dados na página`;
 
         const querEmitir = confirm(confMsg);
         if (!querEmitir) {{
