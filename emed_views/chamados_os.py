@@ -503,12 +503,12 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     if lista_fotos_b64 or checklist_itens:
         fotos_rows = ""
         if lista_fotos_b64:
-            fotos_rows = '<div class="sec-box"><div class="sec-title-blue">ANEXO I — EVIDÊNCIAS FOTOGRÁFICAS DO ATENDIMENTO</div><table><tr>'
-            for idx_f, f_b64 in enumerate(lista_fotos_b64[:4]):
+            fotos_rows = '<div class="sec-box"><div class="sec-title-blue">ANEXO I — EVIDÊNCIAS FOTOGRÁFICAS DO ATENDIMENTO (' + str(len(lista_fotos_b64)) + ' FOTOS)</div><table><tr style="page-break-inside: avoid;">'
+            for idx_f, f_b64 in enumerate(lista_fotos_b64):
                 if idx_f > 0 and idx_f % 2 == 0:
-                    fotos_rows += "</tr><tr>"
+                    fotos_rows += '</tr><tr style="page-break-inside: avoid;">'
                 fotos_rows += f'<td style="width:50%;text-align:center;padding:8px;"><img src="{f_b64}" width="230" style="width:230px;height:155px;object-fit:cover;border:1px solid #cbd5e1;" /><div style="font-size:6.8pt;color:#475569;margin-top:3px;">Registro Fotográfico #{idx_f+1} — OS Nº {id_os_c}</div></td>'
-            if len(lista_fotos_b64[:4]) % 2 == 1:
+            if len(lista_fotos_b64) % 2 == 1:
                 fotos_rows += '<td style="width:50%;"></td>'
             fotos_rows += '</tr></table></div>'
 
