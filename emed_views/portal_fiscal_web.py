@@ -261,11 +261,13 @@ async def api_fiscal_v2_emitir(request: web.Request) -> web.Response:
     if filial == "CONSOLIDADO":
         filial = "FILIAL_DF"
 
-    tipo_op = str(body.get("tipo_nota", "🛠️ PRESTAÇÃO DE SERVIÇOS & PEÇAS (FATURAMENTO DE MANUTENÇÃO)"))
+    tipo_op = str(body.get("tipo_nota", "🏛️ NFS-e NACIONAL (PADRÃO RECEITA FEDERAL / SERPRO • DPS)"))
     uf_tom = str(body.get("tomador_uf", "DF")).strip().upper()
     nat_op = "TRIBUTAÇÃO NO MUNICÍPIO / DF"
     cfop = ""
-    if "DIAGNÓSTICO" in tipo_op:
+    if "NACIONAL" in tipo_op:
+        nat_op = "PRESTAÇÃO DE SERVIÇOS NO AMBIENTE NACIONAL (DPS / RECEITA FEDERAL)"
+    elif "DIAGNÓSTICO" in tipo_op:
         nat_op = "PRESTAÇÃO DE SERVIÇO DE DIAGNÓSTICO TÉCNICO"
     elif "DEVOLUÇÃO" in tipo_op:
         nat_op = "RETORNO DE MERCADORIA/BEM RECEBIDO PARA CONSERTO"
@@ -1371,6 +1373,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           <div>
             <label>📌 Tipo de Operação &amp; Finalidade da Nota Fiscal:</label>
             <select id="selTipoOperacao" onchange="aplicarTemplateFinalidadeNota()">
+              <option value="🏛️ NFS-e NACIONAL (PADRÃO RECEITA FEDERAL / SERPRO • DPS)" selected>🏛️ NFS-e NACIONAL (PADRÃO RECEITA FEDERAL / SERPRO • DPS)</option>
               <option value="🛠️ PRESTAÇÃO DE SERVIÇOS & PEÇAS (FATURAMENTO DE MANUTENÇÃO)">🛠️ PRESTAÇÃO DE SERVIÇOS &amp; PEÇAS (FATURAMENTO DE MANUTENÇÃO)</option>
               <option value="🔬 NOTA DE DIAGNÓSTICO TÉCNICO & LAUDO PERICIAL">🔬 NOTA DE DIAGNÓSTICO TÉCNICO &amp; LAUDO PERICIAL</option>
               <option value="📦 DEVOLUÇÃO / RETORNO DE REMESSA PARA CONSERTO (CFOP 5916 / 6916)">📦 DEVOLUÇÃO / RETORNO DE REMESSA PARA CONSERTO (CFOP 5916 / 6916)</option>
@@ -2057,7 +2060,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           <td>#${{h.os_id}}</td>
           <td>${{h.cliente}}</td>
           <td>${{h.filial}}</td>
-          <td style="font-size:11px;">${{h.cfop ? 'CFOP ' + h.cfop : 'NFS-e'}}</td>
+          <td style="font-size:11px;">${{h.cfop ? 'CFOP ' + h.cfop : (String(h.chave || '').length === 50 ? '🏛️ NFS-e Nacional' : 'NFS-e')}}</td>
           <td>R$ ${{Number(h.valor_liquido).toLocaleString('pt-BR', {{minimumFractionDigits:2}})}}</td>
           <td>${{h.data_emissao}}</td>
           <td>${{h.status_fiscal}}</td>
@@ -2139,7 +2142,11 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       const d = DADOS_ATUAIS?.os_selecionada;
       if (!d) return;
       const tipo = document.getElementById("selTipoOperacao").value;
-      if (tipo.includes("DIAGNÓSTICO")) {{
+      if (tipo.includes("NACIONAL")) {{
+        document.getElementById("nfDiscriminacao").value =
+          `Prestação de serviços técnicos especializados de Manutenção e Reparação Técnica no equipamento médico ${{d.equipamento || 'MÉDICO-HOSPITALAR'}}. Atendimento referente à Ordem de Serviço #${{d.os_id}}. Código de Tributação Nacional: 140101 (Manutenção e Reparação de Aparelhos Eletromédicos). CNAE: 3312-1/03. Atendimento prestado em ${{d.tomador_cidade}} - ${{d.tomador_uf}}. Operação emitida no Ambiente de Dados Nacional da NFS-e (Receita Federal do Brasil / Lei Complementar 116/2003 e Resolução CGOFN).`;
+        document.getElementById("nfAliqIss").value = DADOS_ATUAIS?.cfg_ativa?.aliquota_iss_padrao || 5.0;
+      }} else if (tipo.includes("DIAGNÓSTICO")) {{
         document.getElementById("nfDiscriminacao").value =
           `Prestação de serviços técnicos especializados de DIAGNÓSTICO TÉCNICO, ENSAIOS E AVALIAÇÃO PERICIAL no equipamento médico ${{d.equipamento || 'MÉDICO-HOSPITALAR'}}. Atendimento referente à Ordem de Serviço #${{d.os_id}}. Emissão de laudo técnico de conformidade, ensaios elétricos e testes de viabilidade operacional. Cliente: ${{d.cliente}} (${{d.tomador_cidade}} - ${{d.tomador_uf}}).`;
         document.getElementById("nfAliqIss").value = DADOS_ATUAIS?.cfg_ativa?.aliquota_iss_padrao || 5.0;

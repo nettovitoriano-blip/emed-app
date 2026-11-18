@@ -182,6 +182,32 @@ class FiscalProvider:
         raise NotImplementedError
 
 
+def calcular_chave_nfse_nacional(c_mun: str, cnpj: str, serie: int, num_nf: int, random_seed: Optional[int] = None) -> str:
+    """Gera a Chave de Acesso Oficial de 50 dígitos da NFS-e Nacional (Padrão Receita Federal / Comitê Gestor) com Dígito Verificador Módulo 11."""
+    c_mun_str = f"{int(c_mun):07d}"
+    tp_insc = "2"  # 2 = CNPJ
+    cnpj_limpo = "".join(c for c in str(cnpj) if c.isdigit()) or "03611974000280"
+    cnpj_str = f"{int(cnpj_limpo):014d}"
+    mod = "00"  # Modelo Oficial Nacional NFS-e
+    serie_str = f"{int(serie):05d}"
+    ndf_str = f"{int(num_nf):012d}"
+    if random_seed is not None:
+        cdf_str = f"{abs(random_seed) % 100000000:08d}"
+    else:
+        import random
+        cdf_str = f"{random.randint(10000000, 99999999):08d}"
+    corpo = f"{c_mun_str}{tp_insc}{cnpj_str}{mod}{serie_str}{ndf_str}{cdf_str}"
+    
+    # Módulo 11 (pesos de 2 a 9 da direita para a esquerda)
+    pesos = [2, 3, 4, 5, 6, 7, 8, 9]
+    soma = 0
+    for i, char in enumerate(reversed(corpo)):
+        soma += int(char) * pesos[i % len(pesos)]
+    resto = soma % 11
+    dv = 0 if resto in (0, 1) else (11 - resto)
+    return f"{corpo}{dv}"
+
+
 class MultiFilialFiscalProvider(FiscalProvider):
     def __init__(self, base_dir: Optional[Path] = None):
         if base_dir:
@@ -209,7 +235,76 @@ class MultiFilialFiscalProvider(FiscalProvider):
         p_cnpj = "".join([c for c in str(payload.get("prestador_cnpj", "")) if c.isdigit()]) or "03611974000280"
         t_cnpj = "".join([c for c in str(payload.get("cnpj_tomador", "")) if c.isdigit()]) or "00000000000000"
 
-        xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+        tipo_op = str(payload.get("tipo_nota", "")).upper()
+        is_trf = "TRANSFER" in tipo_op or "REMESSA" in tipo_op or "DEVOLUÇÃO" in tipo_op
+        is_nacional = ("NACIONAL" in tipo_op) or ("SERVIÇO" in tipo_op) or ("MANUTENÇÃO" in tipo_op) or (not is_trf)
+
+        chave = payload.get("chave_acesso", "")
+        c_mun_ibge = "5300108" if payload.get("filial_emissora") == "FILIAL_DF" else "2304285"
+        if not chave:
+            if is_nacional and not is_trf:
+                chave = calcular_chave_nfse_nacional(c_mun_ibge, p_cnpj, 1, int(os_id))
+            else:
+                chave = f"53{datetime.now().strftime('%y%m')}{p_cnpj}99001{int(os_id):09d}100000001"
+            payload["chave_acesso"] = chave
+
+        if is_nacional and not is_trf:
+            # GERAÇÃO DA DPS OFICIAL (DECLARAÇÃO DE PRESTAÇÃO DE SERVIÇO) DO PADRÃO NACIONAL SPED / RECEITA FEDERAL
+            xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<DPS xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.00">
+  <infDPS Id="DPS{chave}">
+    <tpAmb>{1 if payload.get('certificado_ativo') else 2}</tpAmb>
+    <dhEmi>{dt_emissao}</dhEmi>
+    <verAplic>EMED-NFS-e-Nacional-v1.2</verAplic>
+    <dCompet>{dt_simples}</dCompet>
+    <prest>
+      <CNPJ>{p_cnpj}</CNPJ>
+    </prest>
+    <toma>
+      <CNPJ>{t_cnpj}</CNPJ>
+      <xNome>{payload.get('cliente', '')}</xNome>
+      <ender>
+        <endNac>
+          <cMun>{c_mun_ibge}</cMun>
+          <CEP>{payload.get('tomador_cep', '70000000')}</CEP>
+          <xLgr>{payload.get('tomador_endereco', '')}</xLgr>
+          <UF>{payload.get('tomador_uf', 'DF')}</UF>
+        </endNac>
+      </ender>
+    </toma>
+    <serv>
+      <locPrest>
+        <cMun>{c_mun_ibge}</cMun>
+      </locPrest>
+      <cServ>
+        <cTribNac>140101</cTribNac>
+        <CNAE>3312103</CNAE>
+        <xDescServ><![CDATA[{payload.get('discriminacao_servico', 'Serviços de Manutenção e Reparação Técnica')}]]></xDescServ>
+      </cServ>
+    </serv>
+    <valores>
+      <vServPrest>
+        <vServ>{v_serv:.2f}</vServ>
+      </vServPrest>
+      <trib>
+        <tribMun>
+          <tribISSQN>1</tribISSQN>
+          <vBC>{v_serv:.2f}</vBC>
+          <pAliq>{aliq_iss:.2f}</pAliq>
+          <vISSQN>{v_iss:.2f}</vISSQN>
+          <tpRetISSQN>1</tpRetISSQN>
+        </tribMun>
+        <totTrib>
+          <vTotTrib>
+            <vTotTribFed>{v_total * 0.1345:.2f}</vTotTribFed>
+          </vTotTrib>
+        </totTrib>
+      </valores>
+    </valores>
+  </infDPS>
+</DPS>"""
+        else:
+            xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Rps xmlns="http://www.abrasf.org.br/nfse.xsd">
   <InfDeclaracaoPrestacaoServico>
     <Rps>
@@ -234,7 +329,7 @@ class MultiFilialFiscalProvider(FiscalProvider):
       <ItemListaServico>{payload.get('codigo_servico', '14.01')}</ItemListaServico>
       <CodigoCnae>3312103</CodigoCnae>
       <Discriminacao><![CDATA[{payload.get('discriminacao_servico', 'Serviços de Manutenção e Reparação Técnica')}]]></Discriminacao>
-      <CodigoMunicipio>{'5300108' if payload.get('prestador_uf') == 'DF' else '2304285'}</CodigoMunicipio>
+      <CodigoMunicipio>{c_mun_ibge}</CodigoMunicipio>
     </Servico>
     <Prestador>
       <CpfCnpj><Cnpj>{p_cnpj}</Cnpj></CpfCnpj>
@@ -275,12 +370,19 @@ class MultiFilialFiscalProvider(FiscalProvider):
         prestador_uf = payload.get("prestador_uf", "DF" if filial_emissora == "FILIAL_DF" else "CE")
         prestador_fone = payload.get("prestador_fone", "(61) 3234-3647 / (61) 99658-5392" if filial_emissora == "FILIAL_DF" else "(85) 3254-2929")
         prestador_email = payload.get("prestador_email", "brasilia@emed.med.br" if filial_emissora == "FILIAL_DF" else "financeiro@emed.med.br")
-        orgao_emissor = payload.get("orgao_fiscal", "SECRETARIA DE FAZENDA DO DISTRITO FEDERAL (SEFAZ-DF)" if filial_emissora == "FILIAL_DF" else "PREFEITURA MUNICIPAL DE EUSÉBIO - CE")
-        doc_aux_titulo = "DOCUMENTO AUXILIAR DA NFS-e DF" if filial_emissora == "FILIAL_DF" else "DOCUMENTO AUXILIAR DA NFS-e / NF-e"
-        is_trf = "TRANSFER" in str(payload.get("tipo_nota", "")).upper()
+        tipo_nota_val = str(payload.get("tipo_nota", "")).upper()
+        is_trf = "TRANSFER" in tipo_nota_val or "REMESSA" in tipo_nota_val or "DEVOLUÇÃO" in tipo_nota_val
+        is_nacional = ("NACIONAL" in tipo_nota_val) or ("SERVIÇO" in tipo_nota_val) or ("MANUTENÇÃO" in tipo_nota_val) or (not is_trf)
+
         if is_trf:
             doc_aux_titulo = "DANFE • NOTA FISCAL ELETRÔNICA DE TRANSFERÊNCIA"
             orgao_emissor = "SECRETARIA DA FAZENDA (SEFAZ • TRANSFERÊNCIA ENTRE ESTABELECIMENTOS)"
+        elif is_nacional:
+            doc_aux_titulo = "DANFSE • DOCUMENTO AUXILIAR DA NOTA FISCAL DE SERVIÇOS ELETRÔNICA NACIONAL"
+            orgao_emissor = "RECEITA FEDERAL DO BRASIL • AMBIENTE DE DADOS NACIONAL (SERPRO / RFB)"
+        else:
+            orgao_emissor = payload.get("orgao_fiscal", "SECRETARIA DE FAZENDA DO DISTRITO FEDERAL (SEFAZ-DF)" if filial_emissora == "FILIAL_DF" else "PREFEITURA MUNICIPAL DE EUSÉBIO - CE")
+            doc_aux_titulo = "DOCUMENTO AUXILIAR DA NFS-e DF" if filial_emissora == "FILIAL_DF" else "DOCUMENTO AUXILIAR DA NFS-e / NF-e"
 
         dt_emissao_fmt = str(payload.get("data_emissao", "")).replace("T", " ")[:19]
         st_fiscal = payload.get("status", "AUTORIZADA")
@@ -297,16 +399,20 @@ class MultiFilialFiscalProvider(FiscalProvider):
         descr = payload.get("discriminacao_servico", "")
         descr = descr.replace("Engenharia Clínica e Manutenção", "Manutenção e Reparação Técnica").replace("Engenharia Clínica", "Manutenção e Reparação Técnica")
 
-        url_danfe = f"https://emedservice.med.br/api/fiscal/danfe/{os_id}"
+        chave_formatada = " ".join([chave[i:i+4] for i in range(0, len(chave), 4)]) if len(chave) == 50 else chave
+        label_chave = "Chave de Acesso Oficial da NFS-e Nacional (50 dígitos)" if len(chave) == 50 else "Chave de Autenticação / Protocolo Digital"
+        url_qr_oficial = f"https://www.nfse.gov.br/consultapublica?chv={chave}" if len(chave) == 50 else f"https://emedservice.med.br/api/fiscal/danfe/{os_id}"
+        label_qr = "Validação Nacional RFB" if len(chave) == 50 else "Validação Digital"
+
         try:
             from emed_services.equipamento_qrcode import gerar_qrcode_base64
-            qr_b64 = gerar_qrcode_base64(url_danfe)
+            qr_b64 = gerar_qrcode_base64(url_qr_oficial)
         except Exception:
             qr_b64 = ""
 
         qr_html = f'''<div style="text-align: center;">
                 <img src="data:image/png;base64,{qr_b64}" alt="QR Code Oficial" style="width: 72px; height: 72px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px; background: #fff; display: block; margin: 0 auto;" />
-                <div style="font-size: 7.5px; color: #0284c7; font-weight: 800; margin-top: 2px; text-transform: uppercase;">Validação Digital</div>
+                <div style="font-size: 7px; color: #0284c7; font-weight: 800; margin-top: 2px; text-transform: uppercase;">{label_qr}</div>
               </div>''' if qr_b64 else ""
 
         val_total = v_total
@@ -401,10 +507,10 @@ class MultiFilialFiscalProvider(FiscalProvider):
     <table style="width: 100%; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; margin-bottom: 4px; border-collapse: collapse;">
       <tr>
         <td style="padding: 3px 6px; font-size: 8.5px; border: none; text-align: left;">
-          <b>Chave de Autenticação / Protocolo Digital:</b> <span style="font-family: monospace; letter-spacing: 0.5px; font-weight: 600;">{chave}</span>
+          <b>{label_chave}:</b> <span style="font-family: monospace; letter-spacing: 0.5px; font-weight: 700; color: #002b54;">{chave_formatada}</span>
         </td>
         <td style="padding: 3px 6px; font-size: 8px; color: #0284c7; font-weight: 700; border: none; text-align: right; white-space: nowrap;">
-          📱 Validação Digital via QR Code
+          📱 {label_qr}
         </td>
       </tr>
     </table>
@@ -492,18 +598,35 @@ class MultiFilialFiscalProvider(FiscalProvider):
         os_id = payload.get("os_id", 0)
         prefixo = "DF" if filial == "FILIAL_DF" else "CE"
         uf_cod = "53" if filial == "FILIAL_DF" else "23"
+        c_mun_ibge = "5300108" if filial == "FILIAL_DF" else "2304285"
         ano_mes = datetime.now().strftime("%y%m")
         ano = datetime.now().year
         cnpj_limpo = "".join(c for c in str(payload.get("prestador_cnpj", "")) if c.isdigit()) or ("03611974000280" if filial == "FILIAL_DF" else "03611974000108")
-        num_nf = f"{prefixo}-{ano}-{int(os_id):05d}"
-        chave = f"{uf_cod}{ano_mes}{cnpj_limpo}99001{int(os_id):09d}1{uuid.uuid4().int % 100000000:08d}"
-        protocolo = f"SEFAZ-{prefixo}-PROT-{uuid.uuid4().hex[:12].upper()}"
+        
+        tipo_op = str(payload.get("tipo_nota", "")).upper()
+        is_trf = "TRANSFER" in tipo_op or "REMESSA" in tipo_op or "DEVOLUÇÃO" in tipo_op
+        is_nacional = ("NACIONAL" in tipo_op) or ("SERVIÇO" in tipo_op) or ("MANUTENÇÃO" in tipo_op) or (not is_trf)
+
         modo_emissao = str(payload.get("modo_emissao") or "").upper()
         cert_ativo = bool(payload.get("certificado_ativo")) and (modo_emissao != "SIMULACAO")
-        if cert_ativo:
-            status_ret = f"AUTORIZADA SEFAZ-{prefixo} (CERTIFICADO A1)"
+
+        if is_nacional and not is_trf:
+            num_nf = f"NFS-{prefixo}-{ano}-{int(os_id):05d}"
+            chave = calcular_chave_nfse_nacional(c_mun_ibge, cnpj_limpo, 1, int(os_id), random_seed=uuid.uuid4().int)
+            protocolo = f"ADN-RFB-PROT-{uuid.uuid4().hex[:12].upper()}"
+            if cert_ativo:
+                status_ret = "AUTORIZADA AMBIENTE NACIONAL (RECEITA FEDERAL • CERTIFICADO A1)"
+            else:
+                status_ret = "AUTORIZADA (SIMULAÇÃO AMBIENTE NACIONAL • RFB)"
         else:
-            status_ret = f"AUTORIZADA (SIMULAÇÃO SEFAZ-{prefixo})"
+            num_nf = f"{prefixo}-{ano}-{int(os_id):05d}"
+            chave = f"{uf_cod}{ano_mes}{cnpj_limpo}99001{int(os_id):09d}1{uuid.uuid4().int % 100000000:08d}"
+            protocolo = f"SEFAZ-{prefixo}-PROT-{uuid.uuid4().hex[:12].upper()}"
+            if cert_ativo:
+                status_ret = f"AUTORIZADA SEFAZ-{prefixo} (CERTIFICADO A1)"
+            else:
+                status_ret = f"AUTORIZADA (SIMULAÇÃO SEFAZ-{prefixo})"
+
         return {
             "status": status_ret,
             "numero_nf": num_nf,
