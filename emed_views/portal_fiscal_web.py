@@ -2647,7 +2647,13 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       }} else {{
         alert("Erro ao emitir: " + (res.msg || "Falha interna"));
       }}
+    }} catch (e) {{
+      alert("Erro na transmissão da nota fiscal: " + (e.message || e));
+    }} finally {{
+      if (btnSim) btnSim.disabled = false;
+      if (btnReal) btnReal.disabled = false;
     }}
+  }}
 
     async function cancelarNotaSelecionada() {{
       const id = document.getElementById("selNotaCancelar").value;
