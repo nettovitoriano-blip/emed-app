@@ -3649,6 +3649,7 @@ async def auth_api_middleware(request: web.Request, handler):
         or path == "/fiscal"
         or path.startswith("/api/fiscal/danfe/")
         or path.startswith("/api/fiscal/v2/")
+        or path.startswith("/api/fiscal/recebidas/")
         or path.startswith("/api/app-icon/")
         or path.startswith("/static/")
 

@@ -3461,7 +3461,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           headers: {{"Content-Type": "application/json"}},
           body: JSON.stringify({{ filial: FILIAL_ATIVA, usuario: USUARIO_FISCAL?.username || "netto" }})
         }}).then(r => r.json());
-        alert(res.msg);
+        alert(res.msg || res.error || res.erro || "Consulta DF-e concluída.");
         carregarNotasRecebidasDFe();
       }} catch (e) {{
         alert("Erro ao consultar SEFAZ.");
@@ -3488,7 +3488,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             usuario: USUARIO_FISCAL?.username || "netto"
           }})
         }}).then(r => r.json());
-        alert(res.msg);
+        alert(res.msg || res.error || res.erro || "Consulta DF-e concluída.");
         carregarNotasRecebidasDFe();
       }} catch (e) {{
         alert("Erro ao manifestar nota.");
@@ -3509,7 +3509,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           headers: {{"Content-Type": "application/json"}},
           body: JSON.stringify({{ id: id, usuario: USUARIO_FISCAL?.username || "netto" }})
         }}).then(r => r.json());
-        alert(res.msg);
+        alert(res.msg || res.error || res.erro || "Consulta DF-e concluída.");
         carregarNotasRecebidasDFe();
         carregarInventarioAlmoxarifado();
       }} catch (e) {{
