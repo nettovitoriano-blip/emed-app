@@ -2418,19 +2418,20 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
     function preencherFormularioComOs(d, cfg) {{
       if (!d) return;
-      document.getElementById("nfCliente").value = d.cliente || "";
-      document.getElementById("nfCnpj").value = d.cnpj_tomador || "";
-      document.getElementById("nfEmail").value = d.email_cliente || "";
-      document.getElementById("nfEnd").value = d.tomador_endereco || "";
-      document.getElementById("nfCid").value = d.tomador_cidade || "";
-      document.getElementById("nfUf").value = d.tomador_uf || "";
-      document.getElementById("nfDiscriminacao").value = d.discriminacao_servico || "";
-      document.getElementById("nfValSrv").value = d.valor_servicos ?? 0;
-      document.getElementById("nfValPec").value = d.valor_pecas ?? 0;
-      document.getElementById("nfAliqIss").value = d.aliquota_iss ?? (cfg?.aliquota_iss_padrao || 5.0);
-      document.getElementById("nfDesconto").value = d.valor_desconto ?? 0;
-      document.getElementById("lblFormAliqIss").textContent = `Alíquota ISS (${{cfg?.uf || 'DF'}}) (%):`;
-      document.getElementById("btnEmitirNf").textContent = `🚀 EMITIR NOTA FISCAL (${{cfg?.sigla || 'EMED'}}) EM 1 CLIQUE`;
+      if (document.getElementById("nfCliente")) document.getElementById("nfCliente").value = d.cliente || "";
+      if (document.getElementById("nfCnpj")) document.getElementById("nfCnpj").value = d.cnpj_tomador || "";
+      if (document.getElementById("nfEmail")) document.getElementById("nfEmail").value = d.email_cliente || "";
+      if (document.getElementById("nfEnd")) document.getElementById("nfEnd").value = d.tomador_endereco || "";
+      if (document.getElementById("nfCid")) document.getElementById("nfCid").value = d.tomador_cidade || "";
+      if (document.getElementById("nfUf")) document.getElementById("nfUf").value = d.tomador_uf || "";
+      if (document.getElementById("nfDiscriminacao")) document.getElementById("nfDiscriminacao").value = d.discriminacao_servico || "";
+      if (document.getElementById("nfValSrv")) document.getElementById("nfValSrv").value = d.valor_servicos ?? 0;
+      if (document.getElementById("nfValPec")) document.getElementById("nfValPec").value = d.valor_pecas ?? 0;
+      if (document.getElementById("nfAliqIss")) document.getElementById("nfAliqIss").value = d.aliquota_iss ?? (cfg?.aliquota_iss_padrao || 5.0);
+      if (document.getElementById("nfDesconto")) document.getElementById("nfDesconto").value = d.valor_desconto ?? 0;
+      if (document.getElementById("lblFormAliqIss")) document.getElementById("lblFormAliqIss").textContent = `Alíquota ISS (${{cfg?.uf || 'DF'}}) (%):`;
+      const btnEm = document.getElementById("btnEmitirRealNf") || document.getElementById("btnEmitirNf");
+      if (btnEm) btnEm.textContent = `🟢 EMITIR NOTA FISCAL REAL (${{cfg?.sigla || 'EMED'}})`;
       recalcularTotaisFormNf();
     }}
 
