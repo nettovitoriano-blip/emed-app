@@ -2108,18 +2108,34 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
     async function emitirNotaFiscalAgora(modo = 'SIMULACAO') {{
       const osId = document.getElementById("selOsEmissao").value;
-      if (!osId) {{ alert("Selecione uma Ordem de Serviço."); return; }}
+      if (!osId) {{ alert("Por favor, selecione uma Ordem de Serviço para emissão."); return; }}
 
-      if (modo === 'REAL') {{
-        const cliNome = document.getElementById("nfCliente") ? document.getElementById("nfCliente").value : "Cliente";
-        const conf = confirm(
-          "⚠️ ATENÇÃO: EMISSÃO REAL DE NOTA FISCAL COM CERTIFICADO DIGITAL A1!\n\n" +
-          "Cliente: " + cliNome + "\n" +
-          "Unidade: " + (FILIAL_ATIVA === 'MATRIZ_CE' ? 'Matriz Eusébio - CE' : 'Filial Brasília - DF') + "\n\n" +
-          "Esta nota terá valor legal na SEFAZ e na contabilidade.\n\n" +
-          "Deseja realmente confirmar a EMISSÃO REAL agora?"
-        );
-        if (!conf) return;
+      const cliNome = document.getElementById("nfCliente") ? document.getElementById("nfCliente").value : "Cliente";
+      const filialTxt = FILIAL_ATIVA === 'MATRIZ_CE' ? 'Matriz Eusébio - CE' : 'Filial Brasília - DF';
+
+      const confMsg = (modo === 'REAL')
+        ? "⚠️ CONFERÊNCIA OBRIGATÓRIA DOS DADOS DA NOTA FISCAL\n\n" +
+          "Você já conferiu todos os dados da nota fiscal (no espelho da nota que aparece abaixo)?\n\n" +
+          "• Cliente: " + cliNome + "\n" +
+          "• Unidade Emissora: " + filialTxt + "\n" +
+          "• Modalidade: 🟢 EMISSÃO REAL (SEFAZ • CERTIFICADO A1)\n\n" +
+          "Esta nota será transmitida oficialmente à SEFAZ e terá valor legal para apuração do DAS e faturamento.\n\n" +
+          "Realmente quer emitir a Nota Fiscal agora?\n\n" +
+          "[OK] = Sim, emitir nota fiscal agora\n" +
+          "[Cancelar] = Não, desejo revisar os dados na página"
+        : "🧪 MODO SIMULAÇÃO / DEMONSTRAÇÃO\n\n" +
+          "Você já conferiu todos os dados da nota fiscal (no espelho da nota que aparece abaixo)?\n\n" +
+          "• Cliente: " + cliNome + "\n" +
+          "• Unidade: " + filialTxt + "\n" +
+          "• Modalidade: 🧪 SIMULAÇÃO (Sem efeito fiscal na SEFAZ)\n\n" +
+          "Realmente quer emitir o espelho de demonstração?\n\n" +
+          "[OK] = Sim, gerar espelho de demonstração\n" +
+          "[Cancelar] = Não, desejo revisar os dados na página";
+
+      const querEmitir = confirm(confMsg);
+      if (!querEmitir) {{
+        // Usuário optou por revisar: permanece exatamente na página sem fechar e sem apagar nada
+        return;
       }}
 
       const btnSim = document.getElementById("btnSimularNf");
