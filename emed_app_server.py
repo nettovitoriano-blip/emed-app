@@ -3672,6 +3672,8 @@ async def auth_api_middleware(request: web.Request, handler):
 
         or path.startswith("/api/imprimir/")
         or path == "/api/ferramentas/etiquetas-qr"
+        or path == "/api/lab/etiquetas-qr"
+        or path.startswith("/lab/r/")
         or path.startswith("/proposta/")
         or path == "/api/proposta/responder"
 
@@ -23406,6 +23408,512 @@ async def api_pmp_grade_anual(request: web.Request) -> web.Response:
     except Exception as e:
         return web.json_response({"ok": False, "msg": str(e)}, status=500)
 
+# ==============================================================================
+# LABORATORIO QR & LINHA DO TEMPO AO VIVO (EQUIPAMENTOS / PECAS RECOLHIDOS)
+# ==============================================================================
+LAB_STATUS_META = {
+    "RECEBIDO_LAB": ("📥 Recebido no Laboratório", "#0284c7", 10),
+    "EM_ANALISE": ("🔍 Em Análise / Diagnóstico", "#2563eb", 25),
+    "AGUARDANDO_PECA": ("🧩 Aguardando Peça", "#d97706", 40),
+    "AGUARDANDO_INSTRUMENTO": ("🔬 Aguardando Instrumento / Calibrador", "#b45309", 40),
+    "AGUARDANDO_MATERIAL": ("📦 Aguardando Material / Insumo", "#c2410c", 40),
+    "AGUARDANDO_TECNICO": ("👨‍🔧 Aguardando Técnico Especialista", "#7c3aed", 40),
+    "AGUARDANDO_APROVACAO": ("💬 Aguardando Aprovação do Cliente", "#dc2626", 50),
+    "EM_REPARO_TESTES": ("🛠️ Em Reparo / Bancada de Testes", "#0891b2", 75),
+    "PRONTO_DEVOLUCAO": ("✅ Pronto para Entrega / Instalação", "#16a34a", 92),
+    "ENTREGUE": ("🚚 Devolvido ao Cliente", "#15803d", 100),
+}
+
+
+def _garantir_schema_laboratorio_qr(conn: sqlite3.Connection) -> None:
+    """Garante as tabelas do modulo de Rastreio QR de Laboratorio e Linha do Tempo."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS laboratorio_itens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo_lab TEXT UNIQUE NOT NULL,
+            token_publico TEXT UNIQUE NOT NULL,
+            os_id TEXT,
+            remessa_id INTEGER,
+            cliente_nome TEXT NOT NULL,
+            equipamento TEXT NOT NULL,
+            marca_modelo TEXT,
+            numero_serie TEXT,
+            patrimonio_cliente TEXT,
+            defeito_relatado TEXT,
+            acessorios_recebidos TEXT,
+            bancada_local TEXT,
+            tecnico_responsavel TEXT,
+            status_atual TEXT NOT NULL DEFAULT 'RECEBIDO_LAB',
+            motivo_bloqueio TEXT,
+            previsao_entrega TEXT,
+            criado_em TEXT NOT NULL,
+            atualizado_em TEXT NOT NULL,
+            entregue_em TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS laboratorio_intervencoes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_id INTEGER NOT NULL,
+            codigo_lab TEXT NOT NULL,
+            data_hora TEXT NOT NULL,
+            tecnico TEXT NOT NULL,
+            status_anterior TEXT,
+            status_novo TEXT NOT NULL,
+            descricao TEXT NOT NULL,
+            visivel_cliente INTEGER NOT NULL DEFAULT 1
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_lab_itens_codigo ON laboratorio_itens(codigo_lab)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_lab_itens_token ON laboratorio_itens(token_publico)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_lab_interv_item ON laboratorio_intervencoes(item_id, id DESC)")
+
+
+def _dias_desde_br(dt_str: str) -> int:
+    try:
+        from datetime import datetime
+        dt = datetime.strptime(str(dt_str or "")[:16], "%d/%m/%Y %H:%M")
+        agora = datetime.strptime(obter_agora_brasil_str("%d/%m/%Y %H:%M"), "%d/%m/%Y %H:%M")
+        return max(0, (agora - dt).days)
+    except Exception:
+        return 0
+
+
+async def api_lab_itens_listar(request: web.Request) -> web.Response:
+    """Lista equipamentos/pecas recolhidos ao laboratorio com sua linha do tempo de intervencoes."""
+    q = limpar_texto(request.query.get("q"), "").upper()
+    status_f = limpar_texto(request.query.get("status"), "").upper()
+    os_f = limpar_texto(request.query.get("os_id"), "")
+    codigo_f = limpar_texto(request.query.get("codigo"), "").upper()
+
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_laboratorio_qr(conn)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM laboratorio_itens ORDER BY id DESC").fetchall()
+        intervs_rows = conn.execute(
+            "SELECT * FROM laboratorio_intervencoes ORDER BY id DESC"
+        ).fetchall()
+
+    intervs_por_item = {}
+    for ir in intervs_rows:
+        iid = ir["item_id"]
+        intervs_por_item.setdefault(iid, []).append({
+            "id": ir["id"],
+            "data_hora": ir["data_hora"],
+            "tecnico": ir["tecnico"],
+            "status_anterior": ir["status_anterior"],
+            "status_novo": ir["status_novo"],
+            "status_label": LAB_STATUS_META.get(ir["status_novo"], (ir["status_novo"], "#475569", 0))[0],
+            "descricao": ir["descricao"],
+            "visivel_cliente": int(ir["visivel_cliente"] or 0),
+        })
+
+    itens = []
+    contadores = {"TOTAL": 0, "ATIVOS": 0, "AGUARDANDO": 0, "EM_BANCADA": 0, "PRONTO": 0, "ENTREGUE": 0}
+    for r in rows:
+        st = str(r["status_atual"] or "RECEBIDO_LAB").upper()
+        contadores["TOTAL"] += 1
+        if st == "ENTREGUE":
+            contadores["ENTREGUE"] += 1
+        else:
+            contadores["ATIVOS"] += 1
+            if st.startswith("AGUARDANDO_"):
+                contadores["AGUARDANDO"] += 1
+            elif st == "PRONTO_DEVOLUCAO":
+                contadores["PRONTO"] += 1
+            else:
+                contadores["EM_BANCADA"] += 1
+
+        if codigo_f and codigo_f not in (str(r["codigo_lab"] or "").upper(), str(r["token_publico"] or "").upper()):
+            continue
+        if os_f and str(r["os_id"] or "").strip() != os_f:
+            continue
+        if status_f and status_f != "TODOS":
+            if status_f == "AGUARDANDO_GRUPO" and not st.startswith("AGUARDANDO_"):
+                continue
+            elif status_f == "EM_BANCADA_GRUPO" and st not in ("RECEBIDO_LAB", "EM_ANALISE", "EM_REPARO_TESTES"):
+                continue
+            elif status_f not in ("AGUARDANDO_GRUPO", "EM_BANCADA_GRUPO") and st != status_f:
+                continue
+
+        texto_busca = " ".join([
+            str(r["codigo_lab"] or ""),
+            str(r["os_id"] or ""),
+            str(r["cliente_nome"] or ""),
+            str(r["equipamento"] or ""),
+            str(r["marca_modelo"] or ""),
+            str(r["numero_serie"] or ""),
+            str(r["tecnico_responsavel"] or ""),
+            str(r["bancada_local"] or ""),
+        ]).upper()
+        if q and q not in texto_busca:
+            continue
+
+        meta = LAB_STATUS_META.get(st, (st, "#475569", 10))
+        itens.append({
+            "id": r["id"],
+            "codigo_lab": r["codigo_lab"],
+            "token_publico": r["token_publico"],
+            "os_id": r["os_id"] or "",
+            "remessa_id": r["remessa_id"],
+            "cliente_nome": r["cliente_nome"],
+            "equipamento": r["equipamento"],
+            "marca_modelo": r["marca_modelo"] or "",
+            "numero_serie": r["numero_serie"] or "",
+            "patrimonio_cliente": r["patrimonio_cliente"] or "",
+            "defeito_relatado": r["defeito_relatado"] or "",
+            "acessorios_recebidos": r["acessorios_recebidos"] or "",
+            "bancada_local": r["bancada_local"] or "BANCADA PRINCIPAL",
+            "tecnico_responsavel": r["tecnico_responsavel"] or "",
+            "status_atual": st,
+            "status_label": meta[0],
+            "status_cor": meta[1],
+            "progresso": meta[2],
+            "motivo_bloqueio": r["motivo_bloqueio"] or "",
+            "previsao_entrega": r["previsao_entrega"] or "",
+            "criado_em": r["criado_em"],
+            "atualizado_em": r["atualizado_em"],
+            "entregue_em": r["entregue_em"] or "",
+            "dias_parado": _dias_desde_br(r["atualizado_em"]),
+            "dias_no_lab": _dias_desde_br(r["criado_em"]),
+            "intervencoes": intervs_por_item.get(r["id"], []),
+        })
+
+    return web.json_response({"ok": True, "itens": itens, "contadores": contadores, "status_meta": LAB_STATUS_META})
+
+
+async def api_lab_item_criar(request: web.Request) -> web.Response:
+    """Da entrada de equipamento ou peca recolhida no laboratorio e gera codigo LAB-XXXX + token publico."""
+    import secrets
+    body = await request.json()
+    cliente_nome = limpar_texto(body.get("cliente_nome"), "").upper()
+    equipamento = limpar_texto(body.get("equipamento"), "").upper()
+    if not cliente_nome or not equipamento:
+        return web.json_response({"ok": False, "msg": "Informe o cliente e o equipamento/peça recolhida."}, status=400)
+
+    os_id = str(body.get("os_id") or "").strip()
+    remessa_id = body.get("remessa_id")
+    marca_modelo = limpar_texto(body.get("marca_modelo"), "").upper()
+    numero_serie = limpar_texto(body.get("numero_serie"), "").upper()
+    patrimonio_cliente = limpar_texto(body.get("patrimonio_cliente"), "").upper()
+    defeito_relatado = limpar_texto(body.get("defeito_relatado"), "")
+    acessorios = limpar_texto(body.get("acessorios_recebidos"), "")
+    bancada = limpar_texto(body.get("bancada_local"), "BANCADA PRINCIPAL").upper()
+    tecnico = limpar_texto(body.get("tecnico_responsavel"), "LABORATÓRIO EMED").upper()
+    previsao = limpar_texto(body.get("previsao_entrega"), "")
+    agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+    token = secrets.token_hex(5).upper()
+
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_laboratorio_qr(conn)
+        cur = conn.cursor()
+        prox = (cur.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM laboratorio_itens").fetchone()[0]) or 1
+        codigo_lab = f"LAB-{int(prox):04d}"
+        while cur.execute("SELECT 1 FROM laboratorio_itens WHERE codigo_lab = ?", (codigo_lab,)).fetchone():
+            prox += 1
+            codigo_lab = f"LAB-{int(prox):04d}"
+
+        cur.execute("""
+            INSERT INTO laboratorio_itens (
+                codigo_lab, token_publico, os_id, remessa_id, cliente_nome, equipamento,
+                marca_modelo, numero_serie, patrimonio_cliente, defeito_relatado,
+                acessorios_recebidos, bancada_local, tecnico_responsavel, status_atual,
+                motivo_bloqueio, previsao_entrega, criado_em, atualizado_em
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEBIDO_LAB', '', ?, ?, ?)
+        """, (
+            codigo_lab, token, os_id, remessa_id, cliente_nome, equipamento,
+            marca_modelo, numero_serie, patrimonio_cliente, defeito_relatado,
+            acessorios, bancada, tecnico, previsao, agora, agora
+        ))
+        item_id = cur.lastrowid
+        desc_entrada = f"Entrada registrada no laboratório ({bancada})."
+        if defeito_relatado:
+            desc_entrada += f" Motivo/Defeito: {defeito_relatado}"
+        cur.execute("""
+            INSERT INTO laboratorio_intervencoes (
+                item_id, codigo_lab, data_hora, tecnico, status_anterior, status_novo, descricao, visivel_cliente
+            ) VALUES (?, ?, ?, ?, '', 'RECEBIDO_LAB', ?, 1)
+        """, (item_id, codigo_lab, agora, tecnico, desc_entrada))
+        conn.commit()
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"✅ Equipamento registrado no Laboratório: {codigo_lab}",
+        "codigo_lab": codigo_lab,
+        "token_publico": token,
+        "item_id": item_id,
+    })
+
+
+async def api_lab_intervencao_salvar(request: web.Request) -> web.Response:
+    """Registra intervencao tecnica e atualiza status do equipamento no laboratorio."""
+    body = await request.json()
+    codigo_ref = limpar_texto(body.get("codigo_lab") or body.get("token"), "").upper()
+    status_novo = limpar_texto(body.get("status_novo"), "").upper()
+    descricao = limpar_texto(body.get("descricao"), "")
+    tecnico = limpar_texto(body.get("tecnico"), "TÉCNICO EMED").upper()
+    bancada = limpar_texto(body.get("bancada_local"), "").upper()
+    motivo_bloqueio = limpar_texto(body.get("motivo_bloqueio"), "")
+    previsao = limpar_texto(body.get("previsao_entrega"), "")
+    visivel_cliente = 1 if body.get("visivel_cliente", True) else 0
+
+    if not codigo_ref or not status_novo or not descricao:
+        return web.json_response({"ok": False, "msg": "Informe o código, novo status e descrição da intervenção."}, status=400)
+    if status_novo not in LAB_STATUS_META:
+        return web.json_response({"ok": False, "msg": f"Status inválido: {status_novo}"}, status=400)
+
+    agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_laboratorio_qr(conn)
+        cur = conn.cursor()
+        row = cur.execute(
+            "SELECT id, codigo_lab, status_atual, bancada_local, previsao_entrega, motivo_bloqueio FROM laboratorio_itens WHERE UPPER(codigo_lab) = ? OR UPPER(token_publico) = ?",
+            (codigo_ref, codigo_ref)
+        ).fetchone()
+        if not row:
+            return web.json_response({"ok": False, "msg": f"Equipamento {codigo_ref} não encontrado no laboratório."}, status=404)
+
+        item_id, codigo_lab, st_ant, banc_ant, prev_ant, bloq_ant = row
+        entregue_em = agora if status_novo == "ENTREGUE" else None
+        novo_bloqueio = (motivo_bloqueio or bloq_ant or "") if status_novo.startswith("AGUARDANDO_") else ""
+        cur.execute("""
+            UPDATE laboratorio_itens
+            SET status_atual = ?,
+                tecnico_responsavel = ?,
+                bancada_local = ?,
+                motivo_bloqueio = ?,
+                previsao_entrega = ?,
+                atualizado_em = ?,
+                entregue_em = COALESCE(?, entregue_em)
+            WHERE id = ?
+        """, (
+            status_novo,
+            tecnico,
+            bancada or banc_ant or "BANCADA PRINCIPAL",
+            novo_bloqueio,
+            previsao if previsao else prev_ant,
+            agora,
+            entregue_em,
+            item_id,
+        ))
+        cur.execute("""
+            INSERT INTO laboratorio_intervencoes (
+                item_id, codigo_lab, data_hora, tecnico, status_anterior, status_novo, descricao, visivel_cliente
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (item_id, codigo_lab, agora, tecnico, st_ant, status_novo, descricao, visivel_cliente))
+        conn.commit()
+
+    return web.json_response({
+        "ok": True,
+        "msg": f"✅ Intervenção registrada em {codigo_lab} ({LAB_STATUS_META[status_novo][0]})",
+        "codigo_lab": codigo_lab,
+        "status_novo": status_novo,
+    })
+
+
+async def api_lab_etiquetas_qr(request: web.Request) -> web.Response:
+    """Gera folha A4 imprimivel com etiquetas QR Code dos equipamentos no laboratorio."""
+    import base64
+    import html as _h
+    import io
+    import qrcode
+
+    codigo_f = limpar_texto(request.query.get("codigo"), "").upper()
+    base_url = f"{request.scheme}://{request.host}"
+    if "emedservice.med.br" in request.host or request.headers.get("X-Forwarded-Proto") == "https":
+        base_url = f"https://{request.host}"
+
+    itens = []
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_laboratorio_qr(conn)
+        if codigo_f:
+            rows = conn.execute(
+                "SELECT codigo_lab, token_publico, cliente_nome, equipamento, numero_serie, os_id, criado_em, bancada_local FROM laboratorio_itens WHERE UPPER(codigo_lab) = ? ORDER BY id DESC",
+                (codigo_f,)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT codigo_lab, token_publico, cliente_nome, equipamento, numero_serie, os_id, criado_em, bancada_local FROM laboratorio_itens WHERE status_atual != 'ENTREGUE' ORDER BY id DESC"
+            ).fetchall()
+
+        for cod, tok, cli, eqp, sn, os_id, criado, banc in rows:
+            url_qr = f"{base_url}/lab/r/{tok}"
+            qr = qrcode.QRCode(version=1, box_size=5, border=2)
+            qr.add_data(url_qr)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            qr_b64 = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("utf-8")
+            itens.append({
+                "codigo": _h.escape(str(cod)),
+                "cliente": _h.escape(str(cli or "")),
+                "equipamento": _h.escape(str(eqp or "")),
+                "sn": _h.escape(str(sn or "-")),
+                "os_id": _h.escape(str(os_id or "-")),
+                "criado": _h.escape(str(criado or "")),
+                "bancada": _h.escape(str(banc or "BANCADA")),
+                "qr": qr_b64,
+            })
+
+    cards = "".join(
+        f"""<div class="etq">
+          <img src="{it['qr']}" class="qr" />
+          <div class="info">
+            <div class="cod">{it['codigo']} • OS #{it['os_id']}</div>
+            <div class="eqp">{it['equipamento'][:48]}</div>
+            <div class="cli">🏥 {it['cliente'][:42]}</div>
+            <div class="meta">S/N: {it['sn']} • 📍 {it['bancada']}</div>
+            <div class="meta">Entrada: {it['criado']}</div>
+          </div>
+        </div>"""
+        for it in itens
+    ) or "<p>Nenhum equipamento ativo no laboratório para gerar etiqueta.</p>"
+
+    html_out = f"""<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Etiquetas QR Laboratório — EMED</title>
+<style>
+  body {{ font-family: Arial, sans-serif; margin: 12px; background: #f8fafc; }}
+  .top {{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }}
+  .grid {{ display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; }}
+  .etq {{ background:#fff; border:2px solid #002b54; border-radius:8px; padding:8px; display:flex; align-items:center; gap:10px; page-break-inside:avoid; }}
+  .qr {{ width:86px; height:86px; flex-shrink:0; }}
+  .info {{ font-size:10.5px; line-height:1.3; overflow:hidden; }}
+  .cod {{ color:#0284c7; font-weight:900; font-size:11.5px; }}
+  .eqp {{ font-weight:800; color:#0f172a; margin:2px 0; }}
+  .cli {{ color:#1e293b; font-weight:700; }}
+  .meta {{ color:#475569; font-size:9.5px; }}
+  @media print {{ @page {{ size: A4; margin: 8mm; }} body {{ background:#fff; margin:0; }} .no-print {{ display:none; }} }}
+</style></head>
+<body>
+  <div class="top no-print">
+    <b>🔬 Etiquetas QR de Bancada / Laboratório EMED ({len(itens)} itens)</b>
+    <button onclick="window.print()" style="background:#002b54;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:bold;cursor:pointer;">🖨️ Imprimir Etiquetas A4</button>
+  </div>
+  <div class="grid">{cards}</div>
+</body></html>"""
+    return web.Response(text=html_out, content_type="text/html", charset="utf-8")
+
+
+async def api_lab_publico_html(request: web.Request) -> web.Response:
+    """Pagina publica timbrada da EMED para o cliente acompanhar o equipamento no laboratorio em tempo real."""
+    import html as _h
+    token = limpar_texto(request.match_info.get("token"), "").upper()
+
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_laboratorio_qr(conn)
+        conn.row_factory = sqlite3.Row
+        item = conn.execute(
+            "SELECT * FROM laboratorio_itens WHERE UPPER(token_publico) = ? OR UPPER(codigo_lab) = ?",
+            (token, token)
+        ).fetchone()
+        if not item:
+            return web.Response(text="<h2>Registro de laboratório não encontrado ou código inválido.</h2>", content_type="text/html", status=404, charset="utf-8")
+
+        intervs = conn.execute(
+            "SELECT * FROM laboratorio_intervencoes WHERE item_id = ? AND visivel_cliente = 1 ORDER BY id DESC",
+            (item["id"],)
+        ).fetchall()
+
+    st = str(item["status_atual"] or "RECEBIDO_LAB").upper()
+    st_label, st_cor, prog = LAB_STATUS_META.get(st, (st, "#0284c7", 20))
+    motivo_bloq = _h.escape(str(item["motivo_bloqueio"] or ""))
+    bloco_bloqueio = ""
+    if st.startswith("AGUARDANDO_") and motivo_bloq:
+        bloco_bloqueio = f"""<div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13px;color:#92400e;">
+          <b>⏳ Pendência atual:</b> {motivo_bloq}
+        </div>"""
+
+    timeline_html = ""
+    for iv in intervs:
+        iv_lbl, iv_cor, _ = LAB_STATUS_META.get(iv["status_novo"], (iv["status_novo"], "#475569", 0))
+        timeline_html += f"""
+        <div class="tl-item">
+          <div class="tl-dot" style="background:{iv_cor};"></div>
+          <div class="tl-body">
+            <div class="tl-head">
+              <span class="tl-badge" style="background:{iv_cor}18;color:{iv_cor};border:1px solid {iv_cor}44;">{_h.escape(iv_lbl)}</span>
+              <span class="tl-dt">{_h.escape(str(iv['data_hora']))}</span>
+            </div>
+            <div class="tl-desc">{_h.escape(str(iv['descricao']))}</div>
+            <div class="tl-tec">Responsável: {_h.escape(str(iv['tecnico']))}</div>
+          </div>
+        </div>"""
+    if not timeline_html:
+        timeline_html = "<p style='color:#64748b;font-size:13px;'>Equipamento recebido no laboratório, aguardando primeira atualização técnica.</p>"
+
+    html_out = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Rastreio Laboratório {_h.escape(item['codigo_lab'])} — EMED Eletromedicina</title>
+  <style>
+    body {{ font-family: 'Segoe UI', Arial, sans-serif; margin:0; background:#f1f5f9; color:#0f172a; }}
+    .wrap {{ max-width:680px; margin:16px auto; padding:0 12px 32px; }}
+    .hdr {{ background:linear-gradient(135deg,#002b54,#0369a1); color:#fff; border-radius:14px; padding:18px; box-shadow:0 6px 20px rgba(0,43,84,0.18); }}
+    .hdr-top {{ display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }}
+    .cod {{ background:rgba(255,255,255,0.16); padding:4px 10px; border-radius:999px; font-size:12px; font-weight:800; }}
+    .card {{ background:#fff; border-radius:14px; padding:16px; margin-top:12px; box-shadow:0 2px 10px rgba(15,23,42,0.06); }}
+    .st-pill {{ display:inline-block; padding:6px 12px; border-radius:999px; font-weight:800; font-size:13px; color:#fff; background:{st_cor}; }}
+    .bar-bg {{ height:10px; background:#e2e8f0; border-radius:999px; overflow:hidden; margin:12px 0 6px; }}
+    .bar-fill {{ height:100%; width:{prog}%; background:{st_cor}; border-radius:999px; transition:width .4s; }}
+    .grid {{ display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:13px; margin-top:10px; }}
+    .kv {{ background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; }}
+    .kv b {{ display:block; font-size:10.5px; color:#64748b; text-transform:uppercase; }}
+    .tl-item {{ display:flex; gap:12px; padding:10px 0; border-bottom:1px dashed #e2e8f0; }}
+    .tl-item:last-child {{ border-bottom:none; }}
+    .tl-dot {{ width:12px; height:12px; border-radius:50%; margin-top:5px; flex-shrink:0; }}
+    .tl-body {{ flex:1; }}
+    .tl-head {{ display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }}
+    .tl-badge {{ font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; }}
+    .tl-dt {{ font-size:11px; color:#64748b; font-weight:600; }}
+    .tl-desc {{ font-size:13.5px; color:#1e293b; margin:5px 0 2px; line-height:1.4; }}
+    .tl-tec {{ font-size:11px; color:#64748b; }}
+    @media (max-width:520px) {{ .grid {{ grid-template-columns:1fr; }} }}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hdr">
+      <div class="hdr-top">
+        <div>
+          <div style="font-size:11px;opacity:.85;font-weight:700;letter-spacing:.6px;">EMED ELETROMEDICINA • LABORATÓRIO TÉCNICO</div>
+          <h2 style="margin:4px 0 0;font-size:19px;">Acompanhamento de Manutenção</h2>
+        </div>
+        <span class="cod">{_h.escape(item['codigo_lab'])}</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span class="st-pill">{_h.escape(st_label)}</span>
+        <span style="font-size:12px;color:#64748b;">Atualizado em: <b>{_h.escape(str(item['atualizado_em']))}</b></span>
+      </div>
+      <div class="bar-bg"><div class="bar-fill"></div></div>
+      <div style="font-size:11.5px;color:#475569;text-align:right;">Andamento estimado: <b>{prog}%</b></div>
+      {bloco_bloqueio}
+
+      <div class="grid">
+        <div class="kv"><b>Cliente</b>{_h.escape(str(item['cliente_nome']))}</div>
+        <div class="kv"><b>Equipamento / Peça</b>{_h.escape(str(item['equipamento']))}</div>
+        <div class="kv"><b>Marca / Modelo</b>{_h.escape(str(item['marca_modelo'] or '-'))}</div>
+        <div class="kv"><b>Nº Série / OS</b>{_h.escape(str(item['numero_serie'] or '-'))} • OS #{_h.escape(str(item['os_id'] or '-'))}</div>
+        <div class="kv"><b>Entrada no Lab</b>{_h.escape(str(item['criado_em']))}</div>
+        <div class="kv"><b>Previsão de Entrega</b>{_h.escape(str(item['previsao_entrega'] or 'Em definição técnica'))}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 8px;font-size:15px;color:#002b54;">📋 Linha do Tempo das Intervenções</h3>
+      {timeline_html}
+    </div>
+  </div>
+</body>
+</html>"""
+    return web.Response(text=html_out, content_type="text/html", charset="utf-8")
+
+
 def criar_app() -> web.Application:
 
     garantir_schema_dispositivos(DB_NAME)
@@ -23892,6 +24400,11 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/ferramentas/bipagem-lote", api_ferramentas_bipagem_lote)
 
     app.router.add_get("/api/ferramentas/minhas", api_ferramentas_minhas)
+    app.router.add_get("/api/lab/itens", api_lab_itens_listar)
+    app.router.add_post("/api/lab/criar", api_lab_item_criar)
+    app.router.add_post("/api/lab/intervencao", api_lab_intervencao_salvar)
+    app.router.add_get("/api/lab/etiquetas-qr", api_lab_etiquetas_qr)
+    app.router.add_get("/lab/r/{token}", api_lab_publico_html)
 
 
 

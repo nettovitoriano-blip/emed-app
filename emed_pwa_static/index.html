@@ -55054,7 +55054,7 @@
 
 
 
-          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.1.0</div></div>
+          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.2.0</div></div>
 
 
 
@@ -80690,6 +80690,7 @@
 
 
         { id: "TEC_OS", icone: "⚡", titulo: "Minhas OS", desc: "Execução em campo, Check-in, Checklist POP, Fotos, Assinatura" },
+        { id: "TEC_LAB", icone: "🔬", titulo: "Laboratório QR", desc: "Equipamentos recolhidos, intervenções e link ao vivo do cliente" },
 
 
 
@@ -80882,6 +80883,7 @@
         { id: "TEC_PEND", icone: "📋", titulo: "Minhas Pendências", desc: "Retornos técnicos e pendências atribuídas ao seu nome" },
         { id: "TEC_PERFIL", icone: "✍️", titulo: "Cadastro & Assinatura", desc: "Seu cadastro pessoal, CFT e rubrica digital touch para emissão de laudos" },
         { id: "TEC_PECAS", icone: "📦", titulo: "Solicitar Peças ao Almox", desc: "Requisitar peças ao estoque central sem ver preços/custos" },
+        { id: "TEC_LAB", icone: "🔬", titulo: "Laboratório QR", desc: "Equipamentos recolhidos, intervenções e status para o cliente" },
         { id: "TEC_MANUAIS", icone: "📚", titulo: "Manuais & ITs Técnicos", desc: "Manuais de serviço e POPs homologados para consulta offline" }
       ],
       GESTOR: [
@@ -83538,7 +83540,7 @@
           window.location.reload(true);
         } catch(e) { window.location.reload(); }
       }
-      navigator.serviceWorker.register("/sw.js?v=1.1.0").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=1.2.0").then(reg => { if(reg) reg.update(); }).catch(() => {});
       let _swReloaded = false;
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         if (!_swReloaded && navigator.onLine && !STATE.osAberta) {
@@ -94723,6 +94725,7 @@ async function efetuarLogout() {
             menus: [
               { id: "GES_CHAMADOS", icone: "🎫", titulo: "Chamados & Ordens de Serviço", desc: "Abertura, Gestão e Laudos Técnicos" },
               { id: "TEC_OS", icone: "⚡", titulo: "Minhas OS de Campo", desc: "Execução, Check-in, Checklist POP e Assinatura" },
+              { id: "TEC_LAB", icone: "🔬", titulo: "Laboratório QR & Bancada", desc: "Equipamentos recolhidos, intervenções e link ao vivo do cliente" },
               { id: "GES_TV", icone: "📺", titulo: "Dashboard", desc: "Escala Diária no Calendário, Painel Operacional e Disparo WhatsApp" },
               { id: "TEC_MANUAIS", icone: "📚", titulo: "Manuais Técnicos, POPs & Vídeos", desc: "Acervo de ITs e Treinamento Offline" },
               { id: "TEC_ASSINATURA", icone: "✍️", titulo: "Minha Assinatura no Celular", desc: "Cadastrar e Atualizar Rubrica Digital Touch" }
@@ -95892,6 +95895,7 @@ async function efetuarLogout() {
 
 
         case "TEC_FERRAMENTAS": return renderMenuTecFerramentas(box);
+        case "TEC_LAB": return renderMenuLaboratorioQR(box);
 
 
 
@@ -101139,8 +101143,8 @@ async function efetuarLogout() {
           <video id="vidScannerFerramenta" autoplay playsinline style="width:100%;max-height:260px;background:#000;border-radius:10px;object-fit:cover;"></video>
           <div id="lblStatusScanner" style="font-size:11.5px;color:#475569;margin:8px 0;">Aponte a câmera para o QR Code ou código de barras da ferramenta...</div>
           <div style="display:flex;gap:6px;margin-top:8px;">
-            <input id="inpCodigoManualScan" class="input" placeholder="Ou digite código / patrimônio (ex: FER-002)" style="flex:1;text-transform:uppercase;" />
-            <button type="button" class="btn btn-primary btn-sm" onclick="const v=document.getElementById('inpCodigoManualScan').value;window._fecharScannerFerramenta();if(v)abrirPopupFerramentaInterativa(v);">Abrir</button>
+            <input id="inpCodigoManualScan" class="input" placeholder="Ou digite código (ex: FER-002 ou LAB-0001)" style="flex:1;text-transform:uppercase;" />
+            <button type="button" class="btn btn-primary btn-sm" onclick="const v=document.getElementById('inpCodigoManualScan').value;window._fecharScannerFerramenta();if(v)_despacharCodigoScanEmed(v);">Abrir</button>
           </div>
         </div>
       `;
@@ -101158,7 +101162,7 @@ async function efetuarLogout() {
               if (codes && codes.length > 0 && codes[0].rawValue) {
                 const val = codes[0].rawValue.trim().toUpperCase();
                 fechar();
-                abrirPopupFerramentaInterativa(val);
+                _despacharCodigoScanEmed(val);
                 return;
               }
             } catch(e){}
@@ -101170,6 +101174,333 @@ async function efetuarLogout() {
         }
       } catch (err) {
         document.getElementById("lblStatusScanner").innerText = "Câmera indisponível neste dispositivo. Digite o código ou patrimônio abaixo:";
+      }
+    }
+
+    function _despacharCodigoScanEmed(rawVal) {
+      const s = String(rawVal || "").trim();
+      const upper = s.toUpperCase();
+      const mLabUrl = s.match(/\/lab\/r\/([A-Za-z0-9_-]+)/i);
+      if (mLabUrl && mLabUrl[1]) {
+        return abrirModalIntervencaoLabPorCodigo(mLabUrl[1].toUpperCase());
+      }
+      if (upper.startsWith("LAB-")) {
+        return abrirModalIntervencaoLabPorCodigo(upper);
+      }
+      return abrirPopupFerramentaInterativa(upper);
+    }
+
+    let _filtroLabStatus = "TODOS";
+    let _filtroLabBusca = "";
+    let _labItensCache = [];
+
+    const LAB_STATUS_LISTA = [
+      { id: "RECEBIDO_LAB", label: "📥 Recebido no Laboratório" },
+      { id: "EM_ANALISE", label: "🔍 Em Análise / Diagnóstico" },
+      { id: "AGUARDANDO_PECA", label: "🧩 Aguardando Peça" },
+      { id: "AGUARDANDO_INSTRUMENTO", label: "🔬 Aguardando Instrumento / Calibrador" },
+      { id: "AGUARDANDO_MATERIAL", label: "📦 Aguardando Material / Insumo" },
+      { id: "AGUARDANDO_TECNICO", label: "👨‍🔧 Aguardando Técnico Especialista" },
+      { id: "AGUARDANDO_APROVACAO", label: "💬 Aguardando Aprovação do Cliente" },
+      { id: "EM_REPARO_TESTES", label: "🛠️ Em Reparo / Bancada de Testes" },
+      { id: "PRONTO_DEVOLUCAO", label: "✅ Pronto para Entrega / Instalação" },
+      { id: "ENTREGUE", label: "🚚 Devolvido ao Cliente" }
+    ];
+
+    async function renderMenuLaboratorioQR(box) {
+      if (!box) box = document.getElementById("conteudoPrincipal");
+      if (!box) return;
+      box.innerHTML = `<div class="panel"><div style="padding:20px;text-align:center;color:#64748b;">⏳ Carregando Laboratório QR...</div></div>`;
+      const res = await apiGet("/api/lab/itens");
+      if (!res || !res.ok) {
+        box.innerHTML = `<div class="panel"><div style="padding:20px;color:#dc2626;">❌ Erro ao carregar itens do laboratório: ${esc(res?.msg || "Falha de conexão")}</div></div>`;
+        return;
+      }
+      _labItensCache = res.itens || [];
+      const cnt = res.contadores || { TOTAL: 0, ATIVOS: 0, AGUARDANDO: 0, EM_BANCADA: 0, PRONTO: 0, ENTREGUE: 0 };
+
+      const q = (_filtroLabBusca || "").trim().toUpperCase();
+      const filtrados = _labItensCache.filter(it => {
+        if (_filtroLabStatus === "AGUARDANDO_GRUPO" && !String(it.status_atual || "").startsWith("AGUARDANDO_")) return false;
+        if (_filtroLabStatus === "EM_BANCADA_GRUPO" && !["RECEBIDO_LAB", "EM_ANALISE", "EM_REPARO_TESTES"].includes(it.status_atual)) return false;
+        if (!["TODOS", "AGUARDANDO_GRUPO", "EM_BANCADA_GRUPO"].includes(_filtroLabStatus) && it.status_atual !== _filtroLabStatus) return false;
+        if (q) {
+          const hay = `${it.codigo_lab} ${it.os_id} ${it.cliente_nome} ${it.equipamento} ${it.marca_modelo} ${it.numero_serie} ${it.tecnico_responsavel} ${it.bancada_local}`.toUpperCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      const cardsHtml = filtrados.length ? filtrados.map(it => {
+        const cor = it.status_cor || "#0284c7";
+        const ult = (it.intervencoes && it.intervencoes[0]) || null;
+        const alertaParado = (it.status_atual !== "ENTREGUE" && Number(it.dias_parado || 0) >= 3)
+          ? `<span style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:800;">⚠️ ${it.dias_parado}d sem atualização</span>`
+          : "";
+        return `
+          <div style="background:#fff;border:1px solid #e2e8f0;border-left:5px solid ${cor};border-radius:12px;padding:12px 14px;box-shadow:0 2px 8px rgba(15,23,42,0.04);">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+              <div>
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                  <span style="background:#002b54;color:#fff;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:900;">${esc(it.codigo_lab)}</span>
+                  ${it.os_id ? `<span style="background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:800;">OS #${esc(it.os_id)}</span>` : ""}
+                  <span style="background:${cor}18;color:${cor};border:1px solid ${cor}44;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800;">${esc(it.status_label)}</span>
+                  ${alertaParado}
+                </div>
+                <div style="font-size:14.5px;font-weight:800;color:#0f172a;margin-top:6px;">${esc(it.equipamento)} ${it.marca_modelo ? `<span style="color:#64748b;font-weight:600;font-size:12.5px;">• ${esc(it.marca_modelo)}</span>` : ""}</div>
+                <div style="font-size:12px;color:#334155;margin-top:2px;">🏥 <b>${esc(it.cliente_nome)}</b> ${it.numero_serie ? `• S/N: <b>${esc(it.numero_serie)}</b>` : ""}</div>
+              </div>
+              <div style="text-align:right;font-size:11px;color:#64748b;">
+                <div>📍 ${esc(it.bancada_local)}</div>
+                <div>👨‍🔧 ${esc(it.tecnico_responsavel || "-")}</div>
+                <div>🕒 Atualizado: <b>${esc(it.atualizado_em)}</b></div>
+              </div>
+            </div>
+
+            ${it.motivo_bloqueio ? `<div style="margin-top:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:6px 10px;font-size:11.5px;color:#92400e;"><b>⏳ Pendência:</b> ${esc(it.motivo_bloqueio)}</div>` : ""}
+
+            ${ult ? `
+              <div style="margin-top:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:11.5px;color:#334155;">
+                <div style="display:flex;justify-content:space-between;color:#64748b;font-size:10.5px;margin-bottom:3px;">
+                  <span><b>Última intervenção</b> (${esc(ult.tecnico)}) ${ult.visivel_cliente ? "👁️ Visível ao cliente" : "🔒 Nota interna"}</span>
+                  <span>${esc(ult.data_hora)}</span>
+                </div>
+                <div>${esc(ult.descricao)}</div>
+              </div>
+            ` : ""}
+
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+              <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalIntervencaoLabPorCodigo('${esc(it.codigo_lab)}')">🛠️ Registrar Intervenção (${(it.intervencoes || []).length})</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="window.open('/api/lab/etiquetas-qr?codigo=${encodeURIComponent(it.codigo_lab)}','_blank')">🖨️ Etiqueta QR</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="copiarLinkClienteLab('${esc(it.token_publico)}','${esc(it.equipamento)}','${esc(it.codigo_lab)}')">📲 Link / WhatsApp Cliente</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="window.open('/lab/r/${encodeURIComponent(it.token_publico)}','_blank')">👁️ Ver Página Cliente</button>
+            </div>
+          </div>
+        `;
+      }).join("") : `<div style="background:#fff;border:1px dashed #cbd5e1;border-radius:12px;padding:28px;text-align:center;color:#64748b;">Nenhum equipamento encontrado neste filtro. Clique em <b>➕ Entrada no Laboratório</b> para cadastrar.</div>`;
+
+      box.innerHTML = `
+        <div class="panel">
+          <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div>
+              <div class="panel-title">🔬 Laboratório QR &amp; Linha do Tempo</div>
+              <div class="panel-sub">Rastreio de equipamentos/peças recolhidos com QR Code de bancada e acompanhamento ao vivo para o cliente</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button type="button" class="btn btn-primary btn-sm" onclick="abrirScannerFerramentaCamera()">📷 Ler QR do Equipamento</button>
+              <button type="button" class="btn btn-success btn-sm" onclick="abrirModalEntradaLab()">➕ Entrada no Laboratório</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="window.open('/api/lab/etiquetas-qr','_blank')">🖨️ Imprimir Etiquetas A4</button>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px;">
+            <div onclick="_filtroLabStatus='TODOS';renderMenuLaboratorioQR()" style="cursor:pointer;background:${_filtroLabStatus==='TODOS'?'#e0f2fe':'#f8fafc'};border:1.5px solid ${_filtroLabStatus==='TODOS'?'#0284c7':'#e2e8f0'};border-radius:10px;padding:8px 10px;">
+              <div style="font-size:10.5px;color:#64748b;font-weight:700;">📋 Todos</div>
+              <div style="font-size:20px;font-weight:900;color:#0f172a;">${cnt.TOTAL}</div>
+            </div>
+            <div onclick="_filtroLabStatus='EM_BANCADA_GRUPO';renderMenuLaboratorioQR()" style="cursor:pointer;background:${_filtroLabStatus==='EM_BANCADA_GRUPO'?'#e0f2fe':'#f8fafc'};border:1.5px solid ${_filtroLabStatus==='EM_BANCADA_GRUPO'?'#0284c7':'#e2e8f0'};border-radius:10px;padding:8px 10px;">
+              <div style="font-size:10.5px;color:#0369a1;font-weight:700;">🛠️ Em Bancada</div>
+              <div style="font-size:20px;font-weight:900;color:#0369a1;">${cnt.EM_BANCADA}</div>
+            </div>
+            <div onclick="_filtroLabStatus='AGUARDANDO_GRUPO';renderMenuLaboratorioQR()" style="cursor:pointer;background:${_filtroLabStatus==='AGUARDANDO_GRUPO'?'#fef3c7':'#f8fafc'};border:1.5px solid ${_filtroLabStatus==='AGUARDANDO_GRUPO'?'#d97706':'#e2e8f0'};border-radius:10px;padding:8px 10px;">
+              <div style="font-size:10.5px;color:#b45309;font-weight:700;">⏳ Aguardando</div>
+              <div style="font-size:20px;font-weight:900;color:#b45309;">${cnt.AGUARDANDO}</div>
+            </div>
+            <div onclick="_filtroLabStatus='PRONTO_DEVOLUCAO';renderMenuLaboratorioQR()" style="cursor:pointer;background:${_filtroLabStatus==='PRONTO_DEVOLUCAO'?'#dcfce7':'#f8fafc'};border:1.5px solid ${_filtroLabStatus==='PRONTO_DEVOLUCAO'?'#16a34a':'#e2e8f0'};border-radius:10px;padding:8px 10px;">
+              <div style="font-size:10.5px;color:#15803d;font-weight:700;">✅ Prontos</div>
+              <div style="font-size:20px;font-weight:900;color:#15803d;">${cnt.PRONTO}</div>
+            </div>
+            <div onclick="_filtroLabStatus='ENTREGUE';renderMenuLaboratorioQR()" style="cursor:pointer;background:${_filtroLabStatus==='ENTREGUE'?'#f1f5f9':'#f8fafc'};border:1.5px solid ${_filtroLabStatus==='ENTREGUE'?'#475569':'#e2e8f0'};border-radius:10px;padding:8px 10px;">
+              <div style="font-size:10.5px;color:#475569;font-weight:700;">🚚 Entregues</div>
+              <div style="font-size:20px;font-weight:900;color:#475569;">${cnt.ENTREGUE}</div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+            <input class="input" style="flex:1;min-width:220px;" placeholder="🔎 Buscar por cliente, equipamento, nº série, OS ou LAB-0001..." value="${esc(_filtroLabBusca)}" oninput="_filtroLabBusca=this.value;clearTimeout(window._tLabBusca);window._tLabBusca=setTimeout(()=>renderMenuLaboratorioQR(),260);" />
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            ${cardsHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    function copiarLinkClienteLab(token, equip, cod) {
+      const url = `${window.location.origin}/lab/r/${token}`;
+      const texto = `Olá! Segue o link de acompanhamento em tempo real do equipamento *${equip}* (${cod}) no Laboratório Técnico da EMED Eletromedicina:\n\n${url}`;
+      try { navigator.clipboard.writeText(url); } catch(e){}
+      if (confirm(`✅ Link copiado!\n\n${url}\n\nDeseja abrir o WhatsApp com a mensagem pronta para enviar ao cliente?`)) {
+        window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
+      } else {
+        mostrarToast("🔗 Link de acompanhamento copiado!");
+      }
+    }
+
+    function abrirModalEntradaLab() {
+      let ov = document.getElementById("emedLabModal");
+      if (!ov) {
+        ov = document.createElement("div");
+        ov.id = "emedLabModal";
+        ov.style = "position:fixed;inset:0;z-index:99998;background:rgba(15,23,42,0.75);display:flex;align-items:center;justify-content:center;padding:12px;overflow-y:auto;";
+        document.body.appendChild(ov);
+      }
+      const osRecentes = (STATE.os || []).slice(0, 60).map(o => `<option value="${esc(o.id)}">OS #${esc(o.id)} — ${esc(o.cliente || "")} (${esc(o.equipamento || "")})</option>`).join("");
+      ov.innerHTML = `
+        <div style="background:#fff;border-radius:14px;max-width:540px;width:100%;padding:16px;max-height:92vh;overflow-y:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <b style="color:#002b54;font-size:15px;">🔬 Nova Entrada no Laboratório (Gerar QR)</b>
+            <button type="button" onclick="document.getElementById('emedLabModal').style.display='none'" style="background:#ef4444;color:#fff;border:none;border-radius:999px;padding:4px 10px;font-weight:800;cursor:pointer;">✕</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:12.5px;">
+            <div>
+              <label style="font-weight:700;color:#475569;">Vincular a uma OS (opcional — preenche automático):</label>
+              <select id="labInOs" class="input" onchange="preencherEntradaLabDeOS(this.value)">
+                <option value="">-- Entrada Avulsa / Sem OS --</option>
+                ${osRecentes}
+              </select>
+            </div>
+            <div><label style="font-weight:700;">Cliente / Hospital *</label><input id="labInCliente" class="input" placeholder="Ex: HOSPITAL SANTA CASA" /></div>
+            <div><label style="font-weight:700;">Equipamento ou Peça Recolhida *</label><input id="labInEquip" class="input" placeholder="Ex: Monitor Multiparâmetro / Placa Fonte" /></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div><label style="font-weight:700;">Marca / Modelo</label><input id="labInModelo" class="input" placeholder="Ex: Mindray iPM12" /></div>
+              <div><label style="font-weight:700;">Nº de Série</label><input id="labInSerie" class="input" placeholder="Ex: SN-88412" /></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div><label style="font-weight:700;">Bancada / Local no Lab</label><input id="labInBancada" class="input" value="BANCADA PRINCIPAL" /></div>
+              <div><label style="font-weight:700;">Previsão de Entrega</label><input id="labInPrev" class="input" placeholder="Ex: 25/11/2026" /></div>
+            </div>
+            <div><label style="font-weight:700;">Acessórios Recolhidos</label><input id="labInAcess" class="input" placeholder="Ex: Cabo força, sensor SpO2, maleta" /></div>
+            <div><label style="font-weight:700;">Defeito Relatado / Motivo</label><textarea id="labInDefeito" class="input" rows="2" placeholder="Descreva o problema relatado pelo cliente..."></textarea></div>
+            <button type="button" class="btn btn-primary" onclick="salvarEntradaLab()">✅ Registrar &amp; Gerar Código QR</button>
+          </div>
+        </div>
+      `;
+      ov.style.display = "flex";
+    }
+
+    function preencherEntradaLabDeOS(osId) {
+      if (!osId) return;
+      const o = (STATE.os || []).find(x => String(x.id) === String(osId));
+      if (!o) return;
+      if (o.cliente) document.getElementById("labInCliente").value = o.cliente;
+      if (o.equipamento) document.getElementById("labInEquip").value = o.equipamento;
+      if (o.modelo) document.getElementById("labInModelo").value = o.modelo;
+      if (o.numero_serie) document.getElementById("labInSerie").value = o.numero_serie;
+      if (o.defeito_relatado) document.getElementById("labInDefeito").value = o.defeito_relatado;
+    }
+
+    async function salvarEntradaLab() {
+      const payload = {
+        os_id: document.getElementById("labInOs")?.value || "",
+        cliente_nome: document.getElementById("labInCliente")?.value || "",
+        equipamento: document.getElementById("labInEquip")?.value || "",
+        marca_modelo: document.getElementById("labInModelo")?.value || "",
+        numero_serie: document.getElementById("labInSerie")?.value || "",
+        bancada_local: document.getElementById("labInBancada")?.value || "BANCADA PRINCIPAL",
+        previsao_entrega: document.getElementById("labInPrev")?.value || "",
+        acessorios_recebidos: document.getElementById("labInAcess")?.value || "",
+        defeito_relatado: document.getElementById("labInDefeito")?.value || "",
+        tecnico_responsavel: STATE.tecnicoAtual || STATE.usuarioNome || "LABORATÓRIO EMED"
+      };
+      const res = await apiPost("/api/lab/criar", payload);
+      mostrarToast(res?.msg || "Erro ao registrar", 5000);
+      if (res && res.ok) {
+        document.getElementById("emedLabModal").style.display = "none";
+        await renderMenuLaboratorioQR();
+        if (confirm(`Etiqueta ${res.codigo_lab} gerada! Deseja abrir a etiqueta QR para imprimir agora?`)) {
+          window.open(`/api/lab/etiquetas-qr?codigo=${encodeURIComponent(res.codigo_lab)}`, "_blank");
+        }
+      }
+    }
+
+    async function abrirModalIntervencaoLabPorCodigo(codOuToken) {
+      const res = await apiGet(`/api/lab/itens?codigo=${encodeURIComponent(codOuToken)}`);
+      const it = res && res.ok && res.itens && res.itens[0];
+      if (!it) {
+        mostrarToast(`⚠️ Equipamento '${codOuToken}' não encontrado no Laboratório.`, 4500);
+        return;
+      }
+      let ov = document.getElementById("emedLabModal");
+      if (!ov) {
+        ov = document.createElement("div");
+        ov.id = "emedLabModal";
+        ov.style = "position:fixed;inset:0;z-index:99998;background:rgba(15,23,42,0.75);display:flex;align-items:center;justify-content:center;padding:12px;overflow-y:auto;";
+        document.body.appendChild(ov);
+      }
+      const optsStatus = LAB_STATUS_LISTA.map(s => `<option value="${s.id}" ${s.id === it.status_atual ? "selected" : ""}>${s.label}</option>`).join("");
+      const histHtml = (it.intervencoes || []).map(iv => `
+        <div style="border-left:3px solid #0284c7;padding:4px 8px;margin-bottom:6px;background:#f8fafc;border-radius:0 6px 6px 0;font-size:11.5px;">
+          <div style="display:flex;justify-content:space-between;color:#64748b;font-size:10.5px;">
+            <b>${esc(iv.status_label)} • ${esc(iv.tecnico)} ${iv.visivel_cliente ? "👁️" : "🔒"}</b>
+            <span>${esc(iv.data_hora)}</span>
+          </div>
+          <div style="color:#0f172a;margin-top:2px;">${esc(iv.descricao)}</div>
+        </div>
+      `).join("") || "<div style='color:#64748b;font-size:11.5px;'>Sem intervenções registradas ainda.</div>";
+
+      ov.innerHTML = `
+        <div style="background:#fff;border-radius:14px;max-width:560px;width:100%;padding:16px;max-height:92vh;overflow-y:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div>
+              <span style="background:#002b54;color:#fff;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:900;">${esc(it.codigo_lab)}</span>
+              <b style="color:#002b54;font-size:14.5px;margin-left:6px;">${esc(it.equipamento)}</b>
+            </div>
+            <button type="button" onclick="document.getElementById('emedLabModal').style.display='none'" style="background:#ef4444;color:#fff;border:none;border-radius:999px;padding:4px 10px;font-weight:800;cursor:pointer;">✕</button>
+          </div>
+          <div style="font-size:12px;color:#475569;margin-bottom:10px;">🏥 <b>${esc(it.cliente_nome)}</b> • S/N: ${esc(it.numero_serie || "-")}</div>
+
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:12.5px;border-top:1px solid #e2e8f0;padding-top:10px;">
+            <div>
+              <label style="font-weight:700;">Novo Status no Laboratório *</label>
+              <select id="labUpStatus" class="input" onchange="document.getElementById('boxLabMotivoBloq').style.display=this.value.startsWith('AGUARDANDO_')?'block':'none'">${optsStatus}</select>
+            </div>
+            <div id="boxLabMotivoBloq" style="display:${String(it.status_atual).startsWith("AGUARDANDO_") ? "block" : "none"};">
+              <label style="font-weight:700;color:#b45309;">O que está aguardando? (Peça / Instrumento / Material / Técnico)</label>
+              <input id="labUpBloqueio" class="input" value="${esc(it.motivo_bloqueio || "")}" placeholder="Ex: Aguardando placa fonte PN-4421 do fornecedor" />
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div><label style="font-weight:700;">Bancada / Local</label><input id="labUpBancada" class="input" value="${esc(it.bancada_local || "")}" /></div>
+              <div><label style="font-weight:700;">Previsão de Entrega</label><input id="labUpPrev" class="input" value="${esc(it.previsao_entrega || "")}" placeholder="Ex: 25/11/2026" /></div>
+            </div>
+            <div>
+              <label style="font-weight:700;">Descrição da Intervenção / Serviço Realizado *</label>
+              <textarea id="labUpDesc" class="input" rows="3" placeholder="Ex: Realizada inspeção na fonte chaveada, substituído capacitor C14 e iniciados testes em bancada..."></textarea>
+            </div>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#0f172a;cursor:pointer;">
+              <input type="checkbox" id="labUpVisivel" checked /> 👁️ Exibir esta atualização na página pública do cliente
+            </label>
+            <button type="button" class="btn btn-primary" onclick="salvarIntervencaoLab('${esc(it.codigo_lab)}')">💾 Salvar Intervenção</button>
+          </div>
+
+          <div style="margin-top:14px;border-top:1px solid #e2e8f0;padding-top:10px;">
+            <div style="font-weight:800;font-size:12.5px;color:#002b54;margin-bottom:6px;">📜 Histórico de Intervenções</div>
+            <div style="max-height:200px;overflow-y:auto;">${histHtml}</div>
+          </div>
+        </div>
+      `;
+      ov.style.display = "flex";
+    }
+
+    async function salvarIntervencaoLab(codigoLab) {
+      const payload = {
+        codigo_lab: codigoLab,
+        status_novo: document.getElementById("labUpStatus")?.value || "",
+        motivo_bloqueio: document.getElementById("labUpBloqueio")?.value || "",
+        bancada_local: document.getElementById("labUpBancada")?.value || "",
+        previsao_entrega: document.getElementById("labUpPrev")?.value || "",
+        descricao: document.getElementById("labUpDesc")?.value || "",
+        visivel_cliente: !!document.getElementById("labUpVisivel")?.checked,
+        tecnico: STATE.tecnicoAtual || STATE.usuarioNome || "TÉCNICO EMED"
+      };
+      const res = await apiPost("/api/lab/intervencao", payload);
+      mostrarToast(res?.msg || "Erro ao salvar", 5000);
+      if (res && res.ok) {
+        document.getElementById("emedLabModal").style.display = "none";
+        if (STATE.menuAtivo === "TEC_LAB") {
+          renderMenuLaboratorioQR();
+        }
       }
     }
     async function devolverMinhaFerramenta(codigo, avisoEntrega) {
