@@ -669,40 +669,131 @@ def get_osrm_route():
 
 @app.route("/api/history")
 def get_route_history():
-    """Retorna os dias com rotas gravadas e um traçado limpo (sem linhas cruzadas) + condutor do dia."""
+    """Retorna histórico refinado com filtros por veículo, condutor, presets de data, busca livre e traçado limpo."""
     day_filter = request.args.get("date", "").strip()
+    placa_filter = request.args.get("placa", "").strip().upper()
+    driver_filter = request.args.get("driver", "").strip().upper()
+    q_filter = request.args.get("q", "").strip()
+    preset = request.args.get("preset", "").strip().lower()
+    start_date = request.args.get("start_date", "").strip()
+    end_date = request.args.get("end_date", "").strip()
+
+    def _normalize_iso(val: str) -> str:
+        if not val:
+            return ""
+        val = val.strip()
+        if len(val) == 10 and val[2] == "/" and val[5] == "/":
+            return f"{val[6:10]}-{val[3:5]}-{val[0:2]}"
+        return val
+
+    start_iso = _normalize_iso(start_date)
+    end_iso = _normalize_iso(end_date)
+    today_dt = datetime.date.today()
+
+    if preset == "today":
+        start_iso = end_iso = today_dt.strftime("%Y-%m-%d")
+    elif preset == "yesterday":
+        y_dt = today_dt - datetime.timedelta(days=1)
+        start_iso = end_iso = y_dt.strftime("%Y-%m-%d")
+    elif preset == "7days":
+        start_iso = (today_dt - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+        end_iso = today_dt.strftime("%Y-%m-%d")
+    elif preset == "30days":
+        start_iso = (today_dt - datetime.timedelta(days=30)).strftime("%Y-%m-%d")
+        end_iso = today_dt.strftime("%Y-%m-%d")
+
     try:
         with get_nav_db() as conn:
             conn.row_factory = sqlite3.Row
             cur = conn.cursor()
 
-            cur.execute("""
+            # Mapeia modelo cadastrado de cada veículo
+            modelo_por_placa = {}
+            try:
+                cur.execute("SELECT placa, modelo, tipo_veiculo FROM veiculos")
+                for vr in cur.fetchall():
+                    plc_norm = (vr["placa"] or "").replace("-", "").upper()
+                    modelo_por_placa[plc_norm] = {
+                        "modelo": vr["modelo"] or "Veículo eMED",
+                        "tipo": vr["tipo_veiculo"] or "CARRO"
+                    }
+            except Exception:
+                pass
+
+            sql_days = """
                 SELECT substr(data_hora_inicio, 1, 10) AS dia,
+                       (substr(data_hora_inicio, 7, 4) || '-' || substr(data_hora_inicio, 4, 2) || '-' || substr(data_hora_inicio, 1, 2)) AS dia_iso,
+                       placa,
+                       condutor,
                        COUNT(*) AS total_pontos,
                        MIN(data_hora_inicio) AS inicio,
                        MAX(data_hora_fim) AS fim,
                        MAX(velocidade_max_kmh) AS vel_max,
                        MAX(destino_hospital) AS ultimo_destino,
-                       MAX(placa) AS placa,
-                       MAX(condutor) AS condutor
+                       MAX(modelo) AS modelo
                 FROM frota_viagens_gps
                 WHERE lat_fim IS NOT NULL AND lon_fim IS NOT NULL
-                GROUP BY dia
-                ORDER BY id DESC
-                LIMIT 30
-            """)
-            days = [dict(r) for r in cur.fetchall()]
+            """
+            params_days = []
 
+            if placa_filter:
+                sql_days += " AND REPLACE(UPPER(placa), '-', '') = ?"
+                params_days.append(placa_filter.replace("-", ""))
+
+            if driver_filter:
+                sql_days += " AND UPPER(condutor) LIKE ?"
+                params_days.append(f"%{driver_filter}%")
+
+            if q_filter:
+                sql_days += " AND (UPPER(destino_hospital) LIKE ? OR UPPER(condutor) LIKE ? OR UPPER(placa) LIKE ?)"
+                params_days.extend([f"%{q_filter.upper()}%", f"%{q_filter.upper()}%", f"%{q_filter.upper()}%"])
+
+            if start_iso:
+                sql_days += " AND (substr(data_hora_inicio, 7, 4) || '-' || substr(data_hora_inicio, 4, 2) || '-' || substr(data_hora_inicio, 1, 2)) >= ?"
+                params_days.append(start_iso)
+
+            if end_iso:
+                sql_days += " AND (substr(data_hora_inicio, 7, 4) || '-' || substr(data_hora_inicio, 4, 2) || '-' || substr(data_hora_inicio, 1, 2)) <= ?"
+                params_days.append(end_iso)
+
+            sql_days += """
+                GROUP BY dia, placa
+                ORDER BY dia_iso DESC, placa ASC
+                LIMIT 100
+            """
+            cur.execute(sql_days, params_days)
+            raw_days = cur.fetchall()
+
+            days = []
+            for r in raw_days:
+                d = dict(r)
+                plc_key = (d.get("placa") or "").replace("-", "").upper()
+                v_info = modelo_por_placa.get(plc_key, {})
+                d["modelo_oficial"] = v_info.get("modelo") or d.get("modelo") or "Fiat Argo 1.3"
+                d["tipo_veiculo"] = v_info.get("tipo") or "CARRO"
+                days.append(d)
+
+            # Define dia e veículo selecionado para carregar o traçado
             target_day = day_filter or (days[0]["dia"] if days else "")
+            target_placa = placa_filter or (days[0]["placa"] if days else "")
+
             raw_points = []
+            target_driver = "ANTONIO"
+
             if target_day:
-                cur.execute("""
+                sql_pts = """
                     SELECT id, placa, data_hora_inicio, lat_fim, lon_fim, velocidade_max_kmh, destino_hospital, condutor
                     FROM frota_viagens_gps
                     WHERE substr(data_hora_inicio, 1, 10) = ?
                       AND lat_fim IS NOT NULL AND lon_fim IS NOT NULL
-                    ORDER BY data_hora_inicio ASC, id ASC
-                """, (target_day,))
+                """
+                params_pts = [target_day]
+                if target_placa:
+                    sql_pts += " AND REPLACE(UPPER(placa), '-', '') = ?"
+                    params_pts.append(target_placa.replace("-", ""))
+                sql_pts += " ORDER BY data_hora_inicio ASC, id ASC"
+
+                cur.execute(sql_pts, params_pts)
                 for p in cur.fetchall():
                     try:
                         lat = float(p["lat_fim"])
@@ -714,7 +805,7 @@ def get_route_history():
                         if -35.0 <= lat <= 5.0 and -75.0 <= lon <= -30.0:
                             raw_points.append({
                                 "id": p["id"],
-                                "placa": p["placa"] or "EMD-2026",
+                                "placa": p["placa"] or target_placa or "EMD-2026",
                                 "hora": p["data_hora_inicio"],
                                 "lat": lat,
                                 "lon": lon,
@@ -722,11 +813,16 @@ def get_route_history():
                                 "destino": p["destino_hospital"] or "",
                                 "condutor": p["condutor"] or "ANTONIO"
                             })
+                            if p["condutor"]:
+                                target_driver = p["condutor"]
                     except Exception:
                         continue
 
             clean_points = []
             total_km = 0.0
+            vel_max_real = 0.0
+            vel_sum = 0.0
+
             if raw_points:
                 lats_sorted = sorted(p["lat"] for p in raw_points)
                 lons_sorted = sorted(p["lon"] for p in raw_points)
@@ -745,25 +841,46 @@ def get_route_history():
                             continue
                         total_km += dist
                     clean_points.append(pt)
+                    vel = pt.get("vel", 0.0)
+                    if vel > vel_max_real:
+                        vel_max_real = vel
+                    vel_sum += vel
                     prev_pt = pt
 
                 if not clean_points and raw_points:
                     clean_points = [raw_points[0], raw_points[-1]] if len(raw_points) > 1 else [raw_points[0]]
 
+            vel_avg_real = round(vel_sum / len(clean_points), 1) if clean_points else 0.0
+
+            stats = {
+                "dia": target_day,
+                "placa": target_placa,
+                "condutor": target_driver,
+                "km_percorrido": round(total_km, 1),
+                "vel_max": round(vel_max_real, 1),
+                "vel_media": vel_avg_real,
+                "total_pontos": len(clean_points),
+                "inicio": clean_points[0]["hora"] if clean_points else "",
+                "fim": clean_points[-1]["hora"] if clean_points else ""
+            }
+
             return jsonify({
                 "success": True,
                 "selected_day": target_day,
+                "selected_placa": target_placa,
+                "selected_driver": target_driver,
                 "km_percorrido": round(total_km, 1),
+                "stats": stats,
                 "days": days,
                 "points": clean_points
             })
     except Exception as e:
-        return jsonify({"success": False, "error": str(e), "days": [], "points": [], "km_percorrido": 0})
+        return jsonify({"success": False, "error": str(e), "days": [], "points": [], "km_percorrido": 0, "stats": {}})
 
 
 @app.route("/api/history/driver", methods=["POST"])
 def update_history_driver():
-    """Define ou altera o condutor responsável pelas viagens de um dia específico ou veículo."""
+    """Define ou altera o condutor responsável pelas viagens de um dia/veículo específico."""
     try:
         data = request.get_json(force=True) or {}
         dia = str(data.get("dia", "")).strip()
@@ -774,12 +891,20 @@ def update_history_driver():
 
         with get_nav_db() as conn:
             cur = conn.cursor()
-            if dia:
+            if dia and placa:
+                cur.execute("""
+                    UPDATE frota_viagens_gps
+                    SET condutor = ?
+                    WHERE substr(data_hora_inicio, 1, 10) = ?
+                      AND REPLACE(UPPER(placa), '-', '') = ?
+                """, (condutor, dia, placa.replace("-", "")))
+            elif dia:
                 cur.execute("""
                     UPDATE frota_viagens_gps
                     SET condutor = ?
                     WHERE substr(data_hora_inicio, 1, 10) = ?
                 """, (condutor, dia))
+
             if placa:
                 cur.execute("""
                     UPDATE veiculos

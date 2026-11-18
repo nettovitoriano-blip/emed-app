@@ -3820,14 +3820,13 @@ async def handle_proxy_nav(request: web.Request) -> web.Response:
                         return web.Response(text=f_html.read(), content_type="text/html; charset=utf-8")
 
             elif path in ("/frota", "/admin"):
-
                 frota_file = os.path.join(base_nav, "frota.html")
-
                 if os.path.exists(frota_file):
-
                     with open(frota_file, "r", encoding="utf-8") as f_frota:
-
                         return web.Response(text=f_frota.read(), content_type="text/html; charset=utf-8")
+
+            elif path.startswith("/api/"):
+                return web.json_response({"success": False, "error": f"Servidor GPS em inicializacao ({e})", "vehicles": [], "days": [], "points": []})
 
             return web.Response(text=f"Carregando EmedNav GPS... Por favor atualize em instantes ({e})", status=200)
 

@@ -391,6 +391,117 @@
       .fleet-body.sidebar-collapsed .fleet-sidebar { height: 42px; overflow: hidden; }
       .fleet-body.sidebar-collapsed .fleet-map-area { height: calc(100% - 42px); }
     }
+  
+    /* PLACA MERCOSUL AUTÊNTICA */
+    .plate-mercosul {
+      display: inline-flex;
+      flex-direction: column;
+      background: #ffffff;
+      border: 1.5px solid #003399;
+      border-radius: 5px;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      user-select: none;
+      vertical-align: middle;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    .plate-mercosul:hover { transform: scale(1.03); }
+    .plate-mercosul-header {
+      background: #003399;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1px 5px;
+      font-size: 7px;
+      font-weight: 900;
+      letter-spacing: 0.8px;
+      line-height: 1.1;
+    }
+    .plate-mercosul-number {
+      color: #0f172a;
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      padding: 1px 6px;
+      text-align: center;
+      line-height: 1.1;
+    }
+    .plate-mercosul.large {
+      border-width: 2px;
+      border-radius: 7px;
+    }
+    .plate-mercosul.large .plate-mercosul-header {
+      font-size: 9.5px;
+      padding: 2px 10px;
+    }
+    .plate-mercosul.large .plate-mercosul-number {
+      font-size: 19px;
+      letter-spacing: 3px;
+      padding: 2px 12px;
+    }
+
+    /* FILTROS E PRESETS DO HISTÓRICO */
+    .filter-presets-bar {
+      display: flex; gap: 5px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 8px;
+    }
+    .preset-pill {
+      background: #0f172a; color: #94a3b8;
+      border: 1px solid #1e293b;
+      padding: 4px 9px; border-radius: 999px;
+      font-size: 10.5px; font-weight: 800; cursor: pointer;
+      white-space: nowrap; transition: all 0.15s;
+    }
+    .preset-pill:hover, .preset-pill.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: #38bdf8;
+      color: #38bdf8;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+    }
+
+    /* CARD DE VISTA INDIVIDUAL (COCKPIT) */
+    .cockpit-gauge-box {
+      background: radial-gradient(circle, #0c1b33 0%, #060b16 100%);
+      border: 1.5px solid #1e293b;
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+    .cockpit-speed-val {
+      font-size: 42px;
+      font-weight: 900;
+      color: #38bdf8;
+      letter-spacing: -1px;
+      line-height: 1;
+      text-shadow: 0 0 16px rgba(56, 189, 248, 0.55);
+    }
+    .cockpit-speed-unit {
+      font-size: 10px;
+      color: #94a3b8;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 2px;
+    }
+
+    /* BARRA DE SAÚDE / REVISÃO */
+    .maintenance-bar-bg {
+      width: 100%; height: 7px; background: #1e293b; border-radius: 999px; overflow: hidden; margin-top: 5px;
+    }
+    .maintenance-bar-fill {
+      height: 100%; background: linear-gradient(90deg, #22c55e 0%, #38bdf8 100%); border-radius: 999px;
+      transition: width 0.4s ease;
+    }
+
+    .v-actions-grid-2x2 {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+    }
+
   </style>
 </head>
 <body>
@@ -440,8 +551,9 @@
       </div>
 
       <div class="header-actions">
+        <button class="btn-top" onclick="openSingleVehicleModal(0)" title="Abrir painel cockpit com vista individual detalhada do carro" style="border-color:#38bdf8; color:#7dd3fc; background:rgba(56,189,248,0.14);">👁️ Vista Individual</button>
         <button class="btn-top" onclick="openNewVehicleModal()">➕ Novo Veículo / Chip</button>
-        <a href="/" class="btn-top primary">🧭 Abrir Navegador GPS</a>
+        <a href="/" class="btn-top primary">🧭 Abrir GPS</a>
       </div>
     </header>
 
@@ -467,29 +579,77 @@
           </button>
         </div>
 
-        <!-- ABA 1: VEÍCULOS AO VIVO + CONTROLE DE CHIP 4G -->
+        <!-- ABA 1: VEÍCULOS AO VIVO + CONTROLE DE CHIP 4G & VISTA INDIVIDUAL -->
         <div id="tab-vehicles" class="tab-pane active">
+          <div style="margin-bottom:10px;">
+            <input type="text" id="vehicle-search-input" class="form-input" placeholder="🔍 Filtrar veículo por placa, modelo ou condutor..." oninput="renderVehiclesList()" />
+          </div>
           <div id="vehicles-list">Carregando frota eMED...</div>
         </div>
 
-        <!-- ABA 2: HISTÓRICO LIMPO DE ROTAS & INDICAR CONDUTOR -->
+        <!-- ABA 2: HISTÓRICO AVANÇADO DE ROTAS COM FILTROS & INDICAR CONDUTOR -->
         <div id="tab-history" class="tab-pane">
-          <div style="background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.3); border-radius:10px; padding:9px 11px; margin-bottom:12px; font-size:11px; color:#cbd5e1;">
-            💡 <strong>Consulta Rápida:</strong> Clique em qualquer dia para visualizar o trajeto limpo no mapa (clique nos pontos da linha se quiser ver hora/velocidade) e <strong>indicar o condutor</strong>.
+          <!-- CARD DE FILTROS ENTERPRISE -->
+          <div style="background:linear-gradient(145deg, #0f172a 0%, #162038 100%); border:1px solid #1e293b; border-radius:12px; padding:11px; margin-bottom:12px; box-shadow:0 4px 15px rgba(0,0,0,0.35);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size:11px; font-weight:900; color:#38bdf8; text-transform:uppercase; letter-spacing:0.5px;">🔍 Filtros de Histórico & Viagens</span>
+              <button type="button" class="btn-top" onclick="clearHistoryFilters()" style="padding:2px 8px; font-size:10px; background:none; border-color:#475569; color:#94a3b8;">✕ Limpar</button>
+            </div>
+
+            <!-- LINHA 1: SELECT DE VEÍCULO & CONDUTOR -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:8px;">
+              <div>
+                <label style="font-size:9px; color:#94a3b8; font-weight:800; display:block; margin-bottom:3px; text-transform:uppercase;">🚗 Veículo / Placa</label>
+                <select id="hist-filter-placa" class="form-input" onchange="applyHistoryFilters()" style="padding:6px 8px; font-size:12px; font-weight:800;">
+                  <option value="">Todos os Veículos</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:9px; color:#94a3b8; font-weight:800; display:block; margin-bottom:3px; text-transform:uppercase;">👤 Condutor</label>
+                <select id="hist-filter-driver" class="form-input" onchange="applyHistoryFilters()" style="padding:6px 8px; font-size:12px; font-weight:800;">
+                  <option value="">Todos os Condutores</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- LINHA 2: PRESETS RÁPIDOS DE DATA (1 TOQUE) -->
+            <div class="filter-presets-bar">
+              <button type="button" class="preset-pill active" onclick="setHistoryPreset('all', this)">📅 Todas</button>
+              <button type="button" class="preset-pill" onclick="setHistoryPreset('today', this)">⚡ Hoje</button>
+              <button type="button" class="preset-pill" onclick="setHistoryPreset('yesterday', this)">Ontem</button>
+              <button type="button" class="preset-pill" onclick="setHistoryPreset('7days', this)">7 Dias</button>
+              <button type="button" class="preset-pill" onclick="setHistoryPreset('30days', this)">30 Dias</button>
+            </div>
+
+            <!-- LINHA 3: CAMPO DE BUSCA LIVRE EM TEMPO REAL -->
+            <div style="position:relative; margin-bottom:8px;">
+              <input type="text" id="hist-filter-query" class="form-input" placeholder="Buscar por hospital, destino, rua ou condutor..." oninput="debounceApplyHistoryFilters()" style="padding-left:28px; font-size:12px;" />
+              <span style="position:absolute; left:9px; top:50%; transform:translateY(-50%); font-size:12px; opacity:0.6;">🔍</span>
+            </div>
+
+            <!-- LINHA 4: PERÍODO PERSONALIZADO (RANGE) -->
+            <div style="display:flex; align-items:center; gap:6px;">
+              <input type="date" id="hist-filter-start" class="form-input" style="padding:5px 6px; font-size:11px;" title="Data Início" />
+              <span style="font-size:10px; color:#64748b; font-weight:800;">até</span>
+              <input type="date" id="hist-filter-end" class="form-input" style="padding:5px 6px; font-size:11px;" title="Data Fim" />
+              <button type="button" class="btn-top primary" onclick="applyHistoryFilters()" style="padding:6px 10px; font-size:11px;">Filtrar</button>
+            </div>
           </div>
 
-          <div style="margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div style="font-size:11px; font-weight:900; color:#4ade80; text-transform:uppercase;">
+              📡 Viagens Encontradas (<span id="hist-count-lbl">0</span>)
+            </div>
+            <span style="font-size:10px; color:#94a3b8;">Clique para abrir rota</span>
+          </div>
+
+          <div id="history-days-list">Carregando histórico...</div>
+
+          <div style="border-top:1px solid #1e293b; padding-top:12px; margin-top:14px;">
             <div style="font-size:11px; font-weight:900; color:#38bdf8; text-transform:uppercase; margin-bottom:6px;">
-              📍 Rotas Geradas Hoje no Navegador
+              📍 Rotas Recentes Traçadas no GPS Hoje
             </div>
             <div id="traced-today-list"></div>
-          </div>
-
-          <div style="border-top:1px solid #1e293b; padding-top:12px;">
-            <div style="font-size:11px; font-weight:900; color:#4ade80; text-transform:uppercase; margin-bottom:8px;">
-              📡 Viagens Registradas por Data (Clique para ver Rota)
-            </div>
-            <div id="history-days-list">Carregando histórico de dias...</div>
           </div>
         </div>
 
@@ -536,6 +696,9 @@
               <button class="btn-top primary" onclick="openDriverModalForActiveDay()" style="padding:7px 12px;">
                 👤 Condutor: <span id="banner-driver-lbl">ANTONIO</span> ✏️
               </button>
+              <button class="btn-top" onclick="openTripReportModal()" style="border-color:#38bdf8; color:#7dd3fc; padding:7px 10px;">
+                📄 Relatório
+              </button>
               <button class="btn-top" onclick="clearRouteView()" style="border-color:#ef4444; color:#fca5a5; padding:7px 10px;">
                 ✖ Fechar Rota
               </button>
@@ -543,6 +706,161 @@
           </div>
         </div>
       </main>
+    </div>
+  </div>
+
+
+  <!-- MODAL DE VISTA INDIVIDUAL DO VEÍCULO (COCKPIT HIGH-TECH) -->
+  <div id="single-vehicle-modal" class="modal-backdrop">
+    <div class="modal-box" style="max-width:540px; border-color:#38bdf8;">
+      <!-- CABEÇALHO DO COCKPIT -->
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; border-bottom:1px solid #1e293b; padding-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <!-- PLACA MERCOSUL GRANDE -->
+          <div class="plate-mercosul large">
+            <div class="plate-mercosul-header">
+              <span>BRASIL</span>
+              <span>🇧🇷</span>
+            </div>
+            <div class="plate-mercosul-number" id="sv-plate-large">EMD-2026</div>
+          </div>
+
+          <div>
+            <div id="sv-model-name" style="font-size:16px; font-weight:900; color:#f8fafc;">Fiat Argo 1.3 Trekking</div>
+            <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+              <span id="sv-status-pill" class="v-status-pill" style="background:rgba(34,197,94,0.18); border:1px solid #22c55e; color:#4ade80;">
+                <span class="pulse-dot"></span>
+                <span id="sv-status-text">ONLINE 4G</span>
+              </span>
+              <span id="sv-type-badge" style="font-size:10px; color:#94a3b8; font-weight:800; background:#1e293b; padding:2px 6px; border-radius:4px;">🚗 Passeio</span>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="closeSingleVehicleModal()" style="background:none; border:none; color:#94a3b8; font-size:22px; cursor:pointer; padding:2px 6px;">✕</button>
+      </div>
+
+      <!-- PAINEL DIGITAL DO COCKPIT (VELOCÍMETRO + HODÔMETRO + SAÚDE REVISÃO) -->
+      <div style="display:grid; grid-template-columns:1.1fr 1.3fr; gap:10px; margin-bottom:12px;">
+        <!-- VELOCÍMETRO -->
+        <div class="cockpit-gauge-box">
+          <span style="font-size:9px; color:#94a3b8; font-weight:800; text-transform:uppercase;">Velocidade Instantânea</span>
+          <div id="sv-speed" class="cockpit-speed-val">0</div>
+          <div class="cockpit-speed-unit">KM / H</div>
+          <div id="sv-ignition-badge" style="font-size:10px; font-weight:800; color:#94a3b8; margin-top:6px;">
+            🔑 Ignição Desligada
+          </div>
+        </div>
+
+        <!-- HODÔMETRO E REVISÃO PREVENTIVA -->
+        <div style="background:#060b16; border:1px solid #1e293b; border-radius:14px; padding:12px; display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <span style="font-size:9px; color:#94a3b8; font-weight:800; text-transform:uppercase;">Hodômetro Acumulado</span>
+            <div id="sv-km-total" style="font-size:20px; font-weight:900; color:#f8fafc; margin-top:2px;">70.011 km</div>
+          </div>
+
+          <div style="border-top:1px solid #1e293b; padding-top:8px; margin-top:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:9px; color:#94a3b8; font-weight:800; text-transform:uppercase;">Próxima Revisão</span>
+              <span id="sv-revisao-km" style="font-size:11px; font-weight:900; color:#38bdf8;">80.000 km</span>
+            </div>
+            <div class="maintenance-bar-bg">
+              <div id="sv-revisao-bar" class="maintenance-bar-fill" style="width:75%;"></div>
+            </div>
+            <div id="sv-revisao-sub" style="font-size:10px; color:#4ade80; font-weight:800; margin-top:4px;">
+              🟢 Em dia (~9.989 km restantes)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONDUTOR ATIVO NO VOLANTE -->
+      <div style="background:rgba(56,189,248,0.08); border:1.5px solid rgba(56,189,248,0.3); border-radius:12px; padding:11px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <span style="font-size:9px; color:#38bdf8; font-weight:800; text-transform:uppercase;">🛞 Condutor no Volante (NFC / App)</span>
+          <div id="sv-driver-name" style="font-size:15px; font-weight:900; color:#f8fafc; margin-top:2px;">VALFREDO NETTO</div>
+          <div id="sv-driver-tag" style="font-size:10px; color:#94a3b8; margin-top:1px;">Identificado via: Proximidade no App</div>
+        </div>
+        <button class="btn-top primary" onclick="openDriverModalForSingleVehicle()" style="padding:6px 12px; font-size:11px;">
+          👤 Trocar Condutor
+        </button>
+      </div>
+
+      <!-- DETALHES DE TELEMETRIA 4G & CHIP M2M -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
+        <!-- RASTREADOR J16 -->
+        <div style="background:#060b16; border:1px solid #1e293b; border-radius:10px; padding:10px;">
+          <div style="font-size:10px; font-weight:900; color:#38bdf8; text-transform:uppercase; margin-bottom:4px;">
+            📡 Rastreador J16 4G LTE
+          </div>
+          <div style="font-size:11px; color:#e2e8f0;">IMEI: <span id="sv-imei" style="font-family:monospace; font-weight:800;">869890080097193</span></div>
+          <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Último sinal: <span id="sv-last-signal">08/11/2026 23:24</span></div>
+        </div>
+
+        <!-- CHIP M2M -->
+        <div style="background:#060b16; border:1px solid #1e293b; border-radius:10px; padding:10px;">
+          <div style="font-size:10px; font-weight:900; color:#4ade80; text-transform:uppercase; margin-bottom:4px;">
+            📱 Chip Telemetria
+          </div>
+          <div style="font-size:11px; color:#e2e8f0;"><span id="sv-chip-op">Vivo M2M</span> • <span id="sv-chip-num">(85) 99999-4000</span></div>
+          <div id="sv-chip-status" style="font-size:10px; font-weight:800; margin-top:2px; color:#eab308;">
+            Validade: 15/11/2026
+          </div>
+        </div>
+      </div>
+
+      <!-- COORDENADAS E LOCALIZAÇÃO -->
+      <div style="background:#060b16; border:1px solid #1e293b; border-radius:10px; padding:9px 12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <span style="font-size:9px; color:#94a3b8; font-weight:800; text-transform:uppercase;">Posição GPS Atual</span>
+          <div id="sv-coords" style="font-size:11px; font-weight:800; color:#f8fafc; font-family:monospace;">-3.87520, -38.45970</div>
+        </div>
+        <button class="btn-top" onclick="copyVehicleCoords()" style="padding:4px 8px; font-size:10px;">
+          📋 Copiar
+        </button>
+      </div>
+
+      <!-- AÇÕES DO COCKPIT -->
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:10px;">
+        <button class="btn-top primary" onclick="focusActiveSingleVehicle()" style="justify-content:center; padding:8px 6px;">
+          🎯 Focar no Mapa
+        </button>
+        <button class="btn-top" onclick="openHistoryForSingleVehicle()" style="justify-content:center; padding:8px 6px; border-color:#38bdf8; color:#7dd3fc;">
+          ⏱️ Ver Histórico
+        </button>
+        <button class="btn-top" onclick="navigateRouteToVehicle()" style="justify-content:center; padding:8px 6px; border-color:#22c55e; color:#4ade80;">
+          🚀 Ir até o Carro
+        </button>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; gap:8px;">
+        <button class="btn-top" onclick="contactDriverWhatsApp()" style="border-color:#25d366; color:#25d366; padding:8px 12px;">
+          💬 WhatsApp Condutor
+        </button>
+        <button class="btn-top highlight" onclick="editActiveSingleVehicle()" style="padding:8px 14px;">
+          ✏️ Editar Veículo & Chip
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE RELATÓRIO DA VIAGEM / DIÁRIO DE BORDO -->
+  <div id="trip-report-modal" class="modal-backdrop">
+    <div class="modal-box" style="max-width:480px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #1e293b; padding-bottom:8px;">
+        <h3 style="font-size:15px; color:#38bdf8; font-weight:900;">📄 Relatório da Viagem (Diário de Bordo)</h3>
+        <button onclick="closeTripReportModal()" style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer;">✕</button>
+      </div>
+
+      <div id="trip-report-content" style="font-size:12px; color:#cbd5e1; line-height:1.6;"></div>
+
+      <div style="display:flex; justify-content:space-between; margin-top:16px;">
+        <button class="btn-top" onclick="copyTripReportText()">📋 Copiar Relatório</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-top" onclick="window.print()">🖨️ Imprimir</button>
+          <button class="btn-top primary" onclick="closeTripReportModal()">Fechar</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -889,24 +1207,45 @@
       return '🚗';
     }
 
+    function getMercosulPlateHtml(placa, isLarge = false) {
+      const cls = isLarge ? 'plate-mercosul large' : 'plate-mercosul';
+      return `
+        <div class="${cls}">
+          <div class="plate-mercosul-header">
+            <span>BRASIL</span>
+            <span>🇧🇷</span>
+          </div>
+          <div class="plate-mercosul-number">${placa || 'EMD-2026'}</div>
+        </div>
+      `;
+    }
+
     function createVehicleIcon(v) {
       const emoji = getVehicleEmoji(v.tipo_veiculo);
+      const isOnline = !!v.is_online;
+      const glowColor = isOnline ? '#22c55e' : '#38bdf8';
       return L.divIcon({
         className: 'fleet-car-icon',
         html: `
           <div style="position:relative; display:flex; flex-direction:column; align-items:center;">
-            <div style="background:#0f172a; color:#f8fafc; border:1.5px solid #38bdf8; border-radius:6px; padding:1px 6px; font-size:10px; font-weight:900; white-space:nowrap; margin-bottom:3px; box-shadow:0 3px 8px rgba(0,0,0,0.6);">
-              ${v.placa} • ${v.condutor}
+            <div style="background:#0f172a; color:#f8fafc; border:1.5px solid ${glowColor}; border-radius:6px; padding:2px 7px; font-size:10px; font-weight:900; white-space:nowrap; margin-bottom:3px; box-shadow:0 3px 10px rgba(0,0,0,0.7); display:flex; align-items:center; gap:5px;">
+              <span>${v.placa}</span>
+              <span style="opacity:0.8;">• ${v.condutor}</span>
             </div>
-            <div style="width:38px; height:38px; border-radius:50%; background:radial-gradient(circle, #0284c7 0%, #0f172a 85%); border:3px solid #ffffff; box-shadow:0 0 15px #38bdf8; display:flex; align-items:center; justify-content:center; font-size:20px;">
+            <div style="width:40px; height:40px; border-radius:50%; background:radial-gradient(circle, #0284c7 0%, #071226 85%); border:3px solid #ffffff; box-shadow:0 0 16px ${glowColor}; display:flex; align-items:center; justify-content:center; font-size:22px;">
               ${emoji}
             </div>
           </div>
         `,
-        iconSize: [95, 62],
-        iconAnchor: [47, 42]
+        iconSize: [110, 68],
+        iconAnchor: [55, 46]
       });
     }
+
+    let singleVehicleIndex = 0;
+    let historyPreset = 'all';
+    let debounceTimer = null;
+    let activeTripReportData = null;
 
     async function loadFleetOverview() {
       try {
@@ -925,62 +1264,11 @@
         document.getElementById('kpi-clients').textContent = `${st.total_clients || 504} clientes`;
         document.getElementById('kpi-db').textContent = `${st.db_size_mb || 1.6} MB (+10 anos)`;
 
-        const container = document.getElementById('vehicles-list');
-        container.innerHTML = fleetVehicles.map((v, idx) => {
-          const emoji = getVehicleEmoji(v.tipo_veiculo);
-          const isOnline = !!v.is_online;
-          const statusText = v.status_label || (isOnline ? 'ONLINE 4G' : 'DESLIGADO');
-          const pillBg = isOnline ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.18)';
-          const pillBorder = isOnline ? '#22c55e' : '#ef4444';
-          const pillColor = isOnline ? '#4ade80' : '#f87171';
+        // Popula selects do histórico com a frota e motoristas reais
+        populateHistoryFilterSelects();
 
-          return `
-            <div class="vehicle-card" style="${isOnline ? '' : 'border-color:#475569;'}">
-              <div class="v-card-top">
-                <div onclick="focusVehicle(${idx})" style="cursor:pointer;">
-                  <span class="v-plate-badge">${emoji} ${v.placa}</span>
-                  <div class="v-model">${v.modelo}</div>
-                </div>
-                <div class="v-status-pill" style="background:${pillBg}; border:1px solid ${pillBorder}; color:${pillColor};">
-                  ${isOnline ? '<span class="pulse-dot"></span>' : '<span style="width:8px; height:8px; border-radius:50%; background:#ef4444; display:inline-block; margin-right:4px;"></span>'}
-                  <span style="font-size:10px; font-weight:800;">${statusText}</span>
-                </div>
-              </div>
-
-              <div class="v-metrics-grid">
-                <div class="v-metric">
-                  <span class="v-metric-lbl">VELOCIDADE</span>
-                  <span class="v-metric-val" style="color:#38bdf8;">${Math.round(v.speed)} km/h</span>
-                </div>
-                <div class="v-metric">
-                  <span class="v-metric-lbl">HODÔMETRO</span>
-                  <span class="v-metric-val">${Number(v.km_atual).toLocaleString('pt-BR')} km</span>
-                </div>
-                <div class="v-metric" title="Identificado automaticamente via NFC ou App por proximidade ao assumir o volante">
-                  <span class="v-metric-lbl">NO VOLANTE (NFC/APP)</span>
-                  <span class="v-metric-val" style="color:#4ade80;">🛞 ${v.condutor}</span>
-                </div>
-              </div>
-
-              <!-- BANNER DO CHIP 4G COM LEMBRETE DE VALIDADE -->
-              <div class="chip-banner ${v.chip_status}" onclick="openEditVehicleModal(${idx})" style="cursor:pointer;" title="Clique para editar dados do Chip 4G ou validade">
-                <div>
-                  <div style="font-weight:800;">📱 Chip: ${v.chip_operadora} (${v.chip_numero})</div>
-                  <div style="font-size:10px; opacity:0.85;">Ativado em: ${v.chip_data_ativacao || '--'} • Último sinal: ${v.updated_at}</div>
-                </div>
-                <div style="font-weight:900; text-align:right; font-size:11px;">
-                  ${v.chip_label}
-                </div>
-              </div>
-
-              <div class="v-actions-row">
-                <button class="btn-v-action" onclick="focusVehicle(${idx})">🎯 Localizar</button>
-                <button class="btn-v-action highlight" onclick="openEditVehicleModal(${idx})">✏️ Veículo / Chip</button>
-                <button class="btn-v-action" onclick="openHistoryTab()">⏱️ Ver Rotas</button>
-              </div>
-            </div>
-          `;
-        }).join('');
+        // Renderiza lista da sidebar
+        renderVehiclesList();
 
         // Atualiza marcadores no mapa
         Object.values(vehicleMarkers).forEach(m => map.removeLayer(m));
@@ -990,19 +1278,27 @@
           const icon = createVehicleIcon(v);
           vehicleMarkers[v.placa] = L.marker([offsetLat, offsetLon], { icon }).addTo(map)
             .bindPopup(`
-              <div style="font-family:sans-serif; min-width:200px;">
-                <div style="font-weight:900; font-size:14px; color:#0f172a;">${getVehicleEmoji(v.tipo_veiculo)} ${v.modelo} (${v.placa})</div>
+              <div style="font-family:sans-serif; min-width:220px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                  ${getMercosulPlateHtml(v.placa)}
+                  <span style="font-size:11px; font-weight:800; color:#0284c7;">${v.modelo}</span>
+                </div>
                 <div style="font-size:12px; margin-top:4px;">👤 Condutor: <b>${v.condutor}</b></div>
                 <div style="font-size:12px;">🛣️ Hodômetro: <b>${Number(v.km_atual).toLocaleString('pt-BR')} km</b></div>
                 <div style="font-size:11px; color:#0284c7; font-weight:700; margin-top:4px;">📱 ${v.chip_operadora}: ${v.chip_label}</div>
                 <div style="font-size:10px; color:#64748b; margin-top:3px;">Atualizado: ${v.updated_at}</div>
-                <div style="display:flex; gap:6px; margin-top:8px;">
-                  <a href="/gps?destLat=${v.lat}&destLon=${v.lon}&destNome=${encodeURIComponent('Encontro ' + v.modelo + ' - ' + v.condutor)}" style="flex:1; background:#0284c7; color:white; text-decoration:none; font-weight:800; padding:6px 4px; border-radius:6px; text-align:center; font-size:11px;">
-                    🚀 Abrir GPS
-                  </a>
-                  <a href="https://www.waze.com/ul?ll=${v.lat},${v.lon}&navigate=yes" target="_blank" style="flex:1; background:#0f172a; border:1px solid #38bdf8; color:#38bdf8; text-decoration:none; font-weight:800; padding:6px 4px; border-radius:6px; text-align:center; font-size:11px;">
-                    🚙 Waze
-                  </a>
+                <div style="margin-top:8px; display:flex; flex-direction:column; gap:5px;">
+                  <button onclick="openSingleVehicleModal(${idx})" style="background:#0284c7; color:#fff; border:none; padding:7px 10px; border-radius:6px; font-weight:800; font-size:11px; cursor:pointer;">
+                    👁️ Abrir Vista Individual do Carro
+                  </button>
+                  <div style="display:flex; gap:6px;">
+                    <a href="/gps?destLat=${v.lat}&destLon=${v.lon}&destNome=${encodeURIComponent('Encontro ' + v.modelo + ' - ' + v.condutor)}" style="flex:1; background:#16a34a; color:white; text-decoration:none; font-weight:800; padding:6px 4px; border-radius:6px; text-align:center; font-size:11px;">
+                      🚀 Ir no GPS
+                    </a>
+                    <a href="https://www.waze.com/ul?ll=${v.lat},${v.lon}&navigate=yes" target="_blank" style="flex:1; background:#0f172a; border:1px solid #38bdf8; color:#38bdf8; text-decoration:none; font-weight:800; padding:6px 4px; border-radius:6px; text-align:center; font-size:11px;">
+                      🚙 Waze
+                    </a>
+                  </div>
                 </div>
               </div>
             `);
@@ -1010,6 +1306,206 @@
       } catch (e) {
         console.error('Erro ao carregar frota:', e);
       }
+    }
+
+    function renderVehiclesList() {
+      const q = (document.getElementById('vehicle-search-input')?.value || '').toLowerCase().trim();
+      const container = document.getElementById('vehicles-list');
+      if (!container) return;
+
+      const filtered = fleetVehicles.filter(v => {
+        if (!q) return true;
+        return (v.placa || '').toLowerCase().includes(q) ||
+               (v.modelo || '').toLowerCase().includes(q) ||
+               (v.condutor || '').toLowerCase().includes(q);
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div style="color:#64748b; text-align:center; padding:16px;">Nenhum veículo encontrado para a busca.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(v => {
+        const idx = fleetVehicles.indexOf(v);
+        const emoji = getVehicleEmoji(v.tipo_veiculo);
+        const isOnline = !!v.is_online;
+        const statusText = v.status_label || (isOnline ? 'ONLINE 4G' : 'DESLIGADO');
+        const pillBg = isOnline ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.18)';
+        const pillBorder = isOnline ? '#22c55e' : '#ef4444';
+        const pillColor = isOnline ? '#4ade80' : '#f87171';
+
+        return `
+          <div class="vehicle-card" style="${isOnline ? '' : 'border-color:#334155;'}">
+            <div class="v-card-top">
+              <div onclick="openSingleVehicleModal(${idx})" style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+                ${getMercosulPlateHtml(v.placa)}
+                <div>
+                  <div class="v-model">${v.modelo}</div>
+                  <div style="font-size:10px; color:#94a3b8;">${emoji} ${v.tipo_veiculo || 'Passeio'}</div>
+                </div>
+              </div>
+              <div class="v-status-pill" style="background:${pillBg}; border:1px solid ${pillBorder}; color:${pillColor};">
+                ${isOnline ? '<span class="pulse-dot"></span>' : '<span style="width:7px; height:7px; border-radius:50%; background:#ef4444; display:inline-block; margin-right:4px;"></span>'}
+                <span style="font-size:10px; font-weight:800;">${statusText}</span>
+              </div>
+            </div>
+
+            <div class="v-metrics-grid">
+              <div class="v-metric">
+                <span class="v-metric-lbl">VELOCIDADE</span>
+                <span class="v-metric-val" style="color:#38bdf8;">${Math.round(v.speed)} km/h</span>
+              </div>
+              <div class="v-metric">
+                <span class="v-metric-lbl">HODÔMETRO</span>
+                <span class="v-metric-val">${Number(v.km_atual).toLocaleString('pt-BR')} km</span>
+              </div>
+              <div class="v-metric" title="Identificado automaticamente via NFC ou App">
+                <span class="v-metric-lbl">NO VOLANTE (NFC/APP)</span>
+                <span class="v-metric-val" style="color:#4ade80;">🛞 ${v.condutor}</span>
+              </div>
+            </div>
+
+            <!-- BANNER DO CHIP 4G COM LEMBRETE DE VALIDADE -->
+            <div class="chip-banner ${v.chip_status}" onclick="openEditVehicleModal(${idx})" style="cursor:pointer;" title="Clique para editar dados do Chip 4G ou validade">
+              <div>
+                <div style="font-weight:800;">📱 Chip: ${v.chip_operadora} (${v.chip_numero})</div>
+                <div style="font-size:10px; opacity:0.85;">Ativado: ${v.chip_data_ativacao || '--'} • Sinal: ${v.updated_at}</div>
+              </div>
+              <div style="font-weight:900; text-align:right; font-size:11px;">
+                ${v.chip_label}
+              </div>
+            </div>
+
+            <div class="v-actions-grid-2x2">
+              <button class="btn-v-action highlight" onclick="openSingleVehicleModal(${idx})" style="background:rgba(56,189,248,0.2); border-color:#38bdf8; color:#38bdf8; font-weight:900;">
+                👁️ Vista Individual
+              </button>
+              <button class="btn-v-action" onclick="focusVehicle(${idx})">🎯 Localizar</button>
+              <button class="btn-v-action" onclick="openHistoryForVehicle('${v.placa}')">⏱️ Ver Rotas</button>
+              <button class="btn-v-action" onclick="openEditVehicleModal(${idx})">✏️ Editar Chip</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // VISTA INDIVIDUAL DO VEÍCULO (COCKPIT HIGH-TECH)
+    function openSingleVehicleModal(idx = 0) {
+      if (!fleetVehicles || fleetVehicles.length === 0) return;
+      if (idx >= fleetVehicles.length) idx = 0;
+      singleVehicleIndex = idx;
+      const v = fleetVehicles[idx];
+
+      document.getElementById('sv-plate-large').textContent = v.placa;
+      document.getElementById('sv-model-name').textContent = v.modelo;
+      document.getElementById('sv-type-badge').textContent = `${getVehicleEmoji(v.tipo_veiculo)} ${v.tipo_veiculo || 'Passeio'}`;
+
+      const isOnline = !!v.is_online;
+      const pill = document.getElementById('sv-status-pill');
+      pill.style.background = isOnline ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.18)';
+      pill.style.borderColor = isOnline ? '#22c55e' : '#ef4444';
+      pill.style.color = isOnline ? '#4ade80' : '#f87171';
+      document.getElementById('sv-status-text').textContent = v.status_label || (isOnline ? 'ONLINE 4G' : 'DESLIGADO');
+
+      document.getElementById('sv-speed').textContent = Math.round(v.speed);
+      const ign = document.getElementById('sv-ignition-badge');
+      if (v.ignicao) {
+        ign.innerHTML = '⚡ <span style="color:#4ade80;">Ignição Ligada</span>';
+      } else {
+        ign.innerHTML = '🔑 <span style="color:#94a3b8;">Ignição Desligada</span>';
+      }
+
+      document.getElementById('sv-km-total').textContent = `${Number(v.km_atual).toLocaleString('pt-BR')} km`;
+      const proxRev = Number(v.km_proxima_revisao || (v.km_atual + 10000));
+      document.getElementById('sv-revisao-km').textContent = `${proxRev.toLocaleString('pt-BR')} km`;
+
+      const kmRestante = Math.max(0, proxRev - v.km_atual);
+      const pctSaude = Math.min(100, Math.max(5, Math.round((kmRestante / 10000) * 100)));
+      const bar = document.getElementById('sv-revisao-bar');
+      bar.style.width = pctSaude + '%';
+      if (pctSaude > 40) {
+        bar.style.background = 'linear-gradient(90deg, #22c55e 0%, #38bdf8 100%)';
+        document.getElementById('sv-revisao-sub').innerHTML = `🟢 Em dia (~${kmRestante.toLocaleString('pt-BR')} km restantes)`;
+        document.getElementById('sv-revisao-sub').style.color = '#4ade80';
+      } else {
+        bar.style.background = 'linear-gradient(90deg, #eab308 0%, #ef4444 100%)';
+        document.getElementById('sv-revisao-sub').innerHTML = `⚠️ Agendar Revisão (~${kmRestante.toLocaleString('pt-BR')} km restantes)`;
+        document.getElementById('sv-revisao-sub').style.color = '#facc15';
+      }
+
+      document.getElementById('sv-driver-name').textContent = v.condutor || 'ANTONIO';
+      document.getElementById('sv-driver-tag').textContent = `Tag / Identificação: ${v.tag_rfid || 'Proximidade App'}`;
+
+      document.getElementById('sv-imei').textContent = v.imei || '869890080097193';
+      document.getElementById('sv-last-signal').textContent = v.updated_at || 'Sem sinal recente';
+
+      document.getElementById('sv-chip-op').textContent = v.chip_operadora || 'Vivo M2M 4G';
+      document.getElementById('sv-chip-num').textContent = v.chip_numero || '(85) 99999-4000';
+      const stChip = document.getElementById('sv-chip-status');
+      stChip.textContent = v.chip_label || 'Em dia';
+      stChip.style.color = v.chip_status === 'VENCIDO' ? '#ef4444' : (v.chip_status === 'ALERTA' ? '#f59e0b' : '#4ade80');
+
+      document.getElementById('sv-coords').textContent = `${v.lat.toFixed(5)}, ${v.lon.toFixed(5)}`;
+
+      document.getElementById('single-vehicle-modal').style.display = 'flex';
+    }
+
+    function closeSingleVehicleModal() {
+      document.getElementById('single-vehicle-modal').style.display = 'none';
+    }
+
+    function focusActiveSingleVehicle() {
+      closeSingleVehicleModal();
+      focusVehicle(singleVehicleIndex);
+    }
+
+    function openHistoryForSingleVehicle() {
+      const v = fleetVehicles[singleVehicleIndex];
+      closeSingleVehicleModal();
+      openHistoryForVehicle(v ? v.placa : '');
+    }
+
+    function openHistoryForVehicle(placa) {
+      const histBtn = document.querySelectorAll('.tab-btn')[1];
+      switchTab('history', histBtn);
+      const selPlaca = document.getElementById('hist-filter-placa');
+      if (selPlaca && placa) {
+        selPlaca.value = placa;
+      }
+      applyHistoryFilters();
+    }
+
+    function navigateRouteToVehicle() {
+      const v = fleetVehicles[singleVehicleIndex];
+      if (!v) return;
+      window.location.href = `/gps?destLat=${v.lat}&destLon=${v.lon}&destNome=${encodeURIComponent('Encontro ' + v.modelo + ' - ' + v.condutor)}`;
+    }
+
+    function contactDriverWhatsApp() {
+      const v = fleetVehicles[singleVehicleIndex];
+      if (!v) return;
+      const msg = encodeURIComponent(`Olá ${v.condutor}, aqui é da Central de Frota eMED. Localizamos a viatura ${v.placa} (${v.modelo}) em trânsito.`);
+      window.open(`https://wa.me/?text=${msg}`, '_blank');
+    }
+
+    function copyVehicleCoords() {
+      const v = fleetVehicles[singleVehicleIndex];
+      if (!v) return;
+      const str = `${v.lat.toFixed(5)}, ${v.lon.toFixed(5)}`;
+      navigator.clipboard.writeText(str).then(() => {
+        showToast('📋 Coordenadas copiadas para a área de transferência!');
+      });
+    }
+
+    function openDriverModalForSingleVehicle() {
+      const v = fleetVehicles[singleVehicleIndex];
+      if (!v) return;
+      openDriverModal('', v.placa, v.condutor);
+    }
+
+    function editActiveSingleVehicle() {
+      closeSingleVehicleModal();
+      openEditVehicleModal(singleVehicleIndex);
     }
 
     function focusVehicle(idx) {
@@ -1024,79 +1520,130 @@
       switchTab('history', histBtn);
     }
 
-    // ROTAS TRAÇADAS HOJE NO NAVEGADOR
-    function renderTracedToday() {
-      const box = document.getElementById('traced-today-list');
-      let list = [];
-      try {
-        list = JSON.parse(localStorage.getItem('emednav_traced_routes') || '[]');
-      } catch (e) {}
+    // FILTROS AVANÇADOS DO HISTÓRICO
+    function populateHistoryFilterSelects() {
+      const selPlaca = document.getElementById('hist-filter-placa');
+      const selDriver = document.getElementById('hist-filter-driver');
+      if (!selPlaca || !selDriver) return;
 
-      if (list.length === 0) {
-        box.innerHTML = `<div style="font-size:12px; color:#64748b; background:#0f172a; padding:10px; border-radius:8px; border:1px solid #1e293b;">Nenhuma rota simulada hoje neste navegador.</div>`;
-        return;
-      }
+      const curPlaca = selPlaca.value;
+      const curDriver = selDriver.value;
 
-      box.innerHTML = list.map((item, idx) => `
-        <div class="day-card" onclick="drawTracedRoute(${idx})">
-          <div class="day-header">
-            <span class="day-date">🏁 ${item.destName}</span>
-            <span class="day-pts-badge">${item.distKm} km</span>
-          </div>
-          <div class="day-sub">
-            <span>🕒 Gerada às ${item.hora}</span>
-            <span>⏱️ ~${item.durMin} min</span>
-          </div>
-        </div>
+      selPlaca.innerHTML = '<option value="">Todos os Veículos</option>' + fleetVehicles.map(v => `
+        <option value="${v.placa}">${v.placa} (${v.modelo})</option>
       `).join('');
+
+      selDriver.innerHTML = '<option value="">Todos os Condutores</option>' + fleetDrivers.map(d => `
+        <option value="${d}">${d}</option>
+      `).join('');
+
+      if (curPlaca) selPlaca.value = curPlaca;
+      if (curDriver) selDriver.value = curDriver;
     }
 
-    async function drawTracedRoute(idx) {
-      try {
-        const list = JSON.parse(localStorage.getItem('emednav_traced_routes') || '[]');
-        const item = list[idx];
-        if (!item) return;
-        const v0 = fleetVehicles[0] || { lat: myRealLat, lon: myRealLon };
-        const res = await fetch(`/api/route?origin_lat=${v0.lat}&origin_lon=${v0.lon}&dest_lat=${item.destLat}&dest_lon=${item.destLon}`);
-        const data = await res.json();
-        if (data.success && data.coordinates) {
-          routeLayerGroup.clearLayers();
-          L.polyline(data.coordinates, { color: '#38bdf8', weight: 10, opacity: 0.28 }).addTo(routeLayerGroup);
-          const poly = L.polyline(data.coordinates, { color: '#0284c7', weight: 5, opacity: 0.95 }).addTo(routeLayerGroup);
-          map.fitBounds(poly.getBounds(), { padding: [50, 50] });
-        }
-      } catch (e) {}
+    function setHistoryPreset(preset, btn) {
+      document.querySelectorAll('.preset-pill').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      historyPreset = preset;
+      if (preset !== 'custom') {
+        const s = document.getElementById('hist-filter-start');
+        const e = document.getElementById('hist-filter-end');
+        if (s) s.value = '';
+        if (e) e.value = '';
+      }
+      applyHistoryFilters();
     }
 
-    // HISTÓRICO DE VIAGENS GRAVADAS PELO GPS (SEM REPLAY CONFUSO, ROTA LIMPA + INDICAR CONDUTOR)
-    async function loadHistoryDays(selectedDate = '') {
+    function debounceApplyHistoryFilters() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        applyHistoryFilters();
+      }, 250);
+    }
+
+    function clearHistoryFilters() {
+      const selPlaca = document.getElementById('hist-filter-placa');
+      const selDriver = document.getElementById('hist-filter-driver');
+      const q = document.getElementById('hist-filter-query');
+      const s = document.getElementById('hist-filter-start');
+      const e = document.getElementById('hist-filter-end');
+      if (selPlaca) selPlaca.value = '';
+      if (selDriver) selDriver.value = '';
+      if (q) q.value = '';
+      if (s) s.value = '';
+      if (e) e.value = '';
+      document.querySelectorAll('.preset-pill').forEach(b => b.classList.remove('active'));
+      const firstPreset = document.querySelector('.preset-pill');
+      if (firstPreset) firstPreset.classList.add('active');
+      historyPreset = 'all';
+      applyHistoryFilters();
+    }
+
+    // HISTÓRICO DE VIAGENS GRAVADAS PELO GPS COM FILTROS ENTERPRISE
+    async function applyHistoryFilters(targetDay = '', targetPlaca = '') {
       const box = document.getElementById('history-days-list');
-      try {
-        const url = selectedDate ? `/api/history?date=${encodeURIComponent(selectedDate)}` : '/api/history';
-        const res = await fetch(url);
-        const data = await res.json();
-        if (!data.success) return;
+      const countLbl = document.getElementById('hist-count-lbl');
+      if (!box) return;
 
-        const days = data.days || [];
-        if (days.length === 0) {
-          box.innerHTML = '<div style="color:#64748b;">Nenhum registro encontrado.</div>';
+      const placaVal = targetPlaca || (document.getElementById('hist-filter-placa')?.value || '');
+      const driverVal = document.getElementById('hist-filter-driver')?.value || '';
+      const qVal = document.getElementById('hist-filter-query')?.value || '';
+      const startVal = document.getElementById('hist-filter-start')?.value || '';
+      const endVal = document.getElementById('hist-filter-end')?.value || '';
+
+      const params = new URLSearchParams();
+      if (targetDay) params.set('date', targetDay);
+      if (placaVal) params.set('placa', placaVal);
+      if (driverVal) params.set('driver', driverVal);
+      if (qVal) params.set('q', qVal);
+      if (historyPreset && historyPreset !== 'all') params.set('preset', historyPreset);
+      if (startVal) params.set('start_date', startVal);
+      if (endVal) params.set('end_date', endVal);
+
+      try {
+        const res = await fetch(`/api/history?${params.toString()}`);
+        const data = await res.json();
+        if (!data.success) {
+          box.innerHTML = '<div style="color:#ef4444; padding:10px;">Erro ao consultar histórico.</div>';
           return;
         }
 
+        const days = data.days || [];
+        if (countLbl) countLbl.textContent = days.length;
+
+        if (days.length === 0) {
+          box.innerHTML = '<div style="color:#64748b; padding:14px; text-align:center; background:#0f172a; border-radius:8px;">Nenhuma viagem encontrada com estes filtros.</div>';
+          clearRouteView();
+          return;
+        }
+
+        const activeDay = data.selected_day || (days[0] ? days[0].dia : '');
+        const activePlc = data.selected_placa || (days[0] ? days[0].placa : '');
+
         box.innerHTML = days.map(d => {
-          const isSel = d.dia === selectedDate;
+          const isSel = (d.dia === activeDay && (d.placa || '').replace('-', '') === (activePlc || '').replace('-', ''));
           const hIni = (d.inicio || '').split(' ')[1] || '';
           const hFim = (d.fim || '').split(' ')[1] || '';
           const cond = d.condutor || 'ANTONIO';
+          const vel = Math.round(d.vel_max || 0);
+          const velColor = vel > 80 ? '#ef4444' : (vel > 60 ? '#f59e0b' : '#38bdf8');
+          const dest = d.ultimo_destino ? `📍 ${d.ultimo_destino}` : '📍 Rota em Trânsito';
+
           return `
-            <div class="day-card ${isSel ? 'active' : ''}" onclick="loadHistoryDays('${d.dia}')">
+            <div class="day-card ${isSel ? 'active' : ''}" onclick="applyHistoryFilters('${d.dia}', '${d.placa}')">
               <div class="day-header">
-                <span class="day-date">📅 ${d.dia}</span>
-                <span class="day-pts-badge">⚡ Máx: ${Math.round(d.vel_max || 0)} km/h</span>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  ${getMercosulPlateHtml(d.placa)}
+                  <span class="day-date" style="font-size:12px;">📅 ${d.dia}</span>
+                </div>
+                <span class="day-pts-badge" style="border-color:${velColor}; color:${velColor};">⚡ Máx: ${vel} km/h</span>
+              </div>
+              <div style="font-size:11px; color:#cbd5e1; margin:4px 0; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${dest}">
+                ${dest}
               </div>
               <div class="day-sub">
-                <span>🕒 ${hIni} às ${hFim} (${d.total_pontos} reg.)</span>
-                <button class="btn-v-action highlight" style="padding:4px 8px;" onclick="event.stopPropagation(); openDriverModal('${d.dia}', '${d.placa || 'EMD-2026'}', '${cond}');">
+                <span>🕒 ${hIni} às ${hFim} (${d.total_pontos} pts)</span>
+                <button class="btn-v-action highlight" style="padding:3px 7px; font-size:10px;" onclick="event.stopPropagation(); openDriverModal('${d.dia}', '${d.placa || 'EMD-2026'}', '${cond}');">
                   👤 ${cond} ✏️
                 </button>
               </div>
@@ -1104,21 +1651,36 @@
           `;
         }).join('');
 
-        if (selectedDate && data.points && data.points.length > 0) {
-          drawCleanDayRoute(data.selected_day, data.points, data.km_percorrido || 0);
+        if (data.points && data.points.length > 0) {
+          activeTripReportData = {
+            dia: data.selected_day,
+            placa: data.selected_placa,
+            condutor: data.selected_driver,
+            km: data.km_percorrido,
+            stats: data.stats || {},
+            points: data.points
+          };
+          drawCleanDayRoute(data.selected_day, data.points, data.km_percorrido || 0, data.selected_placa, data.selected_driver);
+        } else {
+          clearRouteView();
         }
       } catch (e) {
-        box.innerHTML = '<div style="color:#ef4444;">Erro ao carregar histórico.</div>';
+        box.innerHTML = '<div style="color:#ef4444; padding:10px;">Falha de conexão com a telemetria.</div>';
       }
     }
 
-    async function drawCleanDayRoute(dia, pts, kmTotal) {
+    async function loadHistoryDays(selectedDate = '') {
+      applyHistoryFilters(selectedDate);
+    }
+
+    async function drawCleanDayRoute(dia, pts, kmTotal, targetPlaca = '', condutor = '') {
       routeLayerGroup.clearLayers();
       activeHistoryDay = dia;
-      activeHistoryDriver = (pts[0] && pts[0].condutor) ? pts[0].condutor : 'ANTONIO';
+      activeHistoryDriver = condutor || (pts[0] && pts[0].condutor) ? pts[0].condutor : 'ANTONIO';
 
       const first = pts[0];
       const last = pts[pts.length - 1];
+      const vPlaca = targetPlaca || (first && first.placa) || 'EMD-2026';
 
       // Se início e fim têm deslocamento real (> 200m), traça rota rodoviária limpa via OSRM para nunca rabiscar linhas cruzadas!
       let roadCoords = pts.map(p => [p.lat, p.lon]);
@@ -1131,19 +1693,19 @@
         }
       } catch (e) {}
 
-      L.polyline(roadCoords, { color: '#38bdf8', weight: 11, opacity: 0.25 }).addTo(routeLayerGroup);
+      L.polyline(roadCoords, { color: '#38bdf8', weight: 11, opacity: 0.28 }).addTo(routeLayerGroup);
       const mainPoly = L.polyline(roadCoords, { color: '#0284c7', weight: 5, opacity: 0.95 }).addTo(routeLayerGroup);
 
       // Marcador de Início e Chegada
       L.circleMarker([first.lat, first.lon], {
         radius: 8, fillColor: '#22c55e', color: '#ffffff', weight: 2.5, fillOpacity: 1
-      }).addTo(routeLayerGroup).bindPopup(`<b>🟢 Partida (${dia})</b><br>🕒 Hora: ${first.hora}<br>👤 Condutor: ${activeHistoryDriver}`);
+      }).addTo(routeLayerGroup).bindPopup(`<b>🟢 Partida (${dia})</b><br>🕒 Hora: ${first.hora}<br>🚗 Veículo: ${vPlaca}<br>👤 Condutor: ${activeHistoryDriver}`);
 
       L.circleMarker([last.lat, last.lon], {
         radius: 8, fillColor: '#ef4444', color: '#ffffff', weight: 2.5, fillOpacity: 1
-      }).addTo(routeLayerGroup).bindPopup(`<b>🏁 Ponto Final (${dia})</b><br>🕒 Hora: ${last.hora}<br>⚡ Vel: ${Math.round(last.vel)} km/h<br>👤 Condutor: ${activeHistoryDriver}`);
+      }).addTo(routeLayerGroup).bindPopup(`<b>🏁 Chegada (${dia})</b><br>🕒 Hora: ${last.hora}<br>⚡ Vel: ${Math.round(last.vel)} km/h<br>🚗 Veículo: ${vPlaca}<br>👤 Condutor: ${activeHistoryDriver}`);
 
-      // Pontos intermediários discretos e clicáveis (apenas se o gestor quiser clicar em um ponto específico)
+      // Pontos intermediários discretos e clicáveis
       const step = Math.max(1, Math.floor(pts.length / 20));
       pts.forEach((pt, idx) => {
         if (idx === 0 || idx === pts.length - 1 || idx % step !== 0) return;
@@ -1151,10 +1713,11 @@
           radius: 5, fillColor: '#38bdf8', color: '#0f172a', weight: 1.5, fillOpacity: 0.9
         }).addTo(routeLayerGroup).bindPopup(`
           <div style="font-family:sans-serif;">
-            <b>📍 Registro de Passagem</b><br>
+            <b>📍 Ponto de Telemetria</b><br>
             🕒 Horário: <b>${pt.hora}</b><br>
             ⚡ Velocidade: <b>${Math.round(pt.vel)} km/h</b><br>
-            👤 Condutor: <b>${pt.condutor}</b>
+            🚗 Veículo: <b>${pt.placa || vPlaca}</b><br>
+            👤 Condutor: <b>${pt.condutor || activeHistoryDriver}</b>
           </div>
         `);
       });
@@ -1162,9 +1725,65 @@
       map.fitBounds(mainPoly.getBounds(), { padding: [60, 60], maxZoom: 16 });
 
       document.getElementById('route-info-banner').style.display = 'block';
-      document.getElementById('banner-day-lbl').textContent = dia;
+      document.getElementById('banner-day-lbl').textContent = `${vPlaca} • ${dia}`;
       document.getElementById('banner-km-lbl').textContent = kmTotal > 0 ? `• ${kmTotal} km` : '';
       document.getElementById('banner-driver-lbl').textContent = activeHistoryDriver;
+    }
+
+    function openTripReportModal() {
+      if (!activeTripReportData) return;
+      const d = activeTripReportData;
+      const st = d.stats || {};
+      const container = document.getElementById('trip-report-content');
+
+      container.innerHTML = `
+        <div style="background:#060b16; border:1px solid #1e293b; border-radius:10px; padding:12px; margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            ${getMercosulPlateHtml(d.placa, true)}
+            <span style="font-size:14px; font-weight:900; color:#38bdf8;">📅 ${d.dia}</span>
+          </div>
+          <div style="font-size:13px; font-weight:800; color:#4ade80;">👤 Condutor Responsável: ${d.condutor}</div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+          <div style="background:#060b16; border:1px solid #1e293b; border-radius:8px; padding:8px 10px;">
+            <div style="font-size:10px; color:#94a3b8; font-weight:800; text-transform:uppercase;">Distância Total</div>
+            <div style="font-size:16px; font-weight:900; color:#f8fafc;">${d.km || 0} km</div>
+          </div>
+          <div style="background:#060b16; border:1px solid #1e293b; border-radius:8px; padding:8px 10px;">
+            <div style="font-size:10px; color:#94a3b8; font-weight:800; text-transform:uppercase;">Velocidade Máxima</div>
+            <div style="font-size:16px; font-weight:900; color:#38bdf8;">${st.vel_max || 0} km/h</div>
+          </div>
+          <div style="background:#060b16; border:1px solid #1e293b; border-radius:8px; padding:8px 10px;">
+            <div style="font-size:10px; color:#94a3b8; font-weight:800; text-transform:uppercase;">Partida</div>
+            <div style="font-size:13px; font-weight:900; color:#f8fafc;">${st.inicio || '--'}</div>
+          </div>
+          <div style="background:#060b16; border:1px solid #1e293b; border-radius:8px; padding:8px 10px;">
+            <div style="font-size:10px; color:#94a3b8; font-weight:800; text-transform:uppercase;">Chegada</div>
+            <div style="font-size:13px; font-weight:900; color:#f8fafc;">${st.fim || '--'}</div>
+          </div>
+        </div>
+
+        <div style="background:#060b16; border:1px solid #1e293b; border-radius:8px; padding:9px 11px;">
+          <div style="font-size:10px; color:#94a3b8; font-weight:800; text-transform:uppercase; margin-bottom:4px;">Pontos Gravados pelo GPS J16</div>
+          <div style="font-size:12px; color:#cbd5e1;">${(d.points || []).length} registros de telemetria 4G sem desvio.</div>
+        </div>
+      `;
+
+      document.getElementById('trip-report-modal').style.display = 'flex';
+    }
+
+    function closeTripReportModal() {
+      document.getElementById('trip-report-modal').style.display = 'none';
+    }
+
+    function copyTripReportText() {
+      if (!activeTripReportData) return;
+      const d = activeTripReportData;
+      const text = `=== RELATÓRIO DE VIAGEM eMED ===\nData: ${d.dia}\nVeículo: ${d.placa}\nCondutor: ${d.condutor}\nDistância: ${d.km} km\nVel. Máxima: ${d.stats?.vel_max || 0} km/h\nInício: ${d.stats?.inicio}\nFim: ${d.stats?.fim}\nStatus: Rota 100% Auditada e Homologada`;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('📋 Relatório copiado para a área de transferência!');
+      });
     }
 
     function clearRouteView() {
