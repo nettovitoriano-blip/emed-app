@@ -24634,6 +24634,12 @@ def criar_app() -> web.Application:
     except Exception as _ef:
         print(f"Aviso ao registrar portal fiscal nativo: {_ef}")
 
+    try:
+        from emed_views.gestao_mapa_telemetria import registrar_rotas_gestao_mapa_telemetria
+        registrar_rotas_gestao_mapa_telemetria(app)
+    except Exception as _em:
+        print(f"Aviso ao registrar modulo mapa e telemetria: {_em}")
+
     async def _on_startup_keepalive(_app):
         asyncio.create_task(_background_keep_alive_task())
     app.on_startup.append(_on_startup_keepalive)
@@ -24991,6 +24997,12 @@ async def iniciar_app_com_keepalive():
         registrar_rotas_portal_fiscal(app)
     except Exception as _ef:
         print(f"Aviso ao registrar portal fiscal nativo: {_ef}")
+
+    try:
+        from emed_views.gestao_mapa_telemetria import registrar_rotas_gestao_mapa_telemetria
+        registrar_rotas_gestao_mapa_telemetria(app)
+    except Exception as _em:
+        print(f"Aviso ao registrar modulo mapa e telemetria: {_em}")
 
     asyncio.create_task(_background_keep_alive_task())
 
