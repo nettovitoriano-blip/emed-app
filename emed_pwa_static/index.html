@@ -55054,7 +55054,7 @@
 
 
 
-          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;">v1.0.0</div></div>
+          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.0.7</div></div>
 
 
 
@@ -83524,7 +83524,21 @@
 
 
 
-      navigator.serviceWorker.register("/sw.js?v=1.0.5").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      async function forcarAtualizacaoPWA() {
+        try {
+          if (typeof mostrarToast === "function") mostrarToast("🔄 Verificando atualização...", "info");
+          if ("serviceWorker" in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (const r of regs) await r.update();
+          }
+          if ("caches" in window) {
+            const ks = await caches.keys();
+            for (const k of ks) await caches.delete(k);
+          }
+          window.location.reload(true);
+        } catch(e) { window.location.reload(); }
+      }
+      navigator.serviceWorker.register("/sw.js?v=1.0.7").then(reg => { if(reg) reg.update(); }).catch(() => {});
       let _swReloaded = false;
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         if (!_swReloaded && navigator.onLine && !STATE.osAberta) {
