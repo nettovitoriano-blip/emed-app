@@ -2666,6 +2666,12 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       }} else {{
         alert("Erro ao emitir: " + (res.msg || "Falha interna"));
       }}
+      }} catch (err) {{
+        alert("Erro de conexão ao emitir nota fiscal: " + (err && err.message ? err.message : err));
+      }} finally {{
+        if (btnSim) btnSim.disabled = false;
+        if (btnReal) btnReal.disabled = false;
+      }}
     }}
 
     async function cancelarNotaSelecionada() {{
@@ -2678,9 +2684,9 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       }}
 
       const conf = confirm(
-        "⚠️ ATENÇÃO: CONFIRMAÇÃO IRREVERSÍVEL DE CANCELAMENTO\n\n" +
-        "Você está prestes a CANCELAR esta Nota Fiscal no sistema e registrar a anulação fiscal.\n\n" +
-        "• Justificativa: " + just + "\n\n" +
+        "⚠️ ATENÇÃO: CONFIRMAÇÃO IRREVERSÍVEL DE CANCELAMENTO\\n\\n" +
+        "Você está prestes a CANCELAR esta Nota Fiscal no sistema e registrar a anulação fiscal.\\n\\n" +
+        "• Justificativa: " + just + "\\n\\n" +
         "Deseja realmente prosseguir com o cancelamento?"
       );
       if (!conf) return;
