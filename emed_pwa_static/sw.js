@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v1-2-1-otimizado-mobile';
+const CACHE_NAME = 'emed-pwa-v1-3-0-konica-fr-se00003';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

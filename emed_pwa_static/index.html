@@ -1402,7 +1402,7 @@
       <div class="brand-center" onclick="abrirDrawer()" style="cursor:pointer;display:flex;align-items:center;justify-content:flex-start;margin-right:auto;" title="Abrir Menu">
         <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
           <img src="/api/logo-circle" alt="eMED" class="brand-logo-img" onerror="this.src='/api/logo'" />
-          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.2.0</div></div>
+          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.3.0</div></div>
         </div>
       </div>
       <!-- DIREITA: BOTÃO DE SINCRONIZAR E INSTALAR PWA -->
@@ -3127,7 +3127,7 @@
           window.location.reload(true);
         } catch(e) { window.location.reload(); }
       }
-      navigator.serviceWorker.register("/sw.js?v=1.2.0").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=1.3.0").then(reg => { if(reg) reg.update(); }).catch(() => {});
       let _swReloaded = false;
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         if (!_swReloaded && navigator.onLine && !STATE.osAberta) {
@@ -14396,6 +14396,9 @@ ${linkProp}`;
               <button type="button" id="btnTermoAceiteInstalacao" class="btn btn-xs btn-outline" onclick="abrirModalTermoAceiteInstalacao('${esc(os.id)}')" style="display:none;border-color:#16a34a;color:#16a34a;font-weight:800;background:#f0fdf4;padding:3px 10px;border-radius:6px;" title="Termo Oficial de Aceite e Entrega Técnica de Instalação">
                 📜 Termo de Aceite & Entrega
               </button>
+              <button type="button" id="btnKonicaRxInstalacao" class="btn btn-xs btn-outline" onclick="abrirModalKonicaRxInstalacao('${esc(os.id)}')" style="display:none;border-color:#0284c7;color:#0369a1;font-weight:800;background:#e0f2fe;padding:3px 10px;border-radius:6px;" title="Relatório Completo de Instalação Raios X Konica Minolta (FR_SE00003_03)">
+                📋 Relatório Konica RX (FR_SE00003)
+              </button>
             </div>
             <div style="display:flex;gap:6px;">
               <button type="button" class="btn btn-outline btn-sm" onclick="adicionarItemChecklistModular()" style="border-color:#0284c7;color:#0284c7;font-weight:700;">➕ Adicionar Ponto</button>
@@ -14691,6 +14694,10 @@ ${linkProp}`;
       const btnTermo = document.getElementById("btnTermoAceiteInstalacao");
       if (btnTermo) {
         btnTermo.style.display = tipoSrv.includes("INSTAL") ? "inline-flex" : "none";
+      }
+      const btnKonica = document.getElementById("btnKonicaRxInstalacao");
+      if (btnKonica) {
+        btnKonica.style.display = tipoSrv.includes("INSTAL") ? "inline-flex" : "none";
       }
       const containerModulos = document.getElementById("containerModulosPreventiva");
       if (containerModulos) {
@@ -19196,6 +19203,212 @@ async function abrirPainelPMPAnual() {
       const urlWa = `https://api.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(texto)}`;
       window.open(urlWa, "_blank");
     }
+    let _konicaCtx = { osId: null, dados: {}, schema: {}, aba: "ITENS" };
+
+    async function abrirModalKonicaRxInstalacao(osId) {
+      mostrarToast("⏳ Carregando Relatório Konica FR_SE00003_03...");
+      const res = await apiGet(`/api/instalacao/konica-rx/${encodeURIComponent(osId)}`);
+      if (!res || !res.ok) {
+        mostrarToast("❌ Erro ao carregar formulário Konica: " + (res?.msg || "Falha de conexão"));
+        return;
+      }
+      _konicaCtx = {
+        osId: String(osId),
+        dados: res.dados || {},
+        schema: res.schema || {},
+        aba: "ITENS"
+      };
+      ["series","checks","medicoes","instrumentos","fontes","prep_aq","aq_tp16","aq_tp28","cal_tp16","ap_tp16"].forEach(k => {
+        if (!_konicaCtx.dados[k]) _konicaCtx.dados[k] = {};
+      });
+      renderModalKonicaRx();
+    }
+
+    function _konicaSetTab(aba) {
+      _konicaCtx.aba = aba;
+      renderModalKonicaRx();
+    }
+
+    function _konicaMarcarBloco(blocoId, valor) {
+      const bloco = (_konicaCtx.schema.blocos_checklist || []).find(b => b.id === blocoId);
+      if (!bloco) return;
+      bloco.itens.forEach(it => { _konicaCtx.dados.checks[it.id] = valor; });
+      renderModalKonicaRx();
+    }
+
+    function renderModalKonicaRx() {
+      let modal = document.getElementById("modalKonicaRxInstalacao");
+      if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "modalKonicaRxInstalacao";
+        modal.style = "position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,0.8);display:flex;align-items:center;justify-content:center;padding:10px;overflow-y:auto;";
+        document.body.appendChild(modal);
+      }
+      const d = _konicaCtx.dados;
+      const sc = _konicaCtx.schema;
+      const aba = _konicaCtx.aba;
+
+      const tabBtn = (id, lbl) => `<button type="button" onclick="_konicaSetTab('${id}')" class="btn btn-sm ${aba===id?'btn-primary':'btn-outline'}" style="font-size:11.5px;padding:6px 10px;white-space:nowrap;">${lbl}</button>`;
+
+      let corpo = "";
+      if (aba === "ITENS") {
+        const modelos = ["Maximus","AeroDR Maximus","Maximus ECO","Altus","Altus DR"];
+        const rowsItens = (sc.itens_embalagem || []).map(it => `
+          <tr>
+            <td style="padding:5px;border-bottom:1px solid #e2e8f0;font-size:11.5px;">${esc(it.label)}</td>
+            <td style="padding:4px;border-bottom:1px solid #e2e8f0;width:170px;">
+              <input class="input" style="padding:4px 8px;font-size:12px;" value="${esc(d.series[it.id]||'')}" placeholder="Nº Série / N/A" oninput="_konicaCtx.dados.series['${it.id}']=this.value" />
+            </td>
+          </tr>`).join("");
+        corpo = `
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:10px;font-size:12px;">
+            <div><label style="font-weight:700;">Modelo</label><select class="input" onchange="_konicaCtx.dados.modelo=this.value">${modelos.map(m=>`<option value="${m}" ${d.modelo===m?'selected':''}>${m}</option>`).join("")}</select></div>
+            <div><label style="font-weight:700;">Gerador kV</label><select class="input" onchange="_konicaCtx.dados.gerador_kv_tipo=this.value">${["150kV","125kV","N/A"].map(v=>`<option value="${v}" ${d.gerador_kv_tipo===v?'selected':''}>${v}</option>`).join("")}</select></div>
+            <div><label style="font-weight:700;">Gerador kW</label><select class="input" onchange="_konicaCtx.dados.gerador_kw_tipo=this.value">${["54kW","64kW","N/A"].map(v=>`<option value="${v}" ${d.gerador_kw_tipo===v?'selected':''}>${v}</option>`).join("")}</select></div>
+            <div><label style="font-weight:700;">Grade Fixa</label><select class="input" onchange="_konicaCtx.dados.grade_tipo=this.value">${["103L","152L","200L","N/A"].map(v=>`<option value="${v}" ${d.grade_tipo===v?'selected':''}>${v}</option>`).join("")}</select></div>
+            <div><label style="font-weight:700;">Tubo kV (Tabelas)</label><select class="input" onchange="_konicaCtx.dados.tubo_tipo=this.value">${["125kV","150kV"].map(v=>`<option value="${v}" ${d.tubo_tipo===v?'selected':''}>${v}</option>`).join("")}</select></div>
+          </div>
+          <div style="max-height:46vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;">
+            <table style="width:100%;border-collapse:collapse;">${rowsItens}</table>
+          </div>`;
+      } else if (aba === "CHECKS") {
+        corpo = (sc.blocos_checklist || []).map(b => {
+          const opOk = b.opcoes[0] || "OK";
+          const rows = (b.itens || []).map(it => {
+            const cur = d.checks[it.id] || "";
+            return `<tr>
+              <td style="padding:5px;border-bottom:1px solid #f1f5f9;font-size:11.5px;">${esc(it.label)}</td>
+              <td style="padding:4px;border-bottom:1px solid #f1f5f9;white-space:nowrap;text-align:right;">
+                ${b.opcoes.map(op => `<button type="button" onclick="_konicaCtx.dados.checks['${it.id}']='${op}';renderModalKonicaRx()" style="margin-left:3px;padding:3px 7px;border-radius:6px;font-size:10.5px;font-weight:800;cursor:pointer;border:1px solid ${cur===op?'#002b54':'#cbd5e1'};background:${cur===op?(op==='NÃO'||op==='NÃO OK'?'#dc2626':'#16a34a'):'#fff'};color:${cur===op?'#fff':'#334155'};">${op}</button>`).join("")}
+              </td>
+            </tr>`;
+          }).join("");
+          return `<div style="border:1px solid #cbd5e1;border-radius:10px;margin-bottom:10px;overflow:hidden;">
+            <div style="background:#f1f5f9;padding:7px 10px;display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;">
+              <b style="font-size:12px;color:#002b54;">${esc(b.titulo)}</b>
+              <button type="button" class="btn btn-xs btn-outline" onclick="_konicaMarcarBloco('${b.id}','${opOk}')">⚡ Marcar tudo ${opOk}</button>
+            </div>
+            <table style="width:100%;border-collapse:collapse;">${rows}</table>
+          </div>`;
+        }).join("");
+      } else if (aba === "REDE") {
+        const m = d.medicoes, inst = d.instrumentos;
+        const rowsF = (sc.fontes_pcb || []).map(f => {
+          const cur = d.fontes[f.id] || {};
+          return `<tr>
+            <td style="padding:5px;font-size:11.5px;"><b>${esc(f.label)}</b><div style="font-size:10px;color:#64748b;">${esc(f.criterio)}</div></td>
+            <td style="width:95px;"><input class="input" style="padding:4px 6px;font-size:12px;" value="${esc(cur.val||'')}" placeholder="V" oninput="if(!_konicaCtx.dados.fontes['${f.id}']){_konicaCtx.dados.fontes['${f.id}']={}};_konicaCtx.dados.fontes['${f.id}'].val=this.value" /></td>
+            <td style="width:95px;"><select class="input" style="padding:4px;font-size:11.5px;" onchange="if(!_konicaCtx.dados.fontes['${f.id}']){_konicaCtx.dados.fontes['${f.id}']={}};_konicaCtx.dados.fontes['${f.id}'].av=this.value">${["","OK","NOK","N/A"].map(o=>`<option value="${o}" ${cur.av===o?'selected':''}>${o||"-"}</option>`).join("")}</select></td>
+          </tr>`;
+        }).join("");
+        const rowsP = (sc.prep_aquecimento || []).map(p => {
+          const cur = d.prep_aq[p.id] || {};
+          return `<tr>
+            <td style="padding:5px;font-size:11.5px;"><b>${esc(p.label)}</b><div style="font-size:10px;color:#64748b;">${esc(p.criterio)}</div></td>
+            <td style="width:95px;"><input class="input" style="padding:4px 6px;font-size:12px;" value="${esc(cur.val||'')}" placeholder="mV" oninput="if(!_konicaCtx.dados.prep_aq['${p.id}']){_konicaCtx.dados.prep_aq['${p.id}']={}};_konicaCtx.dados.prep_aq['${p.id}'].val=this.value" /></td>
+            <td style="width:95px;"><select class="input" style="padding:4px;font-size:11.5px;" onchange="if(!_konicaCtx.dados.prep_aq['${p.id}']){_konicaCtx.dados.prep_aq['${p.id}']={}};_konicaCtx.dados.prep_aq['${p.id}'].av=this.value">${["","OK","NOK","N/A"].map(o=>`<option value="${o}" ${cur.av===o?'selected':''}>${o||"-"}</option>`).join("")}</select></td>
+          </tr>`;
+        }).join("");
+        corpo = `
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px;font-size:12px;">
+            <div><label style="font-weight:700;">Tensão R-S (V)</label><input class="input" value="${esc(m.rs_v||'')}" oninput="_konicaCtx.dados.medicoes.rs_v=this.value" /></div>
+            <div><label style="font-weight:700;">Tensão R-T (V)</label><input class="input" value="${esc(m.rt_v||'')}" oninput="_konicaCtx.dados.medicoes.rt_v=this.value" /></div>
+            <div><label style="font-weight:700;">Tensão S-T (V)</label><input class="input" value="${esc(m.st_v||'')}" oninput="_konicaCtx.dados.medicoes.st_v=this.value" /></div>
+            <div><label style="font-weight:700;">Rede Trifásica</label><select class="input" onchange="_konicaCtx.dados.rede_tipo=this.value">${["380V","220V"].map(v=>`<option value="${v}" ${d.rede_tipo===v?'selected':''}>${v}</option>`).join("")}</select></div>
+            <div><label style="font-weight:700;">Cabo Subestação->QDF</label><input class="input" value="${esc(m.bitola_sub||'')}" placeholder="Ex: 22mm" oninput="_konicaCtx.dados.medicoes.bitola_sub=this.value" /></div>
+            <div><label style="font-weight:700;">Cabo QDF->Equip</label><input class="input" value="${esc(m.bitola_eq||'')}" placeholder="Ex: 16mm" oninput="_konicaCtx.dados.medicoes.bitola_eq=this.value" /></div>
+            <div><label style="font-weight:700;">Terra Equip</label><input class="input" value="${esc(m.bitola_terra_eq||'')}" placeholder="Ex: 16mm" oninput="_konicaCtx.dados.medicoes.bitola_terra_eq=this.value" /></div>
+            <div><label style="font-weight:700;">Cabo Neutro</label><input class="input" value="${esc(m.bitola_neutro||'')}" placeholder="Ex: 2,5mm" oninput="_konicaCtx.dados.medicoes.bitola_neutro=this.value" /></div>
+            <div><label style="font-weight:700;">Multímetro (Marca/Mod)</label><input class="input" value="${esc(inst.multimetro||'')}" placeholder="Ex: FLUKE 15B+" oninput="_konicaCtx.dados.instrumentos.multimetro=this.value" /></div>
+            <div><label style="font-weight:700;">Validade Multímetro</label><input class="input" value="${esc(inst.multimetro_val||'')}" placeholder="DD/MM/AAAA" oninput="_konicaCtx.dados.instrumentos.multimetro_val=this.value" /></div>
+            <div><label style="font-weight:700;">Osciloscópio</label><input class="input" value="${esc(inst.osciloscopio||'')}" placeholder="Ex: FNIRSI 1014D" oninput="_konicaCtx.dados.instrumentos.osciloscopio=this.value" /></div>
+            <div><label style="font-weight:700;">Validade Osciloscópio</label><input class="input" value="${esc(inst.osciloscopio_val||'')}" placeholder="DD/MM/AAAA" oninput="_konicaCtx.dados.instrumentos.osciloscopio_val=this.value" /></div>
+          </div>
+          <div style="font-weight:800;font-size:12px;color:#002b54;margin:6px 0;">Fontes PCB01004</div>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;">${rowsF}</table>
+          <div style="font-weight:800;font-size:12px;color:#002b54;margin:10px 0 6px;">Preparação Aquecimento do Tubo</div>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;">${rowsP}</table>`;
+      } else if (aba === "TUBO") {
+        const mkLimStyle = (val, inf, sup) => {
+          const n = parseFloat(String(val || "").replace(",", "."));
+          if (isNaN(n)) return "";
+          return (n >= inf && n <= sup) ? "border-color:#16a34a;background:#f0fdf4;" : "border-color:#dc2626;background:#fef2f2;";
+        };
+        const rowsAq = (sc.aquecimento_tubo || []).map(r => `<tr>
+          <td style="padding:4px;font-size:11px;">${r.ma}mA / ${r.kv}kV (${r.tp16} | ${r.tp28})</td>
+          <td style="width:85px;"><input class="input" style="padding:3px 6px;font-size:11.5px;" value="${esc(d.aq_tp16[r.idx]||'')}" placeholder="TP16 V" oninput="_konicaCtx.dados.aq_tp16['${r.idx}']=this.value" /></td>
+          <td style="width:85px;"><input class="input" style="padding:3px 6px;font-size:11.5px;" value="${esc(d.aq_tp28[r.idx]||'')}" placeholder="TP28 V" oninput="_konicaCtx.dados.aq_tp28['${r.idx}']=this.value" /></td>
+        </tr>`).join("");
+        const rowsCal = (sc.calibracao_correntes || []).map(r => {
+          const v = d.cal_tp16[r.idx] || "";
+          return `<tr>
+            <td style="padding:4px;font-size:11px;"><b>${r.ma}mA</b> ${r.kv}kV ${r.ms}ms <span style="color:#64748b;">(${r.inf.toFixed(3)}–${r.sup.toFixed(3)})</span></td>
+            <td style="width:95px;"><input class="input" style="padding:3px 6px;font-size:11.5px;${mkLimStyle(v,r.inf,r.sup)}" value="${esc(v)}" placeholder="TP16 V" oninput="_konicaCtx.dados.cal_tp16['${r.idx}']=this.value;this.style.cssText='padding:3px 6px;font-size:11.5px;'+((parseFloat(this.value.replace(',','.'))>=${r.inf}&&parseFloat(this.value.replace(',','.'))<=${r.sup})?'border-color:#16a34a;background:#f0fdf4;':'border-color:#dc2626;background:#fef2f2;')" /></td>
+          </tr>`;
+        }).join("");
+        const rowsAp = (sc.alta_potencia || []).map(r => {
+          const v = d.ap_tp16[r.idx] || "";
+          return `<tr>
+            <td style="padding:4px;font-size:11px;"><b>${r.ma}mA</b> ${r.kv}kV ${r.ms}ms <span style="color:#64748b;">(${r.inf.toFixed(3)}–${r.sup.toFixed(3)})</span></td>
+            <td style="width:95px;"><input class="input" style="padding:3px 6px;font-size:11.5px;${mkLimStyle(v,r.inf,r.sup)}" value="${esc(v)}" placeholder="TP16 V" oninput="_konicaCtx.dados.ap_tp16['${r.idx}']=this.value;this.style.cssText='padding:3px 6px;font-size:11.5px;'+((parseFloat(this.value.replace(',','.'))>=${r.inf}&&parseFloat(this.value.replace(',','.'))<=${r.sup})?'border-color:#16a34a;background:#f0fdf4;':'border-color:#dc2626;background:#fef2f2;')" /></td>
+          </tr>`;
+        }).join("");
+        corpo = `
+          <div style="font-weight:800;font-size:12px;color:#002b54;margin-bottom:4px;">1. Aquecimento do Tubo (Pág. 7)</div>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;margin-bottom:10px;">${rowsAq}</table>
+          <div style="font-weight:800;font-size:12px;color:#002b54;margin-bottom:4px;">2. Calibração das Correntes (Págs. 7-8)</div>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;margin-bottom:10px;">${rowsCal}</table>
+          <div style="font-weight:800;font-size:12px;color:#002b54;margin-bottom:4px;">3. Técnicas de Alta Potência (Pág. 9)</div>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;">${rowsAp}</table>`;
+      } else {
+        corpo = `
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:12.5px;">
+            <div><label style="font-weight:700;">Relatório de Intercorrências (Pág. 10)</label><textarea class="input" rows="3" oninput="_konicaCtx.dados.intercorrencias=this.value" placeholder="Descreva eventuais ressalvas de sala, rede elétrica ou ocorrências...">${esc(d.intercorrencias||'')}</textarea></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div><label style="font-weight:700;">Responsável pelo Aceite</label><input class="input" value="${esc(d.aceite_nome||d.contato||'')}" oninput="_konicaCtx.dados.aceite_nome=this.value" /></div>
+              <div><label style="font-weight:700;">Data do Aceite</label><input class="input" value="${esc(d.aceite_data||'')}" placeholder="DD/MM/AAAA" oninput="_konicaCtx.dados.aceite_data=this.value" /></div>
+              <div><label style="font-weight:700;">Doc. Identificação (Termo Sala)</label><input class="input" value="${esc(d.aceite_sala_doc||'')}" placeholder="RG / CPF" oninput="_konicaCtx.dados.aceite_sala_doc=this.value" /></div>
+              <div><label style="font-weight:700;">Doc. Identificação (Termo Rede)</label><input class="input" value="${esc(d.aceite_rede_doc||'')}" placeholder="RG / CPF" oninput="_konicaCtx.dados.aceite_rede_doc=this.value" /></div>
+            </div>
+            <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px;font-size:11.5px;color:#0369a1;">
+              💡 A assinatura digital do cliente colhida na OS será aplicada automaticamente no relatório oficial de 12 páginas (Págs. 10, 11 e 12).
+            </div>
+          </div>`;
+      }
+
+      modal.innerHTML = `
+        <div style="background:#fff;border-radius:14px;max-width:780px;width:100%;padding:14px;max-height:94vh;display:flex;flex-direction:column;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div>
+              <b style="color:#002b54;font-size:14.5px;">📋 Relatório Instalação Konica RX (FR_SE00003_03) • OS #${esc(_konicaCtx.osId)}</b>
+              <div style="font-size:11px;color:#64748b;">${esc(d.cliente || '')}</div>
+            </div>
+            <button type="button" onclick="document.getElementById('modalKonicaRxInstalacao').style.display='none'" style="background:#ef4444;color:#fff;border:none;border-radius:999px;padding:4px 10px;font-weight:800;cursor:pointer;">✕</button>
+          </div>
+          <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;border-bottom:1px solid #e2e8f0;margin-bottom:10px;">
+            ${tabBtn("ITENS", "📦 Itens & Séries")}
+            ${tabBtn("CHECKS", "✅ Checklists (Págs 2-5)")}
+            ${tabBtn("REDE", "⚡ Rede & Fontes")}
+            ${tabBtn("TUBO", "☢️ Aquecimento & mA")}
+            ${tabBtn("TERMOS", "📜 Termos & PDF")}
+          </div>
+          <div style="flex:1;overflow-y:auto;padding-right:4px;">${corpo}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid #e2e8f0;padding-top:10px;margin-top:10px;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="window.open('/api/instalacao/konica-rx/imprimir/${encodeURIComponent(_konicaCtx.osId)}','_blank')">🖨️ Gerar PDF Oficial (12 Págs.)</button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="salvarFormularioKonicaRx()">💾 Salvar Relatório Konica</button>
+          </div>
+        </div>`;
+      modal.style.display = "flex";
+    }
+
+    async function salvarFormularioKonicaRx() {
+      const res = await apiPost(`/api/instalacao/konica-rx/${encodeURIComponent(_konicaCtx.osId)}`, {
+        dados: _konicaCtx.dados,
+        usuario: STATE.tecnicoAtual || STATE.usuarioNome || "TÉCNICO EMED"
+      });
+      mostrarToast(res?.msg || "Erro ao salvar formulário Konica", 4500);
+    }
+
     function abrirModalPreInstalacaoSala(osId) {
       const ordens = STATE.data?.ordens || [];
       const os = ordens.find(o => String(o.id) === String(osId)) || STATE.osAberta || {};
