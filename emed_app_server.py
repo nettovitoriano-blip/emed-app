@@ -6065,6 +6065,14 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
                     "preco_custo": p_unit,
 
+                    "preco_venda_tabela": round(limpar_float(r.get("preco_venda_tabela"), 0.0), 2),
+
+                    "raridade_peca": limpar_texto(r.get("raridade_peca"), "COMUM"),
+
+                    "preco_mercado_ref": round(limpar_float(r.get("preco_mercado_ref"), 0.0), 2),
+
+                    "data_pesquisa_preco": limpar_texto(r.get("data_pesquisa_preco"), ""),
+
 
 
                     "valor_total": v_tot,
@@ -24196,6 +24204,38 @@ async def api_protocolo_entrega_imprimir(request: web.Request) -> web.Response:
     return web.Response(text=html_out, content_type="text/html", charset="utf-8")
 
 
+async def api_estoque_precificacao_atualizar(request: web.Request) -> web.Response:
+    """Atualiza preco de custo, venda, raridade e referencia de mercado de uma peca do estoque."""
+    body = await request.json()
+    codigo = limpar_texto(body.get("codigo"), "").upper()
+    if not codigo:
+        return web.json_response({"ok": False, "msg": "Informe o código da peça."}, status=400)
+    raridade = limpar_texto(body.get("raridade_peca"), "COMUM").upper()
+    if raridade not in ("COMUM", "ESPECIFICA", "RARA"):
+        raridade = "COMUM"
+    custo = limpar_float(body.get("preco_custo"), 0.0)
+    venda = limpar_float(body.get("preco_venda_tabela"), 0.0)
+    mercado = limpar_float(body.get("preco_mercado_ref"), 0.0)
+    agora = obter_agora_brasil_str("%d/%m/%Y")
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE estoque_pecas
+            SET preco_custo = ?,
+                preco_unitario = ?,
+                preco_venda_tabela = ?,
+                raridade_peca = ?,
+                preco_mercado_ref = ?,
+                data_pesquisa_preco = ?
+            WHERE UPPER(codigo) = ? OR CAST(id AS TEXT) = ?
+        """, (custo, custo, venda, raridade, mercado, agora, codigo, codigo))
+        if cur.rowcount == 0:
+            return web.json_response({"ok": False, "msg": f"Peça {codigo} não encontrada."}, status=404)
+        conn.commit()
+    invalidar_cache_bootstrap()
+    return web.json_response({"ok": True, "msg": f"✅ Precificação da peça {codigo} atualizada!"})
+
+
 def criar_app() -> web.Application:
 
     garantir_schema_dispositivos(DB_NAME)
@@ -24693,6 +24733,7 @@ def criar_app() -> web.Application:
     app.router.add_get("/api/protocolo-entrega/listar", api_protocolo_entrega_listar)
     app.router.add_post("/api/protocolo-entrega/salvar", api_protocolo_entrega_salvar)
     app.router.add_get("/api/protocolo-entrega/imprimir/{id}", api_protocolo_entrega_imprimir)
+    app.router.add_post("/api/estoque/precificacao-atualizar", api_estoque_precificacao_atualizar)
     app.router.add_get("/apresentacao", lambda req: web.FileResponse(os.path.join(BASE_DIR, "Apresentacao_Sistema_EMED.html")))
 
 

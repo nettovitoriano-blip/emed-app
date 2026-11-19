@@ -2866,19 +2866,28 @@
         inpVal.value = precoSugerido;
         inpVal.dataset.lastCod = String(codPeca);
       }
+      const rar = String(item.raridade_peca || "COMUM").toUpperCase();
+      const rarBadge = rar === "RARA"
+        ? `<span style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:800;">🔴 PEÇA RARA / CRÍTICA</span>`
+        : (rar === "ESPECIFICA"
+          ? `<span style="background:#fffbeb;color:#b45309;border:1px solid #fde68a;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:800;">🟡 ESPECÍFICA IMAGEM</span>`
+          : `<span style="background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:800;">🟢 COMUM</span>`);
+      const alertaPrecoZero = (parseFloat(precoSugerido) <= 0)
+        ? `<div style="margin-top:6px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:6px 10px;font-size:11.5px;color:#b91c1c;font-weight:800;">⚠️ Item sem preço cadastrado no estoque! Informe manualmente o valor de venda antes de emitir a proposta.</div>`
+        : "";
       // CENÁRIO 1: SALDO TOTALMENTE SUFICIENTE
       if (saldo >= qtdSolicitada) {
         box.innerHTML = `
-          <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;">
+          <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;flex-wrap:wrap;">
             <div style="display:flex;align-items:center;gap:8px;">
               <span style="font-size:22px;">✅</span>
               <div>
-                <div style="font-weight:900;color:#15803d;font-size:13px;">ESTOQUE SUFICIENTE (${saldo} UNIDADE(S) DISPONÍVEL(IS))</div>
+                <div style="font-weight:900;color:#15803d;font-size:13px;">ESTOQUE SUFICIENTE (${saldo} UNIDADE(S) DISPONÍVEL(IS)) ${rarBadge}</div>
                 <div style="font-size:11.5px;color:#166534;">Você orçou <b>${qtdSolicitada} un</b> e o almoxarifado tem <b>${saldo} un</b> • Localização: ${esc(item.localizacao || 'Almoxarifado Central')}</div>
               </div>
             </div>
             <span class="badge concluido">Pronta Entrega</span>
-          </div>
+          </div>${alertaPrecoZero}
         `;
       }
       // CENÁRIO 2: SALDO PARCIAL (ORÇOU MAIS DO QUE TEM EM CASA)
