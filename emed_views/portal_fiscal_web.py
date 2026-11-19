@@ -141,9 +141,9 @@ async def api_fiscal_v2_dados(request: web.Request) -> web.Response:
         rows_hist = conn.execute(sql_h, tuple(params_h)).fetchall()
 
         # Peças disponíveis no almoxarifado (Estoque Físico & Estoque Fiscal)
-        cur_p = conn.execute("SELECT id, codigo, nome_peca, quantidade, COALESCE(saldo_fiscal, quantidade), preco_custo, unidade FROM estoque_pecas ORDER BY nome_peca ASC LIMIT 2000")
+        cur_p = conn.execute("SELECT id, codigo, nome_peca, quantidade, COALESCE(saldo_fiscal, quantidade), preco_custo, unidade, alerta_reajuste FROM estoque_pecas ORDER BY nome_peca ASC LIMIT 2000")
         rows_p = cur_p.fetchall()
-        pecas_almox = [{"id": rp[0], "codigo": rp[1] or "", "nome": rp[2] or "", "qtd": rp[3] or 0, "qtd_fiscal": float(rp[4] if rp[4] is not None else (rp[3] or 0)), "preco": float(rp[5] or 0.0), "unidade": rp[6] or "UN"} for rp in rows_p]
+        pecas_almox = [{"id": rp[0], "codigo": rp[1] or "", "nome": rp[2] or "", "qtd": rp[3] or 0, "qtd_fiscal": float(rp[4] if rp[4] is not None else (rp[3] or 0)), "preco": float(rp[5] or 0.0), "unidade": rp[6] or "UN", "alerta_reajuste": rp[7] or ""} for rp in rows_p]
 
         # Veículos da frota
         cur_v = conn.execute("SELECT placa, modelo FROM veiculos ORDER BY modelo ASC")
@@ -572,18 +572,23 @@ async def api_fiscal_recebidas_manifestar(request: web.Request) -> web.Response:
 
 
 async def api_fiscal_recebidas_dar_entrada_estoque(request: web.Request) -> web.Response:
-    """Dá entrada automática dos itens da nota de compra no inventário do almoxarifado."""
+    """Dá entrada automática dos itens da nota de compra no inventário do almoxarifado,
+    auto-cadastrando itens novos com todos os parâmetros fiscais e detectando reajustes de preço."""
     db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
     body = await request.json()
     nota_id = int(body.get("id", 0))
     usuario = str(body.get("usuario", "netto")).strip()
 
     with _get_db_connection(db_name) as conn:
-        row = conn.execute("SELECT numero_nf, filial, itens_resumo, status_estoque FROM notas_fiscais_recebidas WHERE id = ?", (nota_id,)).fetchone()
+        row = conn.execute("""
+            SELECT numero_nf, filial, itens_resumo, status_estoque, emitente_nome, emitente_cnpj
+            FROM notas_fiscais_recebidas
+            WHERE id = ?
+        """, (nota_id,)).fetchone()
         if not row:
             return web.json_response({"ok": False, "msg": "Nota fiscal não encontrada."}, status=404)
 
-        num_nf, filial, itens_raw, st_est = row
+        num_nf, filial, itens_raw, st_est, emitente_nome, emitente_cnpj = row
         if st_est == "DADO_ENTRADA":
             return web.json_response({"ok": False, "msg": "Esta nota já teve sua entrada realizada no estoque anteriormente."}, status=400)
 
@@ -601,31 +606,98 @@ async def api_fiscal_recebidas_dar_entrada_estoque(request: web.Request) -> web.
         data_mov = agora_dt.strftime("%Y-%m-%d")
         hora_mov = agora_dt.strftime("%H:%M:%S")
         itens_atualizados = 0
+        novos_cadastrados = []
+        reajustes_detectados = []
 
-        for item in itens:
+        for idx, item in enumerate(itens, start=1):
             cod = str(item.get("codigo", "")).strip()
             desc = str(item.get("descricao", "PEÇA HOSPITALAR")).strip()
             qtd = float(item.get("qtd", 1))
             preco = float(item.get("unitario", 0.0))
+            ncm = str(item.get("ncm", "9022.90.90")).strip()
+            unidade = str(item.get("unidade", "UN")).strip().upper() or "UN"
+            ean = str(item.get("ean", "")).strip()
 
-            cur_p = conn.execute("SELECT id, quantidade, preco_custo FROM estoque_pecas WHERE codigo = ? OR UPPER(nome_peca) = UPPER(?)", (cod, desc)).fetchone()
+            cur_p = conn.execute("""
+                SELECT id, quantidade, preco_custo, custo_medio, markup_percentual, preco_venda_tabela, nome_peca, codigo
+                FROM estoque_pecas
+                WHERE codigo = ? OR UPPER(TRIM(nome_peca)) = UPPER(TRIM(?))
+            """, (cod, desc)).fetchone()
+
             if cur_p:
-                p_id, p_qtd, p_custo = cur_p
-                nova_qtd = (p_qtd or 0) + qtd
+                p_id, p_qtd, p_custo, p_c_medio, p_markup, p_venda_tab, p_nome, p_cod = cur_p
+                p_qtd = float(p_qtd or 0.0)
+                p_custo = float(p_custo or 0.0)
+                p_markup = float(p_markup or 50.0)
+                nova_qtd = p_qtd + qtd
+
+                # Custo Médio Ponderado
+                if nova_qtd > 0:
+                    custo_base_antigo = p_custo if p_custo > 0 else preco
+                    novo_custo_medio = round(((p_qtd * custo_base_antigo) + (qtd * preco)) / nova_qtd, 2)
+                else:
+                    novo_custo_medio = preco
+
+                alerta_json = None
+                # Detecção de Reajuste por Inflação / Câmbio / Fornecedor
+                if preco > 0 and p_custo > 0 and preco > p_custo:
+                    var_pct = round(((preco - p_custo) / p_custo) * 100.0, 1)
+                    if var_pct >= 0.5:
+                        preco_venda_sugerido = round(preco * (1.0 + (p_markup / 100.0)), 2)
+                        alerta_dict = {
+                            "aumento_pct": var_pct,
+                            "custo_antigo": p_custo,
+                            "custo_novo": preco,
+                            "preco_venda_sugerido": preco_venda_sugerido,
+                            "nf": str(num_nf),
+                            "data": data_mov,
+                            "fornecedor": emitente_nome or "FORNECEDOR"
+                        }
+                        alerta_json = json.dumps(alerta_dict, ensure_ascii=False)
+                        reajustes_detectados.append(f"{desc}: +{var_pct}% (Custo subiu de R$ {p_custo:,.2f} para R$ {preco:,.2f} • Sugerido Venda: R$ {preco_venda_sugerido:,.2f})")
+
                 conn.execute("""
                     UPDATE estoque_pecas
                     SET quantidade = ?,
                         preco_custo = ?,
+                        custo_medio = ?,
+                        alerta_reajuste = COALESCE(?, alerta_reajuste),
                         saldo_fiscal = COALESCE(saldo_fiscal, 0) + ?
                     WHERE id = ?
-                """, (nova_qtd, preco if preco > 0 else p_custo, qtd, p_id))
+                """, (nova_qtd, preco if preco > 0 else p_custo, novo_custo_medio, alerta_json, qtd, p_id))
+                cod_item_mov = p_cod or cod
             else:
+                # AUTO-CADASTRO COMPLETO DA PEÇA COM TODAS AS DIRETRIZES FISCAIS
+                cod_final = cod if cod else f"PEC-{nota_id}-{idx:02d}"
+                markup_padrao = 50.0
+                preco_venda_tab = round(preco * (1.0 + (markup_padrao / 100.0)), 2)
+                preco_venda_min = round(preco * 1.3, 2)
+                ncm_final = ncm if ncm else "9022.90.90"
+
                 conn.execute("""
                     INSERT INTO estoque_pecas (
-                        codigo, nome_peca, quantidade, preco_custo, tipo_item,
-                        unidade, grupo_item, categoria, preco_unitario, saldo_fiscal
-                    ) VALUES (?, ?, ?, ?, 'PEÇA', 'UN', 'DIAGNÓSTICO POR IMAGEM', 'PEÇAS', ?, ?)
-                """, (cod or f"PEC-{nota_id}", desc, qtd, preco, preco * 1.4, qtd))
+                        codigo, nome_peca, quantidade, preco_custo, custo_medio,
+                        preco_unitario, preco_venda_tabela, preco_venda_minimo, markup_percentual,
+                        saldo_fiscal, ncm, cest, origem_mercadoria, cfop_padrao_venda,
+                        cfop_padrao_transferencia, csosn_icms, aliquota_icms,
+                        tipo_item, unidade, grupo_item, categoria, fabricante,
+                        filial_pertencente, ean_gtin
+                    ) VALUES (
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, '1300100', '0', '5102',
+                        '6152', '400', 0.0,
+                        'PEÇA', ?, 'DIAGNÓSTICO POR IMAGEM', 'PEÇA DE REPOSIÇÃO', ?,
+                        ?, ?
+                    )
+                """, (
+                    cod_final, desc, qtd, preco, preco,
+                    preco_venda_tab, preco_venda_tab, preco_venda_min, markup_padrao,
+                    qtd, ncm_final, unidade, emitente_nome or "FORNECEDOR SEFAZ",
+                    filial or "FILIAL_DF", ean
+                ))
+                cod_item_mov = cod_final
+                novos_cadastrados.append(f"{desc} (Cód: {cod_final} • Custo: R$ {preco:,.2f} • Sugerido: R$ {preco_venda_tab:,.2f})")
 
             conn.execute("""
                 INSERT INTO movimentacoes_estoque (
@@ -634,9 +706,9 @@ async def api_fiscal_recebidas_dar_entrada_estoque(request: web.Request) -> web.
                     saldo, custo_medio, numero_nf, documento, observacao
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, 'ENTRADA_FORNECEDOR', ?, 0, ?, ?, ?, ?, ?)
             """, (
-                filial, "ALMOXARIFADO CENTRAL", cod, desc,
+                filial or "FILIAL_DF", "ALMOXARIFADO CENTRAL", cod_item_mov, desc,
                 "PEÇAS", data_mov, hora_mov, qtd, qtd, preco,
-                str(num_nf), f"NF-e {num_nf}", f"Entrada automática via Radar DF-e SEFAZ por {usuario}"
+                str(num_nf), f"NF-e {num_nf}", f"Entrada automática via Radar DF-e SEFAZ por {usuario} ({emitente_nome or 'Fornecedor'})"
             ))
             itens_atualizados += 1
 
@@ -650,9 +722,136 @@ async def api_fiscal_recebidas_dar_entrada_estoque(request: web.Request) -> web.
         conn.commit()
 
     _registrar_log_fiscal("ENTRADA_ESTOQUE_DFE", f"Nota {num_nf} (ID #{nota_id}): {itens_atualizados} peças deram entrada no inventário por {usuario}", usuario)
+
+    msg = f"✅ Sucesso! {itens_atualizados} item(ns) da NF-e {num_nf} deram entrada no Almoxarifado da EMED."
+    if novos_cadastrados:
+        msg += f"\n\n✨ {len(novos_cadastrados)} nova(s) peça(s) foram CADASTRADAS AUTOMATICAMENTE no almoxarifado:\n" + "\n".join(f"• {x}" for x in novos_cadastrados)
+    if reajustes_detectados:
+        msg += f"\n\n🚨 REAJUSTE DE PREÇO POR INFLAÇÃO/CÂMBIO DETECTADO:\n" + "\n".join(f"• {x}" for x in reajustes_detectados) + "\n\nO novo preço de venda sugerido já está destacado no Inventário e na Ficha Fiscal para proteger a margem da empresa."
+
     return web.json_response({
         "ok": True,
-        "msg": f"✅ Sucesso! {itens_atualizados} item(ns) da Nota {num_nf} deram entrada automática no Almoxarifado da EMED."
+        "msg": msg,
+        "novos_cadastrados": len(novos_cadastrados),
+        "reajustes_detectados": len(reajustes_detectados)
+    })
+
+
+async def api_fiscal_recebidas_importar_xml(request: web.Request) -> web.Response:
+    """Importa e decodifica arquivos XML de NF-e recebidas de fornecedores (GE, Dunlee, Varex, etc.)
+    cadastrando-os no Radar DF-e para manifestação e auto-cadastro no almoxarifado."""
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    body = await request.json()
+    xml_conteudo = body.get("xml_conteudo", "")
+    filial = str(body.get("filial", "FILIAL_DF")).upper()
+    usuario = str(body.get("usuario", "netto")).strip()
+
+    if not xml_conteudo:
+        return web.json_response({"ok": False, "msg": "Conteúdo XML não fornecido."}, status=400)
+
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(xml_conteudo)
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": f"Erro ao decodificar estrutura do XML: {e}"}, status=400)
+
+    # Remover namespaces para facilitar busca
+    for elem in root.iter():
+        if "}" in elem.tag:
+            elem.tag = elem.tag.split("}", 1)[1]
+
+    # Extrair ide
+    ide = root.find(".//ide")
+    num_nf = ide.findtext("nNF", "") if ide is not None else ""
+    serie = ide.findtext("serie", "1") if ide is not None else "1"
+    dh_emi = (ide.findtext("dhEmi", "") or ide.findtext("dEmi", "")) if ide is not None else ""
+    if dh_emi and len(dh_emi) >= 10:
+        dh_emi = dh_emi[:10]
+
+    # Extrair emitente
+    emit = root.find(".//emit")
+    emit_cnpj = emit.findtext("CNPJ", "") if emit is not None else ""
+    emit_nome = emit.findtext("xNome", "FORNECEDOR PEÇAS HOSPITALARES") if emit is not None else ""
+    ender_emit = emit.find(".//enderEmit") if emit is not None else None
+    emit_uf = ender_emit.findtext("UF", "SP") if ender_emit is not None else "SP"
+
+    # Extrair destinatário
+    dest = root.find(".//dest")
+    dest_cnpj = dest.findtext("CNPJ", "") if dest is not None else ""
+
+    # Extrair total
+    total = root.find(".//total/ICMSTot")
+    v_nf = float(total.findtext("vNF", "0.0")) if total is not None else 0.0
+
+    # Extrair itens
+    itens = []
+    for det in root.findall(".//det"):
+        prod = det.find("prod")
+        if prod is None:
+            continue
+        c_prod = prod.findtext("cProd", "").strip()
+        x_prod = prod.findtext("xProd", "PEÇA HOSPITALAR").strip()
+        ncm = prod.findtext("NCM", "90229090").strip()
+        u_com = prod.findtext("uCom", "UN").strip()
+        q_com = float(prod.findtext("qCom", "1"))
+        v_un = float(prod.findtext("vUnCom", "0.0"))
+        v_prod = float(prod.findtext("vProd", "0.0"))
+        c_ean = prod.findtext("cEAN", "").strip()
+        if c_ean.upper() == "SEM GTIN":
+            c_ean = ""
+        itens.append({
+            "codigo": c_prod,
+            "descricao": x_prod,
+            "ncm": ncm,
+            "unidade": u_com,
+            "qtd": q_com,
+            "unitario": v_un,
+            "total": v_prod,
+            "ean": c_ean
+        })
+
+    if not num_nf:
+        return web.json_response({"ok": False, "msg": "Não foi possível identificar o número da NF-e no XML."}, status=400)
+
+    # Chave de acesso
+    inf_nfe = root.find(".//infNFe")
+    chave_acesso = inf_nfe.get("Id", "").replace("NFe", "").strip() if inf_nfe is not None else ""
+
+    with _get_db_connection(db_name) as conn:
+        # Verificar duplicidade por chave ou (numero_nf + emitente_cnpj)
+        ja_tem = conn.execute("""
+            SELECT id FROM notas_fiscais_recebidas
+            WHERE (chave_acesso = ? AND chave_acesso != '') OR (numero_nf = ? AND emitente_cnpj = ?)
+        """, (chave_acesso, num_nf, emit_cnpj)).fetchone()
+
+        if ja_tem:
+            return web.json_response({
+                "ok": True,
+                "msg": f"ℹ️ NF-e nº {num_nf} ({emit_nome}) já estava importada no Radar DF-e (ID #{ja_tem[0]}).",
+                "nota_id": ja_tem[0]
+            })
+
+        cur = conn.execute("""
+            INSERT INTO notas_fiscais_recebidas (
+                cnpj_destinatario, filial, chave_acesso, emitente_cnpj, emitente_nome,
+                emitente_uf, numero_nf, serie, tipo_documento, data_emissao,
+                valor_total, status_manifestacao, status_estoque, itens_resumo, observacoes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'NF-e MERCADORIA (PEÇAS)', ?, ?, 'CIENCIA', 'PENDENTE', ?, ?)
+        """, (
+            dest_cnpj or ("03.611.974/0002-80" if filial == "FILIAL_DF" else "03.611.974/0001-08"),
+            filial, chave_acesso, emit_cnpj, emit_nome,
+            emit_uf, num_nf, serie, dh_emi or datetime.now().strftime("%Y-%m-%d"),
+            v_nf, json.dumps(itens, ensure_ascii=False), f"Importado via XML por {usuario}"
+        ))
+        nova_id = cur.lastrowid
+        conn.commit()
+
+    _registrar_log_fiscal("XML_DFE_IMPORT", f"NF-e {num_nf} ({emit_nome}) de R$ {v_nf:,.2f} com {len(itens)} itens importada com sucesso.", usuario)
+    return web.json_response({
+        "ok": True,
+        "msg": f"✅ NF-e nº {num_nf} ({emit_nome}) importada com sucesso no Radar DF-e!\n\nForam identificados {len(itens)} itens/peças prontas para entrada no estoque.",
+        "nota_id": nova_id,
+        "itens": itens
     })
 
 
@@ -1033,7 +1232,7 @@ async def api_fiscal_v2_peca_salvar(request: web.Request) -> web.Response:
         "margem_avulso", "margem_avista", "margem_desestimulo", "preco_venda_tabela",
         "preco_venda_minimo", "markup_percentual", "fabricante", "modelo_compativel",
         "numero_serie", "lote_fabricacao", "localizacao", "unidade", "categoria",
-        "estoque_minimo", "filial_pertencente"
+        "estoque_minimo", "filial_pertencente", "alerta_reajuste"
     ]
     set_clauses = []
     vals = []
@@ -2159,9 +2358,13 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             <div style="font-size:12px;color:var(--muted);max-width:700px;">
               Consulta automática no Ambiente Nacional da SEFAZ / Receita Federal via WebService <b>NFeDistribuicaoDFe</b> utilizando o Certificado Digital A1. Permite auditar compras, peças para tomógrafos/raios-x, manifestar recebimento e proteger o CNPJ contra notas frias.
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <input type="file" id="inpXmlDFe" accept=".xml" multiple style="display:none;" onchange="uploadXmlDFe(event)" />
               <button type="button" class="btn btn-primary" onclick="sincronizarDFeSefaz()" style="width:auto;padding:8px 14px;">
                 🔄 Puxar Notas no Fisco (SEFAZ • A1)
+              </button>
+              <button type="button" class="btn" onclick="document.getElementById('inpXmlDFe').click()" style="background:#0284c7;color:#fff;width:auto;padding:8px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:bold;" title="Importar arquivos XML de NF-e recebidas de fornecedores">
+                📥 Importar XML de Fornecedor
               </button>
             </div>
           </div>
@@ -2344,8 +2547,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       document.getElementById("cfgCnpj").value = cfg.cnpj || "";
       document.getElementById("cfgSerie").value = cfg.serie_padrao || "";
       document.getElementById("cfgIm").value = cfg.inscricao_municipal || "";
-      document.getElementById("cfgAliq").value = cfg.aliquota_iss_padrao ?? (FILIAL_ATIVA === 'MATRIZ_CE' ? 5.0 : 2.0);
-      if (document.getElementById("nfAliqIss")) document.getElementById("nfAliqIss").value = cfg.aliquota_iss_padrao ?? (FILIAL_ATIVA === 'MATRIZ_CE' ? 5.0 : 2.0);
+      document.getElementById("cfgAliq").value = cfg.aliquota_iss_padrao ?? 5.0;
+      if (document.getElementById("nfAliqIss")) document.getElementById("nfAliqIss").value = cfg.aliquota_iss_padrao ?? 5.0;
       document.getElementById("cfgRazao").value = cfg.razao_social || "";
       document.getElementById("cfgFone").value = cfg.telefone || "";
       document.getElementById("cfgEnd").value = cfg.endereco || "";
@@ -3149,6 +3352,43 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         document.getElementById('fch_mg_desestimulo').value = p.margem_desestimulo ?? 180;
         document.getElementById('fch_preco_tabela').value = p.preco_venda_tabela || (Number(p.preco_custo || 0) * 1.5).toFixed(2);
         document.getElementById('fch_preco_minimo').value = p.preco_venda_minimo || (Number(p.preco_custo || 0) * 1.2).toFixed(2);
+
+        // Alerta de Reajuste por Inflação/Câmbio na Ficha Fiscal
+        const boxAlerta = document.getElementById('fch_box_alerta_reajuste');
+        if (boxAlerta) {{
+          if (p.alerta_reajuste) {{
+            try {{
+              const alr = typeof p.alerta_reajuste === 'string' ? JSON.parse(p.alerta_reajuste) : p.alerta_reajuste;
+              if (alr && alr.aumento_pct) {{
+                boxAlerta.style.display = 'block';
+                boxAlerta.innerHTML = `
+                  <div style="background:#451a03;border:1.5px solid #ea580c;padding:12px 16px;border-radius:8px;margin-bottom:14px;color:#ffedd5;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                      <div>
+                        <div style="font-weight:900;font-size:13px;color:#fdba74;">🚨 ALERTA DE REAJUSTE DE CUSTO (CÂMBIO / INFLAÇÃO): +${{alr.aumento_pct}}%</div>
+                        <div style="font-size:11.5px;color:#fed7aa;margin-top:3px;">
+                          Custo de aquisição subiu de <b>R$ ${{Number(alr.custo_antigo||0).toFixed(2)}}</b> para <b>R$ ${{Number(alr.custo_novo||0).toFixed(2)}}</b> (NF-e nº ${{alr.nf || '-'}} em ${{alr.data || '-'}}).
+                        </div>
+                        <div style="font-size:12px;font-weight:800;color:#38bdf8;margin-top:4px;">
+                          Preço de Venda Sugerido: <b>R$ ${{Number(alr.preco_venda_sugerido||0).toFixed(2)}}</b> (preservando margem de lucro).
+                        </div>
+                      </div>
+                      <button type="button" class="btn" onclick="aplicarPrecoVendaSugerido(${{alr.preco_venda_sugerido}})" style="background:#ea580c;color:#fff;font-weight:800;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;">
+                        ⚡ Aplicar Preço Sugerido
+                      </button>
+                    </div>
+                  </div>
+                `;
+              }} else {{
+                boxAlerta.style.display = 'none';
+              }}
+            }} catch(e) {{
+              boxAlerta.style.display = 'none';
+            }}
+          }} else {{
+            boxAlerta.style.display = 'none';
+          }}
+        }}
       }} catch (err) {{
         alert('Erro ao comunicar com o servidor: ' + err.message);
         fecharModalFichaFiscal();
@@ -3166,6 +3406,19 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       const precoMin = custo * 1.2;
       document.getElementById('fch_preco_tabela').value = precoSug.toFixed(2);
       document.getElementById('fch_preco_minimo').value = precoMin.toFixed(2);
+    }}
+
+    function aplicarPrecoVendaSugerido(precoSugerido) {{
+      const sug = parseFloat(precoSugerido || 0);
+      if (sug <= 0) return;
+      document.getElementById('fch_preco_tabela').value = sug.toFixed(2);
+      document.getElementById('fch_preco_minimo').value = (sug * 0.85).toFixed(2);
+      const custo = parseFloat(document.getElementById('fch_custo').value || 0);
+      if (custo > 0) {{
+        const mg = ((sug - custo) / custo) * 100;
+        document.getElementById('fch_mg_avulso').value = mg.toFixed(1);
+      }}
+      alert(`✅ Preço de venda sugerido de R$ ${{sug.toFixed(2)}} aplicado na ficha! Clique em "Salvar Parâmetros" para persistir.`);
     }}
 
     async function salvarFichaFiscalPeca() {{
@@ -3286,13 +3539,23 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           const corDiff = Math.abs(diff) < 0.001 ? '#34d399' : (diff > 0 ? '#60a5fa' : '#f87171');
           const txtDiff = diff > 0 ? `+${{diff.toFixed(1)}}` : diff.toFixed(1);
 
+          let badgeReajuste = '';
+          if (p.alerta_reajuste) {{
+            try {{
+              const alr = typeof p.alerta_reajuste === 'string' ? JSON.parse(p.alerta_reajuste) : p.alerta_reajuste;
+              if (alr && alr.aumento_pct) {{
+                badgeReajuste = `<span class="badge" style="background:#7c2d12;color:#fdba74;border:1px solid #f97316;font-size:10px;margin-left:6px;cursor:pointer;" onclick="abrirModalFichaFiscalPeca(${{p.id}})" title="Custo subiu +${{alr.aumento_pct}}% na NF-e ${{alr.nf || ''}}. Clique para ajustar preço de venda!">🚨 Reajuste Sugerido: +${{alr.aumento_pct}}%</span>`;
+              }}
+            }} catch(e) {{}}
+          }}
+
           return `
             <tr id="linhaInv_${{p.id}}">
               <td><b>${{p.codigo || '-'}}</b></td>
               <td>
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
                   <div>
-                    <div style="font-weight:700;color:#fff;">${{p.nome}}</div>
+                    <div style="font-weight:700;color:#fff;display:flex;align-items:center;flex-wrap:wrap;">${{p.nome}} ${{badgeReajuste}}</div>
                     <div style="font-size:11px;color:#94a3b8;">Custo: R$ ${{Number(p.preco||0).toFixed(2)}} • Un: ${{p.unidade || 'UN'}}</div>
                   </div>
                   <button type="button" onclick="abrirModalFichaFiscalPeca(${{p.id}})" class="btn btn-outline" style="padding:2px 8px;font-size:10.5px;font-weight:800;color:#38bdf8;border-color:#0284c7;white-space:nowrap;" title="Configurar Impostos (NCM, CEST, ICMS) e Precificação">⚙️ Fiscal</button>
@@ -3638,6 +3901,44 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       }}
     }}
 
+    async function uploadXmlDFe(event) {{
+      const files = event.target.files;
+      if (!files || !files.length) return;
+      let sucesso = 0;
+      let total = files.length;
+      for (let i = 0; i < files.length; i++) {{
+        const file = files[i];
+        const reader = new FileReader();
+        await new Promise((resolve) => {{
+          reader.onload = async (e) => {{
+            const xmlText = e.target.result;
+            try {{
+              const res = await fetch("/api/fiscal/recebidas/importar-xml", {{
+                method: "POST",
+                headers: {{"Content-Type": "application/json"}},
+                body: JSON.stringify({{
+                  xml_conteudo: xmlText,
+                  filial: FILIAL_ATIVA,
+                  usuario: USUARIO_FISCAL?.username || "netto"
+                }})
+              }}).then(r => r.json());
+              if (res.ok) sucesso++;
+              if (total === 1) alert(res.msg);
+            }} catch (err) {{
+              console.error(err);
+            }}
+            resolve();
+          }};
+          reader.readAsText(file);
+        }});
+      }}
+      if (total > 1) {{
+        alert(`✅ Processamento concluído: ${{sucesso}} de ${{total}} arquivo(s) XML importados no Radar DF-e com sucesso!`);
+      }}
+      event.target.value = "";
+      carregarNotasRecebidasDFe();
+    }}
+
     async function manifestarNotaDFe(id, tipo) {{
       if (tipo === "DESCONHECER") {{
         const conf = confirm(
@@ -3768,6 +4069,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       </div>
 
       <input type="hidden" id="fch_id" />
+      <div id="fch_box_alerta_reajuste" style="display:none;margin-bottom:14px;"></div>
 
       <!-- ABA 1: IDENTIFICAÇÃO & ENGENHARIA CLÍNICA (RDC 611) -->
       <div id="tabContent_ident">
@@ -4002,3 +4304,4 @@ def registrar_rotas_portal_fiscal(app: web.Application) -> None:
     app.router.add_post("/api/fiscal/recebidas/consultar-sefaz", api_fiscal_recebidas_consultar_sefaz)
     app.router.add_post("/api/fiscal/recebidas/manifestar", api_fiscal_recebidas_manifestar)
     app.router.add_post("/api/fiscal/recebidas/dar-entrada-estoque", api_fiscal_recebidas_dar_entrada_estoque)
+    app.router.add_post("/api/fiscal/recebidas/importar-xml", api_fiscal_recebidas_importar_xml)
