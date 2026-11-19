@@ -749,12 +749,6 @@ from emed_services.hospital_autorizacao import (
     registrar_credenciamento_os
 
 )
-from emed_views.instalacao_konica_rx import (
-    carregar_dados_konica_rx,
-    salvar_dados_konica_rx,
-    obter_schema_konica_rx,
-    gerar_html_konica_rx_fr_se00003,
-)
 
 from emed_services.triagem_pos_atendimento import (
 
@@ -3680,6 +3674,7 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/api/imprimir/")
         or path == "/api/ferramentas/etiquetas-qr"
         or path == "/api/lab/etiquetas-qr"
+        or path == "/apresentacao"
         or path.startswith("/lab/r/")
         or path.startswith("/proposta/")
         or path == "/api/proposta/responder"
@@ -17171,36 +17166,6 @@ async def api_imprimir_termo_aceite_instalacao(request: web.Request) -> web.Resp
         return web.Response(text=f"Erro ao gerar Termo de Aceite: {e}", status=500)
 
 
-async def api_instalacao_konica_rx_get(request: web.Request) -> web.Response:
-    """Retorna os dados e o schema oficial FR_SE00003_03 de instalacao Konica Minolta para a OS."""
-    os_id = str(request.match_info.get("os_id", "")).strip()
-    with get_db_connection(DB_NAME) as conn:
-        dados = carregar_dados_konica_rx(conn, os_id)
-    return web.json_response({"ok": True, "os_id": os_id, "dados": dados, "schema": obter_schema_konica_rx()})
-
-
-async def api_instalacao_konica_rx_post(request: web.Request) -> web.Response:
-    """Salva o formulario completo FR_SE00003_03 da OS."""
-    os_id = str(request.match_info.get("os_id", "")).strip()
-    body = await request.json()
-    dados = body.get("dados") if isinstance(body, dict) and "dados" in body else body
-    usuario = limpar_texto(body.get("usuario") if isinstance(body, dict) else "", "TÉCNICO EMED").upper()
-    agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
-    with get_db_connection(DB_NAME) as conn:
-        salvar_dados_konica_rx(conn, os_id, dados, agora, usuario)
-    return web.json_response({"ok": True, "msg": f"✅ Relatório Konica FR_SE00003_03 da OS #{os_id} salvo!", "atualizado_em": agora})
-
-
-async def api_instalacao_konica_rx_imprimir(request: web.Request) -> web.Response:
-    """Renderiza o Relatorio Oficial FR_SE00003_03 (12 paginas) em HTML A4 imprimivel."""
-    try:
-        os_id = str(request.match_info.get("os_id", "")).strip()
-        html_doc = gerar_html_konica_rx_fr_se00003(DB_NAME, os_id)
-        return web.Response(text=html_doc, content_type="text/html", charset="utf-8")
-    except Exception as e:
-        return web.Response(text=f"Erro ao gerar Relatório Konica FR_SE00003_03: {e}", status=500)
-
-
 
 
 
@@ -24558,6 +24523,7 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/lab/intervencao", api_lab_intervencao_salvar)
     app.router.add_get("/api/lab/etiquetas-qr", api_lab_etiquetas_qr)
     app.router.add_get("/lab/r/{token}", api_lab_publico_html)
+    app.router.add_get("/apresentacao", lambda req: web.FileResponse(os.path.join(BASE_DIR, "Apresentacao_Sistema_EMED.html")))
 
 
 
@@ -24726,9 +24692,6 @@ def criar_app() -> web.Application:
     app.router.add_get("/api/imprimir/{os_id}", api_imprimir_os)
 
     app.router.add_get("/api/instalacao/termo-aceite/{os_id}", api_imprimir_termo_aceite_instalacao)
-    app.router.add_get("/api/instalacao/konica-rx/imprimir/{os_id}", api_instalacao_konica_rx_imprimir)
-    app.router.add_get("/api/instalacao/konica-rx/{os_id}", api_instalacao_konica_rx_get)
-    app.router.add_post("/api/instalacao/konica-rx/{os_id}", api_instalacao_konica_rx_post)
     app.router.add_get("/api/comercial/oportunidades", api_comercial_oportunidades)
     app.router.add_post("/api/comercial/oportunidade/salvar", api_comercial_oportunidade_salvar)
     app.router.add_post("/api/comercial/oportunidade/status", api_comercial_oportunidade_status)

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apresentação Executiva — Sistema EMED v1.3.0</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #020617; color: #0f172a; overflow: hidden;
+    }
+    .deck {
+      width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 20px 20px 68px 20px;
+    }
+    .slide {
+      display: none; width: 100%; max-width: 1180px; height: 100%; max-height: 680px;
+      background: #ffffff; border-radius: 20px; overflow: hidden;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.55);
+      flex-direction: column; position: relative;
+      animation: fadeIn .25s ease;
+    }
+    .slide.active { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Cover slide */
+    .slide.cover {
+      background: linear-gradient(135deg, #001f3f 0%, #002b54 55%, #0369a1 100%);
+      color: #fff; justify-content: center; padding: 54px;
+    }
+    .cover-badge {
+      display: inline-block; background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(56, 189, 248, 0.5);
+      color: #7dd3fc; font-weight: 800; font-size: 13px; letter-spacing: 1px;
+      padding: 6px 14px; border-radius: 999px; margin-bottom: 18px; width: fit-content;
+    }
+    .cover h1 { font-size: 44px; margin: 0 0 14px; line-height: 1.12; font-weight: 900; }
+    .cover p { font-size: 19px; color: #cbd5e1; max-width: 780px; line-height: 1.5; margin: 0 0 28px; }
+    .cover-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 10px; }
+    .cover-kpi {
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 14px; padding: 14px 16px;
+    }
+    .cover-kpi b { display: block; font-size: 22px; color: #38bdf8; margin-bottom: 4px; }
+    .cover-kpi span { font-size: 12.5px; color: #e2e8f0; }
+
+    /* Standard slide header */
+    .s-hdr {
+      background: linear-gradient(90deg, #002b54 0%, #0369a1 100%);
+      color: #fff; padding: 18px 28px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .s-hdr-left .kicker { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: #7dd3fc; font-weight: 800; }
+    .s-hdr-left h2 { margin: 3px 0 0; font-size: 23px; font-weight: 900; }
+    .s-num {
+      background: rgba(255,255,255,0.16); padding: 6px 12px; border-radius: 999px;
+      font-size: 12px; font-weight: 800;
+    }
+
+    .s-body { flex: 1; padding: 24px 28px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; flex: 1; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .card {
+      background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px 18px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .card.accent { border-left: 5px solid #0284c7; background: #f0f9ff; }
+    .card.green { border-left: 5px solid #16a34a; background: #f0fdf4; }
+    .card.amber { border-left: 5px solid #d97706; background: #fffbeb; }
+    .card.purple { border-left: 5px solid #7c3aed; background: #faf5ff; }
+    .card h3 { margin: 0; font-size: 15.5px; color: #002b54; font-weight: 800; display: flex; align-items: center; gap: 6px; }
+    .card ul { margin: 0; padding-left: 18px; font-size: 13.5px; color: #334155; line-height: 1.55; }
+    .card li { margin-bottom: 4px; }
+    .pill {
+      display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 800;
+      background: #e0f2fe; color: #0369a1; width: fit-content;
+    }
+    .flow {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+      background: #f1f5f9; border-radius: 12px; padding: 12px 16px;
+    }
+    .flow-step {
+      flex: 1; min-width: 140px; background: #fff; border: 1px solid #cbd5e1; border-radius: 10px;
+      padding: 10px 12px; text-align: center; font-size: 12.5px; font-weight: 700; color: #0f172a;
+    }
+    .flow-arrow { font-size: 18px; font-weight: 900; color: #0284c7; }
+
+    .s-ftr {
+      padding: 10px 28px; background: #f8fafc; border-top: 1px solid #e2e8f0;
+      display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #64748b;
+    }
+
+    /* Bottom controls */
+    .controls {
+      position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(8px);
+      border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 999px;
+      padding: 6px 14px; display: flex; align-items: center; gap: 10px; color: #fff; z-index: 100;
+    }
+    .controls button {
+      background: #1e293b; color: #fff; border: 1px solid #334155; border-radius: 999px;
+      padding: 6px 14px; font-weight: 700; font-size: 12.5px; cursor: pointer;
+    }
+    .controls button:hover { background: #0284c7; border-color: #0284c7; }
+    .controls .counter { font-size: 12.5px; font-weight: 800; color: #7dd3fc; min-width: 58px; text-align: center; }
+
+    @media print {
+      @page { size: A4 landscape; margin: 6mm; }
+      html, body { background: #fff; overflow: visible; height: auto; }
+      .deck { display: block; padding: 0; height: auto; }
+      .slide { display: flex !important; height: 190mm; max-height: none; page-break-after: always; box-shadow: none; border: 1px solid #cbd5e1; margin-bottom: 10mm; }
+      .controls { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="deck">
+
+    <!-- SLIDE 1: CAPA -->
+    <section class="slide cover active">
+      <div class="cover-badge">EMED ELETROMEDICINA LTDA. • VERSÃO 1.3.0</div>
+      <h1>Sistema EMED Service<br/>Engenharia Clínica Digital 24/7</h1>
+      <p>Plataforma unificada para operação de campo offline, controle de almoxarifado com QR, rastreio de laboratório em tempo real, faturamento fiscal SEFAZ e formulários homologados.</p>
+      <div class="cover-kpis">
+        <div class="cover-kpi"><b>Offline-First</b><span>OS, fotos, GPS e assinaturas sem internet</span></div>
+        <div class="cover-kpi"><b>QR &amp; Patrimônio</b><span>Ferramentas e Laboratório com câmera</span></div>
+        <div class="cover-kpi"><b>Portal &amp; Proposta</b><span>Aprovação digital e rastreio ao vivo</span></div>
+        <div class="cover-kpi"><b>Fiscal Multi-Filial</b><span>Matriz CE + Filial DF e DF-e SEFAZ</span></div>
+      </div>
+    </section>
+
+    <!-- SLIDE 2: CAMPO & PWA OFFLINE -->
+    <section class="slide">
+      <div class="s-hdr">
+        <div class="s-hdr-left"><div class="kicker">Módulo 01 • Operação em Campo</div><h2>App Técnico PWA Offline-First &amp; Laudo A4</h2></div>
+        <div class="s-num">02 / 08</div>
+      </div>
+      <div class="s-body">
+        <div class="grid-2">
+          <div class="card accent">
+            <h3>📱 Execução Resiliente Offline</h3>
+            <ul>
+              <li>Abertura e preenchimento completo de OS mesmo em salas blindadas ou sem sinal 4G/5G.</li>
+              <li>Fila inteligente de sincronização automática ao reconectar.</li>
+              <li>Check-in e Check-out com horário exato e coordenadas GPS.</li>
+              <li>Corretor ortográfico técnico PT-BR com dicionário aprendível (<code>📖 +Dic</code>).</li>
+            </ul>
+          </div>
+          <div class="card green">
+            <h3>📄 Laudo Oficial A4 &amp; Evidências</h3>
+            <ul>
+              <li><b>Fotos ilimitadas</b> no Anexo I (todas as evidências registradas vão para o PDF).</li>
+              <li>Assinatura digital touch do cliente e do técnico responsável.</li>
+              <li>Checklists dinâmicos por modalidade: Corretiva, Preventiva (3 módulos), Aferição e Instalação.</li>
+              <li>Controle granular do que imprimir no laudo (Defeito, Diagnóstico, Serviços, Observações).</li>
+            </ul>
+          </div>
+        </div>
+        <div class="flow">
+          <div class="flow-step">1. Check-in GPS</div><span class="flow-arrow">→</span>
+          <div class="flow-step">2. Checklist POP</div><span class="flow-arrow">→</span>
+          <div class="flow-step">3. Fotos &amp; Peças</div><span class="flow-arrow">→</span>
+          <div class="flow-step">4. Assinatura Touch</div><span class="flow-arrow">→</span>
+          <div class="flow-step">5. Laudo PDF + WhatsApp</div>
+        </div>
+      </div>
+      <div class="s-ftr"><span>EMED Eletromedicina • Sistema EMED v1.3.0</span><span>Ativo em Produção</span></div>
+    </section>
+
+    <!-- SLIDE 3: PROPOSTA & PORTAL DO CLIENTE -->
+    <section class="slide">
+      <div class="s-hdr">
+        <div class="s-hdr-left"><div class="kicker">Módulo 02 • Relacionamento com o Hospital</div><h2>Proposta Comercial Digital &amp; Portal do Cliente</h2></div>
+        <div class="s-num">03 / 08</div>
+      </div>
+      <div class="s-body">
+        <div class="grid-2">
+          <div class="card accent">
+            <h3>📑 Proposta Timbrada Antifraude</h3>
+            <ul>
+              <li>Link exclusivo gerado por OS (<code>/proposta/{os_id}</code>) sem necessidade de senha para o hospital.</li>
+              <li>Assinatura digital exclusiva de aprovação comercial (não se confunde com a assinatura do laudo).</li>
+              <li>Triagem automática pós-aprovação: peça instalada, aguardar peça, diagnóstico/aluguel ou distribuição.</li>
+            </ul>
+          </div>
+          <div class="card purple">
+            <h3>🏥 Portal do Cliente &amp; Triagem</h3>
+            <ul>
+              <li>Consulta do parque instalado por hospital/unidade.</li>
+              <li>Acompanhamento de chamados em aberto e histórico de manutenções.</li>
+              <li>2ª via imediata de Laudos Técnicos em PDF e acompanhamento financeiro.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="s-ftr"><span>EMED Eletromedicina • Sistema EMED v1.3.0</span><span>Ativo em Produção</span></div>
+    </section>
+
+    <!-- SLIDE 4: ALMOXARIFADO & FERRAMENTAS QR -->
+    <section class="slide">
+      <div class="s-hdr">
+        <div class="s-hdr-left"><div class="kicker">Módulo 03 • Controle de Ativos &amp; Estoque</div><h2>Almoxarifado, Ferramentas &amp; Patrimônio QR (v1.1.0)</h2></div>
+        <div class="s-num">04 / 08</div>
+      </div>
+      <div class="s-body">
+        <div class="grid-3">
+          <div class="card accent">
+            <h3>🏷️ Patrimônio &amp; Mapa</h3>
+            <ul>
+              <li>Código único automático (<code>EMED-PAT-0001</code>) por ferramenta/instrumento.</li>
+              <li>Pop-up interativo com prateleira e localização exata no estoque.</li>
+              <li>Folha A4 de etiquetas QR pronta para impressão.</li>
+            </ul>
+          </div>
+          <div class="card green">
+            <h3>📷 Leitor pela Câmera</h3>
+            <ul>
+              <li>Leitura direta pela câmera traseira do celular (QR e Código de Barras).</li>
+              <li>Registro rápido de retirada para OS ou uso pessoal de trabalho.</li>
+              <li>Validação de calibração dos instrumentos em campo.</li>
+            </ul>
+          </div>
+          <div class="card amber">
+            <h3>🔄 Devolução em 2 Etapas</h3>
+            <ul>
+              <li>Técnico devolve na prateleira externa: item fica logo visível se outro técnico precisar com urgência.</li>
+              <li>Almoxarifado (Paulo) confere e dá baixa definitiva de reposição no estoque.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="s-ftr"><span>EMED Eletromedicina • Sistema EMED v1.3.0</span><span>Ativo em Produção</span></div>
+    </section>
+
+    <!-- SLIDE 5: LABORATÓRIO QR -->
+    <section class="slide">
+      <div class="s-hdr">
+        <div class="s-hdr-left"><div class="kicker">Módulo 04 • Bancada Interna &amp; Transparência</div><h2>Laboratório QR &amp; Linha do Tempo ao Vivo (v1.2.0)</h2></div>
+        <div class="s-num">05 / 08</div>
+      </div>
+      <div class="s-body">
+        <div class="grid-2">
+          <div class="card accent">
+            <h3>🔬 Controle na Bancada</h3>
+            <ul>
+              <li>Etiqueta QR única (<code>LAB-0001</code>) colada no equipamento/placa recolhida.</li>
+              <li>10 status granulares: <i>Recebido, Análise, Aguardando Peça / Instrumento / Material / Técnico / Aprovação, Em Testes, Pronto, Entregue</i>.</li>
+              <li>Alerta automático de dias sem atualização para evitar gargalos.</li>
+              <li>Separação entre <b>👁️ Nota visível ao cliente</b> e <b>🔒 Nota interna da engenharia</b>.</li>
+            </ul>
+          </div>
+          <div class="card green">
+            <h3>📲 Rastreio ao Vivo para o Cliente</h3>
+            <ul>
+              <li>Link público exclusivo (<code>/lab/r/{token}</code>) enviado em 1 clique no WhatsApp.</li>
+              <li>Cliente acompanha barra de progresso e histórico de intervenções sem precisar ligar cobrando.</li>
+              <li>Atendimento localiza na hora por cliente, nº série, OS ou código <code>LAB-*</code>.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="s-ftr"><span>EMED Eletromedicina • Sistema EMED v1.3.0</span><span>Ativo em Produção</span></div>
+    </section>
+
+    <!-- SLIDE 6: KONICA FR_SE00003_03 -->
+    <section class="slide">
+      <div class="s-hdr">
+        <div class="s-hdr-left"><div class="kicker">Módulo 05 • Formulário Homologado</div><h2>Instalação Raios X Konica — FR_SE00003_03 (v1.3.0)</h2></div>
+        <div class="s-num">06 / 08</div>
+      </div>
+      <div class="s-body">
+        <div class="grid-2">
+          <div class="card accent">
+            <h3>📋 Preenchimento Digital em 5 Abas</h3>
+            <ul>
+              <li><b>Itens &amp; Séries:</b> Modelo (Maximus/Altus/AeroDR), kV/kW e 22 itens com Nº de Série.</li>
+              <li><b>Checklists (Págs. 2–5 &amp; 10):</b> 10 blocos completos com botão rápido <i>Marcar tudo OK</i>.</li>
+              <li><b>Rede &amp; Fontes:</b> Tensões R-S/R-T/S-T, bitolas, instrumentos e fontes PCB01004.</li>
+              <li><b>Aquecimento &amp; mA:</b> Validação visual verde/vermelha automática dentro dos limites da tabela.</li>
+            </ul>
+          </div>
+          <div class="card green">
+            <h3>🖨️ PDF Oficial Completo (12 Págs.)</h3>
+            <ul>
+              <li>Geração instantânea do relatório completo no padrão Konica Minolta.</li>
+              <li>Inclui automaticamente o <b>Termo de Aceite Sala (RDC 611/50)</b> e <b>Termo de Aceite Rede Elétrica (NBR 5410/13534)</b>.</li>
+              <li>Reaproveita a assinatura digital já colhida na OS sem retrabalho.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="s-ftr"><span>EMED Eletromedicina • Sistema EMED v1.3.0</span><span>Ativo em Produção</span></div>
+    </section>
+
+    <!-- SLIDE 7: FISCAL, FINANCEIRO & FROTA -->
+    <section class="slide">
+      <div class="s-hdr">
+        <div class="s-hdr-left"><div class="kicker">Módulo 06 • Gestão Corporativa</div><h2>Portal Fiscal, Financeiro PIX, Frota &amp; Auditoria</h2></div>
+        <div class="s-num">07 / 08</div>
+      </div>
+      <div class="s-body">
+        <div class="grid-3">
+          <div class="card purple">
+            <h3>🧾 Portal Fiscal (`/fiscal`)</h3>
+            <ul>
+              <li>Emissão NFS-e Multi-Filial (Matriz CE e Filial DF).</li>
+              <li>Consulta DF-e SEFAZ (notas recebidas e manifestação).</li>
+              <li>Trava de duplicidade, quarentena e fechamento contábil mensal.</li>
+            </ul>
+          </div>
+          <div class="card green">
+            <h3>💠 Financeiro &amp; PIX</h3>
+            <ul>
+              <li>Contas a receber, DRE e terminal PIX oficial.</li>
+              <li>Remessas para diagnóstico (CFOP 5.915/6.915).</li>
+              <li>Cotações de frete e controle de peças em teste.</li>
+            </ul>
+          </div>
+          <div class="card accent">
+            <h3>🛰️ Frota &amp; Segurança</h3>
+            <ul>
+              <li>Telemetria GPS, troca de condutores e monitor DETRAN.</li>
+              <li>Vínculo único por aparelho (<code>emed_device_id</code>) com aprovação e auditoria.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="s-ftr"><span>EMED Eletromedicina • Sistema EMED v1.3.0</span><span>Ativo em Produção</span></div>
+    </section>
+
+    <!-- SLIDE 8: ROADMAP FUTURO -->
+    <section class="slide">
+      <div class="s-hdr">
+        <div class="s-hdr-left"><div class="kicker">Próximas Entregas • Roadmap</div><h2>Projetos de Implementação Futura</h2></div>
+        <div class="s-num">08 / 08</div>
+      </div>
+      <div class="s-body">
+        <div class="grid-2">
+          <div class="card accent">
+            <span class="pill">FASE 1 • CURTO PRAZO</span>
+            <h3>🔗 Integração EMED ↔ Effort (Konica)</h3>
+            <ul>
+              <li>Mapeamento do portal web Effort da Konica Minolta.</li>
+              <li>Preenchimento automático da OS no Effort com prévia de confirmação.</li>
+              <li>Upload automático do PDF <code>FR_SE00003_03</code> e evidências sem redigitação.</li>
+            </ul>
+          </div>
+          <div class="card purple">
+            <span class="pill">FASE 2 • EXPANSÃO TÉCNICA</span>
+            <h3>🏭 Novos Formulários por Fabricante</h3>
+            <ul>
+              <li>Replicar o padrão modular para <b>Lotus</b>, <b>Neusoft</b>, <b>GE</b> e <b>Shimadzu</b>.</li>
+              <li>Incluir demais modelos Konica (AeroDR / Digitalizadores).</li>
+              <li>Anexo de fotos nas intervenções do Laboratório QR e etiquetas térmicas 60×40mm.</li>
+            </ul>
+          </div>
+          <div class="card green">
+            <span class="pill">FASE 3 • INFRAESTRUTURA 24/7</span>
+            <h3>☁️ Migração Cloud (VPS Hostinger KVM 2)</h3>
+            <ul>
+              <li>Servidor dedicado Ubuntu 24.04 LTS no Brasil (São Paulo).</li>
+              <li>Eliminação da dependência do PC local, com backup automático do <code>emed.db</code>.</li>
+            </ul>
+          </div>
+          <div class="card amber">
+            <span class="pill">FASE 4 • AUTOMAÇÃO CLIENTE</span>
+            <h3>🤖 Notificações Automáticas WhatsApp</h3>
+            <ul>
+              <li>Avisos automáticos ao hospital quando equipamento no Lab mudar para <i>Aguardando Aprovação</i> ou <i>Pronto para Entrega</i>.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="s-ftr"><span>EMED Eletromedicina • Roadmap Estratégico</span><span>v1.3.0 → Próximas Versões</span></div>
+    </section>
+
+  </div>
+
+  <div class="controls">
+    <button type="button" onclick="nav(-1)">◀ Anterior</button>
+    <span class="counter" id="lblCounter">1 / 8</span>
+    <button type="button" onclick="nav(1)">Próximo ▶</button>
+    <button type="button" onclick="window.print()" style="background:#0284c7;border-color:#0284c7;">🖨️ PDF</button>
+  </div>
+
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    let idx = 0;
+    function show(n) {
+      idx = Math.max(0, Math.min(slides.length - 1, n));
+      slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+      document.getElementById('lblCounter').textContent = `${idx + 1} / ${slides.length}`;
+    }
+    function nav(d) { show(idx + d); }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); nav(1); }
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); nav(-1); }
+    });
+  </script>
+</body>
+</html>
