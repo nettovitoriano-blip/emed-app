@@ -3980,7 +3980,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         }}).then(r => r.json());
         alert(res.msg);
         carregarNotasRecebidasDFe();
-        carregarInventarioAlmoxarifado();
+        if (typeof carregarDadosFiscais === 'function') await carregarDadosFiscais();
+        if (typeof renderizarInventario === 'function') renderizarInventario();
       }} catch (e) {{
         alert("Erro ao dar entrada no estoque.");
       }}
