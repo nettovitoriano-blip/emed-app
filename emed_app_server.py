@@ -19588,30 +19588,27 @@ async def api_cliente_dossie_radiologico(request: web.Request) -> web.Response:
         # Equipamentos de diagnóstico por imagem do cliente
         if cliente:
             cur.execute("""
-                SELECT id, nome, categoria, numero_serie, identificador, status_calibracao, data_calibracao, validade_calibracao
-                FROM clientes_equipamentos
-                WHERE UPPER(cliente) LIKE ? AND (
-                    UPPER(categoria) LIKE '%IMAGEM%' OR UPPER(categoria) LIKE '%TOMOGRAF%' OR 
-                    UPPER(categoria) LIKE '%RAIO%' OR UPPER(categoria) LIKE '%MAMO%' OR 
-                    UPPER(categoria) LIKE '%ARCO%' OR UPPER(nome) LIKE '%TC%' OR 
-                    UPPER(nome) LIKE '%REVOLUTION%' OR UPPER(nome) LIKE '%RAIO%' OR 
-                    UPPER(nome) LIKE '%TOMO%' OR UPPER(nome) LIKE '%OPDIMA%' OR 
-                    UPPER(nome) LIKE '%SELENIA%'
-                )
+                SELECT id, nome, cliente_nome, categoria, numero_serie, identificador, status, cidade, estado
+                FROM equipamentos
+                WHERE UPPER(cliente_nome) LIKE ?
                 ORDER BY nome ASC
             """, (f"%{cliente.upper()}%",))
+            equipamentos_imagem = [dict(r) for r in cur.fetchall()]
+            if not equipamentos_imagem:
+                cur.execute("""
+                    SELECT DISTINCT id, equipamento as nome, cliente as cliente_nome, 'DIAGNÓSTICO POR IMAGEM' as categoria, '-' as numero_serie, status, cidade, estado
+                    FROM clientes_equipamentos
+                    WHERE UPPER(cliente) LIKE ? AND equipamento IS NOT NULL AND equipamento != ''
+                    ORDER BY equipamento ASC
+                """, (f"%{cliente.upper()}%",))
+                equipamentos_imagem = [dict(r) for r in cur.fetchall()]
         else:
             cur.execute("""
-                SELECT id, nome, categoria, numero_serie, identificador, status_calibracao, data_calibracao, validade_calibracao
-                FROM clientes_equipamentos
-                WHERE (
-                    UPPER(categoria) LIKE '%IMAGEM%' OR UPPER(categoria) LIKE '%TOMOGRAF%' OR 
-                    UPPER(categoria) LIKE '%RAIO%' OR UPPER(categoria) LIKE '%MAMO%' OR 
-                    UPPER(nome) LIKE '%TC%' OR UPPER(nome) LIKE '%REVOLUTION%'
-                )
+                SELECT id, nome, cliente_nome, categoria, numero_serie, identificador, status, cidade, estado
+                FROM equipamentos
                 ORDER BY nome ASC LIMIT 15
             """)
-        equipamentos_imagem = [dict(r) for r in cur.fetchall()]
+            equipamentos_imagem = [dict(r) for r in cur.fetchall()]
 
     metricas = {
         "status_rdc": "100% CONFORME (RDC 611/2022 & IN 90 a 97)",

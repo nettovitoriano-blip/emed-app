@@ -13386,6 +13386,17 @@ function renderMenuCliTriagem(box) {
     /********************************************************************
      * MENU 19 (CLIENTE 2): PORTAL DO CLIENTE (AUTOATENDIMENTO HOSPITALAR)
      ********************************************************************/
+    window.trocarAbaCliPortal = function(aba) {
+      STATE.abaCliPortal = aba;
+      renderizarTelaPrincipal();
+    };
+
+    window.trocarHospitalPortal = function(hosp) {
+      STATE.hospitalPortal = hosp;
+      STATE.dossieRadiologicoCache = null;
+      renderizarTelaPrincipal();
+    };
+
     async function carregarDossieRadiologicoSeNecessario(box) {
       if (!STATE.hospitalPortal) return;
       if (STATE.dossieRadiologicoCache && STATE.dossieRadiologicoCache.cliente === STATE.hospitalPortal) return;
@@ -13498,7 +13509,7 @@ function renderMenuCliTriagem(box) {
             
             <div style="min-width:240px;max-width:360px;flex:1;">
               <label class="field-label" style="color:#94a3b8;font-size:11px;font-weight:700;">UNIDADE HOSPITALAR / CLÍNICA:</label>
-              <select class="select" onchange="STATE.hospitalPortal=this.value;STATE.dossieRadiologicoCache=null;renderMenuCliPortal(box);" style="background:#1e293b;border:1px solid #0284c7;color:#fff;font-weight:800;font-size:13px;">
+              <select class="select" onchange="trocarHospitalPortal(this.value)" style="background:#1e293b;border:1px solid #0284c7;color:#fff;font-weight:800;font-size:13px;">
                 ${hospitais.map(h => `<option value="${esc(h)}" ${STATE.hospitalPortal===h?'selected':''}>🏥 ${esc(h)}</option>`).join("")}
               </select>
             </div>
@@ -13550,13 +13561,13 @@ function renderMenuCliTriagem(box) {
 
           <!-- ABAS DO PORTAL DO CLIENTE -->
           <div style="display:flex;gap:8px;border-bottom:1px solid #334155;padding-bottom:10px;margin-bottom:16px;overflow-x:auto;">
-            <button type="button" class="btn ${abaAtiva==='dossie'?'btn-primary':'btn-outline'}" onclick="STATE.abaCliPortal='dossie';renderMenuCliPortal(box);" style="font-size:12px;padding:7px 14px;font-weight:800;">
+            <button type="button" class="btn ${abaAtiva==='dossie'?'btn-primary':'btn-outline'}" onclick="trocarAbaCliPortal('dossie')" style="font-size:12px;padding:7px 14px;font-weight:800;">
               🛡️ Dossiê Radiológico RDC 611 (${laudos.length})
             </button>
-            <button type="button" class="btn ${abaAtiva==='chamados'?'btn-primary':'btn-outline'}" onclick="STATE.abaCliPortal='chamados';renderMenuCliPortal(box);" style="font-size:12px;padding:7px 14px;font-weight:800;">
+            <button type="button" class="btn ${abaAtiva==='chamados'?'btn-primary':'btn-outline'}" onclick="trocarAbaCliPortal('chamados')" style="font-size:12px;padding:7px 14px;font-weight:800;">
               📋 Chamados &amp; Laudos PDF (${doHospital.length})
             </button>
-            <button type="button" class="btn ${abaAtiva==='propostas'?'btn-primary':'btn-outline'}" onclick="STATE.abaCliPortal='propostas';renderMenuCliPortal(box);" style="font-size:12px;padding:7px 14px;font-weight:800;">
+            <button type="button" class="btn ${abaAtiva==='propostas'?'btn-primary':'btn-outline'}" onclick="trocarAbaCliPortal('propostas')" style="font-size:12px;padding:7px 14px;font-weight:800;">
               ✍️ Propostas Comerciais &amp; Orçamentos (${doHospital.filter(o => String(o.pendencias||'').toUpperCase().includes('PROPOSTA') || (o.status_proposta && o.status_proposta !== 'SEM_PROPOSTA')).length})
             </button>
           </div>
