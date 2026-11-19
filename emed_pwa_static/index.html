@@ -1402,7 +1402,7 @@
       <div class="brand-center" onclick="abrirDrawer()" style="cursor:pointer;display:flex;align-items:center;justify-content:flex-start;margin-right:auto;" title="Abrir Menu">
         <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
           <img src="/api/logo-circle" alt="eMED" class="brand-logo-img" onerror="this.src='/api/logo'" />
-          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.3.0</div></div>
+          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.4.0</div></div>
         </div>
       </div>
       <!-- DIREITA: BOTÃO DE SINCRONIZAR E INSTALAR PWA -->
@@ -3043,6 +3043,7 @@
         { id: "GES_CHAMADOS", icone: "🎫", titulo: "Chamados & OS", desc: "Emitir nova OS, gerenciar todas as OS e Laudo PDF 1 Página" },
         { id: "TEC_OS", icone: "⚡", titulo: "Minhas OS", desc: "Execução em campo, Check-in, Checklist POP, Fotos, Assinatura" },
         { id: "TEC_LAB", icone: "🔬", titulo: "Laboratório QR", desc: "Equipamentos recolhidos, intervenções e link ao vivo do cliente" },
+        { id: "TEC_PROTOCOLO", icone: "📦", titulo: "Protocolo Entrega", desc: "Entrega de material ou devolução de peça com assinatura do cliente" },
         { id: "GES_TV", icone: "📺", titulo: "Dashboard", desc: "Escala Diária no Calendário, Painel Operacional e Disparo WhatsApp" },
         { id: "GES_ESTOQUE", icone: "📦", titulo: "Almoxarifado & Estoque", desc: "Estoque completo de R$ 3,44M, catálogo e Kardex" },
         { id: "GES_ORCAMENTOS", icone: "⏳", titulo: "Orçamentos & Peças Teste", desc: "Orçamentos >15 dias e conversão/retirada de peças em teste" },
@@ -3066,6 +3067,7 @@
         { id: "TEC_PERFIL", icone: "✍️", titulo: "Cadastro & Assinatura", desc: "Seu cadastro pessoal, CFT e rubrica digital touch para emissão de laudos" },
         { id: "TEC_PECAS", icone: "📦", titulo: "Solicitar Peças ao Almox", desc: "Requisitar peças ao estoque central sem ver preços/custos" },
         { id: "TEC_LAB", icone: "🔬", titulo: "Laboratório QR", desc: "Equipamentos recolhidos, intervenções e status para o cliente" },
+        { id: "TEC_PROTOCOLO", icone: "📦", titulo: "Protocolo Entrega", desc: "Entrega de material ou devolução de peça com assinatura do cliente" },
         { id: "TEC_MANUAIS", icone: "📚", titulo: "Manuais & ITs Técnicos", desc: "Manuais de serviço e POPs homologados para consulta offline" }
       ],
       GESTOR: [
@@ -3127,7 +3129,7 @@
           window.location.reload(true);
         } catch(e) { window.location.reload(); }
       }
-      navigator.serviceWorker.register("/sw.js?v=1.3.0").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=1.4.0").then(reg => { if(reg) reg.update(); }).catch(() => {});
       let _swReloaded = false;
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         if (!_swReloaded && navigator.onLine && !STATE.osAberta) {
@@ -4242,6 +4244,7 @@ async function efetuarLogout() {
               { id: "GES_CHAMADOS", icone: "🎫", titulo: "Chamados & Ordens de Serviço", desc: "Abertura, Gestão e Laudos Técnicos" },
               { id: "TEC_OS", icone: "⚡", titulo: "Minhas OS de Campo", desc: "Execução, Check-in, Checklist POP e Assinatura" },
               { id: "TEC_LAB", icone: "🔬", titulo: "Laboratório QR & Bancada", desc: "Equipamentos recolhidos, intervenções e link ao vivo do cliente" },
+              { id: "TEC_PROTOCOLO", icone: "📦", titulo: "Protocolo Entrega / Devolução", desc: "Entrega de material ou devolução de peça com assinatura do cliente" },
               { id: "GES_TV", icone: "📺", titulo: "Dashboard", desc: "Escala Diária no Calendário, Painel Operacional e Disparo WhatsApp" },
               { id: "TEC_MANUAIS", icone: "📚", titulo: "Manuais Técnicos, POPs & Vídeos", desc: "Acervo de ITs e Treinamento Offline" },
               { id: "TEC_ASSINATURA", icone: "✍️", titulo: "Minha Assinatura no Celular", desc: "Cadastrar e Atualizar Rubrica Digital Touch" }
@@ -4333,6 +4336,7 @@ async function efetuarLogout() {
         case "TEC_PECAS": return renderMenuTecPecas(box);
         case "TEC_FERRAMENTAS": return renderMenuTecFerramentas(box);
         case "TEC_LAB": return renderMenuLaboratorioQR(box);
+        case "TEC_PROTOCOLO": return renderMenuProtocoloEntrega(box);
         case "TEC_MANUAIS": return renderMenuManuais(box);
         case "TEC_KM": return renderMenuAtualizarKM(box);
         // 🏢 GESTOR (12)
@@ -5125,6 +5129,195 @@ async function efetuarLogout() {
         document.getElementById("emedLabModal").style.display = "none";
         if (STATE.menuAtivo === "TEC_LAB") {
           renderMenuLaboratorioQR();
+        }
+      }
+    }
+
+    let _protCache = { protocolos: [], saidas: [] };
+    async function renderMenuProtocoloEntrega(box) {
+      if (!box) box = document.getElementById("mainContainer") || document.getElementById("conteudoPrincipal");
+      if (!box) return;
+      box.innerHTML = `<div class="panel"><div style="padding:20px;text-align:center;color:#64748b;">⏳ Carregando Protocolos de Entrega &amp; Saídas de Estoque...</div></div>`;
+      const res = await apiGet("/api/protocolo-entrega/listar");
+      if (!res || !res.ok) {
+        box.innerHTML = `<div class="panel"><div style="padding:20px;color:#dc2626;">❌ Erro ao carregar protocolos: ${esc(res?.msg || "Falha de conexão")}</div></div>`;
+        return;
+      }
+      _protCache = { protocolos: res.protocolos || [], saidas: res.saidas_estoque || [] };
+      const saidasHtml = _protCache.saidas.slice(0, 12).map((s, idx) => `
+        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <div style="font-size:12px;font-weight:800;color:#002b54;">${esc(s.cliente_nome || "CLIENTE A DEFINIR")} ${s.os_id ? `• OS #${esc(s.os_id)}` : ""}</div>
+            <div style="font-size:11.5px;color:#334155;margin-top:2px;">📦 ${esc(s.itens_descricao)}</div>
+            <div style="font-size:10.5px;color:#64748b;">👨‍🔧 ${esc(s.tecnico)} • ${esc(s.status_pedido)} (${esc(s.data_pedido)})</div>
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalProtocoloEntregaDeSaida(${idx})">✍️ Coletar Assinatura</button>
+        </div>
+      `).join("") || `<div style="color:#64748b;font-size:12px;">Nenhuma saída recente de estoque encontrada.</div>`;
+
+      const protsHtml = _protCache.protocolos.map(p => {
+        const assinado = p.status === "ENTREGUE_ASSINADO";
+        return `
+          <div style="background:#fff;border:1px solid #e2e8f0;border-left:5px solid ${assinado?'#16a34a':'#d97706'};border-radius:10px;padding:10px 12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;">
+              <div>
+                <span style="background:#002b54;color:#fff;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:900;">${esc(p.codigo_protocolo)}</span>
+                <span style="background:${assinado?'#dcfce7':'#fef3c7'};color:${assinado?'#15803d':'#b45309'};padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:800;margin-left:4px;">${assinado?'✅ Assinado':'🚚 Em Trânsito'}</span>
+                <span style="font-size:11px;color:#475569;margin-left:4px;font-weight:700;">${p.tipo_protocolo==='DEVOLUCAO_PECA'?'🔁 Devolução de Peça':'📦 Entrega de Material'}</span>
+              </div>
+              <span style="font-size:11px;color:#64748b;">${esc(p.entregue_em || p.criado_em)}</span>
+            </div>
+            <div style="font-size:13px;font-weight:800;color:#0f172a;margin-top:5px;">🏥 ${esc(p.cliente_nome)} ${p.os_id ? `• OS #${esc(p.os_id)}` : ""}</div>
+            <div style="font-size:12px;color:#334155;margin-top:2px;">${esc(p.itens_descricao)}</div>
+            ${p.recebedor_nome ? `<div style="font-size:11.5px;color:#15803d;margin-top:3px;">✍️ Recebido por: <b>${esc(p.recebedor_nome)}</b></div>` : ""}
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+              ${!assinado ? `<button type="button" class="btn btn-primary btn-sm" onclick="abrirModalProtocoloEntregaEditar(${p.id})">✍️ Coletar Assinatura Agora</button>` : ""}
+              <button type="button" class="btn btn-outline btn-sm" onclick="window.open('/api/protocolo-entrega/imprimir/${p.id}','_blank')">🖨️ Imprimir / PDF</button>
+            </div>
+          </div>
+        `;
+      }).join("") || `<div style="color:#64748b;font-size:12px;">Nenhum protocolo emitido ainda.</div>`;
+
+      box.innerHTML = `
+        <div class="panel">
+          <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div>
+              <div class="panel-title">📦 Protocolo de Entrega / Devolução de Peça</div>
+              <div class="panel-sub">Selecione uma saída do estoque (ou crie avulso) e colete nome e assinatura do cliente na hora</div>
+            </div>
+            <button type="button" class="btn btn-success btn-sm" onclick="abrirModalProtocoloEntregaNovo()">➕ Novo Protocolo Avulso</button>
+          </div>
+          <div style="font-weight:800;font-size:12.5px;color:#002b54;margin-bottom:6px;">⚡ Saídas Recentes do Estoque (1 Clique)</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">${saidasHtml}</div>
+          <div style="font-weight:800;font-size:12.5px;color:#002b54;margin-bottom:6px;">📜 Protocolos Emitidos (${_protCache.protocolos.length})</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">${protsHtml}</div>
+        </div>
+      `;
+    }
+
+    function abrirModalProtocoloEntregaDeSaida(idx) {
+      const s = _protCache.saidas[idx];
+      if (!s) return;
+      _abrirModalProtocoloForm({
+        solicitacao_id: s.solicitacao_id,
+        os_id: s.os_id,
+        cliente_nome: s.cliente_nome,
+        itens_descricao: s.itens_descricao,
+        tipo_protocolo: "ENTREGA_MATERIAL"
+      });
+    }
+
+    function abrirModalProtocoloEntregaEditar(id) {
+      const p = _protCache.protocolos.find(x => Number(x.id) === Number(id));
+      if (!p) return;
+      _abrirModalProtocoloForm(p);
+    }
+
+    function abrirModalProtocoloEntregaNovo() {
+      _abrirModalProtocoloForm({ tipo_protocolo: "ENTREGA_MATERIAL", cliente_nome: "", itens_descricao: "", os_id: "" });
+    }
+
+    function _abrirModalProtocoloForm(dados) {
+      let ov = document.getElementById("emedProtocoloModal");
+      if (!ov) {
+        ov = document.createElement("div");
+        ov.id = "emedProtocoloModal";
+        ov.style = "position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,0.8);display:flex;align-items:center;justify-content:center;padding:12px;overflow-y:auto;";
+        document.body.appendChild(ov);
+      }
+      ov.innerHTML = `
+        <div style="background:#fff;border-radius:14px;max-width:520px;width:100%;padding:16px;max-height:94vh;overflow-y:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <b style="color:#002b54;font-size:15px;">📦 Protocolo de Entrega / Devolução</b>
+            <button type="button" onclick="document.getElementById('emedProtocoloModal').style.display='none'" style="background:#ef4444;color:#fff;border:none;border-radius:999px;padding:4px 10px;font-weight:800;cursor:pointer;">✕</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:12.5px;">
+            <input type="hidden" id="protId" value="${esc(dados.id || '')}" />
+            <input type="hidden" id="protSolId" value="${esc(dados.solicitacao_id || '')}" />
+            <div style="display:grid;grid-template-columns:1fr 110px;gap:8px;">
+              <div>
+                <label style="font-weight:700;">Tipo de Protocolo</label>
+                <select id="protTipo" class="input">
+                  <option value="ENTREGA_MATERIAL" ${dados.tipo_protocolo!=='DEVOLUCAO_PECA'?'selected':''}>📦 Entrega de Material / Peça</option>
+                  <option value="DEVOLUCAO_PECA" ${dados.tipo_protocolo==='DEVOLUCAO_PECA'?'selected':''}>🔁 Devolução de Peça ao Cliente</option>
+                </select>
+              </div>
+              <div><label style="font-weight:700;">OS (opc.)</label><input id="protOsId" class="input" value="${esc(dados.os_id || '')}" placeholder="Ex: 46" /></div>
+            </div>
+            <div><label style="font-weight:700;">Cliente / Hospital *</label><input id="protCliente" class="input" value="${esc(dados.cliente_nome || '')}" placeholder="Nome do hospital ou clínica" /></div>
+            <div><label style="font-weight:700;">Materiais / Peças *</label><textarea id="protItens" class="input" rows="2" placeholder="Descreva os itens entregues ou devolvidos...">${esc(dados.itens_descricao || '')}</textarea></div>
+            <div style="display:grid;grid-template-columns:1fr 140px;gap:8px;">
+              <div><label style="font-weight:700;">Nome de quem recebeu *</label><input id="protRecebedor" class="input" value="${esc(dados.recebedor_nome || '')}" placeholder="Nome completo no cliente" /></div>
+              <div><label style="font-weight:700;">Doc. / Cargo</label><input id="protDoc" class="input" value="${esc(dados.recebedor_documento || '')}" placeholder="CPF / Setor" /></div>
+            </div>
+            <div><label style="font-weight:700;">Observações</label><input id="protObs" class="input" value="${esc(dados.observacoes || '')}" placeholder="Opcional" /></div>
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <label style="font-weight:700;">✍️ Assinatura do Cliente (toque na tela):</label>
+                <button type="button" class="btn btn-outline btn-xs" onclick="limparAssinaturaProtocolo()">🧹 Limpar</button>
+              </div>
+              <canvas id="canvasAssProtocolo" width="460" height="140" style="width:100%;height:140px;border:1.5px dashed #94a3b8;border-radius:8px;background:#f8fafc;touch-action:none;"></canvas>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="salvarProtocoloEntrega()">✅ Confirmar &amp; Gerar Protocolo PDF</button>
+          </div>
+        </div>
+      `;
+      ov.style.display = "flex";
+      iniciarCanvasAssinaturaProtocolo();
+    }
+
+    let _protAssinou = false;
+    function limparAssinaturaProtocolo() {
+      const cv = document.getElementById("canvasAssProtocolo");
+      if (!cv) return;
+      cv.getContext("2d").clearRect(0, 0, cv.width, cv.height);
+      _protAssinou = false;
+    }
+
+    function iniciarCanvasAssinaturaProtocolo() {
+      const cv = document.getElementById("canvasAssProtocolo");
+      if (!cv) return;
+      const ctx = cv.getContext("2d");
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "#0f172a";
+      let desenhando = false;
+      _protAssinou = false;
+      const pos = (e) => {
+        const r = cv.getBoundingClientRect();
+        const t = (e.touches && e.touches[0]) || e;
+        return { x: (t.clientX - r.left) * (cv.width / r.width), y: (t.clientY - r.top) * (cv.height / r.height) };
+      };
+      const ini = (e) => { desenhando = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); e.preventDefault(); };
+      const mov = (e) => { if (!desenhando) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); _protAssinou = true; e.preventDefault(); };
+      const fim = () => { desenhando = false; };
+      cv.onmousedown = ini; cv.onmousemove = mov; window.addEventListener("mouseup", fim);
+      cv.ontouchstart = ini; cv.ontouchmove = mov; cv.ontouchend = fim;
+    }
+
+    async function salvarProtocoloEntrega() {
+      const cv = document.getElementById("canvasAssProtocolo");
+      const assImg = (_protAssinou && cv) ? cv.toDataURL("image/png") : "";
+      const payload = {
+        id: document.getElementById("protId")?.value || null,
+        solicitacao_id: document.getElementById("protSolId")?.value || null,
+        tipo_protocolo: document.getElementById("protTipo")?.value || "ENTREGA_MATERIAL",
+        os_id: document.getElementById("protOsId")?.value || "",
+        cliente_nome: document.getElementById("protCliente")?.value || "",
+        itens_descricao: document.getElementById("protItens")?.value || "",
+        recebedor_nome: document.getElementById("protRecebedor")?.value || "",
+        recebedor_documento: document.getElementById("protDoc")?.value || "",
+        observacoes: document.getElementById("protObs")?.value || "",
+        assinatura_recebedor_img: assImg,
+        tecnico_entregador: STATE.tecnicoAtual || STATE.usuarioNome || "TÉCNICO EMED"
+      };
+      const res = await apiPost("/api/protocolo-entrega/salvar", payload);
+      mostrarToast(res?.msg || "Erro ao salvar protocolo", 5000);
+      if (res && res.ok) {
+        document.getElementById("emedProtocoloModal").style.display = "none";
+        renderMenuProtocoloEntrega();
+        if (confirm(`${res.msg}\n\nDeseja abrir o Protocolo PDF para imprimir/enviar?`)) {
+          window.open(`/api/protocolo-entrega/imprimir/${res.id}`, "_blank");
         }
       }
     }

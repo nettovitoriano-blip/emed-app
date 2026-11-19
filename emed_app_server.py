@@ -3675,6 +3675,7 @@ async def auth_api_middleware(request: web.Request, handler):
         or path == "/api/ferramentas/etiquetas-qr"
         or path == "/api/lab/etiquetas-qr"
         or path == "/apresentacao"
+        or path.startswith("/api/protocolo-entrega/imprimir/")
         or path.startswith("/lab/r/")
         or path.startswith("/proposta/")
         or path == "/api/proposta/responder"
@@ -24027,6 +24028,174 @@ async def api_lab_publico_html(request: web.Request) -> web.Response:
     return web.Response(text=html_out, content_type="text/html", charset="utf-8")
 
 
+# ==============================================================================
+# PROTOCOLO DE ENTREGA DE MATERIAL / DEVOLUCAO DE PECA AO CLIENTE
+# ==============================================================================
+def _garantir_schema_protocolos_entrega(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS protocolos_entrega_peca (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo_protocolo TEXT UNIQUE NOT NULL,
+            tipo_protocolo TEXT NOT NULL DEFAULT 'ENTREGA_MATERIAL',
+            solicitacao_id INTEGER,
+            os_id TEXT,
+            cliente_nome TEXT NOT NULL,
+            itens_descricao TEXT NOT NULL,
+            tecnico_entregador TEXT NOT NULL,
+            recebedor_nome TEXT,
+            recebedor_documento TEXT,
+            assinatura_recebedor_img TEXT,
+            observacoes TEXT,
+            status TEXT NOT NULL DEFAULT 'EM_TRANSITO',
+            criado_em TEXT NOT NULL,
+            entregue_em TEXT
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_prot_entrega_cod ON protocolos_entrega_peca(codigo_protocolo)")
+
+
+async def api_protocolo_entrega_listar(request: web.Request) -> web.Response:
+    """Lista protocolos de entrega/devolucao e saidas recentes do estoque para selecao rapida."""
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_protocolos_entrega(conn)
+        conn.row_factory = sqlite3.Row
+        prots = [dict(r) for r in conn.execute("SELECT * FROM protocolos_entrega_peca ORDER BY id DESC LIMIT 100").fetchall()]
+        saidas = []
+        try:
+            rows_sp = conn.execute("""
+                SELECT id, os_id, tecnico, destino_cliente, itens_solicitados, codigo_peca, status_pedido, data_pedido
+                FROM solicitacoes_pecas
+                ORDER BY id DESC LIMIT 40
+            """).fetchall()
+            for r in rows_sp:
+                saidas.append({
+                    "solicitacao_id": r["id"],
+                    "os_id": str(r["os_id"] or ""),
+                    "tecnico": r["tecnico"] or "",
+                    "cliente_nome": r["destino_cliente"] or "",
+                    "itens_descricao": r["itens_solicitados"] or "",
+                    "codigo_peca": r["codigo_peca"] or "",
+                    "status_pedido": r["status_pedido"] or "",
+                    "data_pedido": r["data_pedido"] or "",
+                })
+        except Exception:
+            pass
+    return web.json_response({"ok": True, "protocolos": prots, "saidas_estoque": saidas})
+
+
+async def api_protocolo_entrega_salvar(request: web.Request) -> web.Response:
+    """Cria ou finaliza protocolo de entrega/devolucao com nome e assinatura do cliente."""
+    body = await request.json()
+    prot_id = body.get("id")
+    tipo = limpar_texto(body.get("tipo_protocolo"), "ENTREGA_MATERIAL").upper()
+    sol_id = body.get("solicitacao_id")
+    os_id = str(body.get("os_id") or "").strip()
+    cliente_nome = limpar_texto(body.get("cliente_nome"), "").upper()
+    itens_desc = limpar_texto(body.get("itens_descricao"), "")
+    tecnico = limpar_texto(body.get("tecnico_entregador"), "TÉCNICO EMED").upper()
+    recebedor = limpar_texto(body.get("recebedor_nome"), "").upper()
+    rec_doc = limpar_texto(body.get("recebedor_documento"), "")
+    ass_img = str(body.get("assinatura_recebedor_img") or "").strip()
+    obs = limpar_texto(body.get("observacoes"), "")
+    agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+
+    if not cliente_nome or not itens_desc:
+        return web.json_response({"ok": False, "msg": "Informe o cliente e os materiais/peças."}, status=400)
+
+    assinado = bool(recebedor and ass_img.startswith("data:image"))
+    status = "ENTREGUE_ASSINADO" if assinado else "EM_TRANSITO"
+    entregue_em = agora if assinado else ""
+
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_protocolos_entrega(conn)
+        cur = conn.cursor()
+        if prot_id:
+            cur.execute("""
+                UPDATE protocolos_entrega_peca
+                SET tipo_protocolo = ?, cliente_nome = ?, itens_descricao = ?,
+                    recebedor_nome = ?, recebedor_documento = ?, assinatura_recebedor_img = ?,
+                    observacoes = ?, status = ?, entregue_em = CASE WHEN ?!='' THEN ? ELSE entregue_em END
+                WHERE id = ?
+            """, (tipo, cliente_nome, itens_desc, recebedor, rec_doc, ass_img, obs, status, entregue_em, entregue_em, int(prot_id)))
+            cod = cur.execute("SELECT codigo_protocolo FROM protocolos_entrega_peca WHERE id = ?", (int(prot_id),)).fetchone()[0]
+            pid = int(prot_id)
+        else:
+            prox = (cur.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM protocolos_entrega_peca").fetchone()[0]) or 1
+            cod = f"PROT-{int(prox):04d}"
+            while cur.execute("SELECT 1 FROM protocolos_entrega_peca WHERE codigo_protocolo = ?", (cod,)).fetchone():
+                prox += 1
+                cod = f"PROT-{int(prox):04d}"
+            cur.execute("""
+                INSERT INTO protocolos_entrega_peca (
+                    codigo_protocolo, tipo_protocolo, solicitacao_id, os_id, cliente_nome,
+                    itens_descricao, tecnico_entregador, recebedor_nome, recebedor_documento,
+                    assinatura_recebedor_img, observacoes, status, criado_em, entregue_em
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (cod, tipo, sol_id, os_id, cliente_nome, itens_desc, tecnico, recebedor, rec_doc, ass_img, obs, status, agora, entregue_em))
+            pid = cur.lastrowid
+        conn.commit()
+
+    return web.json_response({
+        "ok": True,
+        "id": pid,
+        "codigo_protocolo": cod,
+        "status": status,
+        "msg": f"✅ Protocolo {cod} {'assinado e concluído' if assinado else 'registrado em trânsito'}!"
+    })
+
+
+async def api_protocolo_entrega_imprimir(request: web.Request) -> web.Response:
+    """Renderiza o Protocolo Oficial de Entrega de Material / Devolucao de Peca em A4."""
+    import html as _h
+    pid = str(request.match_info.get("id", "")).strip()
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_protocolos_entrega(conn)
+        conn.row_factory = sqlite3.Row
+        r = conn.execute(
+            "SELECT * FROM protocolos_entrega_peca WHERE CAST(id AS TEXT) = ? OR UPPER(codigo_protocolo) = ?",
+            (pid, pid.upper())
+        ).fetchone()
+    if not r:
+        return web.Response(text="Protocolo não encontrado.", status=404)
+
+    tipo_lbl = "DEVOLUÇÃO DE PEÇA AO CLIENTE" if r["tipo_protocolo"] == "DEVOLUCAO_PECA" else "ENTREGA DE MATERIAL / PEÇA"
+    ass_tag = f'<img src="{r["assinatura_recebedor_img"]}" style="max-height:70px;max-width:260px;" />' if str(r["assinatura_recebedor_img"] or "").startswith("data:image") else "<div style='height:45px;'></div>"
+    html_out = f"""<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Protocolo {_h.escape(r['codigo_protocolo'])} — EMED</title>
+<style>
+  body {{ font-family: Arial, sans-serif; margin: 16px; background: #f8fafc; color: #0f172a; font-size: 12px; }}
+  .wrap {{ max-width: 760px; margin: 0 auto; background: #fff; padding: 22px; border: 1.5px solid #002b54; border-radius: 8px; }}
+  .hdr {{ display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #002b54; padding-bottom:10px; margin-bottom:14px; }}
+  .box {{ border:1px solid #cbd5e1; border-radius:6px; padding:10px 12px; margin-bottom:12px; }}
+  .lbl {{ font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase; }}
+  .sigs {{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:24px; text-align:center; }}
+  .sig-line {{ border-top:1px solid #0f172a; padding-top:5px; font-size:11px; }}
+  @media print {{ @page {{ size: A4; margin: 10mm; }} body {{ background:#fff; margin:0; }} .no-print {{ display:none; }} .wrap {{ border:none; }} }}
+</style></head>
+<body>
+  <div class="no-print" style="max-width:760px;margin:0 auto 10px;display:flex;justify-content:space-between;">
+    <b>📦 Protocolo Oficial {_h.escape(r['codigo_protocolo'])}</b>
+    <button onclick="window.print()" style="background:#002b54;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:bold;cursor:pointer;">🖨️ Imprimir / Salvar PDF</button>
+  </div>
+  <div class="wrap">
+    <div class="hdr">
+      <div><b style="font-size:16px;color:#002b54;">EMED ELETROMEDICINA LTDA.</b><div style="font-size:11px;color:#475569;">Protocolo de Movimentação Física de Materiais</div></div>
+      <div style="text-align:right;"><span style="background:#002b54;color:#fff;padding:4px 10px;border-radius:6px;font-weight:900;">{_h.escape(r['codigo_protocolo'])}</span><div style="font-size:10.5px;margin-top:4px;">{_h.escape(r['entregue_em'] or r['criado_em'])}</div></div>
+    </div>
+    <div style="background:#e0f2fe;color:#0369a1;font-weight:900;text-align:center;padding:6px;border-radius:6px;margin-bottom:12px;">{tipo_lbl}</div>
+    <div class="box"><div class="lbl">Cliente / Unidade Hospitalar</div><div style="font-size:14px;font-weight:800;margin-top:3px;">{_h.escape(r['cliente_nome'])}</div>{f"<div style='font-size:11px;color:#475569;margin-top:2px;'>OS Vinculada: #{_h.escape(r['os_id'])}</div>" if r['os_id'] else ""}</div>
+    <div class="box"><div class="lbl">Materiais / Peças Entregues ou Devolvidas</div><div style="font-size:13px;font-weight:700;margin-top:4px;white-space:pre-line;">{_h.escape(r['itens_descricao'])}</div></div>
+    {f"<div class='box'><div class='lbl'>Observações</div><div style='margin-top:3px;'>{_h.escape(r['observacoes'])}</div></div>" if r['observacoes'] else ""}
+    <div class="box"><div class="lbl">Declaração de Recebimento</div><div style="margin-top:4px;">Recebi os materiais/peças descritos acima em perfeitas condições de conferência nesta data.</div></div>
+    <div class="sigs">
+      <div><div style="height:70px;"></div><div class="sig-line"><b>{_h.escape(r['tecnico_entregador'])}</b><br/>Portador / Técnico EMED</div></div>
+      <div>{ass_tag}<div class="sig-line"><b>{_h.escape(r['recebedor_nome'] or 'Aguardando assinatura')}</b><br/>Recebedor no Cliente {f"• Doc: {_h.escape(r['recebedor_documento'])}" if r['recebedor_documento'] else ""}</div></div>
+    </div>
+  </div>
+</body></html>"""
+    return web.Response(text=html_out, content_type="text/html", charset="utf-8")
+
+
 def criar_app() -> web.Application:
 
     garantir_schema_dispositivos(DB_NAME)
@@ -24520,6 +24689,10 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/lab/intervencao", api_lab_intervencao_salvar)
     app.router.add_get("/api/lab/etiquetas-qr", api_lab_etiquetas_qr)
     app.router.add_get("/lab/r/{token}", api_lab_publico_html)
+    app.router.add_get("/apresentacao", lambda req: web.FileResponse(os.path.join(BASE_DIR, "Apresentacao_Sistema_EMED.html")))
+    app.router.add_get("/api/protocolo-entrega/listar", api_protocolo_entrega_listar)
+    app.router.add_post("/api/protocolo-entrega/salvar", api_protocolo_entrega_salvar)
+    app.router.add_get("/api/protocolo-entrega/imprimir/{id}", api_protocolo_entrega_imprimir)
     app.router.add_get("/apresentacao", lambda req: web.FileResponse(os.path.join(BASE_DIR, "Apresentacao_Sistema_EMED.html")))
 
 

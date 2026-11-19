@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v1-3-2-nav-maps-fix';
+const CACHE_NAME = 'emed-pwa-v1-4-0-protocolo-entrega';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
