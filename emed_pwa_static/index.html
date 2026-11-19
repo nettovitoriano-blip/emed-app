@@ -2857,12 +2857,14 @@
         return;
       }
       const saldo = parseInt(item.quantidade) || 0;
-      const precoCusto = parseFloat(item.preco_unitario) || 0;
-      const precoSugerido = (precoCusto * 1.45).toFixed(2);
+      const precoTabela = parseFloat(item.preco_venda_tabela) || 0;
+      const precoCusto = parseFloat(item.preco_unitario) || parseFloat(item.preco_custo) || 0;
+      const precoSugerido = (precoTabela > 0 ? precoTabela : (precoCusto * 1.45)).toFixed(2);
       const qtdSolicitada = parseInt(document.getElementById("propQtdPeca")?.value) || 1;
       const inpVal = document.getElementById("propValorUnitario");
-      if (inpVal && (!inpVal.value || parseFloat(inpVal.value) === 0)) {
+      if (inpVal && (inpVal.dataset.lastCod !== String(codPeca) || !inpVal.value || parseFloat(inpVal.value) === 0)) {
         inpVal.value = precoSugerido;
+        inpVal.dataset.lastCod = String(codPeca);
       }
       // CENÁRIO 1: SALDO TOTALMENTE SUFICIENTE
       if (saldo >= qtdSolicitada) {
