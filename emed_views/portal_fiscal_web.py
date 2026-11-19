@@ -2330,9 +2330,10 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           <div style="font-size:12px;color:#a5f3fc;font-weight:800;">🔐 ${{cert.modo || ''}}</div>
         </div>
         <div style="font-size:12.5px;color:#cbd5e1;margin-top:8px;line-height:1.5;">
-          <b>CNPJ:</b> ${{cfg.cnpj || ''}} &bull; <b>Inscrição (CF/DF ou IM):</b> ${{cfg.inscricao_municipal || ''}} &bull; <b>Série NF:</b> ${{cfg.serie_padrao || ''}}<br/>
-          <b>Endereço:</b> ${{cfg.endereco || ''}}, ${{cfg.cidade || ''}} - ${{cfg.uf || ''}} (CEP: ${{cfg.cep || ''}}) &bull; <b>Fone:</b> ${{cfg.telefone || ''}}<br/>
-          <b>Órgão Fiscal:</b> ${{cfg.orgao_fiscal || ''}} &bull; <b>Alíquota ISS Padrão:</b> ${{cfg.aliquota_iss_padrao || 5.0}}%
+          ${{isConsol
+            ? `<b>CNPJs Ativos:</b> 03.611.974/0001-08 (Matriz Eusébio/CE) &bull; 03.611.974/0002-80 (Filial Brasília/DF)<br/><b>Regimes &amp; Órgãos Fiscais:</b> Prefeitura de Eusébio (ISS 5%) &bull; SEFAZ-DF (ISS 2% / ICMS) &bull; DPS Nacional (Receita Federal)<br/><b>Amparo Vinculante:</b> STF ADC 49 &bull; LC 204/2023 &bull; LC 116/2003 (Item 14.01/14.02)`
+            : `<b>CNPJ:</b> ${{cfg.cnpj || ''}} &bull; <b>Inscrição (CF/DF ou IM):</b> ${{cfg.inscricao_municipal || ''}} &bull; <b>Série NF:</b> ${{cfg.serie_padrao || ''}}<br/><b>Endereço:</b> ${{cfg.endereco || ''}}, ${{cfg.cidade || ''}} - ${{cfg.uf || ''}} (CEP: ${{cfg.cep || ''}}) &bull; <b>Fone:</b> ${{cfg.telefone || ''}}<br/><b>Órgão Fiscal:</b> ${{cfg.orgao_fiscal || ''}} &bull; <b>Alíquota ISS Padrão:</b> ${{cfg.aliquota_iss_padrao || 5.0}}%`
+          }}
         </div>
       `;
 
@@ -2361,7 +2362,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
       document.getElementById("kpiFila").textContent = `${{res.kpis.pendentes}} OSs`;
       document.getElementById("kpiEmitidas").textContent = `${{res.kpis.emitidas}} NFs`;
-      document.getElementById("lblKpiFaturado").textContent = `Total Faturado (${{cfg.sigla || ''}})`;
+      document.getElementById("lblKpiFaturado").textContent = isConsol ? "Total Faturado (Consolidado CE + DF)" : `Total Faturado (${{cfg.sigla || ''}})`;
       document.getElementById("kpiTotal").textContent = `R$ ${{Number(res.kpis.total_faturar || 0).toLocaleString('pt-BR', {{minimumFractionDigits:2}})}}`;
 
       const tbFila = document.getElementById("tbodyFilaOs");
@@ -3289,8 +3290,13 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             <tr id="linhaInv_${{p.id}}">
               <td><b>${{p.codigo || '-'}}</b></td>
               <td>
-                <div style="font-weight:700;color:#fff;">${{p.nome}}</div>
-                <div style="font-size:11px;color:#94a3b8;">Custo: R$ ${{Number(p.preco||0).toFixed(2)}} • Un: ${{p.unidade || 'UN'}}</div>
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                  <div>
+                    <div style="font-weight:700;color:#fff;">${{p.nome}}</div>
+                    <div style="font-size:11px;color:#94a3b8;">Custo: R$ ${{Number(p.preco||0).toFixed(2)}} • Un: ${{p.unidade || 'UN'}}</div>
+                  </div>
+                  <button type="button" onclick="abrirModalFichaFiscalPeca(${{p.id}})" class="btn btn-outline" style="padding:2px 8px;font-size:10.5px;font-weight:800;color:#38bdf8;border-color:#0284c7;white-space:nowrap;" title="Configurar Impostos (NCM, CEST, ICMS) e Precificação">⚙️ Fiscal</button>
+                </div>
               </td>
               <td style="text-align:center;">
                 <div style="display:inline-flex;align-items:center;gap:3px;">
@@ -3310,6 +3316,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
               <td style="text-align:center;" id="spBadge_${{p.id}}">${{badge}}</td>
               <td style="text-align:center;">
                 <div style="display:inline-flex;gap:4px;flex-wrap:wrap;justify-content:center;">
+                  <button type="button" onclick="abrirModalFichaFiscalPeca(${{p.id}})" class="btn btn-outline" style="padding:3px 8px;font-size:10.5px;color:#38bdf8;border-color:#0284c7;font-weight:800;" title="Ficha Fiscal, Tributária e Precificação">⚙️ Fiscal</button>
                   <button id="btnSalvarInv_${{p.id}}" onclick="salvarInventarioLinhaDireto(${{p.id}})" class="btn btn-blue" style="padding:3px 8px;font-size:11px;font-weight:800;" title="Salvar diretamente o saldo físico e fiscal">💾 Salvar</button>
                   <button type="button" onclick="igualarFiscalAoFisico(${{p.id}})" class="btn btn-outline" style="padding:3px 6px;font-size:10.5px;color:#38bdf8;border-color:#0284c7;" title="Falha de baixa fiscal: Iguala Fiscal ao Físico">⚖️ Fiscal=Físico</button>
                   <button type="button" onclick="igualarFisicoAoFiscal(${{p.id}})" class="btn btn-outline" style="padding:3px 6px;font-size:10.5px;color:#34d399;border-color:#059669;" title="Falha de baixa física: Iguala Físico ao Fiscal">⚖️ Físico=Fiscal</button>
