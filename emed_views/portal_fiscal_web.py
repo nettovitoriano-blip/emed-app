@@ -1445,258 +1445,7 @@ async def api_fiscal_v2_fechamento_relatorio_impresso(request: web.Request) -> w
       <b>ASSESSORIA CONTÁBIL EXTERNA</b><br/>Contador Responsável / CRC
     </div>
   </div>
-  <!-- MODAL DE ITENS DA NOTA RECEBIDA -->
-  <div class="modal-overlay" id="modalItensDFe" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);z-index:9999;align-items:center;justify-content:center;">
-    <div style="background:#0f172a;border:1.5px solid #0284c7;border-radius:12px;width:680px;max-width:95%;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,0.6);color:#fff;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #334155;padding-bottom:10px;">
-        <h3 id="modalItensDFeTitulo" style="margin:0;font-size:16px;color:#38bdf8;">Itens da Nota Fiscal</h3>
-        <button type="button" onclick="fecharModalItensDFe()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">&times;</button>
-      </div>
-      <div style="overflow-x:auto;max-height:350px;">
-        <table style="width:100%;font-size:12px;">
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Descrição do Item / Peça</th>
-              <th>Qtd</th>
-              <th>Preço Unitário</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody id="tbodyModalItensDFe"></tbody>
-        </table>
-      </div>
-      <div style="margin-top:16px;text-align:right;">
-        <button type="button" class="btn btn-outline" onclick="fecharModalItensDFe()">Fechar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL DE FICHA FISCAL, TRIBUTÁRIA & PRECIFICAÇÃO (PENTE FINO MULTI-ESTADUAL) -->
-  <div id="modalFichaFiscalPeca" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;backdrop-filter:blur(5px);overflow-y:auto;padding:20px;">
-    <div style="max-width:880px;margin:20px auto;background:#0f172a;border:2px solid #0284c7;border-radius:12px;padding:24px;color:#f8fafc;box-shadow:0 10px 40px rgba(2,132,199,0.3);">
-      
-      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #334155;padding-bottom:12px;margin-bottom:16px;">
-        <div>
-          <div style="font-size:16px;font-weight:900;color:#38bdf8;" id="modalFichaTitulo">⚙️ Ficha Fiscal, Tributária &amp; Precificação</div>
-          <div style="font-size:12px;color:#94a3b8;" id="modalFichaSubtitulo">Configuração avançada para emissão estadual e apuração de margens</div>
-        </div>
-        <button type="button" onclick="fecharModalFichaFiscal()" class="btn btn-outline" style="padding:4px 10px;font-size:13px;color:#94a3b8;">✕ Fechar</button>
-      </div>
-
-      <!-- ABAS DO MODAL -->
-      <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid #1e293b;padding-bottom:8px;overflow-x:auto;">
-        <button type="button" class="btn btn-blue" id="tabBtn_ident" onclick="mudarTabFicha('ident')" style="font-size:12px;padding:6px 12px;">🏷️ Identificação &amp; Engenharia</button>
-        <button type="button" class="btn btn-outline" id="tabBtn_icms" onclick="mudarTabFicha('icms')" style="font-size:12px;padding:6px 12px;">🏛️ ICMS, NCM &amp; Estados</button>
-        <button type="button" class="btn btn-outline" id="tabBtn_fed" onclick="mudarTabFicha('fed')" style="font-size:12px;padding:6px 12px;">🇧🇷 Tributos Federais (PIS/COFINS/IPI)</button>
-        <button type="button" class="btn btn-outline" id="tabBtn_preco" onclick="mudarTabFicha('preco')" style="font-size:12px;padding:6px 12px;">💰 Precificação &amp; Margens</button>
-      </div>
-
-      <input type="hidden" id="fch_id" />
-
-      <!-- ABA 1: IDENTIFICAÇÃO & ENGENHARIA CLÍNICA (RDC 611) -->
-      <div id="tabContent_ident">
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
-          <div style="grid-column:1/-1;">
-            <label>Descrição Oficial da Peça / Produto:</label>
-            <input id="fch_nome" type="text" style="width:100%;font-weight:700;" />
-          </div>
-          <div>
-            <label>Código Interno (SKU):</label>
-            <input id="fch_codigo" type="text" disabled style="background:#1e293b;opacity:0.7;" />
-          </div>
-          <div>
-            <label>Código de Barras / GTIN / EAN:</label>
-            <input id="fch_ean" type="text" placeholder="SEM GTIN ou 789..." />
-          </div>
-          <div>
-            <label>Fabricante / Marca:</label>
-            <input id="fch_fabricante" type="text" placeholder="Ex: GE, Philips, Siemens, Dunlee..." />
-          </div>
-          <div>
-            <label>Modelo / Tomógrafo Compatível:</label>
-            <input id="fch_modelo" type="text" placeholder="Ex: Optima CT520, Revolution EVO..." />
-          </div>
-          <div>
-            <label>Número de Série (RDC 611 / Tubos RX):</label>
-            <input id="fch_serie" type="text" placeholder="Nº de Série do Tubo ou Placa" />
-          </div>
-          <div>
-            <label>Lote de Fabricação:</label>
-            <input id="fch_lote" type="text" placeholder="Lote do Fabricante" />
-          </div>
-          <div>
-            <label>Unidade Comercial:</label>
-            <select id="fch_unidade">
-              <option value="UN">UN - Unidade</option>
-              <option value="PC">PC - Peça</option>
-              <option value="JG">JG - Jogo</option>
-              <option value="KIT">KIT - Conjunto/Kit</option>
-              <option value="MT">MT - Metros</option>
-            </select>
-          </div>
-          <div>
-            <label>Localização no Almoxarifado:</label>
-            <input id="fch_local" type="text" placeholder="Ex: Prateleira 2, Base Paulo, Gaveta B" />
-          </div>
-        </div>
-      </div>
-
-      <!-- ABA 2: ICMS, NCM & LEIS ESTADUAIS (DF, CE, INTERESTADUAL) -->
-      <div id="tabContent_icms" style="display:none;">
-        <div style="background:#1e293b;border-left:4px solid #38bdf8;padding:10px 14px;border-radius:4px;font-size:12px;margin-bottom:14px;line-height:1.5;">
-          <b>⚖️ Diretrizes Estaduais &amp; Isenções de Saúde:</b><br/>
-          &bull; <b>Equipamentos Hospitalares:</b> Possuem isenção/desoneração pelo Convênio ICMS 01/99 e 126/10 quando faturados para clínicas e hospitais.<br/>
-          &bull; <b>Transferência de Peças (CE ⇄ DF):</b> Não incidência de ICMS vinculante (STF ADC 49 / LC 204/2023).
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
-          <div>
-            <label>NCM (8 Dígitos - Obrigatório SEFAZ):</label>
-            <input id="fch_ncm" type="text" placeholder="Ex: 9022.90.90 (Tubo/RX)" maxlength="10" style="font-weight:700;color:#38bdf8;" />
-          </div>
-          <div>
-            <label>CEST (Substituição Tributária):</label>
-            <input id="fch_cest" type="text" placeholder="Ex: 01.001.00 ou vazio" maxlength="10" />
-          </div>
-          <div>
-            <label>Origem da Mercadoria:</label>
-            <select id="fch_origem">
-              <option value="0">0 - Nacional</option>
-              <option value="1">1 - Estrangeira (Importação Direta)</option>
-              <option value="2">2 - Estrangeira (Adquirida Mercado Interno)</option>
-              <option value="4">4 - Nacional com Conteúdo de Importação > 40%</option>
-            </select>
-          </div>
-          <div>
-            <label>Regime ICMS / CSOSN (Simples Nacional):</label>
-            <select id="fch_csosn">
-              <option value="102">102 - Tributada pelo Simples sem permissão de crédito</option>
-              <option value="400">400 - Não tributada pelo Simples Nacional (Isenta)</option>
-              <option value="500">500 - ICMS cobrado anteriormente por Substituição Tributária</option>
-              <option value="900">900 - Outros (Com destaque / Operação Especial)</option>
-            </select>
-          </div>
-          <div>
-            <label>Alíquota Interna de ICMS (%):</label>
-            <input id="fch_aliq_icms" type="number" step="0.1" placeholder="Ex: 20.0 (CE) ou 18.0 (DF)" />
-          </div>
-          <div>
-            <label>Redução da Base de Cálculo (%):</label>
-            <input id="fch_red_icms" type="number" step="0.1" placeholder="Ex: 0.0" />
-          </div>
-          <div>
-            <label>CFOP Padrão Venda:</label>
-            <input id="fch_cfop_venda" type="text" value="5102" />
-          </div>
-          <div>
-            <label>CFOP Padrão Transferência:</label>
-            <input id="fch_cfop_trf" type="text" value="5152" />
-          </div>
-          <div style="grid-column:1/-1;">
-            <label>Motivo de Desoneração / Amparo Legal de Isenção:</label>
-            <input id="fch_isencao_motivo" type="text" value="Convênio ICMS 01/99 - Equipamento Médico-Hospitalar" />
-          </div>
-        </div>
-      </div>
-
-      <!-- ABA 3: TRIBUTOS FEDERAIS (PIS, COFINS, IPI) -->
-      <div id="tabContent_fed" style="display:none;">
-        <div style="background:#1e293b;border-left:4px solid #10b981;padding:10px 14px;border-radius:4px;font-size:12px;margin-bottom:14px;line-height:1.5;">
-          <b>🏥 Benefício Fiscal Federal (Alíquota Zero):</b><br/>
-          Dispositivos e peças de imagem e medicina hospitalar contam com enquadramento especial de alíquota zero de PIS/COFINS (Decreto Federal nº 6.426/2008 e Lei 10.865/2004).
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
-          <div>
-            <label>CST PIS:</label>
-            <select id="fch_cst_pis">
-              <option value="49">49 - Outras Operações de Saída</option>
-              <option value="06">06 - Operação Tributável a Alíquota Zero (Hospitalar)</option>
-              <option value="04">04 - Operação Monofásica / Substituição</option>
-              <option value="01">01 - Operação Tributável com Alíquota Básica</option>
-            </select>
-          </div>
-          <div>
-            <label>Alíquota PIS (%):</label>
-            <input id="fch_aliq_pis" type="number" step="0.01" value="0.00" />
-          </div>
-          <div>
-            <label>CST COFINS:</label>
-            <select id="fch_cst_cofins">
-              <option value="49">49 - Outras Operações de Saída</option>
-              <option value="06">06 - Operação Tributável a Alíquota Zero (Hospitalar)</option>
-              <option value="04">04 - Operação Monofásica / Substituição</option>
-              <option value="01">01 - Operação Tributável com Alíquota Básica</option>
-            </select>
-          </div>
-          <div>
-            <label>Alíquota COFINS (%):</label>
-            <input id="fch_aliq_cofins" type="number" step="0.01" value="0.00" />
-          </div>
-          <div>
-            <label>CST IPI:</label>
-            <select id="fch_cst_ipi">
-              <option value="53">53 - Saída Não-Tributada</option>
-              <option value="51">51 - Saída com Alíquota Zero</option>
-              <option value="50">50 - Saída Tributada</option>
-            </select>
-          </div>
-          <div>
-            <label>Alíquota IPI (%):</label>
-            <input id="fch_aliq_ipi" type="number" step="0.1" value="0.0" />
-          </div>
-        </div>
-      </div>
-
-      <!-- ABA 4: PRECIFICAÇÃO & MARGENS DE VENDA -->
-      <div id="tabContent_preco" style="display:none;">
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
-          <div>
-            <label>Preço de Custo Última Compra (R$):</label>
-            <input id="fch_custo" type="number" step="0.01" oninput="recalcularPrecosFicha()" style="font-weight:700;color:#f87171;" />
-          </div>
-          <div>
-            <label>Custo Médio Ponderado (R$):</label>
-            <input id="fch_custo_medio" type="number" step="0.01" />
-          </div>
-          <div>
-            <label>Margem Contrato (%):</label>
-            <input id="fch_mg_contrato" type="number" step="1" oninput="recalcularPrecosFicha()" placeholder="Ex: 30" />
-          </div>
-          <div>
-            <label>Margem Avulso / Emergencial (%):</label>
-            <input id="fch_mg_avulso" type="number" step="1" oninput="recalcularPrecosFicha()" placeholder="Ex: 60" />
-          </div>
-          <div>
-            <label>Margem À Vista (%):</label>
-            <input id="fch_mg_avista" type="number" step="1" placeholder="Ex: 20" />
-          </div>
-          <div>
-            <label>Margem Desestímulo (% - Tubos Raros):</label>
-            <input id="fch_mg_desestimulo" type="number" step="1" placeholder="Ex: 180" />
-          </div>
-          <div>
-            <label>Preço de Venda Sugerido (Tabela R$):</label>
-            <input id="fch_preco_tabela" type="number" step="0.01" style="font-weight:800;color:#4ade80;font-size:14px;" />
-          </div>
-          <div>
-            <label>Preço Mínimo Piso (Segurança R$):</label>
-            <input id="fch_preco_minimo" type="number" step="0.01" style="font-weight:800;color:#fbbf24;" />
-          </div>
-        </div>
-        <div style="font-size:11.5px;color:#94a3b8;margin-top:10px;">
-          💡 <b>Dica de Precificação:</b> Você pode alterar os preços de tabela e piso manualmente a qualquer momento. Eles serão aplicados automaticamente na geração de propostas e remessas.
-        </div>
-      </div>
-
-      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;border-top:1px solid #334155;padding-top:14px;">
-        <button type="button" onclick="fecharModalFichaFiscal()" class="btn btn-outline" style="padding:8px 16px;">Cancelar</button>
-        <button type="button" onclick="salvarFichaFiscalPeca()" class="btn btn-blue" id="btnSalvarFichaFiscal" style="padding:8px 20px;font-weight:800;">💾 Salvar Parâmetros Fiscais &amp; Precificação</button>
-      </div>
-
-    </div>
-  </div>
-
-</body>
+  </body>
 </html>"""
     return web.Response(text=html_out, content_type="text/html")
 
@@ -2567,11 +2316,16 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       const cert = res.certificado || {{}};
       const tipoUn = FILIAL_ATIVA === "MATRIZ_CE" ? "Matriz" : "Filial";
 
+      const isConsol = FILIAL_ATIVA === "CONSOLIDADO";
+      const tituloUnidade = isConsol ? "EMED Eletromedicina • Operação Consolidada (Matriz CE + Filial DF)" : (cfg.razao_social || '');
+      const siglaUnidade = isConsol ? "EMED CONSOLIDADO" : (cfg.sigla || '');
+      const docUnidade = isConsol ? "03.611.974/0001-08 (Matriz) &amp; 03.611.974/0002-80 (Filial)" : (cfg.cnpj || '');
+
       document.getElementById("cardUnidadeInfo").innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <div>
-            <span style="font-size:16px;font-weight:900;color:var(--cyan);">${{cfg.razao_social || ''}}</span>
-            <span class="badge" style="margin-left:8px;">${{cfg.sigla || ''}}</span>
+            <span style="font-size:16px;font-weight:900;color:var(--cyan);">${{tituloUnidade}}</span>
+            <span class="badge" style="margin-left:8px;">${{siglaUnidade}}</span>
           </div>
           <div style="font-size:12px;color:#a5f3fc;font-weight:800;">🔐 ${{cert.modo || ''}}</div>
         </div>
@@ -2589,7 +2343,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       document.getElementById("cfgCnpj").value = cfg.cnpj || "";
       document.getElementById("cfgSerie").value = cfg.serie_padrao || "";
       document.getElementById("cfgIm").value = cfg.inscricao_municipal || "";
-      document.getElementById("cfgAliq").value = cfg.aliquota_iss_padrao ?? 5.0;
+      document.getElementById("cfgAliq").value = cfg.aliquota_iss_padrao ?? (FILIAL_ATIVA === 'MATRIZ_CE' ? 5.0 : 2.0);
+      if (document.getElementById("nfAliqIss")) document.getElementById("nfAliqIss").value = cfg.aliquota_iss_padrao ?? (FILIAL_ATIVA === 'MATRIZ_CE' ? 5.0 : 2.0);
       document.getElementById("cfgRazao").value = cfg.razao_social || "";
       document.getElementById("cfgFone").value = cfg.telefone || "";
       document.getElementById("cfgEnd").value = cfg.endereco || "";
@@ -3957,6 +3712,258 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
     initPortalFiscal();
   </script>
+
+  <!-- MODAL DE ITENS DA NOTA RECEBIDA (RADAR DF-E) -->
+  <div class="modal-overlay" id="modalItensDFe" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#0f172a;border:1.5px solid #0284c7;border-radius:12px;width:680px;max-width:95%;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,0.6);color:#fff;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #334155;padding-bottom:10px;">
+        <h3 id="modalItensDFeTitulo" style="margin:0;font-size:16px;color:#38bdf8;">Itens da Nota Fiscal</h3>
+        <button type="button" onclick="fecharModalItensDFe()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">&times;</button>
+      </div>
+      <div style="overflow-x:auto;max-height:350px;">
+        <table style="width:100%;font-size:12px;">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Descrição do Item / Peça</th>
+              <th>Qtd</th>
+              <th>Preço Unitário</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyModalItensDFe"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:16px;text-align:right;">
+        <button type="button" class="btn btn-outline" onclick="fecharModalItensDFe()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE FICHA FISCAL, TRIBUTÁRIA & PRECIFICAÇÃO (PENTE FINO MULTI-ESTADUAL) -->
+  <div id="modalFichaFiscalPeca" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;backdrop-filter:blur(5px);overflow-y:auto;padding:20px;">
+    <div style="max-width:880px;margin:20px auto;background:#0f172a;border:2px solid #0284c7;border-radius:12px;padding:24px;color:#f8fafc;box-shadow:0 10px 40px rgba(2,132,199,0.3);">
+      
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #334155;padding-bottom:12px;margin-bottom:16px;">
+        <div>
+          <div style="font-size:16px;font-weight:900;color:#38bdf8;" id="modalFichaTitulo">⚙️ Ficha Fiscal, Tributária &amp; Precificação</div>
+          <div style="font-size:12px;color:#94a3b8;" id="modalFichaSubtitulo">Configuração avançada para emissão estadual e apuração de margens</div>
+        </div>
+        <button type="button" onclick="fecharModalFichaFiscal()" class="btn btn-outline" style="padding:4px 10px;font-size:13px;color:#94a3b8;">✕ Fechar</button>
+      </div>
+
+      <!-- ABAS DO MODAL -->
+      <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid #1e293b;padding-bottom:8px;overflow-x:auto;">
+        <button type="button" class="btn btn-blue" id="tabBtn_ident" onclick="mudarTabFicha('ident')" style="font-size:12px;padding:6px 12px;">🏷️ Identificação &amp; Engenharia</button>
+        <button type="button" class="btn btn-outline" id="tabBtn_icms" onclick="mudarTabFicha('icms')" style="font-size:12px;padding:6px 12px;">🏛️ ICMS, NCM &amp; Estados</button>
+        <button type="button" class="btn btn-outline" id="tabBtn_fed" onclick="mudarTabFicha('fed')" style="font-size:12px;padding:6px 12px;">🇧🇷 Tributos Federais (PIS/COFINS/IPI)</button>
+        <button type="button" class="btn btn-outline" id="tabBtn_preco" onclick="mudarTabFicha('preco')" style="font-size:12px;padding:6px 12px;">💰 Precificação &amp; Margens</button>
+      </div>
+
+      <input type="hidden" id="fch_id" />
+
+      <!-- ABA 1: IDENTIFICAÇÃO & ENGENHARIA CLÍNICA (RDC 611) -->
+      <div id="tabContent_ident">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
+          <div style="grid-column:1/-1;">
+            <label>Descrição Oficial da Peça / Produto:</label>
+            <input id="fch_nome" type="text" style="width:100%;font-weight:700;" />
+          </div>
+          <div>
+            <label>Código Interno (SKU):</label>
+            <input id="fch_codigo" type="text" disabled style="background:#1e293b;opacity:0.7;" />
+          </div>
+          <div>
+            <label>Código de Barras / GTIN / EAN:</label>
+            <input id="fch_ean" type="text" placeholder="SEM GTIN ou 789..." />
+          </div>
+          <div>
+            <label>Fabricante / Marca:</label>
+            <input id="fch_fabricante" type="text" placeholder="Ex: GE, Philips, Siemens, Dunlee..." />
+          </div>
+          <div>
+            <label>Modelo / Tomógrafo Compatível:</label>
+            <input id="fch_modelo" type="text" placeholder="Ex: Optima CT520, Revolution EVO..." />
+          </div>
+          <div>
+            <label>Número de Série (RDC 611 / Tubos RX):</label>
+            <input id="fch_serie" type="text" placeholder="Nº de Série do Tubo ou Placa" />
+          </div>
+          <div>
+            <label>Lote de Fabricação:</label>
+            <input id="fch_lote" type="text" placeholder="Lote do Fabricante" />
+          </div>
+          <div>
+            <label>Unidade Comercial:</label>
+            <select id="fch_unidade">
+              <option value="UN">UN - Unidade</option>
+              <option value="PC">PC - Peça</option>
+              <option value="JG">JG - Jogo</option>
+              <option value="KIT">KIT - Conjunto/Kit</option>
+              <option value="MT">MT - Metros</option>
+            </select>
+          </div>
+          <div>
+            <label>Localização no Almoxarifado:</label>
+            <input id="fch_local" type="text" placeholder="Ex: Prateleira 2, Base Paulo, Gaveta B" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ABA 2: ICMS, NCM & LEIS ESTADUAIS (DF, CE, INTERESTADUAL) -->
+      <div id="tabContent_icms" style="display:none;">
+        <div style="background:#1e293b;border-left:4px solid #38bdf8;padding:10px 14px;border-radius:4px;font-size:12px;margin-bottom:14px;line-height:1.5;">
+          <b>⚖️ Diretrizes Estaduais &amp; Isenções de Saúde:</b><br/>
+          &bull; <b>Equipamentos Hospitalares:</b> Possuem isenção/desoneração pelo Convênio ICMS 01/99 e 126/10 quando faturados para clínicas e hospitais.<br/>
+          &bull; <b>Transferência de Peças (CE ⇄ DF):</b> Não incidência de ICMS vinculante (STF ADC 49 / LC 204/2023).
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
+          <div>
+            <label>NCM (8 Dígitos - Obrigatório SEFAZ):</label>
+            <input id="fch_ncm" type="text" placeholder="Ex: 9022.90.90 (Tubo/RX)" maxlength="10" style="font-weight:700;color:#38bdf8;" />
+          </div>
+          <div>
+            <label>CEST (Substituição Tributária):</label>
+            <input id="fch_cest" type="text" placeholder="Ex: 01.001.00 ou vazio" maxlength="10" />
+          </div>
+          <div>
+            <label>Origem da Mercadoria:</label>
+            <select id="fch_origem">
+              <option value="0">0 - Nacional</option>
+              <option value="1">1 - Estrangeira (Importação Direta)</option>
+              <option value="2">2 - Estrangeira (Adquirida Mercado Interno)</option>
+              <option value="4">4 - Nacional com Conteúdo de Importação > 40%</option>
+            </select>
+          </div>
+          <div>
+            <label>Regime ICMS / CSOSN (Simples Nacional):</label>
+            <select id="fch_csosn">
+              <option value="102">102 - Tributada pelo Simples sem permissão de crédito</option>
+              <option value="400">400 - Não tributada pelo Simples Nacional (Isenta)</option>
+              <option value="500">500 - ICMS cobrado anteriormente por Substituição Tributária</option>
+              <option value="900">900 - Outros (Com destaque / Operação Especial)</option>
+            </select>
+          </div>
+          <div>
+            <label>Alíquota Interna de ICMS (%):</label>
+            <input id="fch_aliq_icms" type="number" step="0.1" placeholder="Ex: 20.0 (CE) ou 18.0 (DF)" />
+          </div>
+          <div>
+            <label>Redução da Base de Cálculo (%):</label>
+            <input id="fch_red_icms" type="number" step="0.1" placeholder="Ex: 0.0" />
+          </div>
+          <div>
+            <label>CFOP Padrão Venda:</label>
+            <input id="fch_cfop_venda" type="text" value="5102" />
+          </div>
+          <div>
+            <label>CFOP Padrão Transferência:</label>
+            <input id="fch_cfop_trf" type="text" value="5152" />
+          </div>
+          <div style="grid-column:1/-1;">
+            <label>Motivo de Desoneração / Amparo Legal de Isenção:</label>
+            <input id="fch_isencao_motivo" type="text" value="Convênio ICMS 01/99 - Equipamento Médico-Hospitalar" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ABA 3: TRIBUTOS FEDERAIS (PIS, COFINS, IPI) -->
+      <div id="tabContent_fed" style="display:none;">
+        <div style="background:#1e293b;border-left:4px solid #10b981;padding:10px 14px;border-radius:4px;font-size:12px;margin-bottom:14px;line-height:1.5;">
+          <b>🏥 Benefício Fiscal Federal (Alíquota Zero):</b><br/>
+          Dispositivos e peças de imagem e medicina hospitalar contam com enquadramento especial de alíquota zero de PIS/COFINS (Decreto Federal nº 6.426/2008 e Lei 10.865/2004).
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
+          <div>
+            <label>CST PIS:</label>
+            <select id="fch_cst_pis">
+              <option value="49">49 - Outras Operações de Saída</option>
+              <option value="06">06 - Operação Tributável a Alíquota Zero (Hospitalar)</option>
+              <option value="04">04 - Operação Monofásica / Substituição</option>
+              <option value="01">01 - Operação Tributável com Alíquota Básica</option>
+            </select>
+          </div>
+          <div>
+            <label>Alíquota PIS (%):</label>
+            <input id="fch_aliq_pis" type="number" step="0.01" value="0.00" />
+          </div>
+          <div>
+            <label>CST COFINS:</label>
+            <select id="fch_cst_cofins">
+              <option value="49">49 - Outras Operações de Saída</option>
+              <option value="06">06 - Operação Tributável a Alíquota Zero (Hospitalar)</option>
+              <option value="04">04 - Operação Monofásica / Substituição</option>
+              <option value="01">01 - Operação Tributável com Alíquota Básica</option>
+            </select>
+          </div>
+          <div>
+            <label>Alíquota COFINS (%):</label>
+            <input id="fch_aliq_cofins" type="number" step="0.01" value="0.00" />
+          </div>
+          <div>
+            <label>CST IPI:</label>
+            <select id="fch_cst_ipi">
+              <option value="53">53 - Saída Não-Tributada</option>
+              <option value="51">51 - Saída com Alíquota Zero</option>
+              <option value="50">50 - Saída Tributada</option>
+            </select>
+          </div>
+          <div>
+            <label>Alíquota IPI (%):</label>
+            <input id="fch_aliq_ipi" type="number" step="0.1" value="0.0" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ABA 4: PRECIFICAÇÃO & MARGENS DE VENDA -->
+      <div id="tabContent_preco" style="display:none;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+          <div>
+            <label>Preço de Custo Última Compra (R$):</label>
+            <input id="fch_custo" type="number" step="0.01" oninput="recalcularPrecosFicha()" style="font-weight:700;color:#f87171;" />
+          </div>
+          <div>
+            <label>Custo Médio Ponderado (R$):</label>
+            <input id="fch_custo_medio" type="number" step="0.01" />
+          </div>
+          <div>
+            <label>Margem Contrato (%):</label>
+            <input id="fch_mg_contrato" type="number" step="1" oninput="recalcularPrecosFicha()" placeholder="Ex: 30" />
+          </div>
+          <div>
+            <label>Margem Avulso / Emergencial (%):</label>
+            <input id="fch_mg_avulso" type="number" step="1" oninput="recalcularPrecosFicha()" placeholder="Ex: 60" />
+          </div>
+          <div>
+            <label>Margem À Vista (%):</label>
+            <input id="fch_mg_avista" type="number" step="1" placeholder="Ex: 20" />
+          </div>
+          <div>
+            <label>Margem Desestímulo (% - Tubos Raros):</label>
+            <input id="fch_mg_desestimulo" type="number" step="1" placeholder="Ex: 180" />
+          </div>
+          <div>
+            <label>Preço de Venda Sugerido (Tabela R$):</label>
+            <input id="fch_preco_tabela" type="number" step="0.01" style="font-weight:800;color:#4ade80;font-size:14px;" />
+          </div>
+          <div>
+            <label>Preço Mínimo Piso (Segurança R$):</label>
+            <input id="fch_preco_minimo" type="number" step="0.01" style="font-weight:800;color:#fbbf24;" />
+          </div>
+        </div>
+        <div style="font-size:11.5px;color:#94a3b8;margin-top:10px;">
+          💡 <b>Dica de Precificação:</b> Você pode alterar os preços de tabela e piso manualmente a qualquer momento. Eles serão aplicados automaticamente na geração de propostas e remessas.
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;border-top:1px solid #334155;padding-top:14px;">
+        <button type="button" onclick="fecharModalFichaFiscal()" class="btn btn-outline" style="padding:8px 16px;">Cancelar</button>
+        <button type="button" onclick="salvarFichaFiscalPeca()" class="btn btn-blue" id="btnSalvarFichaFiscal" style="padding:8px 20px;font-weight:800;">💾 Salvar Parâmetros Fiscais &amp; Precificação</button>
+      </div>
+
+    </div>
+  </div>
+
 </body>
 </html>"""
     return web.Response(text=html, content_type="text/html")
