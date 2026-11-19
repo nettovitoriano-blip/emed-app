@@ -1,9 +1,19 @@
-const CACHE_NAME = 'emed-pwa-v1-3-0-konica-fr-se00003';
+const CACHE_NAME = 'emed-pwa-v1-3-2-nav-maps-fix';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
   '/?modo=gestor',
+  '/nav',
+  '/gps',
+  '/frota',
   '/manifest.json',
+  '/static/index.html',
+  '/static/frota.html',
+  '/static/leaflet.css',
+  '/static/leaflet.js',
+  '/static/simbolo_emed_clean.svg',
+  '/static/simbolo_emed_red.svg',
+  '/static/logo_emed_arroba.png',
   '/api/logo',
   '/api/app-icon/192',
   '/api/app-icon/512'
@@ -62,6 +72,14 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
+  // REGRA DE OURO PARA MAPAS E TILES:
+  // NUNCA interceptar requisições cross-origin (fora do domínio do app).
+  // Isso garante que Google Maps Tiles (mt0..mt3.google.com), OpenStreetMap (tile.openstreetmap.org),
+  // CartoCDN e YouTube sejam carregados diretamente pela rede nativa sem bloqueios de CORS, timeouts ou SW!
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
   // 1. /api/bootstrap: rede com timeout 3.5s -> fallback instantaneo no cache
   if (url.pathname.startsWith('/api/bootstrap')) {
     event.respondWith(
@@ -84,7 +102,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Navegacao / App Shell (somente raiz / e /index.html; nunca interceptar /api/imprimir, /proposta/, /nav etc.)
+  // 2. Navegacao / App Shell (raiz / e /index.html)
   if (url.pathname === '/' || url.pathname === '/index.html') {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
@@ -98,7 +116,7 @@ self.addEventListener('fetch', (event) => {
           return cached;
         }
         try {
-          const netRes = await fetchWithTimeout(req, 4000);
+          const netRes = await fetchWithTimeout(req, 5000);
           if (netRes && netRes.ok) {
             await cache.put(req, netRes.clone());
             await cache.put('/?modo=tecnico', netRes.clone());
@@ -116,18 +134,45 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. Estaticos, manifest e icones: Cache-First com atualizacao silenciosa
+  // 2.1 Rotas do EmedNav GPS e Frota (/nav, /gps, /frota, /emedcar)
+  if (url.pathname === '/nav' || url.pathname === '/gps' || url.pathname === '/emedcar' || url.pathname === '/frota') {
+    event.respondWith(
+      caches.open(CACHE_NAME).then(async (cache) => {
+        try {
+          const netRes = await fetchWithTimeout(req, 5000);
+          if (netRes && netRes.ok) {
+            await cache.put(req, netRes.clone());
+            return netRes;
+          }
+        } catch (e) {}
+        const fallbackTarget = (url.pathname === '/frota') ? '/static/frota.html' : '/static/index.html';
+        const cached = (await cache.match(req)) || (await cache.match(fallbackTarget));
+        if (cached) return cached;
+        return fetch(req);
+      })
+    );
+    return;
+  }
+
+  // 3. Estaticos locais, scripts (Leaflet), manifest e icones: Stale-While-Revalidate com Resiliencia
   if (!url.pathname.startsWith('/api/') || url.pathname.startsWith('/api/logo') || url.pathname.startsWith('/api/icone-autosave') || url.pathname.startsWith('/api/app-icon/')) {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
         const cached = await cache.match(req);
-        const netPromise = fetchWithTimeout(req, 3000)
-          .then((res) => {
-            if (res && res.ok) cache.put(req, res.clone());
-            return res;
-          })
-          .catch(() => null);
-        return cached || (await netPromise) || Response.error();
+        const fetchPromise = fetch(req).then((res) => {
+          if (res && res.ok) {
+            try { cache.put(req, res.clone()); } catch (err) {}
+          }
+          return res;
+        }).catch(() => null);
+
+        if (cached) {
+          // Atualiza em background
+          event.waitUntil(fetchPromise);
+          return cached;
+        }
+        const netRes = await fetchPromise;
+        return netRes || cached || new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
       })
     );
   }

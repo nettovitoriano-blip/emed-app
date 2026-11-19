@@ -1,8 +1,9 @@
-// EmedNav Service Worker - v30 (Alta Performance, Tiles Nativo Direto e Zero Bloqueios)
-const CACHE_NAME = 'emednav-v30-direct-tiles';
+// EmedNav Service Worker - v31 (Ultra Resiliente, Suporte Offline e Zero Bloqueios)
+const CACHE_NAME = 'emednav-v31-ultra-resilient';
 
 const ASSETS_TO_CACHE = [
   '/',
+  '/nav',
   '/gps',
   '/emedcar',
   '/frota',

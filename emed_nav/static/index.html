@@ -15,9 +15,34 @@
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="/static/icon-192.png">
 
-  <!-- Leaflet CSS & JS com Dupla Resiliência (Local Offline + Fallback CDN Automático) -->
-  <link rel="stylesheet" href="/static/leaflet.css" />
+    <!-- Leaflet CSS & JS com Ultra-Resiliência Offline + Fallback Assíncrono Sem Bloqueios Mobile -->
+  <link rel="stylesheet" href="/static/leaflet.css" onerror="this.onerror=null;this.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';" />
   <script src="/static/leaflet.js"></script>
+  <script>
+    // Fallback assíncrono moderno: NUNCA usa document.write (que é bloqueado no Chrome Mobile)
+    window.__ensureLeafletLoaded = function(callback) {
+      if (typeof L !== 'undefined') {
+        if (callback) callback();
+        return;
+      }
+      console.warn('Leaflet local indisponível. Carregando CDN de alta disponibilidade...');
+      const s = document.createElement('script');
+      s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      s.async = true;
+      s.onload = function() {
+        console.log('✅ Leaflet carregado com sucesso via CDN!');
+        if (callback) callback();
+      };
+      s.onerror = function() {
+        // Segundo fallback via cdnjs
+        const s2 = document.createElement('script');
+        s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js';
+        s2.onload = function() { if (callback) callback(); };
+        document.head.appendChild(s2);
+      };
+      document.head.appendChild(s);
+    };
+  </script>
   <script>
     if (typeof L === 'undefined') {
       document.write('<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">');
@@ -257,32 +282,28 @@
       display: none; text-align: center; white-space: nowrap;
     }
 
-    /* MAPA LEAFLET */
+    /* MAPA LEAFLET ULTRA FLUIDO COM ZERO TELA PRETA */
     #map-wrapper {
-      flex: 1; width: 100%; position: relative; z-index: 1;
+      flex: 1; width: 100%; height: 100%; position: relative; z-index: 1; min-height: 250px;
+      background: #080d1a;
     }
     #map { 
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
       width: 100%; height: 100%; 
-      transform: translate3d(0, 0, 0);
-      -webkit-transform: translate3d(0, 0, 0);
-      will-change: transform;
       touch-action: pan-x pan-y pinch-zoom;
-    }
-    .leaflet-tile {
-      will-change: transform;
-      transform: translate3d(0, 0, 0);
-      image-rendering: -webkit-optimize-contrast;
-    }
-    .leaflet-tile-container img {
-      will-change: transform;
-      transform: translate3d(0, 0, 0);
-    }
-    .leaflet-marker-icon {
-      will-change: transform;
-      transform: translate3d(0, 0, 0);
+      background: #080d1a;
     }
     .leaflet-container {
+      background: #080d1a !important;
       touch-action: pan-x pan-y pinch-zoom !important;
+    }
+    @keyframes pulseMusicVoice {
+      0% { box-shadow: 0 0 0 0 rgba(236,72,153, 0.6); }
+      70% { box-shadow: 0 0 0 14px rgba(236,72,153, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(236,72,153, 0); }
+    }
+    .btn-voice-music:active {
+      transform: scale(0.97);
     }
 
     /* BOTÕES FLUTUANTES NO MAPA */
@@ -758,8 +779,9 @@
         <a id="btn-hud-frota" href="/frota" class="btn-hud-icon" title="Abrir Central Administrativa de Monitoramento da Frota eMED" style="background: linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%); border-color: #38bdf8; text-decoration: none; width: auto; padding: 0 10px; font-size: 12px; font-weight: 900; gap: 4px;">
           <span>🛰️</span><span>Frota</span>
         </a>
-        <button id="btn-music-open" class="btn-hud-icon" title="Música & Playlists (YouTube, Deezer, Spotify)" onclick="openMusicModal()" style="background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%); border-color: #f472b6;">🎵</button>
+        <button id="btn-music-open" class="btn-hud-icon" title="Música & Playlists por Voz (YouTube)" onclick="openMusicModal()" style="background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%); border-color: #f472b6;">🎵</button>
         <button id="btn-audio-toggle" class="btn-hud-icon active" title="Alternar Alerta Sonoro">🔊</button>
+        <button id="btn-hud-resenha" class="btn-hud-icon" onclick="toggleModoResenha()" title="Modo Resenha (Causos e Piadas do Trecho - Opcional)" style="background:rgba(245, 158, 11, 0.25); border-color:#f59e0b; color:#fbbf24; font-size:14px;">🎭</button>
         <button id="btn-history-routes" class="btn-hud-icon" title="Histórico de Rotas Geradas e Viagens do GPS" style="background: rgba(168, 85, 247, 0.35); border-color: #c084fc;">⏱️</button>
         <button id="btn-services-search" class="btn-hud-icon" title="Buscar Serviços na Rota (Posto, Restaurante, Hotel)" style="background: rgba(2, 132, 199, 0.4); border-color: #38bdf8;">🔍</button>
         <button id="btn-sync-radars" class="btn-hud-icon" title="Atualizar Banco de Radares (Manual / Mensal)">🔄</button>
@@ -857,6 +879,27 @@
     </div>
 
     <!-- TOAST NOTIFICATION -->
+    
+    <!-- BALÃO FLUTUANTE DO CAUSO / PIADA DO TRECHO -->
+    <div id="causo-trecho-card" style="display:none; position:fixed; top:72px; left:12px; right:12px; z-index:2650; background:linear-gradient(135deg, rgba(15,23,42,0.98) 0%, rgba(30,41,59,0.95) 100%); border:2px solid #f59e0b; border-radius:14px; padding:12px 14px; box-shadow:0 12px 32px rgba(0,0,0,0.85); backdrop-filter:blur(8px);">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+        <div style="font-size:26px; line-height:1;">🎭</div>
+        <div style="flex:1;">
+          <div style="font-size:11px; font-weight:900; color:#fbbf24; text-transform:uppercase; letter-spacing:0.5px;" id="causo-titulo">Causo do Trecho Cearense</div>
+          <div style="font-size:13.5px; color:#f8fafc; margin-top:4px; line-height:1.45; font-weight:500;" id="causo-texto">...</div>
+        </div>
+        <button onclick="fecharCausoCard()" style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer; padding:0 4px; line-height:1;">✕</button>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
+        <button onclick="contarPiadaTrecho()" style="background:rgba(245,158,11,0.25); border:1px solid #f59e0b; color:#fde047; font-size:11px; font-weight:800; padding:4px 10px; border-radius:16px; cursor:pointer;">
+          🎲 Outro Causo
+        </button>
+        <button onclick="fecharCausoCard()" style="background:#334155; border:none; color:#f8fafc; font-size:11px; font-weight:800; padding:4px 10px; border-radius:16px; cursor:pointer;">
+          👍 Fechar
+        </button>
+      </div>
+    </div>
+
     <div id="toast-msg">🏁 Rota traçada com sucesso!</div>
 
     <!-- MAPA LEAFLET -->
@@ -882,6 +925,9 @@
           </button>
           <button id="btn-customize-map" onclick="openMapCustomizeModal()" style="background:rgba(255,255,255,0.08); border:none; color:#f8fafc; font-size:12px; font-weight:700; padding:6px 10px; border-radius:6px; text-align:left; cursor:pointer; display:flex; align-items:center; gap:8px;">
             <span>🎨</span> Personalizar Visual
+          </button>
+          <button onclick="contarPiadaTrecho()" style="background:rgba(245,158,11,0.18); border:1px solid #f59e0b; color:#fbbf24; font-size:12px; font-weight:700; padding:6px 10px; border-radius:6px; text-align:left; cursor:pointer; display:flex; align-items:center; gap:8px;">
+            <span>🎭</span> Causo / Piada da Estrada
           </button>
           <button id="btn-pwa-install-menu" onclick="triggerPWAInstall()" style="background:rgba(56,189,248,0.18); border:1px solid #38bdf8; color:#38bdf8; font-size:12px; font-weight:800; padding:6px 10px; border-radius:6px; text-align:left; cursor:pointer; display:flex; align-items:center; gap:8px;">
             <span>📲</span> Instalar App no Celular
@@ -1264,9 +1310,55 @@
           <div style="font-size:28px;">🎵</div>
           <div style="flex:1;">
             <div class="modal-title" style="color:#c084fc;">Central de Música na Estrada</div>
-            <div class="modal-subtitle">Acesso direto ao YouTube, Deezer & Playlists de Viagem</div>
+            <div class="modal-subtitle">Comando de voz para tocar direto no YouTube & Downloads</div>
           </div>
           <button onclick="closeMusicModal()" class="btn-close-modal" type="button">✕</button>
+        </div>
+
+        <!-- BOTÃO GRANDE DE VOZ (O COPILOTO PERGUNTA O QUE O TÉCNICO QUER ESCUTAR) -->
+        <button onclick="startVoiceMusicSearch()" class="btn-voice-music" style="background:linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%); border:2px solid #f472b6; width:100%; border-radius:12px; padding:12px 14px; color:white; display:flex; align-items:center; justify-content:center; gap:12px; margin:10px 0 10px 0; cursor:pointer; box-shadow:0 0 18px rgba(236,72,153,0.45); animation:pulseMusicVoice 2s infinite;">
+          <span style="font-size:28px;">🎙️</span>
+          <div style="display:flex; flex-direction:column; text-align:left;">
+            <span style="font-size:14px; font-weight:900; letter-spacing:0.3px; color:#ffffff;">PEDIR MÚSICA POR VOZ (FALAR AGORA)</span>
+            <span style="font-size:11px; color:#fce7f3;">O copiloto pergunta e já toca o artista no YouTube!</span>
+          </div>
+        </button>
+
+        <!-- ATALHOS RÁPIDOS DOS VETERANOS (1 TOQUE DIRETO NO YOUTUBE MUSIC) -->
+        <div style="margin-bottom:10px; background:rgba(30,41,59,0.7); border:1px solid rgba(168,85,247,0.3); border-radius:10px; padding:8px 10px;">
+          <div style="font-size:10.5px; font-weight:900; color:#c084fc; text-transform:uppercase; margin-bottom:6px; letter-spacing:0.5px; display:flex; align-items:center; gap:6px;">
+            <span>🤠</span> PREFERIDAS DOS TÉCNICOS VETERANOS (1-TOQUE):
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+            <button onclick="playMusicSearch('Bruno e Marrone as melhores modao')" class="btn-music-app" style="background:rgba(239,68,68,0.2); border:1px solid #ef4444; padding:6px 8px; justify-content:flex-start;">
+              <span style="font-size:16px;">🤠</span>
+              <div style="text-align:left; margin-left:4px;">
+                <div style="font-size:11.5px; font-weight:900; color:#fca5a5;">Bruno & Marrone</div>
+                <div style="font-size:9px; color:#f87171;">Modão Sertanejo</div>
+              </div>
+            </button>
+            <button onclick="playMusicSearch('Forro das antigas mastruz com leite limao com mel')" class="btn-music-app" style="background:rgba(245,158,11,0.2); border:1px solid #f59e0b; padding:6px 8px; justify-content:flex-start;">
+              <span style="font-size:16px;">🪗</span>
+              <div style="text-align:left; margin-left:4px;">
+                <div style="font-size:11.5px; font-weight:900; color:#fde68a;">Forró das Antigas</div>
+                <div style="font-size:9px; color:#fbbf24;">Mastruz / Limão</div>
+              </div>
+            </button>
+            <button onclick="playMusicSearch('Amado Batista Reginaldo Rossi Zezo seresta')" class="btn-music-app" style="background:rgba(168,85,247,0.2); border:1px solid #a855f7; padding:6px 8px; justify-content:flex-start;">
+              <span style="font-size:16px;">🍺</span>
+              <div style="text-align:left; margin-left:4px;">
+                <div style="font-size:11.5px; font-weight:900; color:#e9d5ff;">Brega & Seresta</div>
+                <div style="font-size:9px; color:#c084fc;">Amado / Rossi / Zezo</div>
+              </div>
+            </button>
+            <button onclick="playMusicSearch('Rock nacional anos 80 melhores flashback')" class="btn-music-app" style="background:rgba(56,189,248,0.2); border:1px solid #38bdf8; padding:6px 8px; justify-content:flex-start;">
+              <span style="font-size:16px;">🎸</span>
+              <div style="text-align:left; margin-left:4px;">
+                <div style="font-size:11.5px; font-weight:900; color:#bae6fd;">Rock Anos 80</div>
+                <div style="font-size:9px; color:#38bdf8;">Clássicos BR</div>
+              </div>
+            </button>
+          </div>
         </div>
 
         <!-- BOTÃO DE DESTAQUE: MEUS DOWNLOADS OFFLINE NO CELULAR -->
@@ -1524,77 +1616,144 @@
       sheetCollapsed: false
     };
 
-    // INICIALIZAÇÃO DO MAPA COM MOTOR DE ALTA FLUIDEZ (60 FPS - GOOGLE MAPS FEEL)
-    const map = L.map('map', {
-      zoomControl: false,
-      attributionControl: false,
-      preferCanvas: true,
-      fadeAnimation: true,
-      zoomAnimation: true,
-      markerZoomAnimation: true,
-      wheelPxPerZoomLevel: 120,
-      zoomSnap: 0.25,
-      zoomDelta: 0.5,
-      inertia: true,
-      inertiaDeceleration: 3500,
-      inertiaMaxSpeed: 2500,
-      easeLinearity: 0.25,
-      updateWhenZooming: false,
-      updateWhenIdle: true
-    }).setView([state.carLat, state.carLon], 15);
+    // ESTADO DO MODO RESENHA (PIADAS DO TRECHO)
+    state.modoResenha = (localStorage.getItem('emed_modo_resenha') === 'true');
 
-    // CAMADAS DE TILES (ZERO MARCA D'ÁGUA)
-    const tileGoogleRoads = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-      maxZoom: 20,
-      subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
-    });
+    // INICIALIZAÇÃO ROBUSTA DO MAPA COM TRIPLO FALLBACK E RESILIÊNCIA CONTRA TELA PRETA
+    let map = null;
+    let tileGoogleRoads = null;
+    let tileGoogleHybrid = null;
+    let tileCartoVoyager = null;
+    let tileOSM = null;
+    let activeTileLayer = null;
 
-    const tileGoogleHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-      maxZoom: 20,
-      subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
-    });
-
-    const tileOSM = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19
-    });
-
-    tileGoogleRoads.addTo(map);
-
-    // Fallback automático de contingência: se a rede Wi-Fi bloquear Google Tiles, alterna para OpenStreetMap
-    let googleTileFailures = 0;
-    tileGoogleRoads.on('tileerror', () => {
-      googleTileFailures++;
-      if (googleTileFailures === 4) {
-        console.warn('Google Tiles com falha. Alternando para OpenStreetMap...');
-        if (state.mapMode === 'ROADS') {
-          map.removeLayer(tileGoogleRoads);
-          tileOSM.addTo(map);
-          showToast('🌐 Rede com restrição Google: mapa alternado para OpenStreetMap');
+    function initEmedMapInstance() {
+      if (typeof L === 'undefined') {
+        console.warn('Leaflet ainda não disponível. Tentando carregar via CDN...');
+        if (window.__ensureLeafletLoaded) {
+          window.__ensureLeafletLoaded(() => initEmedMapInstance());
+        } else {
+          setTimeout(initEmedMapInstance, 200);
         }
+        return;
       }
-    });
 
-    // Invalidação de tamanho garantida no carregamento do mapa para evitar tela preta em celulares
-    window.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => { if (typeof map !== 'undefined' && map) map.invalidateSize(); }, 200);
-      setTimeout(() => { if (typeof map !== 'undefined' && map) map.invalidateSize(); }, 700);
-    });
-    window.addEventListener('load', () => {
-      setTimeout(() => { if (typeof map !== 'undefined' && map) map.invalidateSize(); }, 300);
-    });
+      if (map) return; // Já inicializado
+
+      try {
+        map = L.map('map', {
+          zoomControl: false,
+          attributionControl: false,
+          preferCanvas: true,
+          fadeAnimation: true,
+          zoomAnimation: true,
+          markerZoomAnimation: true,
+          wheelPxPerZoomLevel: 120,
+          zoomSnap: 0.25,
+          zoomDelta: 0.5,
+          inertia: true,
+          inertiaDeceleration: 3500,
+          inertiaMaxSpeed: 2500,
+          easeLinearity: 0.25,
+          updateWhenZooming: false,
+          updateWhenIdle: true
+        }).setView([state.carLat, state.carLon], 15);
+
+        // 1. Google Roads (Padrão)
+        tileGoogleRoads = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+          maxZoom: 20,
+          subdomains: ['0', '1', '2', '3'],
+          crossOrigin: true
+        });
+
+        // 2. Google Híbrido Satélite
+        tileGoogleHybrid = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+          maxZoom: 20,
+          subdomains: ['0', '1', '2', '3'],
+          crossOrigin: true
+        });
+
+        // 3. CartoDB Voyager (Fallback imediato ultra-rápido, sem bloqueio de referer)
+        tileCartoVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19,
+          subdomains: 'abcd'
+        });
+
+        // 4. OpenStreetMap
+        tileOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          subdomains: ['a', 'b', 'c']
+        });
+
+        activeTileLayer = tileGoogleRoads;
+        activeTileLayer.addTo(map);
+
+        // Proteção automática contra tela preta: se Google falhar 2 tiles, chaveia para CartoDB silenciosamente
+        let tileFails = 0;
+        tileGoogleRoads.on('tileerror', () => {
+          tileFails++;
+          if (tileFails >= 2 && activeTileLayer === tileGoogleRoads) {
+            console.warn('Google Tiles com falha. Chaveando para CartoDB Voyager...');
+            map.removeLayer(tileGoogleRoads);
+            activeTileLayer = tileCartoVoyager;
+            activeTileLayer.addTo(map);
+          }
+        });
+
+        // Invalidações de tamanho sucessivas para garantir renderização perfeita em qualquer celular
+        [100, 300, 600, 1200, 2000].forEach(ms => {
+          setTimeout(() => { if (map) map.invalidateSize(); }, ms);
+        });
+
+        window.addEventListener('resize', () => { if (map) map.invalidateSize(); });
+        window.addEventListener('orientationchange', () => { setTimeout(() => { if (map) map.invalidateSize(); }, 300); });
+
+        // Continua a montagem dos marcadores e listeners
+        setupMapAfterInit();
+      } catch (err) {
+        console.error('Erro ao inicializar mapa Leaflet:', err);
+      }
+    }
+
+    function setupMapAfterInit() {
+      if (!map || typeof L === 'undefined') return;
+      setupCarMarker();
+      if (!gpsHistoryLayer) gpsHistoryLayer = L.layerGroup().addTo(map);
+      if (!fleetVehiclesLayer) fleetVehiclesLayer = L.layerGroup().addTo(map);
+      if (!clientsLayerContrato) clientsLayerContrato = L.layerGroup().addTo(map);
+      if (!clientsLayerAvulso) clientsLayerAvulso = L.layerGroup().addTo(map);
+      if (!emedBaseLayer) emedBaseLayer = L.layerGroup().addTo(map);
+      if (!radarsLayer) radarsLayer = L.layerGroup().addTo(map);
+      try { renderEmedBases(); } catch(e) {}
+      try { loadClientMarkers(); } catch(e) {}
+      try { loadFleetVehicles(); } catch(e) {}
+      atualizarBotaoResenhaUI();
+    }
+
+    // Inicialização imediata com retentativas suaves
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initEmedMapInstance);
+    } else {
+      initEmedMapInstance();
+    }
 
     // ÍCONE DO VEÍCULO (CAPTUR EMD-2026)
-    const carIconHtml = `
-      <div style="position: relative; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center;">
-        <div style="position: absolute; width: 46px; height: 46px; border-radius: 50%; background: rgba(56, 189, 248, 0.4); animation: pulseRadar 1.8s infinite;"></div>
-        <div style="background: #0284c7; border: 2.5px solid #ffffff; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,0.8); font-size: 18px;">
-          🚗
+    let carIcon = null;
+    function setupCarMarker() {
+      if (!map || typeof L === 'undefined') return;
+      if (state.carMarker) return;
+      const carIconHtml = `
+        <div style="position: relative; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center;">
+          <div style="position: absolute; width: 46px; height: 46px; border-radius: 50%; background: rgba(56, 189, 248, 0.4); animation: pulseRadar 1.8s infinite;"></div>
+          <div style="background: #0284c7; border: 2.5px solid #ffffff; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,0.8); font-size: 18px;">
+            🚗
+          </div>
         </div>
-      </div>
-    `;
-    const carIcon = L.divIcon({ html: carIconHtml, className: 'car-marker-icon', iconSize: [46, 46], iconAnchor: [23, 23] });
-    state.carMarker = L.marker([state.carLat, state.carLon], { icon: carIcon }).addTo(map)
-      .bindPopup(`<strong>🚗 Renault Captur EMD-2026</strong><br>Posição GPS em Tempo Real`);
+      `;
+      carIcon = L.divIcon({ html: carIconHtml, className: 'car-marker-icon', iconSize: [46, 46], iconAnchor: [23, 23] });
+      state.carMarker = L.marker([state.carLat, state.carLon], { icon: carIcon }).addTo(map)
+        .bindPopup(`<strong>🚗 Renault Captur EMD-2026</strong><br>Posição GPS em Tempo Real`);
+    }
 
     // ÍCONE DE DESTINO
     function setDestMarker(lat, lon, nome) {
@@ -1669,7 +1828,16 @@
 
       if ('speechSynthesis' in window && state.lastSpokenRadarId !== radar.via + radar.vel) {
         state.lastSpokenRadarId = radar.via + radar.vel;
-        const msg = new SpeechSynthesisUtterance(`Atenção, radar de ${radar.vel} quilômetros por hora a ${Math.round(distM)} metros.`);
+        let fraseRadar = `Atenção, radar de ${radar.vel} quilômetros por hora a ${Math.round(distM)} metros.`;
+        if (state.modoResenha) {
+          const frasesCamaradas = [
+            `Segura a viatura, patrão! Pardal dos homi logo ali a ${radar.vel} por hora!`,
+            `Pé no freio, meu consagrado! Radar dos guardas a ${radar.vel} por hora a ${Math.round(distM)} metros!`,
+            `Devagar com o andor, radar de ${radar.vel} por hora bem pertinho!`
+          ];
+          fraseRadar = frasesCamaradas[Math.floor(Math.random() * frasesCamaradas.length)];
+        }
+        const msg = new SpeechSynthesisUtterance(fraseRadar);
         msg.lang = 'pt-BR';
         msg.rate = 1.1;
         window.speechSynthesis.speak(msg);
@@ -2127,7 +2295,7 @@
     };
 
     // HISTÓRICO DE ROTAS GERADAS E TRAJETOS GRAVADOS PELO J16
-    let gpsHistoryLayer = L.layerGroup().addTo(map);
+    let gpsHistoryLayer = (map && typeof L !== 'undefined') ? L.layerGroup().addTo(map) : null;
     const btnHistory = document.getElementById('btn-history-routes');
     const modalHistory = document.getElementById('history-modal');
 
@@ -2272,7 +2440,7 @@
     // ==========================================================================
     // CAMADA DE VEÍCULOS DA FROTA NO MAPA (ENCONTRO DE TÉCNICOS / PARADA)
     // ==========================================================================
-    let fleetVehiclesLayer = L.layerGroup().addTo(map);
+    let fleetVehiclesLayer = (map && typeof L !== 'undefined') ? L.layerGroup().addTo(map) : null;
 
     async function loadFleetVehicles() {
       try {
@@ -2342,8 +2510,8 @@
     const EMED_SYMBOL_PATH = "M 111.14 14.21 C 105.35 14.24, 99.80 14.82, 94.10 15.89 C 88.40 16.97, 82.37 18.62, 76.95 20.65 C 71.53 22.68, 66.52 25.08, 61.59 28.07 C 56.65 31.06, 51.71 34.68, 47.34 38.61 C 42.97 42.55, 38.85 47.08, 35.35 51.67 C 31.86 56.26, 28.92 60.99, 26.36 66.17 C 23.81 71.34, 21.57 77.16, 20.03 82.73 C 18.48 88.29, 17.53 93.78, 17.10 99.54 C 16.66 105.29, 16.65 111.46, 17.40 117.25 C 18.16 123.03, 19.58 128.97, 21.63 134.26 C 23.67 139.55, 26.35 144.40, 29.69 148.99 C 33.04 153.58, 37.32 158.09, 41.68 161.79 C 46.03 165.48, 50.71 168.47, 55.81 171.15 C 60.91 173.82, 66.63 176.07, 72.27 177.83 C 77.92 179.59, 83.93 180.87, 89.68 181.71 C 95.44 182.54, 101.00 182.93, 106.81 182.85 C 112.62 182.76, 118.93 182.20, 124.54 181.21 C 130.14 180.22, 135.91 178.67, 140.47 176.91 C 145.03 175.14, 150.09 172.35, 151.90 170.64 C 153.70 168.93, 153.31 167.07, 151.28 166.63 C 149.25 166.19, 144.42 167.20, 139.71 167.99 C 135.01 168.79, 128.64 170.62, 123.03 171.40 C 117.41 172.19, 111.78 172.84, 106.02 172.72 C 100.26 172.60, 94.15 172.02, 88.48 170.67 C 82.82 169.32, 77.07 167.22, 72.03 164.62 C 66.98 162.01, 62.36 158.88, 58.21 155.06 C 54.05 151.23, 50.07 146.47, 47.09 141.69 C 44.12 136.90, 41.94 131.78, 40.35 126.33 C 38.76 120.89, 37.81 114.82, 37.55 109.00 C 37.30 103.18, 37.82 97.06, 38.83 91.41 C 39.83 85.75, 41.43 80.42, 43.59 75.08 C 45.75 69.74, 48.66 64.20, 51.81 59.39 C 54.96 54.57, 58.43 50.20, 62.50 46.19 C 66.58 42.17, 71.31 38.29, 76.27 35.28 C 81.23 32.28, 86.82 29.81, 92.25 28.15 C 97.68 26.48, 103.19 25.54, 108.86 25.30 C 114.52 25.07, 120.79 25.52, 126.26 26.74 C 131.73 27.97, 136.98 29.83, 141.70 32.65 C 146.41 35.46, 151.06 39.32, 154.56 43.65 C 158.06 47.97, 160.85 53.38, 162.68 58.60 C 164.52 63.82, 165.41 69.37, 165.58 74.98 C 165.74 80.58, 165.08 86.82, 163.68 92.25 C 162.28 97.67, 160.14 102.78, 157.19 107.53 C 154.25 112.27, 150.29 116.89, 146.01 120.72 C 141.74 124.54, 136.54 127.93, 131.54 130.49 C 126.54 133.06, 121.16 135.24, 116.02 136.12 C 110.89 137.00, 104.84 137.19, 100.73 135.77 C 96.62 134.34, 92.89 131.05, 91.34 127.56 C 89.80 124.07, 89.75 118.66, 91.47 114.82 C 93.18 110.98, 97.47 107.41, 101.62 104.50 C 105.78 101.59, 111.34 99.93, 116.39 97.39 C 121.43 94.85, 127.39 92.44, 131.90 89.26 C 136.41 86.09, 140.75 82.55, 143.45 78.34 C 146.15 74.13, 148.18 68.62, 148.08 64.02 C 147.98 59.42, 145.82 54.16, 142.84 50.73 C 139.86 47.31, 135.04 44.72, 130.22 43.47 C 125.39 42.22, 119.12 42.27, 113.87 43.24 C 108.62 44.22, 103.47 46.44, 98.72 49.31 C 93.98 52.18, 89.36 56.23, 85.39 60.46 C 81.42 64.70, 77.89 69.77, 74.90 74.70 C 71.90 79.64, 69.47 84.67, 67.42 90.08 C 65.37 95.49, 63.57 101.50, 62.59 107.14 C 61.62 112.77, 61.05 118.42, 61.55 123.91 C 62.06 129.39, 63.19 135.43, 65.60 140.05 C 68.02 144.68, 71.85 148.98, 76.05 151.66 C 80.25 154.34, 85.48 155.66, 90.78 156.13 C 96.08 156.60, 102.29 155.64, 107.84 154.47 C 113.38 153.29, 118.66 151.29, 124.04 149.07 C 129.43 146.85, 134.94 144.09, 140.12 141.15 C 145.30 138.20, 150.49 134.89, 155.11 131.38 C 159.73 127.86, 164.02 124.29, 167.86 120.04 C 171.71 115.80, 175.48 110.87, 178.17 105.90 C 180.86 100.94, 182.84 95.76, 184.01 90.27 C 185.18 84.78, 185.65 78.66, 185.17 72.98 C 184.70 67.29, 183.22 61.36, 181.15 56.15 C 179.08 50.94, 176.23 46.16, 172.74 41.71 C 169.26 37.27, 164.75 32.95, 160.24 29.49 C 155.72 26.03, 150.89 23.25, 145.65 20.96 C 140.41 18.66, 134.56 16.86, 128.81 15.73 C 123.06 14.61, 116.92 14.18, 111.14 14.21 Z M 116.07 51.01 C 114.88 51.06, 113.68 51.26, 112.54 51.63 C 111.40 52.00, 110.31 52.64, 109.23 53.23 C 108.16 53.83, 107.09 54.48, 106.10 55.19 C 105.10 55.91, 104.11 56.65, 103.27 57.53 C 102.43 58.40, 101.77 59.46, 101.05 60.46 C 100.33 61.46, 99.59 62.46, 98.95 63.51 C 98.30 64.55, 97.70 65.64, 97.17 66.75 C 96.63 67.86, 96.16 69.01, 95.74 70.16 C 95.31 71.32, 95.00 72.53, 94.62 73.69 C 94.24 74.86, 93.84 75.98, 93.46 77.14 C 93.08 78.31, 92.75 79.50, 92.36 80.67 C 91.96 81.84, 91.51 82.99, 91.11 84.16 C 90.72 85.33, 90.28 86.49, 89.97 87.68 C 89.66 88.86, 89.22 90.14, 89.23 91.27 C 89.24 92.41, 89.40 93.78, 90.04 94.48 C 90.68 95.19, 91.97 95.48, 93.06 95.50 C 94.16 95.52, 95.43 94.97, 96.60 94.62 C 97.77 94.26, 98.94 93.82, 100.08 93.37 C 101.22 92.92, 102.30 92.40, 103.42 91.93 C 104.55 91.46, 105.72 91.03, 106.85 90.54 C 107.98 90.04, 109.11 89.56, 110.19 88.97 C 111.28 88.39, 112.29 87.67, 113.34 87.03 C 114.40 86.38, 115.45 85.74, 116.51 85.11 C 117.58 84.48, 118.69 83.93, 119.72 83.26 C 120.74 82.58, 121.77 81.87, 122.66 81.04 C 123.56 80.21, 124.33 79.23, 125.11 78.28 C 125.89 77.33, 126.69 76.36, 127.34 75.34 C 128.00 74.32, 128.61 73.29, 129.04 72.17 C 129.47 71.05, 129.75 69.81, 129.94 68.60 C 130.12 67.39, 130.19 66.14, 130.14 64.92 C 130.09 63.70, 129.96 62.44, 129.64 61.28 C 129.33 60.11, 128.87 58.93, 128.24 57.91 C 127.61 56.89, 126.72 56.00, 125.85 55.15 C 124.98 54.29, 124.05 53.42, 123.03 52.78 C 122.01 52.14, 120.88 51.61, 119.72 51.32 C 118.56 51.02, 117.27 50.95, 116.07 51.01 Z";
 
     // CARREGAR E PLOTAR ALFINETES DOS CLIENTES NO MAPA (AZUL = CONTRATO | VERMELHO = AVULSO)
-    let clientsLayerContrato = L.layerGroup().addTo(map);
-    let clientsLayerAvulso = L.layerGroup().addTo(map);
+    let clientsLayerContrato = (map && typeof L !== 'undefined') ? L.layerGroup().addTo(map) : null;
+    let clientsLayerAvulso = (map && typeof L !== 'undefined') ? L.layerGroup().addTo(map) : null;
     // Padrão enxuto: inicia somente com clientes em CONTRATO (azuis), deixando o mapa ultra limpo, rápido e navegável!
     let clientFilterMode = localStorage.getItem('emednav_client_mode') || 'CONTRATO';
     let _allClientsCache = [];
@@ -2370,7 +2538,7 @@
       }
     ];
 
-    let emedBaseLayer = L.layerGroup().addTo(map);
+    let emedBaseLayer = (map && typeof L !== 'undefined') ? L.layerGroup().addTo(map) : null;
 
     function renderEmedBases() {
       emedBaseLayer.clearLayers();
@@ -2593,7 +2761,7 @@
 
     // Carrega os alfinetes na inicialização
     loadClientMarkers();
-    const radarsLayer = L.layerGroup().addTo(map);
+    let radarsLayer = (map && typeof L !== 'undefined') ? L.layerGroup().addTo(map) : null;
     document.getElementById('btn-sync-radars').addEventListener('click', async () => {
       showToast('🔄 Atualizando e Gravando Cache Offline no Dispositivo...');
       try {
@@ -4335,6 +4503,204 @@
     }
 
     checkUrlDestinationParams();
-  </script>
+  
+    // =========================================================================
+    // COMANDO DE VOZ PARA MÚSICA & STREAMING DINÂMICO NO YOUTUBE (TÉCNICOS VETERANOS)
+    // =========================================================================
+    function startVoiceMusicSearch() {
+      if (!('speechSynthesis' in window)) {
+        showToast('⚠️ Navegador sem suporte a síntese de voz.');
+      }
+
+      // Fala a saudação do copiloto
+      speakVoice("Diga aí, meu patrão! O que você quer escutar no trecho agora?", () => {
+        // Após falar, ativa o microfone
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRec) {
+          showToast('🎙️ Diga o artista ou música (ex: Bruno e Marrone):');
+          const termo = prompt('O que deseja escutar agora no trecho? (ex: Bruno e Marrone)');
+          if (termo) playMusicSearch(termo);
+          return;
+        }
+
+        try {
+          const rec = new SpeechRec();
+          rec.lang = 'pt-BR';
+          rec.continuous = false;
+          rec.interimResults = false;
+
+          showToast('🎙️ Ouvindo... Fale o artista ou estilo (ex: Bruno e Marrone)');
+
+          rec.onresult = function(e) {
+            const query = e.results[0][0].transcript;
+            if (query && query.trim()) {
+              const cleanQ = query.trim();
+              showToast(`🎵 Entendido: "${cleanQ}"`);
+              speakVoice(`Soltando ${cleanQ} pra animar a viagem!`, () => {
+                playMusicSearch(cleanQ);
+              });
+            }
+          };
+
+          rec.onerror = function(err) {
+            console.warn('Erro de reconhecimento de voz:', err);
+            showToast('🎙️ Não consegui ouvir com clareza. Toque em um dos botões rápidos!');
+          };
+
+          rec.start();
+        } catch (e) {
+          console.error('Falha ao abrir microfone:', e);
+          const termo = prompt('O que deseja escutar no trecho?');
+          if (termo) playMusicSearch(termo);
+        }
+      });
+    }
+
+    function playMusicSearch(query) {
+      closeMusicModal();
+      showToast(`🎵 Tocando ${query}...`);
+      showMusicReturnBanner();
+
+      const isAndroid = /Android/i.test(navigator.userAgent);
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+      // Deep link YouTube Music / YouTube
+      const encoded = encodeURIComponent(query);
+      if (isAndroid) {
+        // Tenta abrir no YouTube Music ou YouTube nativo
+        window.location.href = `intent://music.youtube.com/search?q=${encoded}#Intent;package=com.google.android.apps.youtube.music;scheme=https;end`;
+        setTimeout(() => {
+          // Fallback para YouTube padrão
+          window.location.href = `https://www.youtube.com/results?search_query=${encoded}`;
+        }, 800);
+      } else if (isMobile) {
+        window.location.href = `https://music.youtube.com/search?q=${encoded}`;
+      } else {
+        window.open(`https://music.youtube.com/search?q=${encoded}`, '_blank');
+      }
+    }
+
+    function speakVoice(text, onEnd) {
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = 'pt-BR';
+          u.rate = 1.05;
+          u.pitch = 1.0;
+          if (onEnd) {
+            u.onend = onEnd;
+            u.onerror = onEnd;
+          }
+          window.speechSynthesis.speak(u);
+        } else if (onEnd) {
+          onEnd();
+        }
+      } catch (e) {
+        if (onEnd) onEnd();
+      }
+    }
+
+    // =========================================================================
+    // MODO RESENHA: CAUSOS E PIADAS DO TRECHO (100% OPCIONAL)
+    // =========================================================================
+    const ACERVO_CAUSOS_TRECHO = [
+      {
+        titulo: "O GPS do Ceará",
+        texto: "O técnico novato perguntou: 'Como chego no hospital?'. O veterano respondeu: 'Siga reto toda a vida, quando passar da bodega do Zé você dobra onde era uma mangueira que caiu em 94!'."
+      },
+      {
+        titulo: "Ar-condicionado na BR-116",
+        texto: "Técnico experiente no Ceará não liga o ar-condicionado no máximo pra não dar choque térmico quando descer pra calibrar os equipamentos no calor de 38 graus!"
+      },
+      {
+        titulo: "A Peça que Sobrou",
+        texto: "Dizem que manutenção de equipamento médico feita com pressa é igual receita de bolo: se montar e não sobrar pelo menos uma arruela, montou no hospital errado!"
+      },
+      {
+        titulo: "Calibrador de Pneu Cearense",
+        texto: "O técnico parou no posto e pediu: 'Bota 30 libras na frente e 32 atrás'. O frentista bateu o pé no pneu com a chinela e disse: 'Tá calibrado, meu patrão, aguenta até Juazeiro!'."
+      },
+      {
+        titulo: "A Tomada do Hospital",
+        texto: "Técnico veterano chega na UTI e a enfermeira diz: 'Não mexe nessa tomada, tá sustentando a televisão da novela desde 2012!'."
+      },
+      {
+        titulo: "O Radar Camarada",
+        texto: "Diz que o pardal da avenida tirou uma foto tão boa do carro da eMED que o técnico pediu pra mandar uma cópia 3x4 pra renovar o crachá!"
+      },
+      {
+        titulo: "O Café de Enfermagem",
+        texto: "O combustível do técnico não é gasolina nem diesel: é aquele café preto fervendo servido em copo de plástico na salinha da engenharia clínica!"
+      },
+      {
+        titulo: "Manutenção Preventiva",
+        texto: "Preventiva boa é aquela que o aparelho tá funcionando tão bem que quando o técnico chega perto com a chave de fenda, o monitor até para de apitar de medo!"
+      },
+      {
+        titulo: "A Mala de Ferramentas",
+        texto: "A mala de ferramentas do técnico veterano pesa 20 quilos. Dezenove quilos são de adaptadores que ele nunca usou, mas 'vai que precisa um dia'!"
+      },
+      {
+        titulo: "Curva do S na Estrada",
+        texto: "Curva perigosa na estrada é aquela que até o santinho do painel fecha os olhos e segura no puxador da porta!"
+      }
+    ];
+
+    function toggleModoResenha() {
+      state.modoResenha = !state.modoResenha;
+      localStorage.setItem('emed_modo_resenha', state.modoResenha ? 'true' : 'false');
+      atualizarBotaoResenhaUI();
+
+      if (state.modoResenha) {
+        showToast('🎭 Modo Resenha ATIVADO! Causos e avisos camaradas ligados.');
+        speakVoice('Modo Resenha ativado, meu patrão! Avisos camaradas de radar e causos do trecho liberados na viatura!');
+      } else {
+        showToast('🎭 Modo Resenha DESATIVADO (Modo Silencioso/Padrão).');
+        speakVoice('Modo Resenha desativado. Avisos formais de trânsito.');
+      }
+    }
+
+    function atualizarBotaoResenhaUI() {
+      const btn = document.getElementById('btn-hud-resenha');
+      if (!btn) return;
+      if (state.modoResenha) {
+        btn.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+        btn.style.borderColor = '#fde047';
+        btn.style.color = '#0f172a';
+        btn.style.boxShadow = '0 0 10px rgba(245,158,11,0.6)';
+      } else {
+        btn.style.background = 'rgba(245, 158, 11, 0.2)';
+        btn.style.borderColor = '#f59e0b';
+        btn.style.color = '#fbbf24';
+        btn.style.boxShadow = 'none';
+      }
+    }
+
+    function contarPiadaTrecho() {
+      const pop = document.getElementById('fab-more-popover');
+      if (pop) pop.style.display = 'none';
+
+      const causo = ACERVO_CAUSOS_TRECHO[Math.floor(Math.random() * ACERVO_CAUSOS_TRECHO.length)];
+      
+      const card = document.getElementById('causo-trecho-card');
+      const titulo = document.getElementById('causo-titulo');
+      const texto = document.getElementById('causo-texto');
+      if (card && titulo && texto) {
+        titulo.textContent = causo.titulo;
+        texto.textContent = causo.texto;
+        card.style.display = 'block';
+      }
+
+      speakVoice(causo.titulo + ". " + causo.texto);
+    }
+
+    function fecharCausoCard() {
+      const card = document.getElementById('causo-trecho-card');
+      if (card) card.style.display = 'none';
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    }
+
+</script>
 </body>
 </html>
