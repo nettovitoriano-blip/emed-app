@@ -2204,7 +2204,7 @@ async def api_fiscal_recebidas_danfe(request: web.Request) -> web.Response:
           body: JSON.stringify({{ id: {n_id}, email: d.email }})
         }}).then(r => r.json());
         if (res.ok && res.smtp_sent) {{
-          alert(res.msg);
+          alert(res.msg || (res.ok ? "Lote marcado como transmitido à contabilidade!" : "Não foi possível registrar o fechamento."));
           return;
         }}
       }} catch (e) {{}}
@@ -6237,7 +6237,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
     async function criarOsTesteBrasilia() {{
       const res = await fetch("/api/fiscal/v2/criar-os-teste", {{ method: "POST" }}).then(r => r.json());
-      alert(res.msg);
+      alert(res.msg || (res.ok ? "Lote marcado como transmitido à contabilidade!" : "Não foi possível registrar o fechamento."));
       if (res.ok) carregarDadosFiscais(String(res.os_id));
     }}
 
@@ -6513,7 +6513,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           }})
         }}).then(r => r.json());
         if (res.ok) {{
-          alert(res.msg);
+          alert(res.msg || (res.ok ? "Lote marcado como transmitido à contabilidade!" : "Não foi possível registrar o fechamento."));
           ITENS_TRANSFERENCIA = [];
           renderizarItensTransferencia();
           document.getElementById("boxResultadoTransferencia").innerHTML = `
@@ -6568,7 +6568,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           }})
         }}).then(r => r.json());
         if (res.ok) {{
-          alert(res.msg);
+          alert(res.msg || (res.ok ? "Lote marcado como transmitido à contabilidade!" : "Não foi possível registrar o fechamento."));
           document.getElementById("consDescricao").value = "";
           document.getElementById("consFornecedor").value = "";
           document.getElementById("consNf").value = "";
@@ -7151,7 +7151,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       }}).then(r => r.json());
 
       if (res.ok) {{
-        alert(res.msg);
+        alert(res.msg || (res.ok ? "Lote marcado como transmitido à contabilidade!" : "Não foi possível registrar o fechamento."));
         document.getElementById("novoInvCodigo").value = "";
         document.getElementById("novoInvNome").value = "";
         document.getElementById("boxNovoItemInventario").style.display = "none";
@@ -7239,7 +7239,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         body: JSON.stringify({{ mes, filial: fil, usuario: USUARIO_FISCAL?.username || "netto" }})
       }}).then(r => r.json());
 
-      alert(res.msg);
+      alert(res.msg || (res.ok ? "Lote marcado como transmitido à contabilidade!" : "Não foi possível registrar o fechamento."));
       carregarFechamentoContabil();
     }}
 
@@ -7314,7 +7314,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           headers: {{"Content-Type": "application/json"}},
           body: JSON.stringify({{ filial: FILIAL_ATIVA, usuario: USUARIO_FISCAL?.username || "netto" }})
         }}).then(r => r.json());
-        alert(res.msg);
+        alert(res.msg || (res.ok ? "Lote marcado como transmitido à contabilidade!" : "Não foi possível registrar o fechamento."));
         carregarNotasRecebidasDFe();
       }} catch (e) {{
         alert("Erro ao consultar SEFAZ.");
@@ -7377,7 +7377,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             usuario: USUARIO_FISCAL?.username || "netto"
           }})
         }}).then(r => r.json());
-        alert(res.msg);
+        alert(res.msg || (res.ok ? "Lote marcado como transmitido à contabilidade!" : "Não foi possível registrar o fechamento."));
         carregarNotasRecebidasDFe();
       }} catch (e) {{
         alert("Erro ao manifestar nota.");
@@ -7398,7 +7398,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           headers: {{"Content-Type": "application/json"}},
           body: JSON.stringify({{ id: id, usuario: USUARIO_FISCAL?.username || "netto" }})
         }}).then(r => r.json());
-        alert(res.msg);
+        alert(res.msg || (res.ok ? "Lote marcado como transmitido à contabilidade!" : "Não foi possível registrar o fechamento."));
         carregarNotasRecebidasDFe();
         if (typeof carregarDadosFiscais === 'function') await carregarDadosFiscais();
         if (typeof renderizarInventario === 'function') renderizarInventario();
@@ -7800,7 +7800,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
         if (res.ok && res.smtp_sent) {{
           mostrarAvisoPdfModal(res.msg);
-          alert(res.msg);
+          alert(res.msg || (res.ok ? "Lote marcado como transmitido à contabilidade!" : "Não foi possível registrar o fechamento."));
           return;
         }}
       }} catch (e) {{
@@ -8366,7 +8366,7 @@ Por favor, confira os dados preenchidos.`);
         body: JSON.stringify(payload)
       }}).then(r => r.json());
       if (res.ok) {{
-        alert(res.msg);
+        alert(res.msg || (res.ok ? "Lote marcado como transmitido à contabilidade!" : "Não foi possível registrar o fechamento."));
         toggleFormNovaDespesaUnidade(false);
         carregarDespesasUnidades();
       }} else {{
@@ -8653,7 +8653,7 @@ Por favor, confira os dados preenchidos.`);
       }}).then(r => r.json());
 
       if (res.ok) {{
-        alert(res.msg);
+        alert(res.msg || (res.ok ? "Lote marcado como transmitido à contabilidade!" : "Não foi possível registrar o fechamento."));
         document.getElementById("boxResultadoBatimentoExtrato").style.display = "none";
         toggleBoxExtratoGestora(false);
         carregarDespesasUnidades();
