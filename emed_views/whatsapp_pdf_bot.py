@@ -55,27 +55,61 @@ if __name__ == "__main__":
                     return
                 except Exception:
                     ctx = None
-            _log("Iniciando Playwright + Edge...")
-            pw = sync_playwright().start()
+            _log("Iniciando Playwright para automação WhatsApp Web...")
+            PROFILE_DIR.mkdir(parents=True, exist_ok=True)
             try:
-                ctx = pw.chromium.launch_persistent_context(
-                    user_data_dir=str(PROFILE_DIR),
-                    channel="msedge",
-                    headless=False,
-                    args=["--disable-blink-features=AutomationControlled"],
-                    viewport={"width": 1180, "height": 680},
-                )
+                (PROFILE_DIR / "First Run").touch(exist_ok=True)
             except Exception:
+                pass
+            pw = sync_playwright().start()
+            common_args = [
+                "--disable-blink-features=AutomationControlled",
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--disable-fre",
+                "--disable-features=msFirstRunExperience,msEdgeWelcomeExperience",
+                "--hide-crash-restore-bubble",
+                "--start-maximized"
+            ]
+            try:
                 ctx = pw.chromium.launch_persistent_context(
                     user_data_dir=str(PROFILE_DIR),
                     channel="chrome",
                     headless=False,
-                    args=["--disable-blink-features=AutomationControlled"],
+                    args=common_args,
                     viewport={"width": 1180, "height": 680},
                 )
+                _log("Navegador Google Chrome iniciado com perfil dedicado.")
+            except Exception:
+                try:
+                    ctx = pw.chromium.launch_persistent_context(
+                        user_data_dir=str(PROFILE_DIR),
+                        channel="msedge",
+                        headless=False,
+                        args=common_args,
+                        viewport={"width": 1180, "height": 680},
+                    )
+                    _log("Navegador Microsoft Edge iniciado com perfil dedicado.")
+                except Exception:
+                    ctx = pw.chromium.launch_persistent_context(
+                        user_data_dir=str(PROFILE_DIR),
+                        headless=False,
+                        args=common_args,
+                        viewport={"width": 1180, "height": 680},
+                    )
             page = ctx.pages[0] if ctx.pages else ctx.new_page()
             page.goto("https://web.whatsapp.com", wait_until="domcontentloaded", timeout=45000)
-            _log("WhatsApp Web aberto.")
+            try:
+                for p in list(ctx.pages):
+                    if p != page and ("welcome" in p.url.lower() or "firstrun" in p.url.lower()):
+                        p.close()
+            except Exception:
+                pass
+            try:
+                page.bring_to_front()
+            except Exception:
+                pass
+            _log("WhatsApp Web aberto com sucesso.")
 
         def _is_logged_in(pg) -> bool:
             try:

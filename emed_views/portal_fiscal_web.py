@@ -2882,6 +2882,98 @@ Em caso de dúvidas contábeis, contatar a Diretoria Administrativa da EMED.
     )
 
 
+async def api_fiscal_v2_fechamento_exportar_csv(request: web.Request) -> web.Response:
+    """Exporta planilha contábil (.CSV compatível com Excel e ERPs contábeis) com delimitador ';' e UTF-8 BOM."""
+    import io
+    import csv
+    db_name = request.app.get("db_path", "emed.db")
+    mes = request.query.get("mes", "").strip() or datetime.now().strftime("%Y-%m")
+    filial = request.query.get("filial", "CONSOLIDADO").strip().upper()
+
+    with _get_db_connection(db_name) as conn:
+        sql_n = """
+            SELECT id, os_id, cliente, cnpj_tomador, tipo_nota, cfop,
+                   valor_servicos, valor_pecas, valor_desconto, aliquota_iss,
+                   valor_iss, valor_liquido, status_fiscal, numero_nf, serie,
+                   data_emissao, filial_emissora
+            FROM notas_fiscais
+            WHERE (data_emissao LIKE ? OR lote_contabilidade_mes = ?)
+        """
+        params_n = [f"{mes}%", mes]
+        if filial != "CONSOLIDADO":
+            sql_n += " AND filial_emissora = ?"
+            params_n.append(filial)
+        sql_n += " ORDER BY id ASC"
+        notas = conn.execute(sql_n, tuple(params_n)).fetchall()
+
+    output = io.StringIO()
+    output.write("\ufeff")  # UTF-8 BOM para o Excel abrir com acentuação e colunas corretas
+    writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_MINIMAL)
+    writer.writerow([
+        "NUMERO_DOCUMENTO",
+        "DATA_EMISSAO",
+        "FILIAL_EMISSORA",
+        "TOMADOR_RAZAO_SOCIAL",
+        "TOMADOR_CNPJ",
+        "CTRIB_NACIONAL",
+        "ITEM_LC116",
+        "CFOP",
+        "VALOR_SERVICOS_R$",
+        "VALOR_PECAS_R$",
+        "BASE_CALCULO_ISS_R$",
+        "ALIQUOTA_ISS_PCT",
+        "VALOR_ISS_R$",
+        "RETENCAO_CSRF_465_R$",
+        "RETENCAO_IRRF_150_R$",
+        "TOTAL_RETENCOES_615_R$",
+        "VALOR_TOTAL_BRUTO_R$",
+        "LIQUIDO_A_RECEBER_R$",
+        "STATUS_FISCAL"
+    ])
+
+    for n in notas:
+        v_srv = float(n[6] or 0)
+        v_pec = float(n[7] or 0)
+        v_iss = float(n[10] or 0)
+        v_bruto = float(n[11] or 0)
+        is_canc = "CANCELAD" in str(n[12] or "").upper()
+        csrf = round(v_srv * 0.0465, 2) if (v_srv > 0 and not is_canc) else 0.0
+        irrf = round(v_srv * 0.0150, 2) if (v_srv > 0 and not is_canc) else 0.0
+        tot_ret = round(csrf + irrf, 2)
+        v_liq_rec = round(v_bruto - tot_ret, 2) if not is_canc else 0.0
+
+        writer.writerow([
+            n[13] or f"OS #{n[1]}",
+            n[15] or "",
+            n[16] or filial,
+            n[2] or "",
+            f"'{n[3]}" if n[3] else "",
+            "140101" if v_srv > 0 else "-",
+            "14.01" if v_srv > 0 else "-",
+            n[5] or ("5102" if v_pec > 0 else "NFS-e"),
+            f"{v_srv:.2f}".replace(".", ","),
+            f"{v_pec:.2f}".replace(".", ","),
+            f"{v_srv:.2f}".replace(".", ","),
+            f"{float(n[9] or 5.0):.2f}".replace(".", ","),
+            f"{v_iss:.2f}".replace(".", ","),
+            f"{csrf:.2f}".replace(".", ","),
+            f"{irrf:.2f}".replace(".", ","),
+            f"{tot_ret:.2f}".replace(".", ","),
+            f"{v_bruto:.2f}".replace(".", ","),
+            f"{v_liq_rec:.2f}".replace(".", ","),
+            n[12] or ""
+        ])
+
+    csv_data = output.getvalue().encode("utf-8-sig")
+    nome_arq = f"EMED_Livro_Fiscal_Contabil_{filial}_{mes}.csv"
+    return web.Response(
+        body=csv_data,
+        content_type="text/csv",
+        charset="utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{nome_arq}"'}
+    )
+
+
 async def api_fiscal_v2_fechamento_relatorio_impresso(request: web.Request) -> web.Response:
     """Gera página de relatório de fechamento fiscal e contábil formatada para impressão/PDF."""
     db_name = request.app.get("db_path", "emed.db")
@@ -2909,11 +3001,15 @@ async def api_fiscal_v2_fechamento_relatorio_impresso(request: web.Request) -> w
     tot_srv = sum(float(n[6] or 0) for n in notas if "CANCELAD" not in str(n[12] or "").upper())
     tot_pec = sum(float(n[7] or 0) for n in notas if "CANCELAD" not in str(n[12] or "").upper())
     tot_iss = sum(float(n[10] or 0) for n in notas if "CANCELAD" not in str(n[12] or "").upper())
+    tot_csrf = sum(round(float(n[6] or 0) * 0.0465, 2) for n in notas if "CANCELAD" not in str(n[12] or "").upper() and float(n[6] or 0) > 0)
+    tot_irrf = sum(round(float(n[6] or 0) * 0.0150, 2) for n in notas if "CANCELAD" not in str(n[12] or "").upper() and float(n[6] or 0) > 0)
+    tot_ret = tot_csrf + tot_irrf
+    tot_liq_rec = tot_fat - tot_ret
 
     linhas_html = "".join([
-        f"<tr><td><b>{n[13] or 'OS #'+str(n[1])}</b></td><td>{n[15] or ''}</td><td>{n[2]}</td><td>{n[3]}</td><td>{n[5] or 'NFS-e'}</td><td>R$ {float(n[6] or 0):.2f}</td><td>R$ {float(n[7] or 0):.2f}</td><td>R$ {float(n[10] or 0):.2f}</td><td><b>R$ {float(n[11] or 0):.2f}</b></td><td>{n[12]}</td></tr>"
+        f"<tr><td><b>{n[13] or 'OS #'+str(n[1])}</b></td><td>{n[15] or ''}</td><td><span class='badge-filial'>{n[16] or filial}</span></td><td>{n[2]}</td><td>{n[3]}</td><td>{'cTribNac 140101' if float(n[6] or 0) > 0 else (n[5] or '5102')}</td><td>R$ {float(n[6] or 0):.2f}</td><td>R$ {float(n[7] or 0):.2f}</td><td>R$ {float(n[10] or 0):.2f}</td><td>R$ {round(float(n[6] or 0)*0.0615, 2) if 'CANCELAD' not in str(n[12] or '').upper() and float(n[6] or 0)>0 else 0.0:.2f}</td><td><b>R$ {float(n[11] or 0):.2f}</b></td><td>{n[12]}</td></tr>"
         for n in notas
-    ]) or "<tr><td colspan='10' style='text-align:center;'>Nenhuma nota emitida no período.</td></tr>"
+    ]) or "<tr><td colspan='12' style='text-align:center;'>Nenhuma nota emitida no período.</td></tr>"
 
     html_out = f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -2923,22 +3019,24 @@ async def api_fiscal_v2_fechamento_relatorio_impresso(request: web.Request) -> w
   <style>
     body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0f172a; margin: 24px; font-size: 12px; }}
     .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 16px; }}
-    .kpis {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }}
+    .kpis {{ display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 16px; }}
     .kpi {{ background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; }}
-    .kpi-title {{ font-size: 11px; color: #64748b; font-weight: 700; }}
-    .kpi-val {{ font-size: 18px; font-weight: 900; color: #0369a1; margin-top: 4px; }}
+    .kpi-title {{ font-size: 10px; color: #64748b; font-weight: 700; }}
+    .kpi-val {{ font-size: 16px; font-weight: 900; color: #0369a1; margin-top: 4px; }}
     table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }}
     th, td {{ border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }}
     th {{ background: #f1f5f9; color: #334155; font-weight: 800; }}
-    .alert-box {{ background: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 14px; margin-bottom: 16px; font-size: 11.5px; line-height: 1.5; }}
+    .alert-box {{ background: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 14px; margin-bottom: 16px; font-size: 11px; line-height: 1.5; }}
     .signatures {{ display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; }}
     .sig-line {{ width: 45%; border-top: 1px solid #475569; text-align: center; padding-top: 6px; font-size: 11px; }}
-    @media print {{ .no-print {{ display: none; }} body {{ margin: 0; }} }}
+    .badge-filial {{ font-size: 9.5px; background: #e0f2fe; color: #0369a1; padding: 2px 5px; border-radius: 4px; font-weight: 800; }}
+    @media print {{ .no-print {{ display: none !important; }} body {{ margin: 0; }} }}
   </style>
 </head>
 <body>
-  <div class="no-print" style="margin-bottom: 16px; text-align: right;">
-    <button onclick="window.print()" style="background:#0284c7;color:#fff;border:none;padding:10px 18px;font-weight:800;border-radius:6px;cursor:pointer;">🖨️ Imprimir / Salvar em PDF</button>
+  <div class="no-print" style="margin-bottom: 16px; display:flex; justify-content:flex-end; gap:8px;">
+    <a href="/api/fiscal/v2/fechamento/exportar-csv?mes={mes}&filial={filial}" style="background:#16a34a;color:#fff;text-decoration:none;padding:10px 18px;font-weight:800;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:6px;">📥 Baixar Planilha para Contabilidade (.CSV / Excel)</a>
+    <button onclick="window.print()" style="background:#0284c7;color:#fff;border:none;padding:10px 18px;font-weight:800;border-radius:6px;cursor:pointer;font-size:12px;">🖨️ Imprimir / Salvar em PDF</button>
   </div>
   <div class="header">
     <div style="display:flex;align-items:center;gap:12px;">
@@ -2955,8 +3053,10 @@ async def api_fiscal_v2_fechamento_relatorio_impresso(request: web.Request) -> w
     </div>
   </div>
   <div class="alert-box">
-    ⚖️ <b>MEMORIAL FISCAL PARA A CONTABILIDADE:</b><br/>
-    &bull; <b>Serviços (ISS):</b> LC 116/2003 (Item 14.01/14.02). Alíquota aplicável: 5,0% (DF) ou alíquota municipal da sede/tomador.<br/>
+    ⚖️ <b>MEMORIAL FISCAL &amp; CONTÁBIL (CONFORMIDADE RESOLUÇÕES CFC, RFB E LC 116/2003):</b><br/>
+    &bull; <b>Serviços Especializados (ISS):</b> LC 116/2003 (Item 14.01 / cTribNac 140101 - Manutenção de Equipamentos Hospitalares). Alíquota aplicável: 5,0% (DF) ou alíquota municipal da sede/tomador.<br/>
+    &bull; <b>Padrão Nacional de NFS-e (DPS):</b> Assinatura digital ICP-Brasil padrão SHA-256 e emissão estruturada conforme Sistema Nacional NFS-e / Receita Federal do Brasil.<br/>
+    &bull; <b>Retenções Federais na Fonte (PJ):</b> Previsão de CSRF 4,65% (Lei 10.833/2003: PIS 0,65%, COFINS 3,0%, CSLL 1,0%) e IRRF 1,50% (Decreto 9.580/2018), totalizando 6,15% a deduzir no recebimento quando aplicável.<br/>
     &bull; <b>Transferências entre Filiais (CFOP 5152/6152):</b> Não incidência de ICMS vinculante conforme <b>STF ADC 49 e LC 204/2023</b>.<br/>
     &bull; <b>Consumíveis Administrativos (CFOP 1556/2556):</b> Baixa imediata para despesa de uso/consumo, mantendo saldo de almoxarifado clínico em zero.
   </div>
@@ -2965,11 +3065,13 @@ async def api_fiscal_v2_fechamento_relatorio_impresso(request: web.Request) -> w
     <div class="kpi"><div class="kpi-title">SERVIÇOS (BASE ISS)</div><div class="kpi-val">R$ {tot_srv:,.2f}</div></div>
     <div class="kpi"><div class="kpi-title">PEÇAS FATURADAS</div><div class="kpi-val">R$ {tot_pec:,.2f}</div></div>
     <div class="kpi"><div class="kpi-title">TOTAL ISS APURADO</div><div class="kpi-val">R$ {tot_iss:,.2f}</div></div>
+    <div class="kpi" style="border-color:#f59e0b;"><div class="kpi-title" style="color:#b45309;">RETENÇÕES FEDERAIS (6,15%)</div><div class="kpi-val" style="color:#b45309;">R$ {tot_ret:,.2f}</div><div style="font-size:9px;color:#78350f;">CSRF 4,65% + IRRF 1,50%</div></div>
+    <div class="kpi" style="border-color:#10b981;"><div class="kpi-title" style="color:#047857;">LÍQUIDO A RECEBER</div><div class="kpi-val" style="color:#047857;">R$ {tot_liq_rec:,.2f}</div></div>
   </div>
   <h4 style="margin:0 0 8px 0;color:#0369a1;">📜 Livro de Saídas &amp; NFS-e Emitidas no Período</h4>
   <table>
     <thead>
-      <tr><th>NFS-e</th><th>Data</th><th>Tomador</th><th>CNPJ</th><th>CFOP</th><th>Serviços</th><th>Peças</th><th>ISS</th><th>Total NF</th><th>Status</th></tr>
+      <tr><th>NFS-e</th><th>Data</th><th>Unidade</th><th>Tomador</th><th>CNPJ</th><th>Operação / cTrib</th><th>Serviços</th><th>Peças</th><th>ISS</th><th>Retenções (6,15%)</th><th>Total NF</th><th>Status</th></tr>
     </thead>
     <tbody>{linhas_html}</tbody>
   </table>
@@ -7351,6 +7453,65 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       renderContatosRapidosWhatsDFe();
     }}
 
+    function perguntarOndeConectarWhatsApp() {{
+      const querPadrao = confirm(
+        "📱 COMO VOCÊ PREFERE CONECTAR O WHATSAPP?\n\n" +
+        "• Clique em [OK] para conectar no seu NAVEGADOR PADRÃO (Chrome, Edge, Firefox etc., onde você já usa seu WhatsApp no dia a dia).\n\n" +
+        "• Clique em [Cancelar] se quiser abrir a janela do ROBÔ LOCAL DEDICADO em segundo plano."
+      );
+      if (querPadrao) {{
+        window.open("https://web.whatsapp.com", "_blank");
+        mostrarAvisoPdfModal("🌐 <b>WhatsApp Web aberto no seu navegador padrão!</b> Você já pode disparar as mensagens diretamente.");
+      }} else {{
+        conectarWhatsAppBotLocal();
+      }}
+    }}
+
+    function enviarWhatsNavegadorPadraoModalDFe() {{
+      const n = DFE_NOTA_ATUAL_MODAL;
+      if (!n) return;
+      const rawInput = (document.getElementById("inpModalDFeWhats")?.value || "").trim();
+      const listaFones = rawInput
+        .split(/[,;\\s\\n]+/)
+        .map(s => s.replace(/\\D/g, ""))
+        .filter(s => s.length >= 8);
+
+      const urlDanfe = window.location.origin + `/api/fiscal/recebidas/danfe/${{n.id}}`;
+      const urlXml = window.location.origin + `/api/fiscal/recebidas/xml/${{n.id}}`;
+      const emitNome = n.emitente_nome || n.emitente_razao || "Fornecedor";
+      const cnpjEmit = n.emitente_cnpj || "";
+      const numNf = n.numero_nf || "";
+      const valTot = Number(n.valor_total || 0).toLocaleString("pt-BR", {{ minimumFractionDigits: 2 }});
+      const chave = n.chave_acesso || "";
+
+      const linhas = [
+        `🧾 *DANFE NF-e Nº ${{numNf}} — EMED ELETROMEDICINA*`,
+        `• *Fornecedor:* ${{emitNome}}`,
+        cnpjEmit ? `• *CNPJ Emitente:* ${{cnpjEmit}}` : "",
+        n.data_emissao ? `• *Data Emissão:* ${{n.data_emissao}}` : "",
+        `• *Valor Total:* R$ ${{valTot}}`,
+        chave ? ("• *Chave de Acesso:* " + chave) : "",
+        "",
+        `📄 *Visualizar / Baixar DANFE (.PDF):* ${{urlDanfe}}`,
+        `📥 *Baixar Arquivo XML:* ${{urlXml}}`
+      ].filter(Boolean).join("\\n");
+
+      if (listaFones.length > 0) {{
+        listaFones.forEach((fone, idx) => {{
+          const numFmt = fone.startsWith("55") ? fone : ("55" + fone);
+          const zapUrl = `https://api.whatsapp.com/send?phone=${{numFmt}}&text=${{encodeURIComponent(linhas)}}`;
+          setTimeout(() => {{
+            window.open(zapUrl, "_blank");
+          }}, idx * 350);
+        }});
+        mostrarAvisoPdfModal(`🌐 <b>WhatsApp aberto no navegador padrão</b> para ${{listaFones.length}} contato(s)!`);
+      }} else {{
+        const zapUrl = `https://api.whatsapp.com/send?text=${{encodeURIComponent(linhas)}}`;
+        window.open(zapUrl, "_blank");
+        mostrarAvisoPdfModal("🌐 <b>WhatsApp Web aberto no seu navegador padrão!</b> Escolha o contato ou grupo para enviar.");
+      }}
+    }}
+
     async function conectarWhatsAppBotLocal() {{
       const btn = document.getElementById("btnConectarWhatsBot");
       if (btn) {{ btn.disabled = true; btn.textContent = "⏳ Abrindo..."; }}
@@ -8686,31 +8847,33 @@ Por favor, confira os dados preenchidos.`);
       </div>
 
       <!-- PAINEL RÁPIDO DE ENVIO POR WHATSAPP OU E-MAIL -->
-      <div id="boxShareModalDFe" style="display:none;background:#132338;border:1.5px solid #0284c7;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+      <div id="boxShareModalDFe" style="display:none;background:#132338;border:1.5px solid #0284c7;border-radius:8px;padding:12px;margin-bottom:10px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px;">
           <div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:6px;flex-wrap:wrap;">
-              <label style="color:#4ade80;font-size:11.5px;margin:0;">📲 Enviar PDF Automático via WhatsApp (1 ou mais números):</label>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px;flex-wrap:wrap;">
+              <label style="color:#4ade80;font-size:12px;font-weight:700;margin:0;">📲 Enviar por WhatsApp:</label>
               <div style="display:flex;gap:5px;">
-                <button type="button" id="btnConectarWhatsBot" onclick="conectarWhatsAppBotLocal()" style="background:#0f172a;border:1px solid #38bdf8;color:#38bdf8;border-radius:4px;font-size:10px;padding:2px 7px;cursor:pointer;" title="Abrir janela do WhatsApp Web dedicado para ler QR Code">📷 Conectar WhatsApp</button>
-                <button type="button" onclick="salvarContatoRapidoWhatsDFe()" style="background:none;border:1px solid #4ade80;color:#4ade80;border-radius:4px;font-size:10px;padding:2px 7px;cursor:pointer;" title="Salvar os números digitados como atalho rápido">+ Salvar Contato</button>
+                <button type="button" id="btnConectarWhatsPrompt" onclick="perguntarOndeConectarWhatsApp()" style="background:#0f172a;border:1px solid #38bdf8;color:#38bdf8;border-radius:4px;font-size:11px;padding:3px 8px;cursor:pointer;" title="Conectar no seu navegador padrão ou no robô local">🌐 Conectar WhatsApp...</button>
+                <button type="button" onclick="salvarContatoRapidoWhatsDFe()" style="background:none;border:1px solid #4ade80;color:#4ade80;border-radius:4px;font-size:11px;padding:3px 8px;cursor:pointer;" title="Salvar os números digitados como atalho rápido">+ Salvar Contato</button>
               </div>
             </div>
-            <div style="display:flex;gap:6px;">
-              <input type="text" id="inpModalDFeWhats" placeholder="Ex: 85999999999, 61996585392 (vários números separados por vírgula)" style="padding:7px 10px;font-size:12px;" />
-              <button type="button" id="btnDispararWhatsPdfAuto" class="btn" style="width:auto;background:#16a34a;color:#fff;padding:7px 14px;font-size:12px;white-space:nowrap;" onclick="enviarWhatsDanfeModalDFe()">📲 Enviar PDF</button>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <input type="text" id="inpModalDFeWhats" placeholder="DDD + Número (ex: 85999999999) ou vazio p/ escolher contato" style="flex:1;min-width:180px;padding:8px 10px;font-size:12px;" />
+              <button type="button" id="btnDispararWhatsNavegadorPadrao" class="btn" style="width:auto;background:#16a34a;color:#fff;padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap;" onclick="enviarWhatsNavegadorPadraoModalDFe()" title="Abre diretamente no seu navegador padrão (Chrome, Edge, Firefox etc.)">🌐 Abrir no Navegador Padrão</button>
+              <button type="button" id="btnDispararWhatsPdfAuto" class="btn" style="width:auto;background:#0369a1;color:#fff;padding:8px 10px;font-size:11px;white-space:nowrap;" onclick="enviarWhatsDanfeModalDFe()" title="Anexa o arquivo PDF físico via robô local">🤖 Enviar PDF (Robô)</button>
             </div>
             <div id="boxContatosRapidosWhatsDFe" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;"></div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">💡 <b>Dica:</b> O envio via <b>Navegador Padrão</b> abre no navegador que você já usa no dia a dia, com a mensagem pronta e o link oficial da DANFE.</div>
           </div>
           <div>
-            <label style="color:#60a5fa;font-size:11.5px;">✉️ Enviar DANFE Completa por E-mail:</label>
-            <div style="display:flex;gap:6px;">
-              <input type="email" id="inpModalDFeEmail" placeholder="destinatario@empresa.com.br" style="padding:7px 10px;font-size:12px;" />
-              <button type="button" class="btn" style="width:auto;background:#2563eb;color:#fff;padding:7px 14px;font-size:12px;white-space:nowrap;" onclick="enviarEmailDanfeModalDFe()">✉️ Disparar E-mail</button>
+            <label style="color:#60a5fa;font-size:12px;font-weight:700;">✉️ Enviar DANFE Completa por E-mail:</label>
+            <div style="display:flex;gap:6px;margin-top:6px;">
+              <input type="email" id="inpModalDFeEmail" placeholder="destinatario@empresa.com.br" style="flex:1;padding:8px 10px;font-size:12px;" />
+              <button type="button" class="btn" style="width:auto;background:#2563eb;color:#fff;padding:8px 14px;font-size:12px;white-space:nowrap;" onclick="enviarEmailDanfeModalDFe()">✉️ Disparar E-mail</button>
             </div>
           </div>
         </div>
-        <div id="avisoEnvioPdfModalDFe" style="display:none;margin-top:8px;padding:7px 10px;border-radius:6px;background:#064e3b;border:1px solid #10b981;color:#d1fae5;font-size:11.5px;"></div>
+        <div id="avisoEnvioPdfModalDFe" style="display:none;margin-top:8px;padding:8px 12px;border-radius:6px;background:#064e3b;border:1px solid #10b981;color:#d1fae5;font-size:12px;"></div>
       </div>
 
       <!-- VISÃO 1: DANFE COMPLETA EMBUTIDA -->
@@ -8991,6 +9154,7 @@ def registrar_rotas_portal_fiscal(app: web.Application) -> None:
     app.router.add_get("/api/fiscal/v2/fechamento/dados", api_fiscal_v2_fechamento_dados)
     app.router.add_get("/api/fiscal/v2/fechamento/zip", api_fiscal_v2_fechamento_zip)
     app.router.add_get("/api/fiscal/v2/fechamento/relatorio-impresso", api_fiscal_v2_fechamento_relatorio_impresso)
+    app.router.add_get("/api/fiscal/v2/fechamento/exportar-csv", api_fiscal_v2_fechamento_exportar_csv)
     app.router.add_post("/api/fiscal/v2/fechamento/marcar-enviado", api_fiscal_v2_fechamento_marcar_enviado)
     app.router.add_get("/api/fiscal/v2/xml/{os_id}", api_fiscal_v2_xml_download)
 
