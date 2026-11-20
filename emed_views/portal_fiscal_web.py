@@ -154,6 +154,19 @@ async def api_fiscal_v2_dados(request: web.Request) -> web.Response:
         cur_c = conn.execute("SELECT id, tecnico_setor, nome_item, quantidade, finalidade, data_baixa FROM baixas_consumiveis ORDER BY id DESC LIMIT 10")
         consumiveis_recentes = [{"id": rc[0], "setor": rc[1] or "", "item": rc[2] or "", "qtd": rc[3] or 0, "finalidade": rc[4] or "", "data": rc[5] or ""} for rc in cur_c.fetchall()]
 
+    
+        cfg_smtp_raw = {}
+        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from"):
+            r_s = conn.execute("SELECT valor FROM configuracoes_sistema WHERE chave = ?", (k,)).fetchone()
+            cfg_smtp_raw[k] = r_s[0] if (r_s and r_s[0]) else ""
+        cfg_smtp_safe = {
+            "smtp_host": cfg_smtp_raw.get("smtp_host", ""),
+            "smtp_port": cfg_smtp_raw.get("smtp_port", "587"),
+            "smtp_user": cfg_smtp_raw.get("smtp_user", ""),
+            "smtp_from": cfg_smtp_raw.get("smtp_from", ""),
+            "has_pass": bool(cfg_smtp_raw.get("smtp_pass")),
+        }
+
     total_nf, emitidas, total_faturar = cur_tot if cur_tot else (0, 0, 0.0)
     pendentes_fila = sum(1 for r in rows_os if not r[8] or "CANCELAD" in str(r[7] or "").upper())
 
@@ -217,6 +230,7 @@ async def api_fiscal_v2_dados(request: web.Request) -> web.Response:
         "pecas_almox": pecas_almox,
         "veiculos_frota": veiculos_frota,
         "consumiveis_recentes": consumiveis_recentes,
+        "cfg_smtp": cfg_smtp_safe,
     })
 
 
@@ -249,6 +263,15 @@ async def api_fiscal_v2_salvar_config(request: web.Request) -> web.Response:
         raw_bytes = base64.b64decode(cert_b64)
         ok_c, msg_c = CertificadoManager.salvar_certificado(filial, raw_bytes, senha_cert, db_name, replicar_todas=replicar)
         msg_cert = " | " + msg_c
+
+    with _get_db_connection(db_name) as conn:
+        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_from"):
+            if k in body:
+                val = str(body.get(k, "")).strip()
+                conn.execute("INSERT INTO configuracoes_sistema (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor", (k, val))
+        if body.get("smtp_pass"):
+            conn.execute("INSERT INTO configuracoes_sistema (chave, valor) VALUES ('smtp_pass', ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor", (str(body.get("smtp_pass")).strip(),))
+        conn.commit()
 
     _registrar_log_fiscal("CONFIG_FILIAL", f"Parâmetros salvos para {filial} (ISS: {cfg['aliquota_iss_padrao']}%){msg_cert}", str(body.get("usuario", "netto")))
     return web.json_response({"ok": True, "msg": f"✅ Parâmetros de {cfg.get('nome')} salvos com sucesso!{msg_cert}"})
@@ -1621,13 +1644,15 @@ async def api_fiscal_recebidas_enviar_email_pdf(request: web.Request) -> web.Res
 
             port = int(cfg_smtp.get("smtp_port") or 587)
 
-            with smtplib.SMTP(cfg_smtp["smtp_host"], port, timeout=15) as srv:
-
-                srv.starttls()
-
-                srv.login(cfg_smtp["smtp_user"], cfg_smtp["smtp_pass"])
-
-                srv.send_message(msg_email)
+            if port == 465:
+                with smtplib.SMTP_SSL(cfg_smtp["smtp_host"], port, timeout=15) as srv:
+                    srv.login(cfg_smtp["smtp_user"], cfg_smtp["smtp_pass"])
+                    srv.send_message(msg_email)
+            else:
+                with smtplib.SMTP(cfg_smtp["smtp_host"], port, timeout=15) as srv:
+                    srv.starttls()
+                    srv.login(cfg_smtp["smtp_user"], cfg_smtp["smtp_pass"])
+                    srv.send_message(msg_email)
 
 
 
@@ -1917,7 +1942,13 @@ async def api_fiscal_recebidas_danfe(request: web.Request) -> web.Response:
           </div>
         </div>
         <div style="background:#fff;border:1px solid #bfdbfe;border-radius:6px;padding:10px;">
-          <div style="font-weight:900;font-size:12px;color:#1d4ed8;margin-bottom:6px;">✉️ Enviar DANFE por E-mail</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-weight:900;font-size:12px;color:#1d4ed8;">✉️ Enviar DANFE por E-mail</span>
+            <div style="display:flex;gap:4px;">
+              <button type="button" onclick="dispararEmailDanfeWebmail('gmail')" style="background:#fee2e2;border:1px solid #ef4444;color:#b91c1c;border-radius:4px;font-size:10px;padding:2px 6px;cursor:pointer;font-weight:bold;" title="Abrir no Gmail Web">Gmail</button>
+              <button type="button" onclick="dispararEmailDanfeWebmail('outlook')" style="background:#e0f2fe;border:1px solid #0284c7;color:#0369a1;border-radius:4px;font-size:10px;padding:2px 6px;cursor:pointer;font-weight:bold;" title="Abrir no Outlook Web">Outlook</button>
+            </div>
+          </div>
           <div style="display:flex;gap:6px;">
             <input type="email" id="inpEmailDanfe" value="{dest_email_padrao}" placeholder="E-mail destinatário..." style="flex:1;padding:7px 9px;border:1px solid #93c5fd;border-radius:5px;font-size:12px;" />
             <button type="button" class="btn-act" style="background:#2563eb;" onclick="dispararEmailDanfe()">✉️ Enviar</button>
@@ -2103,33 +2134,83 @@ async def api_fiscal_recebidas_danfe(request: web.Request) -> web.Response:
       window.open(zapUrl, "_blank");
     }}
 
-    function dispararEmailDanfe() {{
+    function obterDadosEmailDanfe() {{
       const email = (document.getElementById("inpEmailDanfe")?.value || "").trim();
       const urlDanfe = window.location.origin + "/api/fiscal/recebidas/danfe/{n_id}";
+      const urlPdf = window.location.origin + "/api/fiscal/recebidas/pdf/{n_id}";
       const urlXml = window.location.origin + "/api/fiscal/recebidas/xml/{n_id}";
       const assunto = "DANFE NF-e Nº {num_nf} - {emit_nome} (EMED Eletromedicina)";
       const corpo = [
         "Prezados,",
         "",
-        "Seguem os dados e links da Nota Fiscal Eletrônica (NF-e) recebida no Radar DF-e da EMED Eletromedicina:",
+        "Seguem os dados da Nota Fiscal Eletrônica (NF-e) recebida no Radar DF-e da EMED Eletromedicina:",
         "",
-        "- Número da NF-e: {num_nf} (Série {serie or '1'})",
-        "- Fornecedor / Emitente: {emit_nome} (CNPJ: {emit_cnpj_fmt})",
-        "- Unidade EMED Destinatária: {dest_razao} ({dest_cnpj_fmt})",
-        "- Data de Emissão: {dt_emi_fmt}",
-        "- Valor Total: R$ {v_tot:,.2f}",
-        "- Chave de Acesso: {chave}",
+        "• Número da NF-e: {num_nf} (Série {serie or '1'})",
+        "• Fornecedor / Emitente: {emit_nome} (CNPJ: {emit_cnpj_fmt})",
+        "• Unidade EMED Destinatária: {dest_razao} ({dest_cnpj_fmt})",
+        "• Data de Emissão: {dt_emi_fmt}",
+        "• Valor Total: R$ {v_tot:,.2f}",
+        "• Chave de Acesso: {chave}",
         "",
-        "Visualizar / Imprimir DANFE Completa:",
+        "📄 Visualizar / Imprimir DANFE Completa:",
         urlDanfe,
         "",
-        "Download do Arquivo XML Oficial:",
+        "📥 Download Direto da DANFE em PDF:",
+        urlPdf,
+        "",
+        "📥 Download do Arquivo XML Oficial:",
         urlXml,
         "",
         "Atenciosamente,",
         "Departamento Fiscal — EMED Eletromedicina"
-      ].join("\\n");
-      window.location.href = `mailto:${{encodeURIComponent(email)}}?subject=${{encodeURIComponent(assunto)}}&body=${{encodeURIComponent(corpo)}}`;
+      ].join("\n");
+      return {{ email, assunto, corpo }};
+    }}
+
+    function dispararEmailDanfeWebmail(tipo) {{
+      const d = obterDadosEmailDanfe();
+      if (!d.email || !d.email.includes("@")) {{
+        alert("Por favor, digite um endereço de e-mail válido.");
+        document.getElementById("inpEmailDanfe")?.focus();
+        return;
+      }}
+      if (tipo === "gmail") {{
+        window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${{encodeURIComponent(d.email)}}&su=${{encodeURIComponent(d.assunto)}}&body=${{encodeURIComponent(d.corpo)}}`, "_blank");
+      }} else if (tipo === "outlook") {{
+        window.open(`https://outlook.live.com/mail/0/deeplink/compose?to=${{encodeURIComponent(d.email)}}&subject=${{encodeURIComponent(d.assunto)}}&body=${{encodeURIComponent(d.corpo)}}`, "_blank");
+      }} else {{
+        window.location.href = `mailto:${{encodeURIComponent(d.email)}}?subject=${{encodeURIComponent(d.assunto)}}&body=${{encodeURIComponent(d.corpo)}}`;
+      }}
+    }}
+
+    async function dispararEmailDanfe() {{
+      const d = obterDadosEmailDanfe();
+      if (!d.email || !d.email.includes("@")) {{
+        alert("Por favor, digite um endereço de e-mail válido.");
+        document.getElementById("inpEmailDanfe")?.focus();
+        return;
+      }}
+      try {{
+        const res = await fetch("/api/fiscal/recebidas/enviar-email-pdf", {{
+          method: "POST",
+          headers: {{"Content-Type": "application/json"}},
+          body: JSON.stringify({{ id: {n_id}, email: d.email }})
+        }}).then(r => r.json());
+        if (res.ok && res.smtp_sent) {{
+          alert(res.msg);
+          return;
+        }}
+      }} catch (e) {{}}
+
+      const el = d.email.toLowerCase();
+      if (el.endsWith("@gmail.com")) {{
+        dispararEmailDanfeWebmail("gmail");
+      }} else if (el.endsWith("@outlook.com") || el.endsWith("@hotmail.com") || el.endsWith("@live.com")) {{
+        dispararEmailDanfeWebmail("outlook");
+      }} else {{
+        dispararEmailDanfeWebmail("mailto");
+      }}
+    }}?subject=${{encodeURIComponent(assunto)}}&body=${{encodeURIComponent(corpo)}}`;
     }}
 
     {"window.addEventListener('load', () => setTimeout(() => window.print(), 350));" if auto_print else ""}
@@ -4964,6 +5045,18 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             <input type="checkbox" id="cfgReplicarCert" checked style="width:auto;" />
             🔗 Aplicar este mesmo Certificado A1 da EMED para todas as unidades (Matriz e Filial)
           </label>
+          <h4 style="margin:16px 0 6px 0;color:var(--cyan);">✉️ Envio Automático de E-mails / SMTP Corporativo (Opcional)</h4>
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">
+            Configure caso deseje disparo automático de DANFEs em PDF pelo servidor. Se não configurado, o envio funciona com 1 clique abrindo diretamente no <b>Gmail Web</b>, <b>Outlook Web</b> ou <b>App Padrão</b>.
+          </div>
+          <div class="grid-2">
+            <div><label>Servidor SMTP (Host):</label><input id="cfgSmtpHost" placeholder="ex: smtp.gmail.com ou smtp.office365.com" /></div>
+            <div><label>Porta SMTP:</label><input id="cfgSmtpPort" type="number" placeholder="587 ou 465" /></div>
+            <div><label>E-mail / Usuário SMTP:</label><input id="cfgSmtpUser" placeholder="ex: fiscal@emed.med.br" /></div>
+            <div><label>Senha / Senha de App SMTP:</label><input id="cfgSmtpPass" type="password" placeholder="Preencha apenas para alterar" /></div>
+            <div><label>Nome / Remetente Oficial:</label><input id="cfgSmtpFrom" placeholder="ex: EMED Fiscal &lt;fiscal@emed.med.br&gt;" /></div>
+          </div>
+
           <div style="margin-top:12px;">
             <button class="btn btn-blue" id="btnSalvarCfgUnidade" onclick="salvarConfigFilial()">💾 Salvar Parâmetros da Unidade</button>
           </div>
@@ -5752,6 +5845,16 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       document.getElementById("cfgEnd").value = cfg.endereco || "";
       document.getElementById("cfgEmail").value = cfg.email || "";
 
+      const smtp = res.cfg_smtp || {{}};
+      if (document.getElementById("cfgSmtpHost")) document.getElementById("cfgSmtpHost").value = smtp.smtp_host || "";
+      if (document.getElementById("cfgSmtpPort")) document.getElementById("cfgSmtpPort").value = smtp.smtp_port || "587";
+      if (document.getElementById("cfgSmtpUser")) document.getElementById("cfgSmtpUser").value = smtp.smtp_user || "";
+      if (document.getElementById("cfgSmtpFrom")) document.getElementById("cfgSmtpFrom").value = smtp.smtp_from || "";
+      if (document.getElementById("cfgSmtpPass")) {{
+        document.getElementById("cfgSmtpPass").value = "";
+        document.getElementById("cfgSmtpPass").placeholder = smtp.has_pass ? "•••••••• (Senha já gravada - preencha p/ trocar)" : "Senha do e-mail ou senha de app";
+      }}
+
       document.getElementById("bannerCertStatus").innerHTML = cert.instalado
         ? `<div style="background:#064e3b;border:1px solid #10b981;padding:10px 14px;border-radius:6px;font-size:12px;color:#ecfdf5;">
              <b>🔒 CERTIFICADO DIGITAL A1 GRAVADO &amp; ATIVO PARA A ${{tipoUn.toUpperCase()}}!</b><br/>
@@ -5940,6 +6043,11 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           cert_b64,
           senha_cert: document.getElementById("cfgCertPass").value,
           replicar_todas: document.getElementById("cfgReplicarCert").checked,
+          smtp_host: document.getElementById("cfgSmtpHost")?.value || "",
+          smtp_port: document.getElementById("cfgSmtpPort")?.value || "587",
+          smtp_user: document.getElementById("cfgSmtpUser")?.value || "",
+          smtp_pass: document.getElementById("cfgSmtpPass")?.value || "",
+          smtp_from: document.getElementById("cfgSmtpFrom")?.value || "",
           usuario: USUARIO_FISCAL?.username || "netto"
         }})
       }}).then(r => r.json());
@@ -7454,11 +7562,14 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     }}
 
     function perguntarOndeConectarWhatsApp() {{
-      const querPadrao = confirm(
-        "📱 COMO VOCÊ PREFERE CONECTAR O WHATSAPP?\n\n" +
-        "• Clique em [OK] para conectar no seu NAVEGADOR PADRÃO (Chrome, Edge, Firefox etc., onde você já usa seu WhatsApp no dia a dia).\n\n" +
+      const msg = [
+        "📱 COMO VOCÊ PREFERE CONECTAR O WHATSAPP?",
+        "",
+        "• Clique em [OK] para conectar no seu NAVEGADOR PADRÃO (Chrome, Edge, Firefox etc., onde você já usa seu WhatsApp no dia a dia).",
+        "",
         "• Clique em [Cancelar] se quiser abrir a janela do ROBÔ LOCAL DEDICADO em segundo plano."
-      );
+      ].join("\\n");
+      const querPadrao = confirm(msg);
       if (querPadrao) {{
         window.open("https://web.whatsapp.com", "_blank");
         mostrarAvisoPdfModal("🌐 <b>WhatsApp Web aberto no seu navegador padrão!</b> Você já pode disparar as mensagens diretamente.");
@@ -7585,36 +7696,120 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         if (btn) {{ btn.disabled = false; btn.textContent = "📲 Enviar PDF"; }}
       }}
     }}
+    function montarDadosEmailDanfeModalDFe(emailDest) {{
+      const n = DFE_NOTA_ATUAL_MODAL;
+      if (!n) return null;
+      const email = emailDest || (document.getElementById("inpModalDFeEmail")?.value || "").trim();
+      const numNf = n.numero_nf || n.id;
+      const fornecedor = n.emitente_nome || "Fornecedor";
+      const cnpjForn = n.emitente_cnpj || "-";
+      const filialDest = n.filial || "EMED Eletromedicina";
+      const cnpjDest = n.cnpj_destinatario || "-";
+      const dtEmi = n.data_emissao || "-";
+      const vTot = Number(n.valor_total || 0).toLocaleString("pt-BR", {{minimumFractionDigits: 2, maximumFractionDigits: 2}});
+      const chave = n.chave_acesso || "-";
+      const hostOrigin = window.location.origin;
+      const urlDanfe = `${{hostOrigin}}/api/fiscal/recebidas/danfe/${{n.id}}`;
+      const urlPdf = `${{hostOrigin}}/api/fiscal/recebidas/pdf/${{n.id}}`;
+      const urlXml = `${{hostOrigin}}/api/fiscal/recebidas/xml/${{n.id}}`;
+
+      const assunto = `DANFE NF-e Nº ${{numNf}} - ${{fornecedor}} (EMED Eletromedicina)`;
+      const corpo = [
+        "Prezados,",
+        "",
+        "Seguem os dados da Nota Fiscal Eletrônica (NF-e) recebida no Radar DF-e da EMED Eletromedicina:",
+        "",
+        `• Número da NF-e: ${{numNf}} (Série ${{n.serie || "1"}})`,
+        `• Emitente / Fornecedor: ${{fornecedor}} (CNPJ: ${{cnpjForn}})`,
+        `• Unidade EMED Destinatária: ${{filialDest}} (CNPJ: ${{cnpjDest}})`,
+        `• Data de Emissão: ${{dtEmi}}`,
+        `• Valor Total: R$ ${{vTot}}`,
+        `• Chave de Acesso: ${{chave}}`,
+        "",
+        "📄 Visualizar / Imprimir DANFE Completa:",
+        urlDanfe,
+        "",
+        "📥 Download Direto da DANFE em PDF:",
+        urlPdf,
+        "",
+        "📥 Download do Arquivo XML Oficial:",
+        urlXml,
+        "",
+        "Atenciosamente,",
+        "Departamento Fiscal — EMED Eletromedicina"
+      ].join("\n");
+
+      return {{ email, numNf, fornecedor, assunto, corpo, urlDanfe, urlPdf, urlXml, id: n.id }};
+    }}
+
+    function abrirEmailDanfeWebmail(tipo, emailDest) {{
+      const dados = montarDadosEmailDanfeModalDFe(emailDest);
+      if (!dados) {{
+        alert("Nenhuma nota fiscal selecionada.");
+        return;
+      }}
+      const email = dados.email;
+      if (!email || !email.includes("@")) {{
+        alert("Informe um e-mail de destino válido no campo.");
+        document.getElementById("inpModalDFeEmail")?.focus();
+        return;
+      }}
+
+      let link = "";
+      if (tipo === "gmail") {{
+        link = `https://mail.google.com/mail/?view=cm&fs=1&to=${{encodeURIComponent(email)}}&su=${{encodeURIComponent(dados.assunto)}}&body=${{encodeURIComponent(dados.corpo)}}`;
+        window.open(link, "_blank");
+        mostrarAvisoPdfModal(`🔴 Rascunho aberto no <b>Gmail Web</b> para ${{email}}! Os dados e links da DANFE já estão preenchidos. <a href="/api/fiscal/recebidas/pdf/${{dados.id}}" target="_blank" style="color:#38bdf8;text-decoration:underline;margin-left:6px;font-weight:bold;">📥 Baixar PDF para Anexar</a>`);
+      }} else if (tipo === "outlook") {{
+        link = `https://outlook.live.com/mail/0/deeplink/compose?to=${{encodeURIComponent(email)}}&subject=${{encodeURIComponent(dados.assunto)}}&body=${{encodeURIComponent(dados.corpo)}}`;
+        window.open(link, "_blank");
+        mostrarAvisoPdfModal(`🔵 Rascunho aberto no <b>Outlook Web</b> para ${{email}}! Os dados e links da DANFE já estão preenchidos. <a href="/api/fiscal/recebidas/pdf/${{dados.id}}" target="_blank" style="color:#38bdf8;text-decoration:underline;margin-left:6px;font-weight:bold;">📥 Baixar PDF para Anexar</a>`);
+      }} else {{
+        link = `mailto:${{encodeURIComponent(email)}}?subject=${{encodeURIComponent(dados.assunto)}}&body=${{encodeURIComponent(dados.corpo)}}`;
+        window.location.href = link;
+        mostrarAvisoPdfModal(`💻 Aberto no <b>Aplicativo Padrão de E-mail</b> (Outlook / Thunderbird)! <a href="/api/fiscal/recebidas/pdf/${{dados.id}}" target="_blank" style="color:#38bdf8;text-decoration:underline;margin-left:6px;font-weight:bold;">📥 Baixar PDF para Anexar</a>`);
+      }}
+    }}
+
     async function enviarEmailDanfeModalDFe() {{
       const n = DFE_NOTA_ATUAL_MODAL;
       if (!n) return;
       const email = (document.getElementById("inpModalDFeEmail")?.value || "").trim();
       if (!email || !email.includes("@")) {{
         alert("Informe um e-mail válido para enviar a DANFE em PDF.");
+        document.getElementById("inpModalDFeEmail")?.focus();
         return;
       }}
+
+      const btn = document.getElementById("btnDispararEmailModal");
+      if (btn) {{ btn.disabled = true; btn.textContent = "⏳ Enviando..."; }}
+
       try {{
         const res = await fetch("/api/fiscal/recebidas/enviar-email-pdf", {{
           method: "POST",
           headers: {{"Content-Type": "application/json"}},
           body: JSON.stringify({{ id: n.id, email }})
         }}).then(r => r.json());
+
         if (res.ok && res.smtp_sent) {{
           mostrarAvisoPdfModal(res.msg);
           alert(res.msg);
           return;
         }}
-      }} catch (e) {{}}
+      }} catch (e) {{
+      }} finally {{
+        if (btn) {{ btn.disabled = false; btn.textContent = "✉️ Disparar E-mail"; }}
+      }}
 
-      // Fallback sem links: baixa o .EML (rascunho de e-mail já com o .PDF anexado dentro) + o .PDF
-      const aEml = document.createElement("a");
-      aEml.href = `/api/fiscal/recebidas/eml/${{n.id}}?to=${{encodeURIComponent(email)}}`;
-      aEml.download = `DANFE_NFe_${{n.numero_nf}}.eml`;
-      document.body.appendChild(aEml);
-      aEml.click();
-      aEml.remove();
-
-      mostrarAvisoPdfModal(`✉️ Arquivo <b>DANFE_NFe_${{n.numero_nf}}.eml</b> baixado <b>com o PDF já anexado dentro</b>! Dê dois cliques nele para abrir no Outlook/E-mail e enviar diretamente ao cliente (sem links).`);
+      // Se SMTP não estiver configurado no servidor, direciona instantaneamente para Webmail inteligente:
+      const emailLower = email.toLowerCase();
+      if (emailLower.endsWith("@gmail.com")) {{
+        abrirEmailDanfeWebmail("gmail", email);
+      }} else if (emailLower.endsWith("@outlook.com") || emailLower.endsWith("@hotmail.com") || emailLower.endsWith("@live.com")) {{
+        abrirEmailDanfeWebmail("outlook", email);
+      }} else {{
+        abrirEmailDanfeWebmail("mailto", email);
+      }}
     }}
 
     function fecharModalItensDFe() {{
@@ -8866,11 +9061,19 @@ Por favor, confira os dados preenchidos.`);
             <div style="font-size:11px;color:#94a3b8;margin-top:4px;">💡 <b>Dica:</b> O envio via <b>Navegador Padrão</b> abre no navegador que você já usa no dia a dia, com a mensagem pronta e o link oficial da DANFE.</div>
           </div>
           <div>
-            <label style="color:#60a5fa;font-size:12px;font-weight:700;">✉️ Enviar DANFE Completa por E-mail:</label>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+              <label style="color:#60a5fa;font-size:12px;font-weight:700;margin:0;">✉️ Enviar DANFE Completa por E-mail:</label>
+              <div style="display:flex;gap:4px;">
+                <button type="button" onclick="abrirEmailDanfeWebmail('gmail')" style="background:#450a0a;border:1px solid #ef4444;color:#fca5a5;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer;font-weight:600;" title="Abrir rascunho no Gmail Web">🔴 Gmail</button>
+                <button type="button" onclick="abrirEmailDanfeWebmail('outlook')" style="background:#082f49;border:1px solid #0284c7;color:#7dd3fc;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer;font-weight:600;" title="Abrir rascunho no Outlook Web">🔵 Outlook</button>
+                <button type="button" onclick="abrirEmailDanfeWebmail('mailto')" style="background:#1e293b;border:1px solid #64748b;color:#cbd5e1;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer;font-weight:600;" title="Abrir no aplicativo padrão do computador (Outlook/Thunderbird)">💻 App Padrão</button>
+              </div>
+            </div>
             <div style="display:flex;gap:6px;margin-top:6px;">
               <input type="email" id="inpModalDFeEmail" placeholder="destinatario@empresa.com.br" style="flex:1;padding:8px 10px;font-size:12px;" />
-              <button type="button" class="btn" style="width:auto;background:#2563eb;color:#fff;padding:8px 14px;font-size:12px;white-space:nowrap;" onclick="enviarEmailDanfeModalDFe()">✉️ Disparar E-mail</button>
+              <button type="button" id="btnDispararEmailModal" class="btn" style="width:auto;background:#2563eb;color:#fff;padding:8px 14px;font-size:12px;white-space:nowrap;" onclick="enviarEmailDanfeModalDFe()">✉️ Disparar E-mail</button>
             </div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">💡 <b>Dica:</b> Envia os dados completos da NF-e, chave de acesso e links oficiais da DANFE e XML.</div>
           </div>
         </div>
         <div id="avisoEnvioPdfModalDFe" style="display:none;margin-top:8px;padding:8px 12px;border-radius:6px;background:#064e3b;border:1px solid #10b981;color:#d1fae5;font-size:12px;"></div>
