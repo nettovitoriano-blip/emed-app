@@ -208,6 +208,51 @@ def calcular_chave_nfse_nacional(c_mun: str, cnpj: str, serie: int, num_nf: int,
     return f"{corpo}{dv}"
 
 
+
+def assinar_xml_dps_nacional(xml_str: str, filial_codigo: str, db_name: str) -> str:
+    """Assina digitalmente a Declaração de Prestação de Serviços (DPS)
+    utilizando o Certificado Digital A1 (.pfx) da EMED no padrão oficial SHA-256 (ICP-Brasil)."""
+    try:
+        from cryptography.hazmat.primitives.serialization import pkcs12, Encoding
+        from lxml import etree
+        import signxml
+
+        st_cert = CertificadoManager.status_certificado(filial_codigo, db_name)
+        if not st_cert.get("instalado") or not st_cert.get("caminho"):
+            return xml_str
+
+        pfx_path = st_cert.get("caminho")
+        with _get_db_connection(db_name) as conn:
+            r_pwd = conn.execute("SELECT valor FROM configuracoes_sistema WHERE chave = ?", (f"cert_senha_{filial_codigo.lower()}",)).fetchone()
+            senha_pfx = (r_pwd[0] if r_pwd and r_pwd[0] else "Emed@2026").encode("utf-8")
+
+        with open(pfx_path, "rb") as f:
+            pfx_data = f.read()
+
+        p_key, cert, _ = pkcs12.load_key_and_certificates(pfx_data, senha_pfx)
+        cert_pem = cert.public_bytes(Encoding.PEM)
+
+        # Parse do XML e localização do Id da infDPS
+        root = etree.fromstring(xml_str.encode("utf-8"))
+        inf_dps = root.find(".//{http://www.sped.fazenda.gov.br/nfse}infDPS")
+        if inf_dps is None:
+            inf_dps = root.find(".//infDPS")
+        ref_id = ("#" + inf_dps.get("Id")) if inf_dps is not None and inf_dps.get("Id") else None
+
+        signer = signxml.XMLSigner(
+            method=signxml.methods.enveloped,
+            signature_algorithm="rsa-sha256",
+            digest_algorithm="sha256",
+            c14n_algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"
+        )
+        signed_root = signer.sign(root, key=p_key, cert=cert_pem, reference_uri=ref_id)
+        return etree.tostring(signed_root, encoding="utf-8", xml_declaration=True).decode("utf-8")
+    except Exception as e:
+        import logging
+        logging.warning(f"Não foi possível assinar o XML da DPS: {e}")
+        return xml_str
+
+
 class MultiFilialFiscalProvider(FiscalProvider):
     def __init__(self, base_dir: Optional[Path] = None):
         if base_dir:
@@ -299,7 +344,7 @@ class MultiFilialFiscalProvider(FiscalProvider):
             <vTotTribFed>{v_total * 0.1345:.2f}</vTotTribFed>
           </vTotTrib>
         </totTrib>
-      </valores>
+      </trib>
     </valores>
   </infDPS>
 </DPS>"""
@@ -358,6 +403,15 @@ class MultiFilialFiscalProvider(FiscalProvider):
 </Rps>"""
 
         xml_path = self.xml_dir / f"nfs_{payload.get('filial_emissora', 'DF').lower()}_{os_id}.xml"
+                # Se for DPS Nacional e o certificado A1 estiver ativo, assina digitalmente no padrão ICP-Brasil
+        if is_nacional and not is_trf and payload.get("certificado_ativo"):
+            try:
+                db_name_str = getattr(self, "db_name", None) or str(Path(__file__).resolve().parent / "emed.db")
+                xml_content = assinar_xml_dps_nacional(xml_content, payload.get("filial_emissora", "FILIAL_DF"), db_name_str)
+            except Exception as e_ass:
+                import logging
+                logging.warning(f"Falha ao acionar assinatura A1 da DPS: {e_ass}")
+
         xml_path.write_text(xml_content, encoding="utf-8")
 
         filial_emissora = payload.get("filial_emissora", "FILIAL_DF")
