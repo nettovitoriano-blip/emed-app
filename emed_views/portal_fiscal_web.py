@@ -7568,7 +7568,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         "• Clique em [OK] para conectar no seu NAVEGADOR PADRÃO (Chrome, Edge, Firefox etc., onde você já usa seu WhatsApp no dia a dia).",
         "",
         "• Clique em [Cancelar] se quiser abrir a janela do ROBÔ LOCAL DEDICADO em segundo plano."
-      ].join("\\n");
+      ].join(String.fromCharCode(10));
       const querPadrao = confirm(msg);
       if (querPadrao) {{
         window.open("https://web.whatsapp.com", "_blank");
@@ -7737,7 +7737,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         "",
         "Atenciosamente,",
         "Departamento Fiscal — EMED Eletromedicina"
-      ].join("\n");
+      ].join(String.fromCharCode(10));
 
       return {{ email, numNf, fornecedor, assunto, corpo, urlDanfe, urlPdf, urlXml, id: n.id }};
     }}
@@ -8463,7 +8463,7 @@ Por favor, confira os dados preenchidos.`);
           "19/11/2026;Posto Petrobras Fortaleza - Abastecimento Gasolina Viagem;289,90",
           "19/11/2026;Restaurante Coco Bambu Sul - Almoco Equipe Tecnica;164,50",
           "19/11/2026;Hotel Ibis Fortaleza - Diaria Plantao Tomografo;320,00"
-        ].join("\\n");
+        ].join(String.fromCharCode(10));
       }} else {{
         document.getElementById("txtConteudoExtratoGestora").value = [
           "Data;Estabelecimento / Descricao;Valor",
@@ -8473,7 +8473,7 @@ Por favor, confira os dados preenchidos.`);
           "19/11/2026;Auto Posto Petrobras Lago Sul - Gasolina Frota DF;348,00",
           "19/11/2026;Hotel Mercure Brasilia - Diaria Equipe Manutencao;410,00",
           "19/11/2026;Restaurante Setor Hospitalar Sul - Almoco Tecnicos;128,00"
-        ].join("\\n");
+        ].join(String.fromCharCode(10));
       }}
       processarBatimentoExtratoGestora();
     }}
