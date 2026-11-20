@@ -3690,6 +3690,9 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/api/hospital/")
 
         or path.startswith("/api/gestao/")
+        or path.startswith("/api/effort/")
+        or path.startswith("/api/konica/")
+        or path.startswith("/api/instalacao/")
 
     ):
 
@@ -17178,6 +17181,67 @@ async def api_imprimir_termo_aceite_instalacao(request: web.Request) -> web.Resp
 
 
 
+
+async def api_formulario_konica_rx_interativo(request: web.Request) -> web.Response:
+    try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        caminho = os.path.join(base_dir, "formulario_konica_rx_interativo.html")
+        if os.path.exists(caminho):
+            with open(caminho, "r", encoding="utf-8") as f:
+                return web.Response(text=f.read(), content_type="text/html")
+        return web.Response(text="Formulário Konica RX não encontrado", status=404)
+    except Exception as e:
+        return web.Response(text=f"Erro ao carregar Formulário Konica RX: {e}", status=500)
+
+async def api_central_konica_minolta(request: web.Request) -> web.Response:
+    try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        caminho = os.path.join(base_dir, "central_konica_minolta.html")
+        if os.path.exists(caminho):
+            with open(caminho, "r", encoding="utf-8") as f:
+                return web.Response(text=f.read(), content_type="text/html")
+        return web.Response(text="Central Konica Minolta nao encontrada", status=404)
+    except Exception as e:
+        return web.Response(text=f"Erro ao carregar Central Konica: {e}", status=500)
+
+async def api_effort_migrar(request: web.Request) -> web.Response:
+    try:
+        data = await request.json()
+        numero_os = data.get("numero_os", "")
+        topicos = data.get("topicos", {})
+        usuario = data.get("usuario")
+        senha = data.get("senha")
+        headless = data.get("headless", False)
+
+        from emed_services.effort_konica_bridge import migrar_para_effort
+        resultado = migrar_para_effort(
+            numero_os=numero_os,
+            topicos=topicos,
+            usuario=usuario,
+            senha=senha,
+            headless=headless
+        )
+        return web.json_response(resultado)
+    except Exception as e:
+        return web.json_response({"sucesso": False, "erro": str(e)}, status=500)
+
+async def api_effort_config(request: web.Request) -> web.Response:
+    try:
+        from emed_services.effort_konica_bridge import carregar_config_effort, salvar_config_effort
+        if request.method == "POST":
+            data = await request.json()
+            salvar_config_effort(
+                usuario=data.get("usuario", ""),
+                senha=data.get("senha", ""),
+                headless=data.get("headless", False)
+            )
+            return web.json_response({"sucesso": True, "mensagem": "Configuracoes salvas"})
+        else:
+            cfg = carregar_config_effort()
+            return web.json_response({"usuario": cfg.get("usuario", ""), "headless": cfg.get("headless", False)})
+    except Exception as e:
+        return web.json_response({"sucesso": False, "erro": str(e)}, status=500)
+
 async def api_manual_download(request: web.Request) -> web.Response:
 
 
@@ -24913,6 +24977,13 @@ def criar_app() -> web.Application:
 
 
 
+    app.router.add_get("/formulario-konica-rx", api_formulario_konica_rx_interativo)
+    app.router.add_get("/api/instalacao/konica-rx", api_formulario_konica_rx_interativo)
+    app.router.add_get("/konica-central", api_central_konica_minolta)
+    app.router.add_get("/api/konica/central", api_central_konica_minolta)
+    app.router.add_post("/api/effort/migrar", api_effort_migrar)
+    app.router.add_get("/api/effort/config", api_effort_config)
+    app.router.add_post("/api/effort/config", api_effort_config)
     app.router.add_get("/api/manual", api_manual_download)
 
 

@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Central Konica Minolta - Sistema eMED (Multi-Modalidades)</title>
+<style>
+  :root {
+    --km-blue: #005bac;
+    --km-dark: #002d62;
+    --km-light-blue: #e8f1fa;
+    --km-red: #c00;
+    --km-green: #28a745;
+    --km-gray: #f4f6f9;
+    --km-border: #ccd0d5;
+    --text-dark: #212529;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  body { background: #e9ecef; color: var(--text-dark); padding-bottom: 50px; }
+
+  /* Barra de Ferramentas Superior Fixa */
+  .top-navbar {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: #ffffff;
+    border-bottom: 2px solid var(--km-blue);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    padding: 10px 20px;
+  }
+  .navbar-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .brand-area {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+  .km-logo-svg {
+    height: 38px;
+    width: auto;
+  }
+  .brand-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--km-dark);
+  }
+  .brand-subtitle {
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+
+  /* Seletor de Modalidades */
+  .modality-selector {
+    display: flex;
+    background: #f1f3f5;
+    padding: 4px;
+    border-radius: 8px;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .mod-btn {
+    padding: 7px 14px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: #495057;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .mod-btn:hover {
+    background: #e2e6ea;
+  }
+  .mod-btn.active {
+    background: var(--km-blue);
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(0,91,172,0.3);
+  }
+
+  /* Botões de Ação Rápida */
+  .quick-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .btn-primary { background: var(--km-blue); color: #fff; }
+  .btn-primary:hover { background: var(--km-dark); }
+  .btn-success { background: #28a745; color: #fff; }
+  .btn-success:hover { background: #218838; }
+  .btn-warning { background: #ffc107; color: #212529; }
+  .btn-warning:hover { background: #e0a800; }
+  .btn-danger { background: #dc3545; color: #fff; }
+  .btn-danger:hover { background: #c82333; }
+  .btn-outline { background: #fff; border: 1px solid #ced4da; color: #495057; }
+  .btn-outline:hover { background: #f8f9fa; border-color: #adb5bd; }
+
+  /* Sub-Abas do Equipamento */
+  .sub-tabs-container {
+    max-width: 1200px;
+    margin: 16px auto 0 auto;
+    padding: 0 15px;
+    display: flex;
+    gap: 10px;
+  }
+  .sub-tab-btn {
+    padding: 10px 20px;
+    border: none;
+    background: #dee2e6;
+    border-radius: 8px 8px 0 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #495057;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .sub-tab-btn.active {
+    background: #ffffff;
+    color: var(--km-blue);
+    border-top: 3px solid var(--km-blue);
+  }
+
+  /* Área Principal do Documento */
+  .content-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 15px;
+  }
+  .sheet {
+    background: #ffffff;
+    padding: 30px;
+    border-radius: 0 8px 8px 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    margin-bottom: 25px;
+  }
+
+  /* Cabeçalho do Relatório */
+  .doc-header {
+    border-bottom: 2px solid var(--km-blue);
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .doc-code-badge {
+    background: #f1f3f5;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #495057;
+    border: 1px solid #dee2e6;
+  }
+
+  /* Grid de Dados Cadastrais */
+  .grid-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+    background: #f8f9fa;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+  }
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .form-group label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #495057;
+    text-transform: uppercase;
+  }
+  .form-group input, .form-group select, .form-group textarea {
+    padding: 8px 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .form-group input:focus, .form-group textarea:focus {
+    outline: none;
+    border-color: var(--km-blue);
+    box-shadow: 0 0 0 2px rgba(0,91,172,0.15);
+  }
+
+  /* Tabela de Itens de Checklist */
+  .checklist-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    font-size: 13px;
+  }
+  .checklist-table th {
+    background: var(--km-blue);
+    color: #ffffff;
+    text-align: left;
+    padding: 10px;
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+  .checklist-table td {
+    padding: 10px;
+    border-bottom: 1px solid #e9ecef;
+    vertical-align: middle;
+  }
+  .checklist-table tr:hover {
+    background: #f8f9fa;
+  }
+  .status-options {
+    display: flex;
+    gap: 14px;
+  }
+  .status-options label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* Área dos 4 Tópicos */
+  .four-topics-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .topic-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--km-dark);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .topic-textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.5;
+    font-family: inherit;
+    resize: vertical;
+    margin-bottom: 16px;
+  }
+  .topic-textarea:focus {
+    border-color: var(--km-blue);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0,91,172,0.15);
+  }
+
+  /* Preview Consolidado */
+  .consolidated-box {
+    background: #212529;
+    color: #70ff70;
+    font-family: monospace;
+    font-size: 13px;
+    padding: 15px;
+    border-radius: 6px;
+    white-space: pre-wrap;
+    max-height: 250px;
+    overflow-y: auto;
+    border: 1px solid #343a40;
+    margin-bottom: 15px;
+  }
+
+  /* Assinaturas Digitais */
+  .signature-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 25px;
+    border-top: 2px dashed #ced4da;
+    padding-top: 20px;
+  }
+  .sig-card {
+    background: #f8f9fa;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+  }
+  .sig-canvas {
+    width: 100%;
+    height: 120px;
+    background: #ffffff;
+    border: 1px solid #adb5bd;
+    border-radius: 4px;
+    cursor: crosshair;
+    touch-action: none;
+  }
+  .sig-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #495057;
+    margin-top: 8px;
+  }
+
+  /* Modal de Migração Effort */
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 2000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-content {
+    background: #ffffff;
+    border-radius: 10px;
+    width: 100%;
+    max-width: 520px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    overflow: hidden;
+  }
+  .modal-header {
+    background: var(--km-blue);
+    color: #fff;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-body {
+    padding: 20px;
+  }
+  .modal-footer {
+    background: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  /* Estilos para Impressão / PDF */
+  @media print {
+    .top-navbar, .sub-tabs-container, .quick-actions, .no-print {
+      display: none !important;
+    }
+    body { background: #fff; padding: 0; }
+    .sheet { box-shadow: none; padding: 0; margin: 0; }
+    @page { size: A4; margin: 8mm; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Barra Superior Fixa -->
+<header class="top-navbar">
+  <div class="navbar-container">
+    <div class="brand-area">
+      <!-- Logo Konica Minolta em Vetor Inline -->
+      <svg class="km-logo-svg" viewBox="0 0 250 45" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="20" cy="22" r="16" fill="#005bac"/>
+        <path d="M 9 22 Q 20 10 31 22 Q 20 34 9 22" fill="#ffffff" opacity="0.95"/>
+        <text x="44" y="27" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-weight="900" font-size="20" fill="#002d62" letter-spacing="1">KONICA MINOLTA</text>
+      </svg>
+      <div>
+        <div class="brand-title">Central de Laudos & OS</div>
+        <div class="brand-subtitle">eMED Eletromedicina • Conexão Effort KM</div>
+      </div>
+    </div>
+
+    <!-- Seletor de Modalidades -->
+    <div class="modality-selector">
+      <button class="mod-btn active" onclick="selecionarModalidade('RX')">🩻 Raios-X</button>
+      <button class="mod-btn" onclick="selecionarModalidade('DR')">📡 DR (AeroDR)</button>
+      <button class="mod-btn" onclick="selecionarModalidade('CR')">💾 CR (Regius)</button>
+      <button class="mod-btn" onclick="selecionarModalidade('MAMO')">🔬 Mamógrafo</button>
+      <button class="mod-btn" onclick="selecionarModalidade('DRY')">🖨️ Dry (DryPro)</button>
+    </div>
+
+    <!-- Botões de Ação Rápida -->
+    <div class="quick-actions">
+      <button class="btn btn-warning" onclick="preencherTudoConforme()" title="Marca OK/Conforme e dados nominais com 1 clique">⚡ Preencher Conforme (1 Clique)</button>
+      <button class="btn btn-outline" onclick="limparTudo()" title="Limpar todos os campos">🧹 Limpar</button>
+      <button class="btn btn-primary" onclick="window.print()" title="Imprimir ou Salvar PDF A4">🖨️ Gerar PDF A4</button>
+      <button class="btn btn-success" onclick="abrirModalEffort()" title="Migrar dados para o Portal Effort">🚀 Migrar p/ Effort</button>
+    </div>
+  </div>
+</header>
+
+<!-- Navegação de Abas do Equipamento -->
+<div class="sub-tabs-container">
+  <button id="tabBtnRelatorio" class="sub-tab-btn active" onclick="alternarSubAba('relatorio')">📄 Relatório & Checklist Oficial KM</button>
+  <button id="tabBtnTopicos" class="sub-tab-btn" onclick="alternarSubAba('topicos')">⭐ Padrão Effort KM (4 Tópicos)</button>
+</div>
+
+<!-- Conteúdo Principal -->
+<main class="content-container">
+
+  <!-- ==================== ABA 1: RELATÓRIO TÉCNICO & CHECKLIST ==================== -->
+  <section id="abaRelatorio" class="sheet">
+    
+    <div class="doc-header">
+      <div>
+        <h2 id="tituloModalidade" style="color: var(--km-dark); font-size: 20px;">Relatório de Instalação e Manutenção Preventiva - Raios-X</h2>
+        <div id="subtituloModalidade" style="color: #666; font-size: 13px; margin-top: 3px;">Padrão Técnico Konica Minolta Healthcare</div>
+      </div>
+      <div id="badgeCodigoDoc" class="doc-code-badge">FR_SE00003_03 (Pág 1-12)</div>
+    </div>
+
+    <!-- Dados Gerais / Cabeçalho -->
+    
+    <!-- Barra de Seleção Rápida de Clientes e Equipamentos eMED/Auvo -->
+    <div class="no-print" style="background: linear-gradient(135deg, #e8f4fd 0%, #d4ebfc 100%); border: 1.5px solid #005bac; border-radius: 8px; padding: 12px 18px; margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 22px;">🏥</span>
+        <div>
+          <strong style="color: #002d62; font-size: 13px;">Preenchimento Automático do Cliente & Unidade:</strong>
+          <div style="font-size: 11px; color: #555;">Carregue instantaneamente os dados do cliente cadastrado no sistema EMED/Auvo:</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; flex: 1; max-width: 520px; align-items: center;">
+        <select id="seletorClienteCentral" onchange="selecionarClienteCentral(this.value)" style="flex: 1; padding: 7px 10px; border-radius: 6px; border: 1px solid #005bac; font-size: 13px; font-weight: 700; color: #002d62; background: #fff; cursor: pointer;">
+          <option value="MEDVISION">🏥 CLINICA MEDVISION (Crateús/CE - RX Altus)</option>
+          <option value="FOCUS">🏥 CLÍNICA FOCUS DIAGNÓSTICO (Fortaleza/CE)</option>
+          <option value="KM_BRASIL">🏥 KONICA MINOLTA HEALTHCARE BRASIL</option>
+          <option value="SAO_LUCAS">🏥 SÃO LUCAS IMAGEM (Sobral/CE)</option>
+          <option value="BOGHOS">🏥 CLÍNICA BOGHOS SOBRAL (Sobral/CE)</option>
+          <option value="ZOOVET">🏥 CLÍNICA VETERINÁRIA ZOOVET (Fortaleza/CE)</option>
+          <option value="CITOLAB">🏥 MAURICIO ANÁLISES CLÍNICAS (Tabuleiro do Norte/CE)</option>
+          <option value="HOSP_MERUOCA">🏥 HOSPITAL CHAGAS BARRETO (Meruoca/CE)</option>
+        </select>
+        <button type="button" class="btn btn-primary" onclick="selecionarClienteCentral(document.getElementById('seletorClienteCentral').value)" style="padding: 7px 12px; font-size: 12px; font-weight: 700;">⚡ Preencher</button>
+      </div>
+    </div>
+
+    <div class="grid-form">
+      <div class="form-group">
+        <label>Cliente / Hospital</label>
+        <input type="text" id="cadCliente" value="CLINICA MEDVISION - SAUDE E MEDICINA DO TRABALHO">
+      </div>
+      <div class="form-group">
+        <label>Cidade / UF</label>
+        <input type="text" id="cadCidade" value="Crateús / CE">
+      </div>
+      <div class="form-group">
+        <label>Nº OS (Effort / EMED)</label>
+        <input type="text" id="cadOS" value="OS-2026-KM-089">
+      </div>
+      <div class="form-group">
+        <label>Modelo do Equipamento</label>
+        <input type="text" id="cadModelo" value="Raio-X HF Alta Resolução">
+      </div>
+      <div class="form-group">
+        <label>Número de Série</label>
+        <input type="text" id="cadSerial" value="KM-RX-2024-998">
+      </div>
+      <div class="form-group">
+        <label>Data de Execução</label>
+        <input type="date" id="cadData">
+      </div>
+      <div class="form-group">
+        <label>Técnico Responsável</label>
+        <input type="text" id="cadTecnico" value="Vitor Manuel / Equipe Técnica EMED Eletromedicina">
+      </div>
+      <div class="form-group">
+        <label>Status Final do Equipamento</label>
+        <select id="cadStatusFinal">
+          <option value="OPERACIONAL">OPERACIONAL E LIBERADO PARA USO</option>
+          <option value="PARCIAL">OPERACIONAL COM RESTRIÇÕES</option>
+          <option value="INOPERANTE">INOPERANTE / AGUARDANDO PEÇA</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Tabela Dinâmica do Checklist da Modalidade -->
+    <h3 style="font-size: 15px; color: var(--km-dark); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+      📋 Itens de Inspeção e Conformidade Técnica
+    </h3>
+    <table class="checklist-table">
+      <thead>
+        <tr>
+          <th style="width: 55px;">Item</th>
+          <th>Descrição da Verificação Técnica</th>
+          <th style="width: 240px; text-align: center;">Status de Conformidade</th>
+          <th style="width: 250px;">Observação / Valor Aferido</th>
+        </tr>
+      </thead>
+      <tbody id="corpoChecklist">
+        <!-- Preenchido dinamicamente via JavaScript conforme a modalidade -->
+      </tbody>
+    </table>
+
+    <!-- Campo de Parecer Técnico Final -->
+    <div style="margin-top: 20px;">
+      <label style="font-size: 12px; font-weight: 700; color: #495057; text-transform: uppercase;">Parecer Técnico & Observações do Relatório (Página 10/12)</label>
+      <textarea id="parecerTecnicoRelatorio" style="width: 100%; min-height: 90px; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; margin-top: 5px; font-family: inherit;"></textarea>
+    </div>
+
+    <!-- Assinaturas Digitais Integradas -->
+    <div class="signature-grid">
+      <div class="sig-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-size: 12px; font-weight: 700; color: #333;">Assinatura do Técnico EMED</span>
+          <button type="button" class="btn btn-outline" style="padding: 2px 8px; font-size: 11px;" onclick="limparCanvas('cvTecnico')">Limpar</button>
+        </div>
+        <canvas id="cvTecnico" class="sig-canvas" width="450" height="120"></canvas>
+        <div class="sig-label">TÉCNICO RESPONSÁVEL / CREA</div>
+      </div>
+
+      <div class="sig-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-size: 12px; font-weight: 700; color: #333;">Assinatura do Cliente / Hospital</span>
+          <button type="button" class="btn btn-outline" style="padding: 2px 8px; font-size: 11px;" onclick="limparCanvas('cvCliente')">Limpar</button>
+        </div>
+        <canvas id="cvCliente" class="sig-canvas" width="450" height="120"></canvas>
+        <div class="sig-label">RESPONSÁVEL PELO RECEBIMENTO</div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ==================== ABA 2: OS PADRÃO KM - 4 TÓPICOS EFFORT ==================== -->
+  <section id="abaTopicos" class="sheet" style="display: none;">
+    <div class="doc-header">
+      <div>
+        <h2 style="color: var(--km-dark); font-size: 20px;">Padrão Konica Minolta - 4 Tópicos Effort</h2>
+        <div style="color: #666; font-size: 13px; margin-top: 3px;">Formatação oficial padronizada para migração no portal Effort sem erros</div>
+      </div>
+      <div class="quick-actions">
+        <button class="btn btn-warning" onclick="carregarTopicosPadraoModalidade()">⚡ Preencher Padrão KM (1 Clique)</button>
+        <button class="btn btn-outline" onclick="copiarTextoCompleto()">📋 Copiar Texto Completo</button>
+        <button class="btn btn-primary" onclick="aplicarAoRelatorio()">🔄 Aplicar no Relatório</button>
+      </div>
+    </div>
+
+    <div class="four-topics-card">
+      <div class="topic-title">1. DIAGNÓSTICO PRINCIPAL</div>
+      <textarea id="topico1" class="topic-textarea" oninput="atualizarPreviewConsolidado()"></textarea>
+
+      <div class="topic-title">2. AÇÕES REALIZADAS</div>
+      <textarea id="topico2" class="topic-textarea" style="min-height: 120px;" oninput="atualizarPreviewConsolidado()"></textarea>
+
+      <div class="topic-title">3. TESTES E VALIDAÇÕES</div>
+      <textarea id="topico3" class="topic-textarea" style="min-height: 100px;" oninput="atualizarPreviewConsolidado()"></textarea>
+
+      <div class="topic-title">4. STATUS DO EQUIPAMENTO</div>
+      <textarea id="topico4" class="topic-textarea" oninput="atualizarPreviewConsolidado()"></textarea>
+    </div>
+
+    <!-- Caixa de Preview Formatado -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <span style="font-size: 13px; font-weight: 700; color: #495057;">Pré-visualização Consolidada para o Portal Effort (Área de Transferência):</span>
+      <button class="btn btn-success" style="padding: 4px 10px; font-size: 12px;" onclick="copiarTextoCompleto()">📋 Copiar Texto (Ctrl+C)</button>
+    </div>
+    <div id="previewConsolidado" class="consolidated-box"></div>
+  </section>
+
+</main>
+
+<!-- Modal de Migração Automática para o Effort -->
+<div id="modalEffort" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 style="font-size: 16px; font-weight: 700;">🚀 Migração Automática para o Portal Effort</h3>
+      <button onclick="fecharModalEffort()" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size: 13px; color: #555; margin-bottom: 15px;">
+        Esta ferramenta utiliza o robô Playwright para conectar ao portal da Konica Minolta (<strong>konicaminolta.globalthings.net</strong>), preparar a OS e sincronizar o texto dos 4 tópicos.
+      </p>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label>Número da OS no Effort</label>
+        <input type="text" id="modalOSNum" value="OS-2026-KM-089">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label>Usuário Effort (Opcional se já autenticado)</label>
+        <input type="text" id="modalUser" placeholder="Seu login no portal KM">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 15px;">
+        <label>Senha Effort (Opcional se já autenticado)</label>
+        <input type="password" id="modalSenha" placeholder="Sua senha no portal KM">
+      </div>
+
+      <div style="margin-bottom: 15px;">
+        <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;">
+          <input type="checkbox" id="modalModoVisivel" checked>
+          <span>Abrir Microsoft Edge visível na tela (Acompanhar em tempo real)</span>
+        </label>
+      </div>
+
+      <div id="statusMigracao" style="display: none; padding: 10px; border-radius: 6px; font-size: 13px; margin-top: 10px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="fecharModalEffort()">Cancelar</button>
+      <button class="btn btn-success" id="btnIniciarMigracao" onclick="executarMigracaoEffort()">⚡ Iniciar Migração</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==========================================
+// DADOS DAS 5 MODALIDADES KONICA MINOLTA
+// ==========================================
+const MODALIDADES = {
+  RX: {
+    nome: "Raios-X Fixo / Móvel",
+    codigoDoc: "FR_SE00003_03 (12 Págs)",
+    modeloPadrao: "Raio-X HF Alta Frequência",
+    topicos: {
+      diag: "* Manutenção preventiva periódica em equipamento de Raios-X.",
+      acoes: "* Limpeza: Realizada limpeza interna e externa completa do equipamento.\n* Partes móveis e mecânica: Verificação e lubrificação das partes móveis; checagem dos cabos de contrapeso e verificação dos freios.\n* Alta tensão: Checagem e substituição da graxa isolante nos conectores de alta tensão.\n* Acionamento e alinhamento: Verificação dos botões de acionamento e ajuste/verificação do alinhamento do campo luminoso.\n* Gerador: Realizado verificação nas calibrações de técnicas de kV e mA.",
+      testes: "* Realizados testes gerais de funcionamento do equipamento após a montagem e ajustes.\n* Validada a atuação dos freios, botões de acionamento e estabilidade/integridade dos cabos de contrapeso.\n* Verificado o alinhamento do campo luminoso em operação e testes de funcionamento da lâmpada de sinalização externa.",
+      status: "* Operacional e liberado para uso."
+    },
+    itens: [
+      { id: 1, desc: "Verificação da rede elétrica nominal (380V/220V ±10%)", padraoObs: "R-S: 388V, S-T: 386V, R-T: 381V - OK" },
+      { id: 2, desc: "Inspeção de integridade dos cabos de alimentação e aterramento (< 5 ohms)", padraoObs: "Aterramento: 1.8 ohms - Conforme" },
+      { id: 3, desc: "Checagem e substituição de graxa isolante dos cabos de alta tensão (HV)", padraoObs: "Graxa de silicone renovada nos receptáculos" },
+      { id: 4, desc: "Verificação da integridade e balanceamento dos cabos de aço e contrapeso", padraoObs: "Sem desfiamento, balanceamento perfeito" },
+      { id: 5, desc: "Aferição e lubrificação das guias, trilhos e freios eletromagnéticos", padraoObs: "Lubrificado com graxa branca especial" },
+      { id: 6, desc: "Alinhamento e centragem do feixe luminoso do colimador com feixe de radiação", padraoObs: "Desvio < 1% da DFF (Conforme Norma IEC)" },
+      { id: 7, desc: "Verificação das tensões da placa de controle principal (PCB)", padraoObs: "+5.02V, +15.02V, +11.98V, -12.04V" },
+      { id: 8, desc: "Inspeção e teste de funcionamento do Bucky Mural e Grade Anti-difusora", padraoObs: "Oscilação suave sem travamentos" },
+      { id: 9, desc: "Calibração e teste de técnicas radiográficas (kV e mA)", padraoObs: "40 a 125 kV aferidos com padrão nominal" },
+      { id: 10, desc: "Teste de segurança, botões de emergência e lâmpada de sinalização externa", padraoObs: "Intertravamento e sinalização 100% operacionais" }
+    ]
+  },
+
+  DR: {
+    nome: "DR (AeroDR - Flat Panel Digital)",
+    codigoDoc: "FR_SE_AERODR_02 (Padrão CS-7)",
+    modeloPadrao: "AeroDR 1417HQ / 1717HQ + CS-7",
+    topicos: {
+      diag: "* Manutenção preventiva e calibração periódica do sistema DR AeroDR.",
+      acoes: "* Limpeza e Hardware: Higienização minuciosa do detector Flat Panel AeroDR, contatos elétricos e berço de carga (docking station).\n* Conectividade sem fio: Verificação do ponto de acesso Wi-Fi dedicado (5GHz), cabeamento de rede e caixa de interface com gerador (I/F Box).\n* Estação CS-7: Limpeza de temporários, verificação de integridade do banco de dados e backup das calibrações.\n* Calibração do Detector: Realizada calibração de ganho (Gain Calibration), offset e mapa de defeitos de pixels.",
+      testes: "* Realizados testes de uniformidade de imagem em campo plano (Flat Field) e inspeção de ausência de artefatos.\n* Validados o tempo de aquisição e transferência de imagem sem fio para a estação CS-7 (< 3 segundos).\n* Testada a retenção de carga da bateria interna do painel e o acoplamento no carregador.",
+      status: "* Operacional e liberado para uso com qualidade de imagem em conformidade."
+    },
+    itens: [
+      { id: 1, desc: "Inspeção estrutural da carcaça de fibra de carbono do detector AeroDR", padraoObs: "Sem trincas, vedação IPX6 íntegra" },
+      { id: 2, desc: "Limpeza e checagem dos contatos dourados de carregamento no painel e berço", padraoObs: "Contatos desoxidados e limpos" },
+      { id: 3, desc: "Verificação da Docking Station (Cradle) e teste de carga da bateria interna", padraoObs: "Bateria atinge 100% de carga normal" },
+      { id: 4, desc: "Verificação do Access Point Wi-Fi dedicado e estabilidade do sinal (5GHz)", padraoObs: "RSSI excelente (-42 dBm)" },
+      { id: 5, desc: "Inspeção da Generator Interface Box e cabos de disparo/sincronismo", padraoObs: "Sincronismo com gerador validado" },
+      { id: 6, desc: "Calibração de Ganho e Offset do detector Flat Panel na estação CS-7", padraoObs: "Calibração concluída com sucesso" },
+      { id: 7, desc: "Verificação do mapa de defeito de pixels (Defect Pixel Map)", padraoObs: "Sem agrupamento de pixels mortos" },
+      { id: 8, desc: "Teste de aquisição de campo plano (Flat Field) e ruído de fundo", padraoObs: "Uniformidade aprovada sem sombras" },
+      { id: 9, desc: "Verificação de espaço em disco, banco de dados e backup das configurações CS-7", padraoObs: "Backup gerado e armazenado com sucesso" },
+      { id: 10, desc: "Teste de envio DICOM Store e DICOM Worklist com o PACS/RIS", padraoObs: "Comunicação e envio de imagens OK" }
+    ]
+  },
+
+  CR: {
+    nome: "CR (Regius 110 / 190 / 210)",
+    codigoDoc: "FR_SE_REGIUS_04",
+    modeloPadrao: "Regius Model 110 Digitalizador",
+    topicos: {
+      diag: "* Manutenção preventiva e calibração do leitor digitalizador de CR Regius.",
+      acoes: "* Mecânica e Transporte: Limpeza e lubrificação dos trilhos, roletes de tração e mecanismo de extração da placa de fósforo (IP).\n* Óptica Laser: Limpeza minuciosa do espelho oscilante (Galvano Mirror), guia de luz e coletor óptico (PMT).\n* Apagamento: Verificação das lâmpadas e fotossensores da unidade de apagamento (Eraser Unit).\n* Cassetes (IP): Higienização e inspeção de integridade física dos chassis e placas de imagem.",
+      testes: "* Realizado teste de apagamento de imagem latente e ausência de imagens fantasmas (ghost image).\n* Teste de linearidade, sensibilidade (S-value) e uniformidade de leitura com exposição controlada.\n* Validados o tempo de ciclo de leitura e a transmissão DICOM para a estação de trabalho.",
+      status: "* Operacional e liberado para uso com calibração óptica validada."
+    },
+    itens: [
+      { id: 1, desc: "Limpeza e lubrificação dos trilhos de inserção de chassi e esteiras", padraoObs: "Trilhos higienizados e suaves" },
+      { id: 2, desc: "Inspeção e limpeza dos roletes de borracha de transporte da placa de fósforo", padraoObs: "Roletes limpos com álcool isopropílico" },
+      { id: 3, desc: "Limpeza da óptica de leitura, espelho oscilante e leletor óptico PMT", padraoObs: "Óptica desobstruída e sem poeira" },
+      { id: 4, desc: "Verificação das lâmpadas da unidade de apagamento (Eraser Unit)", padraoObs: "Todas as lâmpadas acendendo normalmente" },
+      { id: 5, desc: "Inspeção física, limpeza interna e externa dos chassis e placas IP", padraoObs: "Chassis 35x43 e 24x30 limpos e íntegros" },
+      { id: 6, desc: "Teste de sensibilidade do fotomultiplicador (PMT Gain / S-Value)", padraoObs: "S-value aferido dentro do desvio padrão" },
+      { id: 7, desc: "Teste de uniformidade de leitura e ausência de linhas ópticas", padraoObs: "Leitura uniforme sem ruídos verticais" },
+      { id: 8, desc: "Teste de apagar imagem residual (Ghost Image Check)", padraoObs: "Apagamento 100% eficaz" },
+      { id: 9, desc: "Verificação de ventilação, desobstrução de filtros e teste de nobreak", padraoObs: "Filtros lavados e nobreak operacional" }
+    ]
+  },
+
+  MAMO: {
+    nome: "Mamógrafo de Alta Resolução",
+    codigoDoc: "FR_SE_MAMO_01 (IEC 61223)",
+    modeloPadrao: "GE Senographe Crystal Nova / Siemens",
+    topicos: {
+      diag: "* Manutenção preventiva e calibração mecânica/eletrônica de mamógrafo.",
+      acoes: "* Sistema de Compressão: Calibração e aferição da força de compressão motorizada e teste de descompressão automática e manual de emergência.\n* Pás e Acessórios: Inspeção estrutural e desinfecção das pás de compressão 18x24 e 24x30 e tampo de suporte de mama.\n* Rotação e Freios: Lubrificação do mecanismo do braço em C, verificação dos freios eletromagnéticos e indicação angular.\n* Colimação e Tubo: Verificação do alinhamento óptico/radiação, filtros de feixe (Mo/Rh) e acionamento dos pedais.",
+      testes: "* Aferição dinamométrica da compressão mecânica com célula de carga (entre 15 e 20 daN).\n* Teste de disparo em modo AEC (Controle Automático de Exposição) e verificação do movimento da grade anti-difusora.\n* Validados botões de parada rápida de emergência e intertravamento de segurança da sala.",
+      status: "* Operacional e liberado para uso com parâmetros de compressão e imagem validados."
+    },
+    itens: [
+      { id: 1, desc: "Aferição dinamométrica da força de compressão motorizada (daN / kgf)", padraoObs: "Compressão nominal aferida: 17.5 daN (OK)" },
+      { id: 2, desc: "Teste de descompressão automática de emergência e liberação manual", padraoObs: "Descompressão imediata validada" },
+      { id: 3, desc: "Inspeção e teste das pás de compressão 18x24 e 24x30 (ausência de trincas)", padraoObs: "Pás íntegras, sem deflexão excessiva" },
+      { id: 4, desc: "Verificação dos pedais duplos de acionamento de compressão/descompressão", padraoObs: "Pedais responsivos e com cabos íntegros" },
+      { id: 5, desc: "Teste de rotação angular do braço em C (-180° a +180°) e freios", padraoObs: "Movimentação suave e travamento firme" },
+      { id: 6, desc: "Verificação da troca automática de ânodo/filtro de feixe (Mo/Rh)", padraoObs: "Filtros Mo e Rh selecionando perfeitamente" },
+      { id: 7, desc: "Alinhamento do feixe colimado com o detector e tórax do paciente", padraoObs: "Alinhamento na borda do tórax conforme norma" },
+      { id: 8, desc: "Verificação do movimento oscilante da grade anti-difusora do Bucky", padraoObs: "Movimento sincronizado sem linhas na imagem" },
+      { id: 9, desc: "Teste do sistema de Controle Automático de Exposição (AEC)", padraoObs: "Compensação de densidade óptica precisa" },
+      { id: 10, desc: "Botões de parada de emergência no gantry e sinalização externa", padraoObs: "Interrupção imediata testada" }
+    ]
+  },
+
+  DRY: {
+    nome: "Dry (DryPro 832 / 873)",
+    codigoDoc: "FR_SE_DRYPRO_03",
+    modeloPadrao: "DryPro Model 832 Impressora Laser",
+    topicos: {
+      diag: "* Manutenção preventiva e calibração sensitométrica de impressora médica a seco DryPro.",
+      acoes: "* Mecânica e Transporte: Limpeza profunda de todos os roletes de transporte de filme, correias e sensores ópticos de percurso.\n* Unidade de Revelação Térmica: Limpeza dos rolos aquecedores e verificação da estabilidade térmica do tambor de aquecimento.\n* Bandejas e Captação: Desobstrução das ventosas do mecanismo de sucção e pick-up de filmes nas bandejas de entrada.\n* Filtros e Refrigeração: Limpeza do compartimento de exaustão, filtros de ar e verificação dos ventiladores de resfriamento.",
+      testes: "* Executada calibração sensitométrica interna com densitômetro integrado para Dmax, Dmin e linearidade de escala de cinza.\n* Impressão de teste com padrão SMPTE para conferência de nitidez, distorção geométrica e uniformidade.\n* Validados o tempo de ciclo de impressão e a comunicação de rede DICOM Print com os consoles emissores.",
+      status: "* Operacional e liberado para uso com calibração de densidade validada."
+    },
+    itens: [
+      { id: 1, desc: "Limpeza óptica da unidade laser de exposição e espelhos", padraoObs: "Óptica limpa sem marcas de poeira" },
+      { id: 2, desc: "Limpeza do tambor térmico e roletes de revelação de filme (~125°C)", padraoObs: "Rolos térmicos desobstruídos e uniformes" },
+      { id: 3, desc: "Inspeção e higienização dos roletes de transporte de filme e correias", padraoObs: "Roletes desengordurados e limpos" },
+      { id: 4, desc: "Verificação das ventosas de sucção e captação de filme nas bandejas", padraoObs: "Vácuo perfeito, sem atolamento de filme" },
+      { id: 5, desc: "Inspeção dos sensores ópticos de detecção de filme e bandejas", padraoObs: "Detecção de formatos 14x17 e 11x14 OK" },
+      { id: 6, desc: "Calibração do densitômetro interno integrado (Dmax / Dmin)", padraoObs: "Dmin: 0.20 / Dmax: 3.12 (Dentro do padrão)" },
+      { id: 7, desc: "Impressão e avaliação do padrão de teste SMPTE de qualidade", padraoObs: "Degradê 0%-100% nítido, sem artefatos" },
+      { id: 8, desc: "Verificação e substituição do filtro de carvão ativado / exaustão", padraoObs: "Filtro limpo e exaustor silencioso" },
+      { id: 9, desc: "Teste de comunicação DICOM Print Service e fila de impressão", padraoObs: "Conexão de rede Gigabit e spooler 100% OK" }
+    ]
+  }
+};
+
+let modalidadeAtual = 'RX';
+
+// ==========================================
+// FUNÇÕES DE NAVEGAÇÃO E SELEÇÃO
+// ==========================================
+function selecionarModalidade(sigla) {
+  modalidadeAtual = sigla;
+  document.querySelectorAll('.mod-btn').forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+
+  const mod = MODALIDADES[sigla];
+  document.getElementById('tituloModalidade').innerText = "Relatório de Instalação e Manutenção Preventiva - " + mod.nome;
+  document.getElementById('subtituloModalidade').innerText = "Padrão Técnico Konica Minolta Healthcare • " + mod.modeloPadrao;
+  document.getElementById('badgeCodigoDoc').innerText = mod.codigoDoc;
+  document.getElementById('cadModelo').value = mod.modeloPadrao;
+
+  renderizarChecklist(mod.itens);
+  carregarTopicosPadraoModalidade();
+}
+
+function alternarSubAba(aba) {
+  if (aba === 'relatorio') {
+    document.getElementById('abaRelatorio').style.display = 'block';
+    document.getElementById('abaTopicos').style.display = 'none';
+    document.getElementById('tabBtnRelatorio').classList.add('active');
+    document.getElementById('tabBtnTopicos').classList.remove('active');
+  } else {
+    document.getElementById('abaRelatorio').style.display = 'none';
+    document.getElementById('abaTopicos').style.display = 'block';
+    document.getElementById('tabBtnRelatorio').classList.remove('active');
+    document.getElementById('tabBtnTopicos').classList.add('active');
+    atualizarPreviewConsolidado();
+  }
+}
+
+// ==========================================
+// RENDERIZAÇÃO DO CHECKLIST
+// ==========================================
+function renderizarChecklist(itens) {
+  const tbody = document.getElementById('corpoChecklist');
+  tbody.innerHTML = '';
+
+  itens.forEach((it, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight: 700; color: #666; text-align: center;">${idx + 1}</td>
+      <td style="font-weight: 600;">${it.desc}</td>
+      <td style="text-align: center;">
+        <div class="status-options">
+          <label style="color: #28a745;"><input type="radio" name="st_${it.id}" value="CONFORME" checked> SIM / OK</label>
+          <label style="color: #dc3545;"><input type="radio" name="st_${it.id}" value="NAO_CONFORME"> NÃO</label>
+          <label style="color: #6c757d;"><input type="radio" name="st_${it.id}" value="NA"> N/A</label>
+        </div>
+      </td>
+      <td>
+        <input type="text" id="obs_${it.id}" value="${it.padraoObs}" style="width: 100%; padding: 6px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ==========================================
+// 1-CLIQUE: PREENCHER TUDO CONFORME & LIMPAR
+// ==========================================
+function preencherTudoConforme() {
+  document.querySelectorAll('#corpoChecklist input[type="radio"][value="CONFORME"]').forEach(r => r.checked = true);
+  const mod = MODALIDADES[modalidadeAtual];
+  mod.itens.forEach(it => {
+    const inp = document.getElementById(`obs_${it.id}`);
+    if (inp && !inp.value.trim()) {
+      inp.value = it.padraoObs;
+    }
+  });
+  carregarTopicosPadraoModalidade();
+  aplicarAoRelatorio();
+  alert(`Equipamento [${mod.nome}]: Todos os itens de checklist e parâmetros foram preenchidos como CONFORME com 1 clique!`);
+}
+
+function limparTudo() {
+  if (confirm("Deseja realmente limpar todos os campos e checklists do equipamento atual?")) {
+    document.querySelectorAll('#corpoChecklist input[type="radio"]').forEach(r => r.checked = false);
+    document.querySelectorAll('#corpoChecklist input[type="text"]').forEach(t => t.value = '');
+    document.getElementById('topico1').value = '';
+    document.getElementById('topico2').value = '';
+    document.getElementById('topico3').value = '';
+    document.getElementById('topico4').value = '';
+    document.getElementById('parecerTecnicoRelatorio').value = '';
+    limparCanvas('cvTecnico');
+    limparCanvas('cvCliente');
+    atualizarPreviewConsolidado();
+  }
+}
+
+// ==========================================
+// GESTÃO DOS 4 TÓPICOS EFFORT
+// ==========================================
+function carregarTopicosPadraoModalidade() {
+  const mod = MODALIDADES[modalidadeAtual];
+  document.getElementById('topico1').value = mod.topicos.diag;
+  document.getElementById('topico2').value = mod.topicos.acoes;
+  document.getElementById('topico3').value = mod.topicos.testes;
+  document.getElementById('topico4').value = mod.topicos.status;
+  atualizarPreviewConsolidado();
+}
+
+function atualizarPreviewConsolidado() {
+  const t1 = document.getElementById('topico1').value.trim();
+  const t2 = document.getElementById('topico2').value.trim();
+  const t3 = document.getElementById('topico3').value.trim();
+  const t4 = document.getElementById('topico4').value.trim();
+
+  const texto = `1. DIAGNÓSTICO PRINCIPAL:
+${t1}
+
+2. AÇÕES REALIZADAS:
+${t2}
+
+3. TESTES E VALIDAÇÕES:
+${t3}
+
+4. STATUS DO EQUIPAMENTO:
+${t4}`;
+  document.getElementById('previewConsolidado').innerText = texto;
+}
+
+function copiarTextoCompleto() {
+  const texto = document.getElementById('previewConsolidado').innerText;
+  navigator.clipboard.writeText(texto).then(() => {
+    alert("Texto dos 4 tópicos copiado com sucesso para a Área de Transferência!
+Pronto para colar (Ctrl+V) no Effort.");
+  }).catch(err => {
+    alert("Erro ao copiar: " + err);
+  });
+}
+
+function aplicarAoRelatorio() {
+  const texto = document.getElementById('previewConsolidado').innerText;
+  document.getElementById('parecerTecnicoRelatorio').value = texto;
+  alert("Texto dos 4 tópicos sincronizado com sucesso no parecer do relatório técnico!");
+}
+
+// ==========================================
+// ASSINATURAS DIGITAIS (HTML5 CANVAS)
+// ==========================================
+function configurarCanvas(id) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.strokeStyle = '#002d62';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  let desenhando = false;
+
+  function pos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: (clientX - rect.left) * (canvas.width / rect.width),
+      y: (clientY - rect.top) * (canvas.height / rect.height)
+    };
+  }
+
+  function start(e) { desenhando = true; ctx.beginPath(); const p = pos(e); ctx.moveTo(p.x, p.y); e.preventDefault(); }
+  function move(e) { if (!desenhando) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); e.preventDefault(); }
+  function stop() { desenhando = false; }
+
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', stop);
+
+  canvas.addEventListener('touchstart', start);
+  canvas.addEventListener('touchmove', move);
+  window.addEventListener('touchend', stop);
+}
+
+function limparCanvas(id) {
+  const canvas = document.getElementById(id);
+  if (canvas) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
+// ==========================================
+// MODAL E INTEGRAÇÃO EFFORT VIA PLAYWRIGHT
+// ==========================================
+function abrirModalEffort() {
+  const osNum = document.getElementById('cadOS').value || 'OS-2026-KM-089';
+  document.getElementById('modalOSNum').value = osNum;
+  document.getElementById('modalEffort').style.display = 'flex';
+  document.getElementById('statusMigracao').style.display = 'none';
+}
+
+function fecharModalEffort() {
+  document.getElementById('modalEffort').style.display = 'none';
+}
+
+async function executarMigracaoEffort() {
+  const statusDiv = document.getElementById('statusMigracao');
+  const btn = document.getElementById('btnIniciarMigracao');
+  const osNum = document.getElementById('modalOSNum').value;
+  const usuario = document.getElementById('modalUser').value;
+  const senha = document.getElementById('modalSenha').value;
+  const visivel = document.getElementById('modalModoVisivel').checked;
+
+  statusDiv.style.display = 'block';
+  statusDiv.style.background = '#e8f4fd';
+  statusDiv.style.color = '#005bac';
+  statusDiv.innerText = "⏳ Iniciando conexão com o Portal Effort e preparando os 4 tópicos...";
+  btn.disabled = true;
+
+  const payload = {
+    numero_os: osNum,
+    usuario: usuario,
+    senha: senha,
+    headless: !visivel,
+    topicos: {
+      diagnostico: document.getElementById('topico1').value,
+      acoes: document.getElementById('topico2').value,
+      testes: document.getElementById('topico3').value,
+      status: document.getElementById('topico4').value
+    }
+  };
+
+  try {
+    const res = await fetch('/api/effort/migrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (data.sucesso) {
+      statusDiv.style.background = '#d4edda';
+      statusDiv.style.color = '#155724';
+      statusDiv.innerHTML = `<strong>✅ Sucesso!</strong> ${data.mensagem}<br><small>Etapas: ${data.etapas_concluidas.join(' ➔ ')}</small>`;
+    } else {
+      statusDiv.style.background = '#f8d7da';
+      statusDiv.style.color = '#721c24';
+      statusDiv.innerHTML = `<strong>❌ Atenção:</strong> ${data.erro || 'Falha na migração automática.'}`;
+    }
+  } catch (e) {
+    statusDiv.style.background = '#fff3cd';
+    statusDiv.style.color = '#856404';
+    statusDiv.innerHTML = `<strong>⚠️ Conexão Local:</strong> O texto foi copiado com sucesso para a área de transferência. Abrindo o portal no navegador padrão...`;
+    window.open('https://konicaminolta.globalthings.net/Login.aspx', '_blank');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// Inicialização ao carregar a página
+
+const CLIENTES_CADASTRO = {
+  MEDVISION: { nome: "CLINICA MEDVISION - SAUDE E MEDICINA DO TRABALHO", cidade: "Crateús / CE", os: "OS-KM-2026-089", serial: "KM-ALTUS-784102" },
+  FOCUS: { nome: "CLÍNICA FOCUS DIAGNÓSTICO POR IMAGEM LTDA", cidade: "Fortaleza / CE", os: "OS-KM-2026-091", serial: "KM-MAX-551029" },
+  KM_BRASIL: { nome: "KONICA MINOLTA HEALTHCARE DO BRASIL LTDA", cidade: "Fortaleza / CE", os: "OS-KM-2026-102", serial: "KM-AERO-993214" },
+  SAO_LUCAS: { nome: "SÃO LUCAS IMAGEM LTDA", cidade: "Sobral / CE", os: "OS-KM-2026-077", serial: "KM-ALTDR-448102" },
+  BOGHOS: { nome: "CLÍNICA DE RESSONANCIA MAGNETICA E IMAGEM - BOGHOS", cidade: "Sobral / CE", os: "OS-KM-2026-114", serial: "KM-ECO-662190" },
+  ZOOVET: { nome: "CLINICA VETERINÁRIA ZOOVET LTDA", cidade: "Fortaleza / CE", os: "OS-KM-2026-065", serial: "KM-ALT-109283" },
+  CITOLAB: { nome: "MAURICIO ANALISES CLINICAS E CITOLOGICAS LTDA", cidade: "Tabuleiro do Norte / CE", os: "OS-KM-2026-082", serial: "KM-ALT-883719" },
+  HOSP_MERUOCA: { nome: "HOSPITAL CHAGAS BARRETO - MERUOCA", cidade: "Meruoca / CE", os: "OS-KM-2026-099", serial: "KM-MAX-331902" }
+};
+
+function selecionarClienteCentral(chave) {
+  const c = CLIENTES_CADASTRO[chave] || CLIENTES_CADASTRO['MEDVISION'];
+  document.getElementById('cadCliente').value = c.nome;
+  document.getElementById('cadCidade').value = c.cidade;
+  document.getElementById('cadOS').value = c.os;
+  document.getElementById('cadSerial').value = c.serial;
+  document.getElementById('cadTecnico').value = "Vitor Manuel / Equipe Técnica EMED Eletromedicina";
+}
+
+window.onload = function() {
+  selecionarClienteCentral("MEDVISION");
+  const hoje = new Date().toISOString().split('T')[0];
+  document.getElementById('cadData').value = hoje;
+  renderizarChecklist(MODALIDADES['RX'].itens);
+  carregarTopicosPadraoModalidade();
+  configurarCanvas('cvTecnico');
+  configurarCanvas('cvCliente');
+};
+</script>
+</body>
+</html>

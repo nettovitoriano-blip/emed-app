@@ -115,43 +115,68 @@ def inicializar_tabela_pix(db_name: str):
         conn.commit()
 
 
-def liquidar_pagamento_pix(db_name: str, os_id: str, txid: str = "", metodo: str = "SIMULAÇÃO_WEBHOOK_INSTANTANEO") -> tuple[bool, str]:
-    """Liquida o pagamento da OS, atualizando a tabela pagamentos_pix e o status fiscal de notas_fiscais."""
+def liquidar_pagamento_pix(db_name: str, os_id: str, txid: str = "", metodo: str = "SIMULAÇÃO_WEBHOOK_INSTANTANEO", valor_recebido: float = 0.0, e2e_id_externo: str = "") -> tuple[bool, str]:
+    """Liquida o pagamento da OS de forma atômica, atualizando pagamentos_pix, notas_fiscais e clientes_equipamentos."""
     agora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    e2e_id = f"E2E{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{os.urandom(3).hex().upper()}"
+    e2e_id = e2e_id_externo.strip() if e2e_id_externo else f"E2E{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{os.urandom(3).hex().upper()}"
     try:
         os_id_num = re.sub(r'\D', '', str(os_id))
         target_os_id = int(os_id_num) if os_id_num else os_id
 
         with sqlite3.connect(db_name) as conn:
             cursor = conn.cursor()
-            # Atualiza ou insere na tabela pagamentos_pix
+            if e2e_id_externo:
+                dup = cursor.execute("SELECT os_id FROM pagamentos_pix WHERE e2e_id = ? AND UPPER(status_pagamento) = 'PAGO'", (e2e_id,)).fetchone()
+                if dup:
+                    return True, f"Transação já conciliada anteriormente na OS #{dup[0]} (Idempotência E2E: {e2e_id})."
+
+            info_nf = cursor.execute(
+                "SELECT cliente, cnpj_tomador, valor_liquido FROM notas_fiscais WHERE os_id = ? OR os_id = ? ORDER BY id DESC LIMIT 1",
+                (str(os_id), target_os_id),
+            ).fetchone()
+            info_os = cursor.execute(
+                "SELECT cliente, valor_os FROM clientes_equipamentos WHERE id = ?",
+                (target_os_id,),
+            ).fetchone() if isinstance(target_os_id, int) else None
+
+            cli_nome = (info_nf[0] if info_nf and info_nf[0] else (info_os[0] if info_os and info_os[0] else "CLIENTE EMED"))
+            cli_cnpj = (info_nf[1] if info_nf and info_nf[1] else "")
+            val_final = float(valor_recebido or (info_nf[2] if info_nf and info_nf[2] else (info_os[1] if info_os and info_os[1] else 0.0)))
+
             cursor.execute("SELECT id FROM pagamentos_pix WHERE os_id = ? OR os_id = ?", (str(os_id), str(target_os_id)))
             row = cursor.fetchone()
             if row:
                 cursor.execute("""
                     UPDATE pagamentos_pix
                     SET status_pagamento = 'PAGO',
+                        valor = CASE WHEN ? > 0 THEN ? ELSE valor END,
                         data_pagamento = ?,
                         e2e_id = ?,
                         metodo = ?
                     WHERE id = ?
-                """, (agora, e2e_id, metodo, row[0]))
+                """, (val_final, val_final, agora, e2e_id, metodo, row[0]))
             else:
                 cursor.execute("""
                     INSERT INTO pagamentos_pix (os_id, cliente, cnpj, valor, chave_pix, status_pagamento, txid, e2e_id, data_geracao, data_pagamento, metodo)
-                    VALUES (?, 'CLIENTE EMED', '', 0.0, 'financeiro@emed.med.br', 'PAGO', ?, ?, ?, ?, ?)
-                """, (str(os_id), txid, e2e_id, agora, agora, metodo))
+                    VALUES (?, ?, ?, ?, 'financeiro@emed.med.br', 'PAGO', ?, ?, ?, ?, ?)
+                """, (str(target_os_id), cli_nome, cli_cnpj, val_final, txid, e2e_id, agora, agora, metodo))
 
-            # Atualiza status fiscal em notas_fiscais caso exista
             cursor.execute("""
                 UPDATE notas_fiscais
                 SET status_fiscal = 'LIQUIDADO / PAGO VIA PIX',
                     atualizado_em = ?
-                WHERE os_id = ? OR os_id = ?
+                WHERE (os_id = ? OR os_id = ?) AND UPPER(status_fiscal) NOT LIKE '%CANCELAD%'
             """, (agora, target_os_id, str(os_id)))
+
+            if isinstance(target_os_id, int):
+                cursor.execute("""
+                    UPDATE clientes_equipamentos
+                    SET condicao_pagamento = 'PAGO / LIQUIDADO (' || ? || ')'
+                    WHERE id = ?
+                """, (metodo[:35], target_os_id))
+
             conn.commit()
-        return True, f"Pagamento da OS #{os_id} confirmado com sucesso via {metodo}! E2E ID: {e2e_id}"
+        return True, f"Pagamento da OS #{target_os_id} ({cli_nome}) confirmado com sucesso via {metodo}! E2E ID: {e2e_id}"
     except Exception as e:
         return False, f"Erro ao liquidar pagamento: {str(e)}"
 
@@ -164,57 +189,140 @@ def conciliar_pagamento_bancario_duplo(
     end_to_end_id: str = "",
     nome_pagador: str = ""
 ) -> dict:
-    """Realiza a conciliação bancária dupla de pagamentos PIX:
-    1º Cruzamento: Via TXID / Identificador da OS (ex: EMED-OS-41 ou 41).
-    2º Cruzamento: Via CNPJ do pagador + Valor exato (tolerância de R$ 0,05).
-    Se identificado, liquida a OS automaticamente no sistema."""
+    """Realiza a conciliação bancária blindada em 4 camadas para evitar erro de baixa:
+    1ª Camada (Determinística): Via TXID / Identificador único da OS ou NF (ex: EMED-OS-41).
+    2ª Camada (Dupla Checagem Fiscal): CNPJ limpo do Tomador + Valor (Líquido, Bruto ou com Retenção de ISS).
+    3ª Camada (Cruzamento Nominal): Nome/Razão Social do Pagador + Valor exato (tolerância R$ 0,05).
+    4ª Camada (Trava Anti-Homônimo): Se apenas o valor bater, só baixa automaticamente se houver
+       EXATAMENTE 1 título em aberto com aquele valor. Se houver 2 ou mais títulos de mesmo valor,
+       bloqueia a baixa automática e retorna a lista de candidatos para confirmação manual segura."""
     inicializar_tabela_pix(db_name)
     os_id_encontrado = ""
     cliente_encontrado = nome_pagador or "CLIENTE NÃO IDENTIFICADO"
+    camada_match = ""
+    candidatos_ambiguos = []
     valor_float = float(valor or 0.0)
+    cnpj_limpo = re.sub(r"\D", "", str(cnpj or ""))
+    nome_norm = str(nome_pagador or "").strip().upper()
 
-    # 1. Tentar por TXID
-    if txid:
-        match = re.search(r'\d+', txid)
-        if match:
-            candidato_os = match.group(0)
-            with sqlite3.connect(db_name) as conn:
-                cur = conn.cursor()
-                cur.execute("SELECT os_id, cliente FROM notas_fiscais WHERE os_id = ? OR os_id = ?", (candidato_os, str(candidato_os)))
-                row = cur.fetchone()
+    with sqlite3.connect(db_name) as conn:
+        cur = conn.cursor()
+
+        if end_to_end_id:
+            dup = cur.execute("SELECT os_id, cliente FROM pagamentos_pix WHERE e2e_id = ? AND UPPER(status_pagamento) = 'PAGO'", (end_to_end_id.strip(),)).fetchone()
+            if dup:
+                return {
+                    "conciliado": True,
+                    "os_id": str(dup[0]),
+                    "cliente": dup[1] or cliente_encontrado,
+                    "valor": valor_float,
+                    "camada": "IDEMPOTENCIA_E2E",
+                    "mensagem": f"Transação E2E {end_to_end_id} já estava conciliada na OS #{dup[0]}."
+                }
+
+        if txid:
+            match = re.search(r'(?:OS[-_]?|^)(\d+)', txid.upper())
+            if match:
+                candidato_os = match.group(1)
+                row = cur.execute(
+                    "SELECT os_id, cliente, valor_liquido FROM notas_fiscais WHERE (os_id = ? OR os_id = ?) AND UPPER(status_fiscal) NOT LIKE '%CANCELAD%' ORDER BY id DESC LIMIT 1",
+                    (candidato_os, int(candidato_os)),
+                ).fetchone()
+                if not row:
+                    row_os = cur.execute("SELECT id, cliente, valor_os FROM clientes_equipamentos WHERE id = ?", (int(candidato_os),)).fetchone()
+                    if row_os:
+                        row = (row_os[0], row_os[1], row_os[2])
                 if row:
                     os_id_encontrado = str(row[0])
                     cliente_encontrado = row[1] or cliente_encontrado
+                    camada_match = "NIVEL_1_TXID_EXATO"
 
-    # 2. Se não encontrou por TXID, tentar por CNPJ limpo + Valor
-    if not os_id_encontrado and (cnpj or valor_float > 0):
-        with sqlite3.connect(db_name) as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT os_id, cliente, valor_liquido FROM notas_fiscais WHERE status_fiscal != 'LIQUIDADO / PAGO VIA PIX'")
-            for r in cur.fetchall():
-                v_db = float(r[2] or 0.0)
-                if abs(v_db - valor_float) <= 0.05:
-                    os_id_encontrado = str(r[0])
-                    cliente_encontrado = r[1] or cliente_encontrado
-                    break
+        if not os_id_encontrado and valor_float > 0:
+            abertas = cur.execute("""
+                SELECT os_id, cliente, COALESCE(cnpj_tomador, ''), COALESCE(valor_liquido, 0),
+                       COALESCE(valor_servicos, 0) + COALESCE(valor_pecas, 0) - COALESCE(valor_desconto, 0) as valor_bruto,
+                       COALESCE(valor_iss, 0), COALESCE(numero_nf, '')
+                FROM notas_fiscais
+                WHERE UPPER(COALESCE(status_fiscal, '')) NOT LIKE '%LIQUIDAD%'
+                  AND UPPER(COALESCE(status_fiscal, '')) NOT LIKE '%PAGO%'
+                  AND UPPER(COALESCE(status_fiscal, '')) NOT LIKE '%CANCELAD%'
+            """).fetchall()
+
+            def _valor_bate(r_row) -> bool:
+                v_liq = float(r_row[3] or 0.0)
+                v_bruto = float(r_row[4] or v_liq)
+                v_iss = float(r_row[5] or 0.0)
+                v_com_retencao_iss = max(0.0, v_liq - v_iss)
+                v_pix_10_desc = round(v_liq * 0.90, 2)
+                return any(abs(v_cand - valor_float) <= 0.05 for v_cand in (v_liq, v_bruto, v_com_retencao_iss, v_pix_10_desc) if v_cand > 0)
+
+            if cnpj_limpo:
+                matches_cnpj = [r for r in abertas if re.sub(r"\D", "", str(r[2] or "")) == cnpj_limpo and _valor_bate(r)]
+                if len(matches_cnpj) == 1:
+                    os_id_encontrado = str(matches_cnpj[0][0])
+                    cliente_encontrado = matches_cnpj[0][1] or cliente_encontrado
+                    camada_match = "NIVEL_2_CNPJ_E_VALOR"
+                elif len(matches_cnpj) > 1:
+                    candidatos_ambiguos = [{"os_id": str(m[0]), "cliente": m[1], "nf": m[6], "valor": float(m[3])} for m in matches_cnpj]
+
+            if not os_id_encontrado and not candidatos_ambiguos and nome_norm:
+                tokens_pag = [t for t in re.split(r"\s+", nome_norm) if len(t) >= 4 and t not in ("HOSPITAL", "CLINICA", "LTDA", "EIRELI", "SAUDE", "INSTITUTO")]
+                matches_nome = []
+                for r in abertas:
+                    if not _valor_bate(r):
+                        continue
+                    cli_up = str(r[1] or "").upper()
+                    if nome_norm in cli_up or cli_up in nome_norm or (tokens_pag and any(tk in cli_up for tk in tokens_pag)):
+                        matches_nome.append(r)
+                if len(matches_nome) == 1:
+                    os_id_encontrado = str(matches_nome[0][0])
+                    cliente_encontrado = matches_nome[0][1] or cliente_encontrado
+                    camada_match = "NIVEL_3_RAZAO_SOCIAL_E_VALOR"
+                elif len(matches_nome) > 1:
+                    candidatos_ambiguos = [{"os_id": str(m[0]), "cliente": m[1], "nf": m[6], "valor": float(m[3])} for m in matches_nome]
+
+            if not os_id_encontrado and not candidatos_ambiguos:
+                matches_valor = [r for r in abertas if _valor_bate(r)]
+                if len(matches_valor) == 1:
+                    os_id_encontrado = str(matches_valor[0][0])
+                    cliente_encontrado = matches_valor[0][1] or cliente_encontrado
+                    camada_match = "NIVEL_4_VALOR_UNIVOCO"
+                elif len(matches_valor) > 1:
+                    candidatos_ambiguos = [{"os_id": str(m[0]), "cliente": m[1], "nf": m[6], "valor": float(m[3])} for m in matches_valor]
 
     if os_id_encontrado:
         sucesso, msg = liquidar_pagamento_pix(
             db_name,
             os_id=os_id_encontrado,
             txid=txid,
-            metodo=f"CONCILIAÇÃO_BANCÁRIA_DUPLA (E2E: {end_to_end_id or 'N/A'})"
+            metodo=f"{camada_match} (E2E: {end_to_end_id or 'N/A'})",
+            valor_recebido=valor_float,
+            e2e_id_externo=end_to_end_id,
         )
         return {
-            "conciliado": True,
+            "conciliado": sucesso,
+            "status_conciliacao": "CONCILIADO",
+            "camada": camada_match,
             "os_id": os_id_encontrado,
             "cliente": cliente_encontrado,
             "valor": valor_float,
             "mensagem": msg
         }
 
+    if candidatos_ambiguos:
+        return {
+            "conciliado": False,
+            "status_conciliacao": "QUARENTENA_AMBIGUIDADE",
+            "os_id": "",
+            "cliente": cliente_encontrado,
+            "valor": valor_float,
+            "candidatos": candidatos_ambiguos,
+            "mensagem": f"⚠️ TRAVA ANTI-ERRO ATIVADA: Existem {len(candidatos_ambiguos)} títulos em aberto compatíveis com R$ {valor_float:,.2f}. Selecione manualmente a OS correta para evitar baixa trocada."
+        }
+
     return {
         "conciliado": False,
+        "status_conciliacao": "NAO_LOCALIZADO",
         "os_id": "",
         "cliente": cliente_encontrado,
         "valor": valor_float,

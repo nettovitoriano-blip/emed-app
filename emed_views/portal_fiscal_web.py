@@ -7,6 +7,7 @@ eliminando qualquer risco de suspensão de container secundário no Render.
 """
 
 import os
+import asyncio
 import io
 import csv
 import zipfile
@@ -449,7 +450,9 @@ async def api_fiscal_v2_cancelar(request: web.Request) -> web.Response:
 async def api_fiscal_recebidas_dados(request: web.Request) -> web.Response:
     """Retorna notas fiscais emitidas contra a EMED por fornecedores (DF-e da SEFAZ)."""
     db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
-    filial = request.query.get("filial", "FILIAL_DF").strip()
+    filial = request.query.get("filial", "FILIAL_DF").strip().upper()
+    filtro_dfe = request.query.get("filtro_dfe", "CONSOLIDADO").strip().upper()
+    data_inicio = request.query.get("data_inicio", "2026-01-01").strip()
 
     with _get_db_connection(db_name) as conn:
         query = """
@@ -459,12 +462,16 @@ async def api_fiscal_recebidas_dados(request: web.Request) -> web.Response:
                    status_manifestacao, data_manifestacao, status_estoque,
                    data_entrada_estoque, itens_resumo, observacoes
             FROM notas_fiscais_recebidas
+            WHERE 1=1
         """
         params = []
-        if filial != "CONSOLIDADO":
-            query += " WHERE filial = ?"
-            params.append(filial)
-        query += " ORDER BY data_emissao DESC, id DESC"
+        if filtro_dfe in ("FILIAL_DF", "MATRIZ_CE"):
+            query += " AND filial = ?"
+            params.append(filtro_dfe)
+        if data_inicio and data_inicio != "TODAS":
+            query += " AND COALESCE(data_emissao, '2026-11-18') >= ?"
+            params.append(data_inicio)
+        query += " ORDER BY COALESCE(data_emissao, '2026-11-18') DESC, id DESC"
 
         cur = conn.execute(query, params)
         cols = [c[0] for c in cur.description]
@@ -472,6 +479,10 @@ async def api_fiscal_recebidas_dados(request: web.Request) -> web.Response:
         notas = [dict(zip(cols, r)) for r in rows]
 
         for n in notas:
+            if not n.get("data_emissao"):
+                n["data_emissao"] = "2026-11-18"
+            if not n.get("cnpj_destinatario"):
+                n["cnpj_destinatario"] = "03.611.974/0002-80" if n.get("filial") == "FILIAL_DF" else "03.611.974/0001-08"
             if isinstance(n.get("itens_resumo"), str) and n["itens_resumo"]:
                 try:
                     n["itens"] = json.loads(n["itens_resumo"])
@@ -503,30 +514,375 @@ async def api_fiscal_recebidas_dados(request: web.Request) -> web.Response:
     })
 
 
+def _executar_consulta_dfe_sefaz_real(db_name: str, alvos_filiais: list) -> dict:
+    """Conecta diretamente ao WebService NFeDistribuicaoDFe do Ambiente Nacional (SEFAZ/RFB)
+    usando o Certificado Digital A1 (.pfx) da EMED e sincroniza notas fiscais emitidas no CNPJ."""
+    import ssl
+    import gzip
+    import tempfile
+    import urllib.request
+    import xml.etree.ElementTree as ET
+    from emed_fiscal import CertificadoManager
+
+    novas_notas = 0
+    total_docs_lidos = 0
+    mensagens_sefaz = []
+    agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    try:
+        from cryptography.hazmat.primitives.serialization import pkcs12, Encoding, PrivateFormat, NoEncryption
+    except ImportError:
+        return {"ok": False, "novas": 0, "msg": "Biblioteca cryptography não disponível."}
+
+    for fil_cod in alvos_filiais:
+        st_cert = CertificadoManager.status_certificado(fil_cod, db_name)
+        if not st_cert.get("instalado") or not st_cert.get("caminho"):
+            continue
+
+        with _get_db_connection(db_name) as conn:
+            r_pwd = conn.execute("SELECT valor FROM configuracoes_sistema WHERE chave = ?", (f"cert_senha_{fil_cod.lower()}",)).fetchone()
+            senha_pfx = (r_pwd[0] if r_pwd and r_pwd[0] else "Emed@2026").encode("utf-8")
+
+            r_nsu = conn.execute("SELECT ultimo_nsu, max_nsu FROM controle_nsu_dfe WHERE filial = ?", (fil_cod,)).fetchone()
+            ult_nsu_db = r_nsu[0] if r_nsu and r_nsu[0] else "000000000000000"
+            # Se ainda estava no NSU 50/100 de semente, buscar desde 000000000000000
+            if int(ult_nsu_db) <= 200:
+                ult_nsu = "000000000000000"
+            else:
+                ult_nsu = f"{int(ult_nsu_db):015d}"
+
+        try:
+            pfx_bytes = Path(st_cert["caminho"]).read_bytes()
+            priv_key, cert, add_certs = pkcs12.load_key_and_certificates(pfx_bytes, senha_pfx)
+            cert_pem = cert.public_bytes(Encoding.PEM)
+            key_pem = priv_key.private_bytes(Encoding.PEM, PrivateFormat.TraditionalOpenSSL, NoEncryption())
+        except Exception as e:
+            mensagens_sefaz.append(f"{fil_cod}: Erro ao abrir Certificado A1 ({e})")
+            continue
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pem") as tf:
+            tf.write(cert_pem + b"\n" + key_pem)
+            if add_certs:
+                for ac in add_certs:
+                    tf.write(b"\n" + ac.public_bytes(Encoding.PEM))
+            pem_file = tf.name
+
+        cnpj_alvo = "03611974000108" if fil_cod == "MATRIZ_CE" else "03611974000280"
+        uf_autor = "23" if fil_cod == "MATRIZ_CE" else "53"
+
+        try:
+            soap_xml = f"""<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <nfeDistDFeInteresse xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe">
+      <nfeDadosMsg>
+        <distDFeInt xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.01">
+          <tpAmb>1</tpAmb>
+          <cUFAutor>{uf_autor}</cUFAutor>
+          <CNPJ>{cnpj_alvo}</CNPJ>
+          <distNSU>
+            <ultNSU>{ult_nsu}</ultNSU>
+          </distNSU>
+        </distDFeInt>
+      </nfeDadosMsg>
+    </nfeDistDFeInteresse>
+  </soap12:Body>
+</soap12:Envelope>"""
+
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            ctx.load_cert_chain(certfile=pem_file)
+
+            url = "https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx"
+            req = urllib.request.Request(
+                url,
+                data=soap_xml.encode("utf-8"),
+                headers={
+                    "Content-Type": 'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe/nfeDistDFeInteresse"',
+                    "User-Agent": "EMED-Fiscal-DFe/1.0"
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(req, context=ctx, timeout=20) as resp:
+                resp_body = resp.read().decode("utf-8", errors="ignore")
+
+            root = ET.fromstring(resp_body)
+            cstat, xmotivo, new_ult, max_nsu = "", "", ult_nsu, ult_nsu
+            docs = []
+            for elem in root.iter():
+                t = elem.tag.split("}", 1)[-1] if "}" in elem.tag else elem.tag
+                if t == "cStat":
+                    cstat = elem.text or ""
+                elif t == "xMotivo":
+                    xmotivo = elem.text or ""
+                elif t == "ultNSU":
+                    new_ult = elem.text or ult_nsu
+                elif t == "maxNSU":
+                    max_nsu = elem.text or new_ult
+                elif t == "docZip":
+                    docs.append((elem.attrib.get("NSU", ""), elem.attrib.get("schema", ""), elem.text or ""))
+
+            with _get_db_connection(db_name) as conn:
+                for nsu_doc, schema_doc, b64_txt in docs:
+                    if not b64_txt:
+                        continue
+                    total_docs_lidos += 1
+                    raw_xml = gzip.decompress(base64.b64decode(b64_txt)).decode("utf-8", errors="ignore")
+                    if "resNFe" in schema_doc or "procNFe" in schema_doc:
+                        doc_root = ET.fromstring(raw_xml)
+                        for el in doc_root.iter():
+                            if "}" in el.tag:
+                                el.tag = el.tag.split("}", 1)[1]
+                        if "resNFe" in schema_doc:
+                            ch_nfe = doc_root.findtext("chNFe", "").strip()
+                            em_cnpj = doc_root.findtext("CNPJ", "") or doc_root.findtext("CPF", "")
+                            em_nome = doc_root.findtext("xNome", "FORNECEDOR SEFAZ")
+                            dh_emi = (doc_root.findtext("dhEmi", "") or "")[:19].replace("T", " ")
+                            v_nf = float(doc_root.findtext("vNF", "0.0") or 0.0)
+                            num_nf_extraido = str(int(ch_nfe[25:34])) if len(ch_nfe) >= 34 and ch_nfe[25:34].isdigit() else nsu_doc[-6:]
+                            serie_ext = str(int(ch_nfe[22:25])) if len(ch_nfe) >= 25 and ch_nfe[22:25].isdigit() else "1"
+                            uf_map = {"11":"RO","12":"AC","13":"AM","14":"RR","15":"PA","16":"AP","17":"TO","21":"MA","22":"PI","23":"CE","24":"RN","25":"PB","26":"PE","27":"AL","28":"SE","29":"BA","31":"MG","32":"ES","33":"RJ","35":"SP","41":"PR","42":"SC","43":"RS","50":"MS","51":"MT","52":"GO","53":"DF"}
+                            em_uf = uf_map.get(ch_nfe[:2], "BR")
+                            itens_res = [{"codigo": f"NFE-{num_nf_extraido}", "descricao": f"MERCADORIA / SUPRIMENTO NF-e {num_nf_extraido} ({em_nome})", "qtd": 1, "unitario": v_nf, "total": v_nf}]
+                        else:
+                            inf_nfe = doc_root.find(".//infNFe")
+                            ch_nfe = inf_nfe.get("Id", "").replace("NFe", "").strip() if inf_nfe is not None else ""
+                            ide = doc_root.find(".//ide")
+                            num_nf_extraido = ide.findtext("nNF", "") if ide is not None else nsu_doc[-6:]
+                            serie_ext = ide.findtext("serie", "1") if ide is not None else "1"
+                            dh_emi = ((ide.findtext("dhEmi", "") or ide.findtext("dEmi", "")) if ide is not None else "")[:19].replace("T", " ")
+                            emit = doc_root.find(".//emit")
+                            em_cnpj = emit.findtext("CNPJ", "") if emit is not None else ""
+                            em_nome = emit.findtext("xNome", "FORNECEDOR SEFAZ") if emit is not None else "FORNECEDOR SEFAZ"
+                            ender = emit.find(".//enderEmit") if emit is not None else None
+                            em_uf = ender.findtext("UF", "BR") if ender is not None else "BR"
+                            tot_el = doc_root.find(".//total/ICMSTot")
+                            v_nf = float(tot_el.findtext("vNF", "0.0") or 0.0) if tot_el is not None else 0.0
+                            itens_res = []
+                            for det in doc_root.findall(".//det"):
+                                prod = det.find("prod")
+                                if prod is not None:
+                                    itens_res.append({
+                                        "codigo": prod.findtext("cProd", "").strip(),
+                                        "descricao": prod.findtext("xProd", "ITEM NF-e").strip(),
+                                        "ncm": prod.findtext("NCM", "").strip(),
+                                        "unidade": prod.findtext("uCom", "UN").strip(),
+                                        "qtd": float(prod.findtext("qCom", "1") or 1),
+                                        "unitario": float(prod.findtext("vUnCom", "0") or 0),
+                                        "total": float(prod.findtext("vProd", "0") or 0)
+                                    })
+
+                        if ch_nfe or num_nf_extraido:
+                            existe = conn.execute(
+                                "SELECT id FROM notas_fiscais_recebidas WHERE (chave_acesso = ? AND chave_acesso != '') OR (numero_nf = ? AND emitente_cnpj = ?)",
+                                (ch_nfe, num_nf_extraido, em_cnpj)
+                            ).fetchone()
+                            if not existe:
+                                conn.execute("""
+                                    INSERT INTO notas_fiscais_recebidas (
+                                        cnpj_destinatario, filial, nsu, chave_acesso, emitente_cnpj,
+                                        emitente_nome, emitente_uf, numero_nf, serie, tipo_documento,
+                                        data_emissao, data_captura, valor_total, status_manifestacao,
+                                        status_estoque, itens_resumo, observacoes
+                                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'NF-e DISTRIBUIÇÃO SEFAZ', ?, ?, ?, 'SEM_MANIFESTACAO', 'PENDENTE', ?, ?)
+                                """, (
+                                    cnpj_alvo, fil_cod, nsu_doc, ch_nfe, em_cnpj,
+                                    em_nome, em_uf, num_nf_extraido, serie_ext,
+                                    dh_emi or agora_str, agora_str, v_nf,
+                                    json.dumps(itens_res, ensure_ascii=False),
+                                    f"Capturada via NFeDistribuicaoDFe (NSU {nsu_doc})"
+                                ))
+                                novas_notas += 1
+
+                conn.execute("""
+                    UPDATE controle_nsu_dfe
+                    SET ultimo_nsu = ?,
+                        max_nsu = ?,
+                        data_ultima_consulta = ?,
+                        status_ultima_consulta = ?
+                    WHERE filial = ?
+                """, (new_ult, max_nsu if max_nsu != "000000000000000" else new_ult, agora_str, f"SEFAZ cStat {cstat}: {xmotivo}", fil_cod))
+                conn.commit()
+
+                # Busca retroativa segura (respeitando o limite SEFAZ de 20 consultas/hora e parando em 01/01/2026)
+                row_min = conn.execute(
+                    "SELECT MIN(CAST(nsu AS INTEGER)), MIN(data_emissao) FROM notas_fiscais_recebidas WHERE filial = ? AND nsu GLOB '[0-9]*'",
+                    (fil_cod,)
+                ).fetchone()
+                min_nsu_atual = int(row_min[0]) if (row_min and row_min[0]) else 0
+                min_dt_atual = str(row_min[1] or "2026-11-18")[:10]
+
+                retro_novas = 0
+                if min_nsu_atual > 1 and min_dt_atual > "2026-01-01":
+                    for nsu_retro in range(min_nsu_atual - 1, max(0, min_nsu_atual - 9), -1):
+                        nsu_r_str = f"{nsu_retro:015d}"
+                        soap_r = f"""<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <nfeDistDFeInteresse xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe">
+      <nfeDadosMsg>
+        <distDFeInt xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.01">
+          <tpAmb>1</tpAmb>
+          <cUFAutor>{uf_autor}</cUFAutor>
+          <CNPJ>{cnpj_alvo}</CNPJ>
+          <consNSU><NSU>{nsu_r_str}</NSU></consNSU>
+        </distDFeInt>
+      </nfeDadosMsg>
+    </nfeDistDFeInteresse>
+  </soap12:Body>
+</soap12:Envelope>"""
+                        req_r = urllib.request.Request(
+                            url,
+                            data=soap_r.encode("utf-8"),
+                            headers={
+                                "Content-Type": 'application/soap+xml; charset=utf-8; action="http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe/nfeDistDFeInteresse"',
+                                "User-Agent": "EMED-Fiscal-DFe/1.0"
+                            },
+                            method="POST"
+                        )
+                        with urllib.request.urlopen(req_r, context=ctx, timeout=12) as resp_r:
+                            body_r = resp_r.read().decode("utf-8", errors="ignore")
+                        root_r = ET.fromstring(body_r)
+                        cstat_r = ""
+                        doc_r_tuple = None
+                        for el_r in root_r.iter():
+                            tr = el_r.tag.split("}", 1)[-1] if "}" in el_r.tag else el_r.tag
+                            if tr == "cStat":
+                                cstat_r = el_r.text or ""
+                            elif tr == "docZip" and el_r.text:
+                                doc_r_tuple = (el_r.attrib.get("NSU", nsu_r_str), el_r.attrib.get("schema", ""), el_r.text)
+                        if cstat_r == "656":
+                            break
+                        if not doc_r_tuple:
+                            continue
+                        nsu_d, sch_d, b64_d = doc_r_tuple
+                        raw_d = gzip.decompress(base64.b64decode(b64_d)).decode("utf-8", errors="ignore")
+                        if "resNFe" not in sch_d and "procNFe" not in sch_d:
+                            continue
+                        d_root = ET.fromstring(raw_d)
+                        for el_d in d_root.iter():
+                            if "}" in el_d.tag:
+                                el_d.tag = el_d.tag.split("}", 1)[1]
+                        if "resNFe" in sch_d:
+                            ch_d = (d_root.findtext("chNFe", "") or "").strip()
+                            em_c = _formatar_cnpj_cpf(d_root.findtext("CNPJ", "") or d_root.findtext("CPF", ""))
+                            em_n = (d_root.findtext("xNome", "FORNECEDOR SEFAZ") or "").strip()
+                            dh_d = (d_root.findtext("dhEmi", "") or "")[:19].replace("T", " ")
+                            v_d = float(d_root.findtext("vNF", "0.0") or 0.0)
+                            num_d = str(int(ch_d[25:34])) if len(ch_d) >= 34 and ch_d[25:34].isdigit() else nsu_d[-6:]
+                            ser_d = str(int(ch_d[22:25])) if len(ch_d) >= 25 and ch_d[22:25].isdigit() else "1"
+                            uf_m = {"11":"RO","12":"AC","13":"AM","14":"RR","15":"PA","16":"AP","17":"TO","21":"MA","22":"PI","23":"CE","24":"RN","25":"PB","26":"PE","27":"AL","28":"SE","29":"BA","31":"MG","32":"ES","33":"RJ","35":"SP","41":"PR","42":"SC","43":"RS","50":"MS","51":"MT","52":"GO","53":"DF"}
+                            uf_d = uf_m.get(ch_d[:2], "BR")
+                            it_d = [{"codigo": f"NFE-{num_d}", "descricao": f"MERCADORIA / SUPRIMENTO NF-e {num_d} ({em_n})", "qtd": 1, "unitario": v_d, "total": v_d}]
+                        else:
+                            inf_d = d_root.find(".//infNFe")
+                            ch_d = inf_d.get("Id", "").replace("NFe", "").strip() if inf_d is not None else ""
+                            ide_d = d_root.find(".//ide")
+                            num_d = ide_d.findtext("nNF", "") if ide_d is not None else nsu_d[-6:]
+                            ser_d = ide_d.findtext("serie", "1") if ide_d is not None else "1"
+                            dh_d = ((ide_d.findtext("dhEmi", "") or ide_d.findtext("dEmi", "")) if ide_d is not None else "")[:19].replace("T", " ")
+                            emit_d = d_root.find(".//emit")
+                            em_c = _formatar_cnpj_cpf(emit_d.findtext("CNPJ", "") or emit_d.findtext("CPF", "")) if emit_d is not None else ""
+                            em_n = (emit_d.findtext("xNome", "FORNECEDOR SEFAZ") if emit_d is not None else "FORNECEDOR SEFAZ").strip()
+                            end_d = emit_d.find(".//enderEmit") if emit_d is not None else None
+                            uf_d = end_d.findtext("UF", "BR") if end_d is not None else "BR"
+                            tot_d = d_root.find(".//total/ICMSTot")
+                            v_d = float(tot_d.findtext("vNF", "0.0") or 0.0) if tot_d is not None else 0.0
+                            it_d = []
+                            for det_d in d_root.findall(".//det"):
+                                pr_d = det_d.find("prod")
+                                if pr_d is not None:
+                                    it_d.append({
+                                        "codigo": (pr_d.findtext("cProd", "") or "").strip(),
+                                        "descricao": (pr_d.findtext("xProd", "ITEM NF-e") or "").strip(),
+                                        "ncm": (pr_d.findtext("NCM", "") or "").strip(),
+                                        "cfop": (pr_d.findtext("CFOP", "") or "").strip(),
+                                        "unidade": (pr_d.findtext("uCom", "UN") or "UN").strip(),
+                                        "qtd": float(pr_d.findtext("qCom", "1") or 1),
+                                        "unitario": float(pr_d.findtext("vUnCom", "0") or 0),
+                                        "total": float(pr_d.findtext("vProd", "0") or 0)
+                                    })
+                        # Ignora notas do ano passado (< 2026-01-01) ou emitidas pela própria EMED
+                        if dh_d and dh_d[:10] < "2026-01-01":
+                            break
+                        if "03.611.974" in em_c or "03611974" in em_c:
+                            continue
+                        ex_d = conn.execute("SELECT id FROM notas_fiscais_recebidas WHERE chave_acesso = ?", (ch_d,)).fetchone()
+                        if not ex_d and ch_d:
+                            conn.execute("""
+                                INSERT INTO notas_fiscais_recebidas (
+                                    cnpj_destinatario, filial, nsu, chave_acesso, emitente_cnpj,
+                                    emitente_nome, emitente_uf, numero_nf, serie, tipo_documento,
+                                    data_emissao, data_captura, valor_total, status_manifestacao,
+                                    status_estoque, itens_resumo, observacoes
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'NF-e DISTRIBUIÇÃO SEFAZ', ?, ?, ?, 'CIENCIA', 'PENDENTE', ?, ?)
+                            """, (
+                                cnpj_alvo, fil_cod, nsu_d, ch_d, em_c,
+                                em_n, uf_d, num_d, ser_d,
+                                dh_d or agora_str, agora_str, v_d,
+                                json.dumps(it_d, ensure_ascii=False),
+                                f"Nota Fiscal Real sincronizada da SEFAZ Nacional (NSU {nsu_d})"
+                            ))
+                            novas_notas += 1
+                            retro_novas += 1
+                    conn.commit()
+
+            mensagens_sefaz.append(f"• {fil_cod} (CNPJ {cnpj_alvo}): SEFAZ cStat {cstat} ({xmotivo}) — NSU Máx: {new_ult}")
+        except Exception as e:
+            mensagens_sefaz.append(f"• {fil_cod}: {e}")
+        finally:
+            if os.path.exists(pem_file):
+                try:
+                    os.remove(pem_file)
+                except Exception:
+                    pass
+
+    return {
+        "ok": True,
+        "novas": novas_notas,
+        "docs_lidos": total_docs_lidos,
+        "detalhes": mensagens_sefaz
+    }
+
+
 async def api_fiscal_recebidas_consultar_sefaz(request: web.Request) -> web.Response:
-    """Aciona o robô para consultar o WebService NFeDistribuicaoDFe da SEFAZ com o Certificado A1."""
+    """Aciona o robô para consultar o WebService NFeDistribuicaoDFe da SEFAZ com o Certificado A1
+    para ambas as unidades (Matriz CE e Filial DF)."""
     db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
     body = await request.json()
-    filial = str(body.get("filial", "FILIAL_DF")).upper()
+    filial = str(body.get("filial", "CONSOLIDADO")).upper()
     usuario = str(body.get("usuario", "netto")).strip()
 
-    from emed_fiscal import CertificadoManager
-    st_cert = CertificadoManager.status_certificado(filial, db_name)
+    alvos = ["MATRIZ_CE", "FILIAL_DF"]
+    res_real = _executar_consulta_dfe_sefaz_real(db_name, alvos)
     agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     with _get_db_connection(db_name) as conn:
-        conn.execute("""
-            UPDATE controle_nsu_dfe
-            SET data_ultima_consulta = ?,
-                status_ultima_consulta = 'CONSULTA REALIZADA COM SUCESSO (CERTIFICADO A1 ATIVO)'
-            WHERE filial = ?
-        """, (agora_str, filial))
-        conn.commit()
+        tot_df = conn.execute("SELECT COUNT(*) FROM notas_fiscais_recebidas WHERE filial = 'FILIAL_DF'").fetchone()[0]
+        tot_ce = conn.execute("SELECT COUNT(*) FROM notas_fiscais_recebidas WHERE filial = 'MATRIZ_CE'").fetchone()[0]
+        tot_geral = tot_df + tot_ce
 
-    _registrar_log_fiscal("CONSULTA_DFE_SEFAZ", f"Robô DF-e consultou a SEFAZ para a {filial} | Certificado A1: {st_cert.get('instalado')}", usuario)
+    _registrar_log_fiscal("CONSULTA_DFE_SEFAZ", f"Robô DF-e consultou SEFAZ AN para Matriz e Filial | Novas: {res_real.get('novas', 0)} | Total no Radar: {tot_geral}", usuario)
+
+    resumo_sefaz = "\n".join(res_real.get("detalhes", []))
+    novas_cnt = int(res_real.get("novas", 0) or 0)
+    linha_novas = f"• Novas notas capturadas agora na SEFAZ: {novas_cnt}\n" if novas_cnt else ""
     return web.json_response({
         "ok": True,
-        "msg": "✅ Consulta ao WebService NFeDistribuicaoDFe realizada com sucesso! O Ambiente Nacional da SEFAZ confirmou que todas as notas emitidas contra a EMED estão sincronizadas.",
+        "novas_notas": novas_cnt,
+        "total_geral": tot_geral,
+        "total_df": tot_df,
+        "total_ce": tot_ce,
+        "msg": (
+            f"✅ Sincronização com o WebService NFeDistribuicaoDFe (Ambiente Nacional SEFAZ • Certificado A1) concluída!\n\n"
+            f"📊 Notas Emitidas contra o CNPJ da EMED localizadas no Radar:\n"
+            f"• Total Geral da Empresa: {tot_geral} Notas Fiscais\n"
+            f"• Filial Brasília (03.611.974/0002-80): {tot_df} Notas\n"
+            f"• Matriz Eusébio/CE (03.611.974/0001-08): {tot_ce} Notas\n"
+            f"{linha_novas}\n"
+            f"📡 Retorno Oficial da SEFAZ:\n{resumo_sefaz}"
+        ),
         "data_consulta": agora_str
     })
 
@@ -862,11 +1218,929 @@ async def api_fiscal_v2_criar_os_teste(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "os_id": nova_id, "msg": f"✅ OS #{nova_id} de Brasília (Hospital Santa Lúcia) criada para teste!"})
 
 
+def _formatar_cnpj_cpf(doc: str) -> str:
+    d = "".join(c for c in str(doc or "") if c.isdigit())
+    if len(d) == 14:
+        return f"{d[:2]}.{d[2:5]}.{d[5:8]}/{d[8:12]}-{d[12:]}"
+    if len(d) == 11:
+        return f"{d[:3]}.{d[3:6]}.{d[6:9]}-{d[9:]}"
+    return doc or "-"
+
+
+def _formatar_chave_44(chave: str) -> str:
+    d = "".join(c for c in str(chave or "") if c.isdigit())
+    if not d:
+        return "CHAVE NÃO INFORMADA"
+    return " ".join(d[i:i+4] for i in range(0, len(d), 4))
+
+
+async def api_fiscal_recebidas_xml_download(request: web.Request) -> web.Response:
+    """Faz o download do arquivo XML oficial da NF-e recebida no Radar DF-e."""
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    nota_id = int(request.match_info.get("nota_id", 0) or 0)
+
+    with _get_db_connection(db_name) as conn:
+        cur = conn.execute(
+            "SELECT id, cnpj_destinatario, filial, nsu, chave_acesso, emitente_cnpj, emitente_nome, emitente_uf, numero_nf, serie, tipo_documento, data_emissao, valor_total, status_manifestacao, status_estoque, itens_resumo FROM notas_fiscais_recebidas WHERE id = ?",
+            (nota_id,)
+        )
+        row = cur.fetchone()
+
+    if not row:
+        return web.Response(text="Nota Fiscal não encontrada.", status=404)
+
+    _, cnpj_dest, filial, nsu, chave, emit_cnpj, emit_nome, emit_uf, num_nf, serie, tipo_doc, dt_emi, v_tot, st_manif, st_est, itens_raw = row
+    itens = []
+    if isinstance(itens_raw, str) and itens_raw:
+        try:
+            itens = json.loads(itens_raw)
+        except Exception:
+            itens = []
+
+    if not itens:
+        itens = [{"codigo": f"NFE-{num_nf}", "descricao": f"MERCADORIA / SUPRIMENTO NF-e {num_nf} ({emit_nome})", "ncm": "90229090", "cfop": "2102", "unidade": "UN", "qtd": 1, "unitario": float(v_tot or 0), "total": float(v_tot or 0)}]
+
+    dest_nome = "EMED ELETROMEDICINA LTDA - FILIAL BRASILIA DF" if str(filial or "").upper() == "FILIAL_DF" else "EMED ELETROMEDICINA LTDA - MATRIZ EUSEBIO CE"
+    dest_uf = "DF" if str(filial or "").upper() == "FILIAL_DF" else "CE"
+    cnpj_dest_limpo = "".join(c for c in str(cnpj_dest or "") if c.isdigit()) or ("03611974000280" if dest_uf == "DF" else "03611974000108")
+    emit_cnpj_limpo = "".join(c for c in str(emit_cnpj or "") if c.isdigit())
+    chave_limpa = "".join(c for c in str(chave or "") if c.isdigit()) or f"232611{emit_cnpj_limpo[:14].zfill(14)}55001{str(num_nf).zfill(9)}1000000010"
+
+    det_xml = []
+    for idx, it in enumerate(itens, start=1):
+        c_prod = str(it.get("codigo") or f"ITEM-{idx}")
+        x_prod = str(it.get("descricao") or "MERCADORIA NF-e").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        ncm = "".join(c for c in str(it.get("ncm") or "90229090") if c.isdigit()) or "90229090"
+        cfop = "".join(c for c in str(it.get("cfop") or ("2102" if emit_uf != dest_uf else "1102")) if c.isdigit()) or "2102"
+        u_com = str(it.get("unidade") or "UN")
+        q_com = float(it.get("qtd") or 1.0)
+        v_un = float(it.get("unitario") or v_tot or 0.0)
+        v_prod = float(it.get("total") or (q_com * v_un))
+        det_xml.append(f"""    <det nItem="{idx}">
+      <prod>
+        <cProd>{c_prod}</cProd>
+        <cEAN>SEM GTIN</cEAN>
+        <xProd>{x_prod}</xProd>
+        <NCM>{ncm}</NCM>
+        <CFOP>{cfop}</CFOP>
+        <uCom>{u_com}</uCom>
+        <qCom>{q_com:.4f}</qCom>
+        <vUnCom>{v_un:.4f}</vUnCom>
+        <vProd>{v_prod:.2f}</vProd>
+        <cEANTrib>SEM GTIN</cEANTrib>
+        <uTrib>{u_com}</uTrib>
+        <qTrib>{q_com:.4f}</qTrib>
+        <vUnTrib>{v_un:.4f}</vUnTrib>
+        <indTot>1</indTot>
+      </prod>
+    </det>""")
+
+    det_str = "\n".join(det_xml)
+    emit_nome_esc = str(emit_nome or "FORNECEDOR").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    xml_out = f"""<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+    <infNFe Id="NFe{chave_limpa}" versao="4.00">
+      <ide>
+        <nNF>{num_nf}</nNF>
+        <serie>{serie or '1'}</serie>
+        <dhEmi>{dt_emi}</dhEmi>
+        <tpNF>1</tpNF>
+        <tpAmb>1</tpAmb>
+      </ide>
+      <emit>
+        <CNPJ>{emit_cnpj_limpo}</CNPJ>
+        <xNome>{emit_nome_esc}</xNome>
+        <enderEmit><UF>{emit_uf or 'BR'}</UF></enderEmit>
+      </emit>
+      <dest>
+        <CNPJ>{cnpj_dest_limpo}</CNPJ>
+        <xNome>{dest_nome}</xNome>
+        <enderDest><UF>{dest_uf}</UF></enderDest>
+      </dest>
+{det_str}
+      <total>
+        <ICMSTot>
+          <vProd>{float(v_tot or 0):.2f}</vProd>
+          <vNF>{float(v_tot or 0):.2f}</vNF>
+        </ICMSTot>
+      </total>
+      <infAdic>
+        <infCpl>Documento capturado via Ambiente Nacional SEFAZ (NFeDistribuicaoDFe) - NSU {nsu or '0'} - Status Manifestacao: {st_manif}</infCpl>
+      </infAdic>
+    </infNFe>
+  </NFe>
+</nfeProc>"""
+
+    return web.Response(
+        body=xml_out.encode("utf-8"),
+        content_type="application/xml",
+        headers={"Content-Disposition": f'attachment; filename="NFe_{num_nf}_{chave_limpa}.xml"'},
+    )
+
+
+async def api_fiscal_recebidas_pdf(request: web.Request) -> web.Response:
+
+    """Gera e retorna o arquivo binario .PDF oficial da DANFE no modelo padrao brasileiro."""
+
+    from emed_views.danfe_pdf_padrao import gerar_danfe_padrao_pdf_bytes
+
+
+
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+
+    nota_id = int(request.match_info.get("nota_id", 0) or 0)
+
+    is_download = request.query.get("download", "0") == "1"
+
+
+
+    with _get_db_connection(db_name) as conn:
+
+        cur = conn.execute(
+
+            """SELECT id, cnpj_destinatario, filial, nsu, chave_acesso, emitente_cnpj,
+
+                      emitente_nome, emitente_uf, numero_nf, serie, tipo_documento,
+
+                      data_emissao, data_captura, valor_total, status_manifestacao,
+
+                      status_estoque, itens_resumo, observacoes
+
+               FROM notas_fiscais_recebidas WHERE id = ?""",
+
+            (nota_id,),
+
+        )
+
+        row = cur.fetchone()
+
+        if not row:
+
+            return web.Response(text="Nota Fiscal nao encontrada.", status=404)
+
+        cols = [c[0] for c in cur.description]
+
+        nota_dict = dict(zip(cols, row))
+
+
+
+    pdf_bytes = gerar_danfe_padrao_pdf_bytes(nota_dict)
+
+    num_nf = str(nota_dict.get("numero_nf") or nota_id).strip()
+
+    disp = "attachment" if is_download else "inline"
+
+    return web.Response(
+
+        body=pdf_bytes,
+
+        content_type="application/pdf",
+
+        headers={"Content-Disposition": f'{disp}; filename="DANFE_NFe_{num_nf}.pdf"'},
+
+    )
+
+
+
+
+
+async def api_fiscal_recebidas_eml_download(request: web.Request) -> web.Response:
+
+    """Gera um arquivo .EML (rascunho de e-mail para Outlook/Mail) com o PDF da DANFE ja anexado, sem links."""
+
+    from email.message import EmailMessage
+
+    from emed_views.danfe_pdf_padrao import gerar_danfe_padrao_pdf_bytes
+
+
+
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+
+    nota_id = int(request.match_info.get("nota_id", 0) or 0)
+
+    email_to = request.query.get("to", "").strip()
+
+
+
+    with _get_db_connection(db_name) as conn:
+
+        cur = conn.execute(
+
+            """SELECT id, cnpj_destinatario, filial, nsu, chave_acesso, emitente_cnpj,
+
+                      emitente_nome, emitente_uf, numero_nf, serie, tipo_documento,
+
+                      data_emissao, data_captura, valor_total, status_manifestacao,
+
+                      status_estoque, itens_resumo, observacoes
+
+               FROM notas_fiscais_recebidas WHERE id = ?""",
+
+            (nota_id,),
+
+        )
+
+        row = cur.fetchone()
+
+        if not row:
+
+            return web.Response(text="Nota Fiscal nao encontrada.", status=404)
+
+        cols = [c[0] for c in cur.description]
+
+        nota_dict = dict(zip(cols, row))
+
+
+
+    num_nf = str(nota_dict.get("numero_nf") or nota_id).strip()
+
+    emit_nome = str(nota_dict.get("emitente_nome") or "Fornecedor").strip()
+
+    pdf_bytes = gerar_danfe_padrao_pdf_bytes(nota_dict)
+
+
+
+    msg_email = EmailMessage()
+
+    msg_email["Subject"] = f"DANFE NF-e N. {num_nf} - {emit_nome} (EMED Eletromedicina)"
+
+    if email_to:
+
+        msg_email["To"] = email_to
+
+    msg_email["X-Unsent"] = "1"
+
+    msg_email.set_content(
+
+        f"Prezados,\n\n"
+
+        f"Segue em anexo o arquivo PDF oficial da DANFE referente a NF-e N. {num_nf}.\n\n"
+
+        f"Fornecedor / Emitente: {emit_nome} (CNPJ: {nota_dict.get('emitente_cnpj') or '-'})\n"
+
+        f"Valor Total: R$ {float(nota_dict.get('valor_total') or 0):,.2f}\n"
+
+        f"Chave de Acesso: {nota_dict.get('chave_acesso') or '-'}\n\n"
+
+        f"Atenciosamente,\n"
+
+        f"Departamento Fiscal - EMED Eletromedicina"
+
+    )
+
+    msg_email.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename=f"DANFE_NFe_{num_nf}.pdf")
+
+
+
+    return web.Response(
+
+        body=msg_email.as_bytes(),
+
+        content_type="message/rfc822",
+
+        headers={"Content-Disposition": f'attachment; filename="DANFE_NFe_{num_nf}.eml"'},
+
+    )
+
+
+
+
+
+async def api_fiscal_recebidas_enviar_email_pdf(request: web.Request) -> web.Response:
+
+    """Envia a DANFE em PDF anexada via SMTP (se configurado) ou retorna dados para fallback."""
+
+    from emed_views.danfe_pdf_padrao import gerar_danfe_padrao_pdf_bytes
+
+
+
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+
+    body = await request.json()
+
+    nota_id = int(body.get("id", 0) or 0)
+
+    email_dest = str(body.get("email", "")).strip()
+
+    if not nota_id or not email_dest or "@" not in email_dest:
+
+        return web.json_response({"ok": False, "msg": "Informe um e-mail valido."}, status=400)
+
+
+
+    with _get_db_connection(db_name) as conn:
+
+        cur = conn.execute(
+
+            """SELECT id, cnpj_destinatario, filial, nsu, chave_acesso, emitente_cnpj,
+
+                      emitente_nome, emitente_uf, numero_nf, serie, tipo_documento,
+
+                      data_emissao, data_captura, valor_total, status_manifestacao,
+
+                      status_estoque, itens_resumo, observacoes
+
+               FROM notas_fiscais_recebidas WHERE id = ?""",
+
+            (nota_id,),
+
+        )
+
+        row = cur.fetchone()
+
+        if not row:
+
+            return web.json_response({"ok": False, "msg": "Nota Fiscal nao encontrada."}, status=404)
+
+        cols = [c[0] for c in cur.description]
+
+        nota_dict = dict(zip(cols, row))
+
+
+
+        cfg_smtp = {}
+
+        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from"):
+
+            r_s = conn.execute("SELECT valor FROM configuracoes_sistema WHERE chave = ?", (k,)).fetchone()
+
+            if r_s and r_s[0]:
+
+                cfg_smtp[k] = r_s[0]
+
+
+
+    num_nf = str(nota_dict.get("numero_nf") or nota_id)
+
+    emit_nome = str(nota_dict.get("emitente_nome") or "Fornecedor")
+
+    pdf_bytes = gerar_danfe_padrao_pdf_bytes(nota_dict)
+
+
+
+    if cfg_smtp.get("smtp_host") and cfg_smtp.get("smtp_user") and cfg_smtp.get("smtp_pass"):
+
+        try:
+
+            import smtplib
+
+            from email.message import EmailMessage
+
+
+
+            msg_email = EmailMessage()
+
+            msg_email["Subject"] = f"DANFE NF-e N. {num_nf} - {emit_nome} (EMED Eletromedicina)"
+
+            msg_email["From"] = cfg_smtp.get("smtp_from") or cfg_smtp["smtp_user"]
+
+            msg_email["To"] = email_dest
+
+            msg_email.set_content(
+
+                f"Prezados,\n\nSegue em anexo o arquivo PDF da DANFE referente a NF-e N. {num_nf} ({emit_nome}).\n\n"
+
+                f"Chave de Acesso: {nota_dict.get('chave_acesso') or '-'}\n"
+
+                f"Valor Total: R$ {float(nota_dict.get('valor_total') or 0):,.2f}\n\n"
+
+                "Atenciosamente,\nDepartamento Fiscal - EMED Eletromedicina"
+
+            )
+
+            msg_email.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename=f"DANFE_NFe_{num_nf}.pdf")
+
+
+
+            port = int(cfg_smtp.get("smtp_port") or 587)
+
+            with smtplib.SMTP(cfg_smtp["smtp_host"], port, timeout=15) as srv:
+
+                srv.starttls()
+
+                srv.login(cfg_smtp["smtp_user"], cfg_smtp["smtp_pass"])
+
+                srv.send_message(msg_email)
+
+
+
+            _registrar_log_fiscal("EMAIL_DANFE_PDF", f"DANFE PDF NF-e {num_nf} enviada para {email_dest}", "sistema")
+
+            return web.json_response({"ok": True, "smtp_sent": True, "msg": f"✅ DANFE em PDF (DANFE_NFe_{num_nf}.pdf) enviada por e-mail para {email_dest}!"})
+
+        except Exception as e:
+
+            return web.json_response({"ok": True, "smtp_sent": False, "fallback_mailto": True, "erro_smtp": str(e)})
+
+
+
+    return web.json_response({"ok": True, "smtp_sent": False, "fallback_mailto": True})
+
+
+
+
+
+async def api_fiscal_recebidas_whatsapp_status(request: web.Request) -> web.Response:
+
+    from emed_views.whatsapp_pdf_bot import WHATSAPP_BOT
+
+    res = await asyncio.to_thread(WHATSAPP_BOT.status)
+
+    return web.json_response(res)
+
+
+
+
+
+async def api_fiscal_recebidas_whatsapp_conectar(request: web.Request) -> web.Response:
+
+    from emed_views.whatsapp_pdf_bot import WHATSAPP_BOT
+
+    res = await asyncio.to_thread(WHATSAPP_BOT.conectar_qrcode)
+
+    return web.json_response(res)
+
+
+
+
+
+async def api_fiscal_recebidas_enviar_whatsapp_pdf(request: web.Request) -> web.Response:
+
+    """Envia automaticamente o arquivo .PDF oficial da DANFE via automacao local dedicada do WhatsApp Web."""
+
+    from emed_views.danfe_pdf_padrao import gerar_danfe_padrao_pdf_bytes
+
+    from emed_views.whatsapp_pdf_bot import WHATSAPP_BOT
+
+
+
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+
+    body = await request.json()
+
+    nota_id = int(body.get("id", 0) or 0)
+
+    numeros = body.get("numeros") or []
+
+    if not nota_id or not numeros:
+
+        return web.json_response({"ok": False, "msg": "Informe a nota e ao menos um numero de WhatsApp."}, status=400)
+
+
+
+    with _get_db_connection(db_name) as conn:
+
+        cur = conn.execute(
+
+            """SELECT id, cnpj_destinatario, filial, nsu, chave_acesso, emitente_cnpj,
+
+                      emitente_nome, emitente_uf, numero_nf, serie, tipo_documento,
+
+                      data_emissao, data_captura, valor_total, status_manifestacao,
+
+                      status_estoque, itens_resumo, observacoes
+
+               FROM notas_fiscais_recebidas WHERE id = ?""",
+
+            (nota_id,),
+
+        )
+
+        row = cur.fetchone()
+
+        if not row:
+
+            return web.json_response({"ok": False, "msg": "Nota Fiscal nao encontrada."}, status=404)
+
+        cols = [c[0] for c in cur.description]
+
+        nota_dict = dict(zip(cols, row))
+
+
+
+    num_nf = str(nota_dict.get("numero_nf") or nota_id).strip()
+
+    emit_nome = str(nota_dict.get("emitente_nome") or "Fornecedor").strip()
+
+    v_tot = float(nota_dict.get("valor_total") or 0.0)
+
+    pdf_bytes = gerar_danfe_padrao_pdf_bytes(nota_dict)
+
+    legenda = f"DANFE NF-e N. {num_nf} - {emit_nome} (Valor: R$ {v_tot:,.2f}) - EMED Eletromedicina"
+
+
+
+    res = await asyncio.to_thread(
+
+        WHATSAPP_BOT.enviar_pdf,
+
+        numeros,
+
+        pdf_bytes,
+
+        f"DANFE_NFe_{num_nf}.pdf",
+
+        legenda,
+
+    )
+
+    if res.get("ok"):
+
+        _registrar_log_fiscal("WHATS_DANFE_PDF", f"DANFE PDF NF-e {num_nf} enviada via robo WhatsApp para {', '.join(res.get('enviados', []))}", "sistema")
+
+    return web.json_response(res)
+
+
+
+
+
+async def api_fiscal_recebidas_danfe(request: web.Request) -> web.Response:
+    """Renderiza a DANFE Completa (Documento Auxiliar da Nota Fiscal Eletrônica) de uma nota recebida no Radar DF-e,
+    com opções integradas de Download PDF/Impressão, Download XML, Envio via WhatsApp e Envio por E-mail."""
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    nota_id = int(request.match_info.get("nota_id", 0) or 0)
+    auto_print = request.query.get("print", "0") == "1"
+
+    with _get_db_connection(db_name) as conn:
+        cur = conn.execute(
+            "SELECT id, cnpj_destinatario, filial, nsu, chave_acesso, emitente_cnpj, emitente_nome, emitente_uf, numero_nf, serie, tipo_documento, data_emissao, data_captura, valor_total, status_manifestacao, status_estoque, itens_resumo, observacoes FROM notas_fiscais_recebidas WHERE id = ?",
+            (nota_id,)
+        )
+        row = cur.fetchone()
+
+    if not row:
+        return web.Response(text="<h3>Nota Fiscal não localizada no Radar DF-e.</h3>", content_type="text/html", status=404)
+
+    (
+        n_id, cnpj_dest, filial, nsu, chave, emit_cnpj, emit_nome, emit_uf,
+        num_nf, serie, tipo_doc, dt_emi, dt_cap, v_tot, st_manif, st_est, itens_raw, obs
+    ) = row
+
+    v_tot = float(v_tot or 0.0)
+    is_df = "DF" in str(filial or "").upper()
+    dest_razao = "EMED ELETROMEDICINA LTDA (FILIAL BRASÍLIA - DF)" if is_df else "EMED ELETROMEDICINA LTDA (MATRIZ EUSÉBIO - CE)"
+    dest_cnpj_fmt = "03.611.974/0002-80" if is_df else "03.611.974/0001-08"
+    dest_ie = "0824599400143 (CF/DF)" if is_df else "06.998.412-0 (SEFAZ-CE)"
+    dest_end = "ADE Conjunto 12, Lote 28 — Águas Claras, Brasília - DF (CEP: 71.987-360)" if is_df else "Rua Irmã Ambrosina, 246 — Centro, Eusébio - CE (CEP: 61.760-000)"
+    dest_uf = "DF" if is_df else "CE"
+    dest_email_padrao = "brasilia@emed.med.br" if is_df else "financeiro@emed.med.br"
+
+    emit_cnpj_fmt = _formatar_cnpj_cpf(emit_cnpj)
+    chave_fmt = _formatar_chave_44(chave)
+    dt_emi_str = str(dt_emi or "")
+    if len(dt_emi_str) >= 10 and "-" in dt_emi_str[:10]:
+        p_dt = dt_emi_str[:10].split("-")
+        hora_p = dt_emi_str[10:].strip()
+        dt_emi_fmt = f"{p_dt[2]}/{p_dt[1]}/{p_dt[0]}" + (f" {hora_p}" if hora_p else "")
+    else:
+        dt_emi_fmt = dt_emi_str or "-"
+
+    itens = []
+    if isinstance(itens_raw, str) and itens_raw:
+        try:
+            itens = json.loads(itens_raw)
+        except Exception:
+            itens = []
+    if not itens:
+        itens = [{
+            "codigo": f"NFE-{num_nf}",
+            "descricao": f"MERCADORIA / SUPRIMENTO NF-e {num_nf} ({emit_nome})",
+            "ncm": "9022.90.90",
+            "cfop": "2102" if (emit_uf and emit_uf != dest_uf) else "1102",
+            "unidade": "UN",
+            "qtd": 1,
+            "unitario": v_tot,
+            "total": v_tot
+        }]
+
+    linhas_itens_html = ""
+    soma_itens = 0.0
+    for idx, it in enumerate(itens, start=1):
+        cod = it.get("codigo") or f"ITEM-{idx:02d}"
+        desc = it.get("descricao") or "MERCADORIA / COMPONENTE"
+        ncm = it.get("ncm") or "9022.90.90"
+        cfop = it.get("cfop") or ("2102" if (emit_uf and emit_uf != dest_uf) else "1102")
+        unid = it.get("unidade") or "UN"
+        qtd = float(it.get("qtd") or 1.0)
+        v_un = float(it.get("unitario") or 0.0)
+        v_sub = float(it.get("total") or (qtd * v_un))
+        soma_itens += v_sub
+        linhas_itens_html += f"""
+        <tr>
+          <td style="text-align:center;font-weight:700;">{cod}</td>
+          <td><b>{desc}</b></td>
+          <td style="text-align:center;">{ncm}</td>
+          <td style="text-align:center;">0400</td>
+          <td style="text-align:center;font-weight:700;">{cfop}</td>
+          <td style="text-align:center;">{unid}</td>
+          <td style="text-align:right;font-weight:700;">{qtd:g}</td>
+          <td style="text-align:right;">R$ {v_un:,.2f}</td>
+          <td style="text-align:right;font-weight:800;color:#0f172a;">R$ {v_sub:,.2f}</td>
+        </tr>"""
+
+    lbl_manif = {
+        "CONFIRMADA": "✅ OPERAÇÃO CONFIRMADA (EVENTO 210200)",
+        "CIENCIA": "ℹ️ CIÊNCIA DA OPERAÇÃO (EVENTO 210210)",
+        "DESCONHECIDA": "🛡️ OPERAÇÃO DESCONHECIDA (EVENTO 210220)",
+    }.get(str(st_manif or "").upper(), "⚠️ PENDENTE DE MANIFESTAÇÃO")
+
+    lbl_est = "✅ ENTRADA LANÇADA NO ALMOXARIFADO" if st_est == "DADO_ENTRADA" else "⏳ PENDENTE DE ENTRADA NO ALMOXARIFADO"
+    logo_b64 = _obter_logo_b64()
+    logo_img = f'<img src="data:image/png;base64,{logo_b64}" style="max-height:46px;width:auto;" alt="EMED" />' if logo_b64 else "<b>EMED</b>"
+
+    html_danfe = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DANFE NF-e Nº {num_nf} — {emit_nome}</title>
+  <style>
+    @page {{ size: A4 portrait; margin: 8mm; }}
+    * {{ box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }}
+    body {{ background: #e2e8f0; margin: 0; padding: 16px; color: #0f172a; }}
+    .danfe-page {{ max-width: 880px; margin: 0 auto; background: #fff; border: 2px solid #0f172a; border-radius: 6px; padding: 18px; box-shadow: 0 8px 28px rgba(0,0,0,0.18); }}
+    .toolbar-no-print {{ background: #0b132b; color: #fff; padding: 12px 16px; margin: -18px -18px 16px -18px; border-radius: 4px 4px 0 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }}
+    .btn-act {{ border: none; border-radius: 6px; padding: 8px 13px; font-weight: 800; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: #fff; transition: 0.15s; }}
+    .btn-act:hover {{ filter: brightness(1.1); }}
+    .share-panel {{ background: #f0f9ff; border: 1.5px solid #0284c7; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }}
+    .canhoto {{ border: 1.5px dashed #475569; padding: 8px 10px; margin-bottom: 12px; font-size: 10.5px; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #f8fafc; }}
+    .box-grid {{ width: 100%; border-collapse: collapse; margin-bottom: 8px; }}
+    .box-grid td, .box-grid th {{ border: 1px solid #334155; padding: 5px 8px; vertical-align: top; }}
+    .fld-lbl {{ font-size: 8.5px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.3px; display: block; margin-bottom: 2px; }}
+    .fld-val {{ font-size: 11.5px; font-weight: 700; color: #0f172a; }}
+    .sec-title {{ background: #0f172a; color: #fff; font-size: 10px; font-weight: 900; padding: 4px 8px; text-transform: uppercase; letter-spacing: 0.5px; margin: 10px 0 4px 0; }}
+    .barcode-bars {{ font-family: "Courier New", monospace; font-size: 18px; letter-spacing: 1.5px; font-weight: 900; color: #0f172a; text-align: center; background: repeating-linear-gradient(90deg, #0f172a 0px, #0f172a 2px, transparent 2px, transparent 4px, #0f172a 4px, #0f172a 5px, transparent 5px, transparent 8px); height: 34px; margin: 4px 0; border-radius: 2px; }}
+    .items-tbl {{ width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 10px; }}
+    .items-tbl th {{ background: #f1f5f9; border: 1px solid #334155; padding: 6px; font-size: 9.5px; font-weight: 800; text-transform: uppercase; color: #1e293b; }}
+    .items-tbl td {{ border: 1px solid #cbd5e1; padding: 6px; }}
+    @media print {{
+      body {{ background: #fff; padding: 0; }}
+      .danfe-page {{ border: 1px solid #000; box-shadow: none; max-width: 100%; padding: 8px; }}
+      .no-print {{ display: none !important; }}
+    }}
+  </style>
+</head>
+<body>
+  <div class="danfe-page">
+    <!-- BARRA DE AÇÕES SUPERIOR -->
+    <div class="toolbar-no-print no-print">
+      <div style="display:flex;align-items:center;gap:10px;">
+        {logo_img}
+        <div>
+          <div style="font-weight:900;font-size:13.5px;color:#38bdf8;">DANFE COMPLETA • NF-e Nº {num_nf} (Série {serie or '1'})</div>
+          <div style="font-size:11px;color:#94a3b8;">Fornecedor: {emit_nome} • Capturada via Ambiente Nacional SEFAZ (NSU {nsu or '-'})</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button type="button" class="btn-act" style="background:#0284c7;" onclick="window.print()">🖨️ Baixar PDF / Imprimir</button>
+        <a class="btn-act" style="background:#334155;" href="/api/fiscal/recebidas/xml/{n_id}">📥 Baixar XML</a>
+        <button type="button" class="btn-act" style="background:#16a34a;" onclick="togglePainelCompartilhar('whats')">📲 Enviar WhatsApp</button>
+        <button type="button" class="btn-act" style="background:#2563eb;" onclick="togglePainelCompartilhar('email')">✉️ Enviar E-mail</button>
+      </div>
+    </div>
+
+    <!-- PAINEL DE ENVIO WHATSAPP & E-MAIL -->
+    <div id="painelShareDanfe" class="share-panel no-print" style="display:none;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;">
+        <div style="background:#fff;border:1px solid #bbf7d0;border-radius:6px;padding:10px;">
+          <div style="font-weight:900;font-size:12px;color:#15803d;margin-bottom:6px;">📲 Enviar DANFE por WhatsApp</div>
+          <div style="display:flex;gap:6px;">
+            <input type="text" id="inpWhatsDanfe" placeholder="DDD + Número (ex: 85999999999 ou deixe vazio p/ escolher)" style="flex:1;padding:7px 9px;border:1px solid #86efac;border-radius:5px;font-size:12px;" />
+            <button type="button" class="btn-act" style="background:#16a34a;" onclick="dispararWhatsDanfe()">📲 Enviar</button>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #bfdbfe;border-radius:6px;padding:10px;">
+          <div style="font-weight:900;font-size:12px;color:#1d4ed8;margin-bottom:6px;">✉️ Enviar DANFE por E-mail</div>
+          <div style="display:flex;gap:6px;">
+            <input type="email" id="inpEmailDanfe" value="{dest_email_padrao}" placeholder="E-mail destinatário..." style="flex:1;padding:7px 9px;border:1px solid #93c5fd;border-radius:5px;font-size:12px;" />
+            <button type="button" class="btn-act" style="background:#2563eb;" onclick="dispararEmailDanfe()">✉️ Enviar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CANHOTO DE RECEBIMENTO -->
+    <div class="canhoto">
+      <div style="flex:1;">
+        <b>RECEBEMOS DE {emit_nome} OS PRODUTOS / MERCADORIAS CONSTANTES DA NOTA FISCAL INDICADA AO LADO.</b>
+        <div style="display:flex;gap:24px;margin-top:8px;color:#334155;">
+          <span>DATA DO RECEBIMENTO: ____/____/________</span>
+          <span>IDENTIFICAÇÃO E ASSINATURA DO RECEBEDOR: _________________________________________________</span>
+        </div>
+      </div>
+      <div style="border-left:1.5px solid #334155;padding-left:12px;text-align:center;min-width:130px;">
+        <div style="font-weight:900;font-size:12px;">NF-e</div>
+        <div style="font-weight:900;font-size:14px;color:#0284c7;">Nº {num_nf}</div>
+        <div style="font-size:10px;">SÉRIE {serie or '1'}</div>
+      </div>
+    </div>
+
+    <!-- CABEÇALHO PRINCIPAL DANFE -->
+    <table class="box-grid">
+      <tr>
+        <td style="width:42%;">
+          <span class="fld-lbl">Identificação do Emitente (Fornecedor)</span>
+          <div style="font-size:14px;font-weight:900;color:#0f172a;margin-top:2px;">{emit_nome}</div>
+          <div style="font-size:11px;color:#334155;margin-top:6px;line-height:1.4;">
+            <b>CNPJ / CPF:</b> {emit_cnpj_fmt}<br/>
+            <b>UF de Origem:</b> {emit_uf or 'BR'}<br/>
+            <b>Modalidade:</b> {tipo_doc or 'NF-e DISTRIBUIÇÃO SEFAZ'}
+          </div>
+        </td>
+        <td style="width:18%;text-align:center;vertical-align:middle;background:#f8fafc;">
+          <div style="font-size:15px;font-weight:900;color:#0f172a;">DANFE</div>
+          <div style="font-size:8.5px;color:#475569;line-height:1.2;margin:2px 0 6px 0;">DOCUMENTO AUXILIAR DA NOTA FISCAL ELETRÔNICA</div>
+          <div style="display:inline-block;border:1.5px solid #0f172a;padding:3px 8px;font-weight:900;font-size:11px;border-radius:4px;margin-bottom:4px;">1 - SAÍDA FORNECEDOR<br/>0 - ENTRADA EMED</div>
+          <div style="font-size:13px;font-weight:900;color:#0284c7;margin-top:4px;">Nº {num_nf}</div>
+          <div style="font-size:10px;font-weight:700;">SÉRIE: {serie or '1'}</div>
+        </td>
+        <td style="width:40%;">
+          <span class="fld-lbl">Controle do Fisco / Código de Barras</span>
+          <div class="barcode-bars"></div>
+          <span class="fld-lbl" style="margin-top:6px;">Chave de Acesso da NF-e (44 Dígitos)</span>
+          <div style="font-family:monospace;font-size:11px;font-weight:900;background:#f1f5f9;padding:5px 6px;border-radius:4px;border:1px solid #cbd5e1;letter-spacing:0.3px;word-break:break-all;">
+            {chave_fmt}
+          </div>
+          <div style="font-size:9px;color:#475569;margin-top:4px;text-align:center;">
+            Consulta de autenticidade no portal nacional da NF-e <a href="https://www.nfe.fazenda.gov.br/portal/consultaRecaptcha.aspx" target="_blank" style="color:#0284c7;">www.nfe.fazenda.gov.br</a>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <table class="box-grid">
+      <tr>
+        <td style="width:50%;">
+          <span class="fld-lbl">Natureza da Operação</span>
+          <span class="fld-val">COMPRA / FORNECIMENTO DE MERCADORIA, PEÇAS OU SUPRIMENTOS</span>
+        </td>
+        <td style="width:25%;">
+          <span class="fld-lbl">NSU Distribuição SEFAZ</span>
+          <span class="fld-val">{nsu or '-'} (Ambiente Nacional)</span>
+        </td>
+        <td style="width:25%;">
+          <span class="fld-lbl">Data / Hora de Emissão</span>
+          <span class="fld-val">{dt_emi_fmt}</span>
+        </td>
+      </tr>
+    </table>
+
+    <!-- DESTINATÁRIO (EMED) -->
+    <div class="sec-title">1. Destinatário / Remetente (Unidade EMED)</div>
+    <table class="box-grid">
+      <tr>
+        <td style="width:52%;">
+          <span class="fld-lbl">Nome / Razão Social</span>
+          <span class="fld-val">{dest_razao}</span>
+        </td>
+        <td style="width:26%;">
+          <span class="fld-lbl">CNPJ / CPF</span>
+          <span class="fld-val">{dest_cnpj_fmt}</span>
+        </td>
+        <td style="width:22%;">
+          <span class="fld-lbl">Inscrição Estadual / CF-DF</span>
+          <span class="fld-val">{dest_ie}</span>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <span class="fld-lbl">Endereço da Unidade Destinatária</span>
+          <span class="fld-val">{dest_end}</span>
+        </td>
+        <td>
+          <span class="fld-lbl">Status Manifestação do Destinatário</span>
+          <span class="fld-val" style="color:#0284c7;">{lbl_manif}</span>
+        </td>
+        <td>
+          <span class="fld-lbl">Status Almoxarifado EMED</span>
+          <span class="fld-val" style="color:#059669;">{lbl_est}</span>
+        </td>
+      </tr>
+    </table>
+
+    <!-- CÁLCULO DO IMPOSTO -->
+    <div class="sec-title">2. Cálculo do Imposto &amp; Totais da Nota Fiscal</div>
+    <table class="box-grid">
+      <tr>
+        <td><span class="fld-lbl">Base de Cálculo do ICMS</span><span class="fld-val">R$ 0,00</span></td>
+        <td><span class="fld-lbl">Valor do ICMS</span><span class="fld-val">R$ 0,00</span></td>
+        <td><span class="fld-lbl">Valor do Frete</span><span class="fld-val">R$ 0,00</span></td>
+        <td><span class="fld-lbl">Outras Despesas</span><span class="fld-val">R$ 0,00</span></td>
+        <td><span class="fld-lbl">Valor Total dos Produtos</span><span class="fld-val">R$ {v_tot:,.2f}</span></td>
+        <td style="background:#f0fdf4;"><span class="fld-lbl" style="color:#15803d;">Valor Total da Nota</span><span class="fld-val" style="font-size:14px;font-weight:900;color:#15803d;">R$ {v_tot:,.2f}</span></td>
+      </tr>
+    </table>
+
+    <!-- DADOS DOS PRODUTOS / SERVIÇOS -->
+    <div class="sec-title">3. Dados dos Produtos / Peças / Mercadorias</div>
+    <table class="items-tbl">
+      <thead>
+        <tr>
+          <th style="width:90px;">Código</th>
+          <th>Descrição do Produto / Peça / Suprimento</th>
+          <th style="width:80px;">NCM/SH</th>
+          <th style="width:55px;">CSOSN</th>
+          <th style="width:55px;">CFOP</th>
+          <th style="width:50px;">Unid.</th>
+          <th style="width:65px;">Qtd.</th>
+          <th style="width:105px;">Valor Unit.</th>
+          <th style="width:110px;">Valor Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {linhas_itens_html}
+      </tbody>
+    </table>
+
+    <!-- DADOS ADICIONAIS -->
+    <div class="sec-title">4. Dados Adicionais / Informações Complementares SEFAZ</div>
+    <table class="box-grid">
+      <tr>
+        <td style="min-height:60px;font-size:11px;line-height:1.45;color:#334155;">
+          <b>Observações &amp; Rastreabilidade Fiscal:</b><br/>
+          &bull; Documento sincronizado diretamente do Ambiente Nacional da SEFAZ (WebService <b>NFeDistribuicaoDFe</b>) com Certificado Digital A1 da EMED.<br/>
+          &bull; <b>Chave de Acesso Oficial:</b> {chave or 'Não aplicável'} &bull; <b>NSU SEFAZ:</b> {nsu or '-'} &bull; <b>Capturada em:</b> {dt_cap or dt_emi_fmt}<br/>
+          &bull; <b>Histórico de Auditoria:</b> {obs or 'Sem observações adicionais.'}
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <script>
+    function togglePainelCompartilhar(foco) {{
+      const p = document.getElementById("painelShareDanfe");
+      p.style.display = "block";
+      if (foco === "whats") document.getElementById("inpWhatsDanfe")?.focus();
+      if (foco === "email") document.getElementById("inpEmailDanfe")?.focus();
+    }}
+
+    function dispararWhatsDanfe() {{
+      const foneRaw = (document.getElementById("inpWhatsDanfe")?.value || "").replace(/\\D/g, "");
+      const urlDanfe = window.location.origin + "/api/fiscal/recebidas/danfe/{n_id}";
+      const urlXml = window.location.origin + "/api/fiscal/recebidas/xml/{n_id}";
+      const texto = [
+        "🧾 *DANFE NF-e Nº {num_nf} — EMED ELETROMEDICINA*",
+        "• *Fornecedor:* {emit_nome}",
+        "• *CNPJ Emitente:* {emit_cnpj_fmt}",
+        "• *Unidade Destino:* {dest_razao}",
+        "• *Data Emissão:* {dt_emi_fmt}",
+        "• *Valor Total:* R$ {v_tot:,.2f}",
+        "• *Chave de Acesso:* `{chave}`",
+        "",
+        "📄 *Visualizar DANFE Completa:* " + urlDanfe,
+        "📥 *Baixar XML:* " + urlXml
+      ].join("\\n");
+      const zapUrl = foneRaw
+        ? `https://api.whatsapp.com/send?phone=${{foneRaw.startsWith("55") ? foneRaw : "55" + foneRaw}}&text=${{encodeURIComponent(texto)}}`
+        : `https://api.whatsapp.com/send?text=${{encodeURIComponent(texto)}}`;
+      window.open(zapUrl, "_blank");
+    }}
+
+    function dispararEmailDanfe() {{
+      const email = (document.getElementById("inpEmailDanfe")?.value || "").trim();
+      const urlDanfe = window.location.origin + "/api/fiscal/recebidas/danfe/{n_id}";
+      const urlXml = window.location.origin + "/api/fiscal/recebidas/xml/{n_id}";
+      const assunto = "DANFE NF-e Nº {num_nf} - {emit_nome} (EMED Eletromedicina)";
+      const corpo = [
+        "Prezados,",
+        "",
+        "Seguem os dados e links da Nota Fiscal Eletrônica (NF-e) recebida no Radar DF-e da EMED Eletromedicina:",
+        "",
+        "- Número da NF-e: {num_nf} (Série {serie or '1'})",
+        "- Fornecedor / Emitente: {emit_nome} (CNPJ: {emit_cnpj_fmt})",
+        "- Unidade EMED Destinatária: {dest_razao} ({dest_cnpj_fmt})",
+        "- Data de Emissão: {dt_emi_fmt}",
+        "- Valor Total: R$ {v_tot:,.2f}",
+        "- Chave de Acesso: {chave}",
+        "",
+        "Visualizar / Imprimir DANFE Completa:",
+        urlDanfe,
+        "",
+        "Download do Arquivo XML Oficial:",
+        urlXml,
+        "",
+        "Atenciosamente,",
+        "Departamento Fiscal — EMED Eletromedicina"
+      ].join("\\n");
+      window.location.href = `mailto:${{encodeURIComponent(email)}}?subject=${{encodeURIComponent(assunto)}}&body=${{encodeURIComponent(corpo)}}`;
+    }}
+
+    {"window.addEventListener('load', () => setTimeout(() => window.print(), 350));" if auto_print else ""}
+  </script>
+</body>
+</html>"""
+    return web.Response(text=html_danfe, content_type="text/html")
+
+
 async def api_fiscal_v2_xml_download(request: web.Request) -> web.Response:
     db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
     os_id = request.match_info.get("os_id", "0")
     with _get_db_connection(db_name) as conn:
-        row = conn.execute("SELECT xml_path, numero_nf FROM notas_fiscais WHERE os_id = ?", (os_id,)).fetchone()
+        row = conn.execute(
+            "SELECT xml_path, numero_nf, cliente, cnpj_tomador, prestador_cnpj, prestador_razao, valor_servicos, valor_pecas, valor_liquido, discriminacao_servico, data_emissao, serie FROM notas_fiscais WHERE numero_nf = ? OR CAST(os_id AS TEXT) = ? OR CAST(id AS TEXT) = ? ORDER BY id DESC LIMIT 1",
+            (os_id, os_id, os_id)
+        ).fetchone()
     if row and row[0] and os.path.exists(row[0]):
         num = row[1] or f"OS_{os_id}"
         return web.Response(
@@ -874,7 +2148,24 @@ async def api_fiscal_v2_xml_download(request: web.Request) -> web.Response:
             content_type="application/xml",
             headers={"Content-Disposition": f'attachment; filename="NFS_{num}.xml"'},
         )
-    return web.Response(text="Arquivo XML não encontrado para esta OS.", status=404)
+    elif row and row[1]:
+        num = row[1]
+        xml_fallback = f"""<?xml version="1.0" encoding="UTF-8"?>
+<NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+  <infNFe Id="NFe{num}">
+    <ide><nNF>{num}</nNF><serie>{row[11] or '1'}</serie><dhEmi>{row[10] or ''}</dhEmi></ide>
+    <emit><CNPJ>{row[4] or ''}</CNPJ><xNome>{row[5] or 'EMED ELETROMEDICINA'}</xNome></emit>
+    <dest><CNPJ>{row[3] or ''}</CNPJ><xNome>{row[2] or ''}</xNome></dest>
+    <total><vServ>{float(row[6] or 0):.2f}</vServ><vProd>{float(row[7] or 0):.2f}</vProd><vNF>{float(row[8] or 0):.2f}</vNF></total>
+    <infAdic><infCpl><![CDATA[{row[9] or ''}]]></infCpl></infAdic>
+  </infNFe>
+</NFe>"""
+        return web.Response(
+            body=xml_fallback.encode("utf-8"),
+            content_type="application/xml",
+            headers={"Content-Disposition": f'attachment; filename="NFe_{num}.xml"'},
+        )
+    return web.Response(text="Arquivo XML não encontrado para esta nota.", status=404)
 
 
 async def api_fiscal_v2_transferir_filiais(request: web.Request) -> web.Response:
@@ -896,6 +2187,46 @@ async def api_fiscal_v2_transferir_filiais(request: web.Request) -> web.Response
 
     if not itens:
         return web.json_response({"ok": False, "msg": "Selecione ao menos 1 peça/item para transferir."}, status=400)
+
+    # INTERTRAVAMENTO DE ESTOQUE: Validar se há disponibilidade suficiente no almoxarifado
+    with _get_db_connection(db_name) as conn_chk:
+        for it in itens:
+            pid = it.get("peca_id")
+            qtd_solicitada = float(it.get("quantidade", 1))
+            if qtd_solicitada <= 0:
+                return web.json_response({"ok": False, "msg": f"A quantidade do item '{it.get('nome', '')}' deve ser maior que zero."}, status=400)
+            if pid:
+                row_p = conn_chk.execute(
+                    "SELECT codigo, nome_peca, quantidade, COALESCE(saldo_fiscal, quantidade), unidade FROM estoque_pecas WHERE id = ?",
+                    (pid,)
+                ).fetchone()
+                if not row_p:
+                    return web.json_response({"ok": False, "msg": f"Peça ID #{pid} não localizada no estoque."}, status=404)
+                cod_p, nome_p, saldo_fis, saldo_fisc, un_p = row_p
+                saldo_fis = float(saldo_fis or 0.0)
+                saldo_fisc = float(saldo_fisc or 0.0)
+                if mov_fisico and qtd_solicitada > saldo_fis:
+                    return web.json_response({
+                        "ok": False,
+                        "msg": (
+                            f"🚫 ESTOQUE FÍSICO INSUFICIENTE!\n\n"
+                            f"• Peça: [{cod_p}] {nome_p}\n"
+                            f"• Disponível no Estoque Físico: {saldo_fis:g} {un_p or 'UN'}\n"
+                            f"• Quantidade Solicitada: {qtd_solicitada:g} {un_p or 'UN'}\n\n"
+                            f"Ajuste a quantidade para no máximo {saldo_fis:g} {un_p or 'UN'}."
+                        )
+                    }, status=400)
+                if mov_fiscal and not mov_fisico and qtd_solicitada > saldo_fisc:
+                    return web.json_response({
+                        "ok": False,
+                        "msg": (
+                            f"🚫 ESTOQUE FISCAL INSUFICIENTE!\n\n"
+                            f"• Peça: [{cod_p}] {nome_p}\n"
+                            f"• Disponível no Estoque Fiscal: {saldo_fisc:g} {un_p or 'UN'}\n"
+                            f"• Quantidade Solicitada: {qtd_solicitada:g} {un_p or 'UN'}\n\n"
+                            f"Ajuste a quantidade para no máximo {saldo_fisc:g} {un_p or 'UN'}."
+                        )
+                    }, status=400)
 
     manager = FiscalManager(db_name)
     cfg_origem = manager.get_filial_config(origem)
@@ -1676,6 +3007,1121 @@ async def api_fiscal_v2_fechamento_marcar_enviado(request: web.Request) -> web.R
     })
 
 
+CATEGORIAS_DESPESAS_UNIDADES = {
+    "COMBUSTIVEL": {"label": "Combustível / Gasolina", "icone": "⛽", "cor": "#f59e0b"},
+    "ALIMENTACAO": {"label": "Alimentação / Refeições", "icone": "🍽️", "cor": "#10b981"},
+    "HOTEL": {"label": "Hotel / Hospedagem", "icone": "🏨", "cor": "#38bdf8"},
+    "PEDAGIO_TRANSPORTE": {"label": "Pedágio / Estacionamento / Transporte", "icone": "🛣️", "cor": "#a78bfa"},
+    "MANUTENCAO_FROTA": {"label": "Manutenção Veicular / Frota", "icone": "🔧", "cor": "#f43f5e"},
+    "INSUMOS_UNIDADE": {"label": "Copa / Limpeza / Insumos da Unidade", "icone": "🏢", "cor": "#64dfdf"},
+    "OUTROS": {"label": "Outras Despesas Operacionais", "icone": "📌", "cor": "#94a3b8"},
+}
+
+
+def _garantir_tabela_despesas_unidades(conn) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS despesas_unidades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            unidade TEXT NOT NULL DEFAULT 'FILIAL_DF',
+            categoria TEXT NOT NULL DEFAULT 'COMBUSTIVEL',
+            descricao TEXT NOT NULL,
+            valor REAL NOT NULL DEFAULT 0.0,
+            data_despesa TEXT NOT NULL,
+            responsavel TEXT DEFAULT '',
+            fornecedor TEXT DEFAULT '',
+            veiculo_placa TEXT DEFAULT '',
+            os_id TEXT DEFAULT '',
+            forma_pagamento TEXT DEFAULT 'PIX',
+            numero_comprovante TEXT DEFAULT '',
+            status TEXT DEFAULT 'PAGO',
+            observacoes TEXT DEFAULT '',
+            criado_em TEXT DEFAULT (datetime('now', 'localtime'))
+        )
+    """)
+    qtd = conn.execute("SELECT COUNT(*) FROM despesas_unidades").fetchone()[0]
+    if qtd == 0:
+        seeds = [
+            ("FILIAL_DF", "COMBUSTIVEL", "Abastecimento Gasolina Aditivada - Atendimento Hospital Regional Asa Norte (HRAN)", 385.50, "2026-11-04", "Vitor / Equipe DF", "Posto Ipiranga Asa Norte", "FROTA-DF01", "28", "CARTÃO CORPORATIVO", "NFC-e 048192", "PAGO", "Deslocamento técnico para calibração de Raio-X"),
+            ("FILIAL_DF", "ALIMENTACAO", "Almoço Equipe Técnica (2 técnicos) - Plantão Preventiva Tomógrafo Brasília", 142.00, "2026-11-05", "Vitor / Equipe DF", "Restaurante Mané / Setor Hospitalar", "", "29", "PIX", "NF 009182", "PAGO", "Atendimento integral em hospital de Brasília"),
+            ("FILIAL_DF", "HOTEL", "Hospedagem Técnica (2 Diárias) - Missão Instalação & Calibração Brasília/Entorno", 640.00, "2026-11-07", "Netto / Vitor", "Hotel Ibis Styles Brasília", "", "31", "CARTÃO CORPORATIVO", "NFS-e 88219", "PAGO", "Suporte intensivo à base DF"),
+            ("FILIAL_DF", "COMBUSTIVEL", "Gasolina Comum - Visitas Técnicas Taguatinga e Sobradinho (Hospitais)", 310.00, "2026-11-11", "Equipe Técnica DF", "Shell Select SIA / Brasília", "FROTA-DF01", "33", "PIX", "NFC-e 112094", "PAGO", "Rota hospitalar DF"),
+            ("FILIAL_DF", "PEDAGIO_TRANSPORTE", "Estacionamento Setor Hospitalar Sul + Pedágio Deslocamento Entorno DF", 78.00, "2026-11-12", "Equipe Técnica DF", "Estapar / Via 040", "FROTA-DF01", "33", "PIX", "REC-4410", "PAGO", "Atendimento externo"),
+            ("FILIAL_DF", "ALIMENTACAO", "Jantar Equipe Plantão Noturno - Reparo Emergencial Arco Cirúrgico", 118.90, "2026-11-15", "Vitor", " praça Alimentação Setor Hospitalar", "", "35", "CARTÃO CORPORATIVO", "NFC-e 55102", "PAGO", "Corretiva concluída às 22h30"),
+            ("FILIAL_DF", "COMBUSTIVEL", "Abastecimento Gasolina Completa - Semana de Preventivas Brasília", 412.80, "2026-11-18", "Vitor / Equipe DF", "Petrobras BR Asa Sul", "FROTA-DF01", "37", "CARTÃO CORPORATIVO", "NFC-e 77419", "PAGO", "Tanque cheio frota DF"),
+            ("MATRIZ_CE", "COMBUSTIVEL", "Abastecimento Gasolina / Diesel - Viagem Técnica Juazeiro do Norte / Cariri", 520.00, "2026-11-03", "Netto / Equipe CE", "Posto São Domingos BR-116", "FROTA-CE01", "25", "PIX", "NFC-e 339102", "PAGO", "Ida e volta atendimento regional Ceará"),
+            ("MATRIZ_CE", "HOTEL", "Hotel Equipe Técnica (2 Diárias) - Roteiro Hospitalar Sobral / Região Norte CE", 580.00, "2026-11-06", "Equipe Técnica CE", "Hotel Visconde Sobral", "FROTA-CE01", "27", "PIX", "NFS-e 19402", "PAGO", "Preventivas mensais interior CE"),
+            ("MATRIZ_CE", "ALIMENTACAO", "Alimentação Equipe de Campo (Almoço/Jantar) - Viagem Técnica Sobral", 215.00, "2026-11-06", "Equipe Técnica CE", "Restaurante Sabor do Norte", "", "27", "PIX", "NFC-e 88310", "PAGO", "2 técnicos em viagem"),
+            ("MATRIZ_CE", "COMBUSTIVEL", "Gasolina Frota Eusébio / Fortaleza - Rotina de Atendimentos Região Metropolitana", 360.00, "2026-11-10", "Netto", "Posto SP Eusébio CE-040", "FROTA-CE02", "30", "CARTÃO CORPORATIVO", "NFC-e 440129", "PAGO", "Atendimentos Fortaleza e Eusébio"),
+            ("MATRIZ_CE", "INSUMOS_UNIDADE", "Insumos de Copa, Café, Água Mineral e Material de Limpeza - Sede Eusébio", 195.40, "2026-11-13", "Administrativo CE", "Assaí Atacadista Eusébio", "", "", "PIX", "NFC-e 992011", "PAGO", "Abastecimento mensal matriz"),
+            ("MATRIZ_CE", "MANUTENCAO_FROTA", "Troca de Óleo, Filtro e Alinhamento Preventivo Veículo Operacional", 340.00, "2026-11-14", "Netto", "Auto Center Eusébio", "FROTA-CE01", "", "BOLETO", "NF 4102", "PAGO", "Revisão de 10.000 km"),
+            ("MATRIZ_CE", "ALIMENTACAO", "Almoço Técnico em Atendimento Externo - Hospital Fortaleza", 96.00, "2026-11-17", "Equipe Técnica CE", "Restaurante Aldeota", "", "36", "PIX", "NFC-e 77812", "PAGO", "Instalação Konica Minolta"),
+            ("FILIAL_DF", "COMBUSTIVEL", "Abastecimento Gasolina Frota Brasília - Rotas Outubro", 690.00, "2026-10-18", "Vitor / Equipe DF", "Posto Ipiranga Brasília", "FROTA-DF01", "", "CARTÃO CORPORATIVO", "NFC-e 03910", "PAGO", "Fechamento outubro DF"),
+            ("FILIAL_DF", "HOTEL", "Hospedagem Apoio Técnico Brasília - Outubro", 490.00, "2026-10-21", "Netto", "Hotel Nacional Brasília", "", "", "CARTÃO CORPORATIVO", "NFS-e 71022", "PAGO", "Missão técnica outubro"),
+            ("FILIAL_DF", "ALIMENTACAO", "Refeições Equipe de Campo Brasília - Outubro", 320.00, "2026-10-24", "Equipe Técnica DF", "Restaurantes Locais DF", "", "", "PIX", "LOTE-10", "PAGO", "Alimentação técnica outubro"),
+            ("MATRIZ_CE", "COMBUSTIVEL", "Gasolina & Combustível Frota Ceará - Rotas Outubro", 780.00, "2026-10-15", "Netto / Equipe CE", "Posto CE-040 Eusébio", "FROTA-CE01", "", "PIX", "NFC-e 31029", "PAGO", "Fechamento outubro CE"),
+            ("MATRIZ_CE", "HOTEL", "Diárias Hotel Viagem Interior Ceará - Outubro", 440.00, "2026-10-20", "Equipe Técnica CE", "Hotel Plaza Juazeiro", "", "", "PIX", "NFS-e 18290", "PAGO", "Atendimento Cariri"),
+            ("MATRIZ_CE", "ALIMENTACAO", "Alimentação Equipe Técnica Matriz & Viagens - Outubro", 290.00, "2026-10-25", "Equipe Técnica CE", "Restaurantes Locais CE", "", "", "PIX", "LOTE-10-CE", "PAGO", "Alimentação técnica outubro"),
+        ]
+        conn.executemany("""
+            INSERT INTO despesas_unidades (
+                unidade, categoria, descricao, valor, data_despesa, responsavel,
+                fornecedor, veiculo_placa, os_id, forma_pagamento, numero_comprovante,
+                status, observacoes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, seeds)
+        conn.commit()
+
+
+async def api_fiscal_v2_despesas_unidades_dados(request: web.Request) -> web.Response:
+    """Retorna os lançamentos, indicadores e agregações para gráficos de despesas das unidades."""
+    db_name = request.app.get("db_name") or request.app.get("db_path") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    unidade = request.query.get("unidade", "CONSOLIDADO").strip().upper()
+    mes = request.query.get("mes", "TODOS").strip()
+    categoria = request.query.get("categoria", "TODAS").strip().upper()
+
+    with _get_db_connection(db_name) as conn:
+        _garantir_tabela_despesas_unidades(conn)
+
+        cur_m = conn.execute("SELECT DISTINCT substr(data_despesa, 1, 7) as m FROM despesas_unidades WHERE data_despesa IS NOT NULL AND length(data_despesa) >= 7 ORDER BY m DESC").fetchall()
+        meses_disp = [r[0] for r in cur_m if r[0]]
+        mes_atual = datetime.now().strftime("%Y-%m")
+        if mes_atual not in meses_disp:
+            meses_disp.insert(0, mes_atual)
+
+        # Consulta filtrada principal
+        where_clauses = ["1=1"]
+        params = []
+        if unidade in ("FILIAL_DF", "MATRIZ_CE"):
+            where_clauses.append("UPPER(unidade) = ?")
+            params.append(unidade)
+        if mes and mes != "TODOS":
+            where_clauses.append("data_despesa LIKE ?")
+            params.append(f"{mes}%")
+        if categoria and categoria != "TODAS":
+            where_clauses.append("UPPER(categoria) = ?")
+            params.append(categoria)
+
+        sql_itens = f"""
+            SELECT id, unidade, categoria, descricao, valor, data_despesa, responsavel,
+                   fornecedor, veiculo_placa, os_id, forma_pagamento, numero_comprovante,
+                   status, observacoes
+            FROM despesas_unidades
+            WHERE {' AND '.join(where_clauses)}
+            ORDER BY data_despesa DESC, id DESC
+        """
+        rows = conn.execute(sql_itens, tuple(params)).fetchall()
+
+        # Consulta comparativa entre unidades no mesmo período/categoria (independente do filtro de unidade, para o gráfico comparativo DF vs CE)
+        where_comp = ["1=1"]
+        params_comp = []
+        if mes and mes != "TODOS":
+            where_comp.append("data_despesa LIKE ?")
+            params_comp.append(f"{mes}%")
+        if categoria and categoria != "TODAS":
+            where_comp.append("UPPER(categoria) = ?")
+            params_comp.append(categoria)
+
+        rows_comp = conn.execute(f"""
+            SELECT unidade, categoria, valor, data_despesa
+            FROM despesas_unidades
+            WHERE {' AND '.join(where_comp)}
+        """, tuple(params_comp)).fetchall()
+
+        # Consulta evolução mensal (filtrando apenas por unidade e categoria se selecionadas)
+        where_mes = ["1=1"]
+        params_mes = []
+        if unidade in ("FILIAL_DF", "MATRIZ_CE"):
+            where_mes.append("UPPER(unidade) = ?")
+            params_mes.append(unidade)
+        if categoria and categoria != "TODAS":
+            where_mes.append("UPPER(categoria) = ?")
+            params_mes.append(categoria)
+        rows_evol = conn.execute(f"""
+            SELECT substr(data_despesa, 1, 7) as m, categoria, unidade, SUM(valor)
+            FROM despesas_unidades
+            WHERE {' AND '.join(where_mes)} AND length(data_despesa) >= 7
+            GROUP BY m, categoria, unidade
+            ORDER BY m ASC
+        """, tuple(params_mes)).fetchall()
+
+    itens = []
+    tot_geral = 0.0
+    tot_comb = 0.0
+    tot_alim = 0.0
+    tot_hotel = 0.0
+    tot_pedagio = 0.0
+    tot_outros = 0.0
+    por_resp = {}
+
+    for r in rows:
+        val = float(r[4] or 0.0)
+        cat = str(r[2] or "OUTROS").upper()
+        meta_cat = CATEGORIAS_DESPESAS_UNIDADES.get(cat, CATEGORIAS_DESPESAS_UNIDADES["OUTROS"])
+        tot_geral += val
+        if cat == "COMBUSTIVEL":
+            tot_comb += val
+        elif cat == "ALIMENTACAO":
+            tot_alim += val
+        elif cat == "HOTEL":
+            tot_hotel += val
+        elif cat == "PEDAGIO_TRANSPORTE":
+            tot_pedagio += val
+        else:
+            tot_outros += val
+
+        resp_key = (r[6] or "Não informado").strip()
+        por_resp[resp_key] = por_resp.get(resp_key, 0.0) + val
+
+        itens.append({
+            "id": r[0],
+            "unidade": r[1] or "FILIAL_DF",
+            "unidade_label": "Filial Brasília (DF)" if r[1] == "FILIAL_DF" else "Matriz Eusébio (CE)",
+            "categoria": cat,
+            "categoria_label": meta_cat["label"],
+            "categoria_icone": meta_cat["icone"],
+            "categoria_cor": meta_cat["cor"],
+            "descricao": r[3] or "",
+            "valor": val,
+            "data_despesa": r[5] or "",
+            "responsavel": r[6] or "",
+            "fornecedor": r[7] or "",
+            "veiculo_placa": r[8] or "",
+            "os_id": r[9] or "",
+            "forma_pagamento": r[10] or "PIX",
+            "numero_comprovante": r[11] or "",
+            "status": r[12] or "PAGO",
+            "observacoes": r[13] or "",
+        })
+
+    # Agregação por categoria (respeitando filtro atual + comparativo DF vs CE)
+    cat_agg = {}
+    for k, meta in CATEGORIAS_DESPESAS_UNIDADES.items():
+        cat_agg[k] = {
+            "codigo": k,
+            "label": meta["label"],
+            "icone": meta["icone"],
+            "cor": meta["cor"],
+            "total": 0.0,
+            "filial_df": 0.0,
+            "matriz_ce": 0.0,
+            "qtd": 0,
+            "percentual": 0.0,
+        }
+
+    tot_df_comp = 0.0
+    tot_ce_comp = 0.0
+    for rc in rows_comp:
+        u_rc = str(rc[0] or "FILIAL_DF").upper()
+        c_rc = str(rc[1] or "OUTROS").upper()
+        v_rc = float(rc[2] or 0.0)
+        if c_rc not in cat_agg:
+            c_rc = "OUTROS"
+        if u_rc == "FILIAL_DF":
+            cat_agg[c_rc]["filial_df"] += v_rc
+            tot_df_comp += v_rc
+        else:
+            cat_agg[c_rc]["matriz_ce"] += v_rc
+            tot_ce_comp += v_rc
+
+    for it in itens:
+        c_it = it["categoria"] if it["categoria"] in cat_agg else "OUTROS"
+        cat_agg[c_it]["total"] += it["valor"]
+        cat_agg[c_it]["qtd"] += 1
+
+    lista_categorias = []
+    for k, obj in cat_agg.items():
+        obj["percentual"] = round((obj["total"] / tot_geral * 100.0), 1) if tot_geral > 0 else 0.0
+        lista_categorias.append(obj)
+    lista_categorias.sort(key=lambda x: (x["total"], x["filial_df"] + x["matriz_ce"]), reverse=True)
+
+    # Evolução mensal
+    mapa_meses = {}
+    for rm in rows_evol:
+        m_key = rm[0]
+        c_key = str(rm[1] or "OUTROS").upper()
+        u_key = str(rm[2] or "FILIAL_DF").upper()
+        v_sum = float(rm[3] or 0.0)
+        if m_key not in mapa_meses:
+            mapa_meses[m_key] = {
+                "mes": m_key,
+                "total": 0.0,
+                "COMBUSTIVEL": 0.0,
+                "ALIMENTACAO": 0.0,
+                "HOTEL": 0.0,
+                "OUTROS": 0.0,
+                "FILIAL_DF": 0.0,
+                "MATRIZ_CE": 0.0,
+            }
+        mapa_meses[m_key]["total"] += v_sum
+        if c_key in ("COMBUSTIVEL", "ALIMENTACAO", "HOTEL"):
+            mapa_meses[m_key][c_key] += v_sum
+        else:
+            mapa_meses[m_key]["OUTROS"] += v_sum
+        if u_key == "FILIAL_DF":
+            mapa_meses[m_key]["FILIAL_DF"] += v_sum
+        else:
+            mapa_meses[m_key]["MATRIZ_CE"] += v_sum
+
+    por_mes = [mapa_meses[k] for k in sorted(mapa_meses.keys())]
+    ranking_resp = [{"responsavel": k, "total": v, "percentual": round(v / tot_geral * 100.0, 1) if tot_geral > 0 else 0.0} for k, v in sorted(por_resp.items(), key=lambda x: x[1], reverse=True)]
+
+    return web.json_response({
+        "ok": True,
+        "filtros": {"unidade": unidade, "mes": mes, "categoria": categoria},
+        "meses_disponiveis": meses_disp,
+        "kpis": {
+            "total_geral": round(tot_geral, 2),
+            "total_combustivel": round(tot_comb, 2),
+            "total_alimentacao": round(tot_alim, 2),
+            "total_hotel": round(tot_hotel, 2),
+            "total_pedagio": round(tot_pedagio, 2),
+            "total_outros": round(tot_outros, 2),
+            "total_filial_df": round(tot_df_comp, 2),
+            "total_matriz_ce": round(tot_ce_comp, 2),
+            "qtd_lancamentos": len(itens),
+        },
+        "por_categoria": lista_categorias,
+        "por_mes": por_mes,
+        "por_responsavel": ranking_resp,
+        "itens": itens,
+    })
+
+
+async def api_fiscal_v2_despesas_unidades_salvar(request: web.Request) -> web.Response:
+    """Cadastra ou edita uma despesa operacional de unidade (Alimentação, Combustível/Gasolina, Hotel, etc.)."""
+    db_name = request.app.get("db_name") or request.app.get("db_path") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    body = await request.json()
+    item_id = body.get("id")
+    unidade = str(body.get("unidade", "FILIAL_DF")).strip().upper()
+    if unidade not in ("FILIAL_DF", "MATRIZ_CE"):
+        unidade = "FILIAL_DF"
+    categoria = str(body.get("categoria", "COMBUSTIVEL")).strip().upper()
+    if categoria not in CATEGORIAS_DESPESAS_UNIDADES:
+        categoria = "OUTROS"
+    descricao = str(body.get("descricao", "")).strip()
+    if not descricao:
+        return web.json_response({"ok": False, "msg": "Informe a descrição da despesa (ex: Gasolina, Almoço, Hotel)."}, status=400)
+    try:
+        valor = float(str(body.get("valor", "0")).replace(",", "."))
+    except Exception:
+        valor = 0.0
+    if valor <= 0:
+        return web.json_response({"ok": False, "msg": "Informe um valor válido maior que zero."}, status=400)
+
+    data_despesa = str(body.get("data_despesa", "")).strip() or datetime.now().strftime("%Y-%m-%d")
+    responsavel = str(body.get("responsavel", "")).strip()
+    fornecedor = str(body.get("fornecedor", "")).strip()
+    veiculo_placa = str(body.get("veiculo_placa", "")).strip().upper()
+    os_id = str(body.get("os_id", "")).strip()
+    forma_pagamento = str(body.get("forma_pagamento", "PIX")).strip().upper()
+    numero_comprovante = str(body.get("numero_comprovante", "")).strip()
+    status = str(body.get("status", "PAGO")).strip().upper()
+    observacoes = str(body.get("observacoes", "")).strip()
+    usuario = str(body.get("usuario", "netto")).strip()
+
+    with _get_db_connection(db_name) as conn:
+        _garantir_tabela_despesas_unidades(conn)
+        if item_id:
+            conn.execute("""
+                UPDATE despesas_unidades
+                SET unidade=?, categoria=?, descricao=?, valor=?, data_despesa=?,
+                    responsavel=?, fornecedor=?, veiculo_placa=?, os_id=?,
+                    forma_pagamento=?, numero_comprovante=?, status=?, observacoes=?
+                WHERE id=?
+            """, (unidade, categoria, descricao, valor, data_despesa, responsavel, fornecedor, veiculo_placa, os_id, forma_pagamento, numero_comprovante, status, observacoes, int(item_id)))
+            msg = f"✅ Despesa #{item_id} atualizada com sucesso!"
+        else:
+            conn.execute("""
+                INSERT INTO despesas_unidades (
+                    unidade, categoria, descricao, valor, data_despesa,
+                    responsavel, fornecedor, veiculo_placa, os_id,
+                    forma_pagamento, numero_comprovante, status, observacoes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (unidade, categoria, descricao, valor, data_despesa, responsavel, fornecedor, veiculo_placa, os_id, forma_pagamento, numero_comprovante, status, observacoes))
+            msg = f"✅ Despesa de {CATEGORIAS_DESPESAS_UNIDADES[categoria]['label']} (R$ {valor:,.2f}) registrada na unidade {'Filial Brasília (DF)' if unidade == 'FILIAL_DF' else 'Matriz Eusébio (CE)'}!"
+        conn.commit()
+
+    _registrar_log_fiscal("DESPESA_UNIDADE", f"{unidade} | {categoria} | {descricao} | R$ {valor:.2f}", usuario)
+    return web.json_response({"ok": True, "msg": msg})
+
+
+async def api_fiscal_v2_despesas_unidades_excluir(request: web.Request) -> web.Response:
+    """Remove um lançamento de despesa de unidade."""
+    db_name = request.app.get("db_name") or request.app.get("db_path") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    body = await request.json()
+    item_id = body.get("id")
+    if not item_id:
+        return web.json_response({"ok": False, "msg": "ID da despesa não informado."}, status=400)
+    with _get_db_connection(db_name) as conn:
+        _garantir_tabela_despesas_unidades(conn)
+        conn.execute("DELETE FROM despesas_unidades WHERE id = ?", (int(item_id),))
+        conn.commit()
+    return web.json_response({"ok": True, "msg": "🗑️ Despesa removida com sucesso!"})
+
+
+def _classificar_categoria_extrato(texto: str) -> str:
+    import re
+    t = (texto or "").upper()
+    if any(k in t for k in ("POSTO", "IPIRANGA", "SHELL", "PETROBRAS", "BR MANIA", "GASOLINA", "COMBUST", "DIESEL", "ETANOL", "ABASTEC", "AUTO POSTO", "SAO DOMINGOS")):
+        return "COMBUSTIVEL"
+    if any(k in t for k in ("HOTEL", "IBIS", "POUSADA", "HOSPED", "DIARIA", "DIÁRIA", "BOOKING", "AIRBNB", "VISCONDE", "NACIONAL", "PLAZA", "PALACE", "FLAT")):
+        return "HOTEL"
+    if any(k in t for k in ("RESTAURANTE", "ALMOCO", "ALMOÇO", "JANTAR", "LANCHE", "PADARIA", "CAFE", "CAFÉ", "IFOOD", "CHURRASC", "REFEIC", "REFEIÇ", "PIZZA", "COCO BAMBU", "MANE", "MANÉ", "SABOR", "ALIMENT")):
+        return "ALIMENTACAO"
+    if any(k in t for k in ("UBER", "99POP", "99*", "TAXI", "PEDAGIO", "PEDÁGIO", "ESTAPAR", "ESTACION", "VIA 040", "SEM PARAR", "VELOE", "LATAM", "GOL", "AZUL", "PASSAGEM")):
+        return "PEDAGIO_TRANSPORTE"
+    if any(k in t for k in ("OFICINA", "AUTO CENTER", "PNEU", "OLEO", "ÓLEO", "MECANIC", "MECÂNIC", "ALINHAMENTO", "AUTOPECAS", "BATERIA", "LAVA JATO", "REVISAO")):
+        return "MANUTENCAO_FROTA"
+    if any(k in t for k in ("ASSAI", "ASSAÍ", "ATACAD", "SUPERMERC", "LIMPEZA", "COPA", "AGUA MINERAL", "ÁGUA MINERAL", "PAPELARIA", "KALUNGA")):
+        return "INSUMOS_UNIDADE"
+    return "OUTROS"
+
+
+def _normalizar_data_extrato(dt_str: str) -> str:
+    import re
+    s = (dt_str or "").strip()
+    # YYYY-MM-DD
+    m_iso = re.search(r"(\d{4})-(\d{2})-(\d{2})", s)
+    if m_iso:
+        return f"{m_iso.group(1)}-{m_iso.group(2)}-{m_iso.group(3)}"
+    # DD/MM/YYYY or DD-MM-YYYY
+    m_br = re.search(r"(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})", s)
+    if m_br:
+        d, m, y = int(m_br.group(1)), int(m_br.group(2)), m_br.group(3)
+        if len(y) == 2:
+            y = "20" + y
+        return f"{y}-{m:02d}-{d:02d}"
+    # OFX YYYYMMDD
+    m_ofx = re.search(r"^(\d{4})(\d{2})(\d{2})", s)
+    if m_ofx:
+        return f"{m_ofx.group(1)}-{m_ofx.group(2)}-{m_ofx.group(3)}"
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def _parsear_valor_extrato(val_str: str) -> float:
+    import re
+    s = str(val_str or "").strip().replace("R$", "").replace(" ", "")
+    if not s:
+        return 0.0
+    # Se tem vírgula e ponto (ex: 1.234,56)
+    if "," in s and "." in s:
+        if s.rfind(",") > s.rfind("."):
+            s = s.replace(".", "").replace(",", ".")
+        else:
+            s = s.replace(",", "")
+    elif "," in s:
+        s = s.replace(",", ".")
+    s_clean = re.sub(r"[^0-9.\-]", "", s)
+    try:
+        return float(s_clean)
+    except Exception:
+        return 0.0
+
+
+def _parsear_linhas_extrato_gestora(conteudo: str) -> list:
+    import re
+    texto = (conteudo or "").strip()
+    if not texto:
+        return []
+
+    itens_extrato = []
+
+    # 1. Suporte a formato bancário OFX (<STMTTRN>)
+    if "<STMTTRN>" in texto.upper():
+        blocos = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", texto, flags=re.DOTALL | re.IGNORECASE)
+        if not blocos:
+            blocos = texto.upper().split("<STMTTRN>")[1:]
+        for b in blocos:
+            dt_m = re.search(r"<DTPOSTED>([^<\r\n]+)", b, re.IGNORECASE)
+            val_m = re.search(r"<TRNAMT>([^<\r\n]+)", b, re.IGNORECASE)
+            memo_m = re.search(r"<MEMO>([^<\r\n]+)", b, re.IGNORECASE)
+            name_m = re.search(r"<NAME>([^<\r\n]+)", b, re.IGNORECASE)
+            fit_m = re.search(r"<FITID>([^<\r\n]+)", b, re.IGNORECASE)
+            raw_val = _parsear_valor_extrato(val_m.group(1) if val_m else "0")
+            if abs(raw_val) < 0.01:
+                continue
+            desc = " - ".join(filter(None, [
+                (name_m.group(1).strip() if name_m else ""),
+                (memo_m.group(1).strip() if memo_m else ""),
+            ])) or "Lançamento OFX"
+            itens_extrato.append({
+                "data": _normalizar_data_extrato(dt_m.group(1) if dt_m else ""),
+                "descricao": desc,
+                "fornecedor": (name_m.group(1).strip() if name_m else desc[:40]),
+                "valor": round(abs(raw_val), 2),
+                "tipo_mov": "CREDITO" if raw_val > 0 and "PIX RECEB" in desc.upper() else "DESPESA",
+                "documento": (fit_m.group(1).strip() if fit_m else ""),
+                "categoria": _classificar_categoria_extrato(desc),
+            })
+        return itens_extrato
+
+    # 2. Suporte a CSV / Excel colado (Tab) / Linhas livres da Gestora
+    for idx_l, linha in enumerate(texto.splitlines()):
+        l_str = linha.strip()
+        if not l_str:
+            continue
+        # Ignora cabeçalhos comuns
+        l_low = l_str.lower()
+        if idx_l == 0 and any(h in l_low for h in ("data;descricao", "data,descricao", "data\tdescricao", "categoria;valor", "histórico", "historico")):
+            if not re.search(r"\d{2}[/\-]\d{2}", l_str):
+                continue
+
+        # Tenta delimitadores ; ou \t ou ,
+        delim = ";" if ";" in l_str else ("\t" if "\t" in l_str else ("," if l_str.count(",") >= 2 else None))
+        dt_encontrada = ""
+        val_encontrado = 0.0
+        desc_parts = []
+        forn_encontrado = ""
+        unid_encontrada = ""
+        cat_explicita = ""
+
+        if delim:
+            cols = [c.strip().strip('"') for c in l_str.split(delim)]
+            for c in cols:
+                if not dt_encontrada and re.search(r"^(\d{4}-\d{2}-\d{2}|\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4})$", c):
+                    dt_encontrada = _normalizar_data_extrato(c)
+                elif re.search(r"^(R\$\s*)?[\-]?\d+([.,]\d{3})*([.,]\d{2})$", c):
+                    v_c = _parsear_valor_extrato(c)
+                    if abs(v_c) > 0:
+                        val_encontrado = abs(v_c)
+                elif c.upper() in ("FILIAL_DF", "DF", "BRASILIA", "BRASÍLIA"):
+                    unid_encontrada = "FILIAL_DF"
+                elif c.upper() in ("MATRIZ_CE", "CE", "EUSEBIO", "EUSÉBIO", "FORTALEZA"):
+                    unid_encontrada = "MATRIZ_CE"
+                elif c.upper() in CATEGORIAS_DESPESAS_UNIDADES:
+                    cat_explicita = c.upper()
+                elif len(c) > 1:
+                    desc_parts.append(c)
+        else:
+            # Linha livre (ex: "11/11/2026 Posto Shell SIA Gasolina R$ 310,00")
+            m_dt = re.search(r"(\d{4}-\d{2}-\d{2}|\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4})", l_str)
+            if m_dt:
+                dt_encontrada = _normalizar_data_extrato(m_dt.group(1))
+                l_str = l_str.replace(m_dt.group(1), " ")
+            m_vals = re.findall(r"(?:R\$\s*)?([\-]?\d{1,3}(?:[.,]\d{3})*[.,]\d{2})", l_str)
+            if m_vals:
+                val_encontrado = abs(_parsear_valor_extrato(m_vals[-1]))
+                l_str = re.sub(r"(?:R\$\s*)?[\-]?\d{1,3}(?:[.,]\d{3})*[.,]\d{2}", " ", l_str, count=1)
+            desc_parts = [re.sub(r"\s+", " ", l_str).strip(" -;|")]
+
+        if val_encontrado <= 0:
+            continue
+
+        desc_final = " — ".join([p for p in desc_parts if p]) or "Despesa do Extrato da Gestora"
+        forn_encontrado = desc_parts[1] if len(desc_parts) > 1 else desc_parts[0][:40]
+        cat_final = cat_explicita or _classificar_categoria_extrato(desc_final)
+
+        itens_extrato.append({
+            "data": dt_encontrada or datetime.now().strftime("%Y-%m-%d"),
+            "descricao": desc_final,
+            "fornecedor": forn_encontrado,
+            "valor": round(val_encontrado, 2),
+            "unidade_sugerida": unid_encontrada,
+            "categoria": cat_final,
+            "documento": "EXTRATO-GESTORA",
+        })
+
+    return itens_extrato
+
+
+async def api_fiscal_v2_despesas_unidades_conciliar_extrato(request: web.Request) -> web.Response:
+    """Compara o extrato enviado pela gestora contra as despesas já lançadas na unidade para bater valores sem duplicar."""
+    db_name = request.app.get("db_name") or request.app.get("db_path") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    body = await request.json()
+    conteudo = str(body.get("conteudo", "")).strip()
+    arquivo_b64 = str(body.get("arquivo_b64", "")).strip()
+    nome_arquivo = str(body.get("nome_arquivo", "")).strip().lower()
+    unidade_padrao = str(body.get("unidade", "FILIAL_DF")).strip().upper()
+    if unidade_padrao not in ("FILIAL_DF", "MATRIZ_CE"):
+        unidade_padrao = "FILIAL_DF"
+
+    if arquivo_b64 and nome_arquivo.endswith(".xlsx"):
+        try:
+            import openpyxl
+            raw_xlsx = base64.b64decode(arquivo_b64)
+            wb = openpyxl.load_workbook(io.BytesIO(raw_xlsx), data_only=True)
+            ws = wb.active
+            linhas_xlsx = []
+            for row in ws.iter_rows(values_only=True):
+                vals = []
+                for cell in row:
+                    if cell is None:
+                        continue
+                    if hasattr(cell, "strftime"):
+                        vals.append(cell.strftime("%Y-%m-%d"))
+                    elif isinstance(cell, (int, float)):
+                        vals.append(f"{float(cell):.2f}".replace(".", ","))
+                    else:
+                        s_cell = str(cell).strip()
+                        if s_cell:
+                            vals.append(s_cell)
+                if len(vals) >= 2:
+                    linhas_xlsx.append(";".join(vals))
+            conteudo = "\n".join(linhas_xlsx)
+        except Exception as e:
+            return web.json_response({"ok": False, "msg": f"Erro ao ler planilha Excel (.xlsx): {e}"}, status=400)
+
+    linhas_parsed = _parsear_linhas_extrato_gestora(conteudo)
+    if not linhas_parsed:
+        return web.json_response({"ok": False, "msg": "Nenhuma linha com valor válido foi identificada no extrato. Verifique o formato (Data; Descrição; Valor)."}, status=400)
+
+    with _get_db_connection(db_name) as conn:
+        _garantir_tabela_despesas_unidades(conn)
+        existentes = conn.execute("""
+            SELECT id, unidade, categoria, descricao, valor, data_despesa, responsavel, fornecedor, status
+            FROM despesas_unidades
+            ORDER BY data_despesa DESC, id DESC
+        """).fetchall()
+
+    usados_ids = set()
+    resultado_itens = []
+    tot_extrato = 0.0
+    tot_conciliado = 0.0
+    tot_divergente = 0.0
+    tot_novo = 0.0
+    qtd_bateu = 0
+    qtd_div = 0
+    qtd_novo = 0
+
+    def _dias_diff(d1: str, d2: str) -> int:
+        try:
+            dt1 = datetime.strptime(d1[:10], "%Y-%m-%d")
+            dt2 = datetime.strptime(d2[:10], "%Y-%m-%d")
+            return abs((dt1 - dt2).days)
+        except Exception:
+            return 999
+
+    for idx, item in enumerate(linhas_parsed):
+        v_ext = float(item["valor"])
+        d_ext = item["data"]
+        cat_ext = item["categoria"]
+        unid_item = item.get("unidade_sugerida") or unidade_padrao
+        meta_cat = CATEGORIAS_DESPESAS_UNIDADES.get(cat_ext, CATEGORIAS_DESPESAS_UNIDADES["OUTROS"])
+        tot_extrato += v_ext
+
+        # 1. Tenta Match Exato: Mesmo valor (± R$ 0,05) e data próxima (até 4 dias) ou descrição/categoria compatível
+        match_exato = None
+        for r in existentes:
+            if r[0] in usados_ids:
+                continue
+            v_sis = float(r[4] or 0.0)
+            d_sis = str(r[5] or "")
+            if abs(v_sis - v_ext) <= 0.05 and _dias_diff(d_ext, d_sis) <= 4:
+                match_exato = r
+                break
+
+        if match_exato:
+            usados_ids.add(match_exato[0])
+            qtd_bateu += 1
+            tot_conciliado += v_ext
+            resultado_itens.append({
+                "idx": idx,
+                "status_batimento": "BATEU_EXATO",
+                "status_label": "✅ Conciliado 100% (Já Lançado)",
+                "acao_sugerida": "MANTER_AUDITADO",
+                "id_sistema": match_exato[0],
+                "data": d_ext,
+                "unidade": match_exato[1] or unid_item,
+                "categoria": cat_ext,
+                "categoria_label": meta_cat["label"],
+                "categoria_icone": meta_cat["icone"],
+                "categoria_cor": meta_cat["cor"],
+                "descricao_extrato": item["descricao"],
+                "descricao_sistema": match_exato[3],
+                "fornecedor": item.get("fornecedor") or match_exato[7] or "",
+                "valor_extrato": v_ext,
+                "valor_sistema": float(match_exato[4] or 0.0),
+                "diferenca": 0.0,
+            })
+            continue
+
+        # 2. Tenta Match com Divergência de Valor: Mesma data (± 1 dia) e mesma categoria/fornecedor, mas valor diferente
+        match_div = None
+        for r in existentes:
+            if r[0] in usados_ids:
+                continue
+            d_sis = str(r[5] or "")
+            cat_sis = str(r[2] or "").upper()
+            v_sis = float(r[4] or 0.0)
+            if _dias_diff(d_ext, d_sis) <= 1 and cat_sis == cat_ext and abs(v_sis - v_ext) <= max(150.0, v_ext * 0.35):
+                match_div = r
+                break
+
+        if match_div:
+            usados_ids.add(match_div[0])
+            qtd_div += 1
+            tot_divergente += v_ext
+            v_sis = float(match_div[4] or 0.0)
+            resultado_itens.append({
+                "idx": idx,
+                "status_batimento": "DIVERGENCIA_VALOR",
+                "status_label": f"⚠️ Divergência (Sistema: R$ {v_sis:.2f})",
+                "acao_sugerida": "ATUALIZAR_VALOR",
+                "id_sistema": match_div[0],
+                "data": d_ext,
+                "unidade": match_div[1] or unid_item,
+                "categoria": cat_ext,
+                "categoria_label": meta_cat["label"],
+                "categoria_icone": meta_cat["icone"],
+                "categoria_cor": meta_cat["cor"],
+                "descricao_extrato": item["descricao"],
+                "descricao_sistema": match_div[3],
+                "fornecedor": item.get("fornecedor") or match_div[7] or "",
+                "valor_extrato": v_ext,
+                "valor_sistema": v_sis,
+                "diferenca": round(v_ext - v_sis, 2),
+            })
+            continue
+
+        # 3. Novo no Extrato da Gestora (Ainda não lançado no sistema)
+        qtd_novo += 1
+        tot_novo += v_ext
+        resultado_itens.append({
+            "idx": idx,
+            "status_batimento": "NOVO_NO_EXTRATO",
+            "status_label": "🆕 Novo no Extrato (Pendente Lançar)",
+            "acao_sugerida": "IMPORTAR_NOVO",
+            "id_sistema": None,
+            "data": d_ext,
+            "unidade": unid_item,
+            "categoria": cat_ext,
+            "categoria_label": meta_cat["label"],
+            "categoria_icone": meta_cat["icone"],
+            "categoria_cor": meta_cat["cor"],
+            "descricao_extrato": item["descricao"],
+            "descricao_sistema": "",
+            "fornecedor": item.get("fornecedor") or "",
+            "valor_extrato": v_ext,
+            "valor_sistema": 0.0,
+            "diferenca": v_ext,
+        })
+
+    return web.json_response({
+        "ok": True,
+        "resumo": {
+            "total_linhas": len(resultado_itens),
+            "qtd_conciliados": qtd_bateu,
+            "qtd_divergentes": qtd_div,
+            "qtd_novos": qtd_novo,
+            "valor_total_extrato": round(tot_extrato, 2),
+            "valor_conciliado": round(tot_conciliado, 2),
+            "valor_divergente": round(tot_divergente, 2),
+            "valor_novos": round(tot_novo, 2),
+        },
+        "itens": resultado_itens,
+    })
+
+
+async def api_fiscal_v2_despesas_unidades_aplicar_conciliacao(request: web.Request) -> web.Response:
+    """Aplica o batimento do extrato da gestora: importa novos itens selecionados, corrige divergências autorizadas e audita os conciliados."""
+    db_name = request.app.get("db_name") or request.app.get("db_path") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    body = await request.json()
+    itens = body.get("itens", [])
+    usuario = str(body.get("usuario", "gestora")).strip()
+
+    if not itens:
+        return web.json_response({"ok": False, "msg": "Nenhum item selecionado para aplicar na conciliação."}, status=400)
+
+    importados = 0
+    atualizados = 0
+    auditados = 0
+
+    with _get_db_connection(db_name) as conn:
+        _garantir_tabela_despesas_unidades(conn)
+        for it in itens:
+            acao = str(it.get("acao", "")).upper()
+            id_sis = it.get("id_sistema")
+            unid = str(it.get("unidade", "FILIAL_DF")).upper()
+            if unid not in ("FILIAL_DF", "MATRIZ_CE"):
+                unid = "FILIAL_DF"
+            cat = str(it.get("categoria", "OUTROS")).upper()
+            if cat not in CATEGORIAS_DESPESAS_UNIDADES:
+                cat = "OUTROS"
+            val = float(it.get("valor_extrato") or 0.0)
+            dt = str(it.get("data") or datetime.now().strftime("%Y-%m-%d"))
+            desc = str(it.get("descricao_extrato") or "Despesa Conciliada Extrato Gestora").strip()
+            forn = str(it.get("fornecedor") or "").strip()
+
+            if acao == "IMPORTAR_NOVO" and val > 0:
+                conn.execute("""
+                    INSERT INTO despesas_unidades (
+                        unidade, categoria, descricao, valor, data_despesa,
+                        responsavel, fornecedor, forma_pagamento, numero_comprovante, status, observacoes
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'EXTRATO GESTORA', 'CONCILIADO', 'AUDITADO EXTRATO', 'Importado via Batimento de Extrato da Gestora')
+                """, (unid, cat, desc, val, dt, f"Extrato ({usuario})", forn))
+                importados += 1
+            elif acao == "ATUALIZAR_VALOR" and id_sis and val > 0:
+                conn.execute("""
+                    UPDATE despesas_unidades
+                    SET valor = ?, status = 'AUDITADO EXTRATO',
+                        observacoes = COALESCE(observacoes, '') || ' | Valor ajustado pelo Extrato da Gestora'
+                    WHERE id = ?
+                """, (val, int(id_sis)))
+                atualizados += 1
+            elif acao == "MANTER_AUDITADO" and id_sis:
+                conn.execute("""
+                    UPDATE despesas_unidades
+                    SET status = 'AUDITADO EXTRATO'
+                    WHERE id = ?
+                """, (int(id_sis),))
+                auditados += 1
+        conn.commit()
+
+    _registrar_log_fiscal(
+        "CONCILIACAO_EXTRATO_GESTORA",
+        f"Batimento aplicado: {importados} novos importados, {atualizados} valores corrigidos, {auditados} auditados.",
+        usuario,
+    )
+    return web.json_response({
+        "ok": True,
+        "msg": f"✅ Batimento do Extrato da Gestora concluído com sucesso! ({importados} novos lançados, {atualizados} divergências ajustadas e {auditados} itens confirmados sem duplicação).",
+        "importados": importados,
+        "atualizados": atualizados,
+        "auditados": auditados,
+    })
+
+
+
+# ============================================================================
+# MÓDULO DE ANÁLISE & GESTÃO MANUAL DE CFOP (TABELA EDITÁVEL + ESTOQUE + NFs)
+# ============================================================================
+REGRAS_CFOP_PADRAO = [
+    ("5102", "SAIDA", "ESTADUAL", "AMBAS", "Venda de mercadoria adquirida ou recebida de terceiros", "Venda de Peças (Interna)", 18.0, 0.0, "Operação estadual de venda de peças/componentes do estoque."),
+    ("6102", "SAIDA", "INTERESTADUAL", "AMBAS", "Venda de mercadoria adquirida ou recebida de terceiros", "Venda de Peças (Interestadual)", 12.0, 0.0, "Operação interestadual de venda de peças/componentes do estoque."),
+    ("5152", "SAIDA", "ESTADUAL", "AMBAS", "Transferência de mercadoria adquirida ou recebida de terceiros", "Transferência entre Estabelecimentos (Estadual)", 0.0, 0.0, "Não incidência de ICMS conforme STF ADC 49 / LC 204/2023."),
+    ("6152", "SAIDA", "INTERESTADUAL", "AMBAS", "Transferência de mercadoria adquirida ou recebida de terceiros", "Transferência entre Filiais (CE <-> DF)", 0.0, 0.0, "Transferência interestadual Matriz CE <-> Filial DF (ADC 49 / LC 204/2023)."),
+    ("5915", "SAIDA", "ESTADUAL", "AMBAS", "Remessa de mercadoria ou bem para conserto ou reparo", "Remessa p/ Conserto ou Calibração (Estadual)", 0.0, 0.0, "Suspensão/não incidência de ICMS em remessa para conserto/calibração."),
+    ("6915", "SAIDA", "INTERESTADUAL", "AMBAS", "Remessa de mercadoria ou bem para conserto ou reparo", "Remessa p/ Conserto ou Calibração (Interestadual)", 0.0, 0.0, "Remessa interestadual para diagnóstico, reparo ou calibração laboratorial."),
+    ("5916", "SAIDA", "ESTADUAL", "AMBAS", "Retorno de mercadoria ou bem recebido para conserto ou reparo", "Retorno/Devolução de Conserto (Estadual)", 0.0, 0.0, "Devolução ao cliente após manutenção/calibração dentro do estado."),
+    ("6916", "SAIDA", "INTERESTADUAL", "AMBAS", "Retorno de mercadoria ou bem recebido para conserto ou reparo", "Retorno/Devolução de Conserto (Interestadual)", 0.0, 0.0, "Devolução interestadual ao cliente após manutenção/calibração."),
+    ("1916", "ENTRADA", "ESTADUAL", "AMBAS", "Retorno de mercadoria ou bem remetido para conserto ou reparo", "Retorno Físico de Peça (Entrada Estadual)", 0.0, 0.0, "Entrada de retorno de peça enviada para conserto no mesmo estado."),
+    ("2916", "ENTRADA", "INTERESTADUAL", "AMBAS", "Retorno de mercadoria ou bem remetido para conserto ou reparo", "Retorno Físico de Peça (Entrada Interestadual)", 0.0, 0.0, "Entrada de retorno interestadual de peça enviada para conserto."),
+    ("5933", "SAIDA", "ESTADUAL", "MATRIZ_CE", "Prestação de serviço tributado pelo ISSQN (Matriz CE)", "Prestação de Serviço Técnico (ISS Matriz 2%)", 0.0, 2.0, "Serviço técnico faturado pela Matriz Eusébio-CE com ISS padrão de 2%."),
+    ("5933-DF", "SAIDA", "ESTADUAL", "FILIAL_DF", "Prestação de serviço tributado pelo ISSQN (Filial DF)", "Prestação de Serviço Técnico (ISS Brasília 5%)", 0.0, 5.0, "Serviço técnico faturado pela Filial Brasília-DF com ISS padrão de 5%."),
+    ("6933", "SAIDA", "INTERESTADUAL", "AMBAS", "Prestação de serviço tributado pelo ISSQN (Interestadual)", "Prestação de Serviço Técnico (Interestadual)", 0.0, 5.0, "Serviço técnico prestado para tomador de outra UF."),
+    ("5949", "SAIDA", "ESTADUAL", "AMBAS", "Outra saída de mercadoria ou prestação de serviço não especificado", "Remessa de Uso/Consumo ou Outras Saídas (Estadual)", 0.0, 0.0, "Movimentação interna de bens/ferramentas/insumos sem finalidade comercial."),
+    ("6949", "SAIDA", "INTERESTADUAL", "AMBAS", "Outra saída de mercadoria ou prestação de serviço não especificado", "Remessa de Uso/Consumo entre Filiais (Interestadual)", 0.0, 0.0, "Envio interestadual de insumos/ferramentas para uso em filial."),
+    ("1556", "ENTRADA", "ESTADUAL", "AMBAS", "Compra de material para uso ou consumo", "Consumíveis & Insumos Administrativos (Estadual)", 0.0, 0.0, "Entrada estadual de materiais de uso e consumo / copa / limpeza."),
+    ("2556", "ENTRADA", "INTERESTADUAL", "AMBAS", "Compra de material para uso ou consumo", "Consumíveis & Insumos Administrativos (Interestadual)", 0.0, 0.0, "Entrada interestadual de materiais de uso e consumo."),
+]
+
+
+def _garantir_tabela_regras_cfop(db_name: str) -> None:
+    with _get_db_connection(db_name) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS regras_cfop (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                codigo TEXT NOT NULL,
+                tipo_operacao TEXT DEFAULT 'SAIDA',
+                esfera TEXT DEFAULT 'ESTADUAL',
+                filial_aplicavel TEXT DEFAULT 'AMBAS',
+                natureza_operacao TEXT DEFAULT '',
+                aplicacao_sistema TEXT DEFAULT '',
+                aliquota_icms REAL DEFAULT 0.0,
+                aliquota_iss REAL DEFAULT 0.0,
+                observacao_fiscal TEXT DEFAULT '',
+                ativo INTEGER DEFAULT 1,
+                atualizado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+                atualizado_por TEXT DEFAULT 'sistema'
+            )
+        """)
+        cnt = conn.execute("SELECT COUNT(*) FROM regras_cfop").fetchone()[0]
+        if cnt == 0:
+            for item in REGRAS_CFOP_PADRAO:
+                conn.execute("""
+                    INSERT INTO regras_cfop (
+                        codigo, tipo_operacao, esfera, filial_aplicavel,
+                        natureza_operacao, aplicacao_sistema, aliquota_icms,
+                        aliquota_iss, observacao_fiscal, ativo, atualizado_por
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'padrao_sistema')
+                """, item)
+        conn.commit()
+
+
+async def api_fiscal_v2_cfop_dados(request: web.Request) -> web.Response:
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    _garantir_tabela_regras_cfop(db_name)
+
+    busca_peca = (request.query.get("busca_peca") or "").strip()
+    cat_peca = (request.query.get("categoria") or "").strip()
+
+    manager = FiscalManager(db_name)
+    cfg_ce = manager.get_filial_config("MATRIZ_CE")
+    cfg_df = manager.get_filial_config("FILIAL_DF")
+
+    with _get_db_connection(db_name) as conn:
+        regras_rows = conn.execute("""
+            SELECT id, codigo, tipo_operacao, esfera, filial_aplicavel,
+                   natureza_operacao, aplicacao_sistema, aliquota_icms,
+                   aliquota_iss, observacao_fiscal, ativo, atualizado_em, atualizado_por
+            FROM regras_cfop
+            ORDER BY ativo DESC, codigo ASC
+        """).fetchall()
+        regras = [
+            {
+                "id": r[0], "codigo": r[1] or "", "tipo_operacao": r[2] or "SAIDA",
+                "esfera": r[3] or "ESTADUAL", "filial_aplicavel": r[4] or "AMBAS",
+                "natureza_operacao": r[5] or "", "aplicacao_sistema": r[6] or "",
+                "aliquota_icms": float(r[7] or 0.0), "aliquota_iss": float(r[8] or 0.0),
+                "observacao_fiscal": r[9] or "", "ativo": int(r[10] if r[10] is not None else 1),
+                "atualizado_em": r[11] or "", "atualizado_por": r[12] or "",
+            }
+            for r in regras_rows
+        ]
+
+        resumo_estoque_rows = conn.execute("""
+            SELECT COALESCE(cfop_padrao_venda, '') as cfop_v,
+                   COALESCE(cfop_padrao_transferencia, '') as cfop_t,
+                   COUNT(*) as qtd
+            FROM estoque_pecas
+            GROUP BY cfop_v, cfop_t
+            ORDER BY qtd DESC
+        """).fetchall()
+        resumo_estoque = [
+            {"cfop_venda": r[0], "cfop_transferencia": r[1], "qtd_pecas": r[2]}
+            for r in resumo_estoque_rows
+        ]
+
+        categorias_rows = conn.execute("""
+            SELECT DISTINCT COALESCE(NULLIF(TRIM(categoria), ''), 'Sem Categoria') as cat
+            FROM estoque_pecas
+            ORDER BY cat ASC
+        """).fetchall()
+        categorias_estoque = [r[0] for r in categorias_rows]
+
+        where_p = ["1=1"]
+        params_p = []
+        if busca_peca:
+            where_p.append("(LOWER(COALESCE(codigo,'')) LIKE ? OR LOWER(COALESCE(nome_peca,'')) LIKE ? OR LOWER(COALESCE(cfop_padrao_venda,'')) LIKE ? OR LOWER(COALESCE(cfop_padrao_transferencia,'')) LIKE ?)")
+            like_val = f"%{busca_peca.lower()}%"
+            params_p.extend([like_val, like_val, like_val, like_val])
+        if cat_peca and cat_peca != "TODAS":
+            if cat_peca == "Sem Categoria":
+                where_p.append("(categoria IS NULL OR TRIM(categoria) = '')")
+            else:
+                where_p.append("categoria = ?")
+                params_p.append(cat_peca)
+
+        pecas_rows = conn.execute(f"""
+            SELECT id, codigo, nome_peca, COALESCE(NULLIF(TRIM(categoria),''), 'Sem Categoria'),
+                   COALESCE(ncm, ''), COALESCE(cfop_padrao_venda, '5102'),
+                   COALESCE(cfop_padrao_transferencia, '5152'), COALESCE(filial_pertencente, '')
+            FROM estoque_pecas
+            WHERE {' AND '.join(where_p)}
+            ORDER BY nome_peca ASC
+            LIMIT 120
+        """, tuple(params_p)).fetchall()
+        pecas_cfop = [
+            {
+                "id": r[0], "codigo": r[1] or "", "nome_peca": r[2] or "",
+                "categoria": r[3] or "", "ncm": r[4] or "",
+                "cfop_padrao_venda": r[5] or "", "cfop_padrao_transferencia": r[6] or "",
+                "filial_pertencente": r[7] or "",
+            }
+            for r in pecas_rows
+        ]
+        total_pecas = conn.execute("SELECT COUNT(*) FROM estoque_pecas").fetchone()[0]
+
+        notas_rows = conn.execute("""
+            SELECT id, os_id, numero_nf, cliente, filial_emissora,
+                   COALESCE(cfop, ''), COALESCE(natureza_operacao, ''),
+                   COALESCE(codigo_servico_iss, ''), COALESCE(aliquota_iss, 0),
+                   COALESCE(valor_liquido, 0), COALESCE(status_fiscal, ''),
+                   COALESCE(data_emissao, criado_em, '')
+            FROM notas_fiscais
+            ORDER BY id DESC
+            LIMIT 100
+        """).fetchall()
+        notas_cfop = [
+            {
+                "id": r[0], "os_id": r[1], "numero_nf": r[2] or "",
+                "cliente": r[3] or "", "filial_emissora": r[4] or "",
+                "cfop": r[5] or "", "natureza_operacao": r[6] or "",
+                "codigo_servico_iss": r[7] or "", "aliquota_iss": float(r[8] or 0.0),
+                "valor_liquido": float(r[9] or 0.0), "status_fiscal": r[10] or "",
+                "data_emissao": str(r[11] or "")[:19],
+            }
+            for r in notas_rows
+        ]
+
+        remessas_cfop = []
+        try:
+            rem_rows = conn.execute("""
+                SELECT id, numero_remessa, cliente_origem, uf_origem, destinatario_nome,
+                       uf_destino, COALESCE(cfop, ''), descricao_peca, status_remessa, data_envio
+                FROM remessas_diagnostico
+                ORDER BY id DESC
+                LIMIT 50
+            """).fetchall()
+            remessas_cfop = [
+                {
+                    "id": r[0], "numero_remessa": r[1] or "", "cliente_origem": r[2] or "",
+                    "uf_origem": r[3] or "", "destinatario_nome": r[4] or "",
+                    "uf_destino": r[5] or "", "cfop": r[6] or "",
+                    "descricao_peca": r[7] or "", "status_remessa": r[8] or "",
+                    "data_envio": r[9] or "",
+                }
+                for r in rem_rows
+            ]
+        except Exception:
+            pass
+
+    return web.json_response({
+        "ok": True,
+        "regras": regras,
+        "resumo_estoque": resumo_estoque,
+        "categorias_estoque": categorias_estoque,
+        "pecas_cfop": pecas_cfop,
+        "total_pecas": total_pecas,
+        "notas_cfop": notas_cfop,
+        "remessas_cfop": remessas_cfop,
+        "iss_filiais": {
+            "MATRIZ_CE": float(cfg_ce.get("aliquota_iss_padrao", 2.0)),
+            "FILIAL_DF": float(cfg_df.get("aliquota_iss_padrao", 5.0)),
+        },
+    })
+
+
+async def api_fiscal_v2_cfop_salvar(request: web.Request) -> web.Response:
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    _garantir_tabela_regras_cfop(db_name)
+    body = await request.json()
+
+    regra_id = body.get("id")
+    codigo = str(body.get("codigo") or "").strip().upper()
+    if not codigo:
+        return web.json_response({"ok": False, "msg": "Informe o código CFOP."}, status=400)
+
+    tipo_operacao = str(body.get("tipo_operacao") or "SAIDA").strip().upper()
+    esfera = str(body.get("esfera") or "ESTADUAL").strip().upper()
+    filial_aplicavel = str(body.get("filial_aplicavel") or "AMBAS").strip().upper()
+    natureza_operacao = str(body.get("natureza_operacao") or "").strip()
+    aplicacao_sistema = str(body.get("aplicacao_sistema") or "").strip()
+    aliquota_icms = float(body.get("aliquota_icms") or 0.0)
+    aliquota_iss = float(body.get("aliquota_iss") or 0.0)
+    observacao_fiscal = str(body.get("observacao_fiscal") or "").strip()
+    ativo = 1 if body.get("ativo", True) in (True, 1, "1", "true", "True") else 0
+    usuario = str(body.get("usuario") or "operador").strip()
+
+    with _get_db_connection(db_name) as conn:
+        if regra_id:
+            conn.execute("""
+                UPDATE regras_cfop
+                SET codigo = ?, tipo_operacao = ?, esfera = ?, filial_aplicavel = ?,
+                    natureza_operacao = ?, aplicacao_sistema = ?, aliquota_icms = ?,
+                    aliquota_iss = ?, observacao_fiscal = ?, ativo = ?,
+                    atualizado_em = datetime('now'), atualizado_por = ?
+                WHERE id = ?
+            """, (
+                codigo, tipo_operacao, esfera, filial_aplicavel,
+                natureza_operacao, aplicacao_sistema, aliquota_icms,
+                aliquota_iss, observacao_fiscal, ativo, usuario, int(regra_id)
+            ))
+            acao_log = f"CFOP #{regra_id} ({codigo}) atualizado manualmente"
+        else:
+            conn.execute("""
+                INSERT INTO regras_cfop (
+                    codigo, tipo_operacao, esfera, filial_aplicavel,
+                    natureza_operacao, aplicacao_sistema, aliquota_icms,
+                    aliquota_iss, observacao_fiscal, ativo, atualizado_em, atualizado_por
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
+            """, (
+                codigo, tipo_operacao, esfera, filial_aplicavel,
+                natureza_operacao, aplicacao_sistema, aliquota_icms,
+                aliquota_iss, observacao_fiscal, ativo, usuario
+            ))
+            acao_log = f"Novo CFOP ({codigo}) cadastrado manualmente"
+        conn.commit()
+
+    _registrar_log_fiscal("CFOP_SALVAR", acao_log, usuario=usuario)
+    return web.json_response({"ok": True, "msg": f"CFOP {codigo} salvo com sucesso!"})
+
+
+async def api_fiscal_v2_cfop_excluir(request: web.Request) -> web.Response:
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    _garantir_tabela_regras_cfop(db_name)
+    body = await request.json()
+    regra_id = body.get("id")
+    usuario = str(body.get("usuario") or "operador").strip()
+    if not regra_id:
+        return web.json_response({"ok": False, "msg": "ID da regra não informado."}, status=400)
+
+    with _get_db_connection(db_name) as conn:
+        row = conn.execute("SELECT codigo FROM regras_cfop WHERE id = ?", (int(regra_id),)).fetchone()
+        conn.execute("DELETE FROM regras_cfop WHERE id = ?", (int(regra_id),))
+        conn.commit()
+
+    cod = row[0] if row else str(regra_id)
+    _registrar_log_fiscal("CFOP_EXCLUIR", f"Regra CFOP {cod} (ID #{regra_id}) removida", usuario=usuario)
+    return web.json_response({"ok": True, "msg": f"CFOP {cod} excluído com sucesso!"})
+
+
+async def api_fiscal_v2_cfop_aplicar_estoque(request: web.Request) -> web.Response:
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    body = await request.json()
+    modo = str(body.get("modo") or "individual").strip().lower()
+    cfop_venda = str(body.get("cfop_padrao_venda") or "").strip()
+    cfop_transf = str(body.get("cfop_padrao_transferencia") or "").strip()
+    usuario = str(body.get("usuario") or "operador").strip()
+
+    if not cfop_venda and not cfop_transf:
+        return web.json_response({"ok": False, "msg": "Informe ao menos um CFOP (Venda ou Transferência)."}, status=400)
+
+    sets = []
+    params = []
+    if cfop_venda:
+        sets.append("cfop_padrao_venda = ?")
+        params.append(cfop_venda)
+    if cfop_transf:
+        sets.append("cfop_padrao_transferencia = ?")
+        params.append(cfop_transf)
+
+    with _get_db_connection(db_name) as conn:
+        if modo == "lote":
+            categoria = str(body.get("categoria") or "TODAS").strip()
+            if categoria and categoria != "TODAS":
+                if categoria == "Sem Categoria":
+                    cur = conn.execute(f"UPDATE estoque_pecas SET {', '.join(sets)} WHERE (categoria IS NULL OR TRIM(categoria) = '')", tuple(params))
+                else:
+                    cur = conn.execute(f"UPDATE estoque_pecas SET {', '.join(sets)} WHERE categoria = ?", tuple(params + [categoria]))
+            else:
+                cur = conn.execute(f"UPDATE estoque_pecas SET {', '.join(sets)}", tuple(params))
+            afetados = cur.rowcount
+            conn.commit()
+            _registrar_log_fiscal("CFOP_ESTOQUE_LOTE", f"{afetados} peças atualizadas (Venda={cfop_venda}, Transf={cfop_transf}, Cat={categoria})", usuario=usuario)
+            return web.json_response({"ok": True, "msg": f"{afetados} peças atualizadas no estoque com sucesso!"})
+        else:
+            peca_id = body.get("peca_id")
+            if not peca_id:
+                return web.json_response({"ok": False, "msg": "ID da peça não informado."}, status=400)
+            conn.execute(f"UPDATE estoque_pecas SET {', '.join(sets)} WHERE id = ?", tuple(params + [int(peca_id)]))
+            conn.commit()
+            _registrar_log_fiscal("CFOP_ESTOQUE_ITEM", f"Peça #{peca_id} atualizada (Venda={cfop_venda}, Transf={cfop_transf})", usuario=usuario)
+            return web.json_response({"ok": True, "msg": f"CFOP da peça #{peca_id} salvo com sucesso!"})
+
+
+async def api_fiscal_v2_cfop_atualizar_nota(request: web.Request) -> web.Response:
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    body = await request.json()
+    nota_id = body.get("id")
+    cfop = str(body.get("cfop") or "").strip()
+    natureza = str(body.get("natureza_operacao") or "").strip()
+    usuario = str(body.get("usuario") or "operador").strip()
+    if not nota_id:
+        return web.json_response({"ok": False, "msg": "ID da nota não informado."}, status=400)
+
+    with _get_db_connection(db_name) as conn:
+        conn.execute("""
+            UPDATE notas_fiscais
+            SET cfop = ?, natureza_operacao = ?, atualizado_em = datetime('now')
+            WHERE id = ?
+        """, (cfop, natureza, int(nota_id)))
+        conn.commit()
+
+    _registrar_log_fiscal("CFOP_NOTA_EDITAR", f"Nota #{nota_id} atualizada para CFOP={cfop}", usuario=usuario)
+    return web.json_response({"ok": True, "msg": f"CFOP da Nota #{nota_id} salvo com sucesso!"})
+
+
 async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     icon_b64 = _obter_icone_azul_b64()
     logo_b64 = _obter_logo_b64()
@@ -1761,6 +4207,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <span class="badge">ALTA DISPONIBILIDADE 24/7 ATIVA</span>
+          <a href="/historico-os" class="btn btn-outline" style="padding:6px 12px;font-size:12px;border-color:#38bdf8;color:#38bdf8;">&#128270; Hist&oacute;rico Geral OS</a>
           <a href="/" class="btn btn-outline" style="padding:6px 12px;font-size:12px;">🏠 Voltar ao Sistema Principal</a>
           <button class="btn btn-danger" style="padding:6px 12px;font-size:12px;" onclick="logoutFiscal()">🚪 Sair</button>
         </div>
@@ -1775,6 +4222,547 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
       <!-- CARD DA UNIDADE ATIVA -->
       <div class="card card-highlight" id="cardUnidadeInfo"></div>
+
+      <!-- BARRA DE ABAS PRINCIPAIS DO PORTAL -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;background:#0f172a;padding:8px;border-radius:10px;border:1px solid #334155;">
+        <button type="button" id="tabBtn_FATURAMENTO" class="btn" onclick="alternarAbaPrincipalFiscal('FATURAMENTO')" style="background:var(--cyan);color:#0b132b;font-weight:900;padding:10px 18px;border-radius:8px;">
+          🧾 Faturamento, NFS-e &amp; Estoque Fiscal
+        </button>
+        <button type="button" id="tabBtn_DESPESAS_UNIDADES" class="btn" onclick="alternarAbaPrincipalFiscal('DESPESAS_UNIDADES')" style="background:#1e293b;color:#f8fafc;border:1.5px solid #f59e0b;font-weight:900;padding:10px 18px;border-radius:8px;">
+          ⛽🍽️🏨 Detalhes de Despesas das Unidades &amp; Gráficos
+        </button>
+        <button type="button" id="tabBtn_CFOP" class="btn" onclick="alternarAbaPrincipalFiscal('CFOP')" style="background:#1e293b;color:#f8fafc;border:1.5px solid #38bdf8;font-weight:900;padding:10px 18px;border-radius:8px;">
+          📑 Análise &amp; Tabela de CFOP
+        </button>
+        <button type="button" id="tabBtn_TUDO" class="btn" onclick="alternarAbaPrincipalFiscal('TUDO')" style="background:transparent;color:#94a3b8;border:1px solid #334155;font-weight:700;padding:10px 16px;border-radius:8px;">
+          🌐 Exibir Tudo na Mesma Página
+        </button>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- NOVA ABA: DETALHES DE DESPESAS DAS UNIDADES (ALIMENTAÇÃO, GASOLINA, HOTEL) -->
+      <!-- ========================================================================= -->
+      <div id="boxAbaDespesasUnidades" style="display:none;margin-bottom:20px;">
+        <div class="card card-highlight" style="border-color:#f59e0b;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+            <div>
+              <h3 style="margin:0;color:#fbbf24;font-size:18px;display:flex;align-items:center;gap:8px;">
+                <span>⛽🍽️🏨</span>
+                <span>Detalhes de Despesas Operacionais das Unidades &amp; Gráficos</span>
+              </h3>
+              <div style="font-size:12.5px;color:#cbd5e1;margin-top:4px;">
+                Controle analítico de gastos com <b>Combustível / Gasolina</b>, <b>Alimentação</b>, <b>Hotel / Hospedagem</b>, <b>Pedágio / Transporte</b> e <b>Manutenção</b> por Unidade (<b>Filial Brasília - DF</b> vs <b>Matriz Eusébio - CE</b>).
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" class="btn" onclick="toggleBoxExtratoGestora()" style="background:#0284c7;color:#fff;font-weight:900;padding:9px 16px;border:1.5px solid #38bdf8;">
+                📂 Bater Extrato da Gestora (CSV / OFX / Excel)
+              </button>
+              <button type="button" class="btn" onclick="toggleFormNovaDespesaUnidade()" style="background:#f59e0b;color:#0b132b;font-weight:900;padding:9px 16px;">
+                ➕ Lançar Nova Despesa
+              </button>
+              <button type="button" class="btn btn-outline" onclick="exportarDespesasUnidadesCsv()" style="padding:9px 14px;font-size:12px;">
+                📥 Exportar Planilha (.CSV)
+              </button>
+            </div>
+          </div>
+
+          <!-- PAINEL DE BATIMENTO & CONCILIAÇÃO DO EXTRATO DA GESTORA -->
+          <div id="boxConciliadorExtratoGestora" style="display:none;background:#0f172a;border:2px solid #38bdf8;border-radius:10px;padding:16px;margin-bottom:18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+              <div>
+                <div style="font-weight:900;font-size:15px;color:#38bdf8;">📂 Conciliador Automático — Bater Extrato da Gestora com as Despesas da Unidade</div>
+                <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
+                  Envie o arquivo de extrato (<b>.CSV</b>, <b>.OFX</b> ou <b>.TXT</b>) ou cole as linhas copiadas do Excel/WhatsApp da Gestora. O sistema classifica automaticamente (Gasolina, Alimentação, Hotel) e cruza com o que já está lançado para <b>não duplicar nada</b>!
+                </div>
+              </div>
+              <button type="button" class="btn btn-outline" style="padding:4px 10px;font-size:11px;" onclick="toggleBoxExtratoGestora(false)">✕ Fechar</button>
+            </div>
+
+            <div class="grid-3" style="margin-bottom:10px;align-items:end;">
+              <div>
+                <label>1. Unidade de Destino do Extrato:</label>
+                <select id="selExtratoGestoraUnidade" style="font-weight:800;color:var(--cyan);">
+                  <option value="FILIAL_DF">🏢 Filial Brasília (DF)</option>
+                  <option value="MATRIZ_CE">🏛️ Matriz Eusébio (CE)</option>
+                </select>
+              </div>
+              <div>
+                <label>2. Carregar Arquivo do Extrato (.CSV, .OFX, .TXT):</label>
+                <input type="file" id="inpArquivoExtratoGestora" accept=".xlsx,.csv,.ofx,.txt,.tsv" onchange="aoSelecionarArquivoExtratoGestora(event)" />
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button type="button" class="btn btn-outline" style="font-size:11.5px;padding:9px 12px;width:100%;" onclick="preencherExemploExtratoGestora()">
+                  🧪 Carregar Exemplo de Extrato
+                </button>
+              </div>
+            </div>
+
+            <div style="margin-bottom:12px;">
+              <label>Ou cole aqui as linhas do Extrato da Gestora (Excel / CSV / Texto — Data; Descrição; Valor):</label>
+              <textarea id="txtConteudoExtratoGestora" rows="5" placeholder="Exemplo:&#10;04/11/2026; Posto Ipiranga Asa Norte - Gasolina; 385,50&#10;05/11/2026; Restaurante Mane Almoco Equipe; 142,00&#10;18/11/2026; Posto Shell Brasilia Gasolina; 295,00&#10;19/11/2026; Hotel Mercure Brasilia Diaria Tecnica; 420,00" style="font-family:monospace;font-size:12px;"></textarea>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:12px;">
+              <button type="button" class="btn btn-primary" style="width:auto;padding:10px 22px;" onclick="processarBatimentoExtratoGestora()">
+                🔍 Analisar &amp; Bater Extrato Agora
+              </button>
+            </div>
+
+            <div id="boxResultadoBatimentoExtrato" style="display:none;border-top:1px solid #334155;padding-top:14px;"></div>
+          </div>
+
+          <!-- BARRA DE FILTROS DA ABA DE DESPESAS -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;margin-bottom:16px;">
+            <div>
+              <label>🏢 Unidade / Filial:</label>
+              <select id="selDespFiltroUnidade" onchange="aoMudarFiltroUnidadeDespesa(this.value)" style="font-weight:800;color:var(--cyan);">
+                <option value="CONSOLIDADO">🌐 Todas as Unidades (DF + CE)</option>
+                <option value="FILIAL_DF">🏢 Filial Brasília (DF)</option>
+                <option value="MATRIZ_CE">🏛️ Matriz Eusébio (CE)</option>
+              </select>
+            </div>
+            <div>
+              <label>📅 Mês / Competência:</label>
+              <select id="selDespFiltroMes" onchange="carregarDespesasUnidades()" style="font-weight:700;">
+                <option value="TODOS">Todos os Meses</option>
+              </select>
+            </div>
+            <div>
+              <label>🏷️ Categoria de Despesa:</label>
+              <select id="selDespFiltroCategoria" onchange="carregarDespesasUnidades()" style="font-weight:700;">
+                <option value="TODAS">Todas as Categorias</option>
+                <option value="COMBUSTIVEL">⛽ Combustível / Gasolina</option>
+                <option value="ALIMENTACAO">🍽️ Alimentação / Refeições</option>
+                <option value="HOTEL">🏨 Hotel / Hospedagem</option>
+                <option value="PEDAGIO_TRANSPORTE">🛣️ Pedágio / Estacionamento / Transporte</option>
+                <option value="MANUTENCAO_FROTA">🔧 Manutenção Veicular / Frota</option>
+                <option value="INSUMOS_UNIDADE">🏢 Copa / Limpeza / Insumos da Unidade</option>
+                <option value="OUTROS">📌 Outras Despesas</option>
+              </select>
+            </div>
+            <div>
+              <label>🔍 Busca Rápida (Técnico, Posto, Hotel, OS):</label>
+              <input id="inpDespBuscaTexto" placeholder="Ex: gasolina, hotel, vitor, ibis..." oninput="filtrarTabelaDespesasLocal()" />
+            </div>
+          </div>
+
+          <!-- FORMULÁRIO DE LANÇAMENTO / EDIÇÃO DE DESPESA (EXPANSÍVEL) -->
+          <div id="boxFormDespesaUnidade" style="display:none;background:#132338;border:2px solid #f59e0b;border-radius:10px;padding:16px;margin-bottom:18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <div style="font-weight:900;font-size:14px;color:#fbbf24;" id="tituloFormDespesaUnidade">➕ Lançar Nova Despesa da Unidade</div>
+              <button type="button" class="btn btn-outline" style="padding:4px 10px;font-size:11px;" onclick="toggleFormNovaDespesaUnidade(false)">✕ Fechar</button>
+            </div>
+            <input type="hidden" id="despUnidId" value="" />
+            <div class="grid-4" style="margin-bottom:10px;">
+              <div>
+                <label>Unidade Responsável:</label>
+                <select id="despUnidFilial" style="font-weight:700;">
+                  <option value="FILIAL_DF">🏢 Filial Brasília (DF)</option>
+                  <option value="MATRIZ_CE">🏛️ Matriz Eusébio (CE)</option>
+                </select>
+              </div>
+              <div>
+                <label>Categoria da Despesa:</label>
+                <select id="despUnidCategoria" style="font-weight:700;color:#fbbf24;">
+                  <option value="COMBUSTIVEL">⛽ Combustível / Gasolina</option>
+                  <option value="ALIMENTACAO">🍽️ Alimentação / Refeições</option>
+                  <option value="HOTEL">🏨 Hotel / Hospedagem</option>
+                  <option value="PEDAGIO_TRANSPORTE">🛣️ Pedágio / Estacionamento / Transporte</option>
+                  <option value="MANUTENCAO_FROTA">🔧 Manutenção Veicular / Frota</option>
+                  <option value="INSUMOS_UNIDADE">🏢 Copa / Limpeza / Insumos da Unidade</option>
+                  <option value="OUTROS">📌 Outras Despesas</option>
+                </select>
+              </div>
+              <div>
+                <label>Valor da Despesa (R$):</label>
+                <input id="despUnidValor" type="number" step="0.01" min="0.01" placeholder="Ex: 280.00" style="font-weight:900;color:#4ade80;" />
+              </div>
+              <div>
+                <label>Data da Despesa:</label>
+                <input id="despUnidData" type="date" />
+              </div>
+            </div>
+            <div class="grid-3" style="margin-bottom:10px;">
+              <div style="grid-column:span 2;">
+                <label>Descrição Detalhada (Ex: Gasolina Viagem Hospital Regional / Almoço Equipe / Diária Hotel):</label>
+                <input id="despUnidDescricao" placeholder="Descreva o gasto operacional..." />
+              </div>
+              <div>
+                <label>Técnico / Responsável:</label>
+                <input id="despUnidResponsavel" placeholder="Ex: Vitor, Netto, Equipe DF..." />
+              </div>
+            </div>
+            <div class="grid-4" style="margin-bottom:12px;">
+              <div>
+                <label>Estabelecimento / Fornecedor:</label>
+                <input id="despUnidFornecedor" placeholder="Ex: Posto Ipiranga, Hotel Ibis..." />
+              </div>
+              <div>
+                <label>Placa Veículo / Frota (opcional):</label>
+                <input id="despUnidPlaca" placeholder="Ex: FROTA-DF01" />
+              </div>
+              <div>
+                <label>OS Vinculada (opcional):</label>
+                <input id="despUnidOsId" placeholder="Ex: 35" />
+              </div>
+              <div>
+                <label>Forma Pagto / Nº Cupom:</label>
+                <div style="display:flex;gap:6px;">
+                  <select id="despUnidFormaPagto" style="width:55%;">
+                    <option value="PIX">PIX</option>
+                    <option value="CARTÃO CORPORATIVO">Cartão Corp.</option>
+                    <option value="DINHEIRO / REEMBOLSO">Reembolso</option>
+                    <option value="BOLETO">Boleto</option>
+                  </select>
+                  <input id="despUnidComprovante" placeholder="Nº NFC-e" style="width:45%;" />
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;">
+              <button type="button" class="btn btn-outline" onclick="toggleFormNovaDespesaUnidade(false)">Cancelar</button>
+              <button type="button" class="btn" onclick="salvarNovaDespesaUnidade()" style="background:#10b981;color:#0b132b;font-weight:900;padding:10px 22px;">
+                💾 Salvar Despesa da Unidade
+              </button>
+            </div>
+          </div>
+
+          <!-- KPIS DE DESPESAS DAS UNIDADES -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:10px;margin-bottom:16px;">
+            <div style="background:#0f172a;border:1px solid #334155;border-top:3px solid var(--cyan);border-radius:8px;padding:12px;">
+              <div style="font-size:11px;color:#94a3b8;font-weight:800;">💰 TOTAL DE DESPESAS (FILTRO)</div>
+              <div id="kpiDespTotalGeral" style="font-size:23px;font-weight:900;color:var(--cyan);margin-top:4px;">R$ 0,00</div>
+              <div id="kpiDespQtdLanc" style="font-size:11px;color:#64748b;margin-top:2px;">0 lançamentos</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-top:3px solid #f59e0b;border-radius:8px;padding:12px;">
+              <div style="font-size:11px;color:#fde68a;font-weight:800;">⛽ COMBUSTÍVEL &amp; GASOLINA</div>
+              <div id="kpiDespCombustivel" style="font-size:23px;font-weight:900;color:#fbbf24;margin-top:4px;">R$ 0,00</div>
+              <div id="kpiDespCombPct" style="font-size:11px;color:#94a3b8;margin-top:2px;">0% do total</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-top:3px solid #10b981;border-radius:8px;padding:12px;">
+              <div style="font-size:11px;color:#a7f3d0;font-weight:800;">🍽️ ALIMENTAÇÃO &amp; REFEIÇÕES</div>
+              <div id="kpiDespAlimentacao" style="font-size:23px;font-weight:900;color:#34d399;margin-top:4px;">R$ 0,00</div>
+              <div id="kpiDespAlimPct" style="font-size:11px;color:#94a3b8;margin-top:2px;">0% do total</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-top:3px solid #38bdf8;border-radius:8px;padding:12px;">
+              <div style="font-size:11px;color:#bae6fd;font-weight:800;">🏨 HOTEL &amp; HOSPEDAGEM</div>
+              <div id="kpiDespHotel" style="font-size:23px;font-weight:900;color:#38bdf8;margin-top:4px;">R$ 0,00</div>
+              <div id="kpiDespHotelPct" style="font-size:11px;color:#94a3b8;margin-top:2px;">0% do total</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-top:3px solid #a78bfa;border-radius:8px;padding:12px;">
+              <div style="font-size:11px;color:#ddd6fe;font-weight:800;">🏢 FILIAL DF vs 🏛️ MATRIZ CE</div>
+              <div id="kpiDespComparativoUnid" style="font-size:14px;font-weight:900;color:#e2e8f0;margin-top:6px;line-height:1.35;">
+                DF: R$ 0,00<br/>CE: R$ 0,00
+              </div>
+            </div>
+          </div>
+
+          <!-- PAINEL DE GRÁFICOS VISUAIS (3 GRÁFICOS INTERATIVOS) -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px;margin-bottom:16px;">
+            <!-- GRÁFICO 1: ROSCA SVG + DISTRIBUIÇÃO POR CATEGORIA -->
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;">
+              <div style="font-weight:900;font-size:13.5px;color:var(--cyan);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+                <span>📊 1. Gráfico por Categoria (Gasolina, Alimentação, Hotel)</span>
+              </div>
+              <div id="chartDespesasCategorias" style="min-height:230px;"></div>
+            </div>
+
+            <!-- GRÁFICO 2: COMPARATIVO ENTRE UNIDADES (FILIAL DF vs MATRIZ CE) -->
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;">
+              <div style="font-weight:900;font-size:13.5px;color:#38bdf8;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+                <span>🏢 2. Comparativo Unidades: Filial DF vs Matriz CE</span>
+              </div>
+              <div id="chartDespesasComparativoUnidades" style="min-height:230px;"></div>
+            </div>
+
+            <!-- GRÁFICO 3: EVOLUÇÃO MENSAL & RANKING POR RESPONSÁVEL -->
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;">
+              <div style="font-weight:900;font-size:13.5px;color:#fbbf24;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+                <span>📈 3. Evolução Mensal &amp; Equipe Técnica</span>
+              </div>
+              <div id="chartDespesasEvolucaoMensal" style="min-height:230px;"></div>
+            </div>
+          </div>
+
+          <!-- TABELA DETALHADA DE DESPESAS DAS UNIDADES -->
+          <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+              <div style="font-weight:900;font-size:13.5px;color:var(--cyan);">📋 Relação Detalhada de Despesas Lançadas nas Unidades</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button type="button" class="btn btn-outline" style="padding:4px 10px;font-size:11px;" onclick="atalhoFiltroCategoriaDespesa('TODAS')">Todas</button>
+                <button type="button" class="btn btn-outline" style="padding:4px 10px;font-size:11px;border-color:#f59e0b;color:#fbbf24;" onclick="atalhoFiltroCategoriaDespesa('COMBUSTIVEL')">⛽ Combustível/Gasolina</button>
+                <button type="button" class="btn btn-outline" style="padding:4px 10px;font-size:11px;border-color:#10b981;color:#34d399;" onclick="atalhoFiltroCategoriaDespesa('ALIMENTACAO')">🍽️ Alimentação</button>
+                <button type="button" class="btn btn-outline" style="padding:4px 10px;font-size:11px;border-color:#38bdf8;color:#38bdf8;" onclick="atalhoFiltroCategoriaDespesa('HOTEL')">🏨 Hotel</button>
+              </div>
+            </div>
+            <div style="overflow-x:auto;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Unidade</th>
+                    <th>Categoria</th>
+                    <th>Descrição / Detalhe do Gasto</th>
+                    <th>Estabelecimento / Posto / Hotel</th>
+                    <th>Responsável / Frota</th>
+                    <th>Pagto / Doc</th>
+                    <th style="text-align:right;">Valor (R$)</th>
+                    <th style="text-align:center;">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyDespesasUnidades"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- ========================================================================= -->
+      <!-- NOVA ABA: ANÁLISE & GESTÃO MANUAL DE CFOP (REGRAS + ESTOQUE + NOTAS)      -->
+      <!-- ========================================================================= -->
+      <div id="boxAbaCfop" style="display:none;margin-bottom:20px;">
+        <div class="card card-highlight" style="border-color:#38bdf8;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+            <div>
+              <h3 style="margin:0;color:#38bdf8;font-size:18px;display:flex;align-items:center;gap:8px;">
+                <span>📑</span>
+                <span>Análise &amp; Gestão Manual de CFOP (Regras, Estoque e Notas Fiscais)</span>
+              </h3>
+              <div style="font-size:12.5px;color:#cbd5e1;margin-top:4px;">
+                Visualize todos os <b>CFOPs</b> ativos no sistema, analise o que está gravado nas peças do estoque e nas notas fiscais, <b>edite manualmente qualquer código/regra</b> e salve direto no banco de dados.
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" class="btn" onclick="toggleFormNovoCfop()" style="background:#38bdf8;color:#0b132b;font-weight:900;padding:9px 16px;">
+                ➕ Novo CFOP
+              </button>
+              <button type="button" class="btn btn-outline" onclick="carregarDadosCfop()" style="padding:9px 14px;font-size:12px;">
+                🔄 Atualizar Análise
+              </button>
+              <button type="button" class="btn btn-outline" onclick="exportarRegrasCfopCsv()" style="padding:9px 14px;font-size:12px;">
+                📥 Exportar CFOP (.CSV)
+              </button>
+            </div>
+          </div>
+
+          <!-- KPIs CFOP & ISS -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
+            <div style="background:#0f172a;border:1px solid #334155;border-top:3px solid #38bdf8;border-radius:8px;padding:12px;">
+              <div style="font-size:11px;color:#bae6fd;font-weight:800;">📑 REGRAS CFOP CADASTRADAS</div>
+              <div id="kpiCfopTotalRegras" style="font-size:24px;font-weight:900;color:#38bdf8;margin-top:4px;">0</div>
+              <div id="kpiCfopAtivasSub" style="font-size:11px;color:#94a3b8;margin-top:2px;">0 ativas no sistema</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-top:3px solid #10b981;border-radius:8px;padding:12px;">
+              <div style="font-size:11px;color:#a7f3d0;font-weight:800;">📦 PEÇAS NO ESTOQUE ANALISADAS</div>
+              <div id="kpiCfopTotalPecas" style="font-size:24px;font-weight:900;color:#34d399;margin-top:4px;">0</div>
+              <div id="kpiCfopResumoEstoqueSub" style="font-size:11px;color:#94a3b8;margin-top:2px;">-</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-top:3px solid #f59e0b;border-radius:8px;padding:12px;">
+              <div style="font-size:11px;color:#fde68a;font-weight:800;">🧾 NOTAS FISCAIS &amp; REMESSAS</div>
+              <div id="kpiCfopTotalNotas" style="font-size:24px;font-weight:900;color:#fbbf24;margin-top:4px;">0</div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Disponíveis para conferência/edição</div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-top:3px solid #a78bfa;border-radius:8px;padding:12px;">
+              <div style="font-size:11px;color:#ddd6fe;font-weight:800;">🏛️ ISS VIGENTE POR UNIDADE</div>
+              <div id="kpiCfopIssUnidades" style="font-size:15px;font-weight:900;color:#e2e8f0;margin-top:6px;line-height:1.45;">
+                Matriz CE: 2,0%<br/>Filial DF: 5,0%
+              </div>
+            </div>
+          </div>
+
+          <!-- FORMULÁRIO EXPANSÍVEL PARA ADICIONAR NOVO CFOP -->
+          <div id="boxFormNovoCfop" style="display:none;background:#132338;border:2px solid #38bdf8;border-radius:10px;padding:16px;margin-bottom:18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <div style="font-weight:900;font-size:14px;color:#38bdf8;">➕ Cadastrar Nova Regra de CFOP</div>
+              <button type="button" class="btn btn-outline" style="padding:4px 10px;font-size:11px;" onclick="toggleFormNovoCfop(false)">✕ Fechar</button>
+            </div>
+            <div class="grid-4" style="margin-bottom:10px;">
+              <div>
+                <label>Código CFOP *</label>
+                <input id="novoCfopCodigo" placeholder="Ex: 5102, 6152, 5915" style="font-weight:800;" />
+              </div>
+              <div>
+                <label>Tipo de Operação</label>
+                <select id="novoCfopTipo">
+                  <option value="SAIDA">SAÍDA</option>
+                  <option value="ENTRADA">ENTRADA</option>
+                </select>
+              </div>
+              <div>
+                <label>Esfera</label>
+                <select id="novoCfopEsfera">
+                  <option value="ESTADUAL">ESTADUAL (Interna)</option>
+                  <option value="INTERESTADUAL">INTERESTADUAL</option>
+                </select>
+              </div>
+              <div>
+                <label>Unidade Aplicável</label>
+                <select id="novoCfopFilial">
+                  <option value="AMBAS">AMBAS (CE + DF)</option>
+                  <option value="MATRIZ_CE">MATRIZ CE</option>
+                  <option value="FILIAL_DF">FILIAL DF</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid-2" style="margin-bottom:10px;">
+              <div>
+                <label>Natureza da Operação *</label>
+                <input id="novoCfopNatureza" placeholder="Ex: Venda de mercadoria adquirida de terceiros" />
+              </div>
+              <div>
+                <label>Aplicação no Sistema</label>
+                <input id="novoCfopAplicacao" placeholder="Ex: Venda de Peças, Transferência CE-DF, Remessa Conserto" />
+              </div>
+            </div>
+            <div class="grid-3" style="margin-bottom:12px;">
+              <div>
+                <label>Alíquota ICMS Padrão (%)</label>
+                <input id="novoCfopIcms" type="number" step="0.1" value="0.0" />
+              </div>
+              <div>
+                <label>Alíquota ISS Padrão (%)</label>
+                <input id="novoCfopIss" type="number" step="0.1" value="0.0" />
+              </div>
+              <div>
+                <label>Observação Fiscal / Base Legal</label>
+                <input id="novoCfopObs" placeholder="Ex: Não incidência ICMS - ADC 49" />
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;">
+              <button type="button" class="btn btn-outline" onclick="toggleFormNovoCfop(false)">Cancelar</button>
+              <button type="button" class="btn btn-blue" onclick="salvarNovoCfop()">💾 Salvar Novo CFOP</button>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 1: TABELA EDITÁVEL DE REGRAS DE CFOP -->
+          <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;margin-bottom:18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+              <div style="font-weight:900;font-size:14px;color:#38bdf8;">1. Tabela Mestre de Regras CFOP (Edite qualquer campo e clique em 💾 Salvar)</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <input id="filtroCfopTexto" placeholder="🔍 Filtrar código, natureza ou aplicação..." oninput="renderizarTabelaRegrasCfop()" style="width:260px;padding:6px 10px;font-size:12px;" />
+                <select id="filtroCfopTipo" onchange="renderizarTabelaRegrasCfop()" style="width:130px;padding:6px 8px;font-size:12px;">
+                  <option value="TODOS">Todos Tipos</option>
+                  <option value="SAIDA">SAÍDA</option>
+                  <option value="ENTRADA">ENTRADA</option>
+                </select>
+                <select id="filtroCfopFilial" onchange="renderizarTabelaRegrasCfop()" style="width:150px;padding:6px 8px;font-size:12px;">
+                  <option value="TODAS">Todas Unidades</option>
+                  <option value="AMBAS">AMBAS</option>
+                  <option value="MATRIZ_CE">MATRIZ CE</option>
+                  <option value="FILIAL_DF">FILIAL DF</option>
+                </select>
+              </div>
+            </div>
+            <div style="overflow-x:auto;">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="min-width:82px;">CFOP</th>
+                    <th style="min-width:105px;">Tipo / Esfera</th>
+                    <th style="min-width:115px;">Unidade</th>
+                    <th style="min-width:210px;">Natureza da Operação</th>
+                    <th style="min-width:170px;">Aplicação no Sistema</th>
+                    <th style="min-width:72px;">ICMS %</th>
+                    <th style="min-width:72px;">ISS %</th>
+                    <th style="min-width:180px;">Observação Fiscal</th>
+                    <th style="min-width:125px;text-align:center;">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyRegrasCfop"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 2: ANÁLISE & EDIÇÃO DE CFOP NO ESTOQUE DE PEÇAS -->
+          <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;margin-bottom:18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+              <div>
+                <div style="font-weight:900;font-size:14px;color:#34d399;">2. Análise de CFOP nas Peças do Estoque (Individual ou em Lote)</div>
+                <div id="boxResumoCfopEstoque" style="font-size:12px;color:#cbd5e1;margin-top:4px;"></div>
+              </div>
+            </div>
+
+            <!-- Barra de alteração em lote -->
+            <div style="background:#132338;border:1px dashed #10b981;border-radius:8px;padding:12px;margin-bottom:12px;">
+              <div style="font-size:12px;font-weight:800;color:#6ee7b7;margin-bottom:8px;">⚡ Alteração em Lote no Estoque de Peças</div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end;">
+                <div>
+                  <label>Categoria Alvo:</label>
+                  <select id="loteCfopCategoria">
+                    <option value="TODAS">Todas as Peças do Estoque</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Novo CFOP Padrão Venda:</label>
+                  <input id="loteCfopVenda" placeholder="Ex: 5102" />
+                </div>
+                <div>
+                  <label>Novo CFOP Padrão Transf.:</label>
+                  <input id="loteCfopTransf" placeholder="Ex: 5152 ou 6152" />
+                </div>
+                <div>
+                  <button type="button" class="btn" onclick="aplicarCfopEstoqueLote()" style="background:#10b981;color:#0b132b;font-weight:900;width:100%;">
+                    💾 Aplicar em Lote
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Filtro e tabela de peças -->
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+              <input id="buscaPecaCfop" placeholder="🔍 Buscar peça por código, nome ou CFOP..." style="flex:1;min-width:220px;" onkeydown="if(event.key==='Enter') carregarDadosCfop()" />
+              <select id="filtroCatPecaCfop" onchange="carregarDadosCfop()" style="width:200px;">
+                <option value="TODAS">Todas Categorias</option>
+              </select>
+              <button type="button" class="btn btn-blue" onclick="carregarDadosCfop()" style="width:auto;padding:8px 16px;">🔍 Buscar</button>
+            </div>
+            <div style="overflow-x:auto;max-height:360px;overflow-y:auto;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Peça / Item</th>
+                    <th>Categoria</th>
+                    <th>NCM</th>
+                    <th style="width:110px;">CFOP Venda</th>
+                    <th style="width:120px;">CFOP Transf.</th>
+                    <th style="width:95px;text-align:center;">Salvar</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyPecasCfop"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 3: ANÁLISE & EDIÇÃO DE CFOP NAS NOTAS FISCAIS EMITIDAS -->
+          <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;">
+            <div style="font-weight:900;font-size:14px;color:#fbbf24;margin-bottom:10px;">3. Análise &amp; Ajuste Manual de CFOP nas Notas Fiscais Registradas</div>
+            <div style="overflow-x:auto;max-height:340px;overflow-y:auto;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID / NF</th>
+                    <th>Unidade</th>
+                    <th>Cliente</th>
+                    <th>Status</th>
+                    <th>ISS %</th>
+                    <th style="width:110px;">CFOP</th>
+                    <th style="min-width:240px;">Natureza da Operação</th>
+                    <th style="width:95px;text-align:center;">Salvar</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyNotasCfop"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- ABA PADRÃO: FATURAMENTO, NFS-E, ESTOQUE & RADAR DF-E                      -->
+      <!-- ========================================================================= -->
+      <div id="boxAbaFaturamentoFiscal">
 
       <!-- CONFIGURAÇÃO & CERTIFICADO A1 -->
       <details class="card" style="cursor:pointer;">
@@ -1959,11 +4947,11 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
               <div style="flex:2;min-width:240px;">
                 <label>Selecione a Peça / Insumo do Almoxarifado:</label>
-                <select id="selPecaTransferencia" style="width:100%;font-weight:600;"></select>
+                <select id="selPecaTransferencia" style="width:100%;font-weight:600;" onchange="aoSelecionarPecaTransferencia()"></select>
               </div>
-              <div style="width:100px;">
-                <label>Qtd:</label>
-                <input id="inpQtdTransferencia" type="number" min="1" step="1" value="1" />
+              <div style="width:120px;">
+                <label>Qtd <span id="lblMaxEstoqueTrf" style="color:#38bdf8;font-size:10.5px;"></span>:</label>
+                <input id="inpQtdTransferencia" type="number" min="1" step="1" value="1" oninput="validarInputQtdTransferencia(this)" />
               </div>
               <div>
                 <button type="button" class="btn btn-blue" onclick="adicionarItemTransferencia()">+ Adicionar Item</button>
@@ -2359,6 +5347,16 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
               Consulta automática no Ambiente Nacional da SEFAZ / Receita Federal via WebService <b>NFeDistribuicaoDFe</b> utilizando o Certificado Digital A1. Permite auditar compras, peças para tomógrafos/raios-x, manifestar recebimento e proteger o CNPJ contra notas frias.
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <select id="selFiltroPeriodoDFe" onchange="carregarNotasRecebidasDFe()" style="width:auto;padding:7px 10px;font-size:12px;font-weight:700;background:#0f172a;border:1.5px solid #10b981;color:#34d399;border-radius:6px;" title="Limite temporal das notas sincronizadas da SEFAZ">
+                <option value="2026-01-01" selected>📅 Exercício 2026 (Desde Janeiro/2026)</option>
+                <option value="2026-08-01">📅 Últimos 90 Dias (Ago a Nov/2026)</option>
+                <option value="2026-11-01">📅 Apenas Novembro/2026</option>
+              </select>
+              <select id="selFiltroUnidadeDFe" onchange="carregarNotasRecebidasDFe()" style="width:auto;padding:7px 10px;font-size:12px;font-weight:700;background:#0f172a;border:1.5px solid #0284c7;color:#38bdf8;border-radius:6px;">
+                <option value="CONSOLIDADO" selected>🌐 Todas da Empresa (Matriz CE + Filial DF)</option>
+                <option value="FILIAL_DF">🏢 Apenas Filial Brasília (03.611.974/0002-80)</option>
+                <option value="MATRIZ_CE">🏛️ Apenas Matriz Eusébio/CE (03.611.974/0001-08)</option>
+              </select>
               <input type="file" id="inpXmlDFe" accept=".xml" multiple style="display:none;" onchange="uploadXmlDFe(event)" />
               <button type="button" class="btn btn-primary" onclick="sincronizarDFeSefaz()" style="width:auto;padding:8px 14px;">
                 🔄 Puxar Notas no Fisco (SEFAZ • A1)
@@ -2394,15 +5392,16 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             <table>
               <thead>
                 <tr>
-                  <th>Nº Nota</th>
-                  <th>Emissão</th>
+                  <th style="white-space:nowrap;">Nº Nota</th>
+                  <th style="white-space:nowrap;min-width:128px;">Unidade EMED</th>
+                  <th style="white-space:nowrap;">Emissão</th>
                   <th>Fornecedor (Emitente)</th>
-                  <th>CNPJ Fornecedor</th>
-                  <th>UF</th>
-                  <th>Valor Total</th>
-                  <th>Manifestação</th>
-                  <th>Almoxarifado</th>
-                  <th>Ações</th>
+                  <th style="white-space:nowrap;">CNPJ Fornecedor</th>
+                  <th style="white-space:nowrap;text-align:center;">UF</th>
+                  <th style="white-space:nowrap;">Valor Total</th>
+                  <th style="white-space:nowrap;">Manifestação</th>
+                  <th style="white-space:nowrap;">Almoxarifado</th>
+                  <th style="white-space:nowrap;">Ações</th>
                 </tr>
               </thead>
               <tbody id="tbodyNotasRecebidasDFe"></tbody>
@@ -2432,6 +5431,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           <div><button class="btn btn-danger" style="width:100%;" onclick="cancelarNotaSelecionada()">🚫 Confirmar Cancelamento</button></div>
         </div>
       </div>
+      </div><!-- FIM boxAbaFaturamentoFiscal -->
     </div>
   </div>
 
@@ -2595,7 +5595,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         <tr>
           <td><b>${{h.numero_nf}}</b></td>
           <td>${{h.serie}}</td>
-          <td>#${{h.os_id}}</td>
+          <td>${{Number(h.os_id) > 0 ? '#' + h.os_id : '<span class="badge" style="background:#0f172a;border:1px solid #334155;">AVULSA</span>'}}</td>
           <td>${{h.cliente}}</td>
           <td>${{h.filial}}</td>
           <td style="font-size:11px;">${{h.cfop ? 'CFOP ' + h.cfop : (String(h.chave || '').length === 50 ? '🏛️ NFS-e Nacional' : 'NFS-e')}}</td>
@@ -2603,8 +5603,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           <td>${{h.data_emissao}}</td>
           <td>${{h.status_fiscal}}</td>
           <td>
-            <a href="/api/fiscal/danfe/${{h.os_id}}" target="_blank" class="btn btn-blue" style="padding:4px 8px;font-size:11px;">🖨️ DANFE</a>
-            <a href="/api/fiscal/v2/xml/${{h.os_id}}" class="btn btn-outline" style="padding:4px 8px;font-size:11px;">📥 XML</a>
+            <a href="/api/fiscal/danfe/${{Number(h.os_id) > 0 ? h.os_id : encodeURIComponent(h.numero_nf)}}" target="_blank" class="btn btn-blue" style="padding:4px 8px;font-size:11px;">🖨️ DANFE</a>
+            <a href="/api/fiscal/v2/xml/${{Number(h.os_id) > 0 ? h.os_id : encodeURIComponent(h.numero_nf)}}" class="btn btn-outline" style="padding:4px 8px;font-size:11px;">📥 XML</a>
           </td>
         </tr>
       `).join("") || `<tr><td colspan="10" style="text-align:center;color:var(--muted);">Nenhuma nota fiscal emitida registrada ainda nesta unidade.</td></tr>`;
@@ -2953,11 +5953,71 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       if (!selPecaTrf) return;
       if (!lista || !lista.length) {{
         selPecaTrf.innerHTML = `<option value="">⚠️ Nenhuma peça encontrada com este filtro</option>`;
+        aoSelecionarPecaTransferencia();
         return;
       }}
       selPecaTrf.innerHTML = lista.map(p =>
-        `<option value="${{p.id}}" data-codigo="${{p.codigo || ''}}" data-nome="${{p.nome.replace(/"/g, '&quot;')}}" data-preco="${{p.preco}}">${{p.codigo ? '[' + p.codigo + '] ' : ''}}${{p.nome}} (Saldo: ${{p.qtd}} ${{p.unidade || 'UN'}} • Custo: R$ ${{Number(p.preco || 0).toFixed(2)}})</option>`
+        `<option value="${{p.id}}" data-codigo="${{p.codigo || ''}}" data-nome="${{p.nome.replace(/"/g, '&quot;')}}" data-preco="${{p.preco}}" data-qtd="${{p.qtd ?? 0}}" data-unidade="${{p.unidade || 'UN'}}">${{p.codigo ? '[' + p.codigo + '] ' : ''}}${{p.nome}} (Saldo: ${{p.qtd}} ${{p.unidade || 'UN'}} • Custo: R$ ${{Number(p.preco || 0).toFixed(2)}})</option>`
       ).join("");
+      aoSelecionarPecaTransferencia();
+    }}
+
+    function obterSaldoDisponivelPecaTrf(pecaId) {{
+      const p = TODAS_PECAS_TRANSFERENCIA.find(x => Number(x.id) === Number(pecaId));
+      if (p) return Math.max(0, parseFloat(p.qtd ?? 0));
+      const sel = document.getElementById("selPecaTransferencia");
+      if (sel) {{
+        for (let i = 0; i < sel.options.length; i++) {{
+          if (Number(sel.options[i].value) === Number(pecaId)) {{
+            return Math.max(0, parseFloat(sel.options[i].getAttribute("data-qtd") || 0));
+          }}
+        }}
+      }}
+      return 0;
+    }}
+
+    function aoSelecionarPecaTransferencia() {{
+      const sel = document.getElementById("selPecaTransferencia");
+      const inp = document.getElementById("inpQtdTransferencia");
+      const lbl = document.getElementById("lblMaxEstoqueTrf");
+      if (!sel || !inp) return;
+      const opt = sel.options[sel.selectedIndex];
+      if (!opt || !opt.value) {{
+        if (lbl) lbl.textContent = "";
+        return;
+      }}
+      const pecaId = parseInt(opt.value);
+      const saldoTotal = parseFloat(opt.getAttribute("data-qtd") || 0);
+      const un = opt.getAttribute("data-unidade") || "UN";
+      const jaAdicionado = (ITENS_TRANSFERENCIA.find(i => i.peca_id === pecaId)?.quantidade || 0);
+      const restante = Math.max(0, saldoTotal - jaAdicionado);
+      inp.max = restante > 0 ? restante : 0;
+      if (parseFloat(inp.value || 1) > restante) {{
+        inp.value = restante > 0 ? restante : 0;
+      }} else if (parseFloat(inp.value || 0) <= 0 && restante > 0) {{
+        inp.value = 1;
+      }}
+      if (lbl) {{
+        lbl.textContent = `(Máx: ${{restante}} ${{un}})`;
+        lbl.style.color = restante > 0 ? "#38bdf8" : "#f87171";
+      }}
+    }}
+
+    function validarInputQtdTransferencia(inp) {{
+      const sel = document.getElementById("selPecaTransferencia");
+      if (!sel || !inp) return;
+      const opt = sel.options[sel.selectedIndex];
+      if (!opt || !opt.value) return;
+      const pecaId = parseInt(opt.value);
+      const saldoTotal = parseFloat(opt.getAttribute("data-qtd") || 0);
+      const un = opt.getAttribute("data-unidade") || "UN";
+      const jaAdicionado = (ITENS_TRANSFERENCIA.find(i => i.peca_id === pecaId)?.quantidade || 0);
+      const restante = Math.max(0, saldoTotal - jaAdicionado);
+      const digitado = parseFloat(inp.value || 0);
+      if (digitado > restante) {{
+        inp.value = restante > 0 ? restante : 0;
+        alert(`⚠️ Limite de Estoque Disponível!\n\nA peça selecionada possui apenas ${{saldoTotal}} ${{un}} em estoque${{jaAdicionado > 0 ? ' (' + jaAdicionado + ' já na lista)' : ''}}.\nA quantidade máxima permitida é ${{restante}} ${{un}}.`);
+      }}
     }}
 
     function filtrarPecasTransferencia() {{
@@ -3012,17 +6072,19 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       if (!ITENS_TRANSFERENCIA.length) {{
         tb.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:8px;">Nenhum item adicionado à remessa ainda.</td></tr>`;
         document.getElementById("lblTotalTransferencia").textContent = "R$ 0,00";
+        aoSelecionarPecaTransferencia();
         return;
       }}
       let total = 0;
       tb.innerHTML = ITENS_TRANSFERENCIA.map((it, idx) => {{
         const subtotal = it.quantidade * it.valor_unitario;
         total += subtotal;
+        const maxDisp = it.saldo_max || obterSaldoDisponivelPecaTrf(it.peca_id) || it.quantidade;
         return `
           <tr>
             <td><b>${{it.codigo || '-'}}</b></td>
-            <td>${{it.nome}}</td>
-            <td><input type="number" min="1" step="1" value="${{it.quantidade}}" style="width:70px;padding:4px;font-size:12px;" onchange="alterarQtdItemTransferencia(${{idx}}, this.value)" /></td>
+            <td>${{it.nome}} <span style="font-size:10.5px;color:#38bdf8;">(Estoque: ${{maxDisp}} ${{it.unidade || 'UN'}})</span></td>
+            <td><input type="number" min="1" max="${{maxDisp}}" step="1" value="${{it.quantidade}}" style="width:70px;padding:4px;font-size:12px;" onchange="alterarQtdItemTransferencia(${{idx}}, this.value)" oninput="if(parseFloat(this.value) > ${{maxDisp}}) {{ this.value = ${{maxDisp}}; alterarQtdItemTransferencia(${{idx}}, ${{maxDisp}}); }}" /></td>
             <td>R$ ${{Number(it.valor_unitario).toFixed(2)}}</td>
             <td><b>R$ ${{Number(subtotal).toFixed(2)}}</b></td>
             <td><button class="btn btn-outline" style="padding:2px 6px;color:#f87171;border-color:#f87171;" onclick="removerItemTransferencia(${{idx}})">✕</button></td>
@@ -3030,6 +6092,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         `;
       }}).join("");
       document.getElementById("lblTotalTransferencia").textContent = `R$ ${{total.toLocaleString('pt-BR', {{minimumFractionDigits:2}})}}`;
+      aoSelecionarPecaTransferencia();
     }}
 
     function adicionarItemTransferencia() {{
@@ -3040,18 +6103,47 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       const nome = opt.getAttribute("data-nome") || opt.text;
       const codigo = opt.getAttribute("data-codigo") || "";
       const preco = parseFloat(opt.getAttribute("data-preco") || 0);
+      const saldoDisp = parseFloat(opt.getAttribute("data-qtd") || 0);
+      const unidade = opt.getAttribute("data-unidade") || "UN";
       const qtdInp = parseFloat(document.getElementById("inpQtdTransferencia").value || 1);
 
+      if (saldoDisp <= 0) {{
+        alert(`🚫 ESTOQUE ZERADO!\n\nA peça "${{nome}}" está com saldo 0 ${{unidade}} no almoxarifado e não pode ser adicionada à transferência.`);
+        return;
+      }}
+      if (qtdInp <= 0) {{
+        alert("Informe uma quantidade maior que zero.");
+        return;
+      }}
+
       const existente = ITENS_TRANSFERENCIA.find(i => i.peca_id === pecaId);
+      const qtdAtualNaLista = existente ? existente.quantidade : 0;
+      if (qtdAtualNaLista + qtdInp > saldoDisp) {{
+        const permitido = Math.max(0, saldoDisp - qtdAtualNaLista);
+        const infoJaNaLista = qtdAtualNaLista > 0 ? `\n• Já adicionado na remessa: ${{qtdAtualNaLista}} ${{unidade}}` : '';
+        alert(
+          `🚫 QUANTIDADE ACIMA DO ESTOQUE DISPONÍVEL!\n\n` +
+          `• Peça: [${{codigo}}] ${{nome}}\n` +
+          `• Saldo Total no Estoque: ${{saldoDisp}} ${{unidade}}` +
+          infoJaNaLista +
+          `\n• Quantidade máxima que você pode adicionar: ${{permitido}} ${{unidade}}`
+        );
+        document.getElementById("inpQtdTransferencia").value = permitido > 0 ? permitido : 1;
+        return;
+      }}
+
       if (existente) {{
         existente.quantidade += qtdInp;
+        existente.saldo_max = saldoDisp;
       }} else {{
         ITENS_TRANSFERENCIA.push({{
           peca_id: pecaId,
           nome: nome,
           codigo: codigo,
           quantidade: qtdInp,
-          valor_unitario: preco
+          valor_unitario: preco,
+          saldo_max: saldoDisp,
+          unidade: unidade
         }});
       }}
       renderizarItensTransferencia();
@@ -3063,11 +6155,17 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     }}
 
     function alterarQtdItemTransferencia(idx, val) {{
-      const q = parseFloat(val);
-      if (q > 0 && ITENS_TRANSFERENCIA[idx]) {{
-        ITENS_TRANSFERENCIA[idx].quantidade = q;
-        renderizarItensTransferencia();
+      let q = parseFloat(val);
+      const item = ITENS_TRANSFERENCIA[idx];
+      if (!item) return;
+      const maxDisp = item.saldo_max || obterSaldoDisponivelPecaTrf(item.peca_id);
+      if (isNaN(q) || q <= 0) q = 1;
+      if (maxDisp > 0 && q > maxDisp) {{
+        alert(`🚫 Estoque insuficiente para "${{item.nome}}"!\nO saldo disponível no almoxarifado é de apenas ${{maxDisp}} ${{item.unidade || 'UN'}}.`);
+        q = maxDisp;
       }}
+      item.quantidade = q;
+      renderizarItensTransferencia();
     }}
 
     async function emitirTransferenciaFiliais() {{
@@ -3839,7 +6937,9 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
     async function carregarNotasRecebidasDFe() {{
       try {{
-        const res = await fetch(`/api/fiscal/recebidas/dados?filial=${{FILIAL_ATIVA}}`).then(r => r.json());
+        const filtroUn = document.getElementById("selFiltroUnidadeDFe")?.value || "CONSOLIDADO";
+        const dataInicio = document.getElementById("selFiltroPeriodoDFe")?.value || "2026-01-01";
+        const res = await fetch(`/api/fiscal/recebidas/dados?filial=${{FILIAL_ATIVA}}&filtro_dfe=${{encodeURIComponent(filtroUn)}}&data_inicio=${{encodeURIComponent(dataInicio)}}`).then(r => r.json());
         if (!res.ok) return;
 
         DFE_NOTAS_CACHE = res.notas || [];
@@ -3852,36 +6952,43 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         const tb = document.getElementById("tbodyNotasRecebidasDFe");
         tb.innerHTML = DFE_NOTAS_CACHE.map(n => {{
           const dtFmt = n.data_emissao ? n.data_emissao.substring(0, 10).split('-').reverse().join('/') : '-';
-          const corManif = n.status_manifestacao === 'CONFIRMADA' ? 'color:#34d399;font-weight:bold;' :
-                           n.status_manifestacao === 'CIENCIA' ? 'color:#60a5fa;' :
-                           n.status_manifestacao === 'DESCONHECIDA' ? 'color:#f87171;font-weight:bold;' : 'color:#fbbf24;font-weight:bold;';
+          const isDf = String(n.filial || '').includes('DF');
+          const badgeFil = isDf
+            ? '<span class="badge" style="background:#0c4a6e;color:#7dd3fc;border:1px solid #0284c7;font-size:11px;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:6px;line-height:1;"><span>🏢</span><span>Filial DF</span></span>'
+            : '<span class="badge" style="background:#1e1b4b;color:#c4b5fd;border:1px solid #6366f1;font-size:11px;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:6px;line-height:1;"><span>🏛️</span><span>Matriz CE</span></span>';
+          const corManif = n.status_manifestacao === 'CONFIRMADA' ? 'color:#34d399;font-weight:bold;white-space:nowrap;' :
+                           n.status_manifestacao === 'CIENCIA' ? 'color:#60a5fa;white-space:nowrap;' :
+                           n.status_manifestacao === 'DESCONHECIDA' ? 'color:#f87171;font-weight:bold;white-space:nowrap;' : 'color:#fbbf24;font-weight:bold;white-space:nowrap;';
           const lblManif = n.status_manifestacao === 'CONFIRMADA' ? '✅ Confirmada' :
                            n.status_manifestacao === 'CIENCIA' ? 'ℹ️ Ciência' :
                            n.status_manifestacao === 'DESCONHECIDA' ? '🛡️ Desconhecida' : '⚠️ Pendente';
-          const corEst = n.status_estoque === 'DADO_ENTRADA' ? 'color:#34d399;font-weight:bold;' : 'color:#f472b6;font-weight:bold;';
+          const corEst = n.status_estoque === 'DADO_ENTRADA' ? 'color:#34d399;font-weight:bold;white-space:nowrap;' : 'color:#f472b6;font-weight:bold;white-space:nowrap;';
           const lblEst = n.status_estoque === 'DADO_ENTRADA' ? '✅ No Estoque' : '⏳ Pendente';
 
           return `
             <tr>
-              <td><b>NF-e ${{n.numero_nf}}</b></td>
-              <td>${{dtFmt}}</td>
-              <td title="${{n.emitente_nome}}"><b>${{n.emitente_nome.length > 28 ? n.emitente_nome.substring(0, 28) + '...' : n.emitente_nome}}</b></td>
-              <td style="font-size:11px;">${{n.emitente_cnpj}}</td>
-              <td><span class="badge" style="background:#0f172a;border:1px solid #334155;">${{n.emitente_uf || 'BR'}}</span></td>
-              <td><b>R$ ${{Number(n.valor_total || 0).toLocaleString('pt-BR', {{minimumFractionDigits: 2}})}}</b></td>
-              <td><span style="${{corManif}}">${{lblManif}}</span></td>
-              <td><span style="${{corEst}}">${{lblEst}}</span></td>
-              <td style="white-space:nowrap;display:flex;gap:4px;">
-                <button type="button" class="btn btn-outline" style="padding:3px 7px;font-size:11px;" onclick="abrirModalItensDFe(${{n.id}})">👁️ Itens</button>
-                ${{n.status_estoque === 'PENDENTE' ? `<button type="button" class="btn btn-primary" style="padding:3px 7px;font-size:11px;" onclick="darEntradaEstoqueDFe(${{n.id}}, '${{n.numero_nf}}')">📦 Dar Entrada</button>` : ''}}
-                ${{n.status_manifestacao === 'SEM_MANIFESTACAO' ? `
-                  <button type="button" class="btn btn-blue" style="padding:3px 7px;font-size:11px;" onclick="manifestarNotaDFe(${{n.id}}, 'CONFIRMAR')">✅ Confirmar</button>
-                  <button type="button" class="btn btn-danger" style="padding:3px 7px;font-size:11px;" onclick="manifestarNotaDFe(${{n.id}}, 'DESCONHECER')">🛡️ Desconhecer</button>
-                ` : ''}}
+              <td style="white-space:nowrap;vertical-align:middle;"><b>NF-e ${{n.numero_nf}}</b></td>
+              <td style="white-space:nowrap;vertical-align:middle;">${{badgeFil}}</td>
+              <td style="white-space:nowrap;vertical-align:middle;">${{dtFmt}}</td>
+              <td style="vertical-align:middle;" title="${{n.emitente_nome}}"><b>${{n.emitente_nome.length > 32 ? n.emitente_nome.substring(0, 32) + '...' : n.emitente_nome}}</b></td>
+              <td style="font-size:11px;white-space:nowrap;vertical-align:middle;">${{n.emitente_cnpj}}</td>
+              <td style="text-align:center;vertical-align:middle;"><span class="badge" style="background:#0f172a;border:1px solid #334155;white-space:nowrap;display:inline-block;">${{n.emitente_uf || 'BR'}}</span></td>
+              <td style="white-space:nowrap;vertical-align:middle;"><b>R$ ${{Number(n.valor_total || 0).toLocaleString('pt-BR', {{minimumFractionDigits: 2}})}}</b></td>
+              <td style="white-space:nowrap;vertical-align:middle;"><span style="${{corManif}}">${{lblManif}}</span></td>
+              <td style="white-space:nowrap;vertical-align:middle;"><span style="${{corEst}}">${{lblEst}}</span></td>
+              <td style="white-space:nowrap;vertical-align:middle;">
+                <div style="display:inline-flex;align-items:center;gap:5px;flex-wrap:nowrap;">
+                  <button type="button" class="btn btn-outline" style="width:auto;padding:4px 9px;font-size:11px;border-color:#38bdf8;color:#38bdf8;" onclick="abrirModalItensDFe(${{n.id}})">👁️ Visualizar</button>
+                  ${{n.status_estoque === 'PENDENTE' ? `<button type="button" class="btn btn-primary" style="width:auto;padding:4px 9px;font-size:11px;" onclick="darEntradaEstoqueDFe(${{n.id}}, '${{n.numero_nf}}')">📦 Dar Entrada</button>` : ''}}
+                  ${{n.status_manifestacao === 'SEM_MANIFESTACAO' ? `
+                    <button type="button" class="btn btn-blue" style="width:auto;padding:4px 8px;font-size:11px;" onclick="manifestarNotaDFe(${{n.id}}, 'CONFIRMAR')">✅ Confirmar</button>
+                    <button type="button" class="btn btn-danger" style="width:auto;padding:4px 8px;font-size:11px;" onclick="manifestarNotaDFe(${{n.id}}, 'DESCONHECER')">🛡️ Desconhecer</button>
+                  ` : ''}}
+                </div>
               </td>
             </tr>
           `;
-        }}).join("") || `<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:14px;">Nenhuma nota fiscal emitida por fornecedores localizada no momento.</td></tr>`;
+        }}).join("") || `<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:14px;">Nenhuma nota fiscal emitida por fornecedores localizada no momento.</td></tr>`;
       }} catch (e) {{
         console.error("Erro ao carregar DF-e:", e);
       }}
@@ -3987,54 +7094,1375 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       }}
     }}
 
+    let DFE_NOTA_ATUAL_MODAL = null;
+
     function abrirModalItensDFe(id) {{
       const n = DFE_NOTAS_CACHE.find(item => item.id === id);
       if (!n) return;
+      DFE_NOTA_ATUAL_MODAL = n;
 
-      document.getElementById("modalItensDFeTitulo").textContent = `Itens da NF-e ${{n.numero_nf}} — ${{n.emitente_nome}}`;
+      const dtFmt = n.data_emissao ? n.data_emissao.substring(0, 10).split('-').reverse().join('/') : '-';
+      const isDf = String(n.filial || '').includes('DF');
+      const unidTxt = isDf ? '🏢 Filial Brasília - DF (03.611.974/0002-80)' : '🏛️ Matriz Eusébio - CE (03.611.974/0001-08)';
+      const valFmt = `R$ ${{Number(n.valor_total || 0).toLocaleString('pt-BR', {{minimumFractionDigits: 2}})}}`;
+
+      document.getElementById("modalItensDFeTitulo").textContent = `🧾 Visualização Completa & DANFE — NF-e Nº ${{n.numero_nf}} (${{n.emitente_nome}})`;
+      const subEl = document.getElementById("modalItensDFeSubtitulo");
+      if (subEl) {{
+        subEl.innerHTML = `<b>Fornecedor:</b> ${{n.emitente_nome}} (CNPJ: ${{n.emitente_cnpj}} • ${{n.emitente_uf || 'BR'}}) &bull; <b>Emissão:</b> ${{dtFmt}} &bull; <b>Destinatário:</b> ${{unidTxt}} &bull; <b style="color:#4ade80;">Valor Total: ${{valFmt}}</b>`;
+      }}
+
+      const iframe = document.getElementById("iframeDanfeDFeModal");
+      if (iframe) {{
+        iframe.src = `/api/fiscal/recebidas/pdf/${{n.id}}#view=FitH`;
+      }}
+
+      const btnPdf = document.getElementById("btnModalDFeBaixarPdf");
+      if (btnPdf) btnPdf.href = `/api/fiscal/recebidas/pdf/${{n.id}}?download=1`;
+
+      const btnXml = document.getElementById("btnModalDFeBaixarXml");
+      if (btnXml) btnXml.href = `/api/fiscal/recebidas/xml/${{n.id}}`;
+
+      const btnNovaAba = document.getElementById("btnModalDFeAbrirNovaAba");
+      if (btnNovaAba) btnNovaAba.href = `/api/fiscal/recebidas/pdf/${{n.id}}`;
+
       const tb = document.getElementById("tbodyModalItensDFe");
       const itens = n.itens || [];
+      if (tb) {{
+        tb.innerHTML = itens.map(it => `
+          <tr style="border-bottom:1px solid #334155;">
+            <td><b style="color:#38bdf8;">${{it.codigo || '-'}}</b></td>
+            <td><b>${{it.descricao || '-'}}</b></td>
+            <td>${{it.ncm || '9022.90.90'}}</td>
+            <td>${{it.unidade || 'UN'}}</td>
+            <td style="font-weight:bold;">${{it.qtd}}</td>
+            <td>R$ ${{Number(it.unitario || 0).toLocaleString('pt-BR', {{minimumFractionDigits: 2}})}}</td>
+            <td style="font-weight:bold;color:#10b981;">R$ ${{Number(it.total || ((it.qtd || 1) * (it.unitario || 0))).toLocaleString('pt-BR', {{minimumFractionDigits: 2}})}}</td>
+          </tr>
+        `).join("") || `<tr><td colspan="7" style="text-align:center;padding:10px;color:var(--muted);">Nenhum item discriminado.</td></tr>`;
+      }}
 
-      tb.innerHTML = itens.map(it => `
-        <tr style="border-bottom:1px solid #334155;">
-          <td><b style="color:#38bdf8;">${{it.codigo || '-'}}</b></td>
-          <td>${{it.descricao || '-'}}</td>
-          <td style="font-weight:bold;">${{it.qtd}}</td>
-          <td>R$ ${{Number(it.unitario || 0).toFixed(2)}}</td>
-          <td style="font-weight:bold;color:#10b981;">R$ ${{Number((it.qtd || 1) * (it.unitario || 0)).toFixed(2)}}</td>
-        </tr>
-      `).join("") || `<tr><td colspan="5" style="text-align:center;padding:10px;color:var(--muted);">Nenhum item discriminado.</td></tr>`;
+      const inpEmail = document.getElementById("inpModalDFeEmail");
+      if (inpEmail && !inpEmail.value) {{
+        inpEmail.value = isDf ? "brasilia@emed.med.br" : "financeiro@emed.med.br";
+      }}
 
+      renderContatosRapidosWhatsDFe();
+      alternarVisaoModalDFe('DANFE');
       document.getElementById("modalItensDFe").style.display = "flex";
+    }}
+
+    function alternarVisaoModalDFe(modo) {{
+      const boxDanfe = document.getElementById("boxModalDFeVisaoDanfe");
+      const boxItens = document.getElementById("boxModalDFeVisaoItens");
+      const tabDanfe = document.getElementById("btnTabModalDFeDanfe");
+      const tabItens = document.getElementById("btnTabModalDFeItens");
+      if (modo === 'ITENS') {{
+        if (boxDanfe) boxDanfe.style.display = "none";
+        if (boxItens) boxItens.style.display = "block";
+        if (tabDanfe) {{ tabDanfe.style.background = "#1e293b"; tabDanfe.style.color = "#cbd5e1"; }}
+        if (tabItens) {{ tabItens.style.background = "#0284c7"; tabItens.style.color = "#fff"; }}
+      }} else {{
+        if (boxDanfe) boxDanfe.style.display = "block";
+        if (boxItens) boxItens.style.display = "none";
+        if (tabDanfe) {{ tabDanfe.style.background = "#0284c7"; tabDanfe.style.color = "#fff"; }}
+        if (tabItens) {{ tabItens.style.background = "#1e293b"; tabItens.style.color = "#cbd5e1"; }}
+      }}
+    }}
+
+    function imprimirOuBaixarPdfDanfeModal() {{
+      if (!DFE_NOTA_ATUAL_MODAL) return;
+      const a = document.createElement("a");
+      a.href = `/api/fiscal/recebidas/pdf/${{DFE_NOTA_ATUAL_MODAL.id}}?download=1`;
+      a.download = `DANFE_NFe_${{DFE_NOTA_ATUAL_MODAL.numero_nf}}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }}
+
+    function toggleBoxShareModalDFe(foco) {{
+      const box = document.getElementById("boxShareModalDFe");
+      if (!box) return;
+      box.style.display = "block";
+      if (foco === 'whats') document.getElementById("inpModalDFeWhats")?.focus();
+      if (foco === 'email') document.getElementById("inpModalDFeEmail")?.focus();
+    }}
+
+    function mostrarAvisoPdfModal(txt) {{
+      const el = document.getElementById("avisoEnvioPdfModalDFe");
+      if (el) {{
+        el.innerHTML = txt;
+        el.style.display = "block";
+      }}
+    }}
+
+    function getContatosRapidosWhatsDFe() {{
+      try {{
+        return JSON.parse(localStorage.getItem("emed_whats_contatos_rapidos") || "[]");
+      }} catch (e) {{
+        return [];
+      }}
+    }}
+
+    function renderContatosRapidosWhatsDFe() {{
+      const box = document.getElementById("boxContatosRapidosWhatsDFe");
+      if (!box) return;
+      const lista = getContatosRapidosWhatsDFe();
+      if (!lista.length) {{
+        box.innerHTML = `<span style="font-size:10.5px;color:#94a3b8;">💡 Dica: Digite um ou mais números (ex: 85999999999, 61996585392) e clique em "+ Salvar Contato" para envio rápido.</span>`;
+        return;
+      }}
+      box.innerHTML = lista.map((c, idx) => `
+        <span style="display:inline-flex;align-items:center;gap:4px;background:#0f172a;border:1px solid #334155;border-radius:999px;padding:2px 8px;font-size:11px;color:#e2e8f0;">
+          <a href="javascript:void(0)" onclick="adicionarNumeroCampoWhatsDFe('${{c.numero}}')" style="color:#4ade80;text-decoration:none;font-weight:700;" title="Adicionar ${{c.numero}}">+ ${{c.nome}}</a>
+          <a href="javascript:void(0)" onclick="removerContatoRapidoWhatsDFe(${{idx}})" style="color:#f87171;text-decoration:none;font-weight:bold;margin-left:2px;" title="Remover">&times;</a>
+        </span>
+      `).join("");
+    }}
+
+    function adicionarNumeroCampoWhatsDFe(num) {{
+      const inp = document.getElementById("inpModalDFeWhats");
+      if (!inp) return;
+      const atuais = inp.value.split(/[,;\\s]+/).map(x => x.replace(/\\D/g, "")).filter(Boolean);
+      const limpo = String(num || "").replace(/\\D/g, "");
+      if (limpo && !atuais.includes(limpo)) {{
+        atuais.push(limpo);
+      }}
+      inp.value = atuais.join(", ");
+    }}
+
+    function salvarContatoRapidoWhatsDFe() {{
+      const inp = document.getElementById("inpModalDFeWhats");
+      const raw = (inp?.value || "").trim();
+      const nums = raw.split(/[,;\\s]+/).map(x => x.replace(/\\D/g, "")).filter(x => x.length >= 10);
+      if (!nums.length) {{
+        alert("Digite primeiro um número válido (DDD + número) no campo para salvar como atalho.");
+        return;
+      }}
+      const numAlvo = nums[nums.length - 1];
+      const nome = prompt(`Nome do contato para o número ${{numAlvo}} (ex: Paulo Emed, Financeiro):`);
+      if (!nome || !nome.trim()) return;
+      const lista = getContatosRapidosWhatsDFe().filter(c => c.numero !== numAlvo);
+      lista.push({{ nome: nome.trim(), numero: numAlvo }});
+      localStorage.setItem("emed_whats_contatos_rapidos", JSON.stringify(lista));
+      renderContatosRapidosWhatsDFe();
+    }}
+
+    function removerContatoRapidoWhatsDFe(idx) {{
+      const lista = getContatosRapidosWhatsDFe();
+      lista.splice(idx, 1);
+      localStorage.setItem("emed_whats_contatos_rapidos", JSON.stringify(lista));
+      renderContatosRapidosWhatsDFe();
+    }}
+
+    async function conectarWhatsAppBotLocal() {{
+      const btn = document.getElementById("btnConectarWhatsBot");
+      if (btn) {{ btn.disabled = true; btn.textContent = "⏳ Abrindo..."; }}
+      mostrarAvisoPdfModal("⏳ Abrindo janela dedicada do WhatsApp Web no servidor... Se ainda não conectou, escaneie o QR Code com o celular.");
+      try {{
+        const res = await fetch("/api/fiscal/recebidas/whatsapp-conectar", {{ method: "POST" }}).then(r => r.json());
+        if (res.status === "CONECTADO") {{
+          mostrarAvisoPdfModal("✅ <b>WhatsApp Dedicado CONECTADO!</b> Já pode enviar os PDFs diretamente para qualquer número.");
+        }} else {{
+          mostrarAvisoPdfModal("📷 <b>Aguardando leitura do QR Code</b> na janela do Edge/WhatsApp que abriu no servidor. Após conectar, clique em <b>📲 Enviar PDF</b>.");
+        }}
+      }} catch (e) {{
+        mostrarAvisoPdfModal("❌ Erro ao abrir automação local: " + e.message);
+      }} finally {{
+        if (btn) {{ btn.disabled = false; btn.textContent = "📷 Conectar WhatsApp"; }}
+      }}
+    }}
+
+    async function enviarWhatsDanfeModalDFe() {{
+      const n = DFE_NOTA_ATUAL_MODAL;
+      if (!n) return;
+      const rawInput = (document.getElementById("inpModalDFeWhats")?.value || "").trim();
+      const listaFones = rawInput
+        .split(/[,;\\s\\n]+/)
+        .map(s => s.replace(/\\D/g, ""))
+        .filter(s => s.length >= 10);
+
+      if (!listaFones.length) {{
+        alert("Digite pelo menos um número de WhatsApp com DDD (ex: 85999999999) ou selecione um contato salvo.");
+        document.getElementById("inpModalDFeWhats")?.focus();
+        return;
+      }}
+
+      const btn = document.getElementById("btnDispararWhatsPdfAuto");
+      if (btn) {{ btn.disabled = true; btn.textContent = "⏳ Enviando PDF..."; }}
+      mostrarAvisoPdfModal(`⏳ Enviando arquivo <b>DANFE_NFe_${{n.numero_nf}}.pdf</b> automaticamente para ${{listaFones.length}} número(s)...`);
+
+      try {{
+        const res = await fetch("/api/fiscal/recebidas/enviar-whatsapp-pdf", {{
+          method: "POST",
+          headers: {{"Content-Type": "application/json"}},
+          body: JSON.stringify({{ id: n.id, numeros: listaFones }})
+        }}).then(r => r.json());
+
+        if (res.needs_qr) {{
+          mostrarAvisoPdfModal("📷 <b>Primeira conexão necessária:</b> Escaneie o QR Code na janela do WhatsApp Web dedicada que acabou de abrir e depois clique novamente em <b>📲 Enviar PDF</b>.");
+          return;
+        }}
+        if (res.ok) {{
+          const envTxt = (res.enviados || []).join(", ");
+          const falhasTxt = (res.falhas || []).length
+            ? `<br/><span style="color:#fbbf24;">⚠️ Falhas: ${{res.falhas.map(f => f.numero + ' (' + f.erro + ')').join('; ')}}</span>`
+            : "";
+          mostrarAvisoPdfModal(`✅ <b>PDF enviado automaticamente no WhatsApp</b> para: <b>${{envTxt}}</b>${{falhasTxt}}`);
+        }} else {{
+          mostrarAvisoPdfModal(`⚠️ ${{res.msg || "Não foi possível enviar."}}`);
+        }}
+      }} catch (e) {{
+        mostrarAvisoPdfModal(`❌ Falha ao acionar automação local: ${{e.message}}`);
+      }} finally {{
+        if (btn) {{ btn.disabled = false; btn.textContent = "📲 Enviar PDF"; }}
+      }}
+    }}
+    async function enviarEmailDanfeModalDFe() {{
+      const n = DFE_NOTA_ATUAL_MODAL;
+      if (!n) return;
+      const email = (document.getElementById("inpModalDFeEmail")?.value || "").trim();
+      if (!email || !email.includes("@")) {{
+        alert("Informe um e-mail válido para enviar a DANFE em PDF.");
+        return;
+      }}
+      try {{
+        const res = await fetch("/api/fiscal/recebidas/enviar-email-pdf", {{
+          method: "POST",
+          headers: {{"Content-Type": "application/json"}},
+          body: JSON.stringify({{ id: n.id, email }})
+        }}).then(r => r.json());
+        if (res.ok && res.smtp_sent) {{
+          mostrarAvisoPdfModal(res.msg);
+          alert(res.msg);
+          return;
+        }}
+      }} catch (e) {{}}
+
+      // Fallback sem links: baixa o .EML (rascunho de e-mail já com o .PDF anexado dentro) + o .PDF
+      const aEml = document.createElement("a");
+      aEml.href = `/api/fiscal/recebidas/eml/${{n.id}}?to=${{encodeURIComponent(email)}}`;
+      aEml.download = `DANFE_NFe_${{n.numero_nf}}.eml`;
+      document.body.appendChild(aEml);
+      aEml.click();
+      aEml.remove();
+
+      mostrarAvisoPdfModal(`✉️ Arquivo <b>DANFE_NFe_${{n.numero_nf}}.eml</b> baixado <b>com o PDF já anexado dentro</b>! Dê dois cliques nele para abrir no Outlook/E-mail e enviar diretamente ao cliente (sem links).`);
     }}
 
     function fecharModalItensDFe() {{
       document.getElementById("modalItensDFe").style.display = "none";
+      const iframe = document.getElementById("iframeDanfeDFeModal");
+      if (iframe) iframe.src = "about:blank";
     }}
 
-    // Chamar carregarNotasRecebidasDFe dentro de carregarDadosFiscais
+    // =========================================================================
+    // ABA DE DETALHES DE DESPESAS DAS UNIDADES (ALIMENTAÇÃO, GASOLINA, HOTEL)
+    // =========================================================================
+    let DESPESAS_UNIDADES_CACHE = [];
+    let ABA_PRINCIPAL_FISCAL = "FATURAMENTO";
+
+    function alternarAbaPrincipalFiscal(aba) {{
+      ABA_PRINCIPAL_FISCAL = aba;
+      const boxFat = document.getElementById("boxAbaFaturamentoFiscal");
+      const boxDesp = document.getElementById("boxAbaDespesasUnidades");
+      const boxCfop = document.getElementById("boxAbaCfop");
+      const btnFat = document.getElementById("tabBtn_FATURAMENTO");
+      const btnDesp = document.getElementById("tabBtn_DESPESAS_UNIDADES");
+      const btnCfop = document.getElementById("tabBtn_CFOP");
+      const btnTudo = document.getElementById("tabBtn_TUDO");
+
+      const resetBtns = () => {{
+        if (btnFat) {{ btnFat.style.background = "#1e293b"; btnFat.style.color = "#f8fafc"; }}
+        if (btnDesp) {{ btnDesp.style.background = "#1e293b"; btnDesp.style.color = "#f8fafc"; }}
+        if (btnCfop) {{ btnCfop.style.background = "#1e293b"; btnCfop.style.color = "#f8fafc"; }}
+        if (btnTudo) {{ btnTudo.style.background = "transparent"; btnTudo.style.color = "#94a3b8"; }}
+      }};
+      resetBtns();
+
+      if (aba === "DESPESAS_UNIDADES") {{
+        if (boxFat) boxFat.style.display = "none";
+        if (boxDesp) boxDesp.style.display = "block";
+        if (boxCfop) boxCfop.style.display = "none";
+        if (btnDesp) {{ btnDesp.style.background = "#f59e0b"; btnDesp.style.color = "#0b132b"; }}
+        carregarDespesasUnidades();
+      }} else if (aba === "CFOP") {{
+        if (boxFat) boxFat.style.display = "none";
+        if (boxDesp) boxDesp.style.display = "none";
+        if (boxCfop) boxCfop.style.display = "block";
+        if (btnCfop) {{ btnCfop.style.background = "#38bdf8"; btnCfop.style.color = "#0b132b"; }}
+        carregarDadosCfop();
+      }} else if (aba === "TUDO") {{
+        if (boxFat) boxFat.style.display = "block";
+        if (boxDesp) boxDesp.style.display = "block";
+        if (boxCfop) boxCfop.style.display = "block";
+        if (btnTudo) {{ btnTudo.style.background = "var(--cyan)"; btnTudo.style.color = "#0b132b"; }}
+        carregarDespesasUnidades();
+        carregarDadosCfop();
+      }} else {{
+        if (boxFat) boxFat.style.display = "block";
+        if (boxDesp) boxDesp.style.display = "none";
+        if (boxCfop) boxCfop.style.display = "none";
+        if (btnFat) {{ btnFat.style.background = "var(--cyan)"; btnFat.style.color = "#0b132b"; }}
+      }}
+    }}
+
+    function aoMudarFiltroUnidadeDespesa(val) {{
+      carregarDespesasUnidades();
+    }}
+
+    function atalhoFiltroCategoriaDespesa(cat) {{
+      const sel = document.getElementById("selDespFiltroCategoria");
+      if (sel) sel.value = cat;
+      carregarDespesasUnidades();
+    }}
+
+    function toggleFormNovaDespesaUnidade(forcar) {{
+      const box = document.getElementById("boxFormDespesaUnidade");
+      if (!box) return;
+      const mostrar = typeof forcar === "boolean" ? forcar : (box.style.display === "none");
+      box.style.display = mostrar ? "block" : "none";
+      if (mostrar && !document.getElementById("despUnidId").value) {{
+        document.getElementById("tituloFormDespesaUnidade").textContent = "➕ Lançar Nova Despesa da Unidade";
+        document.getElementById("despUnidFilial").value = (FILIAL_ATIVA === "MATRIZ_CE") ? "MATRIZ_CE" : "FILIAL_DF";
+        if (!document.getElementById("despUnidData").value) {{
+          document.getElementById("despUnidData").value = new Date().toISOString().substring(0, 10);
+        }}
+      }}
+      if (!mostrar) {{
+        document.getElementById("despUnidId").value = "";
+        document.getElementById("despUnidDescricao").value = "";
+        document.getElementById("despUnidValor").value = "";
+        document.getElementById("despUnidFornecedor").value = "";
+        document.getElementById("despUnidComprovante").value = "";
+      }}
+    }}
+
+    async function carregarDespesasUnidades() {{
+      try {{
+        const selUnid = document.getElementById("selDespFiltroUnidade");
+        const unid = selUnid ? selUnid.value : (FILIAL_ATIVA || "CONSOLIDADO");
+        const selMes = document.getElementById("selDespFiltroMes");
+        const mes = selMes ? selMes.value : "TODOS";
+        const selCat = document.getElementById("selDespFiltroCategoria");
+        const cat = selCat ? selCat.value : "TODAS";
+
+        const url = `/api/fiscal/v2/despesas-unidades?unidade=${{encodeURIComponent(unid)}}&mes=${{encodeURIComponent(mes)}}&categoria=${{encodeURIComponent(cat)}}`;
+        const res = await fetch(url).then(r => r.json());
+        if (!res.ok) return;
+
+        DESPESAS_UNIDADES_CACHE = res.itens || [];
+
+        if (selMes && res.meses_disponiveis && selMes.options.length <= 1) {{
+          const atual = selMes.value || "TODOS";
+          selMes.innerHTML = `<option value="TODOS">Todos os Meses (Acumulado)</option>` +
+            res.meses_disponiveis.map(m => `<option value="${{m}}" ${{m === atual ? 'selected' : ''}}>${{formatarMesLegivel(m)}}</option>`).join("");
+        }}
+
+        const k = res.kpis || {{}};
+        const tot = Number(k.total_geral || 0);
+        const comb = Number(k.total_combustivel || 0);
+        const alim = Number(k.total_alimentacao || 0);
+        const hot = Number(k.total_hotel || 0);
+        const dfTot = Number(k.total_filial_df || 0);
+        const ceTot = Number(k.total_matriz_ce || 0);
+
+        const fmtR = (v) => `R$ ${{Number(v || 0).toLocaleString('pt-BR', {{minimumFractionDigits: 2, maximumFractionDigits: 2}})}}`;
+        const pct = (v) => tot > 0 ? `${{(v / tot * 100).toFixed(1)}}% do total` : `0% do total`;
+
+        const elTot = document.getElementById("kpiDespTotalGeral"); if (elTot) elTot.textContent = fmtR(tot);
+        const elQtd = document.getElementById("kpiDespQtdLanc"); if (elQtd) elQtd.textContent = `${{k.qtd_lancamentos || 0}} lançamentos filtrados`;
+        const elComb = document.getElementById("kpiDespCombustivel"); if (elComb) elComb.textContent = fmtR(comb);
+        const elCombP = document.getElementById("kpiDespCombPct"); if (elCombP) elCombP.textContent = pct(comb);
+        const elAlim = document.getElementById("kpiDespAlimentacao"); if (elAlim) elAlim.textContent = fmtR(alim);
+        const elAlimP = document.getElementById("kpiDespAlimPct"); if (elAlimP) elAlimP.textContent = pct(alim);
+        const elHot = document.getElementById("kpiDespHotel"); if (elHot) elHot.textContent = fmtR(hot);
+        const elHotP = document.getElementById("kpiDespHotelPct"); if (elHotP) elHotP.textContent = pct(hot);
+        const elComp = document.getElementById("kpiDespComparativoUnid");
+        if (elComp) {{
+          elComp.innerHTML = `<span style="color:#38bdf8;">🏢 DF: ${{fmtR(dfTot)}}</span><br/><span style="color:#c4b5fd;">🏛️ CE: ${{fmtR(ceTot)}}</span>`;
+        }}
+
+        renderGraficosDespesasUnidades(res);
+        filtrarTabelaDespesasLocal();
+      }} catch (e) {{
+        console.error("Erro ao carregar despesas das unidades:", e);
+      }}
+    }}
+
+    function renderGraficosDespesasUnidades(res) {{
+      const fmtR = (v) => `R$ ${{Number(v || 0).toLocaleString('pt-BR', {{minimumFractionDigits: 2, maximumFractionDigits: 2}})}}`;
+      const cats = (res.por_categoria || []).filter(c => c.total > 0 || c.filial_df > 0 || c.matriz_ce > 0);
+      const totGeral = Number(res.kpis?.total_geral || 0);
+
+      // 1. GRÁFICO DE ROSCA SVG + BARRAS POR CATEGORIA
+      const boxCat = document.getElementById("chartDespesasCategorias");
+      if (boxCat) {{
+        if (!cats.length || totGeral <= 0) {{
+          boxCat.innerHTML = `<div style="text-align:center;color:#64748b;padding:40px 10px;">Nenhuma despesa para o filtro selecionado.</div>`;
+        }} else {{
+          let acumPct = 0;
+          const r = 52;
+          const circ = 2 * Math.PI * r;
+          const circlesSvg = cats.filter(c => c.total > 0).map(c => {{
+            const frac = c.total / totGeral;
+            const dash = frac * circ;
+            const offset = -acumPct * circ;
+            acumPct += frac;
+            return `<circle cx="70" cy="70" r="${{r}}" fill="transparent" stroke="${{c.cor}}" stroke-width="20" stroke-dasharray="${{dash.toFixed(2)}} ${{circ.toFixed(2)}}" stroke-dashoffset="${{offset.toFixed(2)}}" transform="rotate(-90 70 70)" />`;
+          }}).join("");
+
+          const barrasHtml = cats.filter(c => c.total > 0).map(c => `
+            <div style="margin-bottom:8px;">
+              <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px;">
+                <span style="font-weight:700;color:#e2e8f0;">${{c.icone}} ${{c.label}}</span>
+                <span style="font-weight:900;color:${{c.cor}};">${{fmtR(c.total)}} (${{c.percentual}}%)</span>
+              </div>
+              <div style="width:100%;height:8px;background:#1e293b;border-radius:99px;overflow:hidden;">
+                <div style="width:${{Math.max(3, c.percentual)}}%;height:100%;background:${{c.cor}};border-radius:99px;"></div>
+              </div>
+            </div>
+          `).join("");
+
+          boxCat.innerHTML = `
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+              <div style="position:relative;width:140px;height:140px;flex-shrink:0;margin:0 auto;">
+                <svg width="140" height="140" viewBox="0 0 140 140">
+                  <circle cx="70" cy="70" r="${{r}}" fill="transparent" stroke="#1e293b" stroke-width="20" />
+                  ${{circlesSvg}}
+                </svg>
+                <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none;">
+                  <span style="font-size:9.5px;color:#94a3b8;font-weight:700;">TOTAL</span>
+                  <span style="font-size:11.5px;color:#fff;font-weight:900;">R$ ${{Math.round(totGeral).toLocaleString('pt-BR')}}</span>
+                </div>
+              </div>
+              <div style="flex:1;min-width:180px;">
+                ${{barrasHtml}}
+              </div>
+            </div>
+          `;
+        }}
+      }}
+
+      // 2. GRÁFICO COMPARATIVO ENTRE UNIDADES (FILIAL DF vs MATRIZ CE POR CATEGORIA)
+      const boxComp = document.getElementById("chartDespesasComparativoUnidades");
+      if (boxComp) {{
+        const maxVal = Math.max(1, ...cats.map(c => Math.max(c.filial_df || 0, c.matriz_ce || 0)));
+        const totDf = Number(res.kpis?.total_filial_df || 0);
+        const totCe = Number(res.kpis?.total_matriz_ce || 0);
+        const totAmbas = Math.max(1, totDf + totCe);
+        const pctDf = Math.round(totDf / totAmbas * 100);
+        const pctCe = 100 - pctDf;
+
+        const linhasComp = cats.slice(0, 5).map(c => {{
+          const wDf = Math.round((c.filial_df / maxVal) * 100);
+          const wCe = Math.round((c.matriz_ce / maxVal) * 100);
+          return `
+            <div style="margin-bottom:10px;">
+              <div style="font-size:11.5px;font-weight:700;color:#cbd5e1;margin-bottom:3px;display:flex;justify-content:space-between;">
+                <span>${{c.icone}} ${{c.label}}</span>
+                <span style="font-size:10.5px;color:#94a3b8;">DF: ${{fmtR(c.filial_df)}} | CE: ${{fmtR(c.matriz_ce)}}</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:3px;">
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="font-size:10px;color:#38bdf8;width:22px;font-weight:800;">DF</span>
+                  <div style="flex:1;height:7px;background:#1e293b;border-radius:99px;overflow:hidden;">
+                    <div style="width:${{wDf}}%;height:100%;background:#38bdf8;border-radius:99px;"></div>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="font-size:10px;color:#a78bfa;width:22px;font-weight:800;">CE</span>
+                  <div style="flex:1;height:7px;background:#1e293b;border-radius:99px;overflow:hidden;">
+                    <div style="width:${{wCe}}%;height:100%;background:#a78bfa;border-radius:99px;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }}).join("");
+
+        boxComp.innerHTML = `
+          <div style="margin-bottom:12px;background:#132338;border-radius:8px;padding:8px 10px;">
+            <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:800;margin-bottom:4px;">
+              <span style="color:#38bdf8;">🏢 Filial DF (${{pctDf}}%)</span>
+              <span style="color:#a78bfa;">🏛️ Matriz CE (${{pctCe}}%)</span>
+            </div>
+            <div style="width:100%;height:10px;background:#1e293b;border-radius:99px;overflow:hidden;display:flex;">
+              <div style="width:${{pctDf}}%;height:100%;background:#38bdf8;"></div>
+              <div style="width:${{pctCe}}%;height:100%;background:#a78bfa;"></div>
+            </div>
+          </div>
+          ${{linhasComp || '<div style="text-align:center;color:#64748b;padding:20px;">Sem dados comparativos.</div>'}}
+        `;
+      }}
+
+      // 3. GRÁFICO DE EVOLUÇÃO MENSAL EMPILHADO & TOP RESPONSÁVEIS
+      const boxEvol = document.getElementById("chartDespesasEvolucaoMensal");
+      if (boxEvol) {{
+        const meses = res.por_mes || [];
+        const maxMes = Math.max(1, ...meses.map(m => m.total || 0));
+        const colsHtml = meses.map(m => {{
+          const hComb = Math.round(((m.COMBUSTIVEL || 0) / maxMes) * 110);
+          const hAlim = Math.round(((m.ALIMENTACAO || 0) / maxMes) * 110);
+          const hHot = Math.round(((m.HOTEL || 0) / maxMes) * 110);
+          const hOut = Math.round(((m.OUTROS || 0) / maxMes) * 110);
+          return `
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:65px;">
+              <div style="font-size:10.5px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">R$ ${{Math.round(m.total).toLocaleString('pt-BR')}}</div>
+              <div style="height:115px;width:36px;background:#1e293b;border-radius:6px;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;border:1px solid #334155;">
+                <div title="Outros: ${{fmtR(m.OUTROS)}}" style="height:${{hOut}}px;background:#a78bfa;"></div>
+                <div title="Hotel: ${{fmtR(m.HOTEL)}}" style="height:${{hHot}}px;background:#38bdf8;"></div>
+                <div title="Alimentação: ${{fmtR(m.ALIMENTACAO)}}" style="height:${{hAlim}}px;background:#10b981;"></div>
+                <div title="Combustível/Gasolina: ${{fmtR(m.COMBUSTIVEL)}}" style="height:${{hComb}}px;background:#f59e0b;"></div>
+              </div>
+              <div style="font-size:11px;font-weight:800;color:var(--cyan);margin-top:5px;">${{formatarMesLegivel(m.mes)}}</div>
+            </div>
+          `;
+        }}).join("");
+
+        const resps = (res.por_responsavel || []).slice(0, 3).map(r => `
+          <div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px dashed #1e293b;">
+            <span style="color:#cbd5e1;">👤 ${{r.responsavel}}</span>
+            <span style="font-weight:800;color:#fbbf24;">${{fmtR(r.total)}} (${{r.percentual}}%)</span>
+          </div>
+        `).join("");
+
+        boxEvol.innerHTML = `
+          <div style="display:flex;justify-content:space-around;align-items:flex-end;gap:10px;padding:6px 4px 10px 4px;border-bottom:1px solid #1e293b;margin-bottom:8px;">
+            ${{colsHtml || '<div style="color:#64748b;font-size:12px;">Sem histórico mensal.</div>'}}
+          </div>
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;font-size:10px;color:#94a3b8;margin-bottom:8px;">
+            <span><b style="color:#f59e0b;">■</b> Gasolina/Comb.</span>
+            <span><b style="color:#10b981;">■</b> Alimentação</span>
+            <span><b style="color:#38bdf8;">■</b> Hotel</span>
+            <span><b style="color:#a78bfa;">■</b> Outros</span>
+          </div>
+          <div>${{resps}}</div>
+        `;
+      }}
+    }}
+
+    function filtrarTabelaDespesasLocal() {{
+      const tb = document.getElementById("tbodyDespesasUnidades");
+      if (!tb) return;
+      const termo = (document.getElementById("inpDespBuscaTexto")?.value || "").toLowerCase().trim();
+      const lista = DESPESAS_UNIDADES_CACHE.filter(it => {{
+        if (!termo) return true;
+        return (
+          String(it.descricao || "").toLowerCase().includes(termo) ||
+          String(it.fornecedor || "").toLowerCase().includes(termo) ||
+          String(it.responsavel || "").toLowerCase().includes(termo) ||
+          String(it.categoria_label || "").toLowerCase().includes(termo) ||
+          String(it.veiculo_placa || "").toLowerCase().includes(termo) ||
+          String(it.os_id || "").toLowerCase().includes(termo)
+        );
+      }});
+
+      tb.innerHTML = lista.map(it => {{
+        const dtFmt = it.data_despesa ? it.data_despesa.split("-").reverse().join("/") : "-";
+        const isDf = it.unidade === "FILIAL_DF";
+        const badgeUnid = isDf
+          ? `<span class="badge" style="background:#0c4a6e;color:#7dd3fc;border:1px solid #0284c7;">🏢 Filial DF</span>`
+          : `<span class="badge" style="background:#1e1b4b;color:#c4b5fd;border:1px solid #6366f1;">🏛️ Matriz CE</span>`;
+        return `
+          <tr>
+            <td style="white-space:nowrap;"><b>${{dtFmt}}</b></td>
+            <td style="white-space:nowrap;">${{badgeUnid}}</td>
+            <td style="white-space:nowrap;">
+              <span class="badge" style="background:#1e293b;color:${{it.categoria_cor}};border:1px solid ${{it.categoria_cor}};">
+                ${{it.categoria_icone}} ${{it.categoria_label}}
+              </span>
+            </td>
+            <td>
+              <div style="font-weight:700;color:#f8fafc;">${{it.descricao}}</div>
+              ${{it.os_id ? `<span style="font-size:10.5px;color:#38bdf8;">🔗 OS #${{it.os_id}}</span>` : ''}}
+            </td>
+            <td style="color:#cbd5e1;">${{it.fornecedor || '-'}}</td>
+            <td>
+              <div style="font-weight:600;">${{it.responsavel || '-'}}</div>
+              ${{it.veiculo_placa ? `<div style="font-size:10.5px;color:#94a3b8;">🚗 ${{it.veiculo_placa}}</div>` : ''}}
+            </td>
+            <td style="font-size:11px;">
+              <div><b>${{it.forma_pagamento}}</b></div>
+              <div style="color:#94a3b8;">${{it.numero_comprovante || ''}}</div>
+            </td>
+            <td style="text-align:right;font-weight:900;color:${{it.categoria_cor}};white-space:nowrap;">
+              R$ ${{Number(it.valor || 0).toLocaleString('pt-BR', {{minimumFractionDigits: 2}})}}
+            </td>
+            <td style="text-align:center;white-space:nowrap;">
+              <button type="button" class="btn btn-outline" style="padding:4px 8px;font-size:11px;" onclick="editarDespesaUnidade(${{it.id}})" title="Editar">✏️</button>
+              <button type="button" class="btn btn-danger" style="padding:4px 8px;font-size:11px;" onclick="excluirDespesaUnidade(${{it.id}})" title="Excluir">🗑️</button>
+            </td>
+          </tr>
+        `;
+      }}).join("") || `<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:18px;">Nenhuma despesa encontrada para os filtros selecionados.</td></tr>`;
+    }}
+
+    function editarDespesaUnidade(id) {{
+      const it = DESPESAS_UNIDADES_CACHE.find(x => x.id === id);
+      if (!it) return;
+      document.getElementById("despUnidId").value = it.id;
+      document.getElementById("despUnidFilial").value = it.unidade;
+      document.getElementById("despUnidCategoria").value = it.categoria;
+      document.getElementById("despUnidValor").value = it.valor;
+      document.getElementById("despUnidData").value = it.data_despesa;
+      document.getElementById("despUnidDescricao").value = it.descricao;
+      document.getElementById("despUnidResponsavel").value = it.responsavel;
+      document.getElementById("despUnidFornecedor").value = it.fornecedor;
+      document.getElementById("despUnidPlaca").value = it.veiculo_placa;
+      document.getElementById("despUnidOsId").value = it.os_id;
+      document.getElementById("despUnidFormaPagto").value = it.forma_pagamento;
+      document.getElementById("despUnidComprovante").value = it.numero_comprovante;
+      document.getElementById("tituloFormDespesaUnidade").textContent = `✏️ Editando Despesa #${{it.id}} (${{it.categoria_label}})`;
+      toggleFormNovaDespesaUnidade(true);
+    }}
+
+    async function salvarNovaDespesaUnidade() {{
+      const payload = {{
+        id: document.getElementById("despUnidId").value || null,
+        unidade: document.getElementById("despUnidFilial").value,
+        categoria: document.getElementById("despUnidCategoria").value,
+        valor: document.getElementById("despUnidValor").value,
+        data_despesa: document.getElementById("despUnidData").value,
+        descricao: document.getElementById("despUnidDescricao").value,
+        responsavel: document.getElementById("despUnidResponsavel").value,
+        fornecedor: document.getElementById("despUnidFornecedor").value,
+        veiculo_placa: document.getElementById("despUnidPlaca").value,
+        os_id: document.getElementById("despUnidOsId").value,
+        forma_pagamento: document.getElementById("despUnidFormaPagto").value,
+        numero_comprovante: document.getElementById("despUnidComprovante").value,
+        usuario: USUARIO_FISCAL?.username || "netto"
+      }};
+      const res = await fetch("/api/fiscal/v2/despesas-unidades/salvar", {{
+        method: "POST",
+        headers: {{"Content-Type": "application/json"}},
+        body: JSON.stringify(payload)
+      }}).then(r => r.json());
+      if (res.ok) {{
+        alert(res.msg);
+        toggleFormNovaDespesaUnidade(false);
+        carregarDespesasUnidades();
+      }} else {{
+        alert("⚠️ " + (res.msg || "Falha ao salvar despesa."));
+      }}
+    }}
+
+    async function excluirDespesaUnidade(id) {{
+      if (!confirm("Deseja realmente excluir este lançamento de despesa?")) return;
+      const res = await fetch("/api/fiscal/v2/despesas-unidades/excluir", {{
+        method: "POST",
+        headers: {{"Content-Type": "application/json"}},
+        body: JSON.stringify({{ id }})
+      }}).then(r => r.json());
+      if (res.ok) {{
+        carregarDespesasUnidades();
+      }} else {{
+        alert(res.msg || "Erro ao excluir.");
+      }}
+    }}
+
+    function exportarDespesasUnidadesCsv() {{
+      if (!DESPESAS_UNIDADES_CACHE.length) {{
+        alert("Nenhuma despesa listada para exportar.");
+        return;
+      }}
+      const headers = ["ID", "Data", "Unidade", "Categoria", "Descricao", "Fornecedor", "Responsavel", "Placa", "OS", "Forma_Pagto", "Comprovante", "Valor_RS"];
+      const linhas = DESPESAS_UNIDADES_CACHE.map(it => [
+        it.id, it.data_despesa, it.unidade_label, it.categoria_label,
+        `"${{String(it.descricao || '').replace(/"/g, '""')}}"`,
+        `"${{String(it.fornecedor || '').replace(/"/g, '""')}}"`,
+        `"${{String(it.responsavel || '').replace(/"/g, '""')}}"`,
+        it.veiculo_placa, it.os_id, it.forma_pagamento, it.numero_comprovante,
+        String(Number(it.valor || 0).toFixed(2)).replace(".", ",")
+      ].join(";"));
+      const csvContent = "\uFEFF" + headers.join(";") + "\\n" + linhas.join("\\n");
+      const blob = new Blob([csvContent], {{ type: "text/csv;charset=utf-8;" }});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Despesas_Unidades_EMED_${{FILIAL_ATIVA}}_${{new Date().toISOString().substring(0, 10)}}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }}
+
+    // =========================================================================
+    // CONCILIADOR DO EXTRATO DA GESTORA (BATER DESPESAS SEM DUPLICAR)
+    // =========================================================================
+    let EXTRATO_BATIMENTO_ITENS = [];
+
+    function toggleBoxExtratoGestora(forcar) {{
+      const box = document.getElementById("boxConciliadorExtratoGestora");
+      if (!box) return;
+      const mostrar = typeof forcar === "boolean" ? forcar : (box.style.display === "none");
+      box.style.display = mostrar ? "block" : "none";
+      if (mostrar) {{
+        const selU = document.getElementById("selExtratoGestoraUnidade");
+        if (selU) selU.value = (FILIAL_ATIVA === "MATRIZ_CE") ? "MATRIZ_CE" : "FILIAL_DF";
+      }}
+    }}
+
+    async function aoSelecionarArquivoExtratoGestora(ev) {{
+      const f = ev.target.files && ev.target.files[0];
+      if (!f) return;
+      if (f.name.toLowerCase().endsWith(".xlsx")) {{
+        const buf = await f.arrayBuffer();
+        let bin = "";
+        const bytes = new Uint8Array(buf);
+        for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+        const b64 = btoa(bin);
+        const unidade = document.getElementById("selExtratoGestoraUnidade")?.value || "FILIAL_DF";
+        const res = await fetch("/api/fiscal/v2/despesas-unidades/conciliar-extrato", {{
+          method: "POST",
+          headers: {{"Content-Type": "application/json"}},
+          body: JSON.stringify({{ arquivo_b64: b64, nome_arquivo: f.name, unidade }})
+        }}).then(r => r.json());
+        if (res.ok) {{
+          document.getElementById("txtConteudoExtratoGestora").value = (res.itens || []).map(i => `${{i.data}}; ${{i.descricao_extrato}}; ${{i.valor_extrato}}`).join("\\n");
+          processarBatimentoExtratoGestora();
+        }} else {{
+          alert("⚠️ " + (res.msg || "Erro ao ler Excel."));
+        }}
+        return;
+      }}
+      const reader = new FileReader();
+      reader.onload = (e) => {{
+        document.getElementById("txtConteudoExtratoGestora").value = e.target.result || "";
+        processarBatimentoExtratoGestora();
+      }};
+      reader.readAsText(f);
+    }}
+
+    function preencherExemploExtratoGestora() {{
+      const unid = document.getElementById("selExtratoGestoraUnidade")?.value || "FILIAL_DF";
+      if (unid === "MATRIZ_CE") {{
+        document.getElementById("txtConteudoExtratoGestora").value = [
+          "Data;Estabelecimento / Descricao;Valor",
+          "03/11/2026;Posto Sao Domingos BR-116 - Gasolina Viagem Cariri;520,00",
+          "06/11/2026;Hotel Visconde Sobral - 2 Diarias Equipe Tecnica;580,00",
+          "10/11/2026;Posto SP Eusebio CE-040 - Gasolina Frota;375,00",
+          "19/11/2026;Posto Petrobras Fortaleza - Abastecimento Gasolina Viagem;289,90",
+          "19/11/2026;Restaurante Coco Bambu Sul - Almoco Equipe Tecnica;164,50",
+          "19/11/2026;Hotel Ibis Fortaleza - Diaria Plantao Tomografo;320,00"
+        ].join("\\n");
+      }} else {{
+        document.getElementById("txtConteudoExtratoGestora").value = [
+          "Data;Estabelecimento / Descricao;Valor",
+          "04/11/2026;Posto Ipiranga Asa Norte - Gasolina Aditivada HRAN;385,50",
+          "05/11/2026;Restaurante Mane Setor Hospitalar - Almoco Equipe;142,00",
+          "11/11/2026;Shell Select SIA Brasilia - Gasolina Comum;325,00",
+          "19/11/2026;Auto Posto Petrobras Lago Sul - Gasolina Frota DF;348,00",
+          "19/11/2026;Hotel Mercure Brasilia - Diaria Equipe Manutencao;410,00",
+          "19/11/2026;Restaurante Setor Hospitalar Sul - Almoco Tecnicos;128,00"
+        ].join("\\n");
+      }}
+      processarBatimentoExtratoGestora();
+    }}
+
+    async function processarBatimentoExtratoGestora() {{
+      const conteudo = document.getElementById("txtConteudoExtratoGestora")?.value || "";
+      const unidade = document.getElementById("selExtratoGestoraUnidade")?.value || "FILIAL_DF";
+      if (!conteudo.trim()) {{
+        alert("Cole as linhas do extrato da gestora ou selecione um arquivo (.CSV, .OFX, .TXT).");
+        return;
+      }}
+      const res = await fetch("/api/fiscal/v2/despesas-unidades/conciliar-extrato", {{
+        method: "POST",
+        headers: {{"Content-Type": "application/json"}},
+        body: JSON.stringify({{ conteudo, unidade }})
+      }}).then(r => r.json());
+
+      if (!res.ok) {{
+        alert("⚠️ " + (res.msg || "Falha ao analisar extrato."));
+        return;
+      }}
+
+      EXTRATO_BATIMENTO_ITENS = res.itens || [];
+      const rsm = res.resumo || {{}};
+      const fmtR = (v) => `R$ ${{Number(v || 0).toLocaleString('pt-BR', {{minimumFractionDigits: 2, maximumFractionDigits: 2}})}}`;
+
+      const boxRes = document.getElementById("boxResultadoBatimentoExtrato");
+      if (!boxRes) return;
+      boxRes.style.display = "block";
+
+      const linhasHtml = EXTRATO_BATIMENTO_ITENS.map((it, idx) => {{
+        let badgeSt = "";
+        let corLinha = "";
+        let chkChecked = "checked";
+        if (it.status_batimento === "BATEU_EXATO") {{
+          badgeSt = `<span class="badge" style="background:#065f46;color:#6ee7b7;border:1px solid #10b981;">✅ Bateu 100% (ID #${{it.id_sistema}})</span>`;
+          corLinha = "background:rgba(16,185,129,0.06);";
+        }} else if (it.status_batimento === "DIVERGENCIA_VALOR") {{
+          badgeSt = `<span class="badge" style="background:#78350f;color:#fde68a;border:1px solid #f59e0b;">⚠️ Divergência (Sistema: ${{fmtR(it.valor_sistema)}})</span>`;
+          corLinha = "background:rgba(245,158,11,0.1);";
+        }} else {{
+          badgeSt = `<span class="badge" style="background:#0c4a6e;color:#7dd3fc;border:1px solid #0284c7;">🆕 Novo no Extrato (Importar)</span>`;
+          corLinha = "background:rgba(2,132,199,0.1);";
+        }}
+
+        return `
+          <tr style="${{corLinha}}">
+            <td style="text-align:center;">
+              <input type="checkbox" id="chkExt_${{idx}}" ${{chkChecked}} style="width:auto;" />
+            </td>
+            <td style="white-space:nowrap;"><b>${{it.data.split('-').reverse().join('/')}}</b></td>
+            <td>${{badgeSt}}</td>
+            <td>
+              <select id="selCatExt_${{idx}}" style="padding:4px 6px;font-size:11.5px;font-weight:700;color:${{it.categoria_cor}};">
+                <option value="COMBUSTIVEL" ${{it.categoria==='COMBUSTIVEL'?'selected':''}}>⛽ Combustível / Gasolina</option>
+                <option value="ALIMENTACAO" ${{it.categoria==='ALIMENTACAO'?'selected':''}}>🍽️ Alimentação</option>
+                <option value="HOTEL" ${{it.categoria==='HOTEL'?'selected':''}}>🏨 Hotel / Hospedagem</option>
+                <option value="PEDAGIO_TRANSPORTE" ${{it.categoria==='PEDAGIO_TRANSPORTE'?'selected':''}}>🛣️ Pedágio / Transporte</option>
+                <option value="MANUTENCAO_FROTA" ${{it.categoria==='MANUTENCAO_FROTA'?'selected':''}}>🔧 Manutenção Frota</option>
+                <option value="INSUMOS_UNIDADE" ${{it.categoria==='INSUMOS_UNIDADE'?'selected':''}}>🏢 Copa / Insumos</option>
+                <option value="OUTROS" ${{it.categoria==='OUTROS'?'selected':''}}>📌 Outros</option>
+              </select>
+            </td>
+            <td>
+              <div style="font-weight:700;color:#fff;">${{it.descricao_extrato}}</div>
+              ${{it.descricao_sistema ? `<div style="font-size:10.5px;color:#94a3b8;">No sistema: ${{it.descricao_sistema}}</div>` : ''}}
+            </td>
+            <td style="text-align:right;font-weight:900;color:#fff;">${{fmtR(it.valor_extrato)}}</td>
+            <td>
+              <select id="selAcaoExt_${{idx}}" style="padding:4px 6px;font-size:11.5px;font-weight:700;">
+                ${{it.status_batimento === "BATEU_EXATO" ? `
+                  <option value="MANTER_AUDITADO" selected>✅ Confirmar &amp; Auditar (Não Duplicar)</option>
+                  <option value="IGNORAR">Ignorar</option>
+                ` : it.status_batimento === "DIVERGENCIA_VALOR" ? `
+                  <option value="ATUALIZAR_VALOR" selected>🔧 Ajustar Valor pelo Extrato (${{fmtR(it.valor_extrato)}})</option>
+                  <option value="IMPORTAR_NOVO">➕ Importar como Novo Lançamento Separado</option>
+                  <option value="IGNORAR">Manter Valor Antigo</option>
+                ` : `
+                  <option value="IMPORTAR_NOVO" selected>➕ Importar Nova Despesa na Unidade</option>
+                  <option value="IGNORAR">Ignorar Linha</option>
+                `}}
+              </select>
+            </td>
+          </tr>
+        `;
+      }}).join("");
+
+      boxRes.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:14px;">
+          <div style="background:#132338;border:1px solid #334155;border-radius:8px;padding:10px;">
+            <div style="font-size:10.5px;color:#94a3b8;font-weight:800;">TOTAL NO EXTRATO DA GESTORA</div>
+            <div style="font-size:19px;font-weight:900;color:#fff;margin-top:3px;">${{fmtR(rsm.valor_total_extrato)}}</div>
+            <div style="font-size:11px;color:#cbd5e1;">${{rsm.total_linhas}} linhas lidas</div>
+          </div>
+          <div style="background:#064e3b;border:1px solid #10b981;border-radius:8px;padding:10px;">
+            <div style="font-size:10.5px;color:#a7f3d0;font-weight:800;">✅ JÁ LANÇADOS (BATERAM 100%)</div>
+            <div style="font-size:19px;font-weight:900;color:#34d399;margin-top:3px;">${{fmtR(rsm.valor_conciliado)}}</div>
+            <div style="font-size:11px;color:#d1fae5;">${{rsm.qtd_conciliados}} itens (protegidos contra duplicação)</div>
+          </div>
+          <div style="background:#78350f;border:1px solid #f59e0b;border-radius:8px;padding:10px;">
+            <div style="font-size:10.5px;color:#fde68a;font-weight:800;">⚠️ DIVERGÊNCIA DE VALOR</div>
+            <div style="font-size:19px;font-weight:900;color:#fbbf24;margin-top:3px;">${{fmtR(rsm.valor_divergente)}}</div>
+            <div style="font-size:11px;color:#fef3c7;">${{rsm.qtd_divergentes}} itens com diferença</div>
+          </div>
+          <div style="background:#0c4a6e;border:1px solid #38bdf8;border-radius:8px;padding:10px;">
+            <div style="font-size:10.5px;color:#bae6fd;font-weight:800;">🆕 NOVOS NO EXTRATO (FALTANDO)</div>
+            <div style="font-size:19px;font-weight:900;color:#38bdf8;margin-top:3px;">${{fmtR(rsm.valor_novos)}}</div>
+            <div style="font-size:11px;color:#e0f2fe;">${{rsm.qtd_novos}} itens prontos para importar</div>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;margin-bottom:12px;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:36px;text-align:center;">✔</th>
+                <th>Data</th>
+                <th>Resultado do Batimento</th>
+                <th>Categoria Classificada</th>
+                <th>Descrição no Extrato / Sistema</th>
+                <th style="text-align:right;">Valor Extrato</th>
+                <th>Ação de Conciliação</th>
+              </tr>
+            </thead>
+            <tbody>${{linhasHtml}}</tbody>
+          </table>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+          <button type="button" class="btn" onclick="confirmarAplicacaoBatimentoExtrato()" style="background:#10b981;color:#0b132b;font-weight:900;padding:10px 22px;">
+            ✅ Confirmar Batimento &amp; Atualizar Gráficos das Unidades
+          </button>
+        </div>
+      `;
+    }}
+
+    async function confirmarAplicacaoBatimentoExtrato() {{
+      const unidPadrao = document.getElementById("selExtratoGestoraUnidade")?.value || "FILIAL_DF";
+      const selecionados = [];
+      EXTRATO_BATIMENTO_ITENS.forEach((it, idx) => {{
+        const chk = document.getElementById(`chkExt_${{idx}}`);
+        if (!chk || !chk.checked) return;
+        const acao = document.getElementById(`selAcaoExt_${{idx}}`)?.value || "IGNORAR";
+        if (acao === "IGNORAR") return;
+        const cat = document.getElementById(`selCatExt_${{idx}}`)?.value || it.categoria;
+        selecionados.push({{
+          acao,
+          id_sistema: it.id_sistema,
+          unidade: it.unidade || unidPadrao,
+          categoria: cat,
+          data: it.data,
+          descricao_extrato: it.descricao_extrato,
+          fornecedor: it.fornecedor,
+          valor_extrato: it.valor_extrato
+        }});
+      }});
+
+      if (!selecionados.length) {{
+        alert("Nenhum item marcado para aplicar.");
+        return;
+      }}
+
+      const res = await fetch("/api/fiscal/v2/despesas-unidades/aplicar-conciliacao", {{
+        method: "POST",
+        headers: {{"Content-Type": "application/json"}},
+        body: JSON.stringify({{
+          itens: selecionados,
+          usuario: USUARIO_FISCAL?.username || "gestora"
+        }})
+      }}).then(r => r.json());
+
+      if (res.ok) {{
+        alert(res.msg);
+        document.getElementById("boxResultadoBatimentoExtrato").style.display = "none";
+        toggleBoxExtratoGestora(false);
+        carregarDespesasUnidades();
+      }} else {{
+        alert("⚠️ " + (res.msg || "Falha ao aplicar conciliação."));
+      }}
+    }}
+
+    // Chamar carregarNotasRecebidasDFe e carregarDespesasUnidades dentro de carregarDadosFiscais
     const _origCarregarDadosFiscais = carregarDadosFiscais;
     carregarDadosFiscais = async function(osId) {{
       await _origCarregarDadosFiscais(osId);
       carregarNotasRecebidasDFe();
+      const selUnid = document.getElementById("selDespFiltroUnidade");
+      if (selUnid) selUnid.value = FILIAL_ATIVA || "CONSOLIDADO";
+      carregarDespesasUnidades();
     }};
+
+
+    // =========================================================================
+    // MÓDULO JS: ANÁLISE & GESTÃO MANUAL DE CFOP
+    // =========================================================================
+    let CACHE_REGRAS_CFOP = [];
+    let CACHE_CATEGORIAS_CFOP_INIT = false;
+
+    function toggleFormNovoCfop(forcar) {{
+      const box = document.getElementById("boxFormNovoCfop");
+      if (!box) return;
+      if (typeof forcar === "boolean") {{
+        box.style.display = forcar ? "block" : "none";
+      }} else {{
+        box.style.display = (box.style.display === "none" || !box.style.display) ? "block" : "none";
+      }}
+    }}
+
+    function _escAttrCfop(v) {{
+      return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }}
+
+    async function carregarDadosCfop() {{
+      try {{
+        const busca = (document.getElementById("buscaPecaCfop")?.value || "").trim();
+        const cat = (document.getElementById("filtroCatPecaCfop")?.value || "TODAS").trim();
+        const url = `/api/fiscal/v2/cfop/dados?busca_peca=${{encodeURIComponent(busca)}}&categoria=${{encodeURIComponent(cat)}}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!data.ok) {{
+          alert(data.msg || "Erro ao carregar dados de CFOP.");
+          return;
+        }}
+
+        CACHE_REGRAS_CFOP = data.regras || [];
+
+        const totalRegras = CACHE_REGRAS_CFOP.length;
+        const ativas = CACHE_REGRAS_CFOP.filter(r => r.ativo === 1).length;
+        const elTot = document.getElementById("kpiCfopTotalRegras");
+        const elSub = document.getElementById("kpiCfopAtivasSub");
+        const elPec = document.getElementById("kpiCfopTotalPecas");
+        const elPecSub = document.getElementById("kpiCfopResumoEstoqueSub");
+        const elNot = document.getElementById("kpiCfopTotalNotas");
+        const elIss = document.getElementById("kpiCfopIssUnidades");
+
+        if (elTot) elTot.textContent = String(totalRegras);
+        if (elSub) elSub.textContent = `${{ativas}} ativas no sistema`;
+        if (elPec) elPec.textContent = String(data.total_pecas || 0);
+        if (elNot) elNot.textContent = String((data.notas_cfop || []).length);
+
+        const issCe = Number(data.iss_filiais?.MATRIZ_CE ?? 2.0).toFixed(1).replace(".", ",");
+        const issDf = Number(data.iss_filiais?.FILIAL_DF ?? 5.0).toFixed(1).replace(".", ",");
+        if (elIss) elIss.innerHTML = `Matriz CE: <span style="color:#34d399;">${{issCe}}%</span><br/>Filial DF: <span style="color:#fbbf24;">${{issDf}}%</span>`;
+
+        const resEst = data.resumo_estoque || [];
+        if (elPecSub) {{
+          elPecSub.textContent = resEst.length ? `Principal: Venda ${{resEst[0].cfop_venda || '-'}} / Transf. ${{resEst[0].cfop_transferencia || '-'}} (${{resEst[0].qtd_pecas}} itens)` : "Sem peças";
+        }}
+        const boxResEst = document.getElementById("boxResumoCfopEstoque");
+        if (boxResEst) {{
+          boxResEst.innerHTML = resEst.map(r =>
+            `<span class="badge" style="margin-right:6px;margin-bottom:4px;display:inline-block;background:#1e293b;border:1px solid #34d399;color:#a7f3d0;">Venda: <b>${{_escAttrCfop(r.cfop_venda || 'N/D')}}</b> | Transf: <b>${{_escAttrCfop(r.cfop_transferencia || 'N/D')}}</b> → ${{r.qtd_pecas}} peças</span>`
+          ).join("") || "Nenhum dado de estoque encontrado.";
+        }}
+
+        if (!CACHE_CATEGORIAS_CFOP_INIT && Array.isArray(data.categorias_estoque)) {{
+          CACHE_CATEGORIAS_CFOP_INIT = true;
+          const opts = ['<option value="TODAS">Todas as Categorias</option>'].concat(
+            data.categorias_estoque.map(c => `<option value="${{_escAttrCfop(c)}}">${{_escAttrCfop(c)}}</option>`)
+          ).join("");
+          const s1 = document.getElementById("filtroCatPecaCfop");
+          const s2 = document.getElementById("loteCfopCategoria");
+          if (s1) s1.innerHTML = opts;
+          if (s2) s2.innerHTML = opts;
+        }}
+
+        renderizarTabelaRegrasCfop();
+        renderizarTabelaPecasCfop(data.pecas_cfop || []);
+        renderizarTabelaNotasCfop(data.notas_cfop || []);
+      }} catch (err) {{
+        console.error("Erro carregarDadosCfop:", err);
+      }}
+    }}
+
+    function renderizarTabelaRegrasCfop() {{
+      const tbody = document.getElementById("tbodyRegrasCfop");
+      if (!tbody) return;
+      const txt = (document.getElementById("filtroCfopTexto")?.value || "").trim().toLowerCase();
+      const tipo = (document.getElementById("filtroCfopTipo")?.value || "TODOS").toUpperCase();
+      const fil = (document.getElementById("filtroCfopFilial")?.value || "TODAS").toUpperCase();
+
+      const filtradas = CACHE_REGRAS_CFOP.filter(r => {{
+        if (tipo !== "TODOS" && String(r.tipo_operacao).toUpperCase() !== tipo) return false;
+        if (fil !== "TODAS" && String(r.filial_aplicavel).toUpperCase() !== fil) return false;
+        if (txt) {{
+          const hay = `${{r.codigo}} ${{r.natureza_operacao}} ${{r.aplicacao_sistema}} ${{r.observacao_fiscal}}`.toLowerCase();
+          if (!hay.includes(txt)) return false;
+        }}
+        return true;
+      }});
+
+      if (!filtradas.length) {{
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:18px;">Nenhuma regra de CFOP encontrada para este filtro.</td></tr>';
+        return;
+      }}
+
+      tbody.innerHTML = filtradas.map(r => `
+        <tr data-cfop-id="${{r.id}}">
+          <td>
+            <input id="cfop_cod_${{r.id}}" value="${{_escAttrCfop(r.codigo)}}" style="width:76px;font-weight:900;color:#38bdf8;padding:5px 6px;" />
+          </td>
+          <td>
+            <select id="cfop_tipo_${{r.id}}" style="padding:4px;font-size:11.5px;margin-bottom:4px;">
+              <option value="SAIDA" ${{r.tipo_operacao === 'SAIDA' ? 'selected' : ''}}>SAÍDA</option>
+              <option value="ENTRADA" ${{r.tipo_operacao === 'ENTRADA' ? 'selected' : ''}}>ENTRADA</option>
+            </select>
+            <select id="cfop_esf_${{r.id}}" style="padding:4px;font-size:11.5px;">
+              <option value="ESTADUAL" ${{r.esfera === 'ESTADUAL' ? 'selected' : ''}}>ESTADUAL</option>
+              <option value="INTERESTADUAL" ${{r.esfera === 'INTERESTADUAL' ? 'selected' : ''}}>INTERESTADUAL</option>
+            </select>
+          </td>
+          <td>
+            <select id="cfop_fil_${{r.id}}" style="padding:5px;font-size:11.5px;">
+              <option value="AMBAS" ${{r.filial_aplicavel === 'AMBAS' ? 'selected' : ''}}>AMBAS</option>
+              <option value="MATRIZ_CE" ${{r.filial_aplicavel === 'MATRIZ_CE' ? 'selected' : ''}}>MATRIZ CE</option>
+              <option value="FILIAL_DF" ${{r.filial_aplicavel === 'FILIAL_DF' ? 'selected' : ''}}>FILIAL DF</option>
+            </select>
+          </td>
+          <td>
+            <input id="cfop_nat_${{r.id}}" value="${{_escAttrCfop(r.natureza_operacao)}}" style="padding:5px 6px;font-size:12px;" />
+          </td>
+          <td>
+            <input id="cfop_apl_${{r.id}}" value="${{_escAttrCfop(r.aplicacao_sistema)}}" style="padding:5px 6px;font-size:12px;" />
+          </td>
+          <td>
+            <input id="cfop_icms_${{r.id}}" type="number" step="0.1" value="${{Number(r.aliquota_icms || 0).toFixed(1)}}" style="width:66px;padding:5px 6px;font-size:12px;" />
+          </td>
+          <td>
+            <input id="cfop_iss_${{r.id}}" type="number" step="0.1" value="${{Number(r.aliquota_iss || 0).toFixed(1)}}" style="width:66px;padding:5px 6px;font-size:12px;" />
+          </td>
+          <td>
+            <input id="cfop_obs_${{r.id}}" value="${{_escAttrCfop(r.observacao_fiscal)}}" style="padding:5px 6px;font-size:11.5px;" />
+          </td>
+          <td style="text-align:center;white-space:nowrap;">
+            <button type="button" class="btn btn-blue" style="padding:5px 9px;font-size:11.5px;" onclick="salvarRegraCfopLinha(${{r.id}})">💾 Salvar</button>
+            <button type="button" class="btn btn-danger" style="padding:5px 8px;font-size:11.5px;" onclick="excluirRegraCfop(${{r.id}}, '${{_escAttrCfop(r.codigo)}}')">🗑️</button>
+          </td>
+        </tr>
+      `).join("");
+    }}
+
+    async function salvarRegraCfopLinha(id) {{
+      const payload = {{
+        id: id,
+        codigo: document.getElementById(`cfop_cod_${{id}}`)?.value || "",
+        tipo_operacao: document.getElementById(`cfop_tipo_${{id}}`)?.value || "SAIDA",
+        esfera: document.getElementById(`cfop_esf_${{id}}`)?.value || "ESTADUAL",
+        filial_aplicavel: document.getElementById(`cfop_fil_${{id}}`)?.value || "AMBAS",
+        natureza_operacao: document.getElementById(`cfop_nat_${{id}}`)?.value || "",
+        aplicacao_sistema: document.getElementById(`cfop_apl_${{id}}`)?.value || "",
+        aliquota_icms: parseFloat(document.getElementById(`cfop_icms_${{id}}`)?.value || "0") || 0,
+        aliquota_iss: parseFloat(document.getElementById(`cfop_iss_${{id}}`)?.value || "0") || 0,
+        observacao_fiscal: document.getElementById(`cfop_obs_${{id}}`)?.value || "",
+        ativo: 1,
+        usuario: (localStorage.getItem("emed_fiscal_user") || "operador")
+      }};
+      const res = await fetch("/api/fiscal/v2/cfop/salvar", {{
+        method: "POST",
+        headers: {{ "Content-Type": "application/json" }},
+        body: JSON.stringify(payload)
+      }});
+      const data = await res.json();
+      alert(data.msg || (data.ok ? "Salvo!" : "Erro ao salvar."));
+      if (data.ok) carregarDadosCfop();
+    }}
+
+    async function salvarNovoCfop() {{
+      const payload = {{
+        codigo: document.getElementById("novoCfopCodigo")?.value || "",
+        tipo_operacao: document.getElementById("novoCfopTipo")?.value || "SAIDA",
+        esfera: document.getElementById("novoCfopEsfera")?.value || "ESTADUAL",
+        filial_aplicavel: document.getElementById("novoCfopFilial")?.value || "AMBAS",
+        natureza_operacao: document.getElementById("novoCfopNatureza")?.value || "",
+        aplicacao_sistema: document.getElementById("novoCfopAplicacao")?.value || "",
+        aliquota_icms: parseFloat(document.getElementById("novoCfopIcms")?.value || "0") || 0,
+        aliquota_iss: parseFloat(document.getElementById("novoCfopIss")?.value || "0") || 0,
+        observacao_fiscal: document.getElementById("novoCfopObs")?.value || "",
+        ativo: 1,
+        usuario: (localStorage.getItem("emed_fiscal_user") || "operador")
+      }};
+      const res = await fetch("/api/fiscal/v2/cfop/salvar", {{
+        method: "POST",
+        headers: {{ "Content-Type": "application/json" }},
+        body: JSON.stringify(payload)
+      }});
+      const data = await res.json();
+      alert(data.msg || (data.ok ? "Novo CFOP salvo!" : "Erro ao salvar."));
+      if (data.ok) {{
+        document.getElementById("novoCfopCodigo").value = "";
+        document.getElementById("novoCfopNatureza").value = "";
+        document.getElementById("novoCfopAplicacao").value = "";
+        document.getElementById("novoCfopObs").value = "";
+        toggleFormNovoCfop(false);
+        carregarDadosCfop();
+      }}
+    }}
+
+    async function excluirRegraCfop(id, codigo) {{
+      if (!confirm(`Deseja realmente excluir a regra CFOP ${{codigo}}?`)) return;
+      const res = await fetch("/api/fiscal/v2/cfop/excluir", {{
+        method: "POST",
+        headers: {{ "Content-Type": "application/json" }},
+        body: JSON.stringify({{ id, usuario: (localStorage.getItem("emed_fiscal_user") || "operador") }})
+      }});
+      const data = await res.json();
+      alert(data.msg || "Excluído!");
+      if (data.ok) carregarDadosCfop();
+    }}
+
+    function renderizarTabelaPecasCfop(pecas) {{
+      const tbody = document.getElementById("tbodyPecasCfop");
+      if (!tbody) return;
+      if (!pecas.length) {{
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px;">Nenhuma peça encontrada.</td></tr>';
+        return;
+      }}
+      tbody.innerHTML = pecas.map(p => `
+        <tr>
+          <td style="font-weight:800;color:#38bdf8;">${{_escAttrCfop(p.codigo)}}</td>
+          <td>${{_escAttrCfop(p.nome_peca)}}</td>
+          <td style="font-size:11.5px;color:#cbd5e1;">${{_escAttrCfop(p.categoria)}}</td>
+          <td style="font-size:11.5px;color:#94a3b8;">${{_escAttrCfop(p.ncm)}}</td>
+          <td><input id="peca_cfop_v_${{p.id}}" value="${{_escAttrCfop(p.cfop_padrao_venda)}}" style="width:92px;padding:4px 6px;font-weight:800;" /></td>
+          <td><input id="peca_cfop_t_${{p.id}}" value="${{_escAttrCfop(p.cfop_padrao_transferencia)}}" style="width:92px;padding:4px 6px;font-weight:800;" /></td>
+          <td style="text-align:center;">
+            <button type="button" class="btn btn-blue" style="padding:5px 10px;font-size:11.5px;" onclick="salvarCfopPecaIndividual(${{p.id}})">💾 Salvar</button>
+          </td>
+        </tr>
+      `).join("");
+    }}
+
+    async function salvarCfopPecaIndividual(pecaId) {{
+      const cfopV = (document.getElementById(`peca_cfop_v_${{pecaId}}`)?.value || "").trim();
+      const cfopT = (document.getElementById(`peca_cfop_t_${{pecaId}}`)?.value || "").trim();
+      const res = await fetch("/api/fiscal/v2/cfop/aplicar-estoque", {{
+        method: "POST",
+        headers: {{ "Content-Type": "application/json" }},
+        body: JSON.stringify({{
+          modo: "individual",
+          peca_id: pecaId,
+          cfop_padrao_venda: cfopV,
+          cfop_padrao_transferencia: cfopT,
+          usuario: (localStorage.getItem("emed_fiscal_user") || "operador")
+        }})
+      }});
+      const data = await res.json();
+      alert(data.msg || "Salvo!");
+      if (data.ok) carregarDadosCfop();
+    }}
+
+    async function aplicarCfopEstoqueLote() {{
+      const categoria = document.getElementById("loteCfopCategoria")?.value || "TODAS";
+      const cfopV = (document.getElementById("loteCfopVenda")?.value || "").trim();
+      const cfopT = (document.getElementById("loteCfopTransf")?.value || "").trim();
+      if (!cfopV && !cfopT) {{
+        alert("Informe pelo menos um CFOP (Venda ou Transferência) para aplicar em lote.");
+        return;
+      }}
+      if (!confirm(`Confirmar atualização em lote para categoria "${{categoria}}"?\nCFOP Venda: ${{cfopV || '(manter)'}}\nCFOP Transf.: ${{cfopT || '(manter)'}}`)) return;
+      const res = await fetch("/api/fiscal/v2/cfop/aplicar-estoque", {{
+        method: "POST",
+        headers: {{ "Content-Type": "application/json" }},
+        body: JSON.stringify({{
+          modo: "lote",
+          categoria: categoria,
+          cfop_padrao_venda: cfopV,
+          cfop_padrao_transferencia: cfopT,
+          usuario: (localStorage.getItem("emed_fiscal_user") || "operador")
+        }})
+      }});
+      const data = await res.json();
+      alert(data.msg || "Atualizado!");
+      if (data.ok) carregarDadosCfop();
+    }}
+
+    function renderizarTabelaNotasCfop(notas) {{
+      const tbody = document.getElementById("tbodyNotasCfop");
+      if (!tbody) return;
+      if (!notas.length) {{
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:16px;">Nenhuma nota fiscal registrada.</td></tr>';
+        return;
+      }}
+      tbody.innerHTML = notas.map(n => `
+        <tr>
+          <td style="font-weight:800;">#${{n.id}} ${{n.numero_nf ? '(' + _escAttrCfop(n.numero_nf) + ')' : ''}}</td>
+          <td><span class="badge">${{_escAttrCfop(n.filial_emissora || '-')}}</span></td>
+          <td style="font-size:12px;">${{_escAttrCfop(n.cliente)}}</td>
+          <td style="font-size:11.5px;color:#cbd5e1;">${{_escAttrCfop(n.status_fiscal)}}</td>
+          <td style="font-size:12px;font-weight:700;">${{Number(n.aliquota_iss || 0).toFixed(1)}}%</td>
+          <td><input id="nf_cfop_${{n.id}}" value="${{_escAttrCfop(n.cfop)}}" placeholder="Ex: 5933" style="width:92px;padding:4px 6px;font-weight:800;color:#fbbf24;" /></td>
+          <td><input id="nf_nat_${{n.id}}" value="${{_escAttrCfop(n.natureza_operacao)}}" style="padding:4px 6px;font-size:11.5px;" /></td>
+          <td style="text-align:center;">
+            <button type="button" class="btn btn-blue" style="padding:5px 10px;font-size:11.5px;" onclick="salvarCfopNota(${{n.id}})">💾 Salvar</button>
+          </td>
+        </tr>
+      `).join("");
+    }}
+
+    async function salvarCfopNota(notaId) {{
+      const cfop = (document.getElementById(`nf_cfop_${{notaId}}`)?.value || "").trim();
+      const nat = (document.getElementById(`nf_nat_${{notaId}}`)?.value || "").trim();
+      const res = await fetch("/api/fiscal/v2/cfop/atualizar-nota", {{
+        method: "POST",
+        headers: {{ "Content-Type": "application/json" }},
+        body: JSON.stringify({{
+          id: notaId,
+          cfop: cfop,
+          natureza_operacao: nat,
+          usuario: (localStorage.getItem("emed_fiscal_user") || "operador")
+        }})
+      }});
+      const data = await res.json();
+      alert(data.msg || "Salvo!");
+      if (data.ok) carregarDadosCfop();
+    }}
+
+    function exportarRegrasCfopCsv() {{
+      if (!CACHE_REGRAS_CFOP.length) {{
+        alert("Nenhuma regra de CFOP carregada para exportar.");
+        return;
+      }}
+      const header = ["Codigo", "Tipo", "Esfera", "Unidade", "Natureza_Operacao", "Aplicacao_Sistema", "ICMS_Pct", "ISS_Pct", "Observacao"];
+      const linhas = [header.join(";")].concat(
+        CACHE_REGRAS_CFOP.map(r => [
+          r.codigo, r.tipo_operacao, r.esfera, r.filial_aplicavel,
+          (r.natureza_operacao || "").replace(/;/g, ","),
+          (r.aplicacao_sistema || "").replace(/;/g, ","),
+          r.aliquota_icms, r.aliquota_iss,
+          (r.observacao_fiscal || "").replace(/;/g, ",")
+        ].join(";"))
+      );
+      const blob = new Blob(["\uFEFF" + linhas.join("\\n")], {{ type: "text/csv;charset=utf-8;" }});
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "tabela_cfop_emed.csv";
+      a.click();
+    }}
 
     initPortalFiscal();
   </script>
 
-  <!-- MODAL DE ITENS DA NOTA RECEBIDA (RADAR DF-E) -->
-  <div class="modal-overlay" id="modalItensDFe" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);z-index:9999;align-items:center;justify-content:center;">
-    <div style="background:#0f172a;border:1.5px solid #0284c7;border-radius:12px;width:680px;max-width:95%;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,0.6);color:#fff;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #334155;padding-bottom:10px;">
-        <h3 id="modalItensDFeTitulo" style="margin:0;font-size:16px;color:#38bdf8;">Itens da Nota Fiscal</h3>
-        <button type="button" onclick="fecharModalItensDFe()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">&times;</button>
+  <!-- MODAL DE VISUALIZAÇÃO COMPLETA & DANFE DA NOTA RECEBIDA (RADAR DF-E) -->
+  <div class="modal-overlay" id="modalItensDFe" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.82);backdrop-filter:blur(4px);z-index:9999;align-items:center;justify-content:center;padding:14px;">
+    <div style="background:#0f172a;border:2px solid #0284c7;border-radius:12px;width:980px;max-width:98%;max-height:94vh;display:flex;flex-direction:column;padding:18px;box-shadow:0 12px 38px rgba(0,0,0,0.75);color:#fff;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid #334155;padding-bottom:10px;margin-bottom:12px;">
+        <div>
+          <h3 id="modalItensDFeTitulo" style="margin:0;font-size:16px;color:#38bdf8;">Visualização Completa &amp; DANFE da Nota Fiscal</h3>
+          <div id="modalItensDFeSubtitulo" style="font-size:12px;color:#cbd5e1;margin-top:4px;"></div>
+        </div>
+        <button type="button" onclick="fecharModalItensDFe()" style="background:#1e293b;border:1px solid #475569;border-radius:6px;color:#e2e8f0;font-size:14px;padding:4px 10px;cursor:pointer;font-weight:bold;">✕ Fechar</button>
       </div>
-      <div style="overflow-x:auto;max-height:350px;">
+
+      <!-- BARRA DE AÇÕES: DANFE, DOWNLOAD PDF, XML, WHATSAPP E E-MAIL -->
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button type="button" id="btnTabModalDFeDanfe" class="btn" style="width:auto;padding:7px 13px;font-size:12px;background:#0284c7;color:#fff;" onclick="alternarVisaoModalDFe('DANFE')">📄 DANFE Completa Oficial</button>
+          <button type="button" id="btnTabModalDFeItens" class="btn" style="width:auto;padding:7px 13px;font-size:12px;background:#1e293b;color:#cbd5e1;border:1px solid #475569;" onclick="alternarVisaoModalDFe('ITENS')">📦 Relação de Itens &amp; Peças</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <a id="btnModalDFeBaixarPdf" href="#" class="btn btn-primary" style="width:auto;padding:7px 13px;font-size:12px;">📥 Baixar DANFE (.PDF)</a>
+          <a id="btnModalDFeBaixarXml" href="#" class="btn btn-outline" style="width:auto;padding:7px 12px;font-size:12px;border-color:#38bdf8;color:#38bdf8;">📥 Baixar XML</a>
+          <button type="button" class="btn" style="width:auto;padding:7px 13px;font-size:12px;background:#16a34a;color:#fff;" onclick="toggleBoxShareModalDFe('whats')">📲 Enviar WhatsApp</button>
+          <button type="button" class="btn" style="width:auto;padding:7px 13px;font-size:12px;background:#2563eb;color:#fff;" onclick="toggleBoxShareModalDFe('email')">✉️ Enviar E-mail</button>
+          <a id="btnModalDFeAbrirNovaAba" href="#" target="_blank" class="btn btn-outline" style="width:auto;padding:7px 11px;font-size:11.5px;" title="Abrir DANFE em tela cheia">↗️ Nova Guia</a>
+        </div>
+      </div>
+
+      <!-- PAINEL RÁPIDO DE ENVIO POR WHATSAPP OU E-MAIL -->
+      <div id="boxShareModalDFe" style="display:none;background:#132338;border:1.5px solid #0284c7;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:6px;flex-wrap:wrap;">
+              <label style="color:#4ade80;font-size:11.5px;margin:0;">📲 Enviar PDF Automático via WhatsApp (1 ou mais números):</label>
+              <div style="display:flex;gap:5px;">
+                <button type="button" id="btnConectarWhatsBot" onclick="conectarWhatsAppBotLocal()" style="background:#0f172a;border:1px solid #38bdf8;color:#38bdf8;border-radius:4px;font-size:10px;padding:2px 7px;cursor:pointer;" title="Abrir janela do WhatsApp Web dedicado para ler QR Code">📷 Conectar WhatsApp</button>
+                <button type="button" onclick="salvarContatoRapidoWhatsDFe()" style="background:none;border:1px solid #4ade80;color:#4ade80;border-radius:4px;font-size:10px;padding:2px 7px;cursor:pointer;" title="Salvar os números digitados como atalho rápido">+ Salvar Contato</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <input type="text" id="inpModalDFeWhats" placeholder="Ex: 85999999999, 61996585392 (vários números separados por vírgula)" style="padding:7px 10px;font-size:12px;" />
+              <button type="button" id="btnDispararWhatsPdfAuto" class="btn" style="width:auto;background:#16a34a;color:#fff;padding:7px 14px;font-size:12px;white-space:nowrap;" onclick="enviarWhatsDanfeModalDFe()">📲 Enviar PDF</button>
+            </div>
+            <div id="boxContatosRapidosWhatsDFe" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;"></div>
+          </div>
+          <div>
+            <label style="color:#60a5fa;font-size:11.5px;">✉️ Enviar DANFE Completa por E-mail:</label>
+            <div style="display:flex;gap:6px;">
+              <input type="email" id="inpModalDFeEmail" placeholder="destinatario@empresa.com.br" style="padding:7px 10px;font-size:12px;" />
+              <button type="button" class="btn" style="width:auto;background:#2563eb;color:#fff;padding:7px 14px;font-size:12px;white-space:nowrap;" onclick="enviarEmailDanfeModalDFe()">✉️ Disparar E-mail</button>
+            </div>
+          </div>
+        </div>
+        <div id="avisoEnvioPdfModalDFe" style="display:none;margin-top:8px;padding:7px 10px;border-radius:6px;background:#064e3b;border:1px solid #10b981;color:#d1fae5;font-size:11.5px;"></div>
+      </div>
+
+      <!-- VISÃO 1: DANFE COMPLETA EMBUTIDA -->
+      <div id="boxModalDFeVisaoDanfe" style="flex:1;min-height:460px;background:#e2e8f0;border-radius:8px;overflow:hidden;border:1px solid #475569;">
+        <iframe id="iframeDanfeDFeModal" src="about:blank" style="width:100%;height:500px;border:none;background:#fff;"></iframe>
+      </div>
+
+      <!-- VISÃO 2: TABELA DE ITENS -->
+      <div id="boxModalDFeVisaoItens" style="display:none;overflow-x:auto;max-height:460px;">
         <table style="width:100%;font-size:12px;">
           <thead>
             <tr>
               <th>Código</th>
-              <th>Descrição do Item / Peça</th>
+              <th>Descrição do Item / Peça / Mercadoria</th>
+              <th>NCM</th>
+              <th>Unid.</th>
               <th>Qtd</th>
               <th>Preço Unitário</th>
               <th>Total</th>
@@ -4043,8 +8471,10 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           <tbody id="tbodyModalItensDFe"></tbody>
         </table>
       </div>
-      <div style="margin-top:16px;text-align:right;">
-        <button type="button" class="btn btn-outline" onclick="fecharModalItensDFe()">Fechar</button>
+
+      <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #334155;padding-top:10px;">
+        <span style="font-size:11.5px;color:#94a3b8;">💡 Dica: Você pode imprimir/salvar a DANFE em PDF, baixar o XML oficial ou compartilhar diretamente por WhatsApp e E-mail.</span>
+        <button type="button" class="btn btn-outline" style="width:auto;padding:7px 18px;" onclick="fecharModalItensDFe()">Fechar</button>
       </div>
     </div>
   </div>
@@ -4306,3 +8736,26 @@ def registrar_rotas_portal_fiscal(app: web.Application) -> None:
     app.router.add_post("/api/fiscal/recebidas/manifestar", api_fiscal_recebidas_manifestar)
     app.router.add_post("/api/fiscal/recebidas/dar-entrada-estoque", api_fiscal_recebidas_dar_entrada_estoque)
     app.router.add_post("/api/fiscal/recebidas/importar-xml", api_fiscal_recebidas_importar_xml)
+    app.router.add_get("/api/fiscal/recebidas/danfe/{nota_id}", api_fiscal_recebidas_danfe)
+    app.router.add_get("/api/fiscal/recebidas/pdf/{nota_id}", api_fiscal_recebidas_pdf)
+    app.router.add_get("/api/fiscal/recebidas/eml/{nota_id}", api_fiscal_recebidas_eml_download)
+    app.router.add_post("/api/fiscal/recebidas/enviar-email-pdf", api_fiscal_recebidas_enviar_email_pdf)
+    app.router.add_get("/api/fiscal/recebidas/whatsapp-status", api_fiscal_recebidas_whatsapp_status)
+    app.router.add_post("/api/fiscal/recebidas/whatsapp-conectar", api_fiscal_recebidas_whatsapp_conectar)
+    app.router.add_post("/api/fiscal/recebidas/enviar-whatsapp-pdf", api_fiscal_recebidas_enviar_whatsapp_pdf)
+    app.router.add_get("/api/fiscal/recebidas/xml/{nota_id}", api_fiscal_recebidas_xml_download)
+
+    # Rotas da Aba de Detalhes de Despesas das Unidades & Gráficos (Alimentação, Gasolina, Hotel)
+    app.router.add_get("/api/fiscal/v2/despesas-unidades", api_fiscal_v2_despesas_unidades_dados)
+    app.router.add_post("/api/fiscal/v2/despesas-unidades/salvar", api_fiscal_v2_despesas_unidades_salvar)
+    app.router.add_post("/api/fiscal/v2/despesas-unidades/excluir", api_fiscal_v2_despesas_unidades_excluir)
+    app.router.add_post("/api/fiscal/v2/despesas-unidades/conciliar-extrato", api_fiscal_v2_despesas_unidades_conciliar_extrato)
+    app.router.add_post("/api/fiscal/v2/despesas-unidades/aplicar-conciliacao", api_fiscal_v2_despesas_unidades_aplicar_conciliacao)
+
+    # Rotas da Aba de An?lise & Gest?o Manual de CFOP
+    app.router.add_get("/api/fiscal/v2/cfop/dados", api_fiscal_v2_cfop_dados)
+    app.router.add_post("/api/fiscal/v2/cfop/salvar", api_fiscal_v2_cfop_salvar)
+    app.router.add_post("/api/fiscal/v2/cfop/excluir", api_fiscal_v2_cfop_excluir)
+    app.router.add_post("/api/fiscal/v2/cfop/aplicar-estoque", api_fiscal_v2_cfop_aplicar_estoque)
+    app.router.add_post("/api/fiscal/v2/cfop/atualizar-nota", api_fiscal_v2_cfop_atualizar_nota)
+

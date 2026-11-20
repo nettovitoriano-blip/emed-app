@@ -10292,6 +10292,9 @@ function fecharModalInsumosViagem() {
             <button class="btn btn-sm" onclick="trocarAbaFinanceira('DRE')" style="font-weight:700;border-radius:8px;padding:8px 14px;${abaAtiva==='DRE'?'background:#1e3a8a;color:#fff;border-color:#1e3a8a;box-shadow:0 2px 6px rgba(30,58,138,0.3);':'background:#fff;color:#475569;border:1px solid #cbd5e1;'}">
               📈 DRE &amp; Rentabilidade
             </button>
+            <button class="btn btn-sm" onclick="trocarAbaFinanceira('DESPESAS_UNIDADES')" style="font-weight:700;border-radius:8px;padding:8px 14px;${abaAtiva==='DESPESAS_UNIDADES'?'background:#d97706;color:#fff;border-color:#d97706;box-shadow:0 2px 6px rgba(217,119,6,0.3);':'background:#fff;color:#475569;border:1px solid #cbd5e1;'}">
+              ⛽🍽️🏨 Despesas das Unidades (Gráficos)
+            </button>
           </div>
           <!-- CONTEÚDO DA ABA ATIVA -->
           <div id="boxConteudoAbaFinanceira">
@@ -10317,6 +10320,8 @@ function fecharModalInsumosViagem() {
         return renderAbaFechamentoContabil(nfs, despesas);
       } else if (aba === "PROPOSTAS") {
         return renderAbaPropostasEncomendas(ordens, solicitacoes);
+      } else if (aba === "DESPESAS_UNIDADES") {
+        return renderAbaDespesasUnidadesErpMain();
       } else if (aba === "DRE") {
         return renderAbaDRE(ordens, estoque);
       } else {
@@ -20393,6 +20398,78 @@ Solicitamos a autorização de entrada na guarita predial.
     function abrirPainelChecklistSemanalFrota() {
       selecionarMenu("GES_FROTA");
     }
+
+
+function renderAbaDespesasUnidadesErpMain() {
+      return `
+        <div class="section-box" style="background:#0b132b;color:#f8fafc;border:1.5px solid #f59e0b;border-radius:12px;padding:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+            <div>
+              <div style="font-size:17px;font-weight:900;color:#fbbf24;">⛽🍽️🏨 Detalhes de Despesas das Unidades &amp; Gráficos (Gasolina, Alimentação, Hotel)</div>
+              <div style="font-size:12px;color:#cbd5e1;margin-top:2px;">Gestão analítica e visual de despesas operacionais por unidade: <b>Filial Brasília (DF)</b> e <b>Matriz Eusébio (CE)</b>.</div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" class="btn btn-sm" onclick="const b=document.getElementById('erpFormDespUnid');if(b)b.style.display=b.style.display==='none'?'block':'none';" style="background:#f59e0b;color:#0b132b;font-weight:900;">➕ Nova Despesa da Unidade</button>
+              <a href="/fiscal" target="_blank" class="btn btn-sm btn-outline" style="color:#64dfdf;border-color:#64dfdf;text-decoration:none;">🧾 Abrir no Portal Fiscal</a>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;background:#1c2541;padding:12px;border-radius:8px;border:1px solid #334155;margin-bottom:14px;">
+            <div>
+              <label style="font-size:11px;color:#cbd5e1;font-weight:700;">🏢 Unidade:</label>
+              <select id="erpSelDespUnidade" onchange="carregarDespesasUnidadesErpMain()" style="width:100%;background:#0f172a;color:#64dfdf;border:1px solid #475569;border-radius:6px;padding:7px;font-weight:800;">
+                <option value="CONSOLIDADO">🌐 Consolidado (Filial DF + Matriz CE)</option>
+                <option value="FILIAL_DF">🏢 Filial Brasília (DF)</option>
+                <option value="MATRIZ_CE">🏛️ Matriz Eusébio (CE)</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:11px;color:#cbd5e1;font-weight:700;">🏷️ Categoria:</label>
+              <select id="erpSelDespCategoria" onchange="carregarDespesasUnidadesErpMain()" style="width:100%;background:#0f172a;color:#fff;border:1px solid #475569;border-radius:6px;padding:7px;">
+                <option value="TODAS">Todas as Categorias</option>
+                <option value="COMBUSTIVEL">⛽ Combustível / Gasolina</option>
+                <option value="ALIMENTACAO">🍽️ Alimentação / Refeições</option>
+                <option value="HOTEL">🏨 Hotel / Hospedagem</option>
+                <option value="PEDAGIO_TRANSPORTE">🛣️ Pedágio / Transporte</option>
+                <option value="MANUTENCAO_FROTA">🔧 Manutenção Frota</option>
+                <option value="INSUMOS_UNIDADE">🏢 Copa / Insumos Unidade</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:11px;color:#cbd5e1;font-weight:700;">📅 Competência:</label>
+              <select id="erpSelDespMes" onchange="carregarDespesasUnidadesErpMain()" style="width:100%;background:#0f172a;color:#fff;border:1px solid #475569;border-radius:6px;padding:7px;">
+                <option value="TODOS">Todos os Meses</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="erpFormDespUnid" style="display:none;background:#132338;border:2px solid #f59e0b;border-radius:10px;padding:14px;margin-bottom:14px;">
+            <div style="font-weight:900;color:#fbbf24;margin-bottom:10px;">➕ Cadastrar Despesa Operacional da Unidade</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:10px;">
+              <div><label style="font-size:11px;color:#cbd5e1;">Unidade:</label><select id="erpInpDespUnid" style="width:100%;background:#0f172a;color:#fff;border:1px solid #475569;border-radius:6px;padding:7px;"><option value="FILIAL_DF">🏢 Filial Brasília (DF)</option><option value="MATRIZ_CE">🏛️ Matriz Eusébio (CE)</option></select></div>
+              <div><label style="font-size:11px;color:#cbd5e1;">Categoria:</label><select id="erpInpDespCat" style="width:100%;background:#0f172a;color:#fbbf24;border:1px solid #475569;border-radius:6px;padding:7px;"><option value="COMBUSTIVEL">⛽ Combustível / Gasolina</option><option value="ALIMENTACAO">🍽️ Alimentação / Refeições</option><option value="HOTEL">🏨 Hotel / Hospedagem</option><option value="PEDAGIO_TRANSPORTE">🛣️ Pedágio / Transporte</option><option value="MANUTENCAO_FROTA">🔧 Manutenção Frota</option><option value="INSUMOS_UNIDADE">🏢 Copa / Insumos</option></select></div>
+              <div><label style="font-size:11px;color:#cbd5e1;">Valor (R$):</label><input id="erpInpDespVal" type="number" step="0.01" placeholder="250.00" style="width:100%;background:#0f172a;color:#4ade80;border:1px solid #475569;border-radius:6px;padding:7px;font-weight:800;" /></div>
+              <div><label style="font-size:11px;color:#cbd5e1;">Data:</label><input id="erpInpDespData" type="date" value="${new Date().toISOString().substring(0,10)}" style="width:100%;background:#0f172a;color:#fff;border:1px solid #475569;border-radius:6px;padding:7px;" /></div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:10px;">
+              <div><label style="font-size:11px;color:#cbd5e1;">Descrição:</label><input id="erpInpDespDesc" placeholder="Ex: Abastecimento Gasolina Viagem Técnica" style="width:100%;background:#0f172a;color:#fff;border:1px solid #475569;border-radius:6px;padding:7px;" /></div>
+              <div><label style="font-size:11px;color:#cbd5e1;">Estabelecimento / Posto / Hotel:</label><input id="erpInpDespForn" placeholder="Ex: Posto Ipiranga / Hotel Ibis" style="width:100%;background:#0f172a;color:#fff;border:1px solid #475569;border-radius:6px;padding:7px;" /></div>
+              <div><label style="font-size:11px;color:#cbd5e1;">Técnico Responsável:</label><input id="erpInpDespResp" placeholder="Ex: Vitor / Netto" style="width:100%;background:#0f172a;color:#fff;border:1px solid #475569;border-radius:6px;padding:7px;" /></div>
+            </div>
+            <div style="text-align:right;">
+              <button type="button" class="btn btn-sm" onclick="salvarDespesaUnidadeErpMain()" style="background:#10b981;color:#0b132b;font-weight:900;padding:8px 18px;">💾 Salvar Despesa</button>
+            </div>
+          </div>
+
+          <div id="erpBoxKpisDespUnid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:14px;"></div>
+          <div id="erpBoxChartsDespUnid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:12px;margin-bottom:14px;"></div>
+          <div id="erpBoxTabelaDespUnid" style="background:#1c2541;border-radius:10px;padding:12px;border:1px solid #334155;overflow-x:auto;"></div>
+        </div>
+      `;
+    }
+
+    async
+
 </script>
 </body>
 </html>

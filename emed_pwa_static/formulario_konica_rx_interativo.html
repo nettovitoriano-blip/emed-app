@@ -1,0 +1,2376 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>FR_SE00003_03 — Relatório Oficial de Instalação e Aceitação de Raios X (Konica Minolta)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10px;
+      color: #111;
+      margin: 0;
+      padding: 0;
+      background: #e2e8f0;
+    }
+    
+    /* Top Toolbar (Fixed in UI, Hidden in Print) */
+    .top-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background: #0f172a;
+      color: #fff;
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+    .top-toolbar .title {
+      font-size: 14px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .top-toolbar .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .btn {
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: bold;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-quick-fill { background: #0284c7; color: #fff; }
+    .btn-quick-fill:hover { background: #0369a1; transform: translateY(-1px); }
+    .btn-clear { background: #64748b; color: #fff; }
+    .btn-clear:hover { background: #475569; }
+    .btn-print { background: #10b981; color: #fff; }
+    .btn-print:hover { background: #059669; transform: translateY(-1px); }
+    .btn-effort { background: #f59e0b; color: #000; }
+    .btn-effort:hover { background: #d97706; color: #fff; }
+    .btn-save { background: #6366f1; color: #fff; }
+    .btn-save:hover { background: #4f46e5; }
+
+    /* Page Container */
+    .page-sheet {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 15px auto;
+      background: #ffffff;
+      padding: 12mm 14mm;
+      box-shadow: 0 3px 15px rgba(0,0,0,0.15);
+      position: relative;
+      page-break-after: always;
+    }
+
+    /* Header Grid */
+    .doc-header {
+      border: 1.5px solid #000;
+      display: grid;
+      grid-template-columns: 110px 1fr 140px;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .doc-header .cell {
+      padding: 6px 4px;
+      border-right: 1.5px solid #000;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    .doc-header .cell:last-child { border-right: none; }
+    .doc-header .code { font-size: 11px; font-weight: bold; }
+    .doc-header .page-num { font-size: 11px; font-weight: bold; margin-top: 3px; }
+    .doc-header .main-title { font-size: 11px; font-weight: bold; text-transform: uppercase; }
+    .doc-header .sub-title { font-size: 10px; font-weight: bold; margin-top: 3px; }
+
+    /* Sections */
+    .sec-block {
+      margin-bottom: 8px;
+    }
+    .sec-title {
+      background: #e2e8f0;
+      color: #000;
+      font-weight: bold;
+      font-size: 10px;
+      padding: 3px 6px;
+      text-transform: uppercase;
+      border: 1px solid #000;
+      border-bottom: none;
+    }
+
+    /* Tables */
+    table.form-tbl {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #000;
+      margin-bottom: 6px;
+    }
+    table.form-tbl th, table.form-tbl td {
+      border: 1px solid #000;
+      padding: 3px 5px;
+      text-align: left;
+      vertical-align: middle;
+    }
+    table.form-tbl th {
+      background: #f1f5f9;
+      font-weight: bold;
+      text-align: center;
+      font-size: 9px;
+    }
+    table.form-tbl.no-outer-border { border: none; }
+
+    /* Inputs */
+    input[type="text"], input[type="number"], select, textarea {
+      width: 100%;
+      border: 1px solid #94a3b8;
+      border-radius: 3px;
+      padding: 3px 5px;
+      font-size: 10px;
+      font-family: inherit;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    input[type="text"]:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #0284c7;
+      background: #fff;
+      box-shadow: 0 0 0 2px rgba(2,132,199,0.2);
+    }
+    .input-clean {
+      border: none !important;
+      border-bottom: 1px dashed #64748b !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      padding: 1px 3px !important;
+    }
+    .input-clean:focus {
+      border-bottom: 1.5px solid #0284c7 !important;
+      box-shadow: none !important;
+    }
+    .text-center { text-align: center !important; }
+    .text-right { text-align: right !important; }
+    .bold { font-weight: bold; }
+
+    /* Radios / Checkboxes inline */
+    .chk-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .chk-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+      font-size: 9.5px;
+      white-space: nowrap;
+    }
+    .chk-label input { cursor: pointer; }
+
+    /* Warning Callout */
+    .callout-box {
+      border: 1px solid #000;
+      padding: 6px;
+      margin-bottom: 8px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: #fffbeb;
+    }
+    .callout-icon { font-size: 22px; color: #b45309; }
+
+    /* Signatures Section */
+    .sig-canvas-box {
+      border: 1px dashed #64748b;
+      background: #fafafa;
+      position: relative;
+      height: 90px;
+      margin-top: 4px;
+    }
+    .sig-canvas-box canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .sig-clear-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      font-size: 9px;
+      padding: 2px 6px;
+      background: #e2e8f0;
+      border: 1px solid #94a3b8;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    /* Footer */
+    .doc-footer {
+      font-size: 8px;
+      color: #333;
+      text-align: center;
+      line-height: 1.25;
+      margin-top: 10px;
+      border-top: 1px solid #cbd5e1;
+      padding-top: 4px;
+    }
+
+    /* Print Styles */
+    @media print {
+      body { background: #fff; margin: 0; padding: 0; }
+      .no-print { display: none !important; }
+      .page-sheet {
+        margin: 0;
+        box-shadow: none;
+        padding: 8mm 10mm;
+        width: 100%;
+        min-height: auto;
+        page-break-after: always;
+      }
+      input[type="text"], input[type="number"], select, textarea {
+        border: none !important;
+        background: transparent !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+      }
+      .input-clean { border-bottom: none !important; }
+      .sig-clear-btn { display: none !important; }
+      @page { size: A4; margin: 6mm; }
+    }
+  
+    /* Tab Navigation */
+    .tab-nav {
+      background: #1e293b;
+      display: flex;
+      padding: 0 16px;
+      gap: 6px;
+      border-bottom: 2px solid #0284c7;
+      position: sticky;
+      top: 48px;
+      z-index: 999;
+    }
+    .tab-btn {
+      background: #0f172a;
+      color: #94a3b8;
+      border: 1px solid #334155;
+      border-bottom: none;
+      padding: 9px 18px;
+      font-size: 12px;
+      font-weight: bold;
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { background: #334155; color: #fff; }
+    .tab-btn.active {
+      background: #0284c7;
+      color: #fff;
+      border-color: #0284c7;
+    }
+
+    /* 4 Topicos Styles */
+    .topicos-container {
+      max-width: 900px;
+      margin: 25px auto;
+      background: #fff;
+      border-radius: 10px;
+      padding: 24px 30px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      border: 1px solid #cbd5e1;
+    }
+    .topico-card {
+      background: #f8fafc;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 18px;
+      transition: border-color 0.2s;
+    }
+    .topico-card:hover { border-color: #0284c7; }
+    .topico-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .topico-title {
+      font-size: 13px;
+      font-weight: bold;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .topico-tag {
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: bold;
+    }
+    .topico-textarea {
+      width: 100%;
+      min-height: 85px;
+      border: 1px solid #94a3b8;
+      border-radius: 6px;
+      padding: 10px;
+      font-family: inherit;
+      font-size: 12px;
+      color: #1e293b;
+      line-height: 1.5;
+      background: #fff;
+      resize: vertical;
+    }
+    .topico-textarea:focus {
+      outline: none;
+      border-color: #0284c7;
+      box-shadow: 0 0 0 3px rgba(2,132,199,0.15);
+    }
+    .chips-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .chip-btn {
+      background: #e2e8f0;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: bold;
+      cursor: pointer;
+      color: #334155;
+      transition: all 0.15s;
+    }
+    .chip-btn:hover { background: #cbd5e1; color: #0f172a; }
+
+    .consolidado-box {
+      background: #0f172a;
+      color: #f8fafc;
+      border-radius: 8px;
+      padding: 18px;
+      margin-top: 25px;
+      border: 1px solid #334155;
+    }
+    .consolidado-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 8px;
+    }
+    .consolidado-content {
+      font-family: Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      background: #020617;
+      padding: 14px;
+      border-radius: 6px;
+      border: 1px solid #1e293b;
+      color: #38bdf8;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+</style>
+</head>
+<body>
+
+  <!-- Floating Sticky Toolbar -->
+  <div class="top-toolbar no-print">
+    <div class="title">
+      <span>📋</span>
+      <span>KONICA MINOLTA — Formulário Oficial de Instalação e Aceitação de Raios X (FR_SE00003_03)</span>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn btn-quick-fill" onclick="preencherTudoConforme()" title="Preenche todos os testes e conformidades com 1 clique">
+        ⚡ Preencher Conforme Padrão (1 Clique)
+      </button>
+      <button type="button" class="btn btn-clear" onclick="limparTudo()" title="Deixa todos os campos em branco">
+        🧹 Limpar Formulário
+      </button>
+      <button type="button" class="btn btn-save" onclick="salvarLocalmente()" title="Salva dados temporariamente">
+        💾 Salvar Rascunho
+      </button>
+      <button type="button" class="btn btn-effort" onclick="abrirIntegracaoEffort()" title="Abre integração com Effort Konica">
+        🚀 Exportar p/ Effort Konica
+      </button>
+      <button type="button" class="btn btn-print" onclick="window.print()" title="Gera o PDF oficial de 12 páginas">
+        🖨️ Imprimir / Salvar PDF
+      </button>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs (Hidden in Print) -->
+  <div class="tab-nav no-print">
+    <button type="button" class="tab-btn active" id="btn-tab-relatorio" onclick="trocarAba('relatorio')">
+      <span>📋</span> Relatório Oficial 12 Páginas (FR_SE00003_03)
+    </button>
+    <button type="button" class="tab-btn" id="btn-tab-topicos" onclick="trocarAba('topicos')">
+      <span>📝</span> OS Padrão Konica Minolta (4 Tópicos Effort)
+    </button>
+  </div>
+
+
+  <form id="formKonica">
+  <div id="view-relatorio" class="tab-view active">
+
+    <!-- ========================================== -->
+    <!-- PÁGINA 1 / 12                             -->
+    <!-- ========================================== -->
+    <div class="page-sheet" id="page-1">
+      <div class="doc-header">
+        <div class="cell">
+          <div class="code">FR_SE00003_03</div>
+          <div class="page-num">Pág. 1 / 12</div>
+        </div>
+        <div class="cell">
+          <div class="main-title">FORMULÁRIO DE REGISTRO</div>
+          <div class="sub-title">RELATÓRIO DE INSTALAÇÃO E ACEITAÇÃO EQUIPAMENTO DE RAIOS X</div>
+        </div>
+        <div class="cell">
+          <svg width="85" height="26" viewBox="0 0 120 36">
+            <circle cx="20" cy="18" r="14" fill="#0066cc"/>
+            <path d="M6 18 Q20 10 34 18 Q20 26 6 18 Z" fill="#ffffff" opacity="0.8"/>
+            <text x="42" y="16" font-family="Arial" font-weight="bold" font-size="9" fill="#002b54">KONICA MINOLTA</text>
+            <text x="42" y="26" font-family="Arial" font-size="7" fill="#666">HEALTHCARE</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Informações do Cliente -->
+      <div class="sec-block">
+        <div class="sec-title">INFORMAÇÕES DO CLIENTE</div>
+        <table class="form-tbl">
+          <tr>
+            <td style="width: 15%;" class="bold">Nome da instituição:</td>
+            <td colspan="3"><input type="text" name="cli_nome" id="cli_nome" class="input-clean bold" value="CLINICA MEDVISION - SAUDE E MEDICINA DO TRABALHO"></td>
+          </tr>
+          <tr>
+            <td class="bold">Endereço de instalação:</td>
+            <td colspan="3"><input type="text" name="cli_endereco" id="cli_endereco" class="input-clean" value="RUA CORONEL LUCIO, 345, CENTRO"></td>
+          </tr>
+          <tr>
+            <td class="bold">Cidade:</td>
+            <td style="width: 45%;"><input type="text" name="cli_cidade" id="cli_cidade" class="input-clean" value="CRATEUS"></td>
+            <td style="width: 10%;" class="bold">Estado:</td>
+            <td style="width: 30%;"><input type="text" name="cli_estado" id="cli_estado" class="input-clean" value="CE"></td>
+          </tr>
+          <tr>
+            <td class="bold">Contato:</td>
+            <td><input type="text" name="cli_contato" id="cli_contato" class="input-clean" value="JELSON BATISTA MOURAO"></td>
+            <td class="bold">Telefone:</td>
+            <td><input type="text" name="cli_telefone" id="cli_telefone" class="input-clean" value="(88) 9704-5445"></td>
+          </tr>
+          <tr>
+            <td class="bold">E-mail:</td>
+            <td><input type="text" name="cli_email" id="cli_email" class="input-clean" value="administracao@medvisionocupacional.com.br"></td>
+            <td class="bold">N° da Nota Fiscal:</td>
+            <td><input type="text" name="cli_nf" id="cli_nf" class="input-clean" value="NF-e 004892 / KM-2026"></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Informações do Representante -->
+      <div class="sec-block">
+        <div class="sec-title">INFORMAÇÕES DO REPRESENTANTE</div>
+        <table class="form-tbl">
+          <tr>
+            <td style="width: 15%;" class="bold">Empresa:</td>
+            <td style="width: 45%;"><input type="text" name="rep_empresa" class="input-clean bold" value="EMED ELETROMEDICINA"></td>
+            <td style="width: 15%;" class="bold">Telefone¹:</td>
+            <td style="width: 25%;"><input type="text" name="rep_tel1" class="input-clean" value="+55 85 99619 9711"></td>
+          </tr>
+          <tr>
+            <td class="bold">Instalador(es):</td>
+            <td><input type="text" name="rep_instalador" id="rep_instalador" class="input-clean bold" value="Vitor Manuel / Equipe Tecnica EMED Eletromedicina"></td>
+            <td class="bold">Telefone²:</td>
+            <td><input type="text" name="rep_tel2" id="rep_tel2" class="input-clean" value="+55 85 99915 0277"></td>
+          </tr>
+          <tr>
+            <td class="bold">E-mail:</td>
+            <td colspan="3"><input type="text" name="rep_email" class="input-clean" value="antonio@emed.med.br"></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Informações de Instalação -->
+      <div class="sec-block">
+        <div class="sec-title">INFORMAÇÕES DE INSTALAÇÃO</div>
+        <table class="form-tbl">
+          <tr>
+            <td style="width: 20%;" class="bold">Modelo do equipamento:</td>
+            <td>
+              <div class="chk-group">
+                <label class="chk-label"><input type="checkbox" name="mod_maximus"> Maximus</label>
+                <label class="chk-label"><input type="checkbox" name="mod_aerodr_maximus"> AeroDR Maximus</label>
+                <label class="chk-label"><input type="checkbox" name="mod_maximus_eco"> Maximus ECO</label>
+                <label class="chk-label"><input type="checkbox" name="mod_altus" checked> Altus</label>
+                <label class="chk-label"><input type="checkbox" name="mod_altus_dr"> Altus DR</label>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Relação de Itens Identificados na Embalagem -->
+      <div class="sec-block">
+        <div class="sec-title">RELAÇÃO DE ITENS IDENTIFICADOS NA EMBALAGEM</div>
+        <table class="form-tbl">
+          <thead>
+            <tr>
+              <th style="width: 10%;">Quant</th>
+              <th style="width: 60%;">Item</th>
+              <th style="width: 30%;">N° série</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:#f8fafc;"><td colspan="3" class="bold text-center">Conjunto Radiológico</td></tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_1" class="text-center input-clean" value="1"></td>
+              <td>
+                Gerador ( <input type="checkbox" name="ger_150kv"> ) 150KV &nbsp;
+                ( <input type="checkbox" name="ger_125kv"> ) 125 KV &nbsp;
+                ( <input type="checkbox" name="ger_na_kv"> ) Não aplicável
+              </td>
+              <td><input type="text" name="serie_gerador_kv" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_2" class="text-center input-clean" value="1"></td>
+              <td>
+                Gerador ( <input type="checkbox" name="ger_54kw"> ) 54kW &nbsp;
+                ( <input type="checkbox" name="ger_64kw"> ) 64 kW &nbsp;
+                ( <input type="checkbox" name="ger_na_kw"> ) Não aplicável
+              </td>
+              <td><input type="text" name="serie_gerador_kw" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_3" class="text-center input-clean" value="1"></td>
+              <td>Transformador</td>
+              <td><input type="text" name="serie_transformador" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_4" class="text-center input-clean" value="1"></td>
+              <td>Tubo Raios X:</td>
+              <td><input type="text" name="serie_tubo" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_5" class="text-center input-clean" value="1"></td>
+              <td>Colimador luminoso:</td>
+              <td><input type="text" name="serie_colimador" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_6" class="text-center input-clean" value="1"></td>
+              <td>Painel de Comando</td>
+              <td><input type="text" name="serie_painel_cmd" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_7" class="text-center input-clean" value="1"></td>
+              <td>Conjunto Mecânico (mesa, estativa porta tubo, estativa mural bucky)</td>
+              <td><input type="text" name="serie_conj_mec" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_8" class="text-center input-clean" value="1"></td>
+              <td>Auto Trafo 20KVA 220V/380-44 (se aplicável)</td>
+              <td><input type="text" name="serie_autotrafo" class="input-clean" placeholder="N° de Série / Não aplicável"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_9" class="text-center input-clean" value="1"></td>
+              <td>Grade fixa ( <input type="checkbox" name="grd_103"> ) 103L &nbsp; ( <input type="checkbox" name="grd_152"> ) 152L &nbsp; ( <input type="checkbox" name="grd_200"> ) 200L</td>
+              <td><input type="text" name="serie_grade" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_10" class="text-center input-clean" value="1"></td>
+              <td>Cabo de alta</td>
+              <td><input type="text" name="serie_cabo_alta" class="input-clean" placeholder="N° de Série / Não aplicável"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_11" class="text-center input-clean" value="1"></td>
+              <td>Painel AeroDR:</td>
+              <td><input type="text" name="serie_painel_aerodr" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_12" class="text-center input-clean" value="1"></td>
+              <td>Battery Charger</td>
+              <td><input type="text" name="serie_battery_charger" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_13" class="text-center input-clean" value="1"></td>
+              <td>DIU / GIU</td>
+              <td><input type="text" name="serie_diu_giu" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_14" class="text-center input-clean" value="1"></td>
+              <td>Aruba (se aplicável)</td>
+              <td><input type="text" name="serie_aruba" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_15" class="text-center input-clean" value="1"></td>
+              <td>Switch</td>
+              <td><input type="text" name="serie_switch" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_16" class="text-center input-clean" value="1"></td>
+              <td>Cabo XG</td>
+              <td><input type="text" name="serie_cabo_xg" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_17" class="text-center input-clean" value="1"></td>
+              <td>IF Cable 3</td>
+              <td><input type="text" name="serie_if_cable" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_18" class="text-center input-clean" value="1"></td>
+              <td>STITCHING</td>
+              <td><input type="text" name="serie_stitching" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_19" class="text-center input-clean" value="1"></td>
+              <td>Monitor</td>
+              <td><input type="text" name="serie_monitor" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_20" class="text-center input-clean" value="1"></td>
+              <td>CPU + teclado + Mouse (ou notebook)</td>
+              <td><input type="text" name="serie_cpu" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_21" class="text-center input-clean" value="1"></td>
+              <td>Câmera de ionização (AEC)</td>
+              <td><input type="text" name="serie_aec" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+            <tr>
+              <td class="text-center"><input type="text" name="emb_qtd_22" class="text-center input-clean" value="1"></td>
+              <td>VacuDap</td>
+              <td><input type="text" name="serie_vacudap" class="input-clean" placeholder="N° de Série"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-footer">
+        É proibida a reprodução parcial ou total deste documento sem a autorização prévia do Setor da Qualidade.<br>
+        Antes da utilização deste documento, consultar o Fluxis e verificar se é a última revisão aprovada.<br>
+        Documento Relacionado: Manuais Técnicos dos Equipamentos relacionados.
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PÁGINA 2 / 12                             -->
+    <!-- ========================================== -->
+    <div class="page-sheet" id="page-2">
+      <div class="doc-header">
+        <div class="cell"><div class="code">FR_SE00003_03</div><div class="page-num">Pág. 2 / 12</div></div>
+        <div class="cell"><div class="main-title">FORMULÁRIO DE REGISTRO</div><div class="sub-title">RELATÓRIO DE INSTALAÇÃO E ACEITAÇÃO EQUIPAMENTO DE RAIOS X</div></div>
+        <div class="cell"><b style="color:#002b54;">KONICA MINOLTA</b></div>
+      </div>
+
+      <div class="callout-box">
+        <div class="callout-icon">⚠️</div>
+        <div style="font-size:9.5px;">Conferir os dados da tabela com os itens recebidos e o Checklist : Expedição de Equipamentos.</div>
+      </div>
+
+      <!-- DOCUMENTOS -->
+      <div class="sec-block">
+        <div class="sec-title">DOCUMENTOS — Deve possuir em sua disposição os seguintes materiais:</div>
+        <table class="form-tbl">
+          <thead>
+            <tr><th style="width: 75%;">Item</th><th style="width: 25%;">Identificado</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Conjunto mecânico contendo mesa, mural, trilhos, estativa, painel de comando (controle dos freios), cabos de ligação e tubo:</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_doc_1" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_doc_1" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Gerador de RX (Gabinete):</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_doc_2" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_doc_2" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Transformador de alta (Caixa de óleo):</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_doc_3" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_doc_3" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Console de comando (Controle de seleção de técnicas):</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_doc_4" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_doc_4" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Autotransformador 220/380 (se aplicável):</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_doc_5" value="SIM"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_doc_5" value="NAO" class="chk-conforme"> NÃO</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Quadro de força (se aplicável);</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_doc_6" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_doc_6" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Cabos de alta; Cabo do Giratório;</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_doc_7" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_doc_7" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Documentos: Expedição de Equipamentos / FR_PR00002</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_doc_8" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_doc_8" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Certificação de garantia:</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_doc_9" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_doc_9" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p style="font-size:9.5px;margin:6px 0;">Antes de iniciar a instalação do equipamento, o técnico responsável deve fazer a verificação da sala, de forma a garantir que todos os requisitos necessários para a correta instalação, estejam em conformidade.</p>
+
+      <!-- QUADRO DE FORÇA -->
+      <div class="sec-block">
+        <div class="sec-title">QUADRO DE FORÇA — O quadro de força deve possuir proteção rápida e eficaz atendendo as exigências mínimas que seguem:</div>
+        <table class="form-tbl">
+          <thead>
+            <tr><th style="width: 70%;">Exigência Técnica</th><th style="width: 30%;">Identificado</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Disjuntor tripolar de 63A / 54Kw;</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_qf_1" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_qf_1" value="NAO"> NÃO</label>
+                <label class="chk-label"><input type="radio" name="chk_qf_1" value="NA"> N/A</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Disjuntor tripolar de 80A / 64kW;</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_qf_2" value="SIM"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_qf_2" value="NAO"> NÃO</label>
+                <label class="chk-label"><input type="radio" name="chk_qf_2" value="NA" class="chk-conforme"> N/A</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Disjuntor bipolar de 10A;</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_qf_3" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_qf_3" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Interruptor de corrente de fuga "FI" 5SM1 346-6 (63A / 30mA). Para circuitos de corrente alternada e contínua pulsante;</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_qf_4" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_qf_4" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Contator 3RT 1044;</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_qf_5" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_qf_5" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Contato "selo" : Contato auxiliar 3RH1921-1EA20 (NO);</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_qf_6" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_qf_6" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Dispositivo de comando formado por 1 botão verde M2BFR.G.1ª (LIGA), 1 botão vermelho com fechadura de segurança 3SB30 00-1BA20 (DESLIGA), e um dispositivo de sinalização cor vermelho M2BKR.R.1B tipo "soco" montados na porta do quadro de força;</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_qf_7" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_qf_7" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Barras de cobre para 04 saídas, sendo 1 para terra e outra para o neutro (isolado do terra);</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_qf_8" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_qf_8" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Dispositivo de comando formado por 1 botoeira com botão de comando duplo Liga-Desliga e sinalização montados em caixa para botoeira;</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_qf_9" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_qf_9" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Dispositivo de comando formado por um botão vermelho com fechadura de segurança 3SB30 00-1BA20 (Desliga), montado em caixa de montagem (Desconectar).</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_qf_10" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_qf_10" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+            <tr>
+              <td>Quadro de comando "sobrepor ou embutir" QDC 50X40X20 cm;</td>
+              <td class="text-center">
+                <label class="chk-label"><input type="radio" name="chk_qf_11" value="SIM" class="chk-conforme"> SIM</label>
+                <label class="chk-label"><input type="radio" name="chk_qf_11" value="NAO"> NÃO</label>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-footer">
+        É proibida a reprodução parcial ou total deste documento sem a autorização prévia do Setor da Qualidade.<br>
+        Documento Relacionado: Manuais Técnicos dos Equipamentos relacionados.
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PÁGINA 3 / 12                             -->
+    <!-- ========================================== -->
+    <div class="page-sheet" id="page-3">
+      <div class="doc-header">
+        <div class="cell"><div class="code">FR_SE00003_03</div><div class="page-num">Pág. 3 / 12</div></div>
+        <div class="cell"><div class="main-title">FORMULÁRIO DE REGISTRO</div><div class="sub-title">RELATÓRIO DE INSTALAÇÃO E ACEITAÇÃO EQUIPAMENTO DE RAIOS X</div></div>
+        <div class="cell"><b style="color:#002b54;">KONICA MINOLTA</b></div>
+      </div>
+
+      <!-- DPS -->
+      <table class="form-tbl">
+        <tr>
+          <td style="width: 75%;">
+            <b>Dispositivo de Proteção contra Surtos (DPS Classe II para sistemas trifásicos com Neutro (TT, TN-S) Modelo sugestivo: DPS FINDER 7P.24.8.275.x020) C</b><br/>
+            <span style="font-size:9px;color:#475569;">Características: • Un 230 Vac (Tensão F-N) • Uc 275 Vac (Tensão F-N) • In 20KA • Imax 40KA • Up 1,5 KV</span>
+          </td>
+          <td class="text-center" style="width: 25%;">
+            <label class="chk-label"><input type="radio" name="chk_dps" value="SIM" class="chk-conforme"> SIM</label>
+            <label class="chk-label"><input type="radio" name="chk_dps" value="NAO"> NÃO</label>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2">
+            <b>EM CASO DE ITEM NÃO IDENTIFICADO, JUSTIFICAR NESTE ESPAÇO:</b><br/>
+            <input type="text" name="justificativa_dps" class="input-clean" placeholder="Justificativa técnica se houver algum item não conforme">
+          </td>
+        </tr>
+      </table>
+
+      <!-- ENTRADA DE REDE LOCAL -->
+      <div class="sec-block">
+        <div class="sec-title">ENTRADA DE REDE LOCAL</div>
+        <table class="form-tbl">
+          <thead>
+            <tr>
+              <th colspan="3">TENSÃO ENTRE FASES</th>
+              <th colspan="3">RESISTÊNCIA DE REDE ENTRE FASES</th>
+            </tr>
+            <tr>
+              <th>R-S</th><th>R-T</th><th>S-T</th>
+              <th>R-S</th><th>R-T</th><th>S-T</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><input type="text" name="tensao_rs" class="text-center input-clean" placeholder="ex: 388 V"></td>
+              <td><input type="text" name="tensao_rt" class="text-center input-clean" placeholder="ex: 386 V"></td>
+              <td><input type="text" name="tensao_st" class="text-center input-clean" placeholder="ex: 381 V"></td>
+              <td><input type="text" name="res_rs" class="text-center input-clean" placeholder="Ω"></td>
+              <td><input type="text" name="res_rt" class="text-center input-clean" placeholder="Ω"></td>
+              <td><input type="text" name="res_st" class="text-center input-clean" placeholder="Ω"></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table class="form-tbl">
+          <tr>
+            <td style="width: 50%;" class="bold">Bitola do cabo de alimentação (da subestação ao quadro):</td>
+            <td><input type="text" name="bitola_sub" class="input-clean" placeholder="ex: 22mm"></td>
+          </tr>
+          <tr>
+            <td class="bold">Bitola do cabo de alimentação (do quadro ao equipamento):</td>
+            <td><input type="text" name="bitola_eq" class="input-clean" placeholder="ex: 16mm"></td>
+          </tr>
+          <tr>
+            <td class="bold">Bitola Cabo de terra exclusivo (do quadro ao equipamento):</td>
+            <td><input type="text" name="bitola_terra_eq" class="input-clean" placeholder="ex: 16mm"></td>
+          </tr>
+          <tr>
+            <td class="bold">Bitola Cabo de terra exclusivo (da subestação ao quadro):</td>
+            <td><input type="text" name="bitola_terra_sub" class="input-clean" placeholder="ex: 22mm"></td>
+          </tr>
+          <tr>
+            <td class="bold">Bitola Cabo Neutro:</td>
+            <td><input type="text" name="bitola_neutro" class="input-clean" placeholder="ex: 2,5mm"></td>
+          </tr>
+          <tr>
+            <td class="bold">Condições físicas/aparentes:</td>
+            <td><input type="text" name="condicoes_fisicas_rede" class="input-clean" value="OK"></td>
+          </tr>
+          <tr>
+            <td class="bold">Configuração de Alimentação:</td>
+            <td>
+              <label class="chk-label"><input type="checkbox" name="cfg_rede_220"> Trifásica (3Ø / P.E) 220VAC ±5% 60Hz/50Hz ±1Hz</label><br/>
+              <label class="chk-label"><input type="checkbox" name="cfg_rede_380" checked> Trifásica (3Ø / P.E) 380VAC ±5% 60Hz/50Hz ±1Hz</label>
+            </td>
+          </tr>
+          <tr><td class="bold">Capacidade potencial (potência de entrada):</td><td><input type="text" name="potencia_entrada" class="input-clean" placeholder="kVA / kW"></td></tr>
+          <tr><td class="bold">Resistencia máxima ideal de 100mΩ entre fases:</td><td><input type="text" name="res_max_ideal" class="input-clean" placeholder="Conforme / Valor medido"></td></tr>
+          <tr><td class="bold">Aterramento exclusivo tipo TT, isolado do neutro, com resistência máxima de 5Ω:</td><td><input type="text" name="aterramento_tt" class="input-clean" placeholder="Conforme / Valor medido"></td></tr>
+        </table>
+      </div>
+
+      <!-- AMBIENTE -->
+      <div class="sec-block">
+        <div class="sec-title">AMBIENTE — RDC Nº 611/2022 e RDC 50 ANVISA quanto à disposição da sala para Raios X:</div>
+        <table class="form-tbl">
+          <thead>
+            <tr><th style="width: 75%;">Critério Normativo</th><th style="width: 25%;">Identificado</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Área mínima recomendada para sala 24,75 m² (4,5 x 5,5 m2)</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="amb_1" value="SIM" class="chk-conforme"> SIM</label><label class="chk-label"><input type="radio" name="amb_1" value="NAO"> NÃO</label></td>
+            </tr>
+            <tr>
+              <td>Altura mínima recomendada para sala 2,70m</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="amb_2" value="SIM" class="chk-conforme"> SIM</label><label class="chk-label"><input type="radio" name="amb_2" value="NAO"> NÃO</label></td>
+            </tr>
+            <tr>
+              <td>Dimensões mínimas da porta: largura de 100cm, altura de 210cm</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="amb_3" value="SIM" class="chk-conforme"> SIM</label><label class="chk-label"><input type="radio" name="amb_3" value="NAO"> NÃO</label></td>
+            </tr>
+            <tr>
+              <td>Temperatura da sala 23 °C ± 2°C</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="amb_4" value="SIM" class="chk-conforme"> SIM</label><label class="chk-label"><input type="radio" name="amb_4" value="NAO"> NÃO</label></td>
+            </tr>
+            <tr>
+              <td>Umidade do Ar 50% ±10% sem condensação</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="amb_5" value="SIM" class="chk-conforme"> SIM</label><label class="chk-label"><input type="radio" name="amb_5" value="NAO"> NÃO</label></td>
+            </tr>
+            <tr>
+              <td>O sistema de ar condicionado deverá manter a temperatura e umidade controladas constantemente.</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="amb_6" value="SIM" class="chk-conforme"> SIM</label><label class="chk-label"><input type="radio" name="amb_6" value="NAO"> NÃO</label></td>
+            </tr>
+            <tr>
+              <td>Paredes, piso, teto e porta (s) com blindagem proporcionando proteção radiológica às áreas externas.</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="amb_7" value="SIM" class="chk-conforme"> SIM</label><label class="chk-label"><input type="radio" name="amb_7" value="NAO"> NÃO</label></td>
+            </tr>
+            <tr>
+              <td>Cabine (s) de comando deve possuir proteção adequada ao operador, sistema de visibilidade ao paciente e controle do equipamento.</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="amb_8" value="SIM" class="chk-conforme"> SIM</label><label class="chk-label"><input type="radio" name="amb_8" value="NAO"> NÃO</label></td>
+            </tr>
+            <tr>
+              <td>Sinalização luminosa externa de cor vermelha de operação do equipamento.</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="amb_9" value="SIM" class="chk-conforme"> SIM</label><label class="chk-label"><input type="radio" name="amb_9" value="NAO"> NÃO</label></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-footer">
+        É proibida a reprodução parcial ou total deste documento sem a autorização prévia do Setor da Qualidade.<br>
+        Documento Relacionado: Manuais Técnicos dos Equipamentos relacionados.
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PÁGINA 4 / 12                             -->
+    <!-- ========================================== -->
+    <div class="page-sheet" id="page-4">
+      <div class="doc-header">
+        <div class="cell"><div class="code">FR_SE00003_03</div><div class="page-num">Pág. 4 / 12</div></div>
+        <div class="cell"><div class="main-title">FORMULÁRIO DE REGISTRO</div><div class="sub-title">RELATÓRIO DE INSTALAÇÃO E ACEITAÇÃO EQUIPAMENTO DE RAIOS X</div></div>
+        <div class="cell"><b style="color:#002b54;">KONICA MINOLTA</b></div>
+      </div>
+
+      <!-- MONTAGEM MECÂNICA -->
+      <div class="sec-block">
+        <div class="sec-title">MONTAGEM MECÂNICA / POSICIONAMENTO DA MESA</div>
+        <table class="form-tbl">
+          <tbody>
+            <tr>
+              <td style="width: 75%;">Nivelar o trilho traseiro de estativa:</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="mm_1" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="mm_1" value="NOK"> NÃO OK</label></td>
+            </tr>
+            <tr>
+              <td>Distância do Trilho da estativa: <input type="text" name="dist_trilho_cm" style="width:60px;" class="text-center input-clean" placeholder="40"> CM</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="mm_2" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="mm_2" value="NOK"> NÃO OK</label></td>
+            </tr>
+            <tr>
+              <td>Distância do Bucky mural: <input type="text" name="dist_bucky_cm" style="width:60px;" class="text-center input-clean" placeholder="190"> CM</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="mm_3" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="mm_3" value="NOK"> NÃO OK</label></td>
+            </tr>
+            <tr>
+              <td>Ajuste de prumo da estativa:</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="mm_4" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="mm_4" value="NOK"> NÃO OK</label></td>
+            </tr>
+            <tr>
+              <td>Nivelamento da mesa:</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="mm_5" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="mm_5" value="NOK"> NÃO OK</label></td>
+            </tr>
+            <tr>
+              <td>Posicionar Gerador e transformador:</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="mm_6" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="mm_6" value="NOK"> NÃO OK</label></td>
+            </tr>
+            <tr>
+              <td>Fixar painel (se solicitado pelo cliente):</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="mm_7" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="mm_7" value="NOK"> NÃO OK</label></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- BUCKY MESA / MURAL -->
+      <div class="sec-block">
+        <div class="sec-title">BUCKY MESA / MURAL</div>
+        <table class="form-tbl">
+          <tbody>
+            <tr><td>Montar a alça da grade removível mesa:</td><td class="text-center"><label class="chk-label"><input type="radio" name="bm_1" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="bm_1" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Montar a alça da grade removível mural:</td><td class="text-center"><label class="chk-label"><input type="radio" name="bm_2" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="bm_2" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Bandeja:</td><td class="text-center"><label class="chk-label"><input type="radio" name="bm_3" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="bm_3" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Fim de curso:</td><td class="text-center"><label class="chk-label"><input type="radio" name="bm_4" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="bm_4" value="NOK"> NÃO OK</label></td></tr>
+            <tr>
+              <td>Freio mural: • Conferir se o deslocamento acontece de forma linear • Conferir funcionamento do manípulo do freio</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="bm_5" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="bm_5" value="NOK"> NÃO OK</label></td>
+            </tr>
+            <tr>
+              <td>Freio do bucky da mesa: • Botão de acionamento imediato • Deslocamento linear desligado</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="bm_6" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="bm_6" value="NOK"> NÃO OK</label></td>
+            </tr>
+            <tr>
+              <td>Freio do tampo da mesa: • Pedal liberado/travado • Posição natural travada</td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="bm_7" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="bm_7" value="NOK"> NÃO OK</label></td>
+            </tr>
+            <tr><td>Sistema conjunto emissor e estativa porta tubo contrabalanceado:</td><td class="text-center"><label class="chk-label"><input type="radio" name="bm_8" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="bm_8" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Instalação da câmara de ionização AEC</td><td class="text-center"><label class="chk-label"><input type="radio" name="bm_9" value="OK"> OK</label><label class="chk-label"><input type="radio" name="bm_9" value="NOK"> NÃO OK</label><label class="chk-label"><input type="radio" name="bm_9" value="NA" class="chk-conforme"> Não aplicável</label></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- CABOS DE ALTA TENSÃO -->
+      <div class="sec-block">
+        <div class="sec-title">CABOS DE ALTA TENSÃO</div>
+        <table class="form-tbl">
+          <tbody>
+            <tr><td>Limpeza dos terminais do cabo de alta:</td><td class="text-center"><label class="chk-label"><input type="radio" name="at_1" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="at_1" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Identificação de polaridade:</td><td class="text-center"><label class="chk-label"><input type="radio" name="at_2" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="at_2" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Utilização de silicone líquido / vaselina:</td><td class="text-center"><label class="chk-label"><input type="radio" name="at_3" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="at_3" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Conexão do tubo ao trafo HV:</td><td class="text-center"><label class="chk-label"><input type="radio" name="at_4" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="at_4" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Verificar o aperto do flange do cabo de HV com as vias (+) e (-) do trafo de HV (deve estar sem folgas):</td><td class="text-center"><label class="chk-label"><input type="radio" name="at_5" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="at_5" value="NOK"> NÃO OK</label></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-footer">
+        É proibida a reprodução parcial ou total deste documento sem a autorização prévia do Setor da Qualidade.<br>
+        Documento Relacionado: Manuais Técnicos dos Equipamentos relacionados.
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PÁGINA 5 / 12                             -->
+    <!-- ========================================== -->
+    <div class="page-sheet" id="page-5">
+      <div class="doc-header">
+        <div class="cell"><div class="code">FR_SE00003_03</div><div class="page-num">Pág. 5 / 12</div></div>
+        <div class="cell"><div class="main-title">FORMULÁRIO DE REGISTRO</div><div class="sub-title">RELATÓRIO DE INSTALAÇÃO E ACEITAÇÃO EQUIPAMENTO DE RAIOS X</div></div>
+        <div class="cell"><b style="color:#002b54;">KONICA MINOLTA</b></div>
+      </div>
+
+      <!-- CABOS DE BAIXA TENSÃO -->
+      <div class="sec-block">
+        <div class="sec-title">CABOS DE BAIXA TENSÃO (Ligação ao gerador)</div>
+        <table class="form-tbl">
+          <tbody>
+            <tr><td>Rede trifásica:</td><td class="text-center"><label class="chk-label"><input type="radio" name="bt_1" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="bt_1" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Aterramento:</td><td class="text-center"><label class="chk-label"><input type="radio" name="bt_2" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="bt_2" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Alimentação da mesa:</td><td class="text-center"><label class="chk-label"><input type="radio" name="bt_3" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="bt_3" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Cabo giratório como sensor do tubo:</td><td class="text-center"><label class="chk-label"><input type="radio" name="bt_4" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="bt_4" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Ligação do Neutro:</td><td class="text-center"><label class="chk-label"><input type="radio" name="bt_5" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="bt_5" value="NOK"> NÃO OK</label><label class="chk-label"><input type="radio" name="bt_5" value="NA"> Não aplicável</label></td></tr>
+            <tr><td>Lâmpada externa:</td><td class="text-center"><label class="chk-label"><input type="radio" name="bt_6" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="bt_6" value="NOK"> NÃO OK</label><label class="chk-label"><input type="radio" name="bt_6" value="NA"> Não aplicável</label></td></tr>
+            <tr><td>Sensor de porta:</td><td class="text-center"><label class="chk-label"><input type="radio" name="bt_7" value="OK"> OK</label><label class="chk-label"><input type="radio" name="bt_7" value="NOK"> NÃO OK</label><label class="chk-label"><input type="radio" name="bt_7" value="NA" class="chk-conforme"> Não aplicável</label></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- INTERLIGAÇÕES -->
+      <div class="sec-block">
+        <div class="sec-title">INTERLIGAÇÕES &amp; ATERRAMENTOS</div>
+        <table class="form-tbl">
+          <tbody>
+            <tr><td>Cabo de alimentação da mesa:</td><td class="text-center"><label class="chk-label"><input type="radio" name="int_1" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="int_1" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Cabo de alimentação da estativa porta tubo:</td><td class="text-center"><label class="chk-label"><input type="radio" name="int_2" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="int_2" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Cabo de alimentação do Mural Bucky:</td><td class="text-center"><label class="chk-label"><input type="radio" name="int_3" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="int_3" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Cabo de alimentação do colimador:</td><td class="text-center"><label class="chk-label"><input type="radio" name="int_4" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="int_4" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Cabo de aterramento do colimador:</td><td class="text-center"><label class="chk-label"><input type="radio" name="int_5" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="int_5" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Aterramento do painel:</td><td class="text-center"><label class="chk-label"><input type="radio" name="int_6" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="int_6" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Cabo primário Trafo de HV:</td><td class="text-center"><label class="chk-label"><input type="radio" name="int_7" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="int_7" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Cab01005_Realimentação KV:</td><td class="text-center"><label class="chk-label"><input type="radio" name="int_8" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="int_8" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Cab01004_Alimentação Filamento:</td><td class="text-center"><label class="chk-label"><input type="radio" name="int_9" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="int_9" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Cab01039_Primário do filamento:</td><td class="text-center"><label class="chk-label"><input type="radio" name="int_10" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="int_10" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Aterramento do Trafo de HV:</td><td class="text-center"><label class="chk-label"><input type="radio" name="int_11" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="int_11" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Cab01016_Alimentação 24V:</td><td class="text-center"><label class="chk-label"><input type="radio" name="int_12" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="int_12" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Terra do Auto Trafo (se aplicável):</td><td class="text-center"><label class="chk-label"><input type="radio" name="int_13" value="OK"> OK</label><label class="chk-label"><input type="radio" name="int_13" value="NOK"> NÃO OK</label><label class="chk-label"><input type="radio" name="int_13" value="NA" class="chk-conforme"> Não aplicável</label></td></tr>
+            <tr><td>Cabo de alimentação do DAP (se aplicável):</td><td class="text-center"><label class="chk-label"><input type="radio" name="int_14" value="OK"> OK</label><label class="chk-label"><input type="radio" name="int_14" value="NOK"> NÃO OK</label><label class="chk-label"><input type="radio" name="int_14" value="NA" class="chk-conforme"> Não aplicável</label></td></tr>
+            <tr><td>Cabo de comunicação da câmara de ionização AEC (se aplicável):</td><td class="text-center"><label class="chk-label"><input type="radio" name="int_15" value="OK"> OK</label><label class="chk-label"><input type="radio" name="int_15" value="NOK"> NÃO OK</label><label class="chk-label"><input type="radio" name="int_15" value="NA" class="chk-conforme"> Não aplicável</label></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- NIVELAMENTO E CENTRALIZAÇÃO MURAL BUCKY -->
+      <div class="sec-block">
+        <div class="sec-title">NIVELAMENTO E CENTRALIZAÇÃO DO MURAL BUCKY</div>
+        <table class="form-tbl">
+          <tbody>
+            <tr><td style="width:75%;">Nivelamento do mural Bucky:</td><td class="text-center"><label class="chk-label"><input type="radio" name="nc_1" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="nc_1" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Centralizar Bucky mural com mesa:</td><td class="text-center"><label class="chk-label"><input type="radio" name="nc_2" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="nc_2" value="NOK"> NÃO OK</label></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- CENTRALIZAÇÃO COLIMADOR -->
+      <div class="sec-block">
+        <div class="sec-title">CENTRALIZAÇÃO E VERIFICAÇÃO DO COLIMADOR E DOS MOVIMENTOS MECÂNICOS</div>
+        <table class="form-tbl">
+          <tbody>
+            <tr><td style="width:75%;">Centralizar luz do colimador com centro da mesa:</td><td class="text-center"><label class="chk-label"><input type="radio" name="nc_3" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="nc_3" value="NOK"> NÃO OK</label></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-footer">
+        É proibida a reprodução parcial ou total deste documento sem a autorização prévia do Setor da Qualidade.<br>
+        Documento Relacionado: Manuais Técnicos dos Equipamentos relacionados.
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PÁGINA 6 / 12                             -->
+    <!-- ========================================== -->
+    <div class="page-sheet" id="page-6">
+      <div class="doc-header">
+        <div class="cell"><div class="code">FR_SE00003_03</div><div class="page-num">Pág. 6 / 12</div></div>
+        <div class="cell"><div class="main-title">FORMULÁRIO DE REGISTRO</div><div class="sub-title">RELATÓRIO DE INSTALAÇÃO E ACEITAÇÃO EQUIPAMENTO DE RAIOS X</div></div>
+        <div class="cell"><b style="color:#002b54;">KONICA MINOLTA</b></div>
+      </div>
+
+      <div class="sec-block">
+        <div class="sec-title">AFERIÇÃO DO GERADOR</div>
+        <p style="font-size:9px;margin:4px 0;">As calibrações devem ser aferidas conforme instruções do manual técnico. Os ajustes devem ser feitos caso haja necessidade. Em caso de dúvidas entre em contato com a assistência técnica da Konica Minolta Brasil.</p>
+        <div class="callout-box">
+          <div class="callout-icon">⚠️</div>
+          <div style="font-size:9px;"><b>ATENÇÃO:</b> Ao energizar e ligar o equipamento são necessários realizar os procedimentos a seguir para garantir a conformidade do equipamento. Todos os itens devem ser feitos sem exceção:</div>
+        </div>
+
+        <table class="form-tbl">
+          <thead>
+            <tr><th>Equipamentos utilizados</th><th>Marca</th><th>Modelo</th><th>Data de vencimento da calibração</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="bold text-center">Multímetro</td>
+              <td><input type="text" name="inst_multi_marca" class="input-clean text-center" value="FLUKE"></td>
+              <td><input type="text" name="inst_multi_modelo" class="input-clean text-center" value="15B+"></td>
+              <td><input type="text" name="inst_multi_val" class="input-clean text-center" placeholder="DD/MM/AAAA"></td>
+            </tr>
+            <tr>
+              <td class="bold text-center">Osciloscópio</td>
+              <td><input type="text" name="inst_osci_marca" class="input-clean text-center" value="FNIRSI"></td>
+              <td><input type="text" name="inst_osci_modelo" class="input-clean text-center" value="1014D 100MHZ"></td>
+              <td><input type="text" name="inst_osci_val" class="input-clean text-center" placeholder="DD/MM/AAAA"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Verificação das fontes da PCB01004 -->
+      <div class="sec-block">
+        <div class="sec-title">Verificação das fontes da PCB01004</div>
+        <table class="form-tbl">
+          <thead>
+            <tr>
+              <th style="width: 25%;">Item</th>
+              <th style="width: 40%;">Critério</th>
+              <th style="width: 15%;">Resultado</th>
+              <th style="width: 20%;">Avaliação</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="bold">Fonte 5 VDC</td>
+              <td>Entre 4,8 VDC e 5,2 VDC (Led D51 aceso)</td>
+              <td><input type="text" name="fonte_5v" class="text-center input-clean" placeholder="5,02 V"></td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="chk_f5" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="chk_f5" value="NOK"> NOK</label></td>
+            </tr>
+            <tr>
+              <td class="bold">Fonte 15 VDC</td>
+              <td>Entre 14,4 VDC e 15,6 VDC (Led D55 aceso)</td>
+              <td><input type="text" name="fonte_15v" class="text-center input-clean" placeholder="15,02 V"></td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="chk_f15" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="chk_f15" value="NOK"> NOK</label></td>
+            </tr>
+            <tr>
+              <td class="bold">Fonte 12 VDC</td>
+              <td>Entre 11,5 VDC e 12,5 VDC (Led D54 aceso)</td>
+              <td><input type="text" name="fonte_12v" class="text-center input-clean" placeholder="11,98 V"></td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="chk_f12" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="chk_f12" value="NOK"> NOK</label></td>
+            </tr>
+            <tr>
+              <td class="bold">Fonte -12 VDC</td>
+              <td>Entre -11,5 VDC e -12,5 VDC (Led D53 aceso)</td>
+              <td><input type="text" name="fonte_m12v" class="text-center input-clean" placeholder="-12,04 V"></td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="chk_fm12" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="chk_fm12" value="NOK"> NOK</label></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Preparação para aquecimento do tubo de raios x -->
+      <div class="sec-block">
+        <div class="sec-title">Preparação para aquecimento do tubo de raios x</div>
+        <table class="form-tbl">
+          <thead>
+            <tr>
+              <th style="width: 30%;">Item</th>
+              <th style="width: 35%;">Critério</th>
+              <th style="width: 15%;">Resultado</th>
+              <th style="width: 20%;">Avaliação</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>100mA; 40kV; 100ms</td>
+              <td>TP16: 244 mV a 256 mV</td>
+              <td><input type="text" name="prep_1" class="text-center input-clean" placeholder="0,248 mV"></td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="chk_pr_1" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="chk_pr_1" value="NOK"> NOK</label></td>
+            </tr>
+            <tr>
+              <td>100mA; 65kV; 100ms</td>
+              <td>TP16: 244 mV a 256 mV</td>
+              <td><input type="text" name="prep_2" class="text-center input-clean" placeholder="0,248 mV"></td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="chk_pr_2" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="chk_pr_2" value="NOK"> NOK</label></td>
+            </tr>
+            <tr>
+              <td>100mA; 80kV; 100ms</td>
+              <td>TP16: 244 mV a 256 mV</td>
+              <td><input type="text" name="prep_3" class="text-center input-clean" placeholder="0,248 mV"></td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="chk_pr_3" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="chk_pr_3" value="NOK"> NOK</label></td>
+            </tr>
+            <tr>
+              <td>100mA; 120kV; 100ms</td>
+              <td>TP16: 244 mV a 256 mV</td>
+              <td><input type="text" name="prep_4" class="text-center input-clean" placeholder="0,248 mV"></td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="chk_pr_4" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="chk_pr_4" value="NOK"> NOK</label></td>
+            </tr>
+            <tr>
+              <td>125mA; 40kV; 100ms (1)</td>
+              <td>TP16: 305 mV a 320 mV</td>
+              <td><input type="text" name="prep_5" class="text-center input-clean" placeholder="0,312 mV"></td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="chk_pr_5" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="chk_pr_5" value="NOK"> NOK</label></td>
+            </tr>
+            <tr>
+              <td>125mA; 40kV; 100ms (2)</td>
+              <td>TP16: 305 mV a 320 mV</td>
+              <td><input type="text" name="prep_6" class="text-center input-clean" placeholder="0,312 mV"></td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="chk_pr_6" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="chk_pr_6" value="NOK"> NOK</label></td>
+            </tr>
+            <tr>
+              <td>125mA; 40kV; 100ms (3)</td>
+              <td>TP16: 305 mV a 320 mV</td>
+              <td><input type="text" name="prep_7" class="text-center input-clean" placeholder="0,312 mV"></td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="chk_pr_7" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="chk_pr_7" value="NOK"> NOK</label></td>
+            </tr>
+            <tr>
+              <td>125mA; 40kV; 100ms (4)</td>
+              <td>TP16: 305 mV a 320 mV</td>
+              <td><input type="text" name="prep_8" class="text-center input-clean" placeholder="0,312 mV"></td>
+              <td class="text-center"><label class="chk-label"><input type="radio" name="chk_pr_8" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="chk_pr_8" value="NOK"> NOK</label></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-footer">
+        É proibida a reprodução parcial ou total deste documento sem a autorização prévia do Setor da Qualidade.<br>
+        Documento Relacionado: Manuais Técnicos dos Equipamentos relacionados.
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PÁGINA 7 / 12                             -->
+    <!-- ========================================== -->
+    <div class="page-sheet" id="page-7">
+      <div class="doc-header">
+        <div class="cell"><div class="code">FR_SE00003_03</div><div class="page-num">Pág. 7 / 12</div></div>
+        <div class="cell"><div class="main-title">FORMULÁRIO DE REGISTRO</div><div class="sub-title">RELATÓRIO DE INSTALAÇÃO E ACEITAÇÃO EQUIPAMENTO DE RAIOS X</div></div>
+        <div class="cell"><b style="color:#002b54;">KONICA MINOLTA</b></div>
+      </div>
+
+      <!-- AQUECIMENTO DO TUBO -->
+      <div class="sec-block">
+        <div class="sec-title">AQUECIMENTO DO TUBO DE RAIOS-X</div>
+        <table class="form-tbl">
+          <thead>
+            <tr>
+              <th>mA</th><th>kV</th><th>ms</th><th>Disparos</th><th>TP16 Ref</th><th>TP28 Ref</th>
+              <th style="width: 20%;">TP16 medido (V)</th>
+              <th style="width: 20%;">TP28 medido (V)</th>
+            </tr>
+          </thead>
+          <tbody id="tbl_aquecimento_tubo">
+            <!-- Populated via JS / Inputs -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- CALIBRAÇÃO DAS CORRENTES Pág 7 -->
+      <div class="sec-block">
+        <div class="sec-title">CALIBRAÇÃO DAS CORRENTES DO TUBO DE RAIOS-X (10mA a 160mA)</div>
+        <table class="form-tbl">
+          <thead>
+            <tr>
+              <th>mA</th><th>kV</th><th>ms</th><th>Limite Inf</th><th>Valor Central</th><th>Limite Sup</th>
+              <th>Tubo 125kV</th><th>Tubo 150kV</th>
+              <th style="width: 22%;">TP16 medido (V)</th>
+            </tr>
+          </thead>
+          <tbody id="tbl_calib_p7">
+            <!-- Populated via JS / Inputs -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-footer">
+        É proibida a reprodução parcial ou total deste documento sem a autorização prévia do Setor da Qualidade.<br>
+        Documento Relacionado: Manuais Técnicos dos Equipamentos relacionados.
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PÁGINA 8 / 12                             -->
+    <!-- ========================================== -->
+    <div class="page-sheet" id="page-8">
+      <div class="doc-header">
+        <div class="cell"><div class="code">FR_SE00003_03</div><div class="page-num">Pág. 8 / 12</div></div>
+        <div class="cell"><div class="main-title">FORMULÁRIO DE REGISTRO</div><div class="sub-title">RELATÓRIO DE INSTALAÇÃO E ACEITAÇÃO EQUIPAMENTO DE RAIOS X</div></div>
+        <div class="cell"><b style="color:#002b54;">KONICA MINOLTA</b></div>
+      </div>
+
+      <!-- CALIBRAÇÃO DAS CORRENTES Pág 8 (220mA a 800mA) -->
+      <div class="sec-block">
+        <div class="sec-title">CALIBRAÇÃO DAS CORRENTES DO TUBO DE RAIOS-X — CONTINUAÇÃO (220mA a 800mA)</div>
+        <table class="form-tbl">
+          <thead>
+            <tr>
+              <th>mA</th><th>kV</th><th>ms</th><th>Limite Inf</th><th>Valor Central</th><th>Limite Sup</th>
+              <th>Tubo 125kV</th><th>Tubo 150kV</th>
+              <th style="width: 22%;">TP16 medido (V)</th>
+            </tr>
+          </thead>
+          <tbody id="tbl_calib_p8">
+            <!-- Populated via JS / Inputs -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-footer">
+        É proibida a reprodução parcial ou total deste documento sem a autorização prévia do Setor da Qualidade.<br>
+        Documento Relacionado: Manuais Técnicos dos Equipamentos relacionados.
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PÁGINA 9 / 12                             -->
+    <!-- ========================================== -->
+    <div class="page-sheet" id="page-9">
+      <div class="doc-header">
+        <div class="cell"><div class="code">FR_SE00003_03</div><div class="page-num">Pág. 9 / 12</div></div>
+        <div class="cell"><div class="main-title">FORMULÁRIO DE REGISTRO</div><div class="sub-title">RELATÓRIO DE INSTALAÇÃO E ACEITAÇÃO EQUIPAMENTO DE RAIOS X</div></div>
+        <div class="cell"><b style="color:#002b54;">KONICA MINOLTA</b></div>
+      </div>
+
+      <!-- TÉCNICAS DE ALTA POTÊNCIA -->
+      <div class="sec-block">
+        <div class="sec-title">VERIFICAÇÃO DAS TÉCNICAS DE ALTA POTÊNCIA</div>
+        <table class="form-tbl">
+          <thead>
+            <tr>
+              <th>mA</th><th>kV</th><th>ms</th><th>Limite Inf</th><th>Valor Central</th><th>Limite Sup</th>
+              <th>Tubo 125kV</th><th>Tubo 150kV</th>
+              <th style="width: 22%;">TP16 medido (V)</th>
+            </tr>
+          </thead>
+          <tbody id="tbl_alta_potencia">
+            <!-- Populated via JS / Inputs -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-footer">
+        É proibida a reprodução parcial ou total deste documento sem a autorização prévia do Setor da Qualidade.<br>
+        Documento Relacionado: Manuais Técnicos dos Equipamentos relacionados.
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PÁGINA 10 / 12                            -->
+    <!-- ========================================== -->
+    <div class="page-sheet" id="page-10">
+      <div class="doc-header">
+        <div class="cell"><div class="code">FR_SE00003_03</div><div class="page-num">Pág. 10 / 12</div></div>
+        <div class="cell"><div class="main-title">FORMULÁRIO DE REGISTRO</div><div class="sub-title">RELATÓRIO DE INSTALAÇÃO E ACEITAÇÃO EQUIPAMENTO DE RAIOS X</div></div>
+        <div class="cell"><b style="color:#002b54;">KONICA MINOLTA</b></div>
+      </div>
+
+      <!-- CONDIÇÕES EXTERNAS E APARENTE -->
+      <div class="sec-block">
+        <div class="sec-title">CONDIÇÕES EXTERNAS E APARENTE DO EQUIPAMENTO</div>
+        <table class="form-tbl">
+          <tbody>
+            <tr><td style="width:75%;">Pintura:</td><td class="text-center"><label class="chk-label"><input type="radio" name="ce_1" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="ce_1" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Funcionamento:</td><td class="text-center"><label class="chk-label"><input type="radio" name="ce_2" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="ce_2" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Mecânica:</td><td class="text-center"><label class="chk-label"><input type="radio" name="ce_3" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="ce_3" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Rede elétrica:</td><td class="text-center"><label class="chk-label"><input type="radio" name="ce_4" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="ce_4" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Aquisição de Imagem:</td><td class="text-center"><label class="chk-label"><input type="radio" name="ce_5" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="ce_5" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Embalagem:</td><td class="text-center"><label class="chk-label"><input type="radio" name="ce_6" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="ce_6" value="NOK"> NÃO OK</label></td></tr>
+            <tr><td>Sala:</td><td class="text-center"><label class="chk-label"><input type="radio" name="ce_7" value="OK" class="chk-conforme"> OK</label><label class="chk-label"><input type="radio" name="ce_7" value="NOK"> NÃO OK</label></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- RELATÓRIO DE INTERCORRÊNCIAS -->
+      <div class="sec-block">
+        <div class="sec-title">RELATÓRIO DE INTERCORRÊNCIAS &amp; OBSERVAÇÕES TÉCNICAS</div>
+        <textarea name="relatorio_intercorrencias" rows="4" placeholder="Descreva aqui eventuais intercorrências, adaptações ou observações técnicas de instalação..."></textarea>
+      </div>
+
+      <div class="callout-box">
+        <div class="callout-icon">⚠️</div>
+        <div style="font-size:9px;">Caso as especificações estruturais da sala estejam diferentes do especificado pelo fabricante e/ou não conforme normativas relevantes, o cliente deve assinar o "Termo de aceite" (anexado a este documento).</div>
+      </div>
+
+      <p style="font-size:9.5px;line-height:1.35;margin:8px 0;"><b>Nota:</b> Ao assinar o registro de aceitação, o cliente declara que foram realizados todos os testes no equipamento necessários para seu perfeito funcionamento e que este se encontra em conformidade. Deverá ser anexado, junto ao relatório de instalação e enviado à fábrica (Konica Minolta), evidência de que o equipamento foi testado e está em conformidade com as especificações técnicas para utilização.</p>
+
+      <!-- ASSINATURAS PÁGINA 10 -->
+      <table class="form-tbl">
+        <thead>
+          <tr>
+            <th style="width: 50%;">Instalador do Conjunto Radiológico</th>
+            <th style="width: 50%;">Proprietário Responsável</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              Nome: <input type="text" name="ass_tec_nome" class="input-clean bold" placeholder="Nome do Técnico"><br/>
+              Data: <input type="text" name="ass_tec_data" class="input-clean" placeholder="DD/MM/AAAA"><br/>
+              <div class="sig-canvas-box">
+                <canvas id="cv_ass_tec"></canvas>
+                <button type="button" class="sig-clear-btn" onclick="limparCanvas('cv_ass_tec')">Limpar</button>
+              </div>
+            </td>
+            <td>
+              Nome: <input type="text" name="ass_cli_nome" class="input-clean bold" placeholder="Nome do Cliente"><br/>
+              Data: <input type="text" name="ass_cli_data" class="input-clean" placeholder="DD/MM/AAAA"><br/>
+              <div class="sig-canvas-box">
+                <canvas id="cv_ass_cli"></canvas>
+                <button type="button" class="sig-clear-btn" onclick="limparCanvas('cv_ass_cli')">Limpar</button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>Carimbo: <input type="text" name="carimbo_tec" class="input-clean" placeholder="CREA / CFT / Reg"></td>
+            <td>Carimbo: <input type="text" name="carimbo_cli" class="input-clean" placeholder="Cargo / Setor"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="doc-footer">
+        É proibida a reprodução parcial ou total deste documento sem a autorização prévia do Setor da Qualidade.<br>
+        Documento Relacionado: Manuais Técnicos dos Equipamentos relacionados.
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PÁGINA 11 / 12                            -->
+    <!-- ========================================== -->
+    <div class="page-sheet" id="page-11">
+      <div class="doc-header">
+        <div class="cell"><div class="code">FR_SE00003_02</div><div class="page-num">Pág. 11 / 12</div></div>
+        <div class="cell"><div class="main-title">FORMULÁRIO DE REGISTRO</div><div class="sub-title">RELATÓRIO DE INSTALAÇÃO E ACEITAÇÃO EQUIPAMENTO DE RAIOS X – FAMÍLIA MAXIMUS</div></div>
+        <div class="cell"><b style="color:#002b54;">KONICA MINOLTA</b></div>
+      </div>
+
+      <div style="text-align:center;font-weight:bold;font-size:12px;margin:16px 0;">TERMO DE ACEITE SALA</div>
+
+      <p style="font-size:10px;line-height:1.55;text-align:justify;">
+        Caso a estrutura onde o equipamento será instalado não esteja de acordo com as especificações mínimas indicadas pelo fabricante e em conformidade com a <b>RDC Nº 611, DE 9 DE MARÇO DE 2022</b> e a resolução <b>RDC 50 de 2002 / RDC 307 de 2002 e RDC 51 de 2011</b>, o cliente declara estar ciente das possíveis limitações que a falta de espaço pode causar na utilização do equipamento. As implicações poderão limitar inclusive a realização de alguns tipos de exames, como por exemplo os exames com maca e os exames dos membros inferiores feitos no bucky mural.
+      </p>
+      <p style="font-size:10px;line-height:1.55;text-align:justify;">
+        Neste sentido, o cliente declara ainda estar ciente da possibilidade de existirem eventuais problemas com os órgãos de fiscalização em razão do não atendimento ao tamanho adequado da sala de instalação do equipamento.
+      </p>
+      <p style="font-size:10px;line-height:1.55;text-align:justify;">
+        Fica ainda estabelecido que caso ocorra algum impeditivo em relação à liberação de alvará, devido ao não atendimento aos requisitos das normas referidas, se houver a necessidade de desinstalação e nova instalação do equipamento em outro local, ou a adequação desta mesma sala o cliente deverá arcar com todas e quaisquer despesas adicionais, ficando a Konica Minolta desobrigada de realizar qualquer destes procedimentos sem o devido pagamento pelo serviço.
+      </p>
+      <p style="font-size:10px;line-height:1.55;text-align:justify;">
+        Nestes termos, o cliente declara estar ciente de que a Konica Minolta não se responsabiliza por qualquer consequência advinda da instalação do equipamento em sala que tem espaço menor do que o aconselhado.
+      </p>
+
+      <div style="margin-top:35px;">
+        <table class="form-tbl no-outer-border">
+          <tr>
+            <td style="width:50%;border:none;">
+              <b>Local:</b> <input type="text" name="termo_sala_local" class="input-clean" placeholder="Cidade - UF" style="width:70%;">
+            </td>
+            <td style="width:50%;border:none;">
+              <b>Data:</b> <input type="text" name="termo_sala_data" class="input-clean" placeholder="DD/MM/AAAA" style="width:70%;">
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" style="border:none;padding-top:14px;">
+              <b>Responsável pelo aceite de instalação:</b> <input type="text" name="termo_sala_resp" class="input-clean bold" placeholder="Nome Completo do Responsável" style="width:65%;">
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" style="border:none;padding-top:14px;">
+              <b>Documento de identificação:</b> <input type="text" name="termo_sala_doc" class="input-clean" placeholder="RG / CPF / Cargo" style="width:65%;">
+            </td>
+          </tr>
+        </table>
+
+        <div style="width:300px;margin-top:15px;">
+          <div style="font-size:9.5px;font-weight:bold;margin-bottom:3px;">Assinatura do Responsável pelo Aceite:</div>
+          <div class="sig-canvas-box" style="height:100px;">
+            <canvas id="cv_ass_sala"></canvas>
+            <button type="button" class="sig-clear-btn" onclick="limparCanvas('cv_ass_sala')">Limpar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="doc-footer" style="margin-top:60px;">
+        É proibida a reprodução parcial ou total deste documento sem a autorização prévia do Setor da Qualidade.<br>
+        Documento Relacionado: Manuais Técnicos dos Equipamentos relacionados.
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- PÁGINA 12 / 12                            -->
+    <!-- ========================================== -->
+    <div class="page-sheet" id="page-12">
+      <div class="doc-header">
+        <div class="cell"><div class="code">FR_SE00003_02</div><div class="page-num">Pág. 12 / 12</div></div>
+        <div class="cell"><div class="main-title">FORMULÁRIO DE REGISTRO</div><div class="sub-title">RELATÓRIO DE INSTALAÇÃO E ACEITAÇÃO EQUIPAMENTO DE RAIOS X – FAMÍLIA MAXIMUS</div></div>
+        <div class="cell"><b style="color:#002b54;">KONICA MINOLTA</b></div>
+      </div>
+
+      <div style="text-align:center;font-weight:bold;font-size:12px;margin:16px 0;">TERMO DE ACEITE REDE ELÉTRICA</div>
+
+      <p style="font-size:10px;line-height:1.55;text-align:justify;">
+        Caso a estrutura de rede elétrica onde o equipamento será instalado não esteja de acordo com as especificações mínimas indicadas pelo fabricante e em conformidade com as normas <b>NBR 5410</b> Instalações elétricas de baixa tensão, <b>NBR 13534</b> Instalações elétricas em estabelecimentos assistenciais de saúde e <b>NBR IEC 60601-1</b> Equipamento eletro médico - Parte 1 - Prescrições gerais para segurança, o cliente declara estar ciente das possíveis falhas que pode ocorrer na utilização do equipamento como falhas intermitentes e mesmo danos ao equipamento.
+      </p>
+      <p style="font-size:10px;line-height:1.55;text-align:justify;">
+        Neste sentido, o cliente declara ainda estar ciente da possibilidade de existirem eventuais problemas com os órgãos de fiscalização em razão do não atendimento aos requisitos de segurança da sala.
+      </p>
+      <p style="font-size:10px;line-height:1.55;text-align:justify;">
+        Fica ainda estabelecido que caso ocorra algum impeditivo em relação à liberação de alvará, devido ao não atendimento aos requisitos das normas referidas, se houver a necessidade de manutenção no equipamento, troca de peças ou até mesmo a troca do equipamento completo o cliente deverá arcar com todas e quaisquer despesas adicionais, ficando a Konica Minolta desobrigada de realizar qualquer destes procedimentos sem o devido pagamento pelo serviço.
+      </p>
+      <p style="font-size:10px;line-height:1.55;text-align:justify;">
+        Nestes termos, o cliente declara estar ciente de que a Konica Minolta não se responsabiliza por qualquer consequência advinda da instalação do equipamento em rede elétrica fora do especificado.
+      </p>
+
+      <div style="margin-top:35px;">
+        <table class="form-tbl no-outer-border">
+          <tr>
+            <td style="width:50%;border:none;">
+              <b>Local:</b> <input type="text" name="termo_rede_local" class="input-clean" placeholder="Cidade - UF" style="width:70%;">
+            </td>
+            <td style="width:50%;border:none;">
+              <b>Data:</b> <input type="text" name="termo_rede_data" class="input-clean" placeholder="DD/MM/AAAA" style="width:70%;">
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" style="border:none;padding-top:14px;">
+              <b>Responsável pelo aceite de instalação:</b> <input type="text" name="termo_rede_resp" class="input-clean bold" placeholder="Nome Completo do Responsável" style="width:65%;">
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" style="border:none;padding-top:14px;">
+              <b>Documento de identificação:</b> <input type="text" name="termo_rede_doc" class="input-clean" placeholder="RG / CPF / Cargo" style="width:65%;">
+            </td>
+          </tr>
+        </table>
+
+        <div style="width:300px;margin-top:15px;">
+          <div style="font-size:9.5px;font-weight:bold;margin-bottom:3px;">Assinatura do Responsável pelo Aceite:</div>
+          <div class="sig-canvas-box" style="height:100px;">
+            <canvas id="cv_ass_rede"></canvas>
+            <button type="button" class="sig-clear-btn" onclick="limparCanvas('cv_ass_rede')">Limpar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="doc-footer" style="margin-top:60px;">
+        É proibida a reprodução parcial ou total deste documento sem a autorização prévia do Setor da Qualidade.<br>
+        Documento Relacionado: Manuais Técnicos dos Equipamentos relacionados.
+      </div>
+    </div>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- ABA 2: OS PADRÃO KM (4 TÓPICOS EFFORT)    -->
+    <!-- ========================================== -->
+    <div id="view-topicos" class="tab-view no-print" style="display: none;">
+      <div class="topicos-container">
+        
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 14px;">
+          <div>
+            <div style="font-size:16px; font-weight:bold; color:#0f172a; display:flex; align-items:center; gap:8px;">
+              <span>🏥</span> Descrição Padrão de OS — Konica Minolta (4 Tópicos Oficiais)
+            </div>
+            <div style="font-size:11px; color:#64748b; margin-top:4px;">
+              Formato obrigatório para preenchimento e encerramento de Ordens de Serviço no portal <b>Effort</b> (<a href="https://konicaminolta.globalthings.net/Login.aspx" target="_blank" style="color:#0284c7;">konicaminolta.globalthings.net</a>).
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="btn btn-quick-fill" onclick="carregarPadraoKM()" style="font-size:11px; padding:6px 12px;">
+              ⚡ Preencher Padrão KM (1 Clique)
+            </button>
+            <button type="button" class="btn btn-clear" onclick="limparTopicos()" style="font-size:11px; padding:6px 12px;">
+              🧹 Limpar
+            </button>
+          </div>
+        </div>
+
+        <!-- Tópico 1 -->
+        <div class="topico-card">
+          <div class="topico-header">
+            <div class="topico-title"><span>1️⃣</span> 1. DIAGNÓSTICO PRINCIPAL</div>
+            <span class="topico-tag">Obrigatório no Effort</span>
+          </div>
+          <textarea id="km_topico_1" class="topico-textarea" oninput="atualizarConsolidado()" placeholder="Ex: * Manutenção preventiva.">* Manutenção preventiva.</textarea>
+          <div class="chips-group">
+            <span style="font-size:10px; color:#64748b; align-self:center;">Sugestões rápidas:</span>
+            <button type="button" class="chip-btn" onclick="setTopico(1, '* Manutenção preventiva.')">Preventiva</button>
+            <button type="button" class="chip-btn" onclick="setTopico(1, '* Manutenção corretiva.')">Corretiva</button>
+            <button type="button" class="chip-btn" onclick="setTopico(1, '* Instalação e aceitação técnica de equipamento novo.')">Instalação Nova</button>
+            <button type="button" class="chip-btn" onclick="setTopico(1, '* Calibração periódica e testes de conformidade.')">Calibração</button>
+          </div>
+        </div>
+
+        <!-- Tópico 2 -->
+        <div class="topico-card">
+          <div class="topico-header">
+            <div class="topico-title"><span>2️⃣</span> 2. AÇÕES REALIZADAS</div>
+            <span class="topico-tag">Detalhamento Técnico</span>
+          </div>
+          <textarea id="km_topico_2" class="topico-textarea" style="min-height:120px;" oninput="atualizarConsolidado()" placeholder="Ações executadas durante o atendimento...">* Limpeza: Realizada limpeza interna e externa completa do equipamento. 
+* Partes móveis e mecânica: Verificação e lubrificação das partes móveis; checagem dos cabos de contrapeso e verificação dos freios. 
+* Alta tensão: Checagem e substituição da graxa isolante nos conectores de alta tensão. 
+* Acionamento e alinhamento: Verificação dos botões de acionamento e ajuste/verificação do alinhamento do campo luminoso. 
+* Gerador: Realizado verificação nas calibrações de técnicas de kv e mA.</textarea>
+          <div class="chips-group">
+            <span style="font-size:10px; color:#64748b; align-self:center;">Inserir item comum:</span>
+            <button type="button" class="chip-btn" onclick="appendTopico(2, '* Substituição de peças: Realizada substituição de componente defeituoso e testes de carga.')">+ Substituição de Peça</button>
+            <button type="button" class="chip-btn" onclick="appendTopico(2, '* Aferição de gerador: Calibração de corrente e tensão nas técnicas de rotina.')">+ Aferição Gerador</button>
+            <button type="button" class="chip-btn" onclick="appendTopico(2, '* Rede e aterramento: Medição de impedância e tensões entre fases (380V/220V).')">+ Rede/Terra</button>
+          </div>
+        </div>
+
+        <!-- Tópico 3 -->
+        <div class="topico-card">
+          <div class="topico-header">
+            <div class="topico-title"><span>3️⃣</span> 3. TESTES E VALIDAÇÕES</div>
+            <span class="topico-tag">Validação de Segurança</span>
+          </div>
+          <textarea id="km_topico_3" class="topico-textarea" style="min-height:95px;" oninput="atualizarConsolidado()" placeholder="Testes realizados...">* Realizados testes gerais de funcionamento do equipamento após a montagem e ajustes. 
+* Validada a atuação dos freios, botões de acionamento e estabilidade/integridade dos cabos de contrapeso. 
+* Verificado o alinhamento do campo luminoso em operação e testes de funcionamento da lâmpada de sinalização externa.</textarea>
+          <div class="chips-group">
+            <span style="font-size:10px; color:#64748b; align-self:center;">Inserir teste:</span>
+            <button type="button" class="chip-btn" onclick="appendTopico(3, '* Disparos de teste: Realizados 10 disparos em diferentes técnicas sem código de erro.')">+ Disparos sem Erro</button>
+            <button type="button" class="chip-btn" onclick="appendTopico(3, '* Aceite com a equipe de radiologia: Acompanhado exame piloto com operador.')">+ Aceite Radiologia</button>
+          </div>
+        </div>
+
+        <!-- Tópico 4 -->
+        <div class="topico-card">
+          <div class="topico-header">
+            <div class="topico-title"><span>4️⃣</span> 4. STATUS DO EQUIPAMENTO</div>
+            <span class="topico-tag">Parecer Final</span>
+          </div>
+          <textarea id="km_topico_4" class="topico-textarea" style="min-height:55px;" oninput="atualizarConsolidado()" placeholder="Status final do equipamento...">* Operacional e liberado para uso.</textarea>
+          <div class="chips-group">
+            <span style="font-size:10px; color:#64748b; align-self:center;">Status padrão:</span>
+            <button type="button" class="chip-btn" onclick="setTopico(4, '* Operacional e liberado para uso.')">Operacional e Liberado</button>
+            <button type="button" class="chip-btn" onclick="setTopico(4, '* Equipamento em observação operacional com a equipe técnica.')">Em Observação</button>
+            <button type="button" class="chip-btn" onclick="setTopico(4, '* Inoperante aguardando fornecimento de peça pelo fabricante.')">Aguardando Peça</button>
+          </div>
+        </div>
+
+        <!-- Caixa de Texto Consolidado Pronto para Copiar -->
+        <div class="consolidado-box">
+          <div class="consolidado-header">
+            <div>
+              <b style="font-size:13px; color:#38bdf8;">📋 TEXTO CONSOLIDADO PARA A OS KONICA MINOLTA</b>
+              <div style="font-size:10px; color:#94a3b8; margin-top:2px;">Pronto para colar no campo de serviço do Effort ou enviar via automação</div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn btn-quick-fill" onclick="copiarTextoConsolidado()" style="font-size:11px; padding:6px 14px;">
+                📋 Copiar Texto Completo (Ctrl+C)
+              </button>
+              <button type="button" class="btn btn-save" onclick="sincronizarComRelatorio()" style="font-size:11px; padding:6px 14px;">
+                🔄 Aplicar na Pág. 10 do Relatório
+              </button>
+              <button type="button" class="btn btn-effort" onclick="abrirIntegracaoEffort()" style="font-size:11px; padding:6px 14px;">
+                🚀 Enviar p/ Effort KM
+              </button>
+            </div>
+          </div>
+          <div class="consolidado-content" id="box_consolidado"></div>
+        </div>
+
+      </div>
+    </div>
+
+</form>
+
+  <script>
+    // -------------------------------------------------------------
+    // Data structures for Calibration Tables (Pages 7, 8, 9)
+    // -------------------------------------------------------------
+    const AQUECIMENTO_DATA = [
+      { ma: 100, kv: 60, ms: 100, disp: 2, tp16: "0,25 V", tp28: "1,20 V", tp16_padrao: "0,248", tp28_padrao: "1,202" },
+      { ma: 100, kv: 70, ms: 100, disp: 2, tp16: "0,25 V", tp28: "1,40 V", tp16_padrao: "0,248", tp28_padrao: "1,400" },
+      { ma: 100, kv: 80, ms: 100, disp: 2, tp16: "0,25 V", tp28: "1,60 V", tp16_padrao: "0,248", tp28_padrao: "1,604" },
+      { ma: 100, kv: 90, ms: 100, disp: 2, tp16: "0,25 V", tp28: "1,80 V", tp16_padrao: "0,248", tp28_padrao: "1,800" },
+      { ma: 100, kv: 100, ms: 100, disp: 2, tp16: "0,25 V", tp28: "2,00 V", tp16_padrao: "0,248", tp28_padrao: "2,004" },
+      { ma: 100, kv: 110, ms: 100, disp: 2, tp16: "0,25 V", tp28: "2,20 V", tp16_padrao: "0,248", tp28_padrao: "2,222" },
+      { ma: 100, kv: 115, ms: 100, disp: 2, tp16: "0,25 V", tp28: "2,30 V", tp16_padrao: "0,248", tp28_padrao: "2,302" },
+      { ma: 100, kv: 120, ms: 100, disp: 2, tp16: "0,25 V", tp28: "2,40 V", tp16_padrao: "0,248", tp28_padrao: "2,400" },
+      { ma: 100, kv: 125, ms: 100, disp: 2, tp16: "0,25 V", tp28: "2,50 V", tp16_padrao: "0,248", tp28_padrao: "2,500" },
+      { ma: 100, kv: 130, ms: 100, disp: 2, tp16: "0,25 V", tp28: "2,60 V", tp16_padrao: "0,248", tp28_padrao: "2,600" },
+      { ma: 125, kv: 135, ms: 100, disp: 2, tp16: "0,31 V", tp28: "2,70 V", tp16_padrao: "0,312", tp28_padrao: "2,702" },
+      { ma: 125, kv: 140, ms: 100, disp: 2, tp16: "0,31 V", tp28: "2,80 V", tp16_padrao: "0,312", tp28_padrao: "2,800" },
+      { ma: 125, kv: 145, ms: 100, disp: 2, tp16: "0,31 V", tp28: "2,90 V", tp16_padrao: "0,312", tp28_padrao: "2,900" },
+      { ma: 125, kv: 150, ms: 100, disp: 2, tp16: "0,31 V", tp28: "3,00 V", tp16_padrao: "0,312", tp28_padrao: "3,000" }
+    ];
+
+    const CALIB_P7_DATA = [
+      { ma: 10, kv: 41, ms: 100, inf: "0,244", cen: "0,250", sup: "0,256", t125: true, t150: true, padrao: "0,248" },
+      { ma: 10, kv: 65, ms: 100, inf: "0,244", cen: "0,250", sup: "0,256", t125: true, t150: true, padrao: "0,248" },
+      { ma: 10, kv: 80, ms: 100, inf: "0,244", cen: "0,250", sup: "0,256", t125: true, t150: true, padrao: "0,248" },
+      { ma: 10, kv: 120, ms: 100, inf: "0,244", cen: "0,250", sup: "0,256", t125: true, t150: true, padrao: "0,248" },
+      { ma: 50, kv: 41, ms: 100, inf: "1,188", cen: "1,219", sup: "1,250", t125: true, t150: true, padrao: "1,190" },
+      { ma: 50, kv: 65, ms: 100, inf: "1,188", cen: "1,219", sup: "1,250", t125: true, t150: true, padrao: "1,190" },
+      { ma: 50, kv: 80, ms: 100, inf: "1,188", cen: "1,219", sup: "1,250", t125: true, t150: true, padrao: "1,190" },
+      { ma: 50, kv: 120, ms: 100, inf: "1,188", cen: "1,219", sup: "1,250", t125: true, t150: true, padrao: "1,190" },
+      { ma: 100, kv: 40, ms: 100, inf: "0,244", cen: "0,250", sup: "0,256", t125: true, t150: true, padrao: "0,248" },
+      { ma: 100, kv: 65, ms: 100, inf: "0,244", cen: "0,250", sup: "0,256", t125: true, t150: true, padrao: "0,248" },
+      { ma: 100, kv: 80, ms: 100, inf: "0,244", cen: "0,250", sup: "0,256", t125: true, t150: true, padrao: "0,248" },
+      { ma: 100, kv: 120, ms: 100, inf: "0,244", cen: "0,250", sup: "0,256", t125: true, t150: true, padrao: "0,248" },
+      { ma: 125, kv: 40, ms: 100, inf: "0,305", cen: "0,313", sup: "0,320", t125: true, t150: true, padrao: "0,312" },
+      { ma: 125, kv: 65, ms: 100, inf: "0,305", cen: "0,313", sup: "0,320", t125: true, t150: true, padrao: "0,312" },
+      { ma: 125, kv: 80, ms: 100, inf: "0,305", cen: "0,313", sup: "0,320", t125: true, t150: true, padrao: "0,312" },
+      { ma: 125, kv: 110, ms: 100, inf: "0,305", cen: "0,313", sup: "0,320", t125: true, t150: false, padrao: "0,312" },
+      { ma: 125, kv: 120, ms: 100, inf: "0,305", cen: "0,313", sup: "0,320", t125: false, t150: true, padrao: "0,312" },
+      { ma: 160, kv: 40, ms: 100, inf: "0,390", cen: "0,400", sup: "0,410", t125: true, t150: true, padrao: "0,400" },
+      { ma: 160, kv: 65, ms: 100, inf: "0,390", cen: "0,400", sup: "0,410", t125: true, t150: true, padrao: "0,400" },
+      { ma: 160, kv: 80, ms: 100, inf: "0,390", cen: "0,400", sup: "0,410", t125: false, t150: true, padrao: "0,400" },
+      { ma: 160, kv: 90, ms: 100, inf: "0,390", cen: "0,400", sup: "0,410", t125: true, t150: false, padrao: "0,400" },
+      { ma: 160, kv: 120, ms: 100, inf: "0,390", cen: "0,400", sup: "0,410", t125: false, t150: true, padrao: "0,400" }
+    ];
+
+    const CALIB_P8_DATA = [
+      { ma: 220, kv: 50, ms: 100, inf: "0,523", cen: "0,536", sup: "0,550", t125: true, t150: true, padrao: "0,536" },
+      { ma: 220, kv: 65, ms: 100, inf: "0,523", cen: "0,536", sup: "0,550", t125: true, t150: true, padrao: "0,536" },
+      { ma: 220, kv: 80, ms: 100, inf: "0,523", cen: "0,536", sup: "0,550", t125: true, t150: true, padrao: "0,536" },
+      { ma: 220, kv: 120, ms: 100, inf: "0,523", cen: "0,536", sup: "0,550", t125: true, t150: false, padrao: "0,536" },
+      { ma: 280, kv: 55, ms: 100, inf: "0,683", cen: "0,700", sup: "0,718", t125: true, t150: true, padrao: "0,700" },
+      { ma: 280, kv: 65, ms: 100, inf: "0,683", cen: "0,700", sup: "0,718", t125: true, t150: true, padrao: "0,700" },
+      { ma: 280, kv: 80, ms: 100, inf: "0,683", cen: "0,700", sup: "0,718", t125: true, t150: true, padrao: "0,700" },
+      { ma: 280, kv: 110, ms: 100, inf: "0,683", cen: "0,700", sup: "0,718", t125: true, t150: false, padrao: "0,700" },
+      { ma: 280, kv: 120, ms: 100, inf: "0,683", cen: "0,700", sup: "0,718", t125: false, t150: true, padrao: "0,700" },
+      { ma: 320, kv: 55, ms: 100, inf: "0,780", cen: "0,800", sup: "0,820", t125: true, t150: true, padrao: "0,800" },
+      { ma: 320, kv: 65, ms: 100, inf: "0,780", cen: "0,800", sup: "0,820", t125: true, t150: true, padrao: "0,800" },
+      { ma: 320, kv: 80, ms: 100, inf: "0,780", cen: "0,800", sup: "0,820", t125: false, t150: true, padrao: "0,800" },
+      { ma: 320, kv: 100, ms: 100, inf: "0,780", cen: "0,800", sup: "0,820", t125: true, t150: false, padrao: "0,800" },
+      { ma: 320, kv: 120, ms: 100, inf: "0,780", cen: "0,800", sup: "0,820", t125: false, t150: true, padrao: "0,800" },
+      { ma: 360, kv: 57, ms: 100, inf: "0,878", cen: "0,900", sup: "0,923", t125: true, t150: true, padrao: "0,900" },
+      { ma: 360, kv: 65, ms: 100, inf: "0,878", cen: "0,900", sup: "0,923", t125: true, t150: true, padrao: "0,900" },
+      { ma: 360, kv: 80, ms: 100, inf: "0,878", cen: "0,900", sup: "0,923", t125: false, t150: true, padrao: "0,900" },
+      { ma: 360, kv: 90, ms: 100, inf: "0,878", cen: "0,900", sup: "0,923", t125: true, t150: false, padrao: "0,900" },
+      { ma: 360, kv: 120, ms: 100, inf: "0,878", cen: "0,900", sup: "0,923", t125: false, t150: true, padrao: "0,900" },
+      { ma: 400, kv: 60, ms: 100, inf: "0,950", cen: "0,975", sup: "1,000", t125: false, t150: true, padrao: "0,975" },
+      { ma: 450, kv: 60, ms: 40, inf: "1,069", cen: "1,097", sup: "1,125", t125: true, t150: false, padrao: "1,100" },
+      { ma: 450, kv: 70, ms: 40, inf: "1,069", cen: "1,097", sup: "1,125", t125: true, t150: false, padrao: "1,100" },
+      { ma: 630, kv: 60, ms: 40, inf: "1,457", cen: "1,497", sup: "1,537", t125: true, t150: false, padrao: "1,480" },
+      { ma: 630, kv: 70, ms: 40, inf: "1,457", cen: "1,497", sup: "1,537", t125: true, t150: false, padrao: "1,480" }
+    ];
+
+    const ALTA_POTENCIA_DATA = [
+      { ma: 10, kv: 125, ms: 5000, inf: "0,244", cen: "0,250", sup: "0,256", t125: true, t150: false, padrao: "0,248" },
+      { ma: 10, kv: 130, ms: 5000, inf: "0,244", cen: "0,250", sup: "0,256", t125: false, t150: true, padrao: "0,248" },
+      { ma: 50, kv: 125, ms: 4500, inf: "1,188", cen: "1,219", sup: "1,250", t125: true, t150: false, padrao: "1,190" },
+      { ma: 50, kv: 130, ms: 4500, inf: "1,188", cen: "1,219", sup: "1,250", t125: false, t150: true, padrao: "1,190" },
+      { ma: 100, kv: 125, ms: 400, inf: "0,244", cen: "0,250", sup: "0,256", t125: true, t150: false, padrao: "0,248" },
+      { ma: 100, kv: 130, ms: 1250, inf: "0,244", cen: "0,250", sup: "0,256", t125: false, t150: true, padrao: "0,248" },
+      { ma: 125, kv: 125, ms: 56, inf: "0,305", cen: "0,313", sup: "0,320", t125: true, t150: false, padrao: "0,312" },
+      { ma: 125, kv: 150, ms: 220, inf: "0,305", cen: "0,313", sup: "0,320", t125: false, t150: true, padrao: "0,312" },
+      { ma: 160, kv: 106, ms: 11, inf: "0,390", cen: "0,400", sup: "0,410", t125: true, t150: false, padrao: "0,400" },
+      { ma: 160, kv: 150, ms: 10, inf: "0,390", cen: "0,400", sup: "0,410", t125: false, t150: true, padrao: "0,400" },
+      { ma: 220, kv: 125, ms: 500, inf: "0,523", cen: "0,536", sup: "0,550", t125: true, t150: false, padrao: "0,536" },
+      { ma: 220, kv: 97, ms: 100, inf: "0,523", cen: "0,536", sup: "0,550", t125: false, t150: true, padrao: "0,536" },
+      { ma: 280, kv: 125, ms: 200, inf: "0,683", cen: "0,700", sup: "0,718", t125: true, t150: false, padrao: "0,700" },
+      { ma: 280, kv: 130, ms: 100, inf: "0,683", cen: "0,700", sup: "0,718", t125: false, t150: true, padrao: "0,700" },
+      { ma: 320, kv: 125, ms: 140, inf: "0,780", cen: "0,800", sup: "0,820", t125: true, t150: false, padrao: "0,800" },
+      { ma: 320, kv: 125, ms: 360, inf: "0,780", cen: "0,800", sup: "0,820", t125: false, t150: true, padrao: "0,800" },
+      { ma: 360, kv: 120, ms: 110, inf: "0,878", cen: "0,900", sup: "0,923", t125: true, t150: false, padrao: "0,900" },
+      { ma: 360, kv: 120, ms: 320, inf: "0,878", cen: "0,900", sup: "0,923", t125: false, t150: true, padrao: "0,900" },
+      { ma: 450, kv: 120, ms: 10, inf: "1,069", cen: "1,097", sup: "1,125", t125: true, t150: false, padrao: "1,100" }
+    ];
+
+    // Build Table Rows dynamically
+    function renderTables() {
+      // Aquecimento
+      const tbodyAq = document.getElementById("tbl_aquecimento_tubo");
+      tbodyAq.innerHTML = AQUECIMENTO_DATA.map((r, i) => `
+        <tr>
+          <td class="text-center">${r.ma}</td>
+          <td class="text-center">${r.kv}</td>
+          <td class="text-center">${r.ms}</td>
+          <td class="text-center">${r.disp}</td>
+          <td class="text-center">${r.tp16}</td>
+          <td class="text-center">${r.tp28}</td>
+          <td><input type="text" name="aq_tp16_${i}" data-padrao="${r.tp16_padrao}" class="text-center input-clean" placeholder="V"></td>
+          <td><input type="text" name="aq_tp28_${i}" data-padrao="${r.tp28_padrao}" class="text-center input-clean" placeholder="V"></td>
+        </tr>
+      `).join('');
+
+      // Calib P7
+      const tbodyCal7 = document.getElementById("tbl_calib_p7");
+      tbodyCal7.innerHTML = CALIB_P7_DATA.map((r, i) => `
+        <tr>
+          <td class="text-center">${r.ma}</td>
+          <td class="text-center">${r.kv}</td>
+          <td class="text-center">${r.ms}</td>
+          <td class="text-center">${r.inf}</td>
+          <td class="text-center">${r.cen}</td>
+          <td class="text-center">${r.sup}</td>
+          <td class="text-center">${r.t125 ? "X" : "-"}</td>
+          <td class="text-center">${r.t150 ? "X" : "-"}</td>
+          <td><input type="text" name="cal_p7_tp16_${i}" data-padrao="${r.padrao}" class="text-center input-clean" placeholder="V"></td>
+        </tr>
+      `).join('');
+
+      // Calib P8
+      const tbodyCal8 = document.getElementById("tbl_calib_p8");
+      tbodyCal8.innerHTML = CALIB_P8_DATA.map((r, i) => `
+        <tr>
+          <td class="text-center">${r.ma}</td>
+          <td class="text-center">${r.kv}</td>
+          <td class="text-center">${r.ms}</td>
+          <td class="text-center">${r.inf}</td>
+          <td class="text-center">${r.cen}</td>
+          <td class="text-center">${r.sup}</td>
+          <td class="text-center">${r.t125 ? "X" : "-"}</td>
+          <td class="text-center">${r.t150 ? "X" : "-"}</td>
+          <td><input type="text" name="cal_p8_tp16_${i}" data-padrao="${r.padrao}" class="text-center input-clean" placeholder="V"></td>
+        </tr>
+      `).join('');
+
+      // Alta Potencia P9
+      const tbodyAP = document.getElementById("tbl_alta_potencia");
+      tbodyAP.innerHTML = ALTA_POTENCIA_DATA.map((r, i) => `
+        <tr>
+          <td class="text-center">${r.ma}</td>
+          <td class="text-center">${r.kv}</td>
+          <td class="text-center">${r.ms}</td>
+          <td class="text-center">${r.inf}</td>
+          <td class="text-center">${r.cen}</td>
+          <td class="text-center">${r.sup}</td>
+          <td class="text-center">${r.t125 ? "X" : "-"}</td>
+          <td class="text-center">${r.t150 ? "X" : "-"}</td>
+          <td><input type="text" name="ap_tp16_${i}" data-padrao="${r.padrao}" class="text-center input-clean" placeholder="V"></td>
+        </tr>
+      `).join('');
+    }
+
+    // -------------------------------------------------------------
+    // Assinaturas em Canvas Touch/Mouse
+    // -------------------------------------------------------------
+    const canvasIds = ["cv_ass_tec", "cv_ass_cli", "cv_ass_sala", "cv_ass_rede"];
+    const contexts = {};
+
+    function initCanvases() {
+      canvasIds.forEach(id => {
+        const cv = document.getElementById(id);
+        if (!cv) return;
+        const rect = cv.getBoundingClientRect();
+        cv.width = cv.parentElement.clientWidth || 280;
+        cv.height = cv.parentElement.clientHeight || 90;
+        const ctx = cv.getContext("2d");
+        ctx.strokeStyle = "#002b54";
+        ctx.lineWidth = 1.8;
+        ctx.lineCap = "round";
+        contexts[id] = ctx;
+
+        let drawing = false;
+
+        function getPos(e) {
+          const r = cv.getBoundingClientRect();
+          const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+          const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+          return { x: clientX - r.left, y: clientY - r.top };
+        }
+
+        cv.addEventListener("mousedown", e => { drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); });
+        cv.addEventListener("mousemove", e => { if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
+        window.addEventListener("mouseup", () => { drawing = false; });
+
+        cv.addEventListener("touchstart", e => { e.preventDefault(); drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }, { passive: false });
+        cv.addEventListener("touchmove", e => { e.preventDefault(); if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); }, { passive: false });
+        cv.addEventListener("touchend", () => { drawing = false; });
+      });
+    }
+
+    function limparCanvas(id) {
+      const cv = document.getElementById(id);
+      if (!cv) return;
+      const ctx = cv.getContext("2d");
+      ctx.clearRect(0, 0, cv.width, cv.height);
+    }
+
+    // -------------------------------------------------------------
+    // FUNÇÃO MÁGICA: Preencher Tudo Conforme (1 Clique)
+    // -------------------------------------------------------------
+    
+  // ==========================================
+  // BANCO DE DADOS DE CLIENTES AUTOMÁTICOS
+  // ==========================================
+  const CLIENTES_PREDEFINIDOS = {
+    MEDVISION: {
+      nome: "CLINICA MEDVISION - SAUDE E MEDICINA DO TRABALHO",
+      endereco: "RUA CORONEL LUCIO, 345, CENTRO",
+      cidade: "CRATEÚS",
+      estado: "CE",
+      contato: "JELSON BATISTA MOURAO",
+      telefone: "(88) 9704-5445",
+      email: "administracao@medvisionocupacional.com.br",
+      nf: "NF-e 004892 / KM-2026",
+      modelo: "Altus",
+      serial: "KM-ALTUS-784102"
+    },
+    FOCUS: {
+      nome: "CLÍNICA FOCUS DIAGNÓSTICO POR IMAGEM LTDA",
+      endereco: "AV. SANTOS DUMONT, 3131, ALDEOTA",
+      cidade: "FORTALEZA",
+      estado: "CE",
+      contato: "DR. EDUARDO / ENG. CLÍNICA",
+      telefone: "(85) 3456-7890",
+      email: "engenhariaclinica@focusdiagnostico.med.br",
+      nf: "NF-e 005112 / KM-2026",
+      modelo: "Maximus",
+      serial: "KM-MAX-551029"
+    },
+    KM_BRASIL: {
+      nome: "KONICA MINOLTA HEALTHCARE DO BRASIL LTDA",
+      endereco: "SCIA QUADRA 14 CONJUNTO 4, BRASÍLIA",
+      cidade: "FORTALEZA",
+      estado: "DF",
+      contato: "SUPORTE TÉCNICO OFICIAL KM",
+      telefone: "(31) 3117-4400",
+      email: "admsuporte.healthcare@konicaminolta.com",
+      nf: "NF-e 009823 / KM-2026",
+      modelo: "AeroDR Maximus",
+      serial: "KM-AERO-993214"
+    },
+    SAO_LUCAS: {
+      nome: "SÃO LUCAS IMAGEM LTDA",
+      endereco: "AV. MONSENHOR JOSÉ ALOÍSIO PINTO, 1362 - DOM EXPEDITO",
+      cidade: "SOBRAL",
+      estado: "CE",
+      contato: "COORDENAÇÃO TÉCNICA DE IMAGEM",
+      telefone: "(88) 3611-0096",
+      email: "saolucasimagemsobral@gmail.com",
+      nf: "NF-e 003445 / KM-2026",
+      modelo: "Altus DR",
+      serial: "KM-ALTDR-448102"
+    },
+    BOGHOS: {
+      nome: "CLÍNICA DE RESSONANCIA MAGNETICA E IMAGEM - BOGHOS",
+      endereco: "AV. CORONEL JOSÉ EUCLIDES, 1200",
+      cidade: "SOBRAL",
+      estado: "CE",
+      contato: "TB CONTABILIDADE / ADM IMAGEM",
+      telefone: "(85) 99723-3597",
+      email: "adm.cadisul@clinicaboghos.com.br",
+      nf: "NF-e 006712 / KM-2026",
+      modelo: "Maximus ECO",
+      serial: "KM-ECO-662190"
+    },
+    ZOOVET: {
+      nome: "CLINICA VETERINÁRIA ZOOVET LTDA",
+      endereco: "AV. JOVITA FEITOSA, 1074 - PARQUELÂNDIA",
+      cidade: "FORTALEZA",
+      estado: "CE",
+      contato: "DRA. ROBERTA LEITE VIANA",
+      telefone: "(85) 98808-3530",
+      email: "rleiteviana@yahoo.com.br",
+      nf: "NF-e 002198 / KM-2026",
+      modelo: "Altus",
+      serial: "KM-ALT-109283"
+    },
+    CITOLAB: {
+      nome: "MAURICIO ANALISES CLINICAS E CITOLOGICAS LTDA",
+      endereco: "RUA CEL. PIO GADELHA, 4654 - CENTRO",
+      cidade: "TABULEIRO DO NORTE",
+      estado: "CE",
+      contato: "SETOR FINANCEIRO E ENGENHARIA",
+      telefone: "(88) 99236-0849",
+      email: "financeiro@citolab-ce.com.br",
+      nf: "NF-e 007781 / KM-2026",
+      modelo: "Altus",
+      serial: "KM-ALT-883719"
+    },
+    HOSP_MERUOCA: {
+      nome: "HOSPITAL CHAGAS BARRETO - MERUOCA",
+      endereco: "RUA DOM EXPEDITO LOPES, S/N - CENTRO",
+      cidade: "MERUOCA",
+      estado: "CE",
+      contato: "DIRETORIA TÉCNICA E ADMINISTRATIVA",
+      telefone: "(88) 99247-0494",
+      email: "hospitalchagasbarreto@meruoca.ce.gov.br",
+      nf: "NF-e 008129 / KM-2026",
+      modelo: "Maximus",
+      serial: "KM-MAX-331902"
+    }
+  };
+
+  function selecionarClientePredefinido(chave) {
+    const c = CLIENTES_PREDEFINIDOS[chave] || CLIENTES_PREDEFINIDOS['MEDVISION'];
+    setVal('cli_nome', c.nome);
+    setVal('cli_endereco', c.endereco);
+    setVal('cli_cidade', c.cidade);
+    setVal('cli_estado', c.estado);
+    setVal('cli_contato', c.contato);
+    setVal('cli_telefone', c.telefone);
+    setVal('cli_email', c.email);
+    setVal('cli_nf', c.nf);
+
+    // Seleciona o modelo de equipamento correspondente
+    if (c.modelo === "Altus") {
+      const el = document.querySelector('input[name="mod_altus"]');
+      if (el) el.checked = true;
+    } else if (c.modelo === "Altus DR") {
+      const el = document.querySelector('input[name="mod_altus_dr"]');
+      if (el) el.checked = true;
+    } else if (c.modelo === "Maximus") {
+      const el = document.querySelector('input[name="mod_maximus"]');
+      if (el) el.checked = true;
+    } else if (c.modelo === "AeroDR Maximus") {
+      const el = document.querySelector('input[name="mod_aerodr_maximus"]');
+      if (el) el.checked = true;
+    } else if (c.modelo === "Maximus ECO") {
+      const el = document.querySelector('input[name="mod_maximus_eco"]');
+      if (el) el.checked = true;
+    }
+
+    // Preenche instalador caso esteja vazio
+    const inst = document.querySelector('input[name="rep_instalador"]');
+    if (inst && (!inst.value || inst.value.includes("Nome do Engenheiro"))) {
+      inst.value = "Vitor Manuel / Equipe Técnica EMED Eletromedicina";
+    }
+  }
+
+  function setVal(name, val) {
+    const el = document.querySelector(`input[name="${name}"]`);
+    if (el) el.value = val;
+  }
+
+  function preencherTudoConforme() {
+      // 0. Garante que os dados do cliente e instalador estão preenchidos
+      const selCli = document.getElementById('seletorClienteRapido');
+      const chaveCli = selCli ? selCli.value : 'MEDVISION';
+      selecionarClientePredefinido(chaveCli);
+
+      // 1. Marca todos os rádios conformes (SIM, OK, N/A conforme o padrão)
+      document.querySelectorAll(".chk-conforme").forEach(el => {
+        el.checked = true;
+      });
+
+      // 2. Modelo padrão
+      const modAltus = document.querySelector('input[name="mod_altus"]');
+      if (modAltus) modAltus.checked = true;
+
+      // 3. Gerador e Grade
+      const ger125 = document.querySelector('input[name="ger_125kv"]');
+      if (ger125) ger125.checked = true;
+      const ger54 = document.querySelector('input[name="ger_54kw"]');
+      if (ger54) ger54.checked = true;
+      const grd103 = document.querySelector('input[name="grd_103"]');
+      if (grd103) grd103.checked = true;
+
+      // 4. Distâncias mecânicas padrão
+      const dTrilho = document.querySelector('input[name="dist_trilho_cm"]');
+      if (dTrilho && !dTrilho.value) dTrilho.value = "40";
+      const dBucky = document.querySelector('input[name="dist_bucky_cm"]');
+      if (dBucky && !dBucky.value) dBucky.value = "190";
+
+      // 5. Tensões e Bitolas nominais de entrada
+      setIfEmpty('tensao_rs', '388 V');
+      setIfEmpty('tensao_rt', '386 V');
+      setIfEmpty('tensao_st', '381 V');
+      setIfEmpty('bitola_sub', '22mm');
+      setIfEmpty('bitola_eq', '16mm');
+      setIfEmpty('bitola_terra_eq', '16mm');
+      setIfEmpty('bitola_terra_sub', '22mm');
+      setIfEmpty('bitola_neutro', '2,5mm');
+      setIfEmpty('condicoes_fisicas_rede', 'OK');
+      setIfEmpty('res_max_ideal', '< 100mΩ (Conforme)');
+      setIfEmpty('aterramento_tt', '< 5Ω (Conforme)');
+
+      // 6. Fontes da PCB
+      setIfEmpty('fonte_5v', '5,02');
+      setIfEmpty('fonte_15v', '15,02');
+      setIfEmpty('fonte_12v', '11,98');
+      setIfEmpty('fonte_m12v', '-12,04');
+
+      // 7. Preparação aquecimento
+      setIfEmpty('prep_1', '0,248');
+      setIfEmpty('prep_2', '0,248');
+      setIfEmpty('prep_3', '0,248');
+      setIfEmpty('prep_4', '0,248');
+      setIfEmpty('prep_5', '0,312');
+      setIfEmpty('prep_6', '0,312');
+      setIfEmpty('prep_7', '0,312');
+      setIfEmpty('prep_8', '0,312');
+
+      // 8. Preencher tabelas com valores padrão dos datasets
+      document.querySelectorAll('#tbl_aquecimento_tubo input[data-padrao], #tbl_calib_p7 input[data-padrao], #tbl_calib_p8 input[data-padrao], #tbl_alta_potencia input[data-padrao]').forEach(input => {
+        if (!input.value) {
+          input.value = input.getAttribute('data-padrao');
+        }
+      });
+
+      // 9. Datas de hoje
+      const hoje = new Date().toLocaleDateString('pt-BR');
+      setIfEmpty('ass_tec_data', hoje);
+      setIfEmpty('ass_cli_data', hoje);
+      setIfEmpty('termo_sala_data', hoje);
+      setIfEmpty('termo_rede_data', hoje);
+
+      alert("✅ Formulário preenchido com todos os parâmetros normativos e conformidades de fábrica!\n\nAgora basta conferir, preencher os Números de Série das peças instaladas e coletar as assinaturas.");
+    }
+
+    function setIfEmpty(name, val) {
+      const el = document.querySelector(`input[name="${name}"]`);
+      if (el && !el.value) el.value = val;
+    }
+
+    // -------------------------------------------------------------
+    // FUNÇÃO: Limpar Formulário (Em Branco)
+    // -------------------------------------------------------------
+    function limparTudo() {
+      if (!confirm("Deseja realmente limpar todos os campos do formulário para começar do zero?")) return;
+      document.getElementById("formKonica").reset();
+      canvasIds.forEach(id => limparCanvas(id));
+      alert("🧹 Formulário limpo com sucesso!");
+    }
+
+    // -------------------------------------------------------------
+    // FUNÇÃO: Salvar Localmente / Exportar
+    // -------------------------------------------------------------
+    function salvarLocalmente() {
+      const formData = new FormData(document.getElementById("formKonica"));
+      const dataObj = {};
+      formData.forEach((val, key) => { dataObj[key] = val; });
+      localStorage.setItem("konica_rx_backup", JSON.stringify(dataObj));
+      alert("💾 Rascunho salvo com sucesso no navegador deste computador!");
+    }
+
+    function abrirIntegracaoEffort() {
+      const cli = document.querySelector('input[name="cli_nome"]')?.value || "Não informado";
+      const tec = document.querySelector('input[name="rep_instalador"]')?.value || "Técnico EMED";
+      const nf = document.querySelector('input[name="cli_nf"]')?.value || "S/N";
+
+      const msg = `🚀 INTEGRAÇÃO COM EFFORT KONICA MINOLTA:\n\n` +
+                  `URL do Portal: https://konicaminolta.globalthings.net/Login.aspx\n` +
+                  `Cliente: ${cli}\n` +
+                  `Instalador: ${tec}\n` +
+                  `NF: ${nf}\n\n` +
+                  `Deseja abrir a tela de login do Effort para migração automática dos dados da OS?`;
+      
+      if (confirm(msg)) {
+        window.open("https://konicaminolta.globalthings.net/Login.aspx", "_blank");
+      }
+    }
+
+    // Initialize on load
+    
+    // -------------------------------------------------------------
+    // CONTROLE DE ABAS (Relatório 12 Págs vs OS 4 Tópicos KM)
+    // -------------------------------------------------------------
+    function trocarAba(aba) {
+      const viewRelatorio = document.getElementById("view-relatorio");
+      const viewTopicos = document.getElementById("view-topicos");
+      const btnRelatorio = document.getElementById("btn-tab-relatorio");
+      const btnTopicos = document.getElementById("btn-tab-topicos");
+
+      if (aba === "relatorio") {
+        viewRelatorio.style.display = "block";
+        viewTopicos.style.display = "none";
+        btnRelatorio.classList.add("active");
+        btnTopicos.classList.remove("active");
+      } else {
+        viewRelatorio.style.display = "none";
+        viewTopicos.style.display = "block";
+        btnRelatorio.classList.remove("active");
+        btnTopicos.classList.add("active");
+        atualizarConsolidado();
+      }
+    }
+
+    // -------------------------------------------------------------
+    // GESTÃO DOS 4 TÓPICOS PADRÃO KM
+    // -------------------------------------------------------------
+    const PADRAO_KM = {
+      topico1: "* Manutenção preventiva.",
+      topico2: "* Limpeza: Realizada limpeza interna e externa completa do equipamento.\n" +
+               "* Partes móveis e mecânica: Verificação e lubrificação das partes móveis; checagem dos cabos de contrapeso e verificação dos freios.\n" +
+               "* Alta tensão: Checagem e substituição da graxa isolante nos conectores de alta tensão.\n" +
+               "* Acionamento e alinhamento: Verificação dos botões de acionamento e ajuste/verificação do alinhamento do campo luminoso.\n" +
+               "* Gerador: Realizado verificação nas calibrações de técnicas de kv e mA.",
+      topico3: "* Realizados testes gerais de funcionamento do equipamento após a montagem e ajustes.\n" +
+               "* Validada a atuação dos freios, botões de acionamento e estabilidade/integridade dos cabos de contrapeso.\n" +
+               "* Verificado o alinhamento do campo luminoso em operação e testes de funcionamento da lâmpada de sinalização externa.",
+      topico4: "* Operacional e liberado para uso."
+    };
+
+    function carregarPadraoKM() {
+      document.getElementById("km_topico_1").value = PADRAO_KM.topico1;
+      document.getElementById("km_topico_2").value = PADRAO_KM.topico2;
+      document.getElementById("km_topico_3").value = PADRAO_KM.topico3;
+      document.getElementById("km_topico_4").value = PADRAO_KM.topico4;
+      atualizarConsolidado();
+      alert("⚡ Os 4 Tópicos Oficiais da Konica Minolta foram carregados com 1 clique!");
+    }
+
+    function setTopico(num, valor) {
+      document.getElementById(`km_topico_${num}`).value = valor;
+      atualizarConsolidado();
+    }
+
+    function appendTopico(num, valor) {
+      const el = document.getElementById(`km_topico_${num}`);
+      if (el.value.trim()) {
+        el.value = el.value.trim() + "\n" + valor;
+      } else {
+        el.value = valor;
+      }
+      atualizarConsolidado();
+    }
+
+    function limparTopicos() {
+      if (!confirm("Limpar os 4 tópicos da OS?")) return;
+      document.getElementById("km_topico_1").value = "";
+      document.getElementById("km_topico_2").value = "";
+      document.getElementById("km_topico_3").value = "";
+      document.getElementById("km_topico_4").value = "";
+      atualizarConsolidado();
+    }
+
+    function obterTextoConsolidado() {
+      const t1 = (document.getElementById("km_topico_1")?.value || "").trim();
+      const t2 = (document.getElementById("km_topico_2")?.value || "").trim();
+      const t3 = (document.getElementById("km_topico_3")?.value || "").trim();
+      const t4 = (document.getElementById("km_topico_4")?.value || "").trim();
+
+      return `1. DIAGNÓSTICO PRINCIPAL\n${t1}\n\n` +
+             `2. AÇÕES REALIZADAS\n${t2}\n\n` +
+             `3. TESTES E VALIDAÇÕES\n${t3}\n\n` +
+             `4. STATUS DO EQUIPAMENTO\n${t4}`;
+    }
+
+    function atualizarConsolidado() {
+      const box = document.getElementById("box_consolidado");
+      if (box) {
+        box.textContent = obterTextoConsolidado();
+      }
+    }
+
+    function copiarTextoConsolidado() {
+      const texto = obterTextoConsolidado();
+      navigator.clipboard.writeText(texto).then(() => {
+        alert("📋 Texto copiado para a área de transferência!\n\nAgora você pode colar (Ctrl+V) diretamente no campo de parecer da OS no portal da Konica Minolta (Effort).");
+      }).catch(err => {
+        // Fallback
+        const textarea = document.createElement("textarea");
+        textarea.value = texto;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+        alert("📋 Texto copiado para a área de transferência!");
+      });
+    }
+
+    function sincronizarComRelatorio() {
+      const texto = obterTextoConsolidado();
+      const txtRel = document.querySelector('textarea[name="relatorio_intercorrencias"]');
+      if (txtRel) {
+        txtRel.value = texto;
+        alert("🔄 Texto dos 4 tópicos aplicado na Página 10 do Relatório Oficial (campo de Observações Técnicas)!");
+        trocarAba('relatorio');
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      atualizarConsolidado();
+      renderTables();
+      setTimeout(initCanvases, 250);
+    });
+  </script>
+</body>
+</html>
