@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v1-5-0-portal-visa-rdc611';
+const CACHE_NAME = 'emed-pwa-v1-5-1-nav-redundancy-full';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
@@ -14,6 +14,8 @@ const ASSETS_TO_CACHE = [
   '/static/simbolo_emed_clean.svg',
   '/static/simbolo_emed_red.svg',
   '/static/logo_emed_arroba.png',
+  '/static/clientes_offline.json',
+  '/static/radares_corredor_offline.json',
   '/api/logo',
   '/api/app-icon/192',
   '/api/app-icon/512'

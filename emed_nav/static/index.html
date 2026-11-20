@@ -881,6 +881,75 @@
     <!-- TOAST NOTIFICATION -->
     
     <!-- BALÃO FLUTUANTE DO CAUSO / PIADA DO TRECHO -->
+    
+    <!-- MODAL DE CONFIGURAÇÃO DO MODO RESENHA & PIADAS DO TRECHO -->
+    <div id="resenha-config-modal" class="modal-overlay" style="z-index:2800;">
+      <div class="modal-card" style="max-width:420px; border-color:#f59e0b;">
+        <div class="modal-header">
+          <div style="font-size:28px;">🎭</div>
+          <div style="flex:1;">
+            <div class="modal-title" style="color:#fbbf24;">Modo Resenha & Causos</div>
+            <div class="modal-subtitle">Piadas limpas de hospital e causos da estrada cearense</div>
+          </div>
+          <button onclick="closeResenhaModal()" class="btn-close-modal" type="button">✕</button>
+        </div>
+
+        <div style="background:rgba(245,158,11,0.12); border:1px solid #f59e0b; border-radius:10px; padding:10px; margin:10px 0; font-size:12px; color:#fde68a; line-height:1.45;">
+          💡 <b>100% Opcional & Respeitoso:</b> Feito para descontrair os técnicos veteranos no trânsito pesado e nas viagens longas. O copiloto avisa radares em tom bem-humorado e solta um causo no tempo que você escolher.
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <div style="font-size:11.5px; font-weight:800; color:#ffffff; margin-bottom:6px;">STATUS DO MODO RESENHA:</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <button id="btn-opt-resenha-on" onclick="setResenhaStatus(true)" class="btn-music-app" style="background:rgba(34,197,94,0.2); border:1.5px solid #22c55e; justify-content:center; padding:10px;">
+              <span style="font-size:16px;">🟢</span>
+              <span style="font-size:12px; font-weight:900; color:#4ade80;">LIGADO</span>
+            </button>
+            <button id="btn-opt-resenha-off" onclick="setResenhaStatus(false)" class="btn-music-app" style="background:rgba(100,116,139,0.2); border:1.5px solid #64748b; justify-content:center; padding:10px;">
+              <span style="font-size:16px;">⚪</span>
+              <span style="font-size:12px; font-weight:900; color:#94a3b8;">DESLIGADO</span>
+            </button>
+          </div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+          <div style="font-size:11.5px; font-weight:800; color:#ffffff; margin-bottom:6px;">⏱️ FREQUÊNCIA DOS CAUSOS AUTOMÁTICOS:</div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <label style="display:flex; align-items:center; gap:8px; background:#0f172a; padding:10px 12px; border-radius:8px; border:1px solid #334155; cursor:pointer;">
+              <input type="radio" name="resenha_intervalo" value="30" onchange="salvarIntervaloResenha(30)" />
+              <div style="display:flex; flex-direction:column;">
+                <span style="font-size:12.5px; font-weight:800; color:#fbbf24;">A cada 30 minutos (Recomendado na BR)</span>
+                <span style="font-size:10.5px; color:#94a3b8;">Solta uma resenha a cada meia hora de viagem</span>
+              </div>
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; background:#0f172a; padding:10px 12px; border-radius:8px; border:1px solid #334155; cursor:pointer;">
+              <input type="radio" name="resenha_intervalo" value="60" onchange="salvarIntervaloResenha(60)" />
+              <div style="display:flex; flex-direction:column;">
+                <span style="font-size:12.5px; font-weight:800; color:#e2e8f0;">A cada 1 hora (Mais discreto)</span>
+                <span style="font-size:10.5px; color:#94a3b8;">Apenas 1 causo por hora percorrida</span>
+              </div>
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; background:#0f172a; padding:10px 12px; border-radius:8px; border:1px solid #334155; cursor:pointer;">
+              <input type="radio" name="resenha_intervalo" value="0" onchange="salvarIntervaloResenha(0)" />
+              <div style="display:flex; flex-direction:column;">
+                <span style="font-size:12.5px; font-weight:800; color:#e2e8f0;">Apenas Manual (Ao tocar no botão)</span>
+                <span style="font-size:10.5px; color:#94a3b8;">Não conta nada sozinho, só quando você apertar 🎭</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:8px;">
+          <button onclick="contarPiadaTrecho(); closeResenhaModal();" class="btn-rocket-go" style="flex:1; background:linear-gradient(135deg, #f59e0b 0%, #d97706 100%); font-size:12px;">
+            🎭 OUVIR CAUSO AGORA
+          </button>
+          <button onclick="closeResenhaModal()" class="btn-modal btn-cancel" style="padding:0 16px;">
+            FECHAR
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div id="causo-trecho-card" style="display:none; position:fixed; top:72px; left:12px; right:12px; z-index:2650; background:linear-gradient(135deg, rgba(15,23,42,0.98) 0%, rgba(30,41,59,0.95) 100%); border:2px solid #f59e0b; border-radius:14px; padding:12px 14px; box-shadow:0 12px 32px rgba(0,0,0,0.85); backdrop-filter:blur(8px);">
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
         <div style="font-size:26px; line-height:1;">🎭</div>
@@ -928,6 +997,9 @@
           </button>
           <button onclick="contarPiadaTrecho()" style="background:rgba(245,158,11,0.18); border:1px solid #f59e0b; color:#fbbf24; font-size:12px; font-weight:700; padding:6px 10px; border-radius:6px; text-align:left; cursor:pointer; display:flex; align-items:center; gap:8px;">
             <span>🎭</span> Causo / Piada da Estrada
+          </button>
+          <button onclick="openResenhaModal()" style="background:rgba(255,255,255,0.08); border:none; color:#f8fafc; font-size:12px; font-weight:700; padding:6px 10px; border-radius:6px; text-align:left; cursor:pointer; display:flex; align-items:center; gap:8px;">
+            <span>⚙️</span> Ajustar Tempo das Piadas (30m / 1h)
           </button>
           <button id="btn-pwa-install-menu" onclick="triggerPWAInstall()" style="background:rgba(56,189,248,0.18); border:1px solid #38bdf8; color:#38bdf8; font-size:12px; font-weight:800; padding:6px 10px; border-radius:6px; text-align:left; cursor:pointer; display:flex; align-items:center; gap:8px;">
             <span>📲</span> Instalar App no Celular
@@ -1726,8 +1798,16 @@
       if (!radarsLayer) radarsLayer = L.layerGroup().addTo(map);
       try { renderEmedBases(); } catch(e) {}
       try { loadClientMarkers(); } catch(e) {}
+      try { loadRadars(); } catch(e) {}
       try { loadFleetVehicles(); } catch(e) {}
       atualizarBotaoResenhaUI();
+      iniciarLoopPiadasPeriodicas();
+
+      // Recalcula marcadores visíveis sempre que o motorista mover ou der zoom no mapa
+      map.on('moveend zoomend', () => {
+        updateVisibleClientsViewport();
+        updateVisibleRadarsViewport();
+      });
     }
 
     // Inicialização imediata com retentativas suaves
@@ -2513,7 +2593,7 @@
     let clientsLayerContrato = (map && typeof L !== 'undefined') ? L.layerGroup().addTo(map) : null;
     let clientsLayerAvulso = (map && typeof L !== 'undefined') ? L.layerGroup().addTo(map) : null;
     // Padrão enxuto: inicia somente com clientes em CONTRATO (azuis), deixando o mapa ultra limpo, rápido e navegável!
-    let clientFilterMode = localStorage.getItem('emednav_client_mode') || 'CONTRATO';
+    let clientFilterMode = localStorage.getItem('emednav_client_mode') || 'TODOS';
     let _allClientsCache = [];
     let _clientsCullTimer = null;
 
@@ -2669,29 +2749,52 @@
     }
 
     async function loadClientMarkers() {
-      // 1. Carrega do Cache Offline Imediatamente (0ms)
+      // 1. Nível 1: Carrega do Cache Offline Local Imediatamente (0ms - instantâneo)
+      let loadedFromCache = false;
       try {
         const cachedRaw = localStorage.getItem('emed_clients_offline_cache');
         if (cachedRaw) {
           const cached = JSON.parse(cachedRaw);
           if (Array.isArray(cached) && cached.length > 0) {
             renderClientMarkers(cached);
+            loadedFromCache = true;
+            console.log(`[EMED-GPS] ${cached.length} clientes carregados do Cache Local (0ms).`);
           }
         }
       } catch (e) {}
 
-      // 2. Busca na rede para atualizar o cache
+      // 2. Nível 2: Busca na API de telemetria
+      let fetchedNetwork = false;
       try {
         const res = await fetch('/api/clients');
-        const data = await res.json();
-        if (data.destinos) {
-          renderClientMarkers(data.destinos);
-          try {
-            localStorage.setItem('emed_clients_offline_cache', JSON.stringify(data.destinos));
-          } catch (e) {}
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.destinos && data.destinos.length > 0) {
+            renderClientMarkers(data.destinos);
+            fetchedNetwork = true;
+            try { localStorage.setItem('emed_clients_offline_cache', JSON.stringify(data.destinos)); } catch (e) {}
+          }
         }
       } catch (err) {
-        console.warn('Rede offline: mantendo clientes do cache local');
+        console.warn('[EMED-GPS] API /api/clients inacessível no momento.');
+      }
+
+      // 3. Nível 3 (Redundância Máxima): Se não obteve da rede e não tinha cache, carrega o arquivo estático offline
+      if (!fetchedNetwork && !loadedFromCache) {
+        try {
+          console.log('[EMED-GPS] Ativando contingência estática clientes_offline.json...');
+          const fallbackRes = await fetch('/static/clientes_offline.json');
+          if (fallbackRes.ok) {
+            const fallbackData = await fallbackRes.json();
+            if (fallbackData && fallbackData.destinos && fallbackData.destinos.length > 0) {
+              renderClientMarkers(fallbackData.destinos);
+              try { localStorage.setItem('emed_clients_offline_cache', JSON.stringify(fallbackData.destinos)); } catch (e) {}
+              console.log(`[EMED-GPS] ✅ ${fallbackData.destinos.length} clientes carregados com sucesso via contingência offline!`);
+            }
+          }
+        } catch (e) {
+          console.warn('[EMED-GPS] Falha ao carregar clientes_offline.json:', e);
+        }
       }
     }
 
@@ -3044,37 +3147,60 @@
 
     // CARREGAR BANCO DE RADARES COM SUPORTE TOTAL A CACHE OFFLINE (16.480+ NACIONAL)
     async function loadRadars() {
-      // 1. Tenta carregar do cache offline local imediatamente (0ms sem delay de rede)
+      // 1. Nível 1: Tenta carregar do cache offline local imediatamente (0ms sem delay de rede)
+      let loadedFromCache = false;
       try {
         const cachedRaw = localStorage.getItem('emed_radars_offline_cache');
         if (cachedRaw) {
           const cachedRadars = JSON.parse(cachedRaw);
           if (Array.isArray(cachedRadars) && cachedRadars.length > 0) {
-            renderRadarMarkers(cachedRadars);
-            console.log(`[EMED-GPS] ${cachedRadars.length} radares carregados instantaneamente do cache offline.`);
+            renderRadarMarkers(cachedRadars, localStorage.getItem('emed_radars_total_db') || 16480);
+            loadedFromCache = true;
+            console.log(`[EMED-GPS] ${cachedRadars.length} radares carregados instantaneamente do cache local.`);
           }
         }
       } catch (e) {
         console.warn('Erro ao ler cache offline de radares:', e);
       }
 
-      // 2. Busca na rede para atualizar o cache
+      // 2. Nível 2: Busca na API de radares do servidor
+      let fetchedNetwork = false;
       try {
         const res = await fetch(`/api/radars?uf=CE,RN,PB,PE,BR`);
-        const data = await res.json();
-        if (data.success && data.radars) {
-          renderRadarMarkers(data.radars, data.total_db);
-          try {
-            localStorage.setItem('emed_radars_offline_cache', JSON.stringify(data.radars));
-            localStorage.setItem('emed_radars_offline_time', new Date().toISOString());
-            if (data.total_db) localStorage.setItem('emed_radars_total_db', data.total_db);
-          } catch (e) {}
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.radars && data.radars.length > 0) {
+            renderRadarMarkers(data.radars, data.total_db);
+            fetchedNetwork = true;
+            try {
+              localStorage.setItem('emed_radars_offline_cache', JSON.stringify(data.radars));
+              localStorage.setItem('emed_radars_offline_time', new Date().toISOString());
+              if (data.total_db) localStorage.setItem('emed_radars_total_db', data.total_db);
+            } catch (e) {}
+          }
         }
       } catch (e) {
-        console.warn('Rede offline: continuando com radares do cache offline local.');
-        const badgeTotal = document.getElementById('badge-radar-total');
-        if (badgeTotal && state.radars.length > 0) {
-          badgeTotal.innerText = `${state.radars.length.toLocaleString('pt-BR')} (Modo Offline)`;
+        console.warn('[EMED-GPS] API de radares indisponível no momento.');
+      }
+
+      // 3. Nível 3 (Redundância Máxima): Arquivo estático regional com 13.500+ radares
+      if (!fetchedNetwork && !loadedFromCache) {
+        try {
+          console.log('[EMED-GPS] Ativando contingência estática radares_corredor_offline.json...');
+          const fallbackRes = await fetch('/static/radares_corredor_offline.json');
+          if (fallbackRes.ok) {
+            const fallbackData = await fallbackRes.json();
+            if (fallbackData && fallbackData.radars && fallbackData.radars.length > 0) {
+              renderRadarMarkers(fallbackData.radars, fallbackData.total_db || fallbackData.total);
+              try {
+                localStorage.setItem('emed_radars_offline_cache', JSON.stringify(fallbackData.radars));
+                localStorage.setItem('emed_radars_total_db', fallbackData.total_db || 16480);
+              } catch (e) {}
+              console.log(`[EMED-GPS] ✅ ${fallbackData.radars.length} radares carregados com sucesso via contingência offline!`);
+            }
+          }
+        } catch (e) {
+          console.warn('[EMED-GPS] Falha ao carregar radares_corredor_offline.json:', e);
         }
       }
     }
@@ -4674,6 +4800,98 @@
         btn.style.borderColor = '#f59e0b';
         btn.style.color = '#fbbf24';
         btn.style.boxShadow = 'none';
+      }
+    }
+
+    
+    // =========================================================================
+    // CONTROLE DE TEMPO DAS PIADAS PERIÓDICAS (30 MIN / 1 HORA / MANUAL)
+    // =========================================================================
+    let _timerPiadaLoop = null;
+    let _lastPiadaTimestamp = Date.now();
+
+    function iniciarLoopPiadasPeriodicas() {
+      if (_timerPiadaLoop) clearInterval(_timerPiadaLoop);
+      _timerPiadaLoop = setInterval(() => {
+        if (!state.modoResenha) return;
+        const intervaloMin = parseInt(localStorage.getItem('emed_resenha_intervalo') || '30', 10);
+        if (intervaloMin <= 0) return;
+
+        const agora = Date.now();
+        const decorridoMin = (agora - _lastPiadaTimestamp) / (1000 * 60);
+
+        if (decorridoMin >= intervaloMin) {
+          _lastPiadaTimestamp = agora;
+          const intro = (intervaloMin === 30)
+            ? "Atenção na rota, patrão! Momento da resenha dos 30 minutos pra animar a estrada!"
+            : "Uma hora de trecho percorrido, meu consagrado! Hora de descontrair com um causo da estrada!";
+          speakVoice(intro, () => {
+            setTimeout(contarPiadaTrecho, 500);
+          });
+        }
+      }, 30000); // Verifica a cada 30 segundos
+    }
+
+    function openResenhaModal() {
+      const pop = document.getElementById('fab-more-popover');
+      if (pop) pop.style.display = 'none';
+
+      const modal = document.getElementById('resenha-config-modal');
+      if (modal) modal.style.display = 'flex';
+
+      // Atualiza estado visual
+      const isLigado = state.modoResenha;
+      const btnOn = document.getElementById('btn-opt-resenha-on');
+      const btnOff = document.getElementById('btn-opt-resenha-off');
+      if (btnOn && btnOff) {
+        if (isLigado) {
+          btnOn.style.background = 'rgba(34,197,94,0.3)';
+          btnOn.style.borderColor = '#22c55e';
+          btnOff.style.background = 'rgba(100,116,139,0.1)';
+          btnOff.style.borderColor = '#475569';
+        } else {
+          btnOn.style.background = 'rgba(34,197,94,0.1)';
+          btnOn.style.borderColor = '#475569';
+          btnOff.style.background = 'rgba(239,68,68,0.25)';
+          btnOff.style.borderColor = '#ef4444';
+        }
+      }
+
+      // Atualiza radio button
+      const intervalo = localStorage.getItem('emed_resenha_intervalo') || '30';
+      const radios = document.getElementsByName('resenha_intervalo');
+      for (const r of radios) {
+        if (r.value === intervalo) r.checked = true;
+      }
+    }
+
+    function closeResenhaModal() {
+      const modal = document.getElementById('resenha-config-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function setResenhaStatus(status) {
+      state.modoResenha = status;
+      localStorage.setItem('emed_modo_resenha', status ? 'true' : 'false');
+      atualizarBotaoResenhaUI();
+      openResenhaModal();
+      if (status) {
+        showToast('🎭 Modo Resenha ATIVADO!');
+        speakVoice('Modo Resenha ativado, meu patrão!');
+      } else {
+        showToast('⚪ Modo Resenha DESATIVADO');
+      }
+    }
+
+    function salvarIntervaloResenha(min) {
+      localStorage.setItem('emed_resenha_intervalo', min.toString());
+      _lastPiadaTimestamp = Date.now(); // reinicia contagem
+      if (min === 30) {
+        showToast('⏱️ Piadas programadas para a cada 30 minutos na estrada!');
+      } else if (min === 60) {
+        showToast('⏰ Piadas programadas para a cada 1 hora de viagem!');
+      } else {
+        showToast('⏹️ Piadas apenas no modo manual (ao tocar no botão).');
       }
     }
 

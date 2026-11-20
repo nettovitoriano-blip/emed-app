@@ -1,5 +1,5 @@
 // EmedNav Service Worker - v31 (Ultra Resiliente, Suporte Offline e Zero Bloqueios)
-const CACHE_NAME = 'emednav-v31-ultra-resilient';
+const CACHE_NAME = 'emednav-v32-full-redundancy';
 
 const ASSETS_TO_CACHE = [
   '/',
@@ -15,6 +15,8 @@ const ASSETS_TO_CACHE = [
   '/static/leaflet.css',
   '/static/leaflet.js',
   '/static/logo_emed_arroba.png',
+  '/static/clientes_offline.json',
+  '/static/radares_corredor_offline.json',
   '/static/simbolo_emed_clean.svg',
   '/static/simbolo_emed_red.svg',
   '/static/logo_emed_oficial.png',

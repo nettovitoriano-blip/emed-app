@@ -1924,14 +1924,38 @@
 
     // CLIENTES EMED (@ AZUL CONTRATO / @ VERMELHO AVULSO + EDIÇÃO COMPLETA)
     async function loadClients() {
+      let carregou = false;
       try {
         const res = await fetch('/api/clients');
-        const data = await res.json();
-        if (!data.success) return;
-        allClients = data.destinos || [];
-        renderMapClients();
-        renderClientsList();
-      } catch (e) {}
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.destinos && data.destinos.length > 0) {
+            allClients = data.destinos;
+            renderMapClients();
+            renderClientsList();
+            carregou = true;
+          }
+        }
+      } catch (e) {
+        console.warn('[FROTA] API /api/clients com erro, usando contingência...');
+      }
+
+      if (!carregou) {
+        try {
+          const fallbackRes = await fetch('/static/clientes_offline.json');
+          if (fallbackRes.ok) {
+            const fallbackData = await fallbackRes.json();
+            if (fallbackData && fallbackData.destinos && fallbackData.destinos.length > 0) {
+              allClients = fallbackData.destinos;
+              renderMapClients();
+              renderClientsList();
+              console.log(`[FROTA] ✅ ${allClients.length} clientes carregados via arquivo de redundância!`);
+            }
+          }
+        } catch (err) {
+          console.warn('[FROTA] Erro ao carregar contingência offline de clientes:', err);
+        }
+      }
     }
 
     function showToast(msg) {
