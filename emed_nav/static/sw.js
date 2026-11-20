@@ -1,5 +1,5 @@
 // EmedNav Service Worker - v31 (Ultra Resiliente, Suporte Offline e Zero Bloqueios)
-const CACHE_NAME = 'emednav-v32-full-redundancy';
+const CACHE_NAME = 'emednav-v33-rocksolid-map';
 
 const ASSETS_TO_CACHE = [
   '/',

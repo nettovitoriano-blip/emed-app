@@ -1128,31 +1128,30 @@
 
       map = L.map('map', { zoomControl: false, attributionControl: false }).setView([myRealLat, myRealLon], 13);
       
-      tileRoads = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-        maxZoom: 20,
-        subdomains: ['0', '1', '2', '3'],
-        crossOrigin: true
-      }).addTo(map);
-
-      tileSat = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-        maxZoom: 20,
-        subdomains: ['0', '1', '2', '3'],
-        crossOrigin: true
-      });
-
+      // CartoDB Voyager como camada primária oficial da Frota (100% livre de tela preta e CORS)
       tileCarto = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         maxZoom: 19,
         subdomains: 'abcd'
+      }).addTo(map);
+
+      tileRoads = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains: ['0', '1', '2', '3']
       });
 
-      // Proteção de contingência: se Google Tiles falhar, chaveia para CartoDB silenciosamente
+      tileSat = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains: ['0', '1', '2', '3']
+      });
+
+      // Proteção de contingência: se CartoDB falhar, chaveia para Google Roads
       let tileFails = 0;
-      tileRoads.on('tileerror', () => {
+      tileCarto.on('tileerror', () => {
         tileFails++;
         if (tileFails >= 2 && !isSat) {
-          console.warn('Google Tiles com falha na Frota. Alternando para CartoDB...');
-          map.removeLayer(tileRoads);
-          tileCarto.addTo(map);
+          console.warn('CartoDB com oscilação na Frota. Alternando para Google Roads...');
+          try { map.removeLayer(tileCarto); } catch(e){}
+          tileRoads.addTo(map);
         }
       });
 

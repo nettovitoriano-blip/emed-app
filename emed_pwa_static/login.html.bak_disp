@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Acesso Seguro — SISTEMA EMED SERVICE</title>
+  <link rel="icon" type="image/png" href="/api/logo">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0d1b2a">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    body {
+      background: radial-gradient(circle at 50% 10%, #1b2838 0%, #0d1b2a 60%, #050b14 100%);
+      color: #e0e6ed;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-container {
+      width: 100%;
+      max-width: 440px;
+      background: rgba(26, 38, 57, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
+      padding: 40px 32px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 180, 216, 0.15);
+      animation: fadeIn 0.4s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .brand-header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 78px;
+      height: 78px;
+      background: rgba(0, 180, 216, 0.12);
+      border: 2px solid rgba(0, 180, 216, 0.45);
+      border-radius: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 24px rgba(0, 180, 216, 0.25);
+    }
+    .logo-badge img {
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
+    }
+    .brand-title {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+      color: #ffffff;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+    .brand-title span {
+      color: #00b4d8;
+    }
+    .brand-subtitle {
+      font-size: 13.5px;
+      font-weight: 500;
+      color: #cbd5e1;
+      letter-spacing: 0.3px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #cbd5e1;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+    }
+    .select-wrapper, .input-wrapper {
+      position: relative;
+    }
+    select, input[type="text"], input[type="password"] {
+      width: 100%;
+      height: 48px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 12px;
+      padding: 0 16px;
+      color: #ffffff;
+      font-size: 15px;
+      transition: all 0.2s ease;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    select:focus, input:focus {
+      border-color: #00b4d8;
+      box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.25);
+      background: rgba(15, 23, 42, 0.95);
+    }
+    select option {
+      background: #0f172a;
+      color: #ffffff;
+    }
+    .btn-submit {
+      width: 100%;
+      height: 50px;
+      background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%);
+      color: #ffffff;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 10px 25px rgba(0, 180, 216, 0.35);
+      transition: all 0.2s ease;
+      margin-top: 10px;
+    }
+    .btn-submit:hover {
+      background: linear-gradient(135deg, #00c7ee 0%, #0088ce 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 12px 30px rgba(0, 180, 216, 0.45);
+    }
+    .btn-submit:active {
+      transform: translateY(1px);
+    }
+    .btn-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .feedback-msg {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      display: none;
+      text-align: center;
+      animation: fadeIn 0.2s;
+    }
+    .feedback-msg.error {
+      display: block;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #fca5a5;
+    }
+    .feedback-msg.success {
+      display: block;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #6ee7b7;
+    }
+    .footer-note {
+      text-align: center;
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 28px;
+    }
+    .footer-note span {
+      color: #00b4d8;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-container">
+    <div class="brand-header">
+      <div class="logo-badge">
+        <img src="/logo_emed_arroba.png" alt="EMED" onerror="this.src='/api/logo'">
+      </div>
+      <h1 class="brand-title">SISTEMA <span>EMED</span> SERVICE</h1>
+      <p class="brand-subtitle">Equipamentos de Diagnóstico por Imagem</p>
+    </div>
+
+    <form id="loginForm" onsubmit="realizarLogin(event)">
+      <div class="form-group">
+        <label class="form-label" for="selectUsuario">Profissional / Técnico</label>
+        <div class="select-wrapper">
+          <select id="selectUsuario" required>
+            <option value="" disabled selected>Carregando técnicos...</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="inputSenha">Senha / PIN de Acesso</label>
+        <div class="input-wrapper">
+          <input type="password" id="inputSenha" placeholder="Digite seu PIN ou senha" required autocomplete="current-password">
+        </div>
+      </div>
+
+      <button type="submit" id="btnEntrar" class="btn-submit">
+        <span>Acessar Sistema</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+          <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+      </button>
+
+      <div id="feedback" class="feedback-msg"></div>
+    </form>
+
+    <div class="footer-note">
+      Conexão Segura & Criptografada • <span>emedservice.med.br</span>
+    </div>
+  </div>
+
+  <script>
+    async function carregarUsuarios() {
+      const select = document.getElementById('selectUsuario');
+      try {
+        const resp = await fetch('/api/auth/usuarios');
+        const data = await resp.json();
+        if (data && data.usuarios && data.usuarios.length > 0) {
+          select.innerHTML = '<option value="" disabled selected>Selecione seu nome</option>';
+          const ultimoNome = localStorage.getItem('emed_tecnico_selecionado') || '';
+          data.usuarios.forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u.nome;
+            opt.textContent = `${u.nome} (${u.perfil})`;
+            if (u.nome.toUpperCase() === ultimoNome.toUpperCase()) {
+              opt.selected = true;
+            }
+            select.appendChild(opt);
+          });
+        } else {
+          select.innerHTML = '<option value="ANTONIO">ANTONIO (Técnico)</option><option value="NETTO">NETTO (Gestor)</option>';
+        }
+      } catch (e) {
+        select.innerHTML = '<option value="ANTONIO">ANTONIO (Técnico)</option><option value="NETTO">NETTO (Gestor)</option>';
+      }
+    }
+
+    async function realizarLogin(e) {
+      e.preventDefault();
+      const usuario = document.getElementById('selectUsuario').value;
+      const senha = document.getElementById('inputSenha').value;
+      const btn = document.getElementById('btnEntrar');
+      const fb = document.getElementById('feedback');
+
+      if (!usuario || !senha) return;
+
+      btn.disabled = true;
+      btn.innerHTML = '<span>Verificando...</span>';
+      fb.className = 'feedback-msg';
+      fb.style.display = 'none';
+
+      try {
+        const resp = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usuario, senha })
+        });
+        const res = await resp.json();
+
+        if (resp.ok && res.ok) {
+          fb.textContent = `Acesso autorizado! Bem-vindo(a), ${res.usuario.nome}!`;
+          fb.className = 'feedback-msg success';
+          fb.style.display = 'block';
+          localStorage.setItem('emed_tecnico_selecionado', res.usuario.nome);
+          localStorage.setItem('emed_token', res.token);
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 400);
+        } else {
+          fb.textContent = res.msg || 'Senha incorreta. Tente novamente.';
+          fb.className = 'feedback-msg error';
+          fb.style.display = 'block';
+          btn.disabled = false;
+          btn.innerHTML = '<span>Acessar Sistema</span>';
+          document.getElementById('inputSenha').focus();
+          document.getElementById('inputSenha').select();
+        }
+      } catch (err) {
+        fb.textContent = 'Erro de conexão com o servidor. Verifique sua rede.';
+        fb.className = 'feedback-msg error';
+        fb.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = '<span>Acessar Sistema</span>';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      carregarUsuarios();
+      document.getElementById('inputSenha').focus();
+    });
+  </script>
+</body>
+</html>

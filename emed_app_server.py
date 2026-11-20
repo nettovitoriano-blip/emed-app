@@ -3674,6 +3674,8 @@ async def auth_api_middleware(request: web.Request, handler):
 
         or path.startswith("/api/fleet")
 
+        or path.startswith("/api/clients")
+
         or path.startswith("/api/instalacao/")
 
         or path.startswith("/api/imprimir/")
