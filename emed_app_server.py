@@ -2006,7 +2006,29 @@ import time
 
 
 
-EMED_AUTH_SECRET = os.environ.get("EMED_AUTH_SECRET", "emed-prod-secret-hospitalar-ceara-2026-auth-key")
+def obter_ou_criar_auth_secret() -> str:
+    env_sec = os.environ.get("EMED_AUTH_SECRET")
+    if env_sec:
+        return env_sec
+    secret_file = os.path.join(BASE_DIR, ".emed_auth_secret")
+    if os.path.exists(secret_file):
+        try:
+            with open(secret_file, "r", encoding="utf-8") as f:
+                s = f.read().strip()
+                if len(s) >= 32:
+                    return s
+        except Exception:
+            pass
+    import secrets
+    new_sec = secrets.token_hex(32)
+    try:
+        with open(secret_file, "w", encoding="utf-8") as f:
+            f.write(new_sec)
+    except Exception:
+        pass
+    return new_sec
+
+EMED_AUTH_SECRET = obter_ou_criar_auth_secret()
 
 
 
@@ -3644,76 +3666,40 @@ async def api_auth_status(request: web.Request) -> web.Response:
 @web.middleware
 
 async def auth_api_middleware(request: web.Request, handler):
-
     path = request.path
 
+    # Lista estrita de recursos estáticos e públicos (Deny by Default)
     if (
-
-        path in ("/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping", "/api/logo", "/api/icone-autosave", "/api/logo-circle", "/api/app-icon/192", "/api/app-icon/512", "/api/app-icon/180", "/api/app-icon/maskable", "/api/app-icon/favicon", "/nav", "/gps", "/frota", "/api/bootstrap", "/api/v1/veiculos", "/api/respostas-tecnicas", "/api/iniciar-rota", "/api/checkin", "/api/checkout", "/api/frota/assumir-veiculo", "/api/frota/troca-condutores-historico")
-
-        or path == "/fiscal"
-        or path.startswith("/api/fiscal/danfe/")
-        or path.startswith("/api/fiscal/v2/")
-        or path.startswith("/api/fiscal/recebidas/")
-        or path.startswith("/api/app-icon/")
+        path in (
+            "/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping",
+            "/api/logo", "/api/icone-autosave", "/api/logo-circle",
+            "/api/app-icon/192", "/api/app-icon/512", "/api/app-icon/180", "/api/app-icon/maskable", "/api/app-icon/favicon",
+            "/nav", "/gps", "/frota", "/apresentacao", "/portal-cliente", "/api/simbolo-emed"
+        )
         or path.startswith("/static/")
-
+        or path.startswith("/api/app-icon/")
         or path.startswith("/api/auth/")
-
         or path.startswith("/api/dispositivos/")
-
-        or path.startswith("/api/car")
-
-        or path.startswith("/api/radars")
-
-        or path.startswith("/api/route")
-
-        or path.startswith("/api/search")
-
-        or path.startswith("/api/history")
-
-        or path.startswith("/api/fleet")
-
-        or path.startswith("/api/clients")
-
-        or path.startswith("/api/instalacao/")
-
-        or path.startswith("/api/imprimir/")
-        or path == "/api/ferramentas/etiquetas-qr"
-        or path == "/api/lab/etiquetas-qr"
-        or path == "/apresentacao"
+        or path.startswith("/qrcode/")
+        or path.startswith("/api/hospital/autorizacao-entrada/")
         or path.startswith("/api/protocolo-entrega/imprimir/")
         or path.startswith("/lab/r/")
         or path.startswith("/proposta/")
         or path == "/api/proposta/responder"
-
-        or path.startswith("/api/triagem/")
-
-        or path.startswith("/api/frota/")
-
-        or path.startswith("/api/almoxarifado/")
-        or path.startswith("/api/cliente/dossie-radiologico/arquivo/")
-        or path == "/api/cliente/dossie-radiologico/imprimir"
-        or path == "/portal-cliente"
-        or path == "/api/equipe/dosimetria/imprimir"
-        or path.startswith("/api/equipe/dosimetria/foto/")
-        or path.startswith("/api/equipe/colaborador/arquivo/")
-        or path == "/api/equipe/colaborador/imprimir"
+        or path == "/api/pix/webhook"
         or path == "/api/cliente/acesso/login"
         or path == "/api/cliente/portal-dados"
         or path == "/api/cliente/portal-salvar-doc"
-        or path.startswith("/api/unidade/")
-        or path.startswith("/api/pmp/")
-
-        or path.startswith("/api/hospital/")
-
-        or path.startswith("/api/gestao/")
-        or path.startswith("/api/effort/")
-        or path.startswith("/api/konica/")
-        or path.startswith("/api/instalacao/")
-
+        # Proxies para visualização de navegação/radares no veículo (Apenas leituras GET)
+        or (request.method == "GET" and (
+            path.startswith("/api/car")
+            or path.startswith("/api/radars")
+            or path.startswith("/api/clients")
+            or path.startswith("/api/route")
+            or path.startswith("/api/search")
+            or path.startswith("/api/fleet")
+        ))
     ):
-
         return await handler(request)
 
 
@@ -25329,6 +25315,26 @@ async def api_equipe_dosimetria_imprimir(request: web.Request) -> web.Response:
     return web.Response(text=html_out, content_type="text/html", charset="utf-8")
 
 
+
+async def api_auditoria_historico_modificacoes(request: web.Request) -> web.Response:
+    """Retorna o log forense e imutável de todas as retificações de histórico da frota (Apenas Gestor/Admin)."""
+    user = request.get("_emed_user")
+    if not user or str(user.get("perfil", "")).strip().upper() not in ("GESTOR", "ADMIN"):
+        return web.json_response({"ok": False, "msg": "Acesso restrito: Apenas Gestores e Administradores possuem autorização."}, status=403)
+
+    with get_db_connection(DB_NAME) as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        rows = cur.execute("""
+            SELECT id, tabela_alvo, registro_id, campo_alterado, valor_anterior, valor_novo,
+                   usuario_gestor, nivel_acesso, motivo_justificativa, data_hora, ip_origem, criado_em
+            FROM auditoria_modificacoes_historico
+            ORDER BY id DESC
+            LIMIT 100
+        """).fetchall()
+        logs = [dict(r) for r in rows]
+    return web.json_response({"ok": True, "logs": logs, "total": len(logs)})
+
 def criar_app() -> web.Application:
 
     garantir_schema_dispositivos(DB_NAME)
@@ -25568,6 +25574,7 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/checkout", api_checkout)
     app.router.add_post("/api/frota/assumir-veiculo", api_frota_assumir_veiculo)
     app.router.add_get("/api/frota/troca-condutores-historico", api_frota_troca_condutores_historico)
+    app.router.add_get("/api/auditoria/historico-modificacoes", api_auditoria_historico_modificacoes)
 
 
 
