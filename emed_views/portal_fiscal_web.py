@@ -1397,9 +1397,9 @@ async def api_fiscal_recebidas_pdf(request: web.Request) -> web.Response:
 
                       status_estoque, itens_resumo, observacoes
 
-               FROM notas_fiscais_recebidas WHERE id = ?""",
+               FROM notas_fiscais_recebidas WHERE id = ? OR numero_nf = ? ORDER BY id DESC LIMIT 1""",
 
-            (nota_id,),
+            (nota_id, str(nota_id)),
 
         )
 
@@ -1471,9 +1471,9 @@ async def api_fiscal_recebidas_eml_download(request: web.Request) -> web.Respons
 
                       status_estoque, itens_resumo, observacoes
 
-               FROM notas_fiscais_recebidas WHERE id = ?""",
+               FROM notas_fiscais_recebidas WHERE id = ? OR numero_nf = ? ORDER BY id DESC LIMIT 1""",
 
-            (nota_id,),
+            (nota_id, str(nota_id)),
 
         )
 
@@ -1577,9 +1577,9 @@ async def api_fiscal_recebidas_enviar_email_pdf(request: web.Request) -> web.Res
 
                       status_estoque, itens_resumo, observacoes
 
-               FROM notas_fiscais_recebidas WHERE id = ?""",
+               FROM notas_fiscais_recebidas WHERE id = ? OR numero_nf = ? ORDER BY id DESC LIMIT 1""",
 
-            (nota_id,),
+            (nota_id, str(nota_id)),
 
         )
 
@@ -1739,9 +1739,9 @@ async def api_fiscal_recebidas_enviar_whatsapp_pdf(request: web.Request) -> web.
 
                       status_estoque, itens_resumo, observacoes
 
-               FROM notas_fiscais_recebidas WHERE id = ?""",
+               FROM notas_fiscais_recebidas WHERE id = ? OR numero_nf = ? ORDER BY id DESC LIMIT 1""",
 
-            (nota_id,),
+            (nota_id, str(nota_id)),
 
         )
 
@@ -1794,16 +1794,20 @@ async def api_fiscal_recebidas_enviar_whatsapp_pdf(request: web.Request) -> web.
 
 
 async def api_fiscal_recebidas_danfe(request: web.Request) -> web.Response:
-    """Renderiza a DANFE Completa (Documento Auxiliar da Nota Fiscal Eletrônica) de uma nota recebida no Radar DF-e,
-    com opções integradas de Download PDF/Impressão, Download XML, Envio via WhatsApp e Envio por E-mail."""
+    """Renderiza a DANFE de uma nota recebida no Radar DF-e.
+    Por padrão fiscal oficial e compatibilidade universal com visualizadores móveis (WhatsApp/celular),
+    retorna DIRETAMENTE o arquivo binário .PDF oficial padrão brasileiro (A4)."""
+    if request.query.get("view") != "html":
+        return await api_fiscal_recebidas_pdf(request)
+
     db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
     nota_id = int(request.match_info.get("nota_id", 0) or 0)
     auto_print = request.query.get("print", "0") == "1"
 
     with _get_db_connection(db_name) as conn:
         cur = conn.execute(
-            "SELECT id, cnpj_destinatario, filial, nsu, chave_acesso, emitente_cnpj, emitente_nome, emitente_uf, numero_nf, serie, tipo_documento, data_emissao, data_captura, valor_total, status_manifestacao, status_estoque, itens_resumo, observacoes FROM notas_fiscais_recebidas WHERE id = ?",
-            (nota_id,)
+            "SELECT id, cnpj_destinatario, filial, nsu, chave_acesso, emitente_cnpj, emitente_nome, emitente_uf, numero_nf, serie, tipo_documento, data_emissao, data_captura, valor_total, status_manifestacao, status_estoque, itens_resumo, observacoes FROM notas_fiscais_recebidas WHERE id = ? OR numero_nf = ? ORDER BY id DESC LIMIT 1",
+            (nota_id, str(nota_id))
         )
         row = cur.fetchone()
 
@@ -2120,11 +2124,33 @@ async def api_fiscal_recebidas_danfe(request: web.Request) -> web.Response:
     }}
 
     function dispararWhatsDanfe() {{
-      const foneRaw = (document.getElementById("inpWhatsDanfe")?.value || "").replace(/\\D/g, "");
-      const urlDanfe = window.location.origin + "/api/fiscal/recebidas/danfe/{n_id}";
+      const inp = document.getElementById("inpWhatsDanfe");
+      const foneAtual = (inp?.value || "").trim();
+      const foneDigitado = prompt(
+        "📱 Para qual número de WhatsApp você deseja enviar a DANFE?\\n\\nDigite o DDD + Número ou confirme o número abaixo:",
+        foneAtual || ""
+      );
+      if (foneDigitado === null) return;
+      const foneTexto = foneDigitado.trim();
+      if (!foneTexto) {{
+        alert("Por favor, informe o número de WhatsApp com DDD para envio.");
+        if (inp) inp.focus();
+        return;
+      }}
+      if (inp) inp.value = foneTexto;
+      let foneRaw = foneTexto.replace(/\\D/g, "");
+      if (!foneRaw || foneRaw.length < 8) {{
+        alert("Número inválido. Digite o DDD + Número (ex: 85996197923).");
+        return;
+      }}
+      if (foneRaw.length === 8 || foneRaw.length === 9) foneRaw = "5585" + foneRaw;
+      else if (!foneRaw.startsWith("55") && (foneRaw.length === 10 || foneRaw.length === 11)) foneRaw = "55" + foneRaw;
+
+      const urlDanfe = window.location.origin + "/api/fiscal/recebidas/pdf/{n_id}";
       const urlXml = window.location.origin + "/api/fiscal/recebidas/xml/{n_id}";
       const texto = [
-        "🧾 *DANFE NF-e Nº {num_nf} — EMED ELETROMEDICINA*",
+        "🧾 *DANFE OFICIAL (PADRÃO BRASILEIRO)*",
+        "• *NF-e Nº:* {num_nf}",
         "• *Fornecedor:* {emit_nome}",
         "• *CNPJ Emitente:* {emit_cnpj_fmt}",
         "• *Unidade Destino:* {dest_razao}",
@@ -2132,12 +2158,18 @@ async def api_fiscal_recebidas_danfe(request: web.Request) -> web.Response:
         "• *Valor Total:* R$ {v_tot:,.2f}",
         "• *Chave de Acesso:* `{chave}`",
         "",
-        "📄 *Visualizar DANFE Completa:* " + urlDanfe,
-        "📥 *Baixar XML:* " + urlXml
-      ].join("\\n");
-      const zapUrl = foneRaw
-        ? `https://api.whatsapp.com/send?phone=${{foneRaw.startsWith("55") ? foneRaw : "55" + foneRaw}}&text=${{encodeURIComponent(texto)}}`
-        : `https://api.whatsapp.com/send?text=${{encodeURIComponent(texto)}}`;
+        "📄 *Abrir DANFE Oficial (.PDF Padrão):* " + urlDanfe,
+        "📥 *Baixar Arquivo XML:* " + urlXml
+      ].join(String.fromCharCode(10));
+      try {{
+        if (navigator.clipboard && navigator.clipboard.writeText) {{
+          navigator.clipboard.writeText(texto);
+        }}
+      }} catch (e) {{}}
+      const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+      const zapUrl = isMobile
+        ? `https://api.whatsapp.com/send?phone=${{foneRaw}}&text=${{encodeURIComponent(texto)}}`
+        : `https://web.whatsapp.com/send?phone=${{foneRaw}}&text=${{encodeURIComponent(texto)}}`;
       window.open(zapUrl, "_blank");
     }}
 
@@ -7588,13 +7620,61 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     function enviarWhatsNavegadorPadraoModalDFe() {{
       const n = DFE_NOTA_ATUAL_MODAL;
       if (!n) return;
-      const rawInput = (document.getElementById("inpModalDFeWhats")?.value || "").trim();
-      const listaFones = rawInput
+      const inpEl = document.getElementById("inpModalDFeWhats");
+      const foneAtual = (inpEl?.value || "").trim();
+
+      // Pergunta diretamente qual o número para envio
+      const foneDigitado = prompt(
+        "📱 Para qual número de WhatsApp você deseja enviar a DANFE?\\n\\nDigite o DDD + Número ou confirme o número abaixo:",
+        foneAtual || "85"
+      );
+
+      // Usuário cancelou
+      if (foneDigitado === null) return;
+
+      const foneTexto = foneDigitado.trim();
+      if (!foneTexto) {{
+        alert("Por favor, digite o número do WhatsApp com DDD para envio.");
+        if (inpEl) inpEl.focus();
+        return;
+      }}
+
+      // Atualiza o campo com o número digitado
+      if (inpEl) inpEl.value = foneTexto;
+
+      // Extrai números
+      const fonesExtraidos = foneTexto
         .split(/[,;\\s\\n]+/)
         .map(s => s.replace(/\\D/g, ""))
         .filter(s => s.length >= 8);
 
-      const urlDanfe = window.location.origin + `/api/fiscal/recebidas/danfe/${{n.id}}`;
+      if (!fonesExtraidos.length) {{
+        alert("Número inválido. Digite o DDD + Número (ex: 85996197923).");
+        return;
+      }}
+
+      // Formata números com código 55
+      const listaFones = fonesExtraidos.map(fone => {{
+        if (fone.startsWith("55") && fone.length >= 12) return fone;
+        if (fone.length === 8 || fone.length === 9) return "5585" + fone;
+        return "55" + fone;
+      }});
+
+      // Tenta salvar atalho rápido
+      try {{
+        const ult = fonesExtraidos[0];
+        if (ult.length >= 10) {{
+          const salvos = getContatosRapidosWhatsDFe();
+          if (!salvos.some(c => c.numero === ult)) {{
+            salvos.unshift({{ nome: "Contato " + ult.slice(-4), numero: ult }});
+            if (salvos.length > 8) salvos.pop();
+            localStorage.setItem("emed_whats_contatos_rapidos", JSON.stringify(salvos));
+            renderContatosRapidosWhatsDFe();
+          }}
+        }}
+      }} catch (e) {{}}
+
+      const urlDanfe = window.location.origin + `/api/fiscal/recebidas/pdf/${{n.id}}`;
       const urlXml = window.location.origin + `/api/fiscal/recebidas/xml/${{n.id}}`;
       const emitNome = n.emitente_nome || n.emitente_razao || "Fornecedor";
       const cnpjEmit = n.emitente_cnpj || "";
@@ -7603,31 +7683,58 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       const chave = n.chave_acesso || "";
 
       const linhas = [
-        `🧾 *DANFE NF-e Nº ${{numNf}} — EMED ELETROMEDICINA*`,
+        `🧾 *DANFE OFICIAL (PADRÃO BRASILEIRO)*`,
+        `• *NF-e Nº:* ${{numNf}}`,
         `• *Fornecedor:* ${{emitNome}}`,
-        cnpjEmit ? `• *CNPJ Emitente:* ${{cnpjEmit}}` : "",
+        cnpjEmit ? `• *CNPJ:* ${{cnpjEmit}}` : "",
         n.data_emissao ? `• *Data Emissão:* ${{n.data_emissao}}` : "",
         `• *Valor Total:* R$ ${{valTot}}`,
         chave ? ("• *Chave de Acesso:* " + chave) : "",
         "",
-        `📄 *Visualizar / Baixar DANFE (.PDF):* ${{urlDanfe}}`,
+        `📄 *Abrir DANFE Oficial (.PDF Padrão):* ${{urlDanfe}}`,
         `📥 *Baixar Arquivo XML:* ${{urlXml}}`
-      ].filter(Boolean).join("\\n");
+      ].filter(Boolean).join(String.fromCharCode(10));
 
-      if (listaFones.length > 0) {{
-        listaFones.forEach((fone, idx) => {{
-          const numFmt = fone.startsWith("55") ? fone : ("55" + fone);
-          const zapUrl = `https://api.whatsapp.com/send?phone=${{numFmt}}&text=${{encodeURIComponent(linhas)}}`;
+      // Copia para área de transferência para garantir
+      try {{
+        if (navigator.clipboard && navigator.clipboard.writeText) {{
+          navigator.clipboard.writeText(linhas);
+        }}
+      }} catch (e) {{}}
+
+      const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+      // Abre aba no WhatsApp para cada contato
+      listaFones.forEach((numFmt, idx) => {{
+        // No desktop usamos web.whatsapp.com/send para abrir direto o chat no WhatsApp Web
+        const zapUrl = isMobile
+          ? `https://api.whatsapp.com/send?phone=${{numFmt}}&text=${{encodeURIComponent(linhas)}}`
+          : `https://web.whatsapp.com/send?phone=${{numFmt}}&text=${{encodeURIComponent(linhas)}}`;
+
+        if (idx === 0) {{
+          window.open(zapUrl, "_blank");
+        }} else {{
           setTimeout(() => {{
             window.open(zapUrl, "_blank");
-          }}, idx * 350);
-        }});
-        mostrarAvisoPdfModal(`🌐 <b>WhatsApp aberto no navegador padrão</b> para ${{listaFones.length}} contato(s)!`);
-      }} else {{
-        const zapUrl = `https://api.whatsapp.com/send?text=${{encodeURIComponent(linhas)}}`;
-        window.open(zapUrl, "_blank");
-        mostrarAvisoPdfModal("🌐 <b>WhatsApp Web aberto no seu navegador padrão!</b> Escolha o contato ou grupo para enviar.");
-      }}
+          }}, idx * 400);
+        }}
+      }});
+
+      const primeiroZap = isMobile
+        ? `https://api.whatsapp.com/send?phone=${{listaFones[0]}}&text=${{encodeURIComponent(linhas)}}`
+        : `https://web.whatsapp.com/send?phone=${{listaFones[0]}}&text=${{encodeURIComponent(linhas)}}`;
+
+      mostrarAvisoPdfModal(`
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <div>
+            ✅ <b>Aba do WhatsApp aberta para +${{listaFones.join(", +")}}!</b><br/>
+            A mensagem e os links da DANFE já foram preenchidos na conversa. Basta pressionar <b>[Enter]</b> na aba do WhatsApp para enviar.
+          </div>
+          <a href="${{primeiroZap}}" target="_blank" style="display:inline-block;background:#16a34a;color:#fff;padding:5px 12px;border-radius:4px;font-size:11.5px;font-weight:700;text-decoration:none;">
+            Reabrir WhatsApp ↗
+          </a>
+        </div>
+      `);
     }}
 
     async function conectarWhatsAppBotLocal() {{
@@ -7644,7 +7751,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         if (res.status === "CONECTADO") {{
           mostrarAvisoPdfModal("✅ <b>WhatsApp Dedicado CONECTADO!</b> Já pode enviar os PDFs diretamente para qualquer número.");
         }} else {{
-          mostrarAvisoPdfModal("📷 <b>Aguardando leitura do QR Code</b> na janela do Edge/WhatsApp que abriu no servidor. Após conectar, clique em <b>📲 Enviar PDF</b>.");
+          mostrarAvisoPdfModal("📷 <b>Aguardando leitura do QR Code</b> na janela do Edge/WhatsApp que abriu no servidor. Após conectar, clique em <b>🤖 Enviar PDF (Robô)</b>.");
         }}
       }} catch (e) {{
         mostrarAvisoPdfModal("❌ Erro ao abrir automação local: " + e.message);
@@ -7656,21 +7763,29 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     async function enviarWhatsDanfeModalDFe() {{
       const n = DFE_NOTA_ATUAL_MODAL;
       if (!n) return;
-      const rawInput = (document.getElementById("inpModalDFeWhats")?.value || "").trim();
+      let rawInput = (document.getElementById("inpModalDFeWhats")?.value || "").trim();
+      if (!rawInput) {{
+        const foneDigitado = prompt("📱 Digite o WhatsApp para envio (com DDD):", "85");
+        if (!foneDigitado) return;
+        rawInput = foneDigitado.trim();
+        if (document.getElementById("inpModalDFeWhats")) {{
+          document.getElementById("inpModalDFeWhats").value = rawInput;
+        }}
+      }}
       const listaFones = rawInput
         .split(/[,;\\s\\n]+/)
         .map(s => s.replace(/\\D/g, ""))
-        .filter(s => s.length >= 10);
+        .filter(s => s.length >= 8);
 
       if (!listaFones.length) {{
-        alert("Digite pelo menos um número de WhatsApp com DDD (ex: 85999999999) ou selecione um contato salvo.");
+        alert("Digite pelo menos um número de WhatsApp com DDD (ex: 85996197923).");
         document.getElementById("inpModalDFeWhats")?.focus();
         return;
       }}
 
       const btn = document.getElementById("btnDispararWhatsPdfAuto");
       if (btn) {{ btn.disabled = true; btn.textContent = "⏳ Enviando PDF..."; }}
-      mostrarAvisoPdfModal(`⏳ Enviando arquivo <b>DANFE_NFe_${{n.numero_nf}}.pdf</b> automaticamente para ${{listaFones.length}} número(s)...`);
+      mostrarAvisoPdfModal(`⏳ Tentando envio de <b>DANFE_NFe_${{n.numero_nf}}.pdf</b> via robô local...`);
 
       try {{
         const resp = await fetch("/api/fiscal/recebidas/enviar-whatsapp-pdf", {{
@@ -7685,7 +7800,17 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         const res = await resp.json();
 
         if (res.needs_qr) {{
-          mostrarAvisoPdfModal("📷 <b>Primeira conexão necessária:</b> Escaneie o QR Code na janela do WhatsApp Web dedicada que acabou de abrir e depois clique novamente em <b>📲 Enviar PDF</b>.");
+          const querAba = confirm("O Robô do servidor não está conectado ao WhatsApp.\\n\\nDeseja abrir e enviar pelo seu NAVEGADOR PADRÃO (WhatsApp Web) agora?");
+          if (querAba) {{
+            enviarWhatsNavegadorPadraoModalDFe();
+            return;
+          }}
+          mostrarAvisoPdfModal(`
+            <div style="background:#451a03;border:1px solid #f59e0b;padding:8px 10px;border-radius:6px;color:#fef3c7;">
+              ⚠️ <b>Robô não autenticado:</b> O WhatsApp do servidor requer leitura de QR Code.<br/>
+              👉 <b>Envio imediato:</b> Clique no botão <button type="button" onclick="enviarWhatsNavegadorPadraoModalDFe()" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;font-weight:700;">🌐 Abrir no Navegador Padrão</button> para enviar pelo seu WhatsApp.
+            </div>
+          `);
           return;
         }}
         if (res.ok) {{
@@ -7695,12 +7820,22 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             : "";
           mostrarAvisoPdfModal(`✅ <b>PDF enviado automaticamente no WhatsApp</b> para: <b>${{envTxt}}</b>${{falhasTxt}}`);
         }} else {{
-          mostrarAvisoPdfModal(`⚠️ ${{res.msg || "Não foi possível enviar."}}`);
+          const querAba = confirm(`${{res.msg || "Robô não conseguiu enviar."}}\\n\\nDeseja abrir e enviar pelo seu NAVEGADOR PADRÃO agora?`);
+          if (querAba) {{
+            enviarWhatsNavegadorPadraoModalDFe();
+            return;
+          }}
+          mostrarAvisoPdfModal(`⚠️ ${{res.msg || "Não foi possível enviar via robô."}}`);
         }}
       }} catch (e) {{
-        mostrarAvisoPdfModal(`❌ Falha ao acionar automação local: ${{e.message}}`);
+        const querAba = confirm(`Falha no robô do servidor (${{e.message}}).\\n\\nDeseja abrir e enviar pelo seu NAVEGADOR PADRÃO (WhatsApp Web) agora?`);
+        if (querAba) {{
+          enviarWhatsNavegadorPadraoModalDFe();
+          return;
+        }}
+        mostrarAvisoPdfModal(`❌ Falha na automação do servidor: ${{e.message}}.<br/>👉 Clique em <b>🌐 Abrir no Navegador Padrão</b>.`);
       }} finally {{
-        if (btn) {{ btn.disabled = false; btn.textContent = "📲 Enviar PDF"; }}
+        if (btn) {{ btn.disabled = false; btn.textContent = "🤖 Enviar PDF (Robô)"; }}
       }}
     }}
     function montarDadosEmailDanfeModalDFe(emailDest) {{
@@ -7716,19 +7851,36 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       const vTot = Number(n.valor_total || 0).toLocaleString("pt-BR", {{minimumFractionDigits: 2, maximumFractionDigits: 2}});
       const chave = n.chave_acesso || "-";
       const hostOrigin = window.location.origin;
-      const urlDanfe = `${{hostOrigin}}/api/fiscal/recebidas/danfe/${{n.id}}`;
+      const urlDanfe = `${{hostOrigin}}/api/fiscal/recebidas/pdf/${{n.id}}`;
       const urlPdf = `${{hostOrigin}}/api/fiscal/recebidas/pdf/${{n.id}}`;
       const urlXml = `${{hostOrigin}}/api/fiscal/recebidas/xml/${{n.id}}`;
 
       const assunto = `DANFE NF-e Nº ${{numNf}} - ${{fornecedor}} (EMED Eletromedicina)`;
-      const corpo = [
+      // Corpo com foco exclusivo no ANEXO PDF (sem links externos para não ser bloqueado em hospitais)
+      const corpoAnexo = [
         "Prezados,",
         "",
-        "Seguem os dados da Nota Fiscal Eletrônica (NF-e) recebida no Radar DF-e da EMED Eletromedicina:",
+        `Segue em anexo o arquivo PDF oficial da DANFE / Nota Fiscal Eletrônica (NF-e Nº ${{numNf}}, Série ${{n.serie || "1"}}).`,
         "",
-        `• Número da NF-e: ${{numNf}} (Série ${{n.serie || "1"}})`,
         `• Emitente / Fornecedor: ${{fornecedor}} (CNPJ: ${{cnpjForn}})`,
-        `• Unidade EMED Destinatária: ${{filialDest}} (CNPJ: ${{cnpjDest}})`,
+        `• Destinatário: ${{filialDest}} (CNPJ: ${{cnpjDest}})`,
+        `• Data de Emissão: ${{dtEmi}}`,
+        `• Valor Total: R$ ${{vTot}}`,
+        `• Chave de Acesso: ${{chave}}`,
+        "",
+        "Favor acusar o recebimento do arquivo PDF anexo.",
+        "",
+        "Atenciosamente,",
+        "Departamento Fiscal — EMED Eletromedicina"
+      ].join(String.fromCharCode(10));
+
+      const corpoComLinks = [
+        "Prezados,",
+        "",
+        `Seguem os dados da Nota Fiscal Eletrônica (NF-e Nº ${{numNf}}):`,
+        "",
+        `• Emitente / Fornecedor: ${{fornecedor}} (CNPJ: ${{cnpjForn}})`,
+        `• Destinatário: ${{filialDest}} (CNPJ: ${{cnpjDest}})`,
         `• Data de Emissão: ${{dtEmi}}`,
         `• Valor Total: R$ ${{vTot}}`,
         `• Chave de Acesso: ${{chave}}`,
@@ -7739,14 +7891,24 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         "📥 Download Direto da DANFE em PDF:",
         urlPdf,
         "",
-        "📥 Download do Arquivo XML Oficial:",
-        urlXml,
-        "",
         "Atenciosamente,",
         "Departamento Fiscal — EMED Eletromedicina"
       ].join(String.fromCharCode(10));
 
-      return {{ email, numNf, fornecedor, assunto, corpo, urlDanfe, urlPdf, urlXml, id: n.id }};
+      return {{ email, numNf, fornecedor, assunto, corpoAnexo, corpoComLinks, urlDanfe, urlPdf, urlXml, id: n.id }};
+    }}
+
+    function abrirRascunhoComPdfAnexadoModalDFe() {{
+      const n = DFE_NOTA_ATUAL_MODAL;
+      if (!n) return;
+      const email = (document.getElementById("inpModalDFeEmail")?.value || "").trim();
+      const aEml = document.createElement("a");
+      aEml.href = `/api/fiscal/recebidas/eml/${{n.id}}?to=${{encodeURIComponent(email)}}`;
+      aEml.download = `DANFE_NFe_${{n.numero_nf}}.eml`;
+      document.body.appendChild(aEml);
+      aEml.click();
+      aEml.remove();
+      mostrarAvisoPdfModal(`📎 Arquivo de e-mail <b>DANFE_NFe_${{n.numero_nf}}.eml</b> gerado com o <b>PDF já embutido no anexo</b>! Dê dois cliques para abrir diretamente no Outlook Desktop com o anexo pronto.`);
     }}
 
     function abrirEmailDanfeWebmail(tipo, emailDest) {{
@@ -7762,19 +7924,28 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         return;
       }}
 
+      // 1. Dispara o download automático do PDF oficial para a pasta Downloads
+      const aPdf = document.createElement("a");
+      aPdf.href = `/api/fiscal/recebidas/pdf/${{dados.id}}?download=1`;
+      aPdf.download = `DANFE_NFe_${{dados.numNf}}.pdf`;
+      document.body.appendChild(aPdf);
+      aPdf.click();
+      aPdf.remove();
+
+      // 2. Abre a tela de composição do webmail com corpo focado em anexo (sem links externos para compatibilidade com hospitais)
       let link = "";
       if (tipo === "gmail") {{
-        link = `https://mail.google.com/mail/?view=cm&fs=1&to=${{encodeURIComponent(email)}}&su=${{encodeURIComponent(dados.assunto)}}&body=${{encodeURIComponent(dados.corpo)}}`;
+        link = `https://mail.google.com/mail/?view=cm&fs=1&to=${{encodeURIComponent(email)}}&su=${{encodeURIComponent(dados.assunto)}}&body=${{encodeURIComponent(dados.corpoAnexo)}}`;
         window.open(link, "_blank");
-        mostrarAvisoPdfModal(`🔴 Rascunho aberto no <b>Gmail Web</b> para ${{email}}! Os dados e links da DANFE já estão preenchidos. <a href="/api/fiscal/recebidas/pdf/${{dados.id}}" target="_blank" style="color:#38bdf8;text-decoration:underline;margin-left:6px;font-weight:bold;">📥 Baixar PDF para Anexar</a>`);
+        mostrarAvisoPdfModal(`🔴 <b>Arquivo DANFE_NFe_${{dados.numNf}}.pdf baixado na sua pasta de Downloads!</b> Como muitos clientes bloqueiam links, basta arrastá-lo para a tela do Gmail que abriu.`);
       }} else if (tipo === "outlook") {{
-        link = `https://outlook.live.com/mail/0/deeplink/compose?to=${{encodeURIComponent(email)}}&subject=${{encodeURIComponent(dados.assunto)}}&body=${{encodeURIComponent(dados.corpo)}}`;
+        link = `https://outlook.live.com/mail/0/deeplink/compose?to=${{encodeURIComponent(email)}}&subject=${{encodeURIComponent(dados.assunto)}}&body=${{encodeURIComponent(dados.corpoAnexo)}}`;
         window.open(link, "_blank");
-        mostrarAvisoPdfModal(`🔵 Rascunho aberto no <b>Outlook Web</b> para ${{email}}! Os dados e links da DANFE já estão preenchidos. <a href="/api/fiscal/recebidas/pdf/${{dados.id}}" target="_blank" style="color:#38bdf8;text-decoration:underline;margin-left:6px;font-weight:bold;">📥 Baixar PDF para Anexar</a>`);
+        mostrarAvisoPdfModal(`🔵 <b>Arquivo DANFE_NFe_${{dados.numNf}}.pdf baixado na sua pasta de Downloads!</b> Como muitos clientes bloqueiam links, basta arrastá-lo para a tela do Outlook que abriu.`);
       }} else {{
-        link = `mailto:${{encodeURIComponent(email)}}?subject=${{encodeURIComponent(dados.assunto)}}&body=${{encodeURIComponent(dados.corpo)}}`;
+        link = `mailto:${{encodeURIComponent(email)}}?subject=${{encodeURIComponent(dados.assunto)}}&body=${{encodeURIComponent(dados.corpoAnexo)}}`;
         window.location.href = link;
-        mostrarAvisoPdfModal(`💻 Aberto no <b>Aplicativo Padrão de E-mail</b> (Outlook / Thunderbird)! <a href="/api/fiscal/recebidas/pdf/${{dados.id}}" target="_blank" style="color:#38bdf8;text-decoration:underline;margin-left:6px;font-weight:bold;">📥 Baixar PDF para Anexar</a>`);
+        mostrarAvisoPdfModal(`💻 <b>Arquivo DANFE_NFe_${{dados.numNf}}.pdf baixado na sua pasta de Downloads!</b> Anexe-o diretamente no programa de e-mail.`);
       }}
     }}
 
@@ -9060,8 +9231,8 @@ Por favor, confira os dados preenchidos.`);
               </div>
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <input type="text" id="inpModalDFeWhats" placeholder="DDD + Número (ex: 85999999999) ou vazio p/ escolher contato" style="flex:1;min-width:180px;padding:8px 10px;font-size:12px;" />
-              <button type="button" id="btnDispararWhatsNavegadorPadrao" class="btn" style="width:auto;background:#16a34a;color:#fff;padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap;" onclick="enviarWhatsNavegadorPadraoModalDFe()" title="Abre diretamente no seu navegador padrão (Chrome, Edge, Firefox etc.)">🌐 Abrir no Navegador Padrão</button>
+              <input type="text" id="inpModalDFeWhats" placeholder="DDD + Número (ex: 85996197923) ou vazio p/ escolher" onkeydown="if(event.key==='Enter'){{enviarWhatsNavegadorPadraoModalDFe();event.preventDefault();}}" style="flex:1;min-width:180px;padding:8px 10px;font-size:12px;" />
+              <button type="button" id="btnDispararWhatsNavegadorPadrao" class="btn" style="width:auto;background:#16a34a;color:#fff;padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap;" onclick="enviarWhatsNavegadorPadraoModalDFe()" title="Abre diretamente no seu navegador padrão (WhatsApp Web) com a mensagem preenchida">🌐 Abrir no Navegador Padrão</button>
               <button type="button" id="btnDispararWhatsPdfAuto" class="btn" style="width:auto;background:#0369a1;color:#fff;padding:8px 10px;font-size:11px;white-space:nowrap;" onclick="enviarWhatsDanfeModalDFe()" title="Anexa o arquivo PDF físico via robô local">🤖 Enviar PDF (Robô)</button>
             </div>
             <div id="boxContatosRapidosWhatsDFe" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;"></div>
@@ -9069,18 +9240,18 @@ Por favor, confira os dados preenchidos.`);
           </div>
           <div>
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-              <label style="color:#60a5fa;font-size:12px;font-weight:700;margin:0;">✉️ Enviar DANFE Completa por E-mail:</label>
-              <div style="display:flex;gap:4px;">
-                <button type="button" onclick="abrirEmailDanfeWebmail('gmail')" style="background:#450a0a;border:1px solid #ef4444;color:#fca5a5;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer;font-weight:600;" title="Abrir rascunho no Gmail Web">🔴 Gmail</button>
-                <button type="button" onclick="abrirEmailDanfeWebmail('outlook')" style="background:#082f49;border:1px solid #0284c7;color:#7dd3fc;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer;font-weight:600;" title="Abrir rascunho no Outlook Web">🔵 Outlook</button>
-                <button type="button" onclick="abrirEmailDanfeWebmail('mailto')" style="background:#1e293b;border:1px solid #64748b;color:#cbd5e1;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer;font-weight:600;" title="Abrir no aplicativo padrão do computador (Outlook/Thunderbird)">💻 App Padrão</button>
+              <label style="color:#60a5fa;font-size:12px;font-weight:700;margin:0;">✉️ Enviar DANFE com PDF Anexo (Sem Links):</label>
+              <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                <button type="button" onclick="abrirEmailDanfeWebmail('gmail')" style="background:#450a0a;border:1px solid #ef4444;color:#fca5a5;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer;font-weight:600;" title="Baixa o PDF oficial e abre no Gmail Web">🔴 Gmail (com PDF)</button>
+                <button type="button" onclick="abrirEmailDanfeWebmail('outlook')" style="background:#082f49;border:1px solid #0284c7;color:#7dd3fc;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer;font-weight:600;" title="Baixa o PDF oficial e abre no Outlook Web">🔵 Outlook Web</button>
+                <button type="button" onclick="abrirRascunhoComPdfAnexadoModalDFe()" style="background:#0f172a;border:1px solid #38bdf8;color:#38bdf8;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer;font-weight:600;" title="Abre o Outlook Desktop com o PDF já anexado no clipe">📎 Outlook (PDF já no Anexo)</button>
               </div>
             </div>
             <div style="display:flex;gap:6px;margin-top:6px;">
               <input type="email" id="inpModalDFeEmail" placeholder="destinatario@empresa.com.br" style="flex:1;padding:8px 10px;font-size:12px;" />
               <button type="button" id="btnDispararEmailModal" class="btn" style="width:auto;background:#2563eb;color:#fff;padding:8px 14px;font-size:12px;white-space:nowrap;" onclick="enviarEmailDanfeModalDFe()">✉️ Disparar E-mail</button>
             </div>
-            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">💡 <b>Dica:</b> Envia os dados completos da NF-e, chave de acesso e links oficiais da DANFE e XML.</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">💡 <b>Clientes que bloqueiam links:</b> O PDF oficial vai como anexo direto (sem links externos no texto). Para envio 100% automático pelo servidor, ative o SMTP em Configurações Fiscais.</div>
           </div>
         </div>
         <div id="avisoEnvioPdfModalDFe" style="display:none;margin-top:8px;padding:8px 12px;border-radius:6px;background:#064e3b;border:1px solid #10b981;color:#d1fae5;font-size:12px;"></div>
