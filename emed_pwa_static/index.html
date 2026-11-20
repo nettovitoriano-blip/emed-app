@@ -1402,7 +1402,7 @@
       <div class="brand-center" onclick="abrirDrawer()" style="cursor:pointer;display:flex;align-items:center;justify-content:flex-start;margin-right:auto;" title="Abrir Menu">
         <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
           <img src="/api/logo-circle" alt="eMED" class="brand-logo-img" onerror="this.src='/api/logo'" />
-          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.4.0</div></div>
+          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.5.0</div></div>
         </div>
       </div>
       <!-- DIREITA: BOTÃO DE SINCRONIZAR E INSTALAR PWA -->
@@ -3140,7 +3140,7 @@
           window.location.reload(true);
         } catch(e) { window.location.reload(); }
       }
-      navigator.serviceWorker.register("/sw.js?v=1.4.0").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=1.5.0").then(reg => { if(reg) reg.update(); }).catch(() => {});
       let _swReloaded = false;
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         if (!_swReloaded && navigator.onLine && !STATE.osAberta) {
@@ -13622,7 +13622,8 @@ function renderMenuCliTriagem(box) {
 
     function renderMenuCliPortal(box) {
       const ordens = STATE.data.ordens || [];
-      const hospitais = [...new Set(ordens.map(o => o.cliente))].filter(Boolean).sort();
+      const clientesCad = (STATE.data.clientes || []).map(c => c.nome).filter(Boolean);
+      const hospitais = [...new Set([...ordens.map(o => o.cliente), ...clientesCad])].filter(Boolean).sort();
       if (!STATE.hospitalPortal && hospitais.length) STATE.hospitalPortal = hospitais[0];
       const doHospital = ordens.filter(o => o.cliente === STATE.hospitalPortal);
       
@@ -13738,9 +13739,14 @@ function renderMenuCliTriagem(box) {
                   <b>Radiação de Fuga:</b> ${esc(metricas.fuga_radiacao_status)}
                 </div>
               </div>
-              <button type="button" class="btn" onclick="abrirModalNovoLaudoDossie()" style="background:#10b981;color:#064e3b;font-weight:900;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;font-size:12px;">
-                + Anexar / Registrar Novo Laudo
-              </button>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn" onclick="window.open('/api/cliente/dossie-radiologico/imprimir?cliente='+encodeURIComponent(STATE.hospitalPortal||''),'_blank')" style="background:#0284c7;color:#fff;font-weight:900;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;font-size:12px;">
+                  🖨️ Dossiê Completo VISA (PDF)
+                </button>
+                <button type="button" class="btn" onclick="abrirModalNovoLaudoDossie()" style="background:#10b981;color:#064e3b;font-weight:900;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;font-size:12px;">
+                  + Anexar / Registrar Documento
+                </button>
+              </div>
             </div>
           </div>
 
@@ -13783,6 +13789,24 @@ function renderMenuCliTriagem(box) {
 
           <!-- CONTEÚDO DAS ABAS -->
           ${abaAtiva === 'dossie' ? `
+            ${(dossieData?.checklist_visa || []).length ? `
+              <div style="margin-bottom:14px;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:12px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+                  <b style="color:#38bdf8;font-size:12.5px;">📋 Checklist Obrigatório de Fiscalização (Vigilância Sanitária / RDC 611)</b>
+                  <span style="font-size:11px;font-weight:800;color:#34d399;">Prontidão: ${metricas.conformidade_percentual || 0}% (${metricas.vigentes || 0} vigentes • ${metricas.vencendo || 0} vencendo • ${metricas.vencidos || 0} vencidos)</span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;">
+                  ${(dossieData.checklist_visa || []).map(cv => {
+                    const cor = cv.status === 'OK' ? '#10b981' : (cv.status === 'VENCENDO' ? '#f59e0b' : '#ef4444');
+                    const ico = cv.status === 'OK' ? '✅' : (cv.status === 'VENCENDO' ? '⏳' : '⚠️');
+                    return `<div onclick="abrirModalNovoLaudoDossie('${esc(cv.categoria)}')" style="cursor:pointer;background:#0f172a;border:1px solid ${cor}55;border-left:4px solid ${cor};border-radius:8px;padding:8px 10px;">
+                      <div style="font-size:11.5px;font-weight:800;color:#f8fafc;">${ico} ${esc(cv.titulo)}</div>
+                      <div style="font-size:10px;color:#94a3b8;margin-top:2px;">${esc(cv.periodicidade)} • <b style="color:${cor};">${cv.status}</b> (${cv.qtd_docs} doc)</div>
+                    </div>`;
+                  }).join("")}
+                </div>
+              </div>
+            ` : ''}
             <div style="overflow-x:auto;">
               <table style="width:100%;border-collapse:collapse;font-size:12px;text-align:left;">
                 <thead>
@@ -13797,7 +13821,11 @@ function renderMenuCliTriagem(box) {
                   </tr>
                 </thead>
                 <tbody>
-                  ${laudos.map(l => `
+                  ${laudos.map(l => {
+                    const stCalc = String(l.status_calculado || 'VIGENTE');
+                    const stCor = stCalc === 'VENCIDO' ? '#dc2626' : (stCalc === 'VENCENDO_30D' ? '#d97706' : '#059669');
+                    const stLbl = stCalc === 'VENCIDO' ? 'VENCIDO' : (stCalc === 'VENCENDO_30D' ? `Vence em ${l.dias_para_vencer}d` : 'Válido & Vigente');
+                    return `
                     <tr style="border-bottom:1px solid #1e293b;">
                       <td style="padding:12px 8px;">
                         <div style="font-weight:800;color:#fff;">${esc(l.titulo)}</div>
@@ -13809,17 +13837,17 @@ function renderMenuCliTriagem(box) {
                         <div style="font-size:10.5px;color:#64748b;">${esc(l.responsavel_tecnico || '')} (${esc(l.registro_profissional || '')})</div>
                       </td>
                       <td style="padding:12px 8px;color:#94a3b8;">${esc(l.data_emissao || '-')}</td>
-                      <td style="padding:12px 8px;font-weight:700;color:#34d399;">${esc(l.data_validade || '-')}</td>
+                      <td style="padding:12px 8px;font-weight:700;color:${stCor};">${esc(l.data_validade || '-')}</td>
                       <td style="padding:12px 8px;text-align:center;">
-                        <span class="badge" style="background:#065f46;color:#a7f3d0;font-size:10.5px;padding:3px 8px;">Válido &amp; Vigente</span>
+                        <span class="badge" style="background:${stCor}22;color:${stCor};border:1px solid ${stCor}55;font-size:10.5px;padding:3px 8px;">${stLbl}</span>
                       </td>
-                      <td style="padding:12px 8px;text-align:right;">
-                        <button type="button" class="btn btn-outline" onclick="alert('📄 Certificado Oficial #${esc(l.numero_documento)} assinado eletronicamente por ${esc(l.responsavel_tecnico)} (${esc(l.registro_profissional)}). Em conformidade estrita com RDC 611/2022 ANVISA e CNEN.')" style="padding:4px 10px;font-size:11px;color:#38bdf8;border-color:#0284c7;">
-                          👁️ Ver Certificado
-                        </button>
+                      <td style="padding:12px 8px;text-align:right;white-space:nowrap;">
+                        ${l.tem_arquivo ? `<button type="button" class="btn btn-outline" onclick="window.open('/api/cliente/dossie-radiologico/arquivo/${l.id}','_blank')" style="padding:4px 9px;font-size:11px;color:#34d399;border-color:#10b981;margin-right:4px;">📎 Anexo</button>` : ''}
+                        <button type="button" class="btn btn-outline" onclick="alert('📄 Documento #${esc(l.numero_documento)} — ${esc(l.titulo)}\\nResponsável: ${esc(l.responsavel_tecnico)} (${esc(l.registro_profissional)})')" style="padding:4px 9px;font-size:11px;color:#38bdf8;border-color:#0284c7;margin-right:4px;">👁️</button>
+                        <button type="button" class="btn btn-outline" onclick="excluirDocDossieVisa(${l.id})" style="padding:4px 8px;font-size:11px;color:#f87171;border-color:#dc2626;">🗑️</button>
                       </td>
-                    </tr>
-                  `).join("")}
+                    </tr>`;
+                  }).join("")}
                 </tbody>
               </table>
             </div>
@@ -13886,13 +13914,23 @@ function renderMenuCliTriagem(box) {
       `;
     }
 
-    function abrirModalNovoLaudoDossie() {
+    function abrirModalNovoLaudoDossie(catPre) {
       const cli = STATE.hospitalPortal || "";
+      const cats = [
+        ["ALVARA_SANITARIO", "Alvará / Licença Sanitária (VISA)"],
+        ["LEVANTAMENTO_RADIOMETRICO", "Levantamento Radiométrico Ambiental (RDC 611)"],
+        ["CONTROLE_QUALIDADE_FISICA", "Controle de Qualidade & Física Médica"],
+        ["DOSIMETRIA_PESSOAL", "Relatório Mensal de Dosimetria Individual"],
+        ["PGRSS", "PGRSS — Plano de Gerenciamento de Resíduos"],
+        ["CNES_RESPONSAVEL", "CNES & Termo de Responsabilidade Técnica (RT)"],
+        ["CALIBRACAO_MANUTENCAO", "Manutenção Preventiva & Calibração EMED"],
+        ["PROJETO_BLINDAGEM", "Projeto de Blindagem & Registro ANVISA"]
+      ];
       const html = `
         <div id="modalNovoLaudoDossie" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px;">
-          <div style="background:#0f172a;border:2px solid #0284c7;border-radius:12px;max-width:540px;width:100%;padding:20px;color:#f8fafc;box-shadow:0 10px 40px rgba(0,0,0,0.6);">
+          <div style="background:#0f172a;border:2px solid #0284c7;border-radius:12px;max-width:560px;width:100%;padding:20px;color:#f8fafc;box-shadow:0 10px 40px rgba(0,0,0,0.6);max-height:92vh;overflow-y:auto;">
             <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #334155;padding-bottom:10px;margin-bottom:14px;">
-              <h3 style="margin:0;font-size:15px;color:#38bdf8;font-weight:900;">🛡️ Registrar Novo Laudo no Dossiê Radiológico</h3>
+              <h3 style="margin:0;font-size:15px;color:#38bdf8;font-weight:900;">🛡️ Anexar Documento — Vigilância Sanitária</h3>
               <button type="button" onclick="document.getElementById('modalNovoLaudoDossie').remove()" class="btn btn-outline" style="padding:2px 8px;font-size:12px;">✕</button>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">
@@ -13901,22 +13939,18 @@ function renderMenuCliTriagem(box) {
                 <input id="nld_cli" class="input" value="${esc(cli)}" style="background:#1e293b;border:1px solid #334155;color:#fff;" />
               </div>
               <div style="grid-column:1/-1;">
-                <label class="field-label">Título do Laudo / Documento:</label>
-                <input id="nld_tit" class="input" placeholder="ex: Levantamento Radiométrico da Sala de Raio-X" style="background:#1e293b;border:1px solid #334155;color:#fff;" />
+                <label class="field-label">Título do Documento / Laudo:</label>
+                <input id="nld_tit" class="input" placeholder="ex: Alvará Sanitário 2026 / Levantamento Radiométrico" style="background:#1e293b;border:1px solid #334155;color:#fff;" />
               </div>
               <div>
-                <label class="field-label">Categoria Sanitária:</label>
+                <label class="field-label">Categoria Sanitária (VISA):</label>
                 <select id="nld_cat" class="select" style="background:#1e293b;border:1px solid #334155;color:#fff;">
-                  <option value="LEVANTAMENTO_RADIOMETRICO">Levantamento Radiométrico</option>
-                  <option value="CONTROLE_QUALIDADE_FISICA">Controle de Qualidade (Física Médica)</option>
-                  <option value="LAUDO_EPIS_CHUMBO">Laudo de EPIs Plumbíferos</option>
-                  <option value="CALIBRACAO_RBC">Calibração Rastreável RBC</option>
-                  <option value="RELATORIO_MANUTENCAO_EMED">Manutenção Preventiva EMED</option>
+                  ${cats.map(c => `<option value="${c[0]}" ${catPre===c[0]?'selected':''}>${c[1]}</option>`).join("")}
                 </select>
               </div>
               <div>
                 <label class="field-label">Nº do Documento:</label>
-                <input id="nld_num" class="input" placeholder="ex: LR-2026-052" style="background:#1e293b;border:1px solid #334155;color:#fff;" />
+                <input id="nld_num" class="input" placeholder="ex: ALV-2026-052" style="background:#1e293b;border:1px solid #334155;color:#fff;" />
               </div>
               <div>
                 <label class="field-label">Data de Emissão:</label>
@@ -13927,12 +13961,16 @@ function renderMenuCliTriagem(box) {
                 <input id="nld_val" type="date" class="input" value="${new Date(Date.now() + 365*86400000).toISOString().slice(0,10)}" style="background:#1e293b;border:1px solid #334155;color:#fff;" />
               </div>
               <div style="grid-column:1/-1;">
-                <label class="field-label">Responsável Técnico (Físico Médico / Eng.):</label>
+                <label class="field-label">Responsável Técnico / Órgão Emissor:</label>
                 <input id="nld_resp" class="input" value="Dr. Alexandre Silveira (ABFM RT-0482)" style="background:#1e293b;border:1px solid #334155;color:#fff;" />
               </div>
               <div style="grid-column:1/-1;">
-                <label class="field-label">Observações / Parecer Conclusivo:</label>
-                <input id="nld_obs" class="input" value="Laudo em conformidade com RDC 611/2022 ANVISA e normas CNEN." style="background:#1e293b;border:1px solid #334155;color:#fff;" />
+                <label class="field-label">📎 Anexar PDF ou Foto do Documento (opcional):</label>
+                <input id="nld_arq" type="file" accept=".pdf,image/*" class="input" style="background:#1e293b;border:1px solid #334155;color:#fff;padding:6px;" />
+              </div>
+              <div style="grid-column:1/-1;">
+                <label class="field-label">Observações:</label>
+                <input id="nld_obs" class="input" value="Documento em conformidade com RDC 611/2022 ANVISA." style="background:#1e293b;border:1px solid #334155;color:#fff;" />
               </div>
             </div>
             <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:8px;">
@@ -13945,34 +13983,50 @@ function renderMenuCliTriagem(box) {
       document.body.insertAdjacentHTML('beforeend', html);
     }
 
+    async function excluirDocDossieVisa(id) {
+      if (!confirm("Remover este documento do Dossiê Sanitário?")) return;
+      const res = await apiPost("/api/cliente/dossie-radiologico/excluir", { id });
+      mostrarToast(res?.msg || "Removido");
+      STATE.dossieRadiologicoCache = null;
+      renderizarTelaPrincipal();
+    }
+
     async function salvarNovoLaudoDossie() {
       const cli = document.getElementById('nld_cli').value.trim();
       const tit = document.getElementById('nld_tit').value.trim();
-      if (!tit) { alert('Informe o título do laudo.'); return; }
-      
+      if (!tit) { alert('Informe o título do documento.'); return; }
+      const fileInput = document.getElementById('nld_arq');
+      let arqB64 = '', arqNome = '';
+      if (fileInput && fileInput.files && fileInput.files[0]) {
+        const f = fileInput.files[0];
+        arqNome = f.name;
+        arqB64 = await new Promise((resolve) => {
+          const rd = new FileReader();
+          rd.onload = () => resolve(rd.result || '');
+          rd.onerror = () => resolve('');
+          rd.readAsDataURL(f);
+        });
+      }
       const payload = {
         cliente_nome: cli,
         titulo: tit,
         categoria: document.getElementById('nld_cat').value,
-        numero_documento: document.getElementById('nld_num').value.trim() || 'DOC-' + Date.now().toString().slice(-4),
+        numero_documento: document.getElementById('nld_num').value.trim() || 'VISA-' + Date.now().toString().slice(-4),
         data_emissao: document.getElementById('nld_emi').value,
         data_validade: document.getElementById('nld_val').value,
         responsavel_tecnico: document.getElementById('nld_resp').value.trim(),
-        observacoes: document.getElementById('nld_obs').value.trim()
+        observacoes: document.getElementById('nld_obs').value.trim(),
+        arquivo_base64: arqB64,
+        arquivo_nome: arqNome
       };
-
       try {
-        const res = await fetch('/api/cliente/dossie-radiologico/salvar', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify(payload)
-        }).then(r => r.json());
-        alert(res.msg || 'Laudo gravado!');
+        const res = await apiPost('/api/cliente/dossie-radiologico/salvar', payload);
+        alert(res.msg || 'Documento gravado!');
         document.getElementById('modalNovoLaudoDossie').remove();
         STATE.dossieRadiologicoCache = null;
         renderizarTelaPrincipal();
       } catch (e) {
-        alert('Erro ao salvar laudo: ' + e.message);
+        alert('Erro ao salvar documento: ' + e.message);
       }
     }
     /********************************************************************

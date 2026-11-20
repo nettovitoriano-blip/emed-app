@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v1-4-0-protocolo-entrega';
+const CACHE_NAME = 'emed-pwa-v1-5-0-portal-visa-rdc611';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
