@@ -3679,6 +3679,7 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/static/")
         or path.startswith("/api/app-icon/")
         or path.startswith("/api/auth/")
+        or path.startswith("/api/fiscal/v2/login")
         or path.startswith("/api/dispositivos/")
         or path.startswith("/qrcode/")
         or path.startswith("/api/hospital/autorizacao-entrada/")

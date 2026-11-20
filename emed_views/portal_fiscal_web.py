@@ -76,12 +76,19 @@ async def api_fiscal_v2_login(request: web.Request) -> web.Response:
 
     if u in USUARIOS_FISCAL and USUARIOS_FISCAL[u]["senha"] == p:
         info = USUARIOS_FISCAL[u]
-        return web.json_response({
+        resp = web.json_response({
             "ok": True,
             "username": u,
             "role": info["role"],
             "cargo": info["cargo"],
         })
+        try:
+            from emed_app_server import gerar_token_sessao
+            tkn = gerar_token_sessao(1, u, info["role"])
+            resp.set_cookie("emed_session", tkn, max_age=30*86400, httponly=True, samesite="Lax", path="/")
+        except Exception:
+            pass
+        return resp
     return web.json_response({"ok": False, "msg": "Usuário ou senha inválidos."}, status=401)
 
 
