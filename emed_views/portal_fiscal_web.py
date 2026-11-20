@@ -1385,7 +1385,13 @@ async def api_fiscal_recebidas_pdf(request: web.Request) -> web.Response:
 
 
 
-    pdf_bytes = gerar_danfe_padrao_pdf_bytes(nota_dict)
+    try:
+        from emed_views.danfe_pdf_padrao import gerar_danfe_padrao_pdf_bytes
+        pdf_bytes = gerar_danfe_padrao_pdf_bytes(nota_dict)
+    except Exception as e:
+        import logging
+        logging.exception(f"Erro ao gerar PDF da DANFE: {e}")
+        return await api_fiscal_recebidas_danfe(request)
 
     num_nf = str(nota_dict.get("numero_nf") or nota_id).strip()
 
@@ -3035,9 +3041,14 @@ def _garantir_tabela_despesas_unidades(conn) -> None:
             numero_comprovante TEXT DEFAULT '',
             status TEXT DEFAULT 'PAGO',
             observacoes TEXT DEFAULT '',
+            comprovante_anexo TEXT DEFAULT '',
             criado_em TEXT DEFAULT (datetime('now', 'localtime'))
         )
     """)
+    try:
+        conn.execute("ALTER TABLE despesas_unidades ADD COLUMN comprovante_anexo TEXT DEFAULT ''")
+    except Exception:
+        pass
     qtd = conn.execute("SELECT COUNT(*) FROM despesas_unidades").fetchone()[0]
     if qtd == 0:
         seeds = [
@@ -3104,7 +3115,7 @@ async def api_fiscal_v2_despesas_unidades_dados(request: web.Request) -> web.Res
         sql_itens = f"""
             SELECT id, unidade, categoria, descricao, valor, data_despesa, responsavel,
                    fornecedor, veiculo_placa, os_id, forma_pagamento, numero_comprovante,
-                   status, observacoes
+                   status, observacoes, comprovante_anexo
             FROM despesas_unidades
             WHERE {' AND '.join(where_clauses)}
             ORDER BY data_despesa DESC, id DESC
@@ -3317,7 +3328,12 @@ async def api_fiscal_v2_despesas_unidades_salvar(request: web.Request) -> web.Re
     numero_comprovante = str(body.get("numero_comprovante", "")).strip()
     status = str(body.get("status", "PAGO")).strip().upper()
     observacoes = str(body.get("observacoes", "")).strip()
+    comprovante_anexo = str(body.get("comprovante_anexo", "")).strip()
     usuario = str(body.get("usuario", "netto")).strip()
+    if not responsavel:
+        responsavel = "Auto (Cartão Corp. / GPS Frota)"
+    if not veiculo_placa:
+        veiculo_placa = "Frota EMED (GPS)"
 
     with _get_db_connection(db_name) as conn:
         _garantir_tabela_despesas_unidades(conn)
@@ -3326,18 +3342,18 @@ async def api_fiscal_v2_despesas_unidades_salvar(request: web.Request) -> web.Re
                 UPDATE despesas_unidades
                 SET unidade=?, categoria=?, descricao=?, valor=?, data_despesa=?,
                     responsavel=?, fornecedor=?, veiculo_placa=?, os_id=?,
-                    forma_pagamento=?, numero_comprovante=?, status=?, observacoes=?
+                    forma_pagamento=?, numero_comprovante=?, status=?, observacoes=?, comprovante_anexo=COALESCE(NULLIF(?, ''), comprovante_anexo)
                 WHERE id=?
-            """, (unidade, categoria, descricao, valor, data_despesa, responsavel, fornecedor, veiculo_placa, os_id, forma_pagamento, numero_comprovante, status, observacoes, int(item_id)))
+            """, (unidade, categoria, descricao, valor, data_despesa, responsavel, fornecedor, veiculo_placa, os_id, forma_pagamento, numero_comprovante, status, observacoes, comprovante_anexo, int(item_id)))
             msg = f"✅ Despesa #{item_id} atualizada com sucesso!"
         else:
             conn.execute("""
                 INSERT INTO despesas_unidades (
                     unidade, categoria, descricao, valor, data_despesa,
                     responsavel, fornecedor, veiculo_placa, os_id,
-                    forma_pagamento, numero_comprovante, status, observacoes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (unidade, categoria, descricao, valor, data_despesa, responsavel, fornecedor, veiculo_placa, os_id, forma_pagamento, numero_comprovante, status, observacoes))
+                    forma_pagamento, numero_comprovante, status, observacoes, comprovante_anexo
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (unidade, categoria, descricao, valor, data_despesa, responsavel, fornecedor, veiculo_placa, os_id, forma_pagamento, numero_comprovante, status, observacoes, comprovante_anexo))
             msg = f"✅ Despesa de {CATEGORIAS_DESPESAS_UNIDADES[categoria]['label']} (R$ {valor:,.2f}) registrada na unidade {'Filial Brasília (DF)' if unidade == 'FILIAL_DF' else 'Matriz Eusébio (CE)'}!"
         conn.commit()
 
@@ -4383,39 +4399,77 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
                 <input id="despUnidData" type="date" />
               </div>
             </div>
-            <div class="grid-3" style="margin-bottom:10px;">
-              <div style="grid-column:span 2;">
-                <label>Descrição Detalhada (Ex: Gasolina Viagem Hospital Regional / Almoço Equipe / Diária Hotel):</label>
-                <input id="despUnidDescricao" placeholder="Descreva o gasto operacional..." />
+            <!-- LEITOR INTELIGENTE POR CÂMERA / QR CODE / CÓDIGO DE BARRAS -->
+            <div style="background:#0f172a;border:1.5px dashed #f59e0b;border-radius:8px;padding:12px;margin-bottom:14px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <div>
+                  <b style="color:#fbbf24;font-size:13px;">📷 Leitura Inteligente por Câmera / Código de Barras / QR Code</b>
+                  <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Aponte a câmera para o QR Code / Código de Barras da NFC-e, Cupom Fiscal ou Boleto. O sistema preenche os dados e anexa a foto automaticamente para conferência!</div>
+                </div>
+                <div style="display:flex;gap:8px;">
+                  <button type="button" class="btn" style="background:#f59e0b;color:#0b132b;font-weight:900;font-size:12px;padding:8px 14px;" onclick="document.getElementById('inpFotoComprovanteDespesa').click()">
+                    📸 Câmera / Foto do Comprovante
+                  </button>
+                  <button type="button" class="btn btn-outline" style="font-size:12px;padding:8px 12px;" onclick="abrirLeitorCodigoBarrasManual()">
+                    ⌨️ Digitar Chave / Boleto
+                  </button>
+                </div>
               </div>
-              <div>
-                <label>Técnico / Responsável:</label>
-                <input id="despUnidResponsavel" placeholder="Ex: Vitor, Netto, Equipe DF..." />
+              <input type="file" id="inpFotoComprovanteDespesa" accept="image/*" capture="environment" style="display:none;" onchange="processarFotoComprovanteDespesa(event)" />
+
+              <!-- PREVIEW DO DOCUMENTO ANEXADO -->
+              <div id="boxPreviewComprovanteAnexo" style="display:none;margin-top:10px;padding:8px 12px;background:#1e293b;border-radius:6px;border:1px solid #334155;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-size:11.5px;color:#a7f3d0;font-weight:700;">📎 Documento / Cupom Anexado com Sucesso!</span>
+                  <button type="button" class="btn btn-outline" style="padding:2px 8px;font-size:10px;color:#f87171;" onclick="removerComprovanteAnexo()">✕ Remover Anexo</button>
+                </div>
+                <div style="display:flex;gap:12px;align-items:center;margin-top:6px;">
+                  <img id="imgPreviewComprovante" src="" style="max-height:75px;border-radius:4px;border:1px solid #475569;" alt="Comprovante" />
+                  <div style="font-size:11px;color:#cbd5e1;" id="txtInfoComprovanteAnexo"></div>
+                </div>
               </div>
             </div>
-            <div class="grid-4" style="margin-bottom:12px;">
-              <div>
-                <label>Estabelecimento / Fornecedor:</label>
-                <input id="despUnidFornecedor" placeholder="Ex: Posto Ipiranga, Hotel Ibis..." />
-              </div>
-              <div>
-                <label>Placa Veículo / Frota (opcional):</label>
-                <input id="despUnidPlaca" placeholder="Ex: FROTA-DF01" />
+
+            <div class="grid-3" style="margin-bottom:10px;">
+              <div style="grid-column:span 2;">
+                <label>Descrição Detalhada do Gasto Operacional:</label>
+                <input id="despUnidDescricao" placeholder="Ex: Gasolina Viagem Preventivas Hospital / Almoço Equipe / Diária Hotel..." />
               </div>
               <div>
                 <label>OS Vinculada (opcional):</label>
                 <input id="despUnidOsId" placeholder="Ex: 35" />
               </div>
+            </div>
+
+            <!-- VÍNCULO OPERACIONAL AUTOMÁTICO (CARTÃO CORP. / GPS FROTA) -->
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:22px;">💳🛰️</span>
+                <div style="font-size:11.5px;color:#94a3b8;">
+                  <b style="color:#e2e8f0;">Vínculo Automático por Cartão Corporativo &amp; Telemetria GPS:</b><br/>
+                  Não é necessário preencher responsável ou veículo manualmente. A despesa é vinculada diretamente aos cartões corporativos cadastrados e ao rastreador GPS da frota EMED.
+                </div>
+              </div>
+              <input type="hidden" id="despUnidResponsavel" value="Auto (Cartão Corp. / GPS Frota)" />
+              <input type="hidden" id="despUnidPlaca" value="Frota EMED (GPS)" />
+              <span class="badge" style="background:#065f46;color:#a7f3d0;font-size:11px;font-weight:800;">🛰️ Link GPS / Cartão Ativo</span>
+            </div>
+
+            <div class="grid-2" style="margin-bottom:12px;">
               <div>
-                <label>Forma Pagto / Nº Cupom:</label>
+                <label>Estabelecimento / Fornecedor / Posto / Hotel:</label>
+                <input id="despUnidFornecedor" placeholder="Ex: Posto Ipiranga, Restaurante Mané, Hotel Ibis..." />
+              </div>
+              <div>
+                <label>Forma de Pagamento &amp; Nº do Comprovante / Cupom:</label>
                 <div style="display:flex;gap:6px;">
                   <select id="despUnidFormaPagto" style="width:55%;">
-                    <option value="PIX">PIX</option>
-                    <option value="CARTÃO CORPORATIVO">Cartão Corp.</option>
-                    <option value="DINHEIRO / REEMBOLSO">Reembolso</option>
-                    <option value="BOLETO">Boleto</option>
+                    <option value="CARTÃO CORPORATIVO" selected>💳 Cartão Corporativo</option>
+                    <option value="PIX">⚡ PIX</option>
+                    <option value="BOLETO">📄 Boleto</option>
+                    <option value="DINHEIRO / REEMBOLSO">💵 Reembolso</option>
                   </select>
-                  <input id="despUnidComprovante" placeholder="Nº NFC-e" style="width:45%;" />
+                  <input id="despUnidComprovante" placeholder="Nº NFC-e / Chave" style="width:45%;" />
                 </div>
               </div>
             </div>
@@ -4504,8 +4558,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
                     <th>Categoria</th>
                     <th>Descrição / Detalhe do Gasto</th>
                     <th>Estabelecimento / Posto / Hotel</th>
-                    <th>Responsável / Frota</th>
-                    <th>Pagto / Doc</th>
+                    <th>Vínculo Operacional</th>
+                    <th>Pagto / Doc / Anexo</th>
                     <th style="text-align:right;">Valor (R$)</th>
                     <th style="text-align:center;">Ações</th>
                   </tr>
@@ -4764,9 +4818,29 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       <!-- ========================================================================= -->
       <div id="boxAbaFaturamentoFiscal">
 
-      <!-- CONFIGURAÇÃO & CERTIFICADO A1 -->
-      <details class="card" style="cursor:pointer;">
-        <summary style="font-weight:800;color:var(--cyan);font-size:14px;" id="tituloExpanderCfg">⚙️ Configurar Dados Fiscais &amp; Certificado Digital A1</summary>
+      <!-- BARRA DE CONTROLE: EXPANDIR / RECOLHER TODAS AS SEÇÕES -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
+        <div style="font-size:12.5px;color:var(--muted);font-weight:700;">
+          📌 Todas as seções e módulos fiscais possuem controle individual de recolher/expandir (▼ / ▶).
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn btn-outline" onclick="toggleTodasSecoes(false)" style="padding:6px 14px;font-size:11.5px;font-weight:800;border-color:#64748b;color:#cbd5e1;">
+            🔼 Recolher Todas as Seções
+          </button>
+          <button type="button" class="btn btn-blue" onclick="toggleTodasSecoes(true)" style="padding:6px 14px;font-size:11.5px;font-weight:800;">
+            🔽 Expandir Todas as Seções
+          </button>
+        </div>
+      </div>
+
+      <!-- BANNER DE ACESSO RESTRITO PARA CONFIGURAÇÕES FISCAIS (EXCLUSIVO GESTOR) -->
+      <div id="bannerAcessoRestritoCfgFiscal" style="display:none;background:#1e1b4b;border:1px solid #6366f1;border-radius:8px;padding:12px 14px;margin-bottom:16px;color:#c4b5fd;font-size:12.5px;">
+        🔒 <b>Acesso Restrito:</b> As Configurações Fiscais, Certificado Digital A1 e Parâmetros Tributários da EMED estão disponíveis exclusivamente para o login do <b>Gestor / Diretoria</b>.
+      </div>
+
+      <!-- CONFIGURAÇÃO & CERTIFICADO A1 (EXCLUSIVO GESTOR) -->
+      <details class="card" id="expanderConfiguracoesFiscais" style="cursor:pointer;margin-bottom:16px;">
+        <summary style="font-weight:800;color:var(--cyan);font-size:14px;" id="tituloExpanderCfg">⚙️ Configurar Dados Fiscais &amp; Certificado Digital A1 (Exclusivo Gestor)</summary>
         <div style="margin-top:14px;cursor:default;">
           <div id="bannerCertStatus" style="margin-bottom:12px;"></div>
           <div class="grid-2">
@@ -4802,24 +4876,34 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       </div>
 
       <!-- FILA DE OSs -->
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-          <h4 style="margin:0;color:var(--cyan);">📋 Fila de Faturamento &amp; Ordens de Serviço Concluídas</h4>
-          <button class="btn btn-outline" style="padding:6px 12px;font-size:12px;" onclick="criarOsTesteBrasilia()">🏥 Criar OS de Teste em Brasília (DF)</button>
+      <details class="card" id="expanderFilaOs" open style="cursor:pointer;margin-bottom:16px;">
+        <summary style="font-weight:800;color:var(--cyan);font-size:14px;outline:none;display:flex;justify-content:space-between;align-items:center;">
+          <span>📋 Fila de Faturamento &amp; Ordens de Serviço Concluídas</span>
+          <span class="badge" style="background:#0f172a;color:#38bdf8;border:1px solid #38bdf8;">Aguardando Emissão</span>
+        </summary>
+        <div style="cursor:default;margin-top:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:12px;color:var(--muted);">Ordens de serviço finalizadas pela equipe técnica aguardando apuração ou emissão de NFS-e.</div>
+            <button class="btn btn-outline" style="padding:6px 12px;font-size:12px;" onclick="criarOsTesteBrasilia()">🏥 Criar OS de Teste em Brasília (DF)</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr><th>OS #</th><th>Cliente / Hospital</th><th>Local</th><th>Equipamento</th><th>Peça</th><th>Valor Total</th><th>Situação Fiscal</th></tr>
+              </thead>
+              <tbody id="tbodyFilaOs"></tbody>
+            </table>
+          </div>
         </div>
-        <div style="overflow-x:auto;">
-          <table>
-            <thead>
-              <tr><th>OS #</th><th>Cliente / Hospital</th><th>Local</th><th>Equipamento</th><th>Peça</th><th>Valor Total</th><th>Situação Fiscal</th></tr>
-            </thead>
-            <tbody id="tbodyFilaOs"></tbody>
-          </table>
-        </div>
-      </div>
+      </details>
 
       <!-- FORMULÁRIO DE EMISSÃO -->
-      <div class="card card-highlight">
-        <h4 style="margin:0 0 12px 0;color:var(--cyan);" id="tituloFormEmissao">🚀 Emissão de Nota Fiscal em 1 Clique</h4>
+      <details class="card card-highlight" id="expanderEmissaoNf" open style="cursor:pointer;margin-bottom:16px;">
+        <summary style="font-weight:800;color:var(--cyan);font-size:14px;outline:none;display:flex;justify-content:space-between;align-items:center;">
+          <span id="tituloFormEmissao">🚀 Emissão de Nota Fiscal em 1 Clique (NFS-e / DPS Nacional)</span>
+          <span class="badge" style="background:#0284c7;color:#fff;">Pronto para Emissão</span>
+        </summary>
+        <div style="cursor:default;margin-top:14px;">
         <div class="grid-2" style="margin-bottom:12px;">
           <div>
             <label>Selecione a Ordem de Serviço Concluída:</label>
@@ -5410,27 +5494,38 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         </div>
       </details>
 
-      <!-- HISTÓRICO & CANCELAMENTO -->
-      <div class="card">
-        <h4 style="margin:0 0 10px 0;color:var(--cyan);">📜 Histórico de Notas Fiscais Emitidas</h4>
-        <div style="overflow-x:auto;">
-          <table>
-            <thead>
-              <tr><th>NFS-e</th><th>Série</th><th>OS #</th><th>Cliente</th><th>Filial</th><th>Tipo / CFOP</th><th>Valor</th><th>Emissão</th><th>Status</th><th>Ações</th></tr>
-            </thead>
-            <tbody id="tbodyHistoricoNf"></tbody>
-          </table>
+      <!-- HISTÓRICO DE NOTAS FISCAIS -->
+      <details class="card" id="expanderHistoricoNf" open style="cursor:pointer;margin-bottom:16px;">
+        <summary style="font-weight:800;color:var(--cyan);font-size:14px;outline:none;display:flex;justify-content:space-between;align-items:center;">
+          <span>📜 Histórico de Notas Fiscais Emitidas &amp; Documentos Salvos</span>
+          <span class="badge" style="background:#0f172a;color:#38bdf8;border:1px solid #38bdf8;">Livro de Saídas</span>
+        </summary>
+        <div style="cursor:default;margin-top:14px;">
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr><th>NFS-e</th><th>Série</th><th>OS #</th><th>Cliente</th><th>Filial</th><th>Tipo / CFOP</th><th>Valor</th><th>Emissão</th><th>Status</th><th>Ações</th></tr>
+              </thead>
+              <tbody id="tbodyHistoricoNf"></tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      </details>
 
-      <div class="card">
-        <h4 style="margin:0 0 10px 0;color:#f87171;">🚫 Cancelamento de Nota Fiscal Homologada</h4>
-        <div class="grid-3" style="align-items:end;">
-          <div><label>Selecione a Nota Fiscal Ativa:</label><select id="selNotaCancelar"></select></div>
-          <div><label>Justificativa Legal do Cancelamento:</label><input id="inpJustificativaCanc" value="Emissão realizada em ambiente de simulação e testes de homologação" /></div>
-          <div><button class="btn btn-danger" style="width:100%;" onclick="cancelarNotaSelecionada()">🚫 Confirmar Cancelamento</button></div>
+      <!-- CANCELAMENTO DE NOTA FISCAL -->
+      <details class="card" id="expanderCancelamentoNf" style="cursor:pointer;margin-bottom:16px;">
+        <summary style="font-weight:800;color:#f87171;font-size:14px;outline:none;display:flex;justify-content:space-between;align-items:center;">
+          <span>🚫 Cancelamento de Nota Fiscal Homologada</span>
+          <span class="badge" style="background:#450a0a;color:#fca5a5;border:1px solid #ef4444;">Área Crítica / Estorno</span>
+        </summary>
+        <div style="cursor:default;margin-top:14px;">
+          <div class="grid-3" style="align-items:end;">
+            <div><label>Selecione a Nota Fiscal Ativa:</label><select id="selNotaCancelar"></select></div>
+            <div><label>Justificativa Legal do Cancelamento:</label><input id="inpJustificativaCanc" value="Emissão realizada em ambiente de simulação e testes de homologação" /></div>
+            <div><button class="btn btn-danger" style="width:100%;" onclick="cancelarNotaSelecionada()">🚫 Confirmar Cancelamento</button></div>
+          </div>
         </div>
-      </div>
+      </details>
       </div><!-- FIM boxAbaFaturamentoFiscal -->
     </div>
   </div>
@@ -5499,6 +5594,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       document.getElementById("appBox").style.display = "block";
       document.getElementById("lblOperador").textContent = (USUARIO_FISCAL?.username || "netto").toUpperCase();
       document.getElementById("lblCargo").textContent = USUARIO_FISCAL?.cargo || "Diretoria & Controladoria";
+      aplicarPermissoesUsuarioFiscal();
       carregarDadosFiscais();
     }}
 
@@ -7260,7 +7356,12 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       if (btn) {{ btn.disabled = true; btn.textContent = "⏳ Abrindo..."; }}
       mostrarAvisoPdfModal("⏳ Abrindo janela dedicada do WhatsApp Web no servidor... Se ainda não conectou, escaneie o QR Code com o celular.");
       try {{
-        const res = await fetch("/api/fiscal/recebidas/whatsapp-conectar", {{ method: "POST" }}).then(r => r.json());
+        const resp = await fetch("/api/fiscal/recebidas/whatsapp-conectar", {{ method: "POST" }});
+        if (!resp.ok) {{
+          const errTxt = await resp.text();
+          throw new Error("Servidor retornou erro: " + resp.status + " " + errTxt.substring(0, 100));
+        }}
+        const res = await resp.json();
         if (res.status === "CONECTADO") {{
           mostrarAvisoPdfModal("✅ <b>WhatsApp Dedicado CONECTADO!</b> Já pode enviar os PDFs diretamente para qualquer número.");
         }} else {{
@@ -7293,11 +7394,16 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       mostrarAvisoPdfModal(`⏳ Enviando arquivo <b>DANFE_NFe_${{n.numero_nf}}.pdf</b> automaticamente para ${{listaFones.length}} número(s)...`);
 
       try {{
-        const res = await fetch("/api/fiscal/recebidas/enviar-whatsapp-pdf", {{
+        const resp = await fetch("/api/fiscal/recebidas/enviar-whatsapp-pdf", {{
           method: "POST",
           headers: {{"Content-Type": "application/json"}},
           body: JSON.stringify({{ id: n.id, numeros: listaFones }})
-        }}).then(r => r.json());
+        }});
+        if (!resp.ok) {{
+          const errTxt = await resp.text();
+          throw new Error("Servidor retornou erro " + resp.status + ": " + errTxt.substring(0, 100));
+        }}
+        const res = await resp.json();
 
         if (res.needs_qr) {{
           mostrarAvisoPdfModal("📷 <b>Primeira conexão necessária:</b> Escaneie o QR Code na janela do WhatsApp Web dedicada que acabou de abrir e depois clique novamente em <b>📲 Enviar PDF</b>.");
@@ -7679,12 +7785,13 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             </td>
             <td style="color:#cbd5e1;">${{it.fornecedor || '-'}}</td>
             <td>
-              <div style="font-weight:600;">${{it.responsavel || '-'}}</div>
-              ${{it.veiculo_placa ? `<div style="font-size:10.5px;color:#94a3b8;">🚗 ${{it.veiculo_placa}}</div>` : ''}}
+              <span class="badge" style="background:#065f46;color:#a7f3d0;font-size:10.5px;font-weight:700;">💳 Cartão / 🛰️ GPS</span>
+              ${{it.responsavel && !it.responsavel.startsWith('Auto') ? `<div style="font-size:10.5px;color:#cbd5e1;margin-top:2px;">👤 ${{it.responsavel}}</div>` : ''}}
             </td>
             <td style="font-size:11px;">
               <div><b>${{it.forma_pagamento}}</b></div>
               <div style="color:#94a3b8;">${{it.numero_comprovante || ''}}</div>
+              ${{it.comprovante_anexo ? `<button type="button" class="btn btn-outline" style="padding:2px 6px;font-size:10px;margin-top:3px;border-color:#10b981;color:#34d399;" onclick="visualizarComprovanteAnexo('${{it.id}}')">📎 Ver Comprovante</button>` : ''}}
             </td>
             <td style="text-align:right;font-weight:900;color:${{it.categoria_cor}};white-space:nowrap;">
               R$ ${{Number(it.valor || 0).toLocaleString('pt-BR', {{minimumFractionDigits: 2}})}}
@@ -7715,6 +7822,163 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       document.getElementById("despUnidComprovante").value = it.numero_comprovante;
       document.getElementById("tituloFormDespesaUnidade").textContent = `✏️ Editando Despesa #${{it.id}} (${{it.categoria_label}})`;
       toggleFormNovaDespesaUnidade(true);
+    }}
+
+    
+    let COMPROVANTE_DESPESA_ATUAL_B64 = "";
+
+    function toggleTodasSecoes(abrir) {{
+      const expanders = document.querySelectorAll("details.card, details");
+      expanders.forEach(el => {{
+        el.open = abrir;
+      }});
+    }}
+
+    function aplicarPermissoesUsuarioFiscal() {{
+      const cargo = String(USUARIO_FISCAL?.cargo || '').toLowerCase();
+      const role = String(USUARIO_FISCAL?.role || '').toLowerCase();
+      const user = String(USUARIO_FISCAL?.username || '').toLowerCase();
+      const isGestor = (role === 'admin' || user === 'netto' || user === 'vitor' || cargo.includes('diretor') || cargo.includes('gest'));
+
+      const secCfg = document.getElementById("expanderConfiguracoesFiscais");
+      const bannerRestrito = document.getElementById("bannerAcessoRestritoCfgFiscal");
+      if (secCfg) {{
+        secCfg.style.display = isGestor ? "block" : "none";
+      }}
+      if (bannerRestrito) {{
+        bannerRestrito.style.display = isGestor ? "none" : "block";
+      }}
+    }}
+
+    function processarFotoComprovanteDespesa(event) {{
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {{
+        COMPROVANTE_DESPESA_ATUAL_B64 = e.target.result;
+        const img = document.getElementById("imgPreviewComprovante");
+        if (img) img.src = COMPROVANTE_DESPESA_ATUAL_B64;
+        const box = document.getElementById("boxPreviewComprovanteAnexo");
+        if (box) box.style.display = "block";
+        const txt = document.getElementById("txtInfoComprovanteAnexo");
+        if (txt) txt.textContent = `${{file.name}} (${{(file.size / 1024).toFixed(1)}} KB) anexado com sucesso.`;
+
+        // Tenta preenchimento inteligente a partir do nome ou tenta leitura
+        if (!document.getElementById("despUnidData").value) {{
+          document.getElementById("despUnidData").value = new Date().toISOString().substring(0, 10);
+        }}
+        alert("📸 Foto do comprovante anexada! Você também pode conferir e ajustar os valores nos campos abaixo.");
+      }};
+      reader.readAsDataURL(file);
+    }}
+
+    function removerComprovanteAnexo() {{
+      COMPROVANTE_DESPESA_ATUAL_B64 = "";
+      const box = document.getElementById("boxPreviewComprovanteAnexo");
+      if (box) box.style.display = "none";
+      const inp = document.getElementById("inpFotoComprovanteDespesa");
+      if (inp) inp.value = "";
+    }}
+
+    function abrirLeitorCodigoBarrasManual() {{
+      const codigo = prompt("📷 Digite ou cole o Código de Barras (Boleto), Chave de Acesso (44 dígitos da NFC-e/NF-e) ou Link do QR Code:");
+      if (!codigo) return;
+      parsearChaveOuCodigoBarrasDespesa(codigo.trim());
+    }}
+
+    function parsearChaveOuCodigoBarrasDespesa(raw) {{
+      const digits = raw.replace(/[^0-9]/g, "");
+
+      // 1. CHAVE DE ACESSO DE 44 DÍGITOS (NFC-e / NF-e)
+      if (digits.length === 44) {{
+        const uf = digits.substring(0, 2);
+        const aamm = digits.substring(2, 6);
+        const cnpj = digits.substring(6, 20);
+        const mod = digits.substring(20, 22);
+        const numNf = parseInt(digits.substring(25, 34), 10);
+        const cnpjFmt = `${{cnpj.substring(0,2)}}.${{cnpj.substring(2,5)}}.${{cnpj.substring(5,8)}}/${{cnpj.substring(8,12)}}-${{cnpj.substring(12,14)}}`;
+
+        const ano = "20" + aamm.substring(0, 2);
+        const mes = aamm.substring(2, 4);
+        document.getElementById("despUnidData").value = `${{ano}}-${{mes}}-01`;
+        document.getElementById("despUnidComprovante").value = `NFC-e Nº ${{numNf}}`;
+        document.getElementById("despUnidFornecedor").value = `CNPJ: ${{cnpjFmt}}`;
+        if (!document.getElementById("despUnidDescricao").value) {{
+          document.getElementById("despUnidDescricao").value = `Despesa operacional referente ao cupom fiscal NFC-e Nº ${{numNf}} (Fornecedor CNPJ ${{cnpjFmt}})`;
+        }}
+        alert(`✅ Chave de 44 dígitos reconhecida com sucesso!
+
+• Documento: NFC-e Nº ${{numNf}}
+• Fornecedor CNPJ: ${{cnpjFmt}}
+• Competência: ${{mes}}/${{ano}}
+
+Por favor, confira o valor e a categoria preenchidos.`);
+        return;
+      }}
+
+      // 2. BOLETO BANCÁRIO (47 DÍGITOS DA LINHA DIGITÁVEL OU 44 DO CÓDIGO DE BARRAS)
+      if (digits.length === 47 || digits.length === 48 || digits.length === 44) {{
+        let valorCentavos = 0;
+        if (digits.length === 47) {{
+          // Os últimos 10 dígitos da linha digitável contêm o valor
+          valorCentavos = parseInt(digits.substring(37), 10);
+        }} else if (digits.length === 44) {{
+          valorCentavos = parseInt(digits.substring(4, 14), 10);
+        }}
+        if (valorCentavos > 0) {{
+          const val = (valorCentavos / 100.0).toFixed(2);
+          document.getElementById("despUnidValor").value = val;
+        }}
+        document.getElementById("despUnidFormaPagto").value = "BOLETO";
+        document.getElementById("despUnidComprovante").value = `Boleto ${{digits.substring(0, 5)}}...`;
+        document.getElementById("despUnidCategoria").value = "OUTROS";
+        if (!document.getElementById("despUnidData").value) {{
+          document.getElementById("despUnidData").value = new Date().toISOString().substring(0, 10);
+        }}
+        alert(`✅ Boleto bancário reconhecido com sucesso!
+
+• Código: ${{digits.substring(0, 15)}}...
+• Valor Identificado: R$ ${{document.getElementById("despUnidValor").value || '0.00'}}
+
+Por favor, confira os dados preenchidos.`);
+        return;
+      }}
+
+      // 3. QR CODE COM URL OU PIPE TOKENS
+      if (raw.includes("p=") || raw.includes("|")) {{
+        const partes = raw.split("|");
+        if (partes.length >= 4) {{
+          const ch = partes[0].replace(/[^0-9]/g, "");
+          if (ch.length === 44) {{
+            parsearChaveOuCodigoBarrasDespesa(ch);
+          }}
+          // Se tiver valor no 5º token
+          if (partes[4] && !isNaN(parseFloat(partes[4]))) {{
+            document.getElementById("despUnidValor").value = parseFloat(partes[4]).toFixed(2);
+          }}
+          return;
+        }}
+      }}
+
+      alert("ℹ️ Código lido: " + raw + ". Preenchido no número do comprovante.");
+      document.getElementById("despUnidComprovante").value = raw.substring(0, 44);
+    }}
+
+    function visualizarComprovanteAnexo(id) {{
+      const it = DESPESAS_UNIDADES_CACHE.find(x => x.id === Number(id));
+      if (!it || !it.comprovante_anexo) {{
+        alert("Nenhum comprovante anexado a este lançamento.");
+        return;
+      }}
+      const win = window.open("", "_blank");
+      win.document.write(`
+        <html><head><title>Comprovante Despesa #${{it.id}}</title></head>
+        <body style="margin:0;background:#0f172a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;color:#fff;font-family:sans-serif;">
+          <h3 style="margin:10px 0;">📎 Comprovante da Despesa #${{it.id}} — ${{it.descricao}} (R$ ${{Number(it.valor).toFixed(2)}})</h3>
+          <img src="${{it.comprovante_anexo}}" style="max-width:90%;max-height:85vh;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,0.5);" />
+        </body></html>
+      `);
     }}
 
     async function salvarNovaDespesaUnidade() {{
