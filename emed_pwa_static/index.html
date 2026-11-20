@@ -1402,7 +1402,7 @@
       <div class="brand-center" onclick="abrirDrawer()" style="cursor:pointer;display:flex;align-items:center;justify-content:flex-start;margin-right:auto;" title="Abrir Menu">
         <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
           <img src="/api/logo-circle" alt="eMED" class="brand-logo-img" onerror="this.src='/api/logo'" />
-          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.6.0</div></div>
+          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.8.0</div></div>
         </div>
       </div>
       <!-- DIREITA: BOTÃO DE SINCRONIZAR E INSTALAR PWA -->
@@ -2237,7 +2237,10 @@
               🎂 Aniversariantes da Equipe (${anivs.length})
             </button>
             <button onclick="window._abaEquipeAtiva='SETORES'; renderConteudoModalEquipeSetores();" style="flex:1; padding:12px; font-weight:800; font-size:13px; border:none; cursor:pointer; background:${aba==='SETORES'?'#fff':'#f1f5f9'}; color:${aba==='SETORES'?'#002b54':'#64748b'}; border-bottom:${aba==='SETORES'?'3px solid #002b54':'none'};">
-              🏢 Setores Internos / Setores (${internos.length})
+              🏢 Setores Internos (${internos.length})
+            </button>
+            <button onclick="window._abaEquipeAtiva='DOSIMETRIA'; carregarDosimetriaEmedModal();" style="flex:1; padding:12px; font-weight:800; font-size:13px; border:none; cursor:pointer; background:${aba==='DOSIMETRIA'?'#fff':'#f1f5f9'}; color:${aba==='DOSIMETRIA'?'#002b54':'#64748b'}; border-bottom:${aba==='DOSIMETRIA'?'3px solid #002b54':'none'};">
+              ☢️ Dosimetria EMED
             </button>
           </div>
           <div style="padding:16px; overflow-y:auto; flex:1;">
@@ -2265,6 +2268,35 @@
           `;
         });
         inner += `</div>`;
+      } else if (aba === "DOSIMETRIA") {
+        const dosList = window._emedDosimetriasCache || [];
+        const tecOpts = (d.tecnicos || []).map(t => `<option value="${esc(t.nome)}">${esc(t.nome)}</option>`).join("");
+        inner += `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
+            <span style="font-size:12px;color:#475569;font-weight:700;">Controle CNEN / RDC 611 dos dosímetros da equipe técnica EMED</span>
+            <button type="button" onclick="window.open('/api/equipe/dosimetria/imprimir','_blank')" style="background:#0284c7;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:11.5px;font-weight:800;cursor:pointer;">🖨️ Relatório Dosimetria (PDF)</button>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:10px;margin-bottom:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;font-size:12px;">
+            <select id="dosTec" class="select">${tecOpts}<option value="OUTRO">OUTRO COLABORADOR</option></select>
+            <input id="dosNum" class="input" placeholder="Nº Dosímetro *" />
+            <input id="dosLab" class="input" value="SAPRA LANDAUER" placeholder="Laboratório" />
+            <input id="dosMes" class="input" value="${new Date().toISOString().slice(0,7)}" placeholder="YYYY-MM" />
+            <input id="dosVal" type="number" step="0.01" class="input" placeholder="Dose (mSv)" value="0.00" />
+            <input id="dosTroca" type="date" class="input" title="Próxima troca" />
+            <button type="button" onclick="salvarDosimetriaEmed()" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:8px;font-weight:800;cursor:pointer;grid-column:1/-1;">💾 Registrar Dosímetro / Leitura</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${dosList.map(r => {
+              const alerta = Number(r.dose_efetiva_msv || 0) >= 1.5;
+              return `<div style="background:#fff;border:1px solid #e2e8f0;border-left:4px solid ${alerta?'#dc2626':'#16a34a'};border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+                <div>
+                  <div style="font-weight:800;color:#002b54;font-size:13px;">☢️ ${esc(r.tecnico_nome)} • <span style="color:#0284c7;">${esc(r.numero_dosimetro)}</span></div>
+                  <div style="font-size:11.5px;color:#475569;">Comp: <b>${esc(r.mes_competencia)}</b> • Dose: <b style="color:${alerta?'#dc2626':'#16a34a'};">${Number(r.dose_efetiva_msv||0).toFixed(2)} mSv</b> • Lab: ${esc(r.laboratorio_monitoracao)} ${r.data_troca_prevista?`• Troca: ${esc(r.data_troca_prevista)}`:''}</div>
+                </div>
+                <button type="button" onclick="excluirDosimetriaEmed(${r.id})" style="background:#fee2e2;color:#b91c1c;border:none;border-radius:5px;padding:4px 8px;font-size:11px;font-weight:800;cursor:pointer;">🗑️</button>
+              </div>`;
+            }).join("") || '<div style="color:#64748b;font-size:12px;">Nenhum dosímetro registrado ainda.</div>'}
+          </div>`;
       } else {
         inner += `
           <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
@@ -2297,6 +2329,29 @@
         </div>
       `;
       modal.innerHTML = inner;
+    }
+    async function carregarDosimetriaEmedModal() {
+      const res = await apiGet("/api/equipe/dosimetria/listar");
+      if (res && res.ok) window._emedDosimetriasCache = res.dosimetrias || [];
+      renderConteudoModalEquipeSetores();
+    }
+    async function salvarDosimetriaEmed() {
+      const payload = {
+        tecnico_nome: document.getElementById("dosTec")?.value || "",
+        numero_dosimetro: document.getElementById("dosNum")?.value || "",
+        laboratorio_monitoracao: document.getElementById("dosLab")?.value || "SAPRA LANDAUER",
+        mes_competencia: document.getElementById("dosMes")?.value || "",
+        dose_efetiva_msv: document.getElementById("dosVal")?.value || 0,
+        data_troca_prevista: document.getElementById("dosTroca")?.value || ""
+      };
+      const res = await apiPost("/api/equipe/dosimetria/salvar", payload);
+      mostrarToast(res?.msg || "Erro ao salvar dosimetria");
+      if (res && res.ok) carregarDosimetriaEmedModal();
+    }
+    async function excluirDosimetriaEmed(id) {
+      if (!confirm("Remover registro de dosimetria?")) return;
+      await apiPost("/api/equipe/dosimetria/excluir", { id });
+      carregarDosimetriaEmedModal();
     }
     function formEditarAniversariante(item) {
       item = item || {};
@@ -3140,7 +3195,7 @@
           window.location.reload(true);
         } catch(e) { window.location.reload(); }
       }
-      navigator.serviceWorker.register("/sw.js?v=1.6.0").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=1.8.0").then(reg => { if(reg) reg.update(); }).catch(() => {});
       let _swReloaded = false;
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         if (!_swReloaded && navigator.onLine && !STATE.osAberta) {

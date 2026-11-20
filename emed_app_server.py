@@ -3693,6 +3693,7 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/api/cliente/dossie-radiologico/arquivo/")
         or path == "/api/cliente/dossie-radiologico/imprimir"
         or path == "/portal-cliente"
+        or path == "/api/equipe/dosimetria/imprimir"
         or path == "/api/cliente/acesso/login"
         or path == "/api/cliente/portal-dados"
         or path == "/api/cliente/portal-salvar-doc"
@@ -25030,6 +25031,117 @@ async def api_estoque_precificacao_atualizar(request: web.Request) -> web.Respon
     return web.json_response({"ok": True, "msg": f"✅ Precificação da peça {codigo} atualizada!"})
 
 
+# ==============================================================================
+# DOSIMETRIA INDIVIDUAL DOS TECNICOS EMED (PPR / CNEN / RDC 611)
+# ==============================================================================
+def _garantir_schema_dosimetria_emed(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS emed_dosimetria_tecnicos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tecnico_nome TEXT NOT NULL,
+            numero_dosimetro TEXT NOT NULL,
+            laboratorio_monitoracao TEXT DEFAULT 'SAPRA LANDAUER',
+            mes_competencia TEXT NOT NULL,
+            dose_efetiva_msv REAL DEFAULT 0.0,
+            status_troca TEXT DEFAULT 'EM_USO',
+            data_troca_prevista TEXT DEFAULT '',
+            observacoes TEXT DEFAULT '',
+            atualizado_em TEXT NOT NULL
+        )
+    """)
+
+
+async def api_equipe_dosimetria_listar(request: web.Request) -> web.Response:
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_dosimetria_emed(conn)
+        conn.row_factory = sqlite3.Row
+        rows = [dict(r) for r in conn.execute("SELECT * FROM emed_dosimetria_tecnicos ORDER BY mes_competencia DESC, id DESC").fetchall()]
+    return web.json_response({"ok": True, "dosimetrias": rows})
+
+
+async def api_equipe_dosimetria_salvar(request: web.Request) -> web.Response:
+    body = await request.json()
+    tec = limpar_texto(body.get("tecnico_nome"), "").upper()
+    num = limpar_texto(body.get("numero_dosimetro"), "").upper()
+    if not tec or not num:
+        return web.json_response({"ok": False, "msg": "Informe o técnico e o número do dosímetro."}, status=400)
+    lab = limpar_texto(body.get("laboratorio_monitoracao"), "SAPRA LANDAUER").upper()
+    mes = limpar_texto(body.get("mes_competencia"), obter_agora_brasil_str("%Y-%m"))
+    dose = limpar_float(body.get("dose_efetiva_msv"), 0.0)
+    st = limpar_texto(body.get("status_troca"), "EM_USO").upper()
+    dt_troca = limpar_texto(body.get("data_troca_prevista"), "")
+    obs = limpar_texto(body.get("observacoes"), "")
+    agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_dosimetria_emed(conn)
+        conn.execute("""
+            INSERT INTO emed_dosimetria_tecnicos (
+                tecnico_nome, numero_dosimetro, laboratorio_monitoracao, mes_competencia,
+                dose_efetiva_msv, status_troca, data_troca_prevista, observacoes, atualizado_em
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (tec, num, lab, mes, dose, st, dt_troca, obs, agora))
+        conn.commit()
+    return web.json_response({"ok": True, "msg": f"✅ Dosímetro {num} ({tec}) registrado para {mes}!"})
+
+
+async def api_equipe_dosimetria_excluir(request: web.Request) -> web.Response:
+    body = await request.json()
+    rid = str(body.get("id") or "").strip()
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_dosimetria_emed(conn)
+        conn.execute("DELETE FROM emed_dosimetria_tecnicos WHERE CAST(id AS TEXT) = ?", (rid,))
+        conn.commit()
+    return web.json_response({"ok": True, "msg": "🗑️ Registro de dosimetria removido."})
+
+
+async def api_equipe_dosimetria_imprimir(request: web.Request) -> web.Response:
+    import html as _h
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_dosimetria_emed(conn)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM emed_dosimetria_tecnicos ORDER BY mes_competencia DESC, tecnico_nome ASC").fetchall()
+
+    trs = ""
+    for r in rows:
+        dose = float(r["dose_efetiva_msv"] or 0.0)
+        cor = "#dc2626" if dose >= 1.5 else "#16a34a"
+        trs += f"""<tr>
+          <td><b>{_h.escape(str(r['tecnico_nome']))}</b></td>
+          <td>{_h.escape(str(r['numero_dosimetro']))}</td>
+          <td>{_h.escape(str(r['laboratorio_monitoracao']))}</td>
+          <td>{_h.escape(str(r['mes_competencia']))}</td>
+          <td style="color:{cor};font-weight:800;">{dose:.2f} mSv</td>
+          <td>{_h.escape(str(r['status_troca']))}</td>
+          <td>{_h.escape(str(r['data_troca_prevista'] or '-'))}</td>
+        </tr>"""
+    html_out = f"""<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Dosimetria Técnica EMED — PPR / CNEN</title>
+<style>
+  body {{ font-family: Arial, sans-serif; margin: 16px; color: #0f172a; font-size: 11.5px; }}
+  .hdr {{ display:flex; justify-content:space-between; border-bottom:2px solid #002b54; padding-bottom:8px; margin-bottom:12px; }}
+  table {{ width:100%; border-collapse:collapse; }}
+  th, td {{ border:1px solid #cbd5e1; padding:6px 8px; text-align:left; }}
+  th {{ background:#f1f5f9; }}
+  @media print {{ @page {{ size: A4; margin: 10mm; }} .no-print {{ display:none; }} }}
+</style></head>
+<body>
+  <div class="no-print" style="margin-bottom:10px;display:flex;justify-content:space-between;">
+    <b>☢️ Controle de Dosimetria Individual — Equipe Técnica EMED</b>
+    <button onclick="window.print()" style="background:#002b54;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-weight:bold;cursor:pointer;">🖨️ Imprimir / Salvar PDF</button>
+  </div>
+  <div class="hdr">
+    <div><b style="font-size:15px;color:#002b54;">PROGRAMA DE PROTEÇÃO RADIOLÓGICA (PPR) — DOSIMETRIA EMED</b><div>Limite de Investigação Mensal CNEN: 1,50 mSv</div></div>
+    <div style="text-align:right;"><b>EMED ELETROMEDICINA LTDA.</b><div>RDC 611/2022 • CNEN NN 3.01</div></div>
+  </div>
+  <table>
+    <thead><tr><th>Técnico / Colaborador</th><th>Nº Dosímetro</th><th>Laboratório</th><th>Competência</th><th>Dose Efetiva</th><th>Status</th><th>Próx. Troca</th></tr></thead>
+    <tbody>{trs or '<tr><td colspan="7">Nenhum registro de dosimetria cadastrado.</td></tr>'}</tbody>
+  </table>
+</body></html>"""
+    return web.Response(text=html_out, content_type="text/html", charset="utf-8")
+
+
 def criar_app() -> web.Application:
 
     garantir_schema_dispositivos(DB_NAME)
@@ -25317,6 +25429,10 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/unidade/registro/salvar", api_unidade_registro_salvar)
     app.router.add_post("/api/unidade/registro/excluir", api_unidade_registro_excluir)
     app.router.add_get("/api/unidade/pgts/imprimir", api_unidade_pgts_imprimir)
+    app.router.add_get("/api/equipe/dosimetria/listar", api_equipe_dosimetria_listar)
+    app.router.add_post("/api/equipe/dosimetria/salvar", api_equipe_dosimetria_salvar)
+    app.router.add_post("/api/equipe/dosimetria/excluir", api_equipe_dosimetria_excluir)
+    app.router.add_get("/api/equipe/dosimetria/imprimir", api_equipe_dosimetria_imprimir)
 
     app.router.add_post("/api/propostas", api_proposta_salvar)
 
