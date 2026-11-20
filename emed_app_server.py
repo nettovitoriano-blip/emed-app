@@ -749,6 +749,11 @@ from emed_services.hospital_autorizacao import (
     registrar_credenciamento_os
 
 )
+from emed_views.portal_gestor_unidade import (
+    carregar_resumo_gestor_unidade,
+    garantir_schema_gestor_unidade,
+    gerar_html_pgts_unidade,
+)
 
 from emed_services.triagem_pos_atendimento import (
 
@@ -3691,6 +3696,7 @@ async def auth_api_middleware(request: web.Request, handler):
         or path == "/api/cliente/acesso/login"
         or path == "/api/cliente/portal-dados"
         or path == "/api/cliente/portal-salvar-doc"
+        or path.startswith("/api/unidade/")
         or path.startswith("/api/pmp/")
 
         or path.startswith("/api/hospital/")
@@ -20052,12 +20058,11 @@ async def api_cliente_portal_dados(request: web.Request) -> web.Response:
             return web.json_response({"ok": False, "msg": "Sessão inválida ou expirada."}, status=401)
         conn.row_factory = sqlite3.Row
         os_rows = [dict(r) for r in conn.execute(
-            "SELECT id, equipamento, tipo_servico, status, data_agendamento, checkin_hora, checkout_hora, tecnico_responsavel FROM clientes_equipamentos WHERE UPPER(cliente) = ? ORDER BY id DESC LIMIT 60",
+            "SELECT id, equipamento, tipo_servico, status, data_agendamento, checkin_hora, checkout_hora, tecnico_responsavel, defeito_relatado FROM clientes_equipamentos WHERE UPPER(cliente) = ? ORDER BY id DESC LIMIT 60",
             (cli_nome.upper(),)
         ).fetchall()]
+        unidade_resumo = carregar_resumo_gestor_unidade(conn, cli_nome)
 
-    # Reaproveita calculo oficial do dossie
-    fake_req = request
     class _QReq:
         def __init__(self, q): self.query = q
     d_resp = await api_cliente_dossie_radiologico(_QReq({"cliente": cli_nome}))
@@ -20069,8 +20074,13 @@ async def api_cliente_portal_dados(request: web.Request) -> web.Response:
         "metricas": dossie.get("metricas", {}),
         "checklist_visa": dossie.get("checklist_visa", []),
         "laudos": dossie.get("laudos", []),
-        "equipamentos": dossie.get("equipamentos", []),
+        "equipamentos": unidade_resumo.get("equipamentos") or dossie.get("equipamentos", []),
         "ordens": os_rows,
+        "pgts_kpis": unidade_resumo.get("pgts_kpis", {}),
+        "equipe": unidade_resumo.get("equipe", []),
+        "epis": unidade_resumo.get("epis", []),
+        "treinamentos": unidade_resumo.get("treinamentos", []),
+        "tecnovigilancia": unidade_resumo.get("tecnovigilancia", []),
     })
 
 
@@ -20150,28 +20160,148 @@ async def api_cliente_alerta_gestor(request: web.Request) -> web.Response:
     })
 
 
+async def api_unidade_gestor_resumo(request: web.Request) -> web.Response:
+    cliente = limpar_texto(request.query.get("cliente"), "").upper()
+    with get_db_connection(DB_NAME) as conn:
+        if not cliente:
+            cliente = (_validar_token_portal_cliente(conn, request) or "").upper()
+        if not cliente:
+            return web.json_response({"ok": False, "msg": "Informe o cliente."}, status=400)
+        resumo = carregar_resumo_gestor_unidade(conn, cliente)
+    return web.json_response({"ok": True, "cliente_nome": cliente, **resumo})
+
+
+async def api_unidade_registro_salvar(request: web.Request) -> web.Response:
+    """Salva registros de Equipe/Dosimetria, EPIs, Treinamentos, Tecnovigilancia ou Solicita Intervencao do Gestor."""
+    body = await request.json()
+    tipo = limpar_texto(body.get("tipo"), "").upper()
+    agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+    hoje_iso = obter_agora_brasil_str("%Y-%m-%d")
+
+    with get_db_connection(DB_NAME) as conn:
+        garantir_schema_gestor_unidade(conn)
+        cli = (_validar_token_portal_cliente(conn, request) or limpar_texto(body.get("cliente_nome"), "")).upper()
+        if not cli:
+            return web.json_response({"ok": False, "msg": "Unidade não identificada."}, status=400)
+
+        if tipo == "EQUIPE":
+            nome = limpar_texto(body.get("nome_profissional"), "").upper()
+            if not nome:
+                return web.json_response({"ok": False, "msg": "Informe o nome do profissional."}, status=400)
+            conn.execute("""
+                INSERT INTO unidade_equipe_radioprotecao (cliente_nome, nome_profissional, cargo, conselho_registro, numero_dosimetro, toe_gestante, criado_em)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (cli, nome, limpar_texto(body.get("cargo"), "").upper(), limpar_texto(body.get("conselho_registro"), "").upper(), limpar_texto(body.get("numero_dosimetro"), "").upper(), 1 if body.get("toe_gestante") else 0, agora))
+            conn.commit()
+            return web.json_response({"ok": True, "msg": f"✅ Profissional {nome} salvo na lista nominal!"})
+
+        if tipo == "EPI":
+            cod = limpar_texto(body.get("codigo_epi"), "").upper() or f"EPI-{int(obter_agora_brasil_str('%H%M%S'))}"
+            tp = limpar_texto(body.get("tipo_epi"), "AVENTAL PLUMBÍFERO").upper()
+            conn.execute("""
+                INSERT INTO unidade_epis_plumbiferos (cliente_nome, codigo_epi, tipo_epi, equivalencia_pb, setor, data_ultima_inspecao, data_proxima_inspecao, resultado, observacoes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (cli, cod, tp, limpar_texto(body.get("equivalencia_pb"), "0.50mm Pb"), limpar_texto(body.get("setor"), "").upper(), limpar_texto(body.get("data_ultima_inspecao"), hoje_iso), limpar_texto(body.get("data_proxima_inspecao"), ""), limpar_texto(body.get("resultado"), "APROVADO").upper(), limpar_texto(body.get("observacoes"), "")))
+            conn.commit()
+            return web.json_response({"ok": True, "msg": f"✅ EPI {cod} registrado!"})
+
+        if tipo == "TREINAMENTO":
+            tit = limpar_texto(body.get("titulo_treinamento"), "")
+            if not tit:
+                return web.json_response({"ok": False, "msg": "Informe o tema do treinamento."}, status=400)
+            conn.execute("""
+                INSERT INTO unidade_treinamentos_rdc611 (cliente_nome, titulo_treinamento, instrutor, data_realizacao, validade_ate, participantes_qtd, carga_horaria, observacoes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (cli, tit, limpar_texto(body.get("instrutor"), "EMED ELETROMEDICINA"), limpar_texto(body.get("data_realizacao"), hoje_iso), limpar_texto(body.get("validade_ate"), ""), int(body.get("participantes_qtd") or 1), limpar_texto(body.get("carga_horaria"), "2h"), limpar_texto(body.get("observacoes"), "")))
+            conn.commit()
+            return web.json_response({"ok": True, "msg": "✅ Treinamento registrado no Programa de Educação Permanente!"})
+
+        if tipo == "TECNOVIGILANCIA":
+            eqp = limpar_texto(body.get("equipamento"), "").upper()
+            desc = limpar_texto(body.get("descricao"), "")
+            if not eqp or not desc:
+                return web.json_response({"ok": False, "msg": "Informe o equipamento e a descrição da ocorrência."}, status=400)
+            conn.execute("""
+                INSERT INTO unidade_tecnovigilancia (cliente_nome, equipamento, numero_serie, data_ocorrencia, gravidade, descricao, acao_tomada, notivisa_protocolo, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ABERTO')
+            """, (cli, eqp, limpar_texto(body.get("numero_serie"), "").upper(), hoje_iso, limpar_texto(body.get("gravidade"), "MEDIA").upper(), desc, limpar_texto(body.get("acao_tomada"), ""), limpar_texto(body.get("notivisa_protocolo"), "")))
+            conn.commit()
+            return web.json_response({"ok": True, "msg": "✅ Ocorrência de Tecnovigilância registrada!"})
+
+        if tipo == "SOLICITAR_INTERVENCAO":
+            eqp = limpar_texto(body.get("equipamento"), "EQUIPAMENTO DA UNIDADE").upper()
+            sintoma = limpar_texto(body.get("descricao"), "Solicitação de avaliação técnica pelo gestor da unidade.")
+            urg = limpar_texto(body.get("urgencia"), "NORMAL").upper()
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO clientes_equipamentos (
+                    cliente, equipamento, tipo_servico, tecnico_responsavel, data_agendamento,
+                    status, defeito_relatado, pendencias
+                ) VALUES (?, ?, 'CORRETIVA', 'A DEFINIR', ?, ?, ?, ?)
+            """, (cli, eqp, hoje_iso, f"SOLICITADO PELO GESTOR ({urg})", sintoma, f"[PORTAL GESTOR - {agora}] {sintoma}"))
+            nova_os = cur.lastrowid
+            conn.commit()
+            invalidar_cache_bootstrap()
+            return web.json_response({"ok": True, "os_id": nova_os, "msg": f"🚨 Chamado #{nova_os} enviado à Engenharia Clínica EMED para {eqp}!"})
+
+    return web.json_response({"ok": False, "msg": "Tipo de registro inválido."}, status=400)
+
+
+async def api_unidade_registro_excluir(request: web.Request) -> web.Response:
+    body = await request.json()
+    tipo = limpar_texto(body.get("tipo"), "").upper()
+    rid = str(body.get("id") or "").strip()
+    mapa = {
+        "EQUIPE": "unidade_equipe_radioprotecao",
+        "EPI": "unidade_epis_plumbiferos",
+        "TREINAMENTO": "unidade_treinamentos_rdc611",
+        "TECNOVIGILANCIA": "unidade_tecnovigilancia",
+    }
+    tbl = mapa.get(tipo)
+    if not tbl or not rid:
+        return web.json_response({"ok": False, "msg": "Parâmetros inválidos."}, status=400)
+    with get_db_connection(DB_NAME) as conn:
+        garantir_schema_gestor_unidade(conn)
+        conn.execute(f"DELETE FROM {tbl} WHERE CAST(id AS TEXT) = ?", (rid,))
+        conn.commit()
+    return web.json_response({"ok": True, "msg": "🗑️ Registro removido."})
+
+
+async def api_unidade_pgts_imprimir(request: web.Request) -> web.Response:
+    cliente = limpar_texto(request.query.get("cliente"), "").upper()
+    if not cliente:
+        with get_db_connection(DB_NAME) as conn:
+            cliente = (_validar_token_portal_cliente(conn, request) or "UNIDADE").upper()
+    return web.Response(text=gerar_html_pgts_unidade(DB_NAME, cliente), content_type="text/html", charset="utf-8")
+
+
 async def api_portal_cliente_html(request: web.Request) -> web.Response:
-    """Portal web exclusivo para clientes/parceiros (Login + Dossie VISA + Equipamentos + Laudos)."""
+    """Portal web exclusivo para clientes/parceiros (Suite Completa RDC 509/611 + Intervencao Proativa)."""
     html_out = """<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Portal do Cliente — EMED Eletromedicina</title>
+<title>Portal do Gestor — EMED Eletromedicina</title>
 <style>
   body { font-family: 'Segoe UI', Arial, sans-serif; margin:0; background:#020617; color:#f8fafc; }
-  .wrap { max-width:960px; margin:0 auto; padding:18px 14px 40px; }
-  .card { background:#0f172a; border:1px solid #1e293b; border-radius:14px; padding:18px; margin-bottom:14px; }
-  .inp { width:100%; box-sizing:border-box; padding:10px 12px; border-radius:8px; border:1px solid #334155; background:#1e293b; color:#fff; font-size:14px; margin-top:4px; }
-  .btn { background:#0284c7; color:#fff; border:none; border-radius:8px; padding:10px 16px; font-weight:800; cursor:pointer; font-size:13px; }
+  .wrap { max-width:1040px; margin:0 auto; padding:16px 14px 44px; }
+  .card { background:#0f172a; border:1px solid #1e293b; border-radius:14px; padding:16px; margin-bottom:14px; }
+  .inp { width:100%; box-sizing:border-box; padding:9px 11px; border-radius:8px; border:1px solid #334155; background:#1e293b; color:#fff; font-size:13.5px; margin-top:4px; }
+  .btn { background:#0284c7; color:#fff; border:none; border-radius:8px; padding:8px 14px; font-weight:800; cursor:pointer; font-size:12.5px; }
   .btn-ok { background:#10b981; color:#064e3b; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; }
-  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  .btn-warn { background:#dc2626; color:#fff; }
+  .tabs { display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:14px; border-bottom:1px solid #1e293b; }
+  .tab { background:#1e293b; color:#cbd5e1; border:1px solid #334155; border-radius:8px; padding:8px 12px; font-weight:700; font-size:12px; cursor:pointer; white-space:nowrap; }
+  .tab.active { background:#0284c7; color:#fff; border-color:#0284c7; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(185px,1fr)); gap:10px; }
+  .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:10px; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
   th, td { border-bottom:1px solid #1e293b; padding:8px 6px; text-align:left; }
-  th { color:#94a3b8; font-size:11px; text-transform:uppercase; }
+  th { color:#94a3b8; font-size:10.5px; text-transform:uppercase; }
 </style></head>
 <body>
   <div class="wrap">
     <div id="boxLogin" class="card" style="max-width:420px;margin:40px auto;">
-      <div style="font-size:11px;color:#38bdf8;font-weight:800;">EMED ELETROMEDICINA • PORTAL DO PARCEIRO</div>
-      <h2 style="margin:4px 0 14px;">Acesso ao Dossiê Sanitário &amp; Parque</h2>
+      <div style="font-size:11px;color:#38bdf8;font-weight:800;">EMED ELETROMEDICINA • PORTAL DO GESTOR</div>
+      <h2 style="margin:4px 0 14px;">Gestão do Parque &amp; Vigilância Sanitária</h2>
       <label style="font-size:12px;color:#94a3b8;">Usuário</label>
       <input id="cliUser" class="inp" placeholder="ex: clinica.ags" />
       <label style="font-size:12px;color:#94a3b8;display:block;margin-top:10px;">Senha</label>
@@ -20183,24 +20313,34 @@ async def api_portal_cliente_html(request: web.Request) -> web.Response:
     <div id="boxApp" style="display:none;">
       <div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
         <div>
-          <div style="font-size:11px;color:#38bdf8;font-weight:800;">PORTAL DE FISCALIZAÇÃO VISA / RDC 611</div>
+          <div style="font-size:11px;color:#38bdf8;font-weight:800;">PORTAL INTEGRADO RDC 509 (PGTS) &amp; RDC 611 (VISA)</div>
           <h2 id="lblCliNome" style="margin:2px 0 0;"></h2>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn" onclick="imprimirDossie()">🖨️ Dossiê Completo PDF</button>
+          <button class="btn btn-warn" onclick="abrirIntervencaoRapida('')">🚨 Avisar EMED / Pedir Intervenção</button>
+          <button class="btn btn-ok" onclick="imprimirPgts()">📑 PGTS Completo (PDF)</button>
+          <button class="btn" onclick="imprimirDossie()">🖨️ Dossiê VISA (PDF)</button>
           <button class="btn" style="background:#334155;" onclick="sairCli()">Sair</button>
         </div>
       </div>
 
-      <div id="boxKpis" class="grid" style="margin-bottom:14px;"></div>
-      <div id="boxChk" class="card"></div>
-      <div id="boxDocs" class="card" style="overflow-x:auto;"></div>
-      <div id="boxOs" class="card" style="overflow-x:auto;"></div>
+      <div class="tabs">
+        <button class="tab active" onclick="setTab('PGTS', this)">📊 Saúde do Parque (PGTS)</button>
+        <button class="tab" onclick="setTab('VISA', this)">🛡️ Dossiê VISA (RDC 611)</button>
+        <button class="tab" onclick="setTab('EQUIPE', this)">👨‍⚕️ Equipe &amp; Dosimetria</button>
+        <button class="tab" onclick="setTab('EPIS', this)">🦺 EPIs Plumbíferos</button>
+        <button class="tab" onclick="setTab('EDUC', this)">🎓 Educação &amp; Tecnovigilância</button>
+        <button class="tab" onclick="setTab('OS', this)">🛠️ Chamados &amp; Laudos PDF</button>
+      </div>
+
+      <div id="paneBody"></div>
     </div>
   </div>
   <script>
     let CLI_TOKEN = sessionStorage.getItem('emed_cli_token') || '';
     let CLI_NOME = sessionStorage.getItem('emed_cli_nome') || '';
+    let DATA = {};
+    let ABA = 'PGTS';
     if (CLI_TOKEN) carregarPortal();
 
     async function fazerLoginCli() {
@@ -20217,25 +20357,118 @@ async def api_portal_cliente_html(request: web.Request) -> web.Response:
     }
     function sairCli() { sessionStorage.clear(); location.reload(); }
     function imprimirDossie() { window.open('/api/cliente/dossie-radiologico/imprimir?cliente=' + encodeURIComponent(CLI_NOME), '_blank'); }
+    function imprimirPgts() { window.open('/api/unidade/pgts/imprimir?cliente=' + encodeURIComponent(CLI_NOME), '_blank'); }
+    function setTab(t, el) {
+      ABA = t;
+      document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+      if (el) el.classList.add('active');
+      renderPane();
+    }
 
     async function carregarPortal() {
       const res = await fetch('/api/cliente/portal-dados', { headers: {'X-Cliente-Token': CLI_TOKEN} }).then(r=>r.json());
       if (!res.ok) { sairCli(); return; }
+      DATA = res;
       document.getElementById('boxLogin').style.display = 'none';
       document.getElementById('boxApp').style.display = 'block';
       document.getElementById('lblCliNome').textContent = res.cliente_nome;
-      const m = res.metricas || {};
-      document.getElementById('boxKpis').innerHTML = `
-        <div class="card"><b>Prontidão VISA</b><div style="font-size:24px;font-weight:900;color:#34d399;">${m.conformidade_percentual||0}%</div></div>
-        <div class="card"><b>Vigentes</b><div style="font-size:24px;font-weight:900;color:#38bdf8;">${m.vigentes||0}</div></div>
-        <div class="card"><b>Vencendo (≤30d)</b><div style="font-size:24px;font-weight:900;color:#fbbf24;">${m.vencendo||0}</div></div>
-        <div class="card"><b>Vencidos</b><div style="font-size:24px;font-weight:900;color:#f87171;">${m.vencidos||0}</div></div>`;
-      document.getElementById('boxChk').innerHTML = `<h3 style="margin:0 0 10px;">📋 Checklist Obrigatório RDC 611 / VISA</h3><div class="grid">${(res.checklist_visa||[]).map(c=>{
-        const cor = c.status==='OK'?'#10b981':(c.status==='VENCENDO'?'#f59e0b':'#ef4444');
-        return `<div style="background:#020617;border-left:4px solid ${cor};padding:8px 10px;border-radius:8px;"><b>${c.titulo}</b><div style="font-size:11px;color:${cor};">${c.status} (${c.qtd_docs} doc)</div></div>`;
-      }).join('')}</div>`;
-      document.getElementById('boxDocs').innerHTML = `<h3 style="margin:0 0 10px;">📁 Documentos &amp; Laudos Sanitários</h3><table><thead><tr><th>Título</th><th>Nº Doc</th><th>Validade</th><th>Status</th><th>Anexo</th></tr></thead><tbody>${(res.laudos||[]).map(l=>`<tr><td>${l.titulo}</td><td>${l.numero_documento||'-'}</td><td>${l.data_validade||'-'}</td><td>${l.status_calculado||'VIGENTE'}</td><td>${l.tem_arquivo?`<a style="color:#38bdf8;" target="_blank" href="/api/cliente/dossie-radiologico/arquivo/${l.id}">📎 Abrir</a>`:'-'}</td></tr>`).join('')}</tbody></table>`;
-      document.getElementById('boxOs').innerHTML = `<h3 style="margin:0 0 10px;">🛠️ Ordens de Serviço &amp; Laudos (${(res.ordens||[]).length})</h3><table><thead><tr><th>OS</th><th>Equipamento</th><th>Serviço</th><th>Status</th><th>Laudo PDF</th></tr></thead><tbody>${(res.ordens||[]).map(o=>`<tr><td>#${o.id}</td><td>${o.equipamento}</td><td>${o.tipo_servico}</td><td>${o.status}</td><td><a style="color:#34d399;" target="_blank" href="/api/imprimir/${o.id}">📄 PDF</a></td></tr>`).join('')}</tbody></table>`;
+      renderPane();
+    }
+
+    async function salvarReg(payload) {
+      const res = await fetch('/api/unidade/registro/salvar', {
+        method:'POST', headers:{'Content-Type':'application/json', 'X-Cliente-Token': CLI_TOKEN}, body:JSON.stringify(payload)
+      }).then(r=>r.json());
+      alert(res.msg || 'Salvo');
+      if (res.ok) carregarPortal();
+    }
+    async function excluirReg(tipo, id) {
+      if (!confirm('Remover registro?')) return;
+      await fetch('/api/unidade/registro/excluir', {
+        method:'POST', headers:{'Content-Type':'application/json', 'X-Cliente-Token': CLI_TOKEN}, body:JSON.stringify({tipo, id})
+      });
+      carregarPortal();
+    }
+    function abrirIntervencaoRapida(eqpNome) {
+      const eqp = eqpNome || prompt('Qual equipamento precisa de avaliação / intervenção?', '') || '';
+      if (!eqp) return;
+      const sint = prompt(`Descreva o que está acontecendo com ${eqp} (ex: ruído anormal, erro de disparo, aquecimento):`, '');
+      if (!sint) return;
+      salvarReg({ tipo: 'SOLICITAR_INTERVENCAO', equipamento: eqp, descricao: sint, urgencia: 'PRIORITÁRIA' });
+    }
+
+    function renderPane() {
+      const el = document.getElementById('paneBody');
+      const m = DATA.metricas || {};
+      const k = DATA.pgts_kpis || {};
+      if (ABA === 'PGTS') {
+        const alertas = k.alertas_intervencao || [];
+        el.innerHTML = `
+          <div class="grid" style="margin-bottom:14px;">
+            <div class="card"><b>Disponibilidade Real</b><div style="font-size:24px;font-weight:900;color:#34d399;">${k.uptime_real_pct||100}%</div></div>
+            <div class="card"><b>Prontidão VISA</b><div style="font-size:24px;font-weight:900;color:#38bdf8;">${m.conformidade_percentual||0}%</div></div>
+            <div class="card"><b>MTTR Médio</b><div style="font-size:24px;font-weight:900;color:#fbbf24;">${k.mttr_horas||0}h</div></div>
+            <div class="card"><b>OS (Prev / Corr)</b><div style="font-size:22px;font-weight:900;color:#c084fc;">${k.total_os||0} <span style="font-size:12px;">(${k.preventivas||0}P / ${k.corretivas||0}C)</span></div></div>
+          </div>
+          ${alertas.length ? `<div class="card" style="border-left:5px solid #ef4444;"><b style="color:#f87171;">⚠️ Equipamentos com Sinal de Atenção / Intervenção (${alertas.length})</b><div style="margin-top:8px;">${alertas.map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #1e293b;"><span><b>${a.equipamento}</b> (${a.numero_serie}) — ${a.motivo}</span><button class="btn btn-warn" onclick="abrirIntervencaoRapida('${a.equipamento}')">🚨 Pedir Intervenção</button></div>`).join('')}</div></div>` : ''}
+          <div class="card" style="overflow-x:auto;">
+            <h3 style="margin:0 0 10px;">🖥️ Parque de Equipamentos (${(DATA.equipamentos||[]).length})</h3>
+            <table><thead><tr><th>Equipamento</th><th>Categoria</th><th>Série</th><th>Status</th><th>Ação Rápida</th></tr></thead>
+            <tbody>${(DATA.equipamentos||[]).map(e=>`<tr><td><b>${e.nome}</b></td><td>${e.categoria||'-'}</td><td>${e.numero_serie||'-'}</td><td>${e.status||'ATIVO'}</td><td><button class="btn btn-warn" style="padding:4px 8px;font-size:11px;" onclick="abrirIntervencaoRapida('${e.nome}')">🚨 Avisar EMED</button></td></tr>`).join('')}</tbody></table>
+          </div>`;
+      } else if (ABA === 'VISA') {
+        el.innerHTML = `
+          <div class="card"><h3 style="margin:0 0 10px;">📋 Checklist Obrigatório RDC 611 / VISA</h3><div class="grid">${(DATA.checklist_visa||[]).map(c=>{
+            const cor = c.status==='OK'?'#10b981':(c.status==='VENCENDO'?'#f59e0b':'#ef4444');
+            return `<div style="background:#020617;border-left:4px solid ${cor};padding:8px 10px;border-radius:8px;"><b>${c.titulo}</b><div style="font-size:11px;color:${cor};">${c.status} (${c.qtd_docs} doc)</div></div>`;
+          }).join('')}</div></div>
+          <div class="card" style="overflow-x:auto;"><h3 style="margin:0 0 10px;">📁 Documentos &amp; Laudos</h3><table><thead><tr><th>Título</th><th>Nº Doc</th><th>Validade</th><th>Status</th><th>Anexo</th></tr></thead><tbody>${(DATA.laudos||[]).map(l=>`<tr><td>${l.titulo}</td><td>${l.numero_documento||'-'}</td><td>${l.data_validade||'-'}</td><td>${l.status_calculado||'VIGENTE'}</td><td>${l.tem_arquivo?`<a style="color:#38bdf8;" target="_blank" href="/api/cliente/dossie-radiologico/arquivo/${l.id}">📎 Abrir</a>`:'-'}</td></tr>`).join('')}</tbody></table></div>`;
+      } else if (ABA === 'EQUIPE') {
+        el.innerHTML = `
+          <div class="card"><h3 style="margin:0 0 10px;">➕ Cadastrar Profissional / Dosímetro (PPR)</h3>
+            <div class="grid">
+              <input id="eqNome" class="inp" placeholder="Nome completo *" />
+              <input id="eqCargo" class="inp" placeholder="Cargo (Téc. RX / Médico)" />
+              <input id="eqCons" class="inp" placeholder="CRTR / CRM" />
+              <input id="eqDos" class="inp" placeholder="Nº Dosímetro" />
+            </div>
+            <label style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;"><input type="checkbox" id="eqGest" /> TOE Gestante</label>
+            <div style="margin-top:10px;"><button class="btn btn-ok" onclick="salvarReg({tipo:'EQUIPE',nome_profissional:eqNome.value,cargo:eqCargo.value,conselho_registro:eqCons.value,numero_dosimetro:eqDos.value,toe_gestante:eqGest.checked})">💾 Salvar Profissional</button></div>
+          </div>
+          <div class="card" style="overflow-x:auto;"><table><thead><tr><th>Profissional</th><th>Cargo</th><th>Conselho</th><th>Dosímetro</th><th>TOE Gestante</th><th></th></tr></thead><tbody>${(DATA.equipe||[]).map(p=>`<tr><td><b>${p.nome_profissional}</b></td><td>${p.cargo}</td><td>${p.conselho_registro}</td><td>${p.numero_dosimetro||'-'}</td><td>${p.toe_gestante?'⚠️ SIM':'Não'}</td><td><button class="btn btn-warn" style="padding:3px 7px;font-size:10px;" onclick="excluirReg('EQUIPE',${p.id})">✕</button></td></tr>`).join('')}</tbody></table></div>`;
+      } else if (ABA === 'EPIS') {
+        el.innerHTML = `
+          <div class="card"><h3 style="margin:0 0 10px;">➕ Cadastrar EPI Plumbífero</h3>
+            <div class="grid">
+              <input id="epiCod" class="inp" placeholder="Código (ex: AV-01)" />
+              <input id="epiTipo" class="inp" placeholder="Tipo (Avental / Tireoide / Óculos)" />
+              <input id="epiPb" class="inp" value="0.50mm Pb" />
+              <input id="epiProx" type="date" class="inp" />
+            </div>
+            <div style="margin-top:10px;"><button class="btn btn-ok" onclick="salvarReg({tipo:'EPI',codigo_epi:epiCod.value,tipo_epi:epiTipo.value,equivalencia_pb:epiPb.value,data_proxima_inspecao:epiProx.value})">💾 Salvar EPI</button></div>
+          </div>
+          <div class="card" style="overflow-x:auto;"><table><thead><tr><th>Código</th><th>Tipo</th><th>Pb</th><th>Próx. Inspeção</th><th>Resultado</th><th></th></tr></thead><tbody>${(DATA.epis||[]).map(ep=>`<tr><td><b>${ep.codigo_epi}</b></td><td>${ep.tipo_epi}</td><td>${ep.equivalencia_pb}</td><td>${ep.data_proxima_inspecao||'-'}</td><td>${ep.resultado}</td><td><button class="btn btn-warn" style="padding:3px 7px;font-size:10px;" onclick="excluirReg('EPI',${ep.id})">✕</button></td></tr>`).join('')}</tbody></table></div>`;
+      } else if (ABA === 'EDUC') {
+        el.innerHTML = `
+          <div class="grid2">
+            <div class="card"><h3 style="margin:0 0 8px;">🎓 Registrar Treinamento (Educação Permanente)</h3>
+              <input id="trTit" class="inp" placeholder="Tema do treinamento *" />
+              <input id="trData" type="date" class="inp" />
+              <input id="trQtd" type="number" class="inp" value="5" placeholder="Qtd participantes" />
+              <button class="btn btn-ok" style="margin-top:10px;" onclick="salvarReg({tipo:'TREINAMENTO',titulo_treinamento:trTit.value,data_realizacao:trData.value,participantes_qtd:trQtd.value})">💾 Salvar Treinamento</button>
+              <div style="margin-top:10px;">${(DATA.treinamentos||[]).map(t=>`<div style="padding:6px 0;border-bottom:1px solid #1e293b;font-size:12px;"><b>${t.titulo_treinamento}</b> (${t.data_realizacao} • ${t.participantes_qtd} part.)</div>`).join('')}</div>
+            </div>
+            <div class="card"><h3 style="margin:0 0 8px;">⚠️ Tecnovigilância / Evento Adverso (Notivisa)</h3>
+              <input id="tvEqp" class="inp" placeholder="Equipamento *" />
+              <input id="tvDesc" class="inp" placeholder="Descrição da queixa técnica / evento *" />
+              <input id="tvNot" class="inp" placeholder="Protocolo Notivisa (opcional)" />
+              <button class="btn btn-warn" style="margin-top:10px;" onclick="salvarReg({tipo:'TECNOVIGILANCIA',equipamento:tvEqp.value,descricao:tvDesc.value,notivisa_protocolo:tvNot.value})">💾 Registrar Ocorrência</button>
+              <div style="margin-top:10px;">${(DATA.tecnovigilancia||[]).map(tv=>`<div style="padding:6px 0;border-bottom:1px solid #1e293b;font-size:12px;"><b>${tv.equipamento}</b> (${tv.data_ocorrencia}): ${tv.descricao}</div>`).join('')}</div>
+            </div>
+          </div>`;
+      } else {
+        el.innerHTML = `<div class="card" style="overflow-x:auto;"><h3 style="margin:0 0 10px;">🛠️ Ordens de Serviço &amp; Laudos (${(DATA.ordens||[]).length})</h3><table><thead><tr><th>OS</th><th>Equipamento</th><th>Serviço</th><th>Status</th><th>Laudo PDF</th></tr></thead><tbody>${(DATA.ordens||[]).map(o=>`<tr><td>#${o.id}</td><td>${o.equipamento}</td><td>${o.tipo_servico}</td><td>${o.status}</td><td><a style="color:#34d399;" target="_blank" href="/api/imprimir/${o.id}">📄 PDF</a></td></tr>`).join('')}</tbody></table></div>`;
+      }
     }
   </script>
 </body></html>"""
@@ -25080,6 +25313,10 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/cliente/portal-salvar-doc", api_cliente_portal_salvar_doc)
     app.router.add_get("/api/cliente/dossie-radiologico/alerta-gestor", api_cliente_alerta_gestor)
     app.router.add_get("/portal-cliente", api_portal_cliente_html)
+    app.router.add_get("/api/unidade/gestor-resumo", api_unidade_gestor_resumo)
+    app.router.add_post("/api/unidade/registro/salvar", api_unidade_registro_salvar)
+    app.router.add_post("/api/unidade/registro/excluir", api_unidade_registro_excluir)
+    app.router.add_get("/api/unidade/pgts/imprimir", api_unidade_pgts_imprimir)
 
     app.router.add_post("/api/propostas", api_proposta_salvar)
 
