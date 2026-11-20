@@ -1402,7 +1402,7 @@
       <div class="brand-center" onclick="abrirDrawer()" style="cursor:pointer;display:flex;align-items:center;justify-content:flex-start;margin-right:auto;" title="Abrir Menu">
         <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
           <img src="/api/logo-circle" alt="eMED" class="brand-logo-img" onerror="this.src='/api/logo'" />
-          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.8.0</div></div>
+          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.9.0</div></div>
         </div>
       </div>
       <!-- DIREITA: BOTÃO DE SINCRONIZAR E INSTALAR PWA -->
@@ -2225,22 +2225,25 @@
       const internos = d.clientes_internos || [];
       const aba = window._abaEquipeAtiva || "ANIVERSARIOS";
       let inner = `
-        <div style="background:#fff; border-radius:14px; max-width:680px; width:100%; max-height:90vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
+        <div style="background:#fff; border-radius:14px; max-width:760px; width:100%; max-height:92vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
           <div style="background:#002b54; color:#fff; padding:14px 18px; display:flex; justify-content:space-between; align-items:center;">
             <div style="font-weight:900; font-size:15px; display:flex; align-items:center; gap:8px;">
-              <span>👥 Gestão de Equipe, Aniversários & Setores Internos</span>
+              <span>👥 Gestão de Equipe, SST, Dosimetria & Setores Internos</span>
             </div>
             <button onclick="fecharModalEquipeSetores()" style="background:none; border:none; color:#fff; font-size:22px; cursor:pointer; font-weight:bold;">&times;</button>
           </div>
-          <div style="display:flex; border-bottom:2px solid #e2e8f0; background:#f8fafc;">
-            <button onclick="window._abaEquipeAtiva='ANIVERSARIOS'; renderConteudoModalEquipeSetores();" style="flex:1; padding:12px; font-weight:800; font-size:13px; border:none; cursor:pointer; background:${aba==='ANIVERSARIOS'?'#fff':'#f1f5f9'}; color:${aba==='ANIVERSARIOS'?'#002b54':'#64748b'}; border-bottom:${aba==='ANIVERSARIOS'?'3px solid #002b54':'none'};">
-              🎂 Aniversariantes da Equipe (${anivs.length})
+          <div style="display:flex; flex-wrap:wrap; border-bottom:2px solid #e2e8f0; background:#f8fafc;">
+            <button onclick="window._abaEquipeAtiva='ANIVERSARIOS'; renderConteudoModalEquipeSetores();" style="flex:1; min-width:130px; padding:11px 8px; font-weight:800; font-size:12.5px; border:none; cursor:pointer; background:${aba==='ANIVERSARIOS'?'#fff':'#f1f5f9'}; color:${aba==='ANIVERSARIOS'?'#002b54':'#64748b'}; border-bottom:${aba==='ANIVERSARIOS'?'3px solid #002b54':'none'};">
+              🎂 Aniversários (${anivs.length})
             </button>
-            <button onclick="window._abaEquipeAtiva='SETORES'; renderConteudoModalEquipeSetores();" style="flex:1; padding:12px; font-weight:800; font-size:13px; border:none; cursor:pointer; background:${aba==='SETORES'?'#fff':'#f1f5f9'}; color:${aba==='SETORES'?'#002b54':'#64748b'}; border-bottom:${aba==='SETORES'?'3px solid #002b54':'none'};">
-              🏢 Setores Internos (${internos.length})
+            <button onclick="window._abaEquipeAtiva='SETORES'; renderConteudoModalEquipeSetores();" style="flex:1; min-width:130px; padding:11px 8px; font-weight:800; font-size:12.5px; border:none; cursor:pointer; background:${aba==='SETORES'?'#fff':'#f1f5f9'}; color:${aba==='SETORES'?'#002b54':'#64748b'}; border-bottom:${aba==='SETORES'?'3px solid #002b54':'none'};">
+              🏢 Setores (${internos.length})
             </button>
-            <button onclick="window._abaEquipeAtiva='DOSIMETRIA'; carregarDosimetriaEmedModal();" style="flex:1; padding:12px; font-weight:800; font-size:13px; border:none; cursor:pointer; background:${aba==='DOSIMETRIA'?'#fff':'#f1f5f9'}; color:${aba==='DOSIMETRIA'?'#002b54':'#64748b'}; border-bottom:${aba==='DOSIMETRIA'?'3px solid #002b54':'none'};">
+            <button onclick="window._abaEquipeAtiva='DOSIMETRIA'; carregarDosimetriaEmedModal();" style="flex:1; min-width:130px; padding:11px 8px; font-weight:800; font-size:12.5px; border:none; cursor:pointer; background:${aba==='DOSIMETRIA'?'#fff':'#f1f5f9'}; color:${aba==='DOSIMETRIA'?'#002b54':'#64748b'}; border-bottom:${aba==='DOSIMETRIA'?'3px solid #002b54':'none'};">
               ☢️ Dosimetria EMED
+            </button>
+            <button onclick="window._abaEquipeAtiva='COLAB_DOSSIE'; carregarDossieColaboradorModal();" style="flex:1; min-width:140px; padding:11px 8px; font-weight:800; font-size:12.5px; border:none; cursor:pointer; background:${aba==='COLAB_DOSSIE'?'#fff':'#f1f5f9'}; color:${aba==='COLAB_DOSSIE'?'#002b54':'#64748b'}; border-bottom:${aba==='COLAB_DOSSIE'?'3px solid #002b54':'none'};">
+              👷 Dossiê SST / EPIs
             </button>
           </div>
           <div style="padding:16px; overflow-y:auto; flex:1;">
@@ -2271,18 +2274,29 @@
       } else if (aba === "DOSIMETRIA") {
         const dosList = window._emedDosimetriasCache || [];
         const tecOpts = (d.tecnicos || []).map(t => `<option value="${esc(t.nome)}">${esc(t.nome)}</option>`).join("");
+        const fotoLabel = window._dosFotoCache?.nome ? `📸 ${esc(window._dosFotoCache.nome)} (anexada)` : "Nenhuma foto anexada";
         inner += `
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
             <span style="font-size:12px;color:#475569;font-weight:700;">Controle CNEN / RDC 611 dos dosímetros da equipe técnica EMED</span>
             <button type="button" onclick="window.open('/api/equipe/dosimetria/imprimir','_blank')" style="background:#0284c7;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:11.5px;font-weight:800;cursor:pointer;">🖨️ Relatório Dosimetria (PDF)</button>
           </div>
-          <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:10px;margin-bottom:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;font-size:12px;">
+          <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:10px;margin-bottom:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:6px;font-size:12px;">
             <select id="dosTec" class="select">${tecOpts}<option value="OUTRO">OUTRO COLABORADOR</option></select>
-            <input id="dosNum" class="input" placeholder="Nº Dosímetro *" />
+            <div style="display:flex;gap:4px;grid-column:span 1;">
+              <input id="dosNum" class="input" placeholder="Nº Dosímetro *" style="flex:1;min-width:95px;" />
+              <button type="button" onclick="_abrirScannerDosimetroCamera()" title="Ler código de barras/QR pela câmera" style="background:#0f172a;color:#fff;border:none;border-radius:6px;padding:0 9px;font-weight:800;cursor:pointer;white-space:nowrap;">📷 Ler</button>
+            </div>
             <input id="dosLab" class="input" value="SAPRA LANDAUER" placeholder="Laboratório" />
             <input id="dosMes" class="input" value="${new Date().toISOString().slice(0,7)}" placeholder="YYYY-MM" />
             <input id="dosVal" type="number" step="0.01" class="input" placeholder="Dose (mSv)" value="0.00" />
             <input id="dosTroca" type="date" class="input" title="Próxima troca" />
+            <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fff;border:1px dashed #94a3b8;border-radius:6px;padding:6px 8px;">
+              <label style="background:#0284c7;color:#fff;border-radius:5px;padding:5px 10px;font-size:11.5px;font-weight:800;cursor:pointer;">
+                📸 Foto do Dosímetro (Extrai Código)
+                <input id="dosFoto" type="file" accept="image/*" capture="environment" onchange="_processarFotoDosimetro(this)" style="display:none;" />
+              </label>
+              <span id="dosFotoStatus" style="font-size:11.5px;color:#475569;font-weight:600;">${fotoLabel}</span>
+            </div>
             <button type="button" onclick="salvarDosimetriaEmed()" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:8px;font-weight:800;cursor:pointer;grid-column:1/-1;">💾 Registrar Dosímetro / Leitura</button>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px;">
@@ -2293,9 +2307,81 @@
                   <div style="font-weight:800;color:#002b54;font-size:13px;">☢️ ${esc(r.tecnico_nome)} • <span style="color:#0284c7;">${esc(r.numero_dosimetro)}</span></div>
                   <div style="font-size:11.5px;color:#475569;">Comp: <b>${esc(r.mes_competencia)}</b> • Dose: <b style="color:${alerta?'#dc2626':'#16a34a'};">${Number(r.dose_efetiva_msv||0).toFixed(2)} mSv</b> • Lab: ${esc(r.laboratorio_monitoracao)} ${r.data_troca_prevista?`• Troca: ${esc(r.data_troca_prevista)}`:''}</div>
                 </div>
-                <button type="button" onclick="excluirDosimetriaEmed(${r.id})" style="background:#fee2e2;color:#b91c1c;border:none;border-radius:5px;padding:4px 8px;font-size:11px;font-weight:800;cursor:pointer;">🗑️</button>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  ${r.tem_foto ? `<a href="/api/equipe/dosimetria/foto/${r.id}" target="_blank" style="background:#e0f2fe;color:#0369a1;text-decoration:none;border-radius:5px;padding:4px 8px;font-size:11px;font-weight:800;">📸 Ver Foto</a>` : ''}
+                  <button type="button" onclick="excluirDosimetriaEmed(${r.id})" style="background:#fee2e2;color:#b91c1c;border:none;border-radius:5px;padding:4px 8px;font-size:11px;font-weight:800;cursor:pointer;">🗑️</button>
+                </div>
               </div>`;
             }).join("") || '<div style="color:#64748b;font-size:12px;">Nenhum dosímetro registrado ainda.</div>'}
+          </div>`;
+      } else if (aba === "COLAB_DOSSIE") {
+        const nomesSet = new Set();
+        (d.tecnicos || []).forEach(t => { if (t.nome) nomesSet.add(t.nome); });
+        (anivs || []).forEach(a => { if (a.nome) nomesSet.add(a.nome); });
+        const nomesColab = Array.from(nomesSet).sort((a,b) => a.localeCompare(b));
+        const colNome = window._colabDossieNome || nomesColab[0] || "";
+        const dos = window._colabDossieCache || { entregas: [], asos: [], dosimetrias: [] };
+        const hoje = new Date().toISOString().slice(0, 10);
+        inner += `
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px;">
+            <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:210px;">
+              <span style="font-size:12px;font-weight:800;color:#002b54;">Colaborador:</span>
+              <select id="colSelect" class="select" onchange="carregarDossieColaboradorModal(this.value)" style="flex:1;">
+                ${nomesColab.map(n => `<option value="${esc(n)}" ${n===colNome?'selected':''}>${esc(n)}</option>`).join("")}
+              </select>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button type="button" onclick="window.open('/api/equipe/colaborador/imprimir?nome='+encodeURIComponent(document.getElementById('colSelect')?.value||''),'_blank')" style="background:#002b54;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:11.5px;font-weight:800;cursor:pointer;">🖨️ Ficha Completa (PDF)</button>
+              <button type="button" onclick="fecharModalEquipeSetores(); if(typeof abrirModalMedicinaTrabalho==='function') abrirModalMedicinaTrabalho();" style="background:#0284c7;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:11.5px;font-weight:800;cursor:pointer;">🩺 Abrir ASOs / Medicina</button>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-bottom:12px;">
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;">
+              <div style="font-weight:800;font-size:12px;color:#002b54;margin-bottom:4px;">🩺 Medicina do Trabalho (ASOs)</div>
+              ${(dos.asos||[]).slice(0,3).map(a => `<div style="font-size:11.5px;color:#334155;border-top:1px solid #e2e8f0;padding-top:3px;margin-top:3px;"><b>${esc(a.tipo_exame)}</b> • Exame: ${esc(a.data_exame)} • Venc: <b style="color:#0369a1;">${esc(a.data_vencimento||'-')}</b> (${esc(a.parecer_aptidao||'APTO')})</div>`).join("") || '<div style="font-size:11px;color:#64748b;">Nenhum ASO cadastrado para este colaborador.</div>'}
+            </div>
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;">
+              <div style="font-weight:800;font-size:12px;color:#002b54;margin-bottom:4px;">☢️ Dosimetria Recente</div>
+              ${(dos.dosimetrias||[]).slice(0,3).map(r => `<div style="font-size:11.5px;color:#334155;border-top:1px solid #e2e8f0;padding-top:3px;margin-top:3px;"><b>${esc(r.numero_dosimetro)}</b> • ${esc(r.mes_competencia)} • <b>${Number(r.dose_efetiva_msv||0).toFixed(2)} mSv</b></div>`).join("") || '<div style="font-size:11px;color:#64748b;">Nenhuma leitura de dosímetro registrada.</div>'}
+            </div>
+          </div>
+
+          <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:10px;margin-bottom:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:6px;font-size:12px;">
+            <select id="colCat" class="select">
+              <option value="EPI">🦺 EPI (Avental, Óculos, Luva)</option>
+              <option value="FARDAMENTO">👕 Fardamento / Uniforme</option>
+              <option value="EQUIPAMENTO">🧰 Equipamento / Ferramenta</option>
+              <option value="MATERIAL">📦 Material de Trabalho</option>
+              <option value="TREINAMENTO">🎓 Treinamento / NR / Certificado</option>
+            </select>
+            <input id="colTitulo" class="input" placeholder="Descrição do item / curso *" />
+            <input id="colCA" class="input" placeholder="CA / Nº Série / Lote" />
+            <input id="colQtd" type="number" min="1" value="1" class="input" placeholder="Qtd" />
+            <input id="colDataEnt" type="date" value="${hoje}" class="input" title="Data de Entrega" />
+            <input id="colDataVal" type="date" class="input" title="Validade / Reciclagem" />
+            <input id="colObs" class="input" placeholder="Observações / Termo assinado" style="grid-column:1/-1;" />
+            <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fff;border:1px dashed #94a3b8;border-radius:6px;padding:6px 8px;">
+              <span style="font-size:11.5px;font-weight:700;color:#334155;">📎 Anexo (Ficha assinada, Foto, Certificado PDF):</span>
+              <input id="colArq" type="file" accept="image/*,.pdf" style="font-size:11.5px;flex:1;" />
+            </div>
+            <button type="button" onclick="salvarItemDossieColaborador()" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:8px;font-weight:800;cursor:pointer;grid-column:1/-1;">💾 Registrar Entrega / Treinamento no Dossiê</button>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:7px;">
+            ${(dos.entregas||[]).map(e => `
+              <div style="background:#fff;border:1px solid #e2e8f0;border-left:4px solid #0284c7;border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+                <div>
+                  <div style="font-weight:800;color:#002b54;font-size:13px;"><span style="background:#e0f2fe;color:#0369a1;padding:2px 6px;border-radius:4px;font-size:10.5px;margin-right:4px;">${esc(e.categoria)}</span> ${esc(e.titulo)} (x${e.quantidade||1})</div>
+                  <div style="font-size:11.5px;color:#475569;">${e.codigo_ca_serie?`CA/Série: <b>${esc(e.codigo_ca_serie)}</b> • `:''}Entrega: <b>${esc(e.data_entrega||'-')}</b> ${e.data_validade?`• Validade: <b>${esc(e.data_validade)}</b>`:''}</div>
+                  ${e.observacoes?`<div style="font-size:11px;color:#64748b;">📝 ${esc(e.observacoes)}</div>`:''}
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  ${e.tem_arquivo ? `<a href="/api/equipe/colaborador/arquivo/${e.id}" target="_blank" style="background:#dcfce7;color:#166534;text-decoration:none;border-radius:5px;padding:4px 8px;font-size:11px;font-weight:800;">📎 Anexo</a>` : ''}
+                  <button type="button" onclick="excluirItemDossieColaborador(${e.id})" style="background:#fee2e2;color:#b91c1c;border:none;border-radius:5px;padding:4px 8px;font-size:11px;font-weight:800;cursor:pointer;">🗑️</button>
+                </div>
+              </div>
+            `).join("") || '<div style="color:#64748b;font-size:12px;">Nenhum EPI, fardamento, equipamento, material ou treinamento registrado para este colaborador.</div>'}
           </div>`;
       } else {
         inner += `
@@ -2335,6 +2421,106 @@
       if (res && res.ok) window._emedDosimetriasCache = res.dosimetrias || [];
       renderConteudoModalEquipeSetores();
     }
+    async function _processarFotoDosimetro(input) {
+      const f = input?.files?.[0];
+      if (!f) return;
+      const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+      window._dosFotoCache = { base64: b64, nome: f.name };
+      const st = document.getElementById("dosFotoStatus");
+      if (st) st.textContent = `📸 ${f.name} (anexada)`;
+      if ("BarcodeDetector" in window) {
+        try {
+          const det = new BarcodeDetector({ formats: ["code_128", "code_39", "ean_13", "ean_8", "qr_code", "data_matrix", "itf"] });
+          const bmp = await createImageBitmap(f);
+          const codes = await det.detect(bmp);
+          if (codes && codes.length && codes[0].rawValue) {
+            const inp = document.getElementById("dosNum");
+            if (inp) inp.value = codes[0].rawValue.trim();
+            if (st) st.textContent = `📸 ${f.name} • Código extraído: ${codes[0].rawValue.trim()}`;
+            mostrarToast("Código do dosímetro extraído da foto!", "success");
+          }
+        } catch (e) {}
+      }
+    }
+    function _fecharScannerDosimetroCamera() {
+      if (window._dosScannerStream) {
+        try { window._dosScannerStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+        window._dosScannerStream = null;
+      }
+      window._dosScannerAtivo = false;
+      const ov = document.getElementById("modalScannerDosimetro");
+      if (ov) ov.remove();
+    }
+    async function _abrirScannerDosimetroCamera() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        mostrarToast("Câmera ao vivo indisponível aqui. Use '📸 Foto do Dosímetro'.", "error");
+        return;
+      }
+      _fecharScannerDosimetroCamera();
+      const ov = document.createElement("div");
+      ov.id = "modalScannerDosimetro";
+      ov.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,0.88);z-index:10050;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;";
+      ov.innerHTML = `
+        <div style="background:#fff;border-radius:12px;max-width:420px;width:100%;overflow:hidden;">
+          <div style="background:#002b54;color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:13.5px;">
+            <span>📷 Leitor de Código de Barras / QR do Dosímetro</span>
+            <button type="button" onclick="_fecharScannerDosimetroCamera()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">&times;</button>
+          </div>
+          <div style="padding:10px;text-align:center;">
+            <video id="dosScannerVideo" autoplay playsinline style="width:100%;border-radius:8px;background:#000;max-height:280px;object-fit:cover;"></video>
+            <div id="dosScannerMsg" style="font-size:11.5px;color:#475569;margin:8px 0;">Aponte para o código de barras ou QR do dosímetro...</div>
+            <div style="display:flex;gap:8px;">
+              <button type="button" id="dosBtnCapturarFrame" style="flex:1;background:#0284c7;color:#fff;border:none;border-radius:6px;padding:8px;font-weight:800;cursor:pointer;">📸 Capturar Foto Agora</button>
+              <button type="button" onclick="_fecharScannerDosimetroCamera()" style="background:#64748b;color:#fff;border:none;border-radius:6px;padding:8px 12px;font-weight:700;cursor:pointer;">Cancelar</button>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(ov);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        window._dosScannerStream = stream;
+        window._dosScannerAtivo = true;
+        const vid = document.getElementById("dosScannerVideo");
+        vid.srcObject = stream;
+        const capturarFrame = () => {
+          const cv = document.createElement("canvas");
+          cv.width = vid.videoWidth || 640; cv.height = vid.videoHeight || 480;
+          cv.getContext("2d").drawImage(vid, 0, 0, cv.width, cv.height);
+          window._dosFotoCache = { base64: cv.toDataURL("image/jpeg", 0.85), nome: `dosimetro_${Date.now()}.jpg` };
+          const st = document.getElementById("dosFotoStatus");
+          if (st) st.textContent = `📸 ${window._dosFotoCache.nome} (anexada)`;
+        };
+        document.getElementById("dosBtnCapturarFrame").onclick = () => { capturarFrame(); _fecharScannerDosimetroCamera(); mostrarToast("Foto do dosímetro anexada!", "success"); };
+        if ("BarcodeDetector" in window) {
+          const det = new BarcodeDetector({ formats: ["code_128", "code_39", "ean_13", "ean_8", "qr_code", "data_matrix", "itf"] });
+          const loop = async () => {
+            if (!window._dosScannerAtivo) return;
+            try {
+              if (vid.readyState >= 2) {
+                const codes = await det.detect(vid);
+                if (codes && codes.length && codes[0].rawValue) {
+                  const val = codes[0].rawValue.trim();
+                  const inp = document.getElementById("dosNum");
+                  if (inp) inp.value = val;
+                  capturarFrame();
+                  _fecharScannerDosimetroCamera();
+                  mostrarToast(`Código lido e foto anexada: ${val}`, "success");
+                  return;
+                }
+              }
+            } catch (e) {}
+            requestAnimationFrame(loop);
+          };
+          requestAnimationFrame(loop);
+        } else {
+          const msg = document.getElementById("dosScannerMsg");
+          if (msg) msg.textContent = "Leitor nativo indisponível neste navegador; toque em 'Capturar Foto Agora' ou digite o código.";
+        }
+      } catch (err) {
+        _fecharScannerDosimetroCamera();
+        mostrarToast("Não foi possível abrir a câmera: " + (err?.message || err), "error");
+      }
+    }
     async function salvarDosimetriaEmed() {
       const payload = {
         tecnico_nome: document.getElementById("dosTec")?.value || "",
@@ -2342,16 +2528,65 @@
         laboratorio_monitoracao: document.getElementById("dosLab")?.value || "SAPRA LANDAUER",
         mes_competencia: document.getElementById("dosMes")?.value || "",
         dose_efetiva_msv: document.getElementById("dosVal")?.value || 0,
-        data_troca_prevista: document.getElementById("dosTroca")?.value || ""
+        data_troca_prevista: document.getElementById("dosTroca")?.value || "",
+        foto_base64: window._dosFotoCache?.base64 || "",
+        foto_nome: window._dosFotoCache?.nome || ""
       };
       const res = await apiPost("/api/equipe/dosimetria/salvar", payload);
       mostrarToast(res?.msg || "Erro ao salvar dosimetria");
-      if (res && res.ok) carregarDosimetriaEmedModal();
+      if (res && res.ok) {
+        window._dosFotoCache = null;
+        carregarDosimetriaEmedModal();
+      }
     }
     async function excluirDosimetriaEmed(id) {
       if (!confirm("Remover registro de dosimetria?")) return;
       await apiPost("/api/equipe/dosimetria/excluir", { id });
       carregarDosimetriaEmedModal();
+    }
+    async function carregarDossieColaboradorModal(nomeArg) {
+      const d = STATE.data || {};
+      const nomes = [];
+      (d.tecnicos || []).forEach(t => { if (t.nome && !nomes.includes(t.nome)) nomes.push(t.nome); });
+      (d.aniversariantes || []).forEach(a => { if (a.nome && !nomes.includes(a.nome)) nomes.push(a.nome); });
+      nomes.sort((a,b) => a.localeCompare(b));
+      const nome = nomeArg || window._colabDossieNome || nomes[0] || "";
+      window._colabDossieNome = nome;
+      if (nome) {
+        const res = await apiGet("/api/equipe/colaborador/dossie?nome=" + encodeURIComponent(nome));
+        if (res && res.ok) window._colabDossieCache = res;
+      }
+      renderConteudoModalEquipeSetores();
+    }
+    async function salvarItemDossieColaborador() {
+      const nome = document.getElementById("colSelect")?.value || window._colabDossieNome || "";
+      const titulo = document.getElementById("colTitulo")?.value || "";
+      if (!nome || !titulo.trim()) { mostrarToast("Informe o colaborador e a descrição do item!", "error"); return; }
+      let arqB64 = "", arqNome = "";
+      const f = document.getElementById("colArq")?.files?.[0];
+      if (f) {
+        arqNome = f.name;
+        arqB64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+      }
+      const res = await apiPost("/api/equipe/colaborador/salvar", {
+        colaborador_nome: nome,
+        categoria: document.getElementById("colCat")?.value || "EPI",
+        titulo: titulo.trim(),
+        codigo_ca_serie: document.getElementById("colCA")?.value || "",
+        quantidade: Number(document.getElementById("colQtd")?.value || 1),
+        data_entrega: document.getElementById("colDataEnt")?.value || "",
+        data_validade: document.getElementById("colDataVal")?.value || "",
+        observacoes: document.getElementById("colObs")?.value || "",
+        arquivo_base64: arqB64,
+        arquivo_nome: arqNome
+      });
+      mostrarToast(res?.msg || "Erro ao salvar no dossiê");
+      if (res && res.ok) carregarDossieColaboradorModal(nome);
+    }
+    async function excluirItemDossieColaborador(id) {
+      if (!confirm("Remover registro do dossiê do colaborador?")) return;
+      await apiPost("/api/equipe/colaborador/excluir", { id });
+      carregarDossieColaboradorModal(window._colabDossieNome);
     }
     function formEditarAniversariante(item) {
       item = item || {};

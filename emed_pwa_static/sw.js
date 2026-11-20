@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v1-5-1-nav-redundancy-full';
+const CACHE_NAME = 'emed-pwa-v1-9-0-dossie-sst-dosimetria-scanner';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

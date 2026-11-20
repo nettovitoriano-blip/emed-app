@@ -3696,6 +3696,9 @@ async def auth_api_middleware(request: web.Request, handler):
         or path == "/api/cliente/dossie-radiologico/imprimir"
         or path == "/portal-cliente"
         or path == "/api/equipe/dosimetria/imprimir"
+        or path.startswith("/api/equipe/dosimetria/foto/")
+        or path.startswith("/api/equipe/colaborador/arquivo/")
+        or path == "/api/equipe/colaborador/imprimir"
         or path == "/api/cliente/acesso/login"
         or path == "/api/cliente/portal-dados"
         or path == "/api/cliente/portal-salvar-doc"
@@ -25048,7 +25051,27 @@ def _garantir_schema_dosimetria_emed(conn: sqlite3.Connection) -> None:
             status_troca TEXT DEFAULT 'EM_USO',
             data_troca_prevista TEXT DEFAULT '',
             observacoes TEXT DEFAULT '',
+            foto_path TEXT DEFAULT '',
             atualizado_em TEXT NOT NULL
+        )
+    """)
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(emed_dosimetria_tecnicos)").fetchall()]
+    if "foto_path" not in cols:
+        conn.execute("ALTER TABLE emed_dosimetria_tecnicos ADD COLUMN foto_path TEXT DEFAULT ''")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS emed_colaboradores_dossie (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            colaborador_nome TEXT NOT NULL,
+            categoria TEXT NOT NULL,
+            titulo TEXT NOT NULL,
+            codigo_ca_serie TEXT DEFAULT '',
+            quantidade TEXT DEFAULT '1',
+            data_entrega TEXT DEFAULT '',
+            data_validade TEXT DEFAULT '',
+            arquivo_path TEXT DEFAULT '',
+            arquivo_nome TEXT DEFAULT '',
+            observacoes TEXT DEFAULT '',
+            registrado_em TEXT NOT NULL
         )
     """)
 
@@ -25057,11 +25080,18 @@ async def api_equipe_dosimetria_listar(request: web.Request) -> web.Response:
     with get_db_connection(DB_NAME) as conn:
         _garantir_schema_dosimetria_emed(conn)
         conn.row_factory = sqlite3.Row
-        rows = [dict(r) for r in conn.execute("SELECT * FROM emed_dosimetria_tecnicos ORDER BY mes_competencia DESC, id DESC").fetchall()]
+        rows = []
+        for r in conn.execute("SELECT * FROM emed_dosimetria_tecnicos ORDER BY mes_competencia DESC, id DESC").fetchall():
+            d = dict(r)
+            d["tem_foto"] = bool(d.get("foto_path") and os.path.exists(str(d.get("foto_path"))))
+            rows.append(d)
     return web.json_response({"ok": True, "dosimetrias": rows})
 
 
 async def api_equipe_dosimetria_salvar(request: web.Request) -> web.Response:
+    import base64
+    import re as _re
+    from datetime import datetime as _dt
     body = await request.json()
     tec = limpar_texto(body.get("tecnico_nome"), "").upper()
     num = limpar_texto(body.get("numero_dosimetro"), "").upper()
@@ -25075,16 +25105,171 @@ async def api_equipe_dosimetria_salvar(request: web.Request) -> web.Response:
     obs = limpar_texto(body.get("observacoes"), "")
     agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
 
+    foto_b64 = str(body.get("foto_base64") or "").strip()
+    foto_nome = limpar_texto(body.get("foto_nome"), "dosimetro.jpg")
+    foto_path = ""
+    if foto_b64:
+        try:
+            pasta = os.path.join(BASE_DIR, "uploads_os", "dosimetria_emed")
+            os.makedirs(pasta, exist_ok=True)
+            b64_clean = foto_b64.split(",", 1)[1] if "," in foto_b64 else foto_b64
+            safe_n = _re.sub(r"[^A-Za-z0-9._-]", "_", foto_nome)
+            foto_path = os.path.join(pasta, f"DOS_{int(_dt.now().timestamp())}_{safe_n}")
+            with open(foto_path, "wb") as fh:
+                fh.write(base64.b64decode(b64_clean))
+        except Exception:
+            foto_path = ""
+
     with get_db_connection(DB_NAME) as conn:
         _garantir_schema_dosimetria_emed(conn)
         conn.execute("""
             INSERT INTO emed_dosimetria_tecnicos (
                 tecnico_nome, numero_dosimetro, laboratorio_monitoracao, mes_competencia,
-                dose_efetiva_msv, status_troca, data_troca_prevista, observacoes, atualizado_em
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (tec, num, lab, mes, dose, st, dt_troca, obs, agora))
+                dose_efetiva_msv, status_troca, data_troca_prevista, observacoes, foto_path, atualizado_em
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (tec, num, lab, mes, dose, st, dt_troca, obs, foto_path, agora))
         conn.commit()
     return web.json_response({"ok": True, "msg": f"✅ Dosímetro {num} ({tec}) registrado para {mes}!"})
+
+
+async def api_equipe_dosimetria_foto(request: web.Request) -> web.Response:
+    did = str(request.match_info.get("id", "")).strip()
+    with get_db_connection(DB_NAME) as conn:
+        row = conn.execute("SELECT foto_path FROM emed_dosimetria_tecnicos WHERE CAST(id AS TEXT) = ?", (did,)).fetchone()
+    if not row or not row[0] or not os.path.exists(str(row[0])):
+        return web.Response(text="Foto não encontrada.", status=404)
+    return web.FileResponse(str(row[0]))
+
+
+async def api_equipe_colaborador_dossie(request: web.Request) -> web.Response:
+    """Retorna Dossie Completo do Colaborador EMED: ASOs, Dosimetria, EPIs, Fardamento, Equipamentos, Materiais e Treinamentos."""
+    nome = limpar_texto(request.query.get("nome"), "").upper()
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_dosimetria_emed(conn)
+        conn.row_factory = sqlite3.Row
+        if nome:
+            entregas = [dict(r) for r in conn.execute("SELECT * FROM emed_colaboradores_dossie WHERE UPPER(colaborador_nome) = ? ORDER BY id DESC", (nome,)).fetchall()]
+            dosimetrias = [dict(r) for r in conn.execute("SELECT * FROM emed_dosimetria_tecnicos WHERE UPPER(tecnico_nome) = ? ORDER BY mes_competencia DESC, id DESC", (nome,)).fetchall()]
+            asos = [dict(r) for r in conn.execute("SELECT * FROM historico_exames_medicos WHERE UPPER(nome_tecnico) LIKE ? ORDER BY id DESC", (f"%{nome}%",)).fetchall()]
+        else:
+            entregas = [dict(r) for r in conn.execute("SELECT * FROM emed_colaboradores_dossie ORDER BY id DESC LIMIT 100").fetchall()]
+            dosimetrias = [dict(r) for r in conn.execute("SELECT * FROM emed_dosimetria_tecnicos ORDER BY mes_competencia DESC, id DESC LIMIT 60").fetchall()]
+            asos = [dict(r) for r in conn.execute("SELECT * FROM historico_exames_medicos ORDER BY id DESC LIMIT 60").fetchall()]
+        for e in entregas:
+            e["tem_arquivo"] = bool(e.get("arquivo_path") and os.path.exists(str(e.get("arquivo_path"))))
+    return web.json_response({"ok": True, "colaborador": nome, "entregas": entregas, "dosimetrias": dosimetrias, "asos": asos})
+
+
+async def api_equipe_colaborador_salvar(request: web.Request) -> web.Response:
+    import base64
+    import re as _re
+    from datetime import datetime as _dt
+    body = await request.json()
+    colab = limpar_texto(body.get("colaborador_nome"), "").upper()
+    cat = limpar_texto(body.get("categoria"), "EPI").upper()
+    tit = limpar_texto(body.get("titulo"), "")
+    if not colab or not tit:
+        return web.json_response({"ok": False, "msg": "Informe o colaborador e a descrição do item/treinamento."}, status=400)
+    ca_serie = limpar_texto(body.get("codigo_ca_serie"), "").upper()
+    qtd = limpar_texto(body.get("quantidade"), "1")
+    dt_ent = limpar_texto(body.get("data_entrega"), obter_agora_brasil_str("%Y-%m-%d"))
+    dt_val = limpar_texto(body.get("data_validade"), "")
+    obs = limpar_texto(body.get("observacoes"), "")
+    agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+
+    arq_b64 = str(body.get("arquivo_base64") or "").strip()
+    arq_nome = limpar_texto(body.get("arquivo_nome"), "")
+    arq_path = ""
+    if arq_b64 and arq_nome:
+        try:
+            pasta = os.path.join(BASE_DIR, "uploads_os", "colaboradores_dossie")
+            os.makedirs(pasta, exist_ok=True)
+            b64_clean = arq_b64.split(",", 1)[1] if "," in arq_b64 else arq_b64
+            safe_n = _re.sub(r"[^A-Za-z0-9._-]", "_", arq_nome)
+            arq_path = os.path.join(pasta, f"COLAB_{int(_dt.now().timestamp())}_{safe_n}")
+            with open(arq_path, "wb") as fh:
+                fh.write(base64.b64decode(b64_clean))
+        except Exception:
+            arq_path = ""
+
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_dosimetria_emed(conn)
+        conn.execute("""
+            INSERT INTO emed_colaboradores_dossie (
+                colaborador_nome, categoria, titulo, codigo_ca_serie, quantidade,
+                data_entrega, data_validade, arquivo_path, arquivo_nome, observacoes, registrado_em
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (colab, cat, tit, ca_serie, qtd, dt_ent, dt_val, arq_path, arq_nome, obs, agora))
+        conn.commit()
+    return web.json_response({"ok": True, "msg": f"✅ Registro '{tit}' salvo no dossiê de {colab}!"})
+
+
+async def api_equipe_colaborador_excluir(request: web.Request) -> web.Response:
+    body = await request.json()
+    rid = str(body.get("id") or "").strip()
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_dosimetria_emed(conn)
+        conn.execute("DELETE FROM emed_colaboradores_dossie WHERE CAST(id AS TEXT) = ?", (rid,))
+        conn.commit()
+    return web.json_response({"ok": True, "msg": "🗑️ Registro removido."})
+
+
+async def api_equipe_colaborador_arquivo(request: web.Request) -> web.Response:
+    did = str(request.match_info.get("id", "")).strip()
+    with get_db_connection(DB_NAME) as conn:
+        row = conn.execute("SELECT arquivo_path FROM emed_colaboradores_dossie WHERE CAST(id AS TEXT) = ?", (did,)).fetchone()
+    if not row or not row[0] or not os.path.exists(str(row[0])):
+        return web.Response(text="Anexo não encontrado.", status=404)
+    return web.FileResponse(str(row[0]))
+
+
+async def api_equipe_colaborador_imprimir(request: web.Request) -> web.Response:
+    import html as _h
+    nome = limpar_texto(request.query.get("nome"), "").upper()
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_dosimetria_emed(conn)
+        conn.row_factory = sqlite3.Row
+        if nome:
+            entregas = conn.execute("SELECT * FROM emed_colaboradores_dossie WHERE UPPER(colaborador_nome) = ? ORDER BY id DESC", (nome,)).fetchall()
+            dosim = conn.execute("SELECT * FROM emed_dosimetria_tecnicos WHERE UPPER(tecnico_nome) = ? ORDER BY mes_competencia DESC", (nome,)).fetchall()
+            asos = conn.execute("SELECT * FROM historico_exames_medicos WHERE UPPER(nome_tecnico) LIKE ? ORDER BY id DESC", (f"%{nome}%",)).fetchall()
+        else:
+            entregas = conn.execute("SELECT * FROM emed_colaboradores_dossie ORDER BY colaborador_nome ASC, id DESC").fetchall()
+            dosim = conn.execute("SELECT * FROM emed_dosimetria_tecnicos ORDER BY mes_competencia DESC").fetchall()
+            asos = conn.execute("SELECT * FROM historico_exames_medicos ORDER BY id DESC").fetchall()
+
+    r_aso = "".join(f"<tr><td>{_h.escape(str(a['nome_tecnico']))}</td><td>{_h.escape(str(a['tipo_exame']))}</td><td>{_h.escape(str(a['data_exame']))}</td><td>{_h.escape(str(a['data_vencimento']))}</td><td><b>{_h.escape(str(a['parecer_aptidao']))}</b></td></tr>" for a in asos) or "<tr><td colspan='5'>Nenhum ASO registrado.</td></tr>"
+    r_dos = "".join(f"<tr><td>{_h.escape(str(d['tecnico_nome']))}</td><td>{_h.escape(str(d['numero_dosimetro']))}</td><td>{_h.escape(str(d['mes_competencia']))}</td><td>{float(d['dose_efetiva_msv'] or 0):.2f} mSv</td></tr>" for d in dosim) or "<tr><td colspan='4'>Nenhuma dosimetria registrada.</td></tr>"
+    r_ent = "".join(f"<tr><td>{_h.escape(str(e['colaborador_nome']))}</td><td>{_h.escape(str(e['categoria']))}</td><td>{_h.escape(str(e['titulo']))}</td><td>{_h.escape(str(e['codigo_ca_serie'] or '-'))}</td><td>{_h.escape(str(e['quantidade']))}</td><td>{_h.escape(str(e['data_entrega']))}</td></tr>" for e in entregas) or "<tr><td colspan='6'>Nenhuma entrega/treinamento registrado.</td></tr>"
+
+    html_out = f"""<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Ficha do Colaborador — {_h.escape(nome or 'EQUIPE EMED')}</title>
+<style>
+  body {{ font-family: Arial, sans-serif; margin: 16px; color: #0f172a; font-size: 11px; }}
+  .hdr {{ display:flex; justify-content:space-between; border-bottom:2px solid #002b54; padding-bottom:8px; margin-bottom:12px; }}
+  h3 {{ background:#002b54; color:#fff; padding:5px 8px; margin:12px 0 4px; font-size:11.5px; }}
+  table {{ width:100%; border-collapse:collapse; margin-bottom:8px; }}
+  th, td {{ border:1px solid #cbd5e1; padding:4px 6px; text-align:left; }}
+  th {{ background:#f1f5f9; }}
+  @media print {{ @page {{ size: A4; margin: 10mm; }} .no-print {{ display:none; }} }}
+</style></head>
+<body>
+  <div class="no-print" style="margin-bottom:10px;display:flex;justify-content:space-between;">
+    <b>👥 Prontuário Completo do Colaborador — {_h.escape(nome or 'EQUIPE EMED')}</b>
+    <button onclick="window.print()" style="background:#002b54;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-weight:bold;cursor:pointer;">🖨️ Imprimir / Salvar PDF</button>
+  </div>
+  <div class="hdr">
+    <div><b style="font-size:15px;color:#002b54;">DOSSIÊ DE COLABORADOR, SST &amp; RADIOPROTEÇÃO</b><div>Colaborador: <b>{_h.escape(nome or 'TODOS OS COLABORADORES')}</b></div></div>
+    <div style="text-align:right;"><b>EMED ELETROMEDICINA LTDA.</b><div>Medicina do Trabalho • EPIs • Treinamentos</div></div>
+  </div>
+  <h3>1. Exames Médicos Ocupacionais (ASO / PCMSO)</h3>
+  <table><thead><tr><th>Colaborador</th><th>Tipo</th><th>Data Exame</th><th>Vencimento</th><th>Parecer</th></tr></thead><tbody>{r_aso}</tbody></table>
+  <h3>2. Monitoração Individual (Dosimetria)</h3>
+  <table><thead><tr><th>Técnico</th><th>Nº Dosímetro</th><th>Competência</th><th>Dose Efetiva</th></tr></thead><tbody>{r_dos}</tbody></table>
+  <h3>3. Entregas de EPIs, Fardamento, Equipamentos, Materiais &amp; Treinamentos</h3>
+  <table><thead><tr><th>Colaborador</th><th>Categoria</th><th>Item / Treinamento</th><th>CA / Série</th><th>Qtd</th><th>Data</th></tr></thead><tbody>{r_ent}</tbody></table>
+</body></html>"""
+    return web.Response(text=html_out, content_type="text/html", charset="utf-8")
 
 
 async def api_equipe_dosimetria_excluir(request: web.Request) -> web.Response:
@@ -25435,6 +25620,12 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/equipe/dosimetria/salvar", api_equipe_dosimetria_salvar)
     app.router.add_post("/api/equipe/dosimetria/excluir", api_equipe_dosimetria_excluir)
     app.router.add_get("/api/equipe/dosimetria/imprimir", api_equipe_dosimetria_imprimir)
+    app.router.add_get("/api/equipe/dosimetria/foto/{id}", api_equipe_dosimetria_foto)
+    app.router.add_get("/api/equipe/colaborador/dossie", api_equipe_colaborador_dossie)
+    app.router.add_post("/api/equipe/colaborador/salvar", api_equipe_colaborador_salvar)
+    app.router.add_post("/api/equipe/colaborador/excluir", api_equipe_colaborador_excluir)
+    app.router.add_get("/api/equipe/colaborador/arquivo/{id}", api_equipe_colaborador_arquivo)
+    app.router.add_get("/api/equipe/colaborador/imprimir", api_equipe_colaborador_imprimir)
 
     app.router.add_post("/api/propostas", api_proposta_salvar)
 
