@@ -1402,7 +1402,7 @@
       <div class="brand-center" onclick="abrirDrawer()" style="cursor:pointer;display:flex;align-items:center;justify-content:flex-start;margin-right:auto;" title="Abrir Menu">
         <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
           <img src="/api/logo-circle" alt="eMED" class="brand-logo-img" onerror="this.src='/api/logo'" />
-          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.5.0</div></div>
+          <div class="brand-title">EMED <span class="hide-mobile">ELETROMEDICINA</span><div onclick="forcarAtualizacaoPWA()" title="Toque para verificar atualizações" style="font-size:9.5px;font-weight:700;opacity:0.78;letter-spacing:0.6px;line-height:1;margin-top:2px;cursor:pointer;">v1.6.0</div></div>
         </div>
       </div>
       <!-- DIREITA: BOTÃO DE SINCRONIZAR E INSTALAR PWA -->
@@ -3140,7 +3140,7 @@
           window.location.reload(true);
         } catch(e) { window.location.reload(); }
       }
-      navigator.serviceWorker.register("/sw.js?v=1.5.0").then(reg => { if(reg) reg.update(); }).catch(() => {});
+      navigator.serviceWorker.register("/sw.js?v=1.6.0").then(reg => { if(reg) reg.update(); }).catch(() => {});
       let _swReloaded = false;
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         if (!_swReloaded && navigator.onLine && !STATE.osAberta) {
@@ -13740,6 +13740,12 @@ function renderMenuCliTriagem(box) {
                 </div>
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="btn" onclick="abrirModalAcessoClientePortal()" style="background:#f59e0b;color:#451a03;font-weight:900;padding:6px 12px;border:none;border-radius:6px;cursor:pointer;font-size:12px;">
+                  🔑 Gerar Login &amp; Senha
+                </button>
+                <button type="button" class="btn" onclick="enviarAlertaMensalGestorVisa()" style="background:#25d366;color:#052e16;font-weight:900;padding:6px 12px;border:none;border-radius:6px;cursor:pointer;font-size:12px;">
+                  📲 Alerta / Relatório Gestor
+                </button>
                 <button type="button" class="btn" onclick="window.open('/api/cliente/dossie-radiologico/imprimir?cliente='+encodeURIComponent(STATE.hospitalPortal||''),'_blank')" style="background:#0284c7;color:#fff;font-weight:900;padding:6px 14px;border:none;border-radius:6px;cursor:pointer;font-size:12px;">
                   🖨️ Dossiê Completo VISA (PDF)
                 </button>
@@ -13981,6 +13987,38 @@ function renderMenuCliTriagem(box) {
         </div>
       `;
       document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    async function abrirModalAcessoClientePortal() {
+      const cli = STATE.hospitalPortal || "";
+      if (!cli) return alert("Selecione uma unidade hospitalar primeiro.");
+      const gestor = prompt(`Nome do Gestor da unidade ${cli} (opcional):`, "") || "";
+      const wpp = prompt(`WhatsApp do Gestor (com DDD, ex: 85999990000 - opcional):`, "") || "";
+      const res = await apiPost("/api/cliente/acesso/gerar", {
+        cliente_nome: cli,
+        gestor_nome: gestor,
+        gestor_whatsapp: wpp
+      });
+      if (!res || !res.ok) return alert(res?.msg || "Erro ao gerar acesso.");
+      const urlPortal = `${window.location.origin}/portal-cliente`;
+      const msgWa = `Olá${gestor ? ' ' + gestor : ''}! Segue o acesso exclusivo de *${cli}* ao Portal de Vigilância Sanitária & Laudos (RDC 611) da *EMED Eletromedicina*:\n\n🔗 *Link:* ${urlPortal}\n👤 *Usuário:* ${res.usuario}\n🔑 *Senha:* ${res.senha}`;
+      try { navigator.clipboard.writeText(msgWa); } catch(e){}
+      if (confirm(`✅ Acesso criado com sucesso!\n\nUsuário: ${res.usuario}\nSenha: ${res.senha}\nLink: ${urlPortal}\n\n(Mensagem copiada! Deseja abrir o WhatsApp para enviar ao gestor?)`)) {
+        const tel = String(wpp).replace(/\D/g, "");
+        window.open(`https://wa.me/${tel ? '55' + tel : ''}?text=${encodeURIComponent(msgWa)}`, "_blank");
+      }
+    }
+
+    async function enviarAlertaMensalGestorVisa() {
+      const cli = STATE.hospitalPortal || "";
+      if (!cli) return alert("Selecione uma unidade hospitalar primeiro.");
+      const res = await apiGet(`/api/cliente/dossie-radiologico/alerta-gestor?cliente=${encodeURIComponent(cli)}`);
+      if (!res || !res.ok) return alert(res?.msg || "Erro ao gerar relatório mensal.");
+      try { navigator.clipboard.writeText(res.mensagem); } catch(e){}
+      if (confirm(`📲 Relatório Mensal de Conformidade VISA gerado e copiado!\n\n${res.mensagem.slice(0, 380)}...\n\nDeseja abrir no WhatsApp para enviar ao gestor?`)) {
+        const tel = String(res.gestor_whatsapp || "").replace(/\D/g, "");
+        window.open(`https://wa.me/${tel ? '55' + tel : ''}?text=${encodeURIComponent(res.mensagem)}`, "_blank");
+      }
     }
 
     async function excluirDocDossieVisa(id) {

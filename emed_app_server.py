@@ -3687,6 +3687,10 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/api/almoxarifado/")
         or path.startswith("/api/cliente/dossie-radiologico/arquivo/")
         or path == "/api/cliente/dossie-radiologico/imprimir"
+        or path == "/portal-cliente"
+        or path == "/api/cliente/acesso/login"
+        or path == "/api/cliente/portal-dados"
+        or path == "/api/cliente/portal-salvar-doc"
         or path.startswith("/api/pmp/")
 
         or path.startswith("/api/hospital/")
@@ -19921,6 +19925,323 @@ async def api_cliente_dossie_imprimir(request: web.Request) -> web.Response:
     return web.Response(text=html_out, content_type="text/html", charset="utf-8")
 
 
+# ==============================================================================
+# PORTAL EXCLUSIVO DO CLIENTE (LOGIN/SENHA POR UNIDADE + ALERTA MENSAL GESTOR)
+# ==============================================================================
+def _garantir_schema_acessos_cliente(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS clientes_acessos_portal (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cliente_nome TEXT UNIQUE NOT NULL,
+            usuario TEXT UNIQUE NOT NULL,
+            senha_hash TEXT NOT NULL,
+            gestor_nome TEXT DEFAULT '',
+            gestor_whatsapp TEXT DEFAULT '',
+            gestor_email TEXT DEFAULT '',
+            token_acesso TEXT UNIQUE NOT NULL,
+            ativo INTEGER NOT NULL DEFAULT 1,
+            criado_em TEXT NOT NULL,
+            ultimo_acesso TEXT DEFAULT ''
+        )
+    """)
+
+
+def _hash_senha_portal(senha: str) -> str:
+    import hashlib
+    return hashlib.sha256(("EMED_PORTAL_SALT_2026:" + str(senha)).encode("utf-8")).hexdigest()
+
+
+async def api_cliente_acesso_gerar(request: web.Request) -> web.Response:
+    """Gera ou redefine login e senha exclusivos para a unidade hospitalar/clinica."""
+    import re as _re
+    import secrets
+    body = await request.json()
+    cliente_nome = limpar_texto(body.get("cliente_nome"), "").upper()
+    if not cliente_nome:
+        return web.json_response({"ok": False, "msg": "Informe o nome do cliente/unidade."}, status=400)
+
+    gestor_nome = limpar_texto(body.get("gestor_nome"), "")
+    gestor_wpp = limpar_texto(body.get("gestor_whatsapp"), "")
+    gestor_email = limpar_texto(body.get("gestor_email"), "")
+    slug = _re.sub(r"[^a-z0-9]+", ".", cliente_nome.lower()).strip(".")[:24] or "unidade"
+    usuario = limpar_texto(body.get("usuario"), slug).lower()
+    senha_plana = limpar_texto(body.get("senha"), "") or f"emed{secrets.randbelow(9000)+1000}"
+    token = secrets.token_hex(16)
+    agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_acessos_cliente(conn)
+        row_ex = conn.execute("SELECT id, usuario FROM clientes_acessos_portal WHERE UPPER(cliente_nome) = ?", (cliente_nome,)).fetchone()
+        if row_ex:
+            conn.execute("""
+                UPDATE clientes_acessos_portal
+                SET usuario = ?, senha_hash = ?, gestor_nome = ?, gestor_whatsapp = ?, gestor_email = ?, token_acesso = ?, ativo = 1
+                WHERE id = ?
+            """, (usuario, _hash_senha_portal(senha_plana), gestor_nome, gestor_wpp, gestor_email, token, row_ex[0]))
+        else:
+            while conn.execute("SELECT 1 FROM clientes_acessos_portal WHERE usuario = ?", (usuario,)).fetchone():
+                usuario = f"{slug}.{secrets.randbelow(90)+10}"
+            conn.execute("""
+                INSERT INTO clientes_acessos_portal (
+                    cliente_nome, usuario, senha_hash, gestor_nome, gestor_whatsapp, gestor_email, token_acesso, ativo, criado_em
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+            """, (cliente_nome, usuario, _hash_senha_portal(senha_plana), gestor_nome, gestor_wpp, gestor_email, token, agora))
+        conn.commit()
+
+    return web.json_response({
+        "ok": True,
+        "cliente_nome": cliente_nome,
+        "usuario": usuario,
+        "senha": senha_plana,
+        "gestor_nome": gestor_nome,
+        "gestor_whatsapp": gestor_wpp,
+        "msg": f"✅ Acesso criado para {cliente_nome}! Usuário: {usuario}",
+    })
+
+
+async def api_cliente_acesso_listar(request: web.Request) -> web.Response:
+    cliente_f = limpar_texto(request.query.get("cliente"), "").upper()
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_acessos_cliente(conn)
+        conn.row_factory = sqlite3.Row
+        if cliente_f:
+            rows = conn.execute("SELECT id, cliente_nome, usuario, gestor_nome, gestor_whatsapp, gestor_email, ativo, criado_em, ultimo_acesso FROM clientes_acessos_portal WHERE UPPER(cliente_nome) = ?", (cliente_f,)).fetchall()
+        else:
+            rows = conn.execute("SELECT id, cliente_nome, usuario, gestor_nome, gestor_whatsapp, gestor_email, ativo, criado_em, ultimo_acesso FROM clientes_acessos_portal ORDER BY id DESC").fetchall()
+    return web.json_response({"ok": True, "acessos": [dict(r) for r in rows]})
+
+
+async def api_cliente_acesso_login(request: web.Request) -> web.Response:
+    body = await request.json()
+    usuario = limpar_texto(body.get("usuario"), "").lower()
+    senha = str(body.get("senha") or "").strip()
+    if not usuario or not senha:
+        return web.json_response({"ok": False, "msg": "Informe usuário e senha."}, status=400)
+
+    agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_acessos_cliente(conn)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM clientes_acessos_portal WHERE LOWER(usuario) = ? AND ativo = 1", (usuario,)).fetchone()
+        if not row or row["senha_hash"] != _hash_senha_portal(senha):
+            return web.json_response({"ok": False, "msg": "Usuário ou senha inválidos."}, status=401)
+        conn.execute("UPDATE clientes_acessos_portal SET ultimo_acesso = ? WHERE id = ?", (agora, row["id"]))
+        conn.commit()
+    return web.json_response({
+        "ok": True,
+        "token": row["token_acesso"],
+        "cliente_nome": row["cliente_nome"],
+        "gestor_nome": row["gestor_nome"] or row["cliente_nome"],
+    })
+
+
+def _validar_token_portal_cliente(conn: sqlite3.Connection, request: web.Request) -> Optional[str]:
+    _garantir_schema_acessos_cliente(conn)
+    tok = str(request.headers.get("X-Cliente-Token") or request.query.get("token") or "").strip()
+    if not tok:
+        return None
+    row = conn.execute("SELECT cliente_nome FROM clientes_acessos_portal WHERE token_acesso = ? AND ativo = 1", (tok,)).fetchone()
+    return str(row[0]) if row else None
+
+
+async def api_cliente_portal_dados(request: web.Request) -> web.Response:
+    """Retorna exclusivamente os dados da unidade autenticada (Dossie VISA, Equipamentos e OS)."""
+    with get_db_connection(DB_NAME) as conn:
+        cli_nome = _validar_token_portal_cliente(conn, request)
+        if not cli_nome:
+            return web.json_response({"ok": False, "msg": "Sessão inválida ou expirada."}, status=401)
+        conn.row_factory = sqlite3.Row
+        os_rows = [dict(r) for r in conn.execute(
+            "SELECT id, equipamento, tipo_servico, status, data_agendamento, checkin_hora, checkout_hora, tecnico_responsavel FROM clientes_equipamentos WHERE UPPER(cliente) = ? ORDER BY id DESC LIMIT 60",
+            (cli_nome.upper(),)
+        ).fetchall()]
+
+    # Reaproveita calculo oficial do dossie
+    fake_req = request
+    class _QReq:
+        def __init__(self, q): self.query = q
+    d_resp = await api_cliente_dossie_radiologico(_QReq({"cliente": cli_nome}))
+    import json as _j
+    dossie = _j.loads(d_resp.text)
+    return web.json_response({
+        "ok": True,
+        "cliente_nome": cli_nome,
+        "metricas": dossie.get("metricas", {}),
+        "checklist_visa": dossie.get("checklist_visa", []),
+        "laudos": dossie.get("laudos", []),
+        "equipamentos": dossie.get("equipamentos", []),
+        "ordens": os_rows,
+    })
+
+
+async def api_cliente_portal_salvar_doc(request: web.Request) -> web.Response:
+    """Permite que o proprio parceiro/cliente autenticado anexe um documento ao seu Dossie VISA."""
+    with get_db_connection(DB_NAME) as conn:
+        cli_nome = _validar_token_portal_cliente(conn, request)
+        if not cli_nome:
+            return web.json_response({"ok": False, "msg": "Sessão inválida."}, status=401)
+    body = await request.json()
+    body["cliente_nome"] = cli_nome
+    class _BReq:
+        def __init__(self, b): self._b = b
+        async def json(self): return self._b
+    return await api_cliente_dossie_radiologico_salvar(_BReq(body))
+
+
+async def api_cliente_alerta_gestor(request: web.Request) -> web.Response:
+    """Gera mensagem pronta (WhatsApp / Relatorio Mensal) de vencimentos VISA e prontidao para o gestor da unidade."""
+    cliente = limpar_texto(request.query.get("cliente"), "").upper()
+    if not cliente:
+        return web.json_response({"ok": False, "msg": "Informe o cliente."}, status=400)
+    class _QReq:
+        def __init__(self, q): self.query = q
+    import json as _j
+    d_resp = await api_cliente_dossie_radiologico(_QReq({"cliente": cliente}))
+    dossie = _j.loads(d_resp.text)
+    m = dossie.get("metricas", {})
+    laudos = dossie.get("laudos", [])
+    chk = dossie.get("checklist_visa", [])
+
+    vencidos = [l for l in laudos if l.get("status_calculado") == "VENCIDO"]
+    vencendo = [l for l in laudos if l.get("status_calculado") == "VENCENDO_30D"]
+    faltantes = [c for c in chk if c.get("status") == "FALTANDO"]
+
+    gestor_nome = ""
+    gestor_wpp = ""
+    with get_db_connection(DB_NAME) as conn:
+        _garantir_schema_acessos_cliente(conn)
+        row = conn.execute("SELECT gestor_nome, gestor_whatsapp FROM clientes_acessos_portal WHERE UPPER(cliente_nome) = ?", (cliente,)).fetchone()
+        if row:
+            gestor_nome, gestor_wpp = row[0] or "", row[1] or ""
+
+    linhas = [
+        f"🏥 *RELATÓRIO MENSAL DE CONFORMIDADE VISA / RDC 611*",
+        f"*Unidade:* {cliente}",
+        f"🛡️ *Prontidão p/ Fiscalização:* {m.get('conformidade_percentual', 0)}%",
+        f"✅ Vigentes: {m.get('vigentes', 0)} | ⏳ Vencendo (≤30d): {m.get('vencendo', 0)} | 🚨 Vencidos: {m.get('vencidos', 0)}",
+        "",
+    ]
+    if vencidos:
+        linhas.append("🚨 *DOCUMENTOS VENCIDOS (AÇÃO URGENTE):*")
+        for v in vencidos[:5]:
+            linhas.append(f"• {v.get('titulo')} (venceu em {v.get('data_validade')})")
+        linhas.append("")
+    if vencendo:
+        linhas.append("⏳ *VENCENDO NOS PRÓXIMOS 30 DIAS:*")
+        for v in vencendo[:5]:
+            linhas.append(f"• {v.get('titulo')} (vence em {v.get('data_validade')} — {v.get('dias_para_vencer')}d)")
+        linhas.append("")
+    if faltantes:
+        linhas.append("📋 *PENDENTES NO CHECKLIST RDC 611:*")
+        for f in faltantes[:6]:
+            linhas.append(f"• {f.get('titulo')}")
+        linhas.append("")
+
+    base_url = f"https://{request.host}" if "emedservice.med.br" in request.host else f"{request.scheme}://{request.host}"
+    linhas.append(f"🔗 *Acesse seu Dossiê & Laudos no Portal do Cliente:*\n{base_url}/portal-cliente")
+    linhas.append("\n_EMED Eletromedicina — Engenharia Clínica & Radioproteção_")
+
+    return web.json_response({
+        "ok": True,
+        "cliente": cliente,
+        "gestor_nome": gestor_nome,
+        "gestor_whatsapp": gestor_wpp,
+        "mensagem": "\n".join(linhas),
+    })
+
+
+async def api_portal_cliente_html(request: web.Request) -> web.Response:
+    """Portal web exclusivo para clientes/parceiros (Login + Dossie VISA + Equipamentos + Laudos)."""
+    html_out = """<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Portal do Cliente — EMED Eletromedicina</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; margin:0; background:#020617; color:#f8fafc; }
+  .wrap { max-width:960px; margin:0 auto; padding:18px 14px 40px; }
+  .card { background:#0f172a; border:1px solid #1e293b; border-radius:14px; padding:18px; margin-bottom:14px; }
+  .inp { width:100%; box-sizing:border-box; padding:10px 12px; border-radius:8px; border:1px solid #334155; background:#1e293b; color:#fff; font-size:14px; margin-top:4px; }
+  .btn { background:#0284c7; color:#fff; border:none; border-radius:8px; padding:10px 16px; font-weight:800; cursor:pointer; font-size:13px; }
+  .btn-ok { background:#10b981; color:#064e3b; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th, td { border-bottom:1px solid #1e293b; padding:8px 6px; text-align:left; }
+  th { color:#94a3b8; font-size:11px; text-transform:uppercase; }
+</style></head>
+<body>
+  <div class="wrap">
+    <div id="boxLogin" class="card" style="max-width:420px;margin:40px auto;">
+      <div style="font-size:11px;color:#38bdf8;font-weight:800;">EMED ELETROMEDICINA • PORTAL DO PARCEIRO</div>
+      <h2 style="margin:4px 0 14px;">Acesso ao Dossiê Sanitário &amp; Parque</h2>
+      <label style="font-size:12px;color:#94a3b8;">Usuário</label>
+      <input id="cliUser" class="inp" placeholder="ex: clinica.ags" />
+      <label style="font-size:12px;color:#94a3b8;display:block;margin-top:10px;">Senha</label>
+      <input id="cliPass" type="password" class="inp" placeholder="••••••" />
+      <button class="btn" style="width:100%;margin-top:14px;" onclick="fazerLoginCli()">🔐 Entrar no Portal</button>
+      <div id="cliErr" style="color:#f87171;font-size:12px;margin-top:8px;"></div>
+    </div>
+
+    <div id="boxApp" style="display:none;">
+      <div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-size:11px;color:#38bdf8;font-weight:800;">PORTAL DE FISCALIZAÇÃO VISA / RDC 611</div>
+          <h2 id="lblCliNome" style="margin:2px 0 0;"></h2>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn" onclick="imprimirDossie()">🖨️ Dossiê Completo PDF</button>
+          <button class="btn" style="background:#334155;" onclick="sairCli()">Sair</button>
+        </div>
+      </div>
+
+      <div id="boxKpis" class="grid" style="margin-bottom:14px;"></div>
+      <div id="boxChk" class="card"></div>
+      <div id="boxDocs" class="card" style="overflow-x:auto;"></div>
+      <div id="boxOs" class="card" style="overflow-x:auto;"></div>
+    </div>
+  </div>
+  <script>
+    let CLI_TOKEN = sessionStorage.getItem('emed_cli_token') || '';
+    let CLI_NOME = sessionStorage.getItem('emed_cli_nome') || '';
+    if (CLI_TOKEN) carregarPortal();
+
+    async function fazerLoginCli() {
+      const usuario = document.getElementById('cliUser').value.trim();
+      const senha = document.getElementById('cliPass').value.trim();
+      const res = await fetch('/api/cliente/acesso/login', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({usuario, senha})
+      }).then(r=>r.json());
+      if (!res.ok) { document.getElementById('cliErr').textContent = res.msg || 'Acesso negado'; return; }
+      CLI_TOKEN = res.token; CLI_NOME = res.cliente_nome;
+      sessionStorage.setItem('emed_cli_token', CLI_TOKEN);
+      sessionStorage.setItem('emed_cli_nome', CLI_NOME);
+      carregarPortal();
+    }
+    function sairCli() { sessionStorage.clear(); location.reload(); }
+    function imprimirDossie() { window.open('/api/cliente/dossie-radiologico/imprimir?cliente=' + encodeURIComponent(CLI_NOME), '_blank'); }
+
+    async function carregarPortal() {
+      const res = await fetch('/api/cliente/portal-dados', { headers: {'X-Cliente-Token': CLI_TOKEN} }).then(r=>r.json());
+      if (!res.ok) { sairCli(); return; }
+      document.getElementById('boxLogin').style.display = 'none';
+      document.getElementById('boxApp').style.display = 'block';
+      document.getElementById('lblCliNome').textContent = res.cliente_nome;
+      const m = res.metricas || {};
+      document.getElementById('boxKpis').innerHTML = `
+        <div class="card"><b>Prontidão VISA</b><div style="font-size:24px;font-weight:900;color:#34d399;">${m.conformidade_percentual||0}%</div></div>
+        <div class="card"><b>Vigentes</b><div style="font-size:24px;font-weight:900;color:#38bdf8;">${m.vigentes||0}</div></div>
+        <div class="card"><b>Vencendo (≤30d)</b><div style="font-size:24px;font-weight:900;color:#fbbf24;">${m.vencendo||0}</div></div>
+        <div class="card"><b>Vencidos</b><div style="font-size:24px;font-weight:900;color:#f87171;">${m.vencidos||0}</div></div>`;
+      document.getElementById('boxChk').innerHTML = `<h3 style="margin:0 0 10px;">📋 Checklist Obrigatório RDC 611 / VISA</h3><div class="grid">${(res.checklist_visa||[]).map(c=>{
+        const cor = c.status==='OK'?'#10b981':(c.status==='VENCENDO'?'#f59e0b':'#ef4444');
+        return `<div style="background:#020617;border-left:4px solid ${cor};padding:8px 10px;border-radius:8px;"><b>${c.titulo}</b><div style="font-size:11px;color:${cor};">${c.status} (${c.qtd_docs} doc)</div></div>`;
+      }).join('')}</div>`;
+      document.getElementById('boxDocs').innerHTML = `<h3 style="margin:0 0 10px;">📁 Documentos &amp; Laudos Sanitários</h3><table><thead><tr><th>Título</th><th>Nº Doc</th><th>Validade</th><th>Status</th><th>Anexo</th></tr></thead><tbody>${(res.laudos||[]).map(l=>`<tr><td>${l.titulo}</td><td>${l.numero_documento||'-'}</td><td>${l.data_validade||'-'}</td><td>${l.status_calculado||'VIGENTE'}</td><td>${l.tem_arquivo?`<a style="color:#38bdf8;" target="_blank" href="/api/cliente/dossie-radiologico/arquivo/${l.id}">📎 Abrir</a>`:'-'}</td></tr>`).join('')}</tbody></table>`;
+      document.getElementById('boxOs').innerHTML = `<h3 style="margin:0 0 10px;">🛠️ Ordens de Serviço &amp; Laudos (${(res.ordens||[]).length})</h3><table><thead><tr><th>OS</th><th>Equipamento</th><th>Serviço</th><th>Status</th><th>Laudo PDF</th></tr></thead><tbody>${(res.ordens||[]).map(o=>`<tr><td>#${o.id}</td><td>${o.equipamento}</td><td>${o.tipo_servico}</td><td>${o.status}</td><td><a style="color:#34d399;" target="_blank" href="/api/imprimir/${o.id}">📄 PDF</a></td></tr>`).join('')}</tbody></table>`;
+    }
+  </script>
+</body></html>"""
+    return web.Response(text=html_out, content_type="text/html", charset="utf-8")
+
+
 
 
 
@@ -24752,6 +25073,13 @@ def criar_app() -> web.Application:
     app.router.add_get("/api/cliente/dossie-radiologico/arquivo/{id}", api_cliente_dossie_arquivo)
     app.router.add_post("/api/cliente/dossie-radiologico/excluir", api_cliente_dossie_excluir)
     app.router.add_get("/api/cliente/dossie-radiologico/imprimir", api_cliente_dossie_imprimir)
+    app.router.add_post("/api/cliente/acesso/gerar", api_cliente_acesso_gerar)
+    app.router.add_get("/api/cliente/acesso/listar", api_cliente_acesso_listar)
+    app.router.add_post("/api/cliente/acesso/login", api_cliente_acesso_login)
+    app.router.add_get("/api/cliente/portal-dados", api_cliente_portal_dados)
+    app.router.add_post("/api/cliente/portal-salvar-doc", api_cliente_portal_salvar_doc)
+    app.router.add_get("/api/cliente/dossie-radiologico/alerta-gestor", api_cliente_alerta_gestor)
+    app.router.add_get("/portal-cliente", api_portal_cliente_html)
 
     app.router.add_post("/api/propostas", api_proposta_salvar)
 
