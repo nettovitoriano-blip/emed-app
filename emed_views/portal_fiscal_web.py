@@ -7812,7 +7812,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       `);
     }}
 
-    function conectarWhatsAppBotLocal() {{
+    async function conectarWhatsAppBotLocal() {{
       const btn = document.getElementById("btnConectarWhatsBot");
       if (btn) {{ btn.disabled = true; btn.textContent = "⏳ Abrindo..."; }}
       mostrarAvisoPdfModal("⏳ Abrindo janela dedicada do WhatsApp Web no servidor... Se ainda não conectou, escaneie o QR Code com o celular.");
