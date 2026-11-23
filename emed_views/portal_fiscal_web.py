@@ -65,12 +65,19 @@ async def api_fiscal_v2_login(request: web.Request) -> web.Response:
             ttl = float(data.get("ttl", 1800))
             if (is_perm or (time.time() - ts <= ttl)) and usr in USUARIOS_FISCAL:
                 info = USUARIOS_FISCAL[usr]
-                return web.json_response({
+                resp = web.json_response({
                     "ok": True,
                     "username": usr,
                     "role": info["role"],
                     "cargo": info["cargo"],
                 })
+                try:
+                    from emed_app_server import gerar_token_sessao
+                    tkn = gerar_token_sessao(1, usr, info["role"])
+                    resp.set_cookie("emed_session", tkn, max_age=30*86400, httponly=True, samesite="Lax", path="/")
+                except Exception:
+                    pass
+                return resp
         except Exception as e:
             return web.json_response({"ok": False, "msg": f"Token QR inválido: {e}"}, status=400)
 
@@ -428,8 +435,8 @@ async def api_fiscal_v2_cancelar(request: web.Request) -> web.Response:
     usuario = str(body.get("usuario", "netto")).strip()
     senha = str(body.get("senha", "")).strip()
 
-    # Validação de segurança: Senha Mestra Fiscal / Certificado A1 ou senha do usuário admin
-    senhas_validas = {"emed2026", "Emed@2026"}
+    # Validação de segurança: Senha individual do operador fiscal autorizado ou Certificado A1
+    senhas_validas = set()
     if usuario in USUARIOS_FISCAL and USUARIOS_FISCAL[usuario].get("senha"):
         senhas_validas.add(USUARIOS_FISCAL[usuario]["senha"])
 
@@ -1715,10 +1722,12 @@ async def api_fiscal_recebidas_enviar_whatsapp_pdf(request: web.Request) -> web.
 
     db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
 
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
 
     nota_id = int(body.get("id", 0) or 0)
-
     numeros = body.get("numeros") or []
 
     if not nota_id or not numeros:
@@ -2146,8 +2155,14 @@ async def api_fiscal_recebidas_danfe(request: web.Request) -> web.Response:
       if (foneRaw.length === 8 || foneRaw.length === 9) foneRaw = "5585" + foneRaw;
       else if (!foneRaw.startsWith("55") && (foneRaw.length === 10 || foneRaw.length === 11)) foneRaw = "55" + foneRaw;
 
-      const urlDanfe = window.location.origin + "/api/fiscal/recebidas/pdf/{n_id}";
-      const urlXml = window.location.origin + "/api/fiscal/recebidas/xml/{n_id}";
+      // Download automático do PDF oficial da DANFE
+      const aPdfAuto = document.createElement("a");
+      aPdfAuto.href = "/api/fiscal/recebidas/pdf/{n_id}?download=1";
+      aPdfAuto.download = "DANFE_NFe_{num_nf}.pdf";
+      document.body.appendChild(aPdfAuto);
+      aPdfAuto.click();
+      aPdfAuto.remove();
+
       const texto = [
         "🧾 *DANFE OFICIAL (PADRÃO BRASILEIRO)*",
         "• *NF-e Nº:* {num_nf}",
@@ -2158,8 +2173,7 @@ async def api_fiscal_recebidas_danfe(request: web.Request) -> web.Response:
         "• *Valor Total:* R$ {v_tot:,.2f}",
         "• *Chave de Acesso:* `{chave}`",
         "",
-        "📄 *Abrir DANFE Oficial (.PDF Padrão):* " + urlDanfe,
-        "📥 *Baixar Arquivo XML:* " + urlXml
+        "📎 *Arquivo Oficial em Anexo:* DANFE_NFe_{num_nf}.pdf (sem links externos)"
       ].join(String.fromCharCode(10));
       try {{
         if (navigator.clipboard && navigator.clipboard.writeText) {{
@@ -2175,14 +2189,11 @@ async def api_fiscal_recebidas_danfe(request: web.Request) -> web.Response:
 
     function obterDadosEmailDanfe() {{
       const email = (document.getElementById("inpEmailDanfe")?.value || "").trim();
-      const urlDanfe = window.location.origin + "/api/fiscal/recebidas/danfe/{n_id}";
-      const urlPdf = window.location.origin + "/api/fiscal/recebidas/pdf/{n_id}";
-      const urlXml = window.location.origin + "/api/fiscal/recebidas/xml/{n_id}";
       const assunto = "DANFE NF-e Nº {num_nf} - {emit_nome} (EMED Eletromedicina)";
       const corpo = [
         "Prezados,",
         "",
-        "Seguem os dados da Nota Fiscal Eletrônica (NF-e) recebida no Radar DF-e da EMED Eletromedicina:",
+        "Segue em anexo o arquivo PDF oficial da DANFE / Nota Fiscal Eletrônica referente ao faturamento:",
         "",
         "• Número da NF-e: {num_nf} (Série {serie or '1'})",
         "• Fornecedor / Emitente: {emit_nome} (CNPJ: {emit_cnpj_fmt})",
@@ -2191,18 +2202,11 @@ async def api_fiscal_recebidas_danfe(request: web.Request) -> web.Response:
         "• Valor Total: R$ {v_tot:,.2f}",
         "• Chave de Acesso: {chave}",
         "",
-        "📄 Visualizar / Imprimir DANFE Completa:",
-        urlDanfe,
-        "",
-        "📥 Download Direto da DANFE em PDF:",
-        urlPdf,
-        "",
-        "📥 Download do Arquivo XML Oficial:",
-        urlXml,
+        "Favor acusar o recebimento do arquivo PDF anexo.",
         "",
         "Atenciosamente,",
         "Departamento Fiscal — EMED Eletromedicina"
-      ].join("\n");
+      ].join(String.fromCharCode(10));
       return {{ email, assunto, corpo }};
     }}
 
@@ -2213,6 +2217,15 @@ async def api_fiscal_recebidas_danfe(request: web.Request) -> web.Response:
         document.getElementById("inpEmailDanfe")?.focus();
         return;
       }}
+      // 1. Download automático do PDF oficial da DANFE
+      const aPdfAuto = document.createElement("a");
+      aPdfAuto.href = "/api/fiscal/recebidas/pdf/{n_id}?download=1";
+      aPdfAuto.download = "DANFE_NFe_{num_nf}.pdf";
+      document.body.appendChild(aPdfAuto);
+      aPdfAuto.click();
+      aPdfAuto.remove();
+
+      // 2. Abre a tela do webmail sem links
       if (tipo === "gmail") {{
         window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${{encodeURIComponent(d.email)}}&su=${{encodeURIComponent(d.assunto)}}&body=${{encodeURIComponent(d.corpo)}}`, "_blank");
       }} else if (tipo === "outlook") {{
@@ -6094,6 +6107,47 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       carregarDadosFiscais();
     }}
 
+    
+    async function compartilharPdfWhatsAppDirect(osId, numNf, msgWpp) {{
+      // 1. Download automático do PDF oficial da NFS-e
+      const a = document.createElement("a");
+      a.href = `/api/fiscal/danfe/${{osId}}?formato=pdf`;
+      a.download = `NFS_e_${{numNf}}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      const textoLimpo = decodeURIComponent(msgWpp);
+
+      // 2. Se suporte a Web Share com arquivos:
+      if (navigator.canShare) {{
+        try {{
+          const resp = await fetch(`/api/fiscal/danfe/${{osId}}?formato=pdf`);
+          const blob = await resp.blob();
+          const file = new File([blob], `NFS_e_${{numNf}}.pdf`, {{ type: "application/pdf" }});
+          if (navigator.canShare({{ files: [file] }})) {{
+            await navigator.share({{
+              files: [file],
+              title: `NFS-e Nº ${{numNf}}`,
+              text: textoLimpo
+            }});
+            return;
+          }}
+        }} catch (e) {{
+          console.warn("Share fallback:", e);
+        }}
+      }}
+
+      // 3. Fallback: abre o WhatsApp com a mensagem limpa
+      const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+      const url = isMobile
+        ? `https://api.whatsapp.com/send?text=${{encodeURIComponent(textoLimpo)}}`
+        : `https://web.whatsapp.com/send?text=${{encodeURIComponent(textoLimpo)}}`;
+      window.open(url, "_blank");
+      alert(`📎 O arquivo "NFS_e_${{numNf}}.pdf" foi baixado para o seu computador!\n\nBasta arrastá-lo para a conversa aberta do WhatsApp (sem nenhum link externo no texto).`);
+    }}
+
+
     async function emitirNotaFiscalAgora(modo = 'SIMULACAO', forcarDuplicidade = false) {{
       const osId = document.getElementById("selOsEmissao").value;
       if (!osId) {{ alert("Por favor, selecione uma Ordem de Serviço para emissão."); return; }}
@@ -6175,7 +6229,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center;">
               <a href="${{linkDanfe}}" target="_blank" class="btn btn-blue" style="font-weight:800;">🖨️ Abrir DANFE Oficial Completo</a>
               <a href="${{linkPdf}}" download="DANFE_NFS_${{n.numero_nf}}.pdf" class="btn" style="background:#0284c7;color:#fff;font-weight:800;">📥 Baixar Arquivo PDF (.pdf)</a>
-              <a href="https://api.whatsapp.com/send?text=${{msgWpp}}" target="_blank" class="btn" style="background:#16a34a;color:#fff;font-weight:800;">📲 Enviar WhatsApp com Link do PDF</a>
+              <button type="button" onclick="compartilharPdfWhatsAppDirect('${{osId}}', '${{n.numero_nf}}', '${{msgWpp}}')" class="btn" style="background:#16a34a;color:#fff;font-weight:800;">📲 Enviar WhatsApp (com PDF Anexo)</button>
               <button type="button" onclick="compartilharPdfWhatsAppDirect('${{osId}}', '${{n.numero_nf}}', '${{msgWpp}}')" class="btn" style="background:#25d366;color:#000;font-weight:900;">📎 Compartilhar PDF no WhatsApp</button>
               <a href="/api/fiscal/v2/xml/${{osId}}" class="btn btn-outline" style="font-weight:800;">📥 Baixar XML SEFAZ</a>
             </div>
@@ -7617,30 +7671,28 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       }}
     }}
 
-    function enviarWhatsNavegadorPadraoModalDFe() {{
+    function enviarWhatsNavegadorPadraoModalDFe(forcarPrompt) {{
       const n = DFE_NOTA_ATUAL_MODAL;
       if (!n) return;
       const inpEl = document.getElementById("inpModalDFeWhats");
-      const foneAtual = (inpEl?.value || "").trim();
+      let foneTexto = (inpEl?.value || "").trim();
 
-      // Pergunta diretamente qual o número para envio
-      const foneDigitado = prompt(
-        "📱 Para qual número de WhatsApp você deseja enviar a DANFE?\\n\\nDigite o DDD + Número ou confirme o número abaixo:",
-        foneAtual || "85"
-      );
+      // Pergunta diretamente qual o número para envio se não estiver preenchido
+      if (!foneTexto || forcarPrompt) {{
+        const foneDigitado = prompt(
+          "📱 Para qual número de WhatsApp você deseja enviar a DANFE?\\n\\nDigite o DDD + Número:",
+          foneTexto || "85"
+        );
+        if (foneDigitado === null) return;
+        foneTexto = foneDigitado.trim();
+        if (inpEl) inpEl.value = foneTexto;
+      }}
 
-      // Usuário cancelou
-      if (foneDigitado === null) return;
-
-      const foneTexto = foneDigitado.trim();
       if (!foneTexto) {{
         alert("Por favor, digite o número do WhatsApp com DDD para envio.");
         if (inpEl) inpEl.focus();
         return;
       }}
-
-      // Atualiza o campo com o número digitado
-      if (inpEl) inpEl.value = foneTexto;
 
       // Extrai números
       const fonesExtraidos = foneTexto
@@ -7674,14 +7726,13 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         }}
       }} catch (e) {{}}
 
-      const urlDanfe = window.location.origin + `/api/fiscal/recebidas/pdf/${{n.id}}`;
-      const urlXml = window.location.origin + `/api/fiscal/recebidas/xml/${{n.id}}`;
       const emitNome = n.emitente_nome || n.emitente_razao || "Fornecedor";
       const cnpjEmit = n.emitente_cnpj || "";
       const numNf = n.numero_nf || "";
       const valTot = Number(n.valor_total || 0).toLocaleString("pt-BR", {{ minimumFractionDigits: 2 }});
       const chave = n.chave_acesso || "";
 
+      // Mensagem limpa SEM NENHUM LINK EXTERNO
       const linhas = [
         `🧾 *DANFE OFICIAL (PADRÃO BRASILEIRO)*`,
         `• *NF-e Nº:* ${{numNf}}`,
@@ -7691,11 +7742,36 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         `• *Valor Total:* R$ ${{valTot}}`,
         chave ? ("• *Chave de Acesso:* " + chave) : "",
         "",
-        `📄 *Abrir DANFE Oficial (.PDF Padrão):* ${{urlDanfe}}`,
-        `📥 *Baixar Arquivo XML:* ${{urlXml}}`
+        `📎 *Arquivo Oficial em Anexo:* DANFE_NFe_${{numNf}}.pdf (sem links)`
       ].filter(Boolean).join(String.fromCharCode(10));
 
-      // Copia para área de transferência para garantir
+      // 1. Download automático do arquivo PDF oficial para a pasta do computador
+      const aPdfAuto = document.createElement("a");
+      aPdfAuto.href = `/api/fiscal/recebidas/pdf/${{n.id}}?download=1`;
+      aPdfAuto.download = `DANFE_NFe_${{numNf}}.pdf`;
+      document.body.appendChild(aPdfAuto);
+      aPdfAuto.click();
+      aPdfAuto.remove();
+
+      // 2. Tenta compartilhamento nativo com arquivo (Web Share API com File) se disponível
+      if (navigator.canShare) {{
+        try {{
+          fetch(`/api/fiscal/recebidas/pdf/${{n.id}}?download=1`)
+            .then(r => r.blob())
+            .then(blob => {{
+              const file = new File([blob], `DANFE_NFe_${{numNf}}.pdf`, {{ type: "application/pdf" }});
+              if (navigator.canShare({{ files: [file] }})) {{
+                navigator.share({{
+                  files: [file],
+                  title: `DANFE NF-e Nº ${{numNf}}`,
+                  text: linhas
+                }}).catch(() => {{}});
+              }}
+            }}).catch(() => {{}});
+        }} catch (eShare) {{}}
+      }}
+
+      // 3. Copia texto limpo para área de transferência
       try {{
         if (navigator.clipboard && navigator.clipboard.writeText) {{
           navigator.clipboard.writeText(linhas);
@@ -7704,9 +7780,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
       const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
-      // Abre aba no WhatsApp para cada contato
+      // 4. Abre conversa no WhatsApp
       listaFones.forEach((numFmt, idx) => {{
-        // No desktop usamos web.whatsapp.com/send para abrir direto o chat no WhatsApp Web
         const zapUrl = isMobile
           ? `https://api.whatsapp.com/send?phone=${{numFmt}}&text=${{encodeURIComponent(linhas)}}`
           : `https://web.whatsapp.com/send?phone=${{numFmt}}&text=${{encodeURIComponent(linhas)}}`;
@@ -7727,8 +7802,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       mostrarAvisoPdfModal(`
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
           <div>
-            ✅ <b>Aba do WhatsApp aberta para +${{listaFones.join(", +")}}!</b><br/>
-            A mensagem e os links da DANFE já foram preenchidos na conversa. Basta pressionar <b>[Enter]</b> na aba do WhatsApp para enviar.
+            ✅ <b>Arquivo DANFE_NFe_${{numNf}}.pdf baixado com sucesso!</b> (Zero links externos)<br/>
+            A conversa do WhatsApp já foi aberta. <b>Basta arrastar o arquivo PDF baixado para a conversa</b> para enviar como anexo direto ao cliente.
           </div>
           <a href="${{primeiroZap}}" target="_blank" style="display:inline-block;background:#16a34a;color:#fff;padding:5px 12px;border-radius:4px;font-size:11.5px;font-weight:700;text-decoration:none;">
             Reabrir WhatsApp ↗
@@ -7737,7 +7812,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       `);
     }}
 
-    async function conectarWhatsAppBotLocal() {{
+    function conectarWhatsAppBotLocal() {{
       const btn = document.getElementById("btnConectarWhatsBot");
       if (btn) {{ btn.disabled = true; btn.textContent = "⏳ Abrindo..."; }}
       mostrarAvisoPdfModal("⏳ Abrindo janela dedicada do WhatsApp Web no servidor... Se ainda não conectou, escaneie o QR Code com o celular.");
@@ -7800,15 +7875,15 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         const res = await resp.json();
 
         if (res.needs_qr) {{
-          const querAba = confirm("O Robô do servidor não está conectado ao WhatsApp.\\n\\nDeseja abrir e enviar pelo seu NAVEGADOR PADRÃO (WhatsApp Web) agora?");
+          const querAba = confirm("O Robô em Background do servidor precisa de um QR Code próprio.\\n\\nDeseja enviar diretamente pelo seu WHATSAPP QUE JÁ ESTÁ ABERTO no navegador agora?");
           if (querAba) {{
             enviarWhatsNavegadorPadraoModalDFe();
             return;
           }}
           mostrarAvisoPdfModal(`
             <div style="background:#451a03;border:1px solid #f59e0b;padding:8px 10px;border-radius:6px;color:#fef3c7;">
-              ⚠️ <b>Robô não autenticado:</b> O WhatsApp do servidor requer leitura de QR Code.<br/>
-              👉 <b>Envio imediato:</b> Clique no botão <button type="button" onclick="enviarWhatsNavegadorPadraoModalDFe()" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;font-weight:700;">🌐 Abrir no Navegador Padrão</button> para enviar pelo seu WhatsApp.
+              ⚠️ <b>Robô em Background não conectado:</b> Requer leitura de QR Code próprio no servidor.<br/>
+              👉 <b>Envio com 1 clique:</b> Clique em <button type="button" onclick="enviarWhatsNavegadorPadraoModalDFe()" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;font-weight:700;">🚀 Enviar pelo seu WhatsApp Aberto</button> para enviar diretamente pela aba do navegador!
             </div>
           `);
           return;
@@ -7820,7 +7895,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             : "";
           mostrarAvisoPdfModal(`✅ <b>PDF enviado automaticamente no WhatsApp</b> para: <b>${{envTxt}}</b>${{falhasTxt}}`);
         }} else {{
-          const querAba = confirm(`${{res.msg || "Robô não conseguiu enviar."}}\\n\\nDeseja abrir e enviar pelo seu NAVEGADOR PADRÃO agora?`);
+          const querAba = confirm(`${{res.msg || "Robô não conseguiu enviar."}}\\n\\nDeseja enviar pelo seu WHATSAPP QUE JÁ ESTÁ ABERTO agora?`);
           if (querAba) {{
             enviarWhatsNavegadorPadraoModalDFe();
             return;
@@ -7828,12 +7903,12 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           mostrarAvisoPdfModal(`⚠️ ${{res.msg || "Não foi possível enviar via robô."}}`);
         }}
       }} catch (e) {{
-        const querAba = confirm(`Falha no robô do servidor (${{e.message}}).\\n\\nDeseja abrir e enviar pelo seu NAVEGADOR PADRÃO (WhatsApp Web) agora?`);
+        const querAba = confirm(`O robô do servidor não respondeu (${{e.message}}).\\n\\nDeseja enviar diretamente pelo seu WHATSAPP QUE JÁ ESTÁ ABERTO no navegador agora?`);
         if (querAba) {{
           enviarWhatsNavegadorPadraoModalDFe();
           return;
         }}
-        mostrarAvisoPdfModal(`❌ Falha na automação do servidor: ${{e.message}}.<br/>👉 Clique em <b>🌐 Abrir no Navegador Padrão</b>.`);
+        mostrarAvisoPdfModal(`❌ Falha no robô em background: ${{e.message}}.<br/>👉 Clique em <b>🚀 Enviar pelo seu WhatsApp Aberto</b>.`);
       }} finally {{
         if (btn) {{ btn.disabled = false; btn.textContent = "🤖 Enviar PDF (Robô)"; }}
       }}
@@ -7874,26 +7949,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         "Departamento Fiscal — EMED Eletromedicina"
       ].join(String.fromCharCode(10));
 
-      const corpoComLinks = [
-        "Prezados,",
-        "",
-        `Seguem os dados da Nota Fiscal Eletrônica (NF-e Nº ${{numNf}}):`,
-        "",
-        `• Emitente / Fornecedor: ${{fornecedor}} (CNPJ: ${{cnpjForn}})`,
-        `• Destinatário: ${{filialDest}} (CNPJ: ${{cnpjDest}})`,
-        `• Data de Emissão: ${{dtEmi}}`,
-        `• Valor Total: R$ ${{vTot}}`,
-        `• Chave de Acesso: ${{chave}}`,
-        "",
-        "📄 Visualizar / Imprimir DANFE Completa:",
-        urlDanfe,
-        "",
-        "📥 Download Direto da DANFE em PDF:",
-        urlPdf,
-        "",
-        "Atenciosamente,",
-        "Departamento Fiscal — EMED Eletromedicina"
-      ].join(String.fromCharCode(10));
+      const corpoComLinks = corpoAnexo;
 
       return {{ email, numNf, fornecedor, assunto, corpoAnexo, corpoComLinks, urlDanfe, urlPdf, urlXml, id: n.id }};
     }}
@@ -9231,12 +9287,12 @@ Por favor, confira os dados preenchidos.`);
               </div>
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <input type="text" id="inpModalDFeWhats" placeholder="DDD + Número (ex: 85996197923) ou vazio p/ escolher" onkeydown="if(event.key==='Enter'){{enviarWhatsNavegadorPadraoModalDFe();event.preventDefault();}}" style="flex:1;min-width:180px;padding:8px 10px;font-size:12px;" />
-              <button type="button" id="btnDispararWhatsNavegadorPadrao" class="btn" style="width:auto;background:#16a34a;color:#fff;padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap;" onclick="enviarWhatsNavegadorPadraoModalDFe()" title="Abre diretamente no seu navegador padrão (WhatsApp Web) com a mensagem preenchida">🌐 Abrir no Navegador Padrão</button>
-              <button type="button" id="btnDispararWhatsPdfAuto" class="btn" style="width:auto;background:#0369a1;color:#fff;padding:8px 10px;font-size:11px;white-space:nowrap;" onclick="enviarWhatsDanfeModalDFe()" title="Anexa o arquivo PDF físico via robô local">🤖 Enviar PDF (Robô)</button>
+              <input type="text" id="inpModalDFeWhats" placeholder="DDD + Número (ex: 85996197923)" onkeydown="if(event.key==='Enter'){{enviarWhatsNavegadorPadraoModalDFe();event.preventDefault();}}" style="flex:1;min-width:180px;padding:8px 10px;font-size:12px;" />
+              <button type="button" id="btnDispararWhatsNavegadorPadrao" class="btn" style="width:auto;background:#16a34a;color:#fff;padding:8px 14px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(22,163,74,0.4);" onclick="enviarWhatsNavegadorPadraoModalDFe()" title="Abre diretamente na aba do WhatsApp Web já aberta no seu navegador">🚀 Enviar pelo seu WhatsApp Aberto (Navegador)</button>
+              <button type="button" id="btnDispararWhatsPdfAuto" class="btn" style="width:auto;background:#0369a1;color:#fff;padding:8px 10px;font-size:11px;white-space:nowrap;" onclick="enviarWhatsDanfeModalDFe()" title="Anexa o arquivo PDF físico via robô local no servidor">🤖 Enviar PDF Anexo (Robô Local)</button>
             </div>
             <div id="boxContatosRapidosWhatsDFe" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;"></div>
-            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">💡 <b>Dica:</b> O envio via <b>Navegador Padrão</b> abre no navegador que você já usa no dia a dia, com a mensagem pronta e o link oficial da DANFE.</div>
+            <div style="font-size:11px;color:#cbd5e1;margin-top:4px;">💡 <b>Recomendado:</b> Como você já tem o WhatsApp aberto na aba ao lado, clique em <b style="color:#4ade80;">🚀 Enviar pelo seu WhatsApp Aberto</b> para enviar a DANFE oficial em 1 clique!</div>
           </div>
           <div>
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">

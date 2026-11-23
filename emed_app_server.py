@@ -2612,7 +2612,7 @@ async def api_auth_login(request: web.Request) -> web.Response:
 
             senha_db = str(row["senha"]).strip()
 
-            if senha != senha_db and senha != "emed2026":
+            if senha != senha_db:
 
                 _record_auth_failure(ident_ip)
 
@@ -3498,22 +3498,11 @@ async def api_dispositivos_liberar_com_codigo(request: web.Request) -> web.Respo
             
 
             valido = False
-
-            if codigo_digitado in ("2026", "emed2026"):
-
+            cur.execute("SELECT id, codigo, expira_em FROM codigos_autorizacao_dispositivos WHERE REPLACE(codigo, ' ', '') = ? AND expira_em > ?", (codigo_digitado, agora_str))
+            cod_row = cur.fetchone()
+            if cod_row:
                 valido = True
-
-            else:
-
-                cur.execute("SELECT id, codigo, expira_em FROM codigos_autorizacao_dispositivos WHERE REPLACE(codigo, ' ', '') = ? AND expira_em > ?", (codigo_digitado, agora_str))
-
-                cod_row = cur.fetchone()
-
-                if cod_row:
-
-                    valido = True
-
-                    cur.execute("UPDATE codigos_autorizacao_dispositivos SET usado = usado + 1, usado_por = ?, usado_em = ?, device_id_vinculado = ? WHERE id = ?", (usuario or 'DESCONHECIDO', agora_str, device_id, cod_row["id"]))
+                cur.execute("UPDATE codigos_autorizacao_dispositivos SET usado = usado + 1, usado_por = ?, usado_em = ?, device_id_vinculado = ? WHERE id = ?", (usuario or 'DESCONHECIDO', agora_str, device_id, cod_row["id"]))
 
 
 
@@ -3678,9 +3667,13 @@ async def auth_api_middleware(request: web.Request, handler):
         )
         or path.startswith("/static/")
         or path.startswith("/api/app-icon/")
-        or path.startswith("/api/auth/")
+        # Autenticação pública restrita (impede enumeração de usuários em /api/auth/usuarios)
+        or path in ("/api/auth/login", "/api/auth/logout", "/api/auth/status")
+        # Rotas fiscais públicas e operacionais do portal fiscal
+        or path == "/fiscal"
         or path.startswith("/api/fiscal/")
-        or path.startswith("/api/dispositivos/")
+        # Handshake público de dispositivos (bloqueia /listar, /acao, /codigo/gerar sem login de gestor)
+        or path in ("/api/dispositivos/status", "/api/dispositivos/registrar", "/api/dispositivos/liberar-com-codigo")
         or path.startswith("/qrcode/")
         or path.startswith("/api/hospital/autorizacao-entrada/")
         or path.startswith("/api/protocolo-entrega/imprimir/")
@@ -9476,6 +9469,8 @@ def _obter_base_url_publica(request: web.Request) -> str:
 async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
     os_id = request.match_info.get("os_id", "").strip()
+    nota_id = request.match_info.get("nota_id", "").strip()
+    is_cliente_view = (request.query.get("view") == "cliente") or bool(request.headers.get("X-Cliente-Token"))
 
     df = _carregar_df_direto()
 
@@ -9497,9 +9492,15 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
         cur = conn.cursor()
 
-        cur.execute("SELECT * FROM notas_fiscais WHERE os_id = ?", (os_id,))
+        if nota_id:
+            cur.execute("SELECT * FROM notas_fiscais WHERE id = ?", (nota_id,))
+        else:
+            cur.execute("SELECT * FROM notas_fiscais WHERE os_id = ?", (os_id,))
 
         r = cur.fetchone()
+        if not r and not nota_id and os_id.isdigit():
+            cur.execute("SELECT * FROM notas_fiscais WHERE id = ?", (int(os_id),))
+            r = cur.fetchone()
 
         if r:
 
@@ -9722,7 +9723,7 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
     <!-- PAINEL DE CONFERÊNCIA, ENVIO POR E-MAIL E INTEGRAÇÃO CONTÁBIL -->
 
-    <div id="painelEnvioCliente" class="no-print" style="background: #eff6ff; border: 2px solid #3b82f6; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+    <div id="painelEnvioCliente" class="no-print" style="{'display:none;' if is_cliente_view else ''} background: #eff6ff; border: 2px solid #3b82f6; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
 
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
 
@@ -19701,14 +19702,15 @@ async def api_cliente_dossie_radiologico(request: web.Request) -> web.Response:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
 
-        if cliente:
+        if not cliente:
+            # Sem cliente especificado, isolamento total: não retorna laudos de ninguém
+            laudos_rows = []
+        else:
             cur.execute("""
                 SELECT * FROM dossie_radiologico_documentos
-                WHERE UPPER(cliente_nome) LIKE ? OR cliente_nome IS NULL OR cliente_nome = ''
+                WHERE UPPER(TRIM(cliente_nome)) = ?
                 ORDER BY data_validade ASC, data_emissao DESC
-            """, (f"%{cliente.upper()}%",))
-        else:
-            cur.execute("SELECT * FROM dossie_radiologico_documentos ORDER BY data_validade ASC, data_emissao DESC")
+            """, (cliente.strip().upper(),))
         laudos_rows = []
         vigentes = vencendo = vencidos = 0
         for r in cur.fetchall():
@@ -19749,17 +19751,17 @@ async def api_cliente_dossie_radiologico(request: web.Request) -> web.Response:
             cur.execute("""
                 SELECT id, nome, cliente_nome, categoria, numero_serie, identificador, status, cidade, estado
                 FROM equipamentos
-                WHERE UPPER(cliente_nome) LIKE ?
+                WHERE UPPER(TRIM(cliente_nome)) = ?
                 ORDER BY nome ASC
-            """, (f"%{cliente.upper()}%",))
+            """, (cliente.strip().upper(),))
             equipamentos_imagem = [dict(r) for r in cur.fetchall()]
             if not equipamentos_imagem:
                 cur.execute("""
                     SELECT DISTINCT id, equipamento as nome, cliente as cliente_nome, 'DIAGNÓSTICO POR IMAGEM' as categoria, '-' as numero_serie, status, cidade, estado
                     FROM clientes_equipamentos
-                    WHERE UPPER(cliente) LIKE ? AND equipamento IS NOT NULL AND equipamento != ''
+                    WHERE UPPER(TRIM(cliente)) = ? AND equipamento IS NOT NULL AND TRIM(equipamento) != ''
                     ORDER BY equipamento ASC
-                """, (f"%{cliente.upper()}%",))
+                """, (cliente.strip().upper(),))
                 equipamentos_imagem = [dict(r) for r in cur.fetchall()]
         else:
             cur.execute("SELECT id, nome, cliente_nome, categoria, numero_serie, identificador, status, cidade, estado FROM equipamentos ORDER BY nome ASC LIMIT 15")
@@ -20044,31 +20046,115 @@ def _validar_token_portal_cliente(conn: sqlite3.Connection, request: web.Request
 
 
 async def api_cliente_portal_dados(request: web.Request) -> web.Response:
-    """Retorna exclusivamente os dados da unidade autenticada (Dossie VISA, Equipamentos e OS)."""
+    """Retorna exclusivamente os dados da unidade autenticada (Dossiê VISA, Parque Tecnológico Próprio e DANFEs Oficiais salvas na Ficha)."""
     with get_db_connection(DB_NAME) as conn:
         cli_nome = _validar_token_portal_cliente(conn, request)
         if not cli_nome:
             return web.json_response({"ok": False, "msg": "Sessão inválida ou expirada."}, status=401)
         conn.row_factory = sqlite3.Row
-        os_rows = [dict(r) for r in conn.execute(
-            "SELECT id, equipamento, tipo_servico, status, data_agendamento, checkin_hora, checkout_hora, tecnico_responsavel, defeito_relatado FROM clientes_equipamentos WHERE UPPER(cliente) = ? ORDER BY id DESC LIMIT 60",
-            (cli_nome.upper(),)
+        cur = conn.cursor()
+        cli_up = cli_nome.strip().upper()
+
+        # 1. Ordens de Serviço estritamente desta unidade
+        os_rows = [dict(r) for r in cur.execute(
+            """SELECT id, equipamento, tipo_servico, status, data_agendamento, 
+                      checkin_hora, checkout_hora, tecnico_responsavel, defeito_relatado 
+               FROM clientes_equipamentos 
+               WHERE UPPER(TRIM(cliente)) = ? 
+               ORDER BY id DESC LIMIT 100""",
+            (cli_up,)
         ).fetchall()]
+
+        # 2. Resumo PGTS (Equipe, EPIs, Treinamentos, Tecnovigilância)
         unidade_resumo = carregar_resumo_gestor_unidade(conn, cli_nome)
+
+        # 3. Equipamentos pertencentes ESTRITAMENTE ao parque tecnológico do cliente
+        cur.execute("""
+            SELECT id, nome, categoria, numero_serie, identificador, status, cidade, estado
+            FROM equipamentos
+            WHERE UPPER(TRIM(cliente_nome)) = ?
+            ORDER BY nome ASC
+        """, (cli_up,))
+        eq_rows = [dict(r) for r in cur.fetchall()]
+
+        # Se não houver equipamentos cadastrados em 'equipamentos', busca os do histórico exclusivo do cliente
+        if not eq_rows:
+            cur.execute("""
+                SELECT DISTINCT 0 as id, equipamento as nome, tipo_servico as categoria, 
+                                '-' as numero_serie, '' as identificador, status, cidade, estado
+                FROM clientes_equipamentos
+                WHERE UPPER(TRIM(cliente)) = ? AND equipamento IS NOT NULL AND TRIM(equipamento) != ''
+                ORDER BY equipamento ASC
+            """, (cli_up,))
+            eq_rows = [dict(r) for r in cur.fetchall()]
+
+        # 4. Ficha Cadastral da Unidade
+        cur.execute("""
+            SELECT id, codigo_cliente, nome, cpf_cnpj, razao_social, endereco, cidade, estado, telefone, email, contato, tipo_contrato
+            FROM clientes
+            WHERE UPPER(TRIM(nome)) = ? OR UPPER(TRIM(razao_social)) = ?
+            LIMIT 1
+        """, (cli_up, cli_up))
+        r_cli = cur.fetchone()
+        ficha_cliente = dict(r_cli) if r_cli else {
+            "nome": cli_nome,
+            "razao_social": cli_nome,
+            "cpf_cnpj": "",
+            "endereco": "",
+            "cidade": "",
+            "estado": "",
+            "telefone": "",
+            "email": "",
+            "tipo_contrato": "CONTRATO DE MANUTENÇÃO & ENGENHARIA CLÍNICA"
+        }
+        cnpj_cli = ficha_cliente.get("cpf_cnpj", "") or ""
+        cnpj_limpo = "".join([c for c in str(cnpj_cli) if c.isdigit()])
+
+        # 5. Notas Fiscais emitidas para o cliente - APENAS a DANFE oficial fica disponível e salva na ficha
+        cur.execute("""
+            SELECT id, os_id, cliente, cnpj_tomador, tipo_nota, numero_nf, serie, chave_acesso,
+                   data_emissao, valor_liquido, status_fiscal, discriminacao_servico
+            FROM notas_fiscais
+            WHERE UPPER(TRIM(cliente)) = ?
+               OR (cnpj_tomador IS NOT NULL AND TRIM(cnpj_tomador) != '' AND REPLACE(REPLACE(REPLACE(cnpj_tomador, '.', ''), '/', ''), '-', '') = ?)
+            ORDER BY id DESC
+        """, (cli_up, cnpj_limpo if cnpj_limpo else "NONE_CNPJ"))
+        nf_rows = cur.fetchall()
+
+        notas_danfe = []
+        for nf in nf_rows:
+            d_nf = dict(nf)
+            os_ref = str(d_nf.get("os_id") or "")
+            danfe_url = f"/api/fiscal/danfe/{os_ref}?view=cliente" if os_ref else f"/api/fiscal/danfe/nfe/{d_nf['id']}?view=cliente"
+            notas_danfe.append({
+                "id": d_nf["id"],
+                "os_id": d_nf["os_id"],
+                "numero_nf": d_nf.get("numero_nf") or f"NF-{d_nf['id']}",
+                "serie": d_nf.get("serie") or "1",
+                "chave_acesso": d_nf.get("chave_acesso") or "",
+                "data_emissao": d_nf.get("data_emissao") or "-",
+                "valor_total": float(d_nf.get("valor_liquido") or 0.0),
+                "status_fiscal": d_nf.get("status_fiscal") or "AUTORIZADA",
+                "servico": d_nf.get("discriminacao_servico") or "Prestação de serviços técnicos de engenharia clínica e manutenção hospitalar",
+                "danfe_url": danfe_url,
+            })
 
     class _QReq:
         def __init__(self, q): self.query = q
     d_resp = await api_cliente_dossie_radiologico(_QReq({"cliente": cli_nome}))
     import json as _j
     dossie = _j.loads(d_resp.text)
+
     return web.json_response({
         "ok": True,
         "cliente_nome": cli_nome,
+        "ficha_cliente": ficha_cliente,
         "metricas": dossie.get("metricas", {}),
         "checklist_visa": dossie.get("checklist_visa", []),
         "laudos": dossie.get("laudos", []),
-        "equipamentos": unidade_resumo.get("equipamentos") or dossie.get("equipamentos", []),
+        "equipamentos": eq_rows,
         "ordens": os_rows,
+        "notas_danfe": notas_danfe,
         "pgts_kpis": unidade_resumo.get("pgts_kpis", {}),
         "equipe": unidade_resumo.get("equipe", []),
         "epis": unidade_resumo.get("epis", []),
@@ -20319,6 +20405,7 @@ async def api_portal_cliente_html(request: web.Request) -> web.Response:
 
       <div class="tabs">
         <button class="tab active" onclick="setTab('PGTS', this)">📊 Saúde do Parque (PGTS)</button>
+        <button class="tab" onclick="setTab('DANFE', this)">📑 Ficha da Unidade &amp; DANFEs</button>
         <button class="tab" onclick="setTab('VISA', this)">🛡️ Dossiê VISA (RDC 611)</button>
         <button class="tab" onclick="setTab('EQUIPE', this)">👨‍⚕️ Equipe &amp; Dosimetria</button>
         <button class="tab" onclick="setTab('EPIS', this)">🦺 EPIs Plumbíferos</button>
@@ -20459,8 +20546,73 @@ async def api_portal_cliente_html(request: web.Request) -> web.Response:
               <div style="margin-top:10px;">${(DATA.tecnovigilancia||[]).map(tv=>`<div style="padding:6px 0;border-bottom:1px solid #1e293b;font-size:12px;"><b>${tv.equipamento}</b> (${tv.data_ocorrencia}): ${tv.descricao}</div>`).join('')}</div>
             </div>
           </div>`;
+      } else if (ABA === 'DANFE') {
+        const fc = DATA.ficha_cliente || {};
+        const nfs = DATA.notas_danfe || [];
+        el.innerHTML = `
+          <div class="card" style="border-left:4px solid #38bdf8;margin-bottom:14px;">
+            <div style="font-size:11px;color:#38bdf8;font-weight:800;text-transform:uppercase;">Ficha Cadastral da Unidade Hospitalar</div>
+            <h3 style="margin:4px 0 8px;">${fc.razao_social || DATA.cliente_nome}</h3>
+            <div class="grid2" style="font-size:12.5px;color:#cbd5e1;">
+              <div><b>Nome Fantasia / Unidade:</b> ${fc.nome || DATA.cliente_nome}</div>
+              <div><b>CNPJ/CPF:</b> ${fc.cpf_cnpj || 'Cadastrado'}</div>
+              <div><b>Tipo de Contrato:</b> ${fc.tipo_contrato || 'Contrato de Manutenção e Engenharia Clínica'}</div>
+              <div><b>Endereço:</b> ${fc.endereco || '-'} ${fc.cidade ? `(${fc.cidade}/${fc.estado||'BR'})` : ''}</div>
+              <div><b>Contato:</b> ${fc.contato || fc.telefone || 'Gestão da Unidade'} ${fc.email ? `• ${fc.email}` : ''}</div>
+              <div><b>Parque Tecnológico Próprio:</b> ${(DATA.equipamentos||[]).length} equipamento(s) vinculado(s)</div>
+            </div>
+          </div>
+          <div class="card" style="overflow-x:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+              <div>
+                <h3 style="margin:0;">📄 Documentos Fiscais &amp; DANFEs (${nfs.length})</h3>
+                <div style="font-size:11.5px;color:#94a3b8;margin-top:2px;">Acesso restrito e exclusivo à DANFE oficial dos atendimentos desta unidade, salva permanentemente nesta ficha.</div>
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>OS Ref</th>
+                  <th>Nº da Nota</th>
+                  <th>Emissão</th>
+                  <th>Discriminação dos Serviços</th>
+                  <th>Valor Total</th>
+                  <th>Status Fiscal</th>
+                  <th>DANFE Oficial</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${nfs.length ? nfs.map(n => `
+                  <tr>
+                    <td><b>${n.os_id ? '#' + n.os_id : '-'}</b></td>
+                    <td><b style="color:#38bdf8;">${n.numero_nf}</b></td>
+                    <td>${n.data_emissao}</td>
+                    <td style="max-width:280px;white-space:normal;">${n.servico}</td>
+                    <td style="font-weight:bold;color:#34d399;">R$ ${Number(n.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td><span style="font-size:10.5px;padding:2px 6px;border-radius:4px;background:#1e293b;border:1px solid #334155;color:#38bdf8;">${n.status_fiscal}</span></td>
+                    <td>
+                      <a class="btn btn-ok" target="_blank" href="${n.danfe_url}" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;padding:5px 9px;font-size:11px;">
+                        📄 Visualizar DANFE
+                      </a>
+                    </td>
+                  </tr>
+                `).join('') : `
+                  <tr>
+                    <td colspan="7" style="text-align:center;padding:18px;color:#94a3b8;">
+                      Nenhuma Nota Fiscal/DANFE emitida para esta unidade até o momento.<br>
+                      As DANFEs oficiais emitidas pela EMED são arquivadas automaticamente nesta ficha cadastral para consulta do gestor.
+                    </td>
+                  </tr>
+                `}
+              </tbody>
+            </table>
+          </div>
+        `;
       } else {
-        el.innerHTML = `<div class="card" style="overflow-x:auto;"><h3 style="margin:0 0 10px;">🛠️ Ordens de Serviço &amp; Laudos (${(DATA.ordens||[]).length})</h3><table><thead><tr><th>OS</th><th>Equipamento</th><th>Serviço</th><th>Status</th><th>Laudo PDF</th></tr></thead><tbody>${(DATA.ordens||[]).map(o=>`<tr><td>#${o.id}</td><td>${o.equipamento}</td><td>${o.tipo_servico}</td><td>${o.status}</td><td><a style="color:#34d399;" target="_blank" href="/api/imprimir/${o.id}">📄 PDF</a></td></tr>`).join('')}</tbody></table></div>`;
+        el.innerHTML = `<div class="card" style="overflow-x:auto;"><h3 style="margin:0 0 10px;">🛠️ Ordens de Serviço &amp; Laudos (${(DATA.ordens||[]).length})</h3><table><thead><tr><th>OS</th><th>Equipamento</th><th>Serviço</th><th>Status</th><th>Laudo PDF</th><th>DANFE Faturamento</th></tr></thead><tbody>${(DATA.ordens||[]).map(o=>{
+          const danfe = (DATA.notas_danfe||[]).find(n => String(n.os_id) === String(o.id));
+          return `<tr><td>#${o.id}</td><td><b>${o.equipamento}</b></td><td>${o.tipo_servico}</td><td>${o.status}</td><td><a style="color:#34d399;" target="_blank" href="/api/imprimir/${o.id}">📄 PDF</a></td><td>${danfe ? `<a class="btn btn-ok" target="_blank" href="${danfe.danfe_url}" style="text-decoration:none;padding:3px 7px;font-size:11px;">📄 DANFE NF #${danfe.numero_nf}</a>` : '<span style="color:#64748b;font-size:11px;">-</span>'}</td></tr>`;
+        }).join('')}</tbody></table></div>`;
       }
     }
   </script>
@@ -21715,54 +21867,82 @@ async def api_fiscal_enviar_cliente(request: web.Request) -> web.Response:
 
 
 
-    assunto = f"Nota Fiscal Eletrônica {num_nf} - OS #{os_id} - EMED Eletromedicina"
+    # Envio direto com PDF anexado (Sem Links para clientes com firewalls rígidos)
+    smtp_enviado = False
+    erro_smtp = ""
+    with get_db_connection(DB_NAME) as conn:
+        cfg_smtp = {}
+        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from"):
+            r_s = conn.execute("SELECT valor FROM configuracoes_sistema WHERE chave = ?", (k,)).fetchone()
+            if r_s and r_s[0]:
+                cfg_smtp[k] = r_s[0]
 
-    corpo = (
+        cur_nf = conn.execute("SELECT * FROM notas_fiscais WHERE os_id = ? OR numero_nf = ? ORDER BY id DESC LIMIT 1", (os_id, os_id))
+        r_all = cur_nf.fetchone()
+        nota_full = dict(zip([c[0] for c in cur_nf.description], r_all)) if r_all else {}
 
+    corpo_anexo = (
         f"Prezado(a) {cliente_nome},\n\n"
-
-        f"Segue o comprovante oficial de emissão da Nota Fiscal Eletrônica referente ao atendimento técnico da OS #{os_id}.\n\n"
-
-        f"📄 Número da Nota: {num_nf}\n"
-
-        f"💰 Valor Total: R$ {val_total:,.2f}\n"
-
-        f"🔑 Chave de Acesso: {chave_acesso}\n"
-
-        f"📅 Emitida em: {agora_brasil}\n\n"
-
-        f"🔗 Visualizar DANFE Oficial: {_obter_base_url_publica(request)}/api/fiscal/danfe/{os_id}\n\n"
-
+        f"Segue em anexo o arquivo PDF oficial da Nota Fiscal Eletrônica referente ao atendimento técnico da OS #{os_id}.\n\n"
+        f"• Número da Nota: {num_nf}\n"
+        f"• Valor Total: R$ {val_total:,.2f}\n"
+        f"• Chave de Acesso: {chave_acesso}\n"
+        f"• Data de Emissão: {agora_brasil}\n\n"
+        f"Favor acusar o recebimento do arquivo PDF anexo.\n\n"
         f"Agradecemos a parceria!\n"
-
         f"EMED Eletromedicina Ltda.\n"
-
         f"Fone Ceará: (85) 3254-2929 | WhatsApp DF: (61) 3234-3647 / (61) 99658-5392\n"
-
         f"Rua Coronel Freire, 16 - Bairro Amador, Eusébio - CE"
-
     )
 
-    mailto_url = f"mailto:{urllib.parse.quote(email_dest)}?subject={urllib.parse.quote(assunto)}&body={urllib.parse.quote(corpo)}"
+    if cfg_smtp.get("smtp_host") and cfg_smtp.get("smtp_user") and cfg_smtp.get("smtp_pass"):
+        try:
+            import smtplib
+            from email.message import EmailMessage
+            from emed_views.danfe_pdf_padrao import gerar_danfe_padrao_pdf_bytes
 
+            pdf_bytes = gerar_danfe_padrao_pdf_bytes(nota_full)
+            msg_email = EmailMessage()
+            msg_email["Subject"] = f"Nota Fiscal Eletrônica {num_nf} (OS #{os_id}) - EMED Eletromedicina"
+            msg_email["From"] = cfg_smtp.get("smtp_from") or cfg_smtp["smtp_user"]
+            msg_email["To"] = email_dest
+            msg_email.set_content(corpo_anexo)
+            msg_email.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename=f"NFS_e_{num_nf}.pdf")
 
+            port = int(cfg_smtp.get("smtp_port") or 587)
+            if port == 465:
+                with smtplib.SMTP_SSL(cfg_smtp["smtp_host"], port, timeout=15) as srv:
+                    srv.login(cfg_smtp["smtp_user"], cfg_smtp["smtp_pass"])
+                    srv.send_message(msg_email)
+            else:
+                with smtplib.SMTP(cfg_smtp["smtp_host"], port, timeout=15) as srv:
+                    srv.starttls()
+                    srv.login(cfg_smtp["smtp_user"], cfg_smtp["smtp_pass"])
+                    srv.send_message(msg_email)
+
+            smtp_enviado = True
+            with get_db_connection(DB_NAME) as conn:
+                conn.execute("UPDATE notas_fiscais SET email_status = 'ENVIADO_COM_PDF_ANEXO' WHERE os_id = ?", (os_id,))
+                conn.commit()
+        except Exception as e:
+            erro_smtp = str(e)
+
+    assunto = f"Nota Fiscal Eletrônica {num_nf} - OS #{os_id} - EMED Eletromedicina"
+    mailto_url = f"mailto:{urllib.parse.quote(email_dest)}?subject={urllib.parse.quote(assunto)}&body={urllib.parse.quote(corpo_anexo)}"
+
+    msg_ret = f"Nota Fiscal {num_nf} enviada com o arquivo PDF anexado diretamente para {email_dest}!" if smtp_enviado else f"Nota Fiscal {num_nf} registrada para {email_dest}! O arquivo PDF oficial está preparado para anexo."
 
     return web.json_response({
-
         "ok": True,
-
-        "msg": f"Nota Fiscal {num_nf} enviada com sucesso para {email_dest}!",
-
+        "smtp_sent": smtp_enviado,
+        "erro_smtp": erro_smtp,
+        "msg": msg_ret,
         "email_enviado_em": agora_brasil,
-
         "email_destino": email_dest,
-
         "lote_contabilidade": mes_competencia,
-
-        "mailto_url": mailto_url
-
+        "mailto_url": mailto_url,
+        "pdf_url": f"/api/fiscal/recebidas/pdf/{nota_full.get('id', 0)}" if nota_full.get('id') else f"/api/fiscal/danfe/{os_id}?formato=pdf"
     })
-
 
 
 
@@ -25938,6 +26118,7 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/os/nf-salvar", api_os_nf_salvar)
 
     app.router.add_get("/api/fiscal/danfe/{os_id}", api_fiscal_danfe)
+    app.router.add_get("/api/fiscal/danfe/nfe/{nota_id}", api_fiscal_danfe)
 
     app.router.add_post("/api/fiscal/enviar-cliente", api_fiscal_enviar_cliente)
 
