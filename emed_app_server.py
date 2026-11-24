@@ -22,7 +22,6 @@ Servidor Nativo & API REST Completa do Aplicativo Oficial EMED (PWA Técnico, Ge
 
 
 
-==============================================================================================
 
 
 
@@ -2004,31 +2003,263 @@ import hashlib
 
 import time
 
+import ipaddress
 
 
-def obter_ou_criar_auth_secret() -> str:
-    env_sec = os.environ.get("EMED_AUTH_SECRET")
+
+def _obter_ou_criar_segredo_arquivo(env_name: str, filename: str, n_bytes: int = 32) -> str:
+    env_sec = str(os.environ.get(env_name) or "").strip()
     if env_sec:
         return env_sec
-    secret_file = os.path.join(BASE_DIR, ".emed_auth_secret")
+    secret_file = os.path.join(BASE_DIR, filename)
     if os.path.exists(secret_file):
         try:
             with open(secret_file, "r", encoding="utf-8") as f:
                 s = f.read().strip()
-                if len(s) >= 32:
+                if len(s) >= 24:
                     return s
         except Exception:
             pass
     import secrets
-    new_sec = secrets.token_hex(32)
+    new_sec = secrets.token_hex(n_bytes)
     try:
         with open(secret_file, "w", encoding="utf-8") as f:
             f.write(new_sec)
+        if os.name != "nt":
+            os.chmod(secret_file, 0o600)
     except Exception:
         pass
     return new_sec
 
+
+def obter_ou_criar_auth_secret() -> str:
+    return _obter_ou_criar_segredo_arquivo("EMED_AUTH_SECRET", ".emed_auth_secret", 32)
+
+
 EMED_AUTH_SECRET = obter_ou_criar_auth_secret()
+EMED_PIX_WEBHOOK_SECRET = _obter_ou_criar_segredo_arquivo("EMED_PIX_WEBHOOK_SECRET", ".emed_pix_secret", 24)
+
+
+def _is_trusted_proxy_ip(remote_ip: str) -> bool:
+    if not remote_ip:
+        return False
+    extra = {x.strip() for x in str(os.environ.get("EMED_TRUSTED_PROXIES", "")).split(",") if x.strip()}
+    if remote_ip in extra:
+        return True
+    try:
+        addr = ipaddress.ip_address(remote_ip.split("%")[0])
+        return addr.is_loopback or addr.is_private
+    except Exception:
+        return False
+
+
+def obter_ip_real(request: web.Request) -> str:
+    peer = str(request.remote or "127.0.0.1").strip()
+    if _is_trusted_proxy_ip(peer):
+        for cand in (
+            request.headers.get("CF-Connecting-IP", ""),
+            request.headers.get("X-Real-IP", ""),
+            request.headers.get("X-Forwarded-For", "").split(",")[0],
+        ):
+            c = str(cand or "").strip()
+            if c:
+                try:
+                    ipaddress.ip_address(c.split("%")[0])
+                    return c
+                except Exception:
+                    continue
+    return peer
+
+
+def requisicao_https(request: web.Request) -> bool:
+    if request.scheme == "https":
+        return True
+    if _is_trusted_proxy_ip(str(request.remote or "")):
+        if str(request.headers.get("X-Forwarded-Proto") or "").strip().lower() == "https":
+            return True
+    return False
+
+
+def hash_senha_forte(senha: str) -> str:
+    salt = os.urandom(16)
+    dk = hashlib.pbkdf2_hmac("sha256", str(senha).encode("utf-8"), salt, 120_000)
+    return f"pbkdf2$120000${salt.hex()}${dk.hex()}"
+
+
+def verificar_senha_segura(senha_digitada: str, valor_armazenado: str, legacy_salt: str = "") -> tuple:
+    arm = str(valor_armazenado or "").strip()
+    dig = str(senha_digitada or "").strip()
+    if not arm or not dig:
+        return False, False
+    if arm.startswith("pbkdf2$"):
+        try:
+            _, rounds_s, salt_hex, hash_hex = arm.split("$", 3)
+            dk = hashlib.pbkdf2_hmac("sha256", dig.encode("utf-8"), bytes.fromhex(salt_hex), int(rounds_s))
+            return hmac.compare_digest(dk.hex(), hash_hex), False
+        except Exception:
+            return False, False
+    if legacy_salt:
+        leg = hashlib.sha256((legacy_salt + dig).encode("utf-8")).hexdigest()
+        if hmac.compare_digest(leg, arm):
+            return True, True
+    if hmac.compare_digest(dig, arm):
+        return True, True
+    return False, False
+
+
+def _migrar_senhas_legadas(db_path: str) -> None:
+    try:
+        with get_db_connection(db_path) as conn:
+            rows = conn.execute("SELECT id, senha FROM tecnicos WHERE senha IS NOT NULL AND TRIM(senha) != ''").fetchall()
+            atualizados = 0
+            for tid, s_raw in rows:
+                s_str = str(s_raw).strip()
+                if s_str and not s_str.startswith("pbkdf2$"):
+                    conn.execute("UPDATE tecnicos SET senha = ? WHERE id = ?", (hash_senha_forte(s_str), tid))
+                    atualizados += 1
+            if atualizados:
+                conn.commit()
+    except Exception as e:
+        print(f"[SEGURANCA] Aviso ao migrar senhas legadas: {e}")
+
+
+def _eh_gestor_ou_admin(user: Optional[dict]) -> bool:
+    if not isinstance(user, dict):
+        return False
+    perfil = str(user.get("perfil") or "").strip().upper()
+    nome = str(user.get("nome") or "").strip().upper()
+    return ("GESTOR" in perfil) or ("ADMIN" in perfil) or (nome == "NETTO")
+
+
+def _eh_fiscal_ou_gestor(user: Optional[dict]) -> bool:
+    if _eh_gestor_ou_admin(user):
+        return True
+    if not isinstance(user, dict):
+        return False
+    perfil = str(user.get("perfil") or "").strip().upper()
+    return perfil in ("FATURAMENTO", "FINANCEIRO", "FISCAL")
+
+
+def gerar_token_portal_cliente_assinado(cliente_nome: str, token_acesso: str) -> str:
+    payload = {
+        "cli": str(cliente_nome).strip().upper(),
+        "tok": str(token_acesso).strip(),
+        "exp": int(time.time()) + (7 * 86400),
+    }
+    raw = base64.urlsafe_b64encode(json.dumps(payload, ensure_ascii=False).encode("utf-8")).decode("utf-8")
+    sig = hmac.new(EMED_AUTH_SECRET.encode("utf-8"), raw.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{raw}.{sig}"
+
+
+def verificar_token_portal_cliente_assinado(token_str: str) -> Optional[dict]:
+    if not token_str or "." not in token_str:
+        return None
+    try:
+        raw, sig = token_str.split(".", 1)
+        exp_sig = hmac.new(EMED_AUTH_SECRET.encode("utf-8"), raw.encode("utf-8"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, exp_sig):
+            return None
+        payload = json.loads(base64.urlsafe_b64decode(raw.encode("utf-8")).decode("utf-8"))
+        if float(payload.get("exp") or 0) < time.time():
+            return None
+        return payload
+    except Exception:
+        return None
+
+
+def _validar_magic_bytes_arquivo(raw_bytes: bytes, ext: str) -> bool:
+    e = ext.lower()
+    if e == ".pdf":
+        return raw_bytes.startswith(b"%PDF-")
+    if e == ".png":
+        return raw_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+    if e in (".jpg", ".jpeg"):
+        return raw_bytes.startswith(b"\xff\xd8\xff")
+    if e == ".webp":
+        return len(raw_bytes) >= 12 and raw_bytes[:4] == b"RIFF" and raw_bytes[8:12] == b"WEBP"
+    if e == ".txt":
+        return b"\x00" not in raw_bytes[:1024]
+    return False
+
+
+def _salvar_arquivo_b64_seguro(
+    b64_str: str,
+    subpasta: str,
+    prefixo: str,
+    filename_hint: str = "anexo.jpg",
+    allowed_exts: tuple = (".pdf", ".png", ".jpg", ".jpeg", ".webp"),
+    max_bytes: int = 15 * 1024 * 1024,
+) -> tuple:
+    import re as _re
+    import secrets
+    raw_txt = str(b64_str or "").strip()
+    if not raw_txt:
+        return "", ""
+    header = ""
+    encoded = raw_txt
+    if "," in raw_txt and raw_txt[:80].lower().startswith("data:"):
+        header, encoded = raw_txt.split(",", 1)
+    safe_n = _re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(str(filename_hint or "anexo")))
+    _, ext = os.path.splitext(safe_n)
+    ext = ext.lower()
+    if ext not in allowed_exts:
+        hl = header.lower()
+        if "application/pdf" in hl:
+            ext = ".pdf"
+        elif "image/png" in hl:
+            ext = ".png"
+        elif "image/webp" in hl:
+            ext = ".webp"
+        elif "image/jpeg" in hl or "image/jpg" in hl:
+            ext = ".jpg"
+        else:
+            return "", ""
+    if ext not in allowed_exts:
+        return "", ""
+    try:
+        decoded = base64.b64decode(encoded, validate=False)
+    except Exception:
+        return "", ""
+    if not decoded or len(decoded) > max_bytes:
+        return "", ""
+    if not _validar_magic_bytes_arquivo(decoded, ext):
+        return "", ""
+    pasta = os.path.realpath(os.path.join(BASE_DIR, "uploads_os", subpasta))
+    os.makedirs(pasta, exist_ok=True)
+    stem = _re.sub(r"[^A-Za-z0-9_-]", "_", os.path.splitext(safe_n)[0])[:40] or "arquivo"
+    arq_nome_final = f"{prefixo}_{int(time.time())}_{secrets.token_hex(4)}_{stem}{ext}"
+    arq_path = os.path.join(pasta, arq_nome_final)
+    with open(arq_path, "wb") as fh:
+        fh.write(decoded)
+    return arq_path, f"{stem}{ext}"
+
+
+def _servir_arquivo_seguro(arq_path: str, nome_sugerido: str = "") -> web.Response:
+    import re as _re
+    if not arq_path:
+        return web.Response(text="Arquivo não encontrado.", status=404)
+    real_file = os.path.realpath(str(arq_path))
+    allowed_roots = [
+        os.path.realpath(os.path.join(BASE_DIR, "uploads_os")),
+        os.path.realpath(BASE_DIR),
+    ]
+    if not any(os.path.commonpath([real_file, root]) == root for root in allowed_roots):
+        return web.Response(text="Caminho de arquivo não autorizado.", status=403)
+    if not os.path.isfile(real_file):
+        return web.Response(text="Arquivo anexo não encontrado.", status=404)
+    ext = os.path.splitext(real_file)[1].lower()
+    if ext not in (".pdf", ".png", ".jpg", ".jpeg", ".webp", ".txt"):
+        return web.Response(text="Tipo de arquivo bloqueado por política de segurança.", status=403)
+    safe_dl = _re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(nome_sugerido or real_file))
+    disp = "inline" if ext in (".pdf", ".png", ".jpg", ".jpeg", ".webp") else "attachment"
+    return web.FileResponse(
+        real_file,
+        headers={
+            "Content-Disposition": f'{disp}; filename="{safe_dl}"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 
@@ -2115,17 +2346,12 @@ async def rate_limiting_middleware(request: web.Request, handler):
     ):
         return await handler(request)
 
-    # 2. Identificação precisa do IP real (suporte a Cloudflare e Proxies)
-    ip = (
-        request.headers.get("CF-Connecting-IP")
-        or request.headers.get("X-Real-IP")
-        or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-        or (request.remote or "127.0.0.1")
-    )
+    # 2. Identificação precisa do IP real (anti-spoofing: só confia em proxy local/privado)
+    ip = obter_ip_real(request)
     now = time.time()
 
     # 3. Usuários autenticados com cookie de sessão possuem limite generoso para trabalho normal
-    tem_sessao_valida = bool(request.cookies.get("emed_session"))
+    tem_sessao_valida = bool(request.cookies.get("emed_session") or request.cookies.get("emed_cli_session"))
     limite_geral = 2500 if tem_sessao_valida else 1200 # Suporte pleno a CGNAT móvel 4G/5G e Wi-Fi hospitalar
 
     reqs = _RATE_LIMIT_STORE.get(ip, [])
@@ -2140,8 +2366,17 @@ async def rate_limiting_middleware(request: web.Request, handler):
             "retry_after": 60
         }, status=429, headers={"Retry-After": "60"})
 
-    # 4. Limite estrito APENAS para rotas críticas de autenticação contra força bruta (30 req/min)
-    rotas_sensiveis = ("/api/auth/login", "/api/fiscal/cancelar-nota", "/api/os/excluir", "/api/seguranca/2fa")
+    # 4. Limite estrito APENAS para rotas críticas de autenticação e ações destrutivas (30 req/min)
+    rotas_sensiveis = (
+        "/api/auth/login",
+        "/api/cliente/acesso/login",
+        "/api/fiscal/v2/login",
+        "/api/fiscal/cancelar-nota",
+        "/api/fiscal/v2/cancelar",
+        "/api/os/excluir",
+        "/api/auditoria/excluir",
+        "/api/seguranca/2fa",
+    )
     if any(path.startswith(r) for r in rotas_sensiveis):
         s_reqs = _RATE_LIMIT_SENSITIVE_STORE.get(ip, [])
         s_reqs = [t for t in s_reqs if now - t < 60]
@@ -2154,74 +2389,6 @@ async def rate_limiting_middleware(request: web.Request, handler):
                 "erro": "Excesso de tentativas em rota sensível. Bloqueio temporário ativado.",
                 "retry_after": 60
             }, status=429, headers={"Retry-After": "60"})
-
-    return await handler(request)
-
-
-
-    ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (request.remote or "127.0.0.1")
-
-    now = time.time()
-
-
-
-    # Janela deslizante de 60 segundos (150 requisições/minuto no geral)
-
-    limite_geral = 150
-
-    reqs = _RATE_LIMIT_STORE.get(ip, [])
-
-    reqs = [t for t in reqs if now - t < 60]
-
-    reqs.append(now)
-
-    _RATE_LIMIT_STORE[ip] = reqs
-
-
-
-    if len(reqs) > limite_geral:
-
-        return web.json_response({
-
-            "ok": False,
-
-            "erro": "Muitas requisições. Rate limit excedido (150 req/min). Aguarde alguns segundos.",
-
-            "retry_after": 60
-
-        }, status=429, headers={"Retry-After": "60"})
-
-
-
-    # Limite estrito para rotas críticas (login, fiscal, cancelamento, exclusão): 30 req/min
-
-    rotas_sensiveis = ("/api/auth/login", "/api/fiscal/cancelar-nota", "/api/os/excluir", "/api/seguranca/2fa")
-
-    if any(path.startswith(r) for r in rotas_sensiveis):
-
-        s_reqs = _RATE_LIMIT_SENSITIVE_STORE.get(ip, [])
-
-        s_reqs = [t for t in s_reqs if now - t < 60]
-
-        s_reqs.append(now)
-
-        _RATE_LIMIT_SENSITIVE_STORE[ip] = s_reqs
-
-
-
-        if len(s_reqs) > 30:
-
-            return web.json_response({
-
-                "ok": False,
-
-                "erro": "Excesso de tentativas em rota sensível. Bloqueio temporário ativado.",
-
-                "retry_after": 60
-
-            }, status=429, headers={"Retry-After": "60"})
-
-
 
     return await handler(request)
 
@@ -2421,6 +2588,14 @@ async def security_headers_middleware(request: web.Request, handler):
 
     resp.headers["X-XSS-Protection"] = "1; mode=block"
 
+    resp.headers["Permissions-Policy"] = "geolocation=(self), camera=(self), microphone=()"
+
+    resp.headers["Content-Security-Policy"] = "base-uri 'self'; object-src 'none'; frame-ancestors 'self'"
+
+    if requisicao_https(request):
+
+        resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
     return resp
 
 
@@ -2566,7 +2741,7 @@ async def api_auth_login(request: web.Request) -> web.Response:
 
 
 
-    ip_origem = request.remote or "127.0.0.1"
+    ip_origem = obter_ip_real(request)
 
     ident_ip = f"ip:{ip_origem}"
 
@@ -2619,13 +2794,15 @@ async def api_auth_login(request: web.Request) -> web.Response:
                 except Exception:
                     pass
 
-                return web.json_response({"ok": False, "msg": "Usuário não encontrado."}, status=401)
+                return web.json_response({"ok": False, "msg": "Usuário ou senha inválidos."}, status=401)
 
                 
 
             senha_db = str(row["senha"]).strip()
 
-            if senha != senha_db:
+            senha_ok, precisa_rehash = verificar_senha_segura(senha, senha_db)
+
+            if not senha_ok:
 
                 _record_auth_failure(ident_ip)
 
@@ -2636,7 +2813,11 @@ async def api_auth_login(request: web.Request) -> web.Response:
                 except Exception:
                     pass
 
-                return web.json_response({"ok": False, "msg": "Senha incorreta."}, status=401)
+                return web.json_response({"ok": False, "msg": "Usuário ou senha inválidos."}, status=401)
+
+            if precisa_rehash:
+                cur.execute("UPDATE tecnicos SET senha = ? WHERE id = ?", (hash_senha_forte(senha), row["id"]))
+                conn.commit()
 
                 
 
@@ -2651,12 +2832,6 @@ async def api_auth_login(request: web.Request) -> web.Response:
             perfil_usr = str(row["perfil"]).upper()
 
             agora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            ip_origem = (
-                request.headers.get("CF-Connecting-IP")
-                or request.headers.get("X-Real-IP")
-                or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-                or ip_origem
-            )
 
 
 
@@ -2847,6 +3022,8 @@ async def api_auth_login(request: web.Request) -> web.Response:
                 httponly=True,
 
                 samesite="Lax",
+
+                secure=requisicao_https(request),
 
                 path="/"
 
@@ -3631,6 +3808,8 @@ async def api_dispositivos_liberar_com_codigo(request: web.Request) -> web.Respo
                 httponly=True,
 
                 samesite="Lax",
+
+                secure=requisicao_https(request),
 
                 path="/"
 
@@ -9712,13 +9891,8 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
         for r_p in cur.fetchall():
             pecas.append({"item": r_p[0], "codigo": r_p[1] or "PEC", "origem": r_p[2] or "NOVA_COM_NF"})
 
-<<<<<<< HEAD
-    # Por padrão fiscal oficial, retorna DIRETAMENTE o arquivo binário .PDF da DANFE no formato padrão brasileiro (A4)
-    if request.query.get("view") != "html":
-=======
-    # Por padrão fiscal oficial, retorna DIRETAMENTE o arquivo binário .PDF da DANFE no formato padrão brasileiro (A4)
-    if request.query.get("view") != "html":
->>>>>>> origin/main
+    # Retorna o arquivo binário .PDF caso expressamente solicitado via query string ?formato=pdf ou ?view=pdf
+    if request.query.get("formato") == "pdf" or request.query.get("view") == "pdf":
         try:
             from emed_views.danfe_pdf_padrao import gerar_danfe_padrao_pdf_bytes
             cfop_srv = str(dados_nf.get("cfop") or ("6933" if uf_cli != prestador_uf else "5933"))
@@ -27023,7 +27197,6 @@ if __name__ == "__main__":
 
 
     web.run_app(criar_app(), host="0.0.0.0", port=porta, handle_signals=False, backlog=2048)
-
 
 
 

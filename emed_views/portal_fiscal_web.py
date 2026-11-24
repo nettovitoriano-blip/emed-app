@@ -3024,7 +3024,6 @@ async def api_fiscal_v2_fechamento_zip(request: web.Request) -> web.Response:
 EMED ELETROMEDICINA — INSTRUÇÕES & MEMORIAL FISCAL DE FECHAMENTO MENSAL
 Competência: {mes} | Unidade: {filial}
 Documento oficial para a Assessoria Contábil / Fiscal
-================================================================================
 
 Prezado(a) Contador(a) e Equipe Fiscal,
 
@@ -3061,7 +3060,6 @@ seguem as orientações operacionais da EMED Eletromedicina:
    - Pasta /danfe: Espelhos visuais DANFE em HTML para conferência rápida.
 
 Em caso de dúvidas contábeis, contatar a Diretoria Administrativa da EMED.
-================================================================================
 """
         zf.writestr(f"05_ORIENTACOES_TRIBUTARIAS_CONTADOR_{mes}.txt", texto_contador.encode("utf-8"))
 
@@ -6118,7 +6116,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           <td>${{h.data_emissao}}</td>
           <td>${{h.status_fiscal}}</td>
           <td>
-            <a href="/api/fiscal/danfe/${{Number(h.os_id) > 0 ? h.os_id : encodeURIComponent(h.numero_nf)}}" target="_blank" class="btn btn-blue" style="padding:4px 8px;font-size:11px;">🖨️ DANFE</a>
+            <a href="/api/fiscal/danfe/${{Number(h.os_id) > 0 ? h.os_id : encodeURIComponent(h.numero_nf)}}?formato=pdf" target="_blank" class="btn btn-blue" style="padding:4px 8px;font-size:11px;">🖨️ DANFE</a>
             <a href="/api/fiscal/v2/xml/${{Number(h.os_id) > 0 ? h.os_id : encodeURIComponent(h.numero_nf)}}" class="btn btn-outline" style="padding:4px 8px;font-size:11px;">📥 XML</a>
           </td>
         </tr>
@@ -6365,8 +6363,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       if (res.ok) {{
         const n = res.nota;
         const basePub = window.location.origin;
-        const linkDanfe = `${{basePub}}/api/fiscal/danfe/${{osId}}`;
-        const linkPdf = `${{basePub}}/api/fiscal/danfe/${{osId}}?formato=pdf`;
+        const linkDanfe = `${{basePub}}/api/fiscal/danfe/${{osId}}?formato=pdf`;
+        const linkPdf = `${{basePub}}/api/fiscal/danfe/${{osId}}?formato=pdf&download=1`;
         const filialLabel = FILIAL_ATIVA === 'MATRIZ_CE' ? 'EMED-CE' : 'EMED-DF';
         const msgWpp = encodeURIComponent(
           `🧾 *EMED ELETROMEDICINA • NOTA FISCAL EMITIDA (${{filialLabel}})*\\n\\n` +
@@ -10315,4 +10313,3 @@ def registrar_rotas_portal_fiscal(app: web.Application) -> None:
     app.router.add_post("/api/fiscal/v2/cfop/excluir", api_fiscal_v2_cfop_excluir)
     app.router.add_post("/api/fiscal/v2/cfop/aplicar-estoque", api_fiscal_v2_cfop_aplicar_estoque)
     app.router.add_post("/api/fiscal/v2/cfop/atualizar-nota", api_fiscal_v2_cfop_atualizar_nota)
-
