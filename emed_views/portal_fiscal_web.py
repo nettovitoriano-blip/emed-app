@@ -81,8 +81,23 @@ async def api_fiscal_v2_login(request: web.Request) -> web.Response:
         except Exception as e:
             return web.json_response({"ok": False, "msg": f"Token QR inválido: {e}"}, status=400)
 
+    ip_origem = (
+        request.headers.get("CF-Connecting-IP")
+        or request.headers.get("X-Real-IP")
+        or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+        or (request.remote or "127.0.0.1")
+    )
+    ua_hdr = request.headers.get("User-Agent", "")
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+
     if u in USUARIOS_FISCAL and USUARIOS_FISCAL[u]["senha"] == p:
         info = USUARIOS_FISCAL[u]
+        try:
+            from emed_views.supervisorio_web import registrar_auditoria_login
+            registrar_auditoria_login("PORTAL_FISCAL", u, ip_origem, "SUCESSO", f"Operador fiscal autenticado: {info['cargo']}", ua_hdr, "Navegador Web", db_name)
+        except Exception:
+            pass
+
         resp = web.json_response({
             "ok": True,
             "username": u,
@@ -96,6 +111,14 @@ async def api_fiscal_v2_login(request: web.Request) -> web.Response:
         except Exception:
             pass
         return resp
+
+    try:
+        from emed_views.supervisorio_web import registrar_auditoria_login
+        st_res = "SENHA_INCORRETA" if u in USUARIOS_FISCAL else "USUARIO_INEXISTENTE"
+        registrar_auditoria_login("PORTAL_FISCAL", u, ip_origem, st_res, "Credenciais de operador fiscal inválidas", ua_hdr, "Navegador Web", db_name)
+    except Exception:
+        pass
+
     return web.json_response({"ok": False, "msg": "Usuário ou senha inválidos."}, status=401)
 
 
@@ -170,7 +193,7 @@ async def api_fiscal_v2_dados(request: web.Request) -> web.Response:
 
     
         cfg_smtp_raw = {}
-        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from"):
+        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from", "whatsapp_empresa"):
             r_s = conn.execute("SELECT valor FROM configuracoes_sistema WHERE chave = ?", (k,)).fetchone()
             cfg_smtp_raw[k] = r_s[0] if (r_s and r_s[0]) else ""
         cfg_smtp_safe = {
@@ -179,6 +202,7 @@ async def api_fiscal_v2_dados(request: web.Request) -> web.Response:
             "smtp_user": cfg_smtp_raw.get("smtp_user", ""),
             "smtp_from": cfg_smtp_raw.get("smtp_from", ""),
             "has_pass": bool(cfg_smtp_raw.get("smtp_pass")),
+            "whatsapp_empresa": cfg_smtp_raw.get("whatsapp_empresa", ""),
         }
 
     total_nf, emitidas, total_faturar = cur_tot if cur_tot else (0, 0, 0.0)
@@ -279,7 +303,7 @@ async def api_fiscal_v2_salvar_config(request: web.Request) -> web.Response:
         msg_cert = " | " + msg_c
 
     with _get_db_connection(db_name) as conn:
-        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_from"):
+        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_from", "whatsapp_empresa"):
             if k in body:
                 val = str(body.get(k, "")).strip()
                 conn.execute("INSERT INTO configuracoes_sistema (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor", (k, val))
@@ -1686,6 +1710,74 @@ async def api_fiscal_recebidas_enviar_email_pdf(request: web.Request) -> web.Res
 
 
 
+async def api_fiscal_canais_status(request: web.Request) -> web.Response:
+    from emed_views.whatsapp_pdf_bot import WHATSAPP_BOT
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    res_w = await asyncio.to_thread(WHATSAPP_BOT.status)
+    with _get_db_connection(db_name) as conn:
+        cfg = {}
+        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_from", "whatsapp_empresa"):
+            r = conn.execute("SELECT valor FROM configuracoes_sistema WHERE chave = ?", (k,)).fetchone()
+            cfg[k] = r[0] if (r and r[0]) else ""
+    return web.json_response({
+        "ok": True,
+        "whatsapp_status": res_w.get("status", "DESCONECTADO"),
+        "whatsapp_empresa": cfg.get("whatsapp_empresa", ""),
+        "smtp_host": cfg.get("smtp_host", ""),
+        "smtp_user": cfg.get("smtp_user", ""),
+        "smtp_configurado": bool(cfg.get("smtp_host") and cfg.get("smtp_user"))
+    })
+
+
+async def api_fiscal_canais_conectar_background(request: web.Request) -> web.Response:
+    from emed_views.whatsapp_pdf_bot import WHATSAPP_BOT
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+
+    st_whats = "DESCONECTADO"
+    try:
+        res_w = await asyncio.to_thread(WHATSAPP_BOT.status)
+        st_whats = res_w.get("status", "DESCONECTADO")
+        if st_whats == "DESCONECTADO" and res_w.get("perfil_existe"):
+            res_c = await asyncio.to_thread(WHATSAPP_BOT.conectar_qrcode)
+            st_whats = res_c.get("status", st_whats)
+    except Exception as e:
+        st_whats = f"ERRO: {e}"
+
+    st_email = "NAO_CONFIGURADO"
+    msg_email = ""
+    with _get_db_connection(db_name) as conn:
+        cfg = {}
+        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from", "whatsapp_empresa"):
+            r = conn.execute("SELECT valor FROM configuracoes_sistema WHERE chave = ?", (k,)).fetchone()
+            if r and r[0]:
+                cfg[k] = r[0]
+
+        if cfg.get("smtp_host") and cfg.get("smtp_user") and cfg.get("smtp_pass"):
+            try:
+                import smtplib
+                port = int(cfg.get("smtp_port") or 587)
+                if port == 465:
+                    with smtplib.SMTP_SSL(cfg["smtp_host"], port, timeout=6) as srv:
+                        srv.login(cfg["smtp_user"], cfg["smtp_pass"])
+                else:
+                    with smtplib.SMTP(cfg["smtp_host"], port, timeout=6) as srv:
+                        srv.starttls()
+                        srv.login(cfg["smtp_user"], cfg["smtp_pass"])
+                st_email = "CONECTADO"
+                msg_email = f"SMTP ({cfg['smtp_user']}) ativo e pronto"
+            except Exception as em_err:
+                st_email = "ERRO_AUTENTICACAO"
+                msg_email = str(em_err)
+
+    return web.json_response({
+        "ok": True,
+        "whatsapp_status": st_whats,
+        "email_status": st_email,
+        "email_msg": msg_email,
+        "whatsapp_empresa": cfg.get("whatsapp_empresa", ""),
+    })
+
+
 async def api_fiscal_recebidas_whatsapp_status(request: web.Request) -> web.Response:
 
     from emed_views.whatsapp_pdf_bot import WHATSAPP_BOT
@@ -2266,7 +2358,8 @@ async def api_fiscal_recebidas_danfe(request: web.Request) -> web.Response:
     }}
 
     {"window.addEventListener('load', () => setTimeout(() => window.print(), 350));" if auto_print else ""}
-  </script>
+  
+</script>
 </body>
 </html>"""
     return web.Response(text=html_danfe, content_type="text/html")
@@ -4474,20 +4567,35 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       <!-- CARD DA UNIDADE ATIVA -->
       <div class="card card-highlight" id="cardUnidadeInfo"></div>
 
-      <!-- BARRA DE ABAS PRINCIPAIS DO PORTAL -->
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;background:#0f172a;padding:8px;border-radius:10px;border:1px solid #334155;">
-        <button type="button" id="tabBtn_FATURAMENTO" class="btn" onclick="alternarAbaPrincipalFiscal('FATURAMENTO')" style="background:var(--cyan);color:#0b132b;font-weight:900;padding:10px 18px;border-radius:8px;">
-          🧾 Faturamento, NFS-e &amp; Estoque Fiscal
+      <!-- BARRA DE MENUS PRINCIPAIS DO PORTAL FISCAL -->
+      <div id="navMenusPrincipaisFiscal" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;background:#0f172a;padding:10px;border-radius:12px;border:1px solid #334155;box-shadow:0 6px 20px rgba(0,0,0,0.35);">
+        <button type="button" id="menuBtn_EMISSAO" class="btn" onclick="selecionarMenuFiscal('EMISSAO')" style="background:var(--cyan);color:#0b132b;font-weight:900;padding:10px 15px;border-radius:8px;font-size:12.5px;">
+          🧾 1. Emissão &amp; NFS-e <span id="badgeMenuEmissao" style="background:rgba(11,19,43,0.2);padding:2px 7px;border-radius:999px;font-size:11px;margin-left:4px;">0</span>
         </button>
-        <button type="button" id="tabBtn_DESPESAS_UNIDADES" class="btn" onclick="alternarAbaPrincipalFiscal('DESPESAS_UNIDADES')" style="background:#1e293b;color:#f8fafc;border:1.5px solid #f59e0b;font-weight:900;padding:10px 18px;border-radius:8px;">
-          ⛽🍽️🏨 Detalhes de Despesas das Unidades &amp; Gráficos
+        <button type="button" id="menuBtn_RADAR_DFE" class="btn" onclick="selecionarMenuFiscal('RADAR_DFE')" style="background:#1e293b;color:#f8fafc;border:1.5px solid #0284c7;font-weight:900;padding:10px 15px;border-radius:8px;font-size:12.5px;">
+          📥 2. Radar DF-e &amp; Compras <span id="badgeMenuDFe" style="background:#0369a1;color:#fff;padding:2px 7px;border-radius:999px;font-size:11px;margin-left:4px;">0</span>
         </button>
-        <button type="button" id="tabBtn_CFOP" class="btn" onclick="alternarAbaPrincipalFiscal('CFOP')" style="background:#1e293b;color:#f8fafc;border:1.5px solid #38bdf8;font-weight:900;padding:10px 18px;border-radius:8px;">
-          📑 Análise &amp; Tabela de CFOP
+        <button type="button" id="menuBtn_ESTOQUE" class="btn" onclick="selecionarMenuFiscal('ESTOQUE')" style="background:#1e293b;color:#f8fafc;border:1.5px solid #10b981;font-weight:900;padding:10px 15px;border-radius:8px;font-size:12.5px;">
+          📦 3. Estoque &amp; Inventário <span id="badgeMenuEstoque" style="background:#065f46;color:#a7f3d0;padding:2px 7px;border-radius:999px;font-size:11px;margin-left:4px;">0</span>
         </button>
-        <button type="button" id="tabBtn_TUDO" class="btn" onclick="alternarAbaPrincipalFiscal('TUDO')" style="background:transparent;color:#94a3b8;border:1px solid #334155;font-weight:700;padding:10px 16px;border-radius:8px;">
-          🌐 Exibir Tudo na Mesma Página
+        <button type="button" id="menuBtn_CONTABIL_CFOP" class="btn" onclick="selecionarMenuFiscal('CONTABIL_CFOP')" style="background:#1e293b;color:#f8fafc;border:1.5px solid #38bdf8;font-weight:900;padding:10px 15px;border-radius:8px;font-size:12.5px;">
+          🏛️ 4. Contabilidade &amp; CFOP
         </button>
+        <button type="button" id="menuBtn_DESPESAS" class="btn" onclick="selecionarMenuFiscal('DESPESAS')" style="background:#1e293b;color:#f8fafc;border:1.5px solid #f59e0b;font-weight:900;padding:10px 15px;border-radius:8px;font-size:12.5px;">
+          ⛽ 5. Despesas &amp; Extratos
+        </button>
+        <button type="button" id="menuBtn_CONFIG" class="btn" onclick="selecionarMenuFiscal('CONFIG')" style="background:#1e293b;color:#f8fafc;border:1.5px solid #a78bfa;font-weight:900;padding:10px 15px;border-radius:8px;font-size:12.5px;">
+          ⚙️ 6. Configurações &amp; A1
+        </button>
+        <button type="button" id="menuBtn_TUDO" class="btn" onclick="selecionarMenuFiscal('TUDO')" style="background:transparent;color:#94a3b8;border:1px solid #334155;font-weight:700;padding:10px 14px;border-radius:8px;font-size:12px;margin-left:auto;">
+          🌐 Visão Completa (Tudo)
+        </button>
+      </div>
+
+      <!-- BARRA DE SUBMENUS CONTEXTUAL (MÓDULO SELECIONADO) -->
+      <div id="navSubmenusFiscal" style="background:#132338;border:1px solid #0284c7;border-left:4px solid var(--cyan);border-radius:10px;padding:10px 14px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;" id="boxBotoesSubmenuFiscal"></div>
+        <div id="lblBreadcrumbMenuFiscal" style="font-size:11.5px;color:#7dd3fc;font-weight:700;"></div>
       </div>
 
       <!-- ========================================================================= -->
@@ -4564,7 +4672,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </div>
 
           <!-- BARRA DE FILTROS DA ABA DE DESPESAS -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;margin-bottom:16px;">
+          <div id="secDespFiltros" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;margin-bottom:16px;">
             <div>
               <label>🏢 Unidade / Filial:</label>
               <select id="selDespFiltroUnidade" onchange="aoMudarFiltroUnidadeDespesa(this.value)" style="font-weight:800;color:var(--cyan);">
@@ -4717,7 +4825,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </div>
 
           <!-- KPIS DE DESPESAS DAS UNIDADES -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:10px;margin-bottom:16px;">
+          <div id="secDespKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:10px;margin-bottom:16px;">
             <div style="background:#0f172a;border:1px solid #334155;border-top:3px solid var(--cyan);border-radius:8px;padding:12px;">
               <div style="font-size:11px;color:#94a3b8;font-weight:800;">💰 TOTAL DE DESPESAS (FILTRO)</div>
               <div id="kpiDespTotalGeral" style="font-size:23px;font-weight:900;color:var(--cyan);margin-top:4px;">R$ 0,00</div>
@@ -4747,7 +4855,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </div>
 
           <!-- PAINEL DE GRÁFICOS VISUAIS (3 GRÁFICOS INTERATIVOS) -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px;margin-bottom:16px;">
+          <div id="secDespGraficos" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px;margin-bottom:16px;">
             <!-- GRÁFICO 1: ROSCA SVG + DISTRIBUIÇÃO POR CATEGORIA -->
             <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;">
               <div style="font-weight:900;font-size:13.5px;color:var(--cyan);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
@@ -4774,7 +4882,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </div>
 
           <!-- TABELA DETALHADA DE DESPESAS DAS UNIDADES -->
-          <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;">
+          <div id="secDespTabela" style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
               <div style="font-weight:900;font-size:13.5px;color:var(--cyan);">📋 Relação Detalhada de Despesas Lançadas nas Unidades</div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -4836,7 +4944,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </div>
 
           <!-- KPIs CFOP & ISS -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
+          <div id="secCfopKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
             <div style="background:#0f172a;border:1px solid #334155;border-top:3px solid #38bdf8;border-radius:8px;padding:12px;">
               <div style="font-size:11px;color:#bae6fd;font-weight:800;">📑 REGRAS CFOP CADASTRADAS</div>
               <div id="kpiCfopTotalRegras" style="font-size:24px;font-weight:900;color:#38bdf8;margin-top:4px;">0</div>
@@ -4925,7 +5033,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </div>
 
           <!-- SEÇÃO 1: TABELA EDITÁVEL DE REGRAS DE CFOP -->
-          <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;margin-bottom:18px;">
+          <div id="secCfopRegras" style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;margin-bottom:18px;">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
               <div style="font-weight:900;font-size:14px;color:#38bdf8;">1. Tabela Mestre de Regras CFOP (Edite qualquer campo e clique em 💾 Salvar)</div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -4964,7 +5072,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </div>
 
           <!-- SEÇÃO 2: ANÁLISE & EDIÇÃO DE CFOP NO ESTOQUE DE PEÇAS -->
-          <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;margin-bottom:18px;">
+          <div id="secCfopEstoque" style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;margin-bottom:18px;">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
               <div>
                 <div style="font-weight:900;font-size:14px;color:#34d399;">2. Análise de CFOP nas Peças do Estoque (Individual ou em Lote)</div>
@@ -5025,7 +5133,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </div>
 
           <!-- SEÇÃO 3: ANÁLISE & EDIÇÃO DE CFOP NAS NOTAS FISCAIS EMITIDAS -->
-          <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;">
+          <div id="secCfopNotas" style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;">
             <div style="font-weight:900;font-size:14px;color:#fbbf24;margin-bottom:10px;">3. Análise &amp; Ajuste Manual de CFOP nas Notas Fiscais Registradas</div>
             <div style="overflow-x:auto;max-height:340px;overflow-y:auto;">
               <table>
@@ -5054,7 +5162,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       <div id="boxAbaFaturamentoFiscal">
 
       <!-- BARRA DE CONTROLE: EXPANDIR / RECOLHER TODAS AS SEÇÕES -->
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
+      <div id="barraControleSecoes" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
         <div style="font-size:12.5px;color:var(--muted);font-weight:700;">
           📌 Todas as seções e módulos fiscais possuem controle individual de recolher/expandir (▼ / ▶).
         </div>
@@ -5097,16 +5205,43 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             <input type="checkbox" id="cfgReplicarCert" checked style="width:auto;" />
             🔗 Aplicar este mesmo Certificado A1 da EMED para todas as unidades (Matriz e Filial)
           </label>
-          <h4 style="margin:16px 0 6px 0;color:var(--cyan);">✉️ Envio Automático de E-mails / SMTP Corporativo (Opcional)</h4>
-          <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">
-            Configure caso deseje disparo automático de DANFEs em PDF pelo servidor. Se não configurado, o envio funciona com 1 clique abrindo diretamente no <b>Gmail Web</b>, <b>Outlook Web</b> ou <b>App Padrão</b>.
+          <h4 id="secCanaisOficiaisCfg" style="margin:16px 0 6px 0;color:var(--cyan);">📡 Canais Oficiais de Envio da Empresa (E-mail &amp; WhatsApp em Background)</h4>
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">
+            Cadastre o e-mail corporativo e o WhatsApp da EMED. O sistema se conecta em segundo plano após a inicialização para permitir envio instantâneo de DANFEs e Notas Fiscais com PDF anexado.
           </div>
-          <div class="grid-2">
-            <div><label>Servidor SMTP (Host):</label><input id="cfgSmtpHost" placeholder="ex: smtp.gmail.com ou smtp.office365.com" /></div>
-            <div><label>Porta SMTP:</label><input id="cfgSmtpPort" type="number" placeholder="587 ou 465" /></div>
-            <div><label>E-mail / Usuário SMTP:</label><input id="cfgSmtpUser" placeholder="ex: fiscal@emed.med.br" /></div>
-            <div><label>Senha / Senha de App SMTP:</label><input id="cfgSmtpPass" type="password" placeholder="Preencha apenas para alterar" /></div>
-            <div><label>Nome / Remetente Oficial:</label><input id="cfgSmtpFrom" placeholder="ex: EMED Fiscal &lt;fiscal@emed.med.br&gt;" /></div>
+          <div class="grid-2" style="gap:12px;">
+            <!-- WHATSAPP CORPORATIVO -->
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <label style="color:#4ade80;font-weight:700;margin:0;">📲 WhatsApp Corporativo da EMED:</label>
+                <span id="cfgWhatsStatusBadge" style="font-size:11px;font-weight:bold;color:#fbbf24;">Aguardando verificação</span>
+              </div>
+              <div style="margin-bottom:8px;">
+                <label style="font-size:11px;color:#94a3b8;">Número Oficial com DDD (ex: 85996197923):</label>
+                <input id="cfgWhatsEmpresa" placeholder="85996197923 ou 6132343647" style="margin-top:2px;" />
+              </div>
+              <div style="display:flex;gap:6px;margin-top:8px;">
+                <button type="button" class="btn btn-outline" style="font-size:11px;padding:5px 10px;border-color:#38bdf8;color:#38bdf8;" onclick="perguntarOndeConectarWhatsApp()">📷 Conectar / Ler QR Code</button>
+                <button type="button" class="btn btn-outline" style="font-size:11px;padding:5px 10px;" onclick="testarConexaoCanaisBackground()">🔄 Testar Conexão</button>
+              </div>
+            </div>
+
+            <!-- E-MAIL CORPORATIVO SMTP -->
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <label style="color:#60a5fa;font-weight:700;margin:0;">✉️ E-mail Corporativo (SMTP):</label>
+                <span id="cfgEmailStatusBadge" style="font-size:11px;font-weight:bold;color:#94a3b8;">Não verificado</span>
+              </div>
+              <div class="grid-2" style="gap:6px;">
+                <div><label style="font-size:11px;">Host SMTP:</label><input id="cfgSmtpHost" placeholder="smtp.terraempresas.com.br" /></div>
+                <div><label style="font-size:11px;">Porta:</label><input id="cfgSmtpPort" type="number" placeholder="587" /></div>
+              </div>
+              <div style="margin-top:6px;"><label style="font-size:11px;">E-mail / Usuário:</label><input id="cfgSmtpUser" placeholder="financeiro@emed.med.br" /></div>
+              <div class="grid-2" style="gap:6px;margin-top:6px;">
+                <div><label style="font-size:11px;">Senha:</label><input id="cfgSmtpPass" type="password" placeholder="Preencha p/ alterar" /></div>
+                <div><label style="font-size:11px;">Remetente:</label><input id="cfgSmtpFrom" placeholder="EMED Fiscal &lt;fiscal@emed.med.br&gt;" /></div>
+              </div>
+            </div>
           </div>
 
           <div style="margin-top:12px;">
@@ -5116,7 +5251,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       </details>
 
       <!-- KPIs -->
-      <div class="grid-3">
+      <div class="grid-3" id="secFaturamentoKpis">
         <div class="card"><div style="font-size:12px;color:var(--muted);">Total em Fila Fiscal</div><div class="kpi-num" id="kpiFila">0 OSs</div></div>
         <div class="card"><div style="font-size:12px;color:var(--muted);">Notas Fiscais Emitidas</div><div class="kpi-num" id="kpiEmitidas">0 NFs</div></div>
         <div class="card"><div style="font-size:12px;color:var(--muted);" id="lblKpiFaturado">Total Faturado</div><div class="kpi-num" id="kpiTotal">R$ 0,00</div></div>
@@ -5841,7 +5976,11 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       document.getElementById("appBox").style.display = "block";
       document.getElementById("lblOperador").textContent = (USUARIO_FISCAL?.username || "netto").toUpperCase();
       document.getElementById("lblCargo").textContent = USUARIO_FISCAL?.cargo || "Diretoria & Controladoria";
-      aplicarPermissoesUsuarioFiscal();
+      if (typeof restaurarMenuFiscalSalvo === "function") {{
+        restaurarMenuFiscalSalvo();
+      }} else {{
+        aplicarPermissoesUsuarioFiscal();
+      }}
       carregarDadosFiscais();
     }}
 
@@ -5902,6 +6041,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       if (document.getElementById("cfgSmtpPort")) document.getElementById("cfgSmtpPort").value = smtp.smtp_port || "587";
       if (document.getElementById("cfgSmtpUser")) document.getElementById("cfgSmtpUser").value = smtp.smtp_user || "";
       if (document.getElementById("cfgSmtpFrom")) document.getElementById("cfgSmtpFrom").value = smtp.smtp_from || "";
+      if (document.getElementById("cfgWhatsEmpresa")) document.getElementById("cfgWhatsEmpresa").value = smtp.whatsapp_empresa || "";
       if (document.getElementById("cfgSmtpPass")) {{
         document.getElementById("cfgSmtpPass").value = "";
         document.getElementById("cfgSmtpPass").placeholder = smtp.has_pass ? "•••••••• (Senha já gravada - preencha p/ trocar)" : "Senha do e-mail ou senha de app";
@@ -6100,6 +6240,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           smtp_user: document.getElementById("cfgSmtpUser")?.value || "",
           smtp_pass: document.getElementById("cfgSmtpPass")?.value || "",
           smtp_from: document.getElementById("cfgSmtpFrom")?.value || "",
+          whatsapp_empresa: document.getElementById("cfgWhatsEmpresa")?.value || "",
           usuario: USUARIO_FISCAL?.username || "netto"
         }})
       }}).then(r => r.json());
@@ -7347,6 +7488,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         document.getElementById("kpiRecPendManif").textContent = res.kpis.pend_manifestacao;
         document.getElementById("kpiRecPendEstoque").textContent = res.kpis.pend_estoque;
         document.getElementById("badgeQtdRecebidas").textContent = `${{res.kpis.total}} Notas`;
+        if (typeof atualizarBadgesMenusFiscal === "function") atualizarBadgesMenusFiscal();
 
         const tb = document.getElementById("tbodyNotasRecebidasDFe");
         tb.innerHTML = DFE_NOTAS_CACHE.map(n => {{
@@ -7812,7 +7954,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       `);
     }}
 
-    function conectarWhatsAppBotLocal() {{
+    async function conectarWhatsAppBotLocal() {{
       const btn = document.getElementById("btnConectarWhatsBot");
       if (btn) {{ btn.disabled = true; btn.textContent = "⏳ Abrindo..."; }}
       mostrarAvisoPdfModal("⏳ Abrindo janela dedicada do WhatsApp Web no servidor... Se ainda não conectou, escaneie o QR Code com o celular.");
@@ -8046,6 +8188,149 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       }}
     }}
 
+    
+    function toggleMenuContatosWhats(e) {{
+      if (e) e.stopPropagation();
+      fecharMenuEnvioWhats();
+      fecharMenuOpcoesEmail();
+      const m = document.getElementById("menuContatosWhats");
+      if (!m) return;
+      const aberto = m.style.display === "block";
+      m.style.display = aberto ? "none" : "block";
+      if (!aberto) renderDropdownContatosWhats();
+    }}
+
+    function fecharMenuContatosWhats() {{
+      const m = document.getElementById("menuContatosWhats");
+      if (m) m.style.display = "none";
+    }}
+
+    function toggleMenuEnvioWhats(e) {{
+      if (e) e.stopPropagation();
+      fecharMenuContatosWhats();
+      fecharMenuOpcoesEmail();
+      const m = document.getElementById("menuEnvioWhats");
+      if (!m) return;
+      m.style.display = m.style.display === "block" ? "none" : "block";
+    }}
+
+    function fecharMenuEnvioWhats() {{
+      const m = document.getElementById("menuEnvioWhats");
+      if (m) m.style.display = "none";
+    }}
+
+    function toggleMenuOpcoesEmail(e) {{
+      if (e) e.stopPropagation();
+      fecharMenuContatosWhats();
+      fecharMenuEnvioWhats();
+      const m = document.getElementById("menuOpcoesEmail");
+      if (!m) return;
+      m.style.display = m.style.display === "block" ? "none" : "block";
+    }}
+
+    function fecharMenuOpcoesEmail() {{
+      const m = document.getElementById("menuOpcoesEmail");
+      if (m) m.style.display = "none";
+    }}
+
+    function renderDropdownContatosWhats() {{
+      const box = document.getElementById("listaContatosDropdownWhats");
+      if (!box) return;
+      const lista = getContatosRapidosWhatsDFe();
+      if (!lista.length) {{
+        box.innerHTML = '<div style="padding:6px 8px;font-size:11px;color:#94a3b8;">Nenhum contato salvo ainda. Digite um número e clique em <b>+ Salvar</b>.</div>';
+        return;
+      }}
+      box.innerHTML = lista.map((c, idx) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:4px;cursor:pointer;" onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background='none'">
+          <div onclick="selecionarContatoWhats('${{c.numero}}')" style="flex:1;">
+            <div style="font-size:11.5px;color:#e2e8f0;font-weight:600;">${{c.nome}}</div>
+            <div style="font-size:10.5px;color:#4ade80;">+${{c.numero}}</div>
+          </div>
+          <button type="button" onclick="removerContatoRapidoWhatsDFe(${{idx}});event.stopPropagation();renderDropdownContatosWhats();" style="background:none;border:none;color:#f87171;font-size:14px;cursor:pointer;padding:2px 4px;" title="Remover">&times;</button>
+        </div>
+      `).join("");
+    }}
+
+    function selecionarContatoWhats(num) {{
+      const inp = document.getElementById("inpModalDFeWhats");
+      if (inp) inp.value = num;
+      fecharMenuContatosWhats();
+    }}
+
+    function copiarMensagemLimpaWhatsModalDFe() {{
+      const n = DFE_NOTA_ATUAL_MODAL;
+      if (!n) return;
+      const emitNome = n.emitente_nome || n.emitente_razao || "Fornecedor";
+      const cnpjEmit = n.emitente_cnpj || "";
+      const numNf = n.numero_nf || "";
+      const valTot = Number(n.valor_total || 0).toLocaleString("pt-BR", {{ minimumFractionDigits: 2 }});
+      const chave = n.chave_acesso || "";
+
+      const linhas = [
+        "🧾 *DANFE OFICIAL (PADRÃO BRASILEIRO)*",
+        `• *NF-e Nº:* ${{numNf}}`,
+        `• *Fornecedor:* ${{emitNome}}`,
+        cnpjEmit ? `• *CNPJ:* ${{cnpjEmit}}` : "",
+        n.data_emissao ? `• *Data Emissão:* ${{n.data_emissao}}` : "",
+        `• *Valor Total:* R$ ${{valTot}}`,
+        chave ? ("• *Chave de Acesso:* " + chave) : "",
+        "",
+        `📎 *Arquivo Oficial em Anexo:* DANFE_NFe_${{numNf}}.pdf (sem links)`
+      ].filter(Boolean).join(String.fromCharCode(10));
+
+      try {{
+        if (navigator.clipboard && navigator.clipboard.writeText) {{
+          navigator.clipboard.writeText(linhas);
+          mostrarAvisoPdfModal("📋 <b>Texto da nota copiado com sucesso!</b> (Sem links externos)");
+        }}
+      }} catch (e) {{}}
+    }}
+
+    document.addEventListener("click", function(e) {{
+      if (!e.target.closest("#wrapContatosWhats")) fecharMenuContatosWhats();
+      if (!e.target.closest("#wrapEnvioWhats")) fecharMenuEnvioWhats();
+      if (!e.target.closest("#wrapOpcoesEmail")) fecharMenuOpcoesEmail();
+    }});
+
+    // Conexão em Background após inicialização das páginas (aguarda sistema carregar)
+    setTimeout(function() {{
+      testarConexaoCanaisBackground();
+    }}, 4000);
+
+    async function testarConexaoCanaisBackground() {{
+      try {{
+        const resp = await fetch("/api/fiscal/canais-conectar-background", {{ method: "POST" }});
+        if (!resp.ok) return;
+        const res = await resp.json();
+        const bW = document.getElementById("badgeCanaisWhatsStatus");
+        const bW2 = document.getElementById("cfgWhatsStatusBadge");
+        if (res.whatsapp_status === "CONECTADO") {{
+          if (bW) {{ bW.innerHTML = "🟢 WhatsApp Conectado"; bW.style.color = "#4ade80"; }}
+          if (bW2) {{ bW2.innerHTML = "🟢 Conectado em Background"; bW2.style.color = "#4ade80"; }}
+        }} else if (res.whatsapp_status === "AGUARDANDO_QRCODE") {{
+          if (bW) {{ bW.innerHTML = "📷 QR Code Pendente"; bW.style.color = "#fbbf24"; }}
+          if (bW2) {{ bW2.innerHTML = "📷 Aguardando Leitura QR Code"; bW2.style.color = "#fbbf24"; }}
+        }}
+
+        const bE = document.getElementById("badgeCanaisEmailStatus");
+        const bE2 = document.getElementById("cfgEmailStatusBadge");
+        if (res.email_status === "CONECTADO") {{
+          if (bE) {{ bE.innerHTML = "🟢 E-mail Ativo"; bE.style.color = "#60a5fa"; }}
+          if (bE2) {{ bE2.innerHTML = "🟢 Conectado / Pronto"; bE2.style.color = "#60a5fa"; }}
+        }} else if (res.email_status === "NAO_CONFIGURADO") {{
+          if (bE) {{ bE.innerHTML = "⚪ Servidor SMTP Opcional"; bE.style.color = "#94a3b8"; }}
+          if (bE2) {{ bE2.innerHTML = "⚪ Não configurado"; bE2.style.color = "#94a3b8"; }}
+        }} else {{
+          if (bE) {{ bE.innerHTML = "⚠️ Falha SMTP"; bE.style.color = "#f87171"; }}
+          if (bE2) {{ bE2.innerHTML = "⚠️ Falha: " + (res.email_msg || "Erro login"); bE2.style.color = "#f87171"; }}
+        }}
+      }} catch (e) {{
+        console.warn("Background warmup canais:", e);
+      }}
+    }}
+
+
     function fecharModalItensDFe() {{
       document.getElementById("modalItensDFe").style.display = "none";
       const iframe = document.getElementById("iframeDanfeDFeModal");
@@ -8056,51 +8341,388 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     // ABA DE DETALHES DE DESPESAS DAS UNIDADES (ALIMENTAÇÃO, GASOLINA, HOTEL)
     // =========================================================================
     let DESPESAS_UNIDADES_CACHE = [];
-    let ABA_PRINCIPAL_FISCAL = "FATURAMENTO";
+    let ABA_PRINCIPAL_FISCAL = "EMISSAO";
+    let SUBMENU_ATIVO_FISCAL = "EMISSAO_NF";
 
-    function alternarAbaPrincipalFiscal(aba) {{
-      ABA_PRINCIPAL_FISCAL = aba;
+    const MAPA_MENUS_FISCAL = {{
+      EMISSAO: {{
+        titulo: "🧾 1. Emissão & NFS-e",
+        cor: "var(--cyan)",
+        corTexto: "#0b132b",
+        submenus: [
+          {{ id: "EMISSAO_NF", label: "🚀 Emissão em 1 Clique & Fila de OSs" }},
+          {{ id: "HISTORICO_NF", label: "📜 Histórico de Notas (Livro de Saídas)" }},
+          {{ id: "TRANSFERENCIA", label: "📦 Transferência Filiais (CE ⇄ DF)" }},
+          {{ id: "CANCELAMENTO", label: "🚫 Cancelamento de NF" }},
+          {{ id: "TODOS_EMISSAO", label: "👁️ Ver Todos de Emissão" }}
+        ]
+      }},
+      RADAR_DFE: {{
+        titulo: "📥 2. Radar DF-e & Compras",
+        cor: "#38bdf8",
+        corTexto: "#0b132b",
+        submenus: [
+          {{ id: "RADAR_SEFAZ", label: "📡 Radar SEFAZ • Notas de Fornecedores & DANFE" }},
+          {{ id: "CONSUMIVEIS", label: "☕ Consumíveis Administrativos (Baixa Direta)" }},
+          {{ id: "TODOS_COMPRAS", label: "👁️ Ver Todos de Compras" }}
+        ]
+      }},
+      ESTOQUE: {{
+        titulo: "📦 3. Estoque & Inventário Fiscal",
+        cor: "#10b981",
+        corTexto: "#0b132b",
+        submenus: [
+          {{ id: "INVENTARIO_GERAL", label: "📋 Inventário Geral (Físico vs. Fiscal)" }},
+          {{ id: "NOVA_PECA", label: "➕ Cadastrar Nova Peça no Almoxarifado" }},
+          {{ id: "MOVIMENTACAO_AVULSA", label: "⚡ Movimentação Avulsa (Entrada / Saída)" }}
+        ]
+      }},
+      CONTABIL_CFOP: {{
+        titulo: "🏛️ 4. Contabilidade & CFOP",
+        cor: "#38bdf8",
+        corTexto: "#0b132b",
+        submenus: [
+          {{ id: "FECHAMENTO_CONTABIL", label: "🏛️ Fechamento Mensal & Relatórios Contábeis" }},
+          {{ id: "CFOP_REGRAS", label: "📑 1. Tabela Mestre de Regras CFOP" }},
+          {{ id: "CFOP_ESTOQUE", label: "📦 2. CFOP nas Peças do Estoque" }},
+          {{ id: "CFOP_NOTAS", label: "🧾 3. Ajuste de CFOP nas Notas" }},
+          {{ id: "TODOS_CONTABIL", label: "👁️ Visão Completa Contábil & CFOP" }}
+        ]
+      }},
+      DESPESAS: {{
+        titulo: "⛽ 5. Despesas & Extratos",
+        cor: "#f59e0b",
+        corTexto: "#0b132b",
+        submenus: [
+          {{ id: "PAINEL_DESPESAS", label: "📊 Painel Geral, Gráficos & Relação" }},
+          {{ id: "LANCAR_DESPESA", label: "➕ Lançar Nova Despesa (Câmera / QR Code)" }},
+          {{ id: "CONCILIAR_EXTRATO", label: "📂 Bater Extrato da Gestora (CSV / OFX)" }}
+        ]
+      }},
+      CONFIG: {{
+        titulo: "⚙️ 6. Configurações & Certificado A1",
+        cor: "#a78bfa",
+        corTexto: "#0b132b",
+        submenus: [
+          {{ id: "CERTIFICADO_DADOS", label: "🔐 Dados Fiscais da Unidade & Certificado A1" }},
+          {{ id: "CANAIS_ENVIO", label: "📡 Canais Oficiais (WhatsApp & E-mail SMTP)" }}
+        ]
+      }},
+      TUDO: {{
+        titulo: "🌐 Visão Completa (Todos os Módulos)",
+        cor: "var(--cyan)",
+        corTexto: "#0b132b",
+        submenus: [
+          {{ id: "TUDO_GERAL", label: "🌐 Todos os Módulos Abertos na Página" }},
+          {{ id: "RECOLHER_TUDO", label: "🔼 Recolher Todos os Painéis" }},
+          {{ id: "EXPANDIR_TUDO", label: "🔽 Expandir Todos os Painéis" }}
+        ]
+      }}
+    }};
+
+    function verificarIsGestorFiscal() {{
+      const cargo = String(USUARIO_FISCAL?.cargo || '').toLowerCase();
+      const role = String(USUARIO_FISCAL?.role || '').toLowerCase();
+      const user = String(USUARIO_FISCAL?.username || '').toLowerCase();
+      return (role === 'admin' || user === 'netto' || user === 'vitor' || cargo.includes('diretor') || cargo.includes('gest'));
+    }}
+
+    function atualizarBadgesMenusFiscal() {{
+      const bEm = document.getElementById("badgeMenuEmissao");
+      if (bEm && DADOS_ATUAIS?.kpis) {{
+        bEm.textContent = DADOS_ATUAIS.kpis.pendentes ?? 0;
+      }}
+      const bDfe = document.getElementById("badgeMenuDFe");
+      if (bDfe) {{
+        bDfe.textContent = (DFE_NOTAS_CACHE || []).length;
+      }}
+      const bEst = document.getElementById("badgeMenuEstoque");
+      if (bEst) {{
+        bEst.textContent = (INVENTARIO_ITENS || []).length;
+      }}
+    }}
+
+    function selecionarMenuFiscal(menu, submenuForcado) {{
+      if (!MAPA_MENUS_FISCAL[menu]) menu = "EMISSAO";
+      ABA_PRINCIPAL_FISCAL = menu;
+      const cfgMenu = MAPA_MENUS_FISCAL[menu];
+      const listaSubs = cfgMenu.submenus || [];
+      let subAlvo = submenuForcado;
+      if (!subAlvo || !listaSubs.some(s => s.id === subAlvo)) {{
+        subAlvo = listaSubs[0]?.id || "";
+      }}
+      SUBMENU_ATIVO_FISCAL = subAlvo;
+
+      try {{
+        localStorage.setItem("emed_fiscal_menu_ativo", menu);
+        localStorage.setItem("emed_fiscal_submenu_ativo", subAlvo);
+      }} catch (e) {{}}
+
+      // Estiliza botões de menu principal
+      Object.keys(MAPA_MENUS_FISCAL).forEach(k => {{
+        const btn = document.getElementById("menuBtn_" + k);
+        if (!btn) return;
+        if (k === menu) {{
+          btn.style.background = MAPA_MENUS_FISCAL[k].cor;
+          btn.style.color = MAPA_MENUS_FISCAL[k].corTexto;
+          btn.style.boxShadow = "0 0 12px rgba(100,223,223,0.35)";
+        }} else if (k === "TUDO") {{
+          btn.style.background = "transparent";
+          btn.style.color = "#94a3b8";
+          btn.style.boxShadow = "none";
+        }} else {{
+          btn.style.background = "#1e293b";
+          btn.style.color = "#f8fafc";
+          btn.style.boxShadow = "none";
+        }}
+      }});
+
+      renderizarSubmenusFiscal(menu, subAlvo);
+      aplicarVisibilidadeSubmenuFiscal(menu, subAlvo);
+    }}
+
+    function selecionarSubmenuFiscal(subId) {{
+      if (subId === "RECOLHER_TUDO") {{
+        toggleTodasSecoes(false);
+        return;
+      }}
+      if (subId === "EXPANDIR_TUDO") {{
+        toggleTodasSecoes(true);
+        return;
+      }}
+      SUBMENU_ATIVO_FISCAL = subId;
+      try {{
+        localStorage.setItem("emed_fiscal_submenu_ativo", subId);
+      }} catch (e) {{}}
+      renderizarSubmenusFiscal(ABA_PRINCIPAL_FISCAL, subId);
+      aplicarVisibilidadeSubmenuFiscal(ABA_PRINCIPAL_FISCAL, subId);
+    }}
+
+    function renderizarSubmenusFiscal(menu, subAtivo) {{
+      const cfgMenu = MAPA_MENUS_FISCAL[menu];
+      const box = document.getElementById("boxBotoesSubmenuFiscal");
+      const bread = document.getElementById("lblBreadcrumbMenuFiscal");
+      if (!box || !cfgMenu) return;
+
+      const subObj = (cfgMenu.submenus || []).find(s => s.id === subAtivo) || cfgMenu.submenus[0];
+      if (bread) {{
+        bread.innerHTML = `📍 <span style="color:#94a3b8;">Menu:</span> <b style="color:#fff;">${{cfgMenu.titulo}}</b> &rsaquo; <span style="color:var(--cyan);">${{subObj ? subObj.label : ''}}</span>`;
+      }}
+
+      box.innerHTML = `<span style="font-size:11.5px;font-weight:900;color:#94a3b8;margin-right:4px;">SUBMENUS:</span>` +
+        (cfgMenu.submenus || []).map(s => {{
+          const ativo = s.id === subAtivo;
+          const bg = ativo ? cfgMenu.cor : "#0f172a";
+          const fg = ativo ? cfgMenu.corTexto : "#e2e8f0";
+          const brd = ativo ? cfgMenu.cor : "#334155";
+          const fw = ativo ? "900" : "700";
+          return `<button type="button" class="btn" onclick="selecionarSubmenuFiscal('${{s.id}}')" style="background:${{bg}};color:${{fg}};border:1.5px solid ${{brd}};font-weight:${{fw}};padding:7px 13px;font-size:12px;border-radius:7px;">${{s.label}}</button>`;
+        }}).join("");
+    }}
+
+    function aplicarVisibilidadeSubmenuFiscal(menu, sub) {{
       const boxFat = document.getElementById("boxAbaFaturamentoFiscal");
       const boxDesp = document.getElementById("boxAbaDespesasUnidades");
       const boxCfop = document.getElementById("boxAbaCfop");
-      const btnFat = document.getElementById("tabBtn_FATURAMENTO");
-      const btnDesp = document.getElementById("tabBtn_DESPESAS_UNIDADES");
-      const btnCfop = document.getElementById("tabBtn_CFOP");
-      const btnTudo = document.getElementById("tabBtn_TUDO");
+      const isGestor = verificarIsGestorFiscal();
 
-      const resetBtns = () => {{
-        if (btnFat) {{ btnFat.style.background = "#1e293b"; btnFat.style.color = "#f8fafc"; }}
-        if (btnDesp) {{ btnDesp.style.background = "#1e293b"; btnDesp.style.color = "#f8fafc"; }}
-        if (btnCfop) {{ btnCfop.style.background = "#1e293b"; btnCfop.style.color = "#f8fafc"; }}
-        if (btnTudo) {{ btnTudo.style.background = "transparent"; btnTudo.style.color = "#94a3b8"; }}
+      const todasSecoesFat = [
+        "barraControleSecoes",
+        "bannerAcessoRestritoCfgFiscal",
+        "expanderConfiguracoesFiscais",
+        "secFaturamentoKpis",
+        "expanderFilaOs",
+        "expanderEmissaoNf",
+        "expanderTransferencia",
+        "expanderConsumiveis",
+        "expanderEstoqueFiscal",
+        "expanderFechamentoContabil",
+        "expanderNotasRecebidasDFe",
+        "expanderHistoricoNf",
+        "expanderCancelamentoNf"
+      ];
+
+      const setVisFat = (visiveisIds, abrirDetails = true) => {{
+        const setV = new Set(visiveisIds);
+        todasSecoesFat.forEach(id => {{
+          const el = document.getElementById(id);
+          if (!el) return;
+          if (setV.has(id)) {{
+            el.style.display = (id === "secFaturamentoKpis") ? "grid" : (id === "barraControleSecoes" ? "flex" : "block");
+            if (abrirDetails && el.tagName === "DETAILS") el.open = true;
+          }} else {{
+            el.style.display = "none";
+          }}
+        }});
       }};
-      resetBtns();
 
-      if (aba === "DESPESAS_UNIDADES") {{
-        if (boxFat) boxFat.style.display = "none";
-        if (boxDesp) boxDesp.style.display = "block";
-        if (boxCfop) boxCfop.style.display = "none";
-        if (btnDesp) {{ btnDesp.style.background = "#f59e0b"; btnDesp.style.color = "#0b132b"; }}
-        carregarDespesasUnidades();
-      }} else if (aba === "CFOP") {{
-        if (boxFat) boxFat.style.display = "none";
-        if (boxDesp) boxDesp.style.display = "none";
-        if (boxCfop) boxCfop.style.display = "block";
-        if (btnCfop) {{ btnCfop.style.background = "#38bdf8"; btnCfop.style.color = "#0b132b"; }}
-        carregarDadosCfop();
-      }} else if (aba === "TUDO") {{
+      const setVisCfop = (visiveisIds) => {{
+        const setV = new Set(visiveisIds);
+        ["secCfopKpis", "secCfopRegras", "secCfopEstoque", "secCfopNotas"].forEach(id => {{
+          const el = document.getElementById(id);
+          if (!el) return;
+          if (setV.has(id)) {{
+            el.style.display = (id === "secCfopKpis") ? "grid" : "block";
+          }} else {{
+            el.style.display = "none";
+          }}
+        }});
+      }};
+
+      if (menu === "EMISSAO") {{
         if (boxFat) boxFat.style.display = "block";
+        if (boxDesp) boxDesp.style.display = "none";
+        if (boxCfop) boxCfop.style.display = "none";
+        if (sub === "EMISSAO_NF") {{
+          setVisFat(["secFaturamentoKpis", "expanderFilaOs", "expanderEmissaoNf"]);
+        }} else if (sub === "HISTORICO_NF") {{
+          setVisFat(["secFaturamentoKpis", "expanderHistoricoNf"]);
+        }} else if (sub === "TRANSFERENCIA") {{
+          setVisFat(["expanderTransferencia"]);
+        }} else if (sub === "CANCELAMENTO") {{
+          setVisFat(["expanderCancelamentoNf"]);
+        }} else {{
+          setVisFat(["secFaturamentoKpis", "expanderFilaOs", "expanderEmissaoNf", "expanderHistoricoNf", "expanderTransferencia", "expanderCancelamentoNf"]);
+        }}
+      }} else if (menu === "RADAR_DFE") {{
+        if (boxFat) boxFat.style.display = "block";
+        if (boxDesp) boxDesp.style.display = "none";
+        if (boxCfop) boxCfop.style.display = "none";
+        if (sub === "RADAR_SEFAZ") {{
+          setVisFat(["expanderNotasRecebidasDFe"]);
+        }} else if (sub === "CONSUMIVEIS") {{
+          setVisFat(["expanderConsumiveis"]);
+        }} else {{
+          setVisFat(["expanderNotasRecebidasDFe", "expanderConsumiveis"]);
+        }}
+        carregarNotasRecebidasDFe();
+      }} else if (menu === "ESTOQUE") {{
+        if (boxFat) boxFat.style.display = "block";
+        if (boxDesp) boxDesp.style.display = "none";
+        if (boxCfop) boxCfop.style.display = "none";
+        setVisFat(["expanderEstoqueFiscal"]);
+        const boxNovo = document.getElementById("boxNovoItemInventario");
+        const boxAjuste = document.getElementById("boxAjusteRelativo");
+        if (sub === "NOVA_PECA") {{
+          if (boxNovo) boxNovo.style.display = "block";
+          if (boxAjuste) boxAjuste.style.display = "none";
+        }} else if (sub === "MOVIMENTACAO_AVULSA") {{
+          if (boxNovo) boxNovo.style.display = "none";
+          if (boxAjuste) boxAjuste.style.display = "block";
+        }} else {{
+          if (boxNovo) boxNovo.style.display = "none";
+          if (boxAjuste) boxAjuste.style.display = "none";
+        }}
+      }} else if (menu === "CONTABIL_CFOP") {{
+        if (boxDesp) boxDesp.style.display = "none";
+        if (sub === "FECHAMENTO_CONTABIL") {{
+          if (boxFat) boxFat.style.display = "block";
+          if (boxCfop) boxCfop.style.display = "none";
+          setVisFat(["expanderFechamentoContabil"]);
+          carregarFechamentoContabil();
+        }} else if (sub === "CFOP_REGRAS") {{
+          if (boxFat) boxFat.style.display = "none";
+          if (boxCfop) boxCfop.style.display = "block";
+          setVisCfop(["secCfopKpis", "secCfopRegras"]);
+          carregarDadosCfop();
+        }} else if (sub === "CFOP_ESTOQUE") {{
+          if (boxFat) boxFat.style.display = "none";
+          if (boxCfop) boxCfop.style.display = "block";
+          setVisCfop(["secCfopKpis", "secCfopEstoque"]);
+          carregarDadosCfop();
+        }} else if (sub === "CFOP_NOTAS") {{
+          if (boxFat) boxFat.style.display = "none";
+          if (boxCfop) boxCfop.style.display = "block";
+          setVisCfop(["secCfopKpis", "secCfopNotas"]);
+          carregarDadosCfop();
+        }} else {{
+          if (boxFat) boxFat.style.display = "block";
+          if (boxCfop) boxCfop.style.display = "block";
+          setVisFat(["expanderFechamentoContabil"]);
+          setVisCfop(["secCfopKpis", "secCfopRegras", "secCfopEstoque", "secCfopNotas"]);
+          carregarFechamentoContabil();
+          carregarDadosCfop();
+        }}
+      }} else if (menu === "DESPESAS") {{
+        if (boxFat) boxFat.style.display = "none";
+        if (boxCfop) boxCfop.style.display = "none";
         if (boxDesp) boxDesp.style.display = "block";
-        if (boxCfop) boxCfop.style.display = "block";
-        if (btnTudo) {{ btnTudo.style.background = "var(--cyan)"; btnTudo.style.color = "#0b132b"; }}
+        const boxFormDesp = document.getElementById("boxFormDespesaUnidade");
+        const boxExtrato = document.getElementById("boxConciliadorExtratoGestora");
+        const secGraf = document.getElementById("secDespGraficos");
+        const secKpis = document.getElementById("secDespKpis");
+        if (sub === "LANCAR_DESPESA") {{
+          if (boxExtrato) boxExtrato.style.display = "none";
+          toggleFormNovaDespesaUnidade(true);
+          if (secGraf) secGraf.style.display = "none";
+          if (secKpis) secKpis.style.display = "grid";
+        }} else if (sub === "CONCILIAR_EXTRATO") {{
+          if (boxFormDesp) boxFormDesp.style.display = "none";
+          toggleBoxExtratoGestora(true);
+          if (secGraf) secGraf.style.display = "none";
+          if (secKpis) secKpis.style.display = "grid";
+        }} else {{
+          if (boxFormDesp) boxFormDesp.style.display = "none";
+          if (boxExtrato) boxExtrato.style.display = "none";
+          if (secGraf) secGraf.style.display = "grid";
+          if (secKpis) secKpis.style.display = "grid";
+        }}
         carregarDespesasUnidades();
-        carregarDadosCfop();
+      }} else if (menu === "CONFIG") {{
+        if (boxFat) boxFat.style.display = "block";
+        if (boxDesp) boxDesp.style.display = "none";
+        if (boxCfop) boxCfop.style.display = "none";
+        if (isGestor) {{
+          setVisFat(["expanderConfiguracoesFiscais"]);
+          if (sub === "CANAIS_ENVIO") {{
+            setTimeout(() => {{
+              document.getElementById("secCanaisOficiaisCfg")?.scrollIntoView({{ behavior: "smooth", block: "center" }});
+            }}, 100);
+          }}
+        }} else {{
+          setVisFat(["bannerAcessoRestritoCfgFiscal"]);
+        }}
       }} else {{
+        // TUDO
         if (boxFat) boxFat.style.display = "block";
-        if (boxDesp) boxDesp.style.display = "none";
-        if (boxCfop) boxCfop.style.display = "none";
-        if (btnFat) {{ btnFat.style.background = "var(--cyan)"; btnFat.style.color = "#0b132b"; }}
+        if (boxDesp) boxDesp.style.display = "block";
+        if (boxCfop) boxCfop.style.display = "block";
+        const listaTudo = [
+          "barraControleSecoes",
+          isGestor ? "expanderConfiguracoesFiscais" : "bannerAcessoRestritoCfgFiscal",
+          "secFaturamentoKpis",
+          "expanderFilaOs",
+          "expanderEmissaoNf",
+          "expanderTransferencia",
+          "expanderConsumiveis",
+          "expanderEstoqueFiscal",
+          "expanderFechamentoContabil",
+          "expanderNotasRecebidasDFe",
+          "expanderHistoricoNf",
+          "expanderCancelamentoNf"
+        ];
+        setVisFat(listaTudo, false);
+        setVisCfop(["secCfopKpis", "secCfopRegras", "secCfopEstoque", "secCfopNotas"]);
+        carregarDespesasUnidades();
+        carregarDadosCfop();
       }}
+    }}
+
+    function restaurarMenuFiscalSalvo() {{
+      let m = "EMISSAO";
+      let s = "EMISSAO_NF";
+      try {{
+        m = localStorage.getItem("emed_fiscal_menu_ativo") || "EMISSAO";
+        s = localStorage.getItem("emed_fiscal_submenu_ativo") || "";
+      }} catch (e) {{}}
+      selecionarMenuFiscal(m, s);
+    }}
+
+    function alternarAbaPrincipalFiscal(aba) {{
+      if (aba === "DESPESAS_UNIDADES") selecionarMenuFiscal("DESPESAS", "PAINEL_DESPESAS");
+      else if (aba === "CFOP") selecionarMenuFiscal("CONTABIL_CFOP", "CFOP_REGRAS");
+      else if (aba === "TUDO") selecionarMenuFiscal("TUDO", "TUDO_GERAL");
+      else selecionarMenuFiscal("EMISSAO", "EMISSAO_NF");
     }}
 
     function aoMudarFiltroUnidadeDespesa(val) {{
@@ -8425,18 +9047,15 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     }}
 
     function aplicarPermissoesUsuarioFiscal() {{
-      const cargo = String(USUARIO_FISCAL?.cargo || '').toLowerCase();
-      const role = String(USUARIO_FISCAL?.role || '').toLowerCase();
-      const user = String(USUARIO_FISCAL?.username || '').toLowerCase();
-      const isGestor = (role === 'admin' || user === 'netto' || user === 'vitor' || cargo.includes('diretor') || cargo.includes('gest'));
-
+      const isGestor = verificarIsGestorFiscal();
       const secCfg = document.getElementById("expanderConfiguracoesFiscais");
       const bannerRestrito = document.getElementById("bannerAcessoRestritoCfgFiscal");
-      if (secCfg) {{
-        secCfg.style.display = isGestor ? "block" : "none";
-      }}
-      if (bannerRestrito) {{
-        bannerRestrito.style.display = isGestor ? "none" : "block";
+      if (ABA_PRINCIPAL_FISCAL === "CONFIG" || ABA_PRINCIPAL_FISCAL === "TUDO") {{
+        if (secCfg) secCfg.style.display = isGestor ? "block" : "none";
+        if (bannerRestrito) bannerRestrito.style.display = isGestor ? "none" : "block";
+      }} else {{
+        if (secCfg) secCfg.style.display = "none";
+        if (bannerRestrito) bannerRestrito.style.display = "none";
       }}
     }}
 
@@ -8893,7 +9512,8 @@ Por favor, confira os dados preenchidos.`);
     const _origCarregarDadosFiscais = carregarDadosFiscais;
     carregarDadosFiscais = async function(osId) {{
       await _origCarregarDadosFiscais(osId);
-      carregarNotasRecebidasDFe();
+      await carregarNotasRecebidasDFe();
+      if (typeof atualizarBadgesMenusFiscal === "function") atualizarBadgesMenusFiscal();
       const selUnid = document.getElementById("selDespFiltroUnidade");
       if (selUnid) selUnid.value = FILIAL_ATIVA || "CONSOLIDADO";
       carregarDespesasUnidades();
@@ -9275,40 +9895,88 @@ Por favor, confira os dados preenchidos.`);
         </div>
       </div>
 
-      <!-- PAINEL RÁPIDO DE ENVIO POR WHATSAPP OU E-MAIL -->
-      <div id="boxShareModalDFe" style="display:none;background:#132338;border:1.5px solid #0284c7;border-radius:8px;padding:12px;margin-bottom:10px;">
+      <!-- PAINEL RÁPIDO DE ENVIO POR WHATSAPP OU E-MAIL (ENXUTO E OTIMIZADO) -->
+      <div id="boxShareModalDFe" style="display:none;background:#132338;border:1.5px solid #0284c7;border-radius:8px;padding:12px;margin-bottom:10px;box-shadow:0 4px 15px rgba(0,0,0,0.3);">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px;">
+          
+          <!-- COLUNA 1: WHATSAPP COM PDF -->
           <div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px;flex-wrap:wrap;">
-              <label style="color:#4ade80;font-size:12px;font-weight:700;margin:0;">📲 Enviar por WhatsApp:</label>
-              <div style="display:flex;gap:5px;">
-                <button type="button" id="btnConectarWhatsPrompt" onclick="perguntarOndeConectarWhatsApp()" style="background:#0f172a;border:1px solid #38bdf8;color:#38bdf8;border-radius:4px;font-size:11px;padding:3px 8px;cursor:pointer;" title="Conectar no seu navegador padrão ou no robô local">🌐 Conectar WhatsApp...</button>
-                <button type="button" onclick="salvarContatoRapidoWhatsDFe()" style="background:none;border:1px solid #4ade80;color:#4ade80;border-radius:4px;font-size:11px;padding:3px 8px;cursor:pointer;" title="Salvar os números digitados como atalho rápido">+ Salvar Contato</button>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="color:#4ade80;font-size:12px;font-weight:700;margin:0;">📲 WhatsApp (PDF Anexo Sem Links):</label>
+              <span id="badgeCanaisWhatsStatus" style="font-size:11px;color:#94a3b8;">Conectado em background</span>
+            </div>
+            
+            <div style="display:flex;gap:6px;position:relative;">
+              <input type="text" id="inpModalDFeWhats" placeholder="DDD + Número (ex: 85996197923)" onkeydown="if(event.key==='Enter'){{enviarWhatsNavegadorPadraoModalDFe();event.preventDefault();}}" style="flex:1;min-width:130px;padding:8px 10px;font-size:12px;" />
+              
+              <!-- BOTÃO ÚNICO DE CONTATOS -->
+              <div id="wrapContatosWhats" style="position:relative;">
+                <button type="button" id="btnDropdownContatosWhats" onclick="toggleMenuContatosWhats(event)" class="btn" style="width:auto;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:8px 10px;font-size:12px;font-weight:600;white-space:nowrap;" title="Abrir lista de contatos salvos">👥 Contatos ▾</button>
+                <div id="menuContatosWhats" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:#0f172a;border:1.5px solid #38bdf8;border-radius:6px;width:240px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.6);padding:6px;">
+                  <div style="font-size:11px;font-weight:700;color:#38bdf8;padding:4px 6px;border-bottom:1px solid #334155;display:flex;justify-content:space-between;align-items:center;">
+                    <span>CONTATOS RÁPIDOS</span>
+                    <button type="button" onclick="salvarContatoRapidoWhatsDFe()" style="background:#16a34a;border:none;color:#fff;border-radius:3px;font-size:10px;padding:2px 6px;cursor:pointer;font-weight:700;" title="Salvar número digitado">+ Salvar</button>
+                  </div>
+                  <div id="listaContatosDropdownWhats" style="max-height:160px;overflow-y:auto;padding:4px 0;"></div>
+                  <div style="border-top:1px solid #334155;padding-top:4px;margin-top:4px;">
+                    <a href="javascript:void(0)" onclick="perguntarOndeConectarWhatsApp()" style="display:block;padding:5px 8px;font-size:11px;color:#94a3b8;text-decoration:none;border-radius:4px;" onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background='none'">🌐 Conectar WhatsApp...</a>
+                  </div>
+                </div>
               </div>
+
+              <!-- BOTÃO ÚNICO DE ENVIO WHATSAPP -->
+              <div id="wrapEnvioWhats" style="position:relative;">
+                <button type="button" id="btnDropdownEnviarWhats" onclick="toggleMenuEnvioWhats(event)" class="btn" style="width:auto;background:#16a34a;color:#fff;padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(22,163,74,0.3);" title="Opções de envio no WhatsApp">🚀 Enviar ▾</button>
+                <div id="menuEnvioWhats" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:#0f172a;border:1.5px solid #22c55e;border-radius:6px;width:260px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.6);padding:6px;">
+                  <button type="button" onclick="enviarWhatsNavegadorPadraoModalDFe();fecharMenuEnvioWhats();" style="display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;color:#e2e8f0;padding:8px 10px;border-radius:4px;font-size:11.5px;cursor:pointer;text-align:left;font-weight:600;" onmouseover="this.style.background='#16a34a';this.style.color='#fff'" onmouseout="this.style.background='none';this.style.color='#e2e8f0'">
+                    <span>🚀</span> <div><b>WhatsApp Web (Navegador)</b><div style="font-size:10px;color:#94a3b8;font-weight:normal;">Baixa o PDF e abre a conversa</div></div>
+                  </button>
+                  <button type="button" onclick="enviarWhatsDanfeModalDFe();fecharMenuEnvioWhats();" style="display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;color:#e2e8f0;padding:8px 10px;border-radius:4px;font-size:11.5px;cursor:pointer;text-align:left;font-weight:600;" onmouseover="this.style.background='#0284c7';this.style.color='#fff'" onmouseout="this.style.background='none';this.style.color='#e2e8f0'">
+                    <span>🤖</span> <div><b>Envio Automático (Robô Local)</b><div style="font-size:10px;color:#94a3b8;font-weight:normal;">Anexa o PDF via automação em 1 clique</div></div>
+                  </button>
+                  <button type="button" onclick="copiarMensagemLimpaWhatsModalDFe();fecharMenuEnvioWhats();" style="display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;color:#e2e8f0;padding:8px 10px;border-radius:4px;font-size:11.5px;cursor:pointer;text-align:left;font-weight:600;" onmouseover="this.style.background='#334155';this.style.color='#fff'" onmouseout="this.style.background='none';this.style.color='#e2e8f0'">
+                    <span>📋</span> <div><b>Copiar Mensagem (Sem Links)</b><div style="font-size:10px;color:#94a3b8;font-weight:normal;">Copia o texto formatado da nota</div></div>
+                  </button>
+                </div>
+              </div>
+
             </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <input type="text" id="inpModalDFeWhats" placeholder="DDD + Número (ex: 85996197923)" onkeydown="if(event.key==='Enter'){{enviarWhatsNavegadorPadraoModalDFe();event.preventDefault();}}" style="flex:1;min-width:180px;padding:8px 10px;font-size:12px;" />
-              <button type="button" id="btnDispararWhatsNavegadorPadrao" class="btn" style="width:auto;background:#16a34a;color:#fff;padding:8px 14px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(22,163,74,0.4);" onclick="enviarWhatsNavegadorPadraoModalDFe()" title="Abre diretamente na aba do WhatsApp Web já aberta no seu navegador">🚀 Enviar pelo seu WhatsApp Aberto (Navegador)</button>
-              <button type="button" id="btnDispararWhatsPdfAuto" class="btn" style="width:auto;background:#0369a1;color:#fff;padding:8px 10px;font-size:11px;white-space:nowrap;" onclick="enviarWhatsDanfeModalDFe()" title="Anexa o arquivo PDF físico via robô local no servidor">🤖 Enviar PDF Anexo (Robô Local)</button>
-            </div>
-            <div id="boxContatosRapidosWhatsDFe" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;"></div>
-            <div style="font-size:11px;color:#cbd5e1;margin-top:4px;">💡 <b>Recomendado:</b> Como você já tem o WhatsApp aberto na aba ao lado, clique em <b style="color:#4ade80;">🚀 Enviar pelo seu WhatsApp Aberto</b> para enviar a DANFE oficial em 1 clique!</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">💡 O PDF oficial é anexado diretamente, 100% sem links externos.</div>
           </div>
+
+          <!-- COLUNA 2: E-MAIL COM PDF ANEXO -->
           <div>
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-              <label style="color:#60a5fa;font-size:12px;font-weight:700;margin:0;">✉️ Enviar DANFE com PDF Anexo (Sem Links):</label>
-              <div style="display:flex;gap:4px;flex-wrap:wrap;">
-                <button type="button" onclick="abrirEmailDanfeWebmail('gmail')" style="background:#450a0a;border:1px solid #ef4444;color:#fca5a5;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer;font-weight:600;" title="Baixa o PDF oficial e abre no Gmail Web">🔴 Gmail (com PDF)</button>
-                <button type="button" onclick="abrirEmailDanfeWebmail('outlook')" style="background:#082f49;border:1px solid #0284c7;color:#7dd3fc;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer;font-weight:600;" title="Baixa o PDF oficial e abre no Outlook Web">🔵 Outlook Web</button>
-                <button type="button" onclick="abrirRascunhoComPdfAnexadoModalDFe()" style="background:#0f172a;border:1px solid #38bdf8;color:#38bdf8;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer;font-weight:600;" title="Abre o Outlook Desktop com o PDF já anexado no clipe">📎 Outlook (PDF já no Anexo)</button>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="color:#60a5fa;font-size:12px;font-weight:700;margin:0;">✉️ E-mail (PDF Anexo Sem Links):</label>
+              <span id="badgeCanaisEmailStatus" style="font-size:11px;color:#94a3b8;">Servidor SMTP ativo</span>
+            </div>
+
+            <div style="display:flex;gap:6px;position:relative;">
+              <input type="email" id="inpModalDFeEmail" placeholder="destinatario@empresa.com.br" onkeydown="if(event.key==='Enter'){{enviarEmailDanfeModalDFe();event.preventDefault();}}" style="flex:1;min-width:130px;padding:8px 10px;font-size:12px;" />
+              
+              <!-- BOTÃO DE ENVIO DIRETO PELO SERVIDOR -->
+              <button type="button" id="btnDispararEmailModal" class="btn" style="width:auto;background:#2563eb;color:#fff;padding:8px 13px;font-size:12px;font-weight:700;white-space:nowrap;" onclick="enviarEmailDanfeModalDFe()" title="Disparar e-mail em segundo plano pelo servidor da empresa">✉️ Disparar</button>
+              
+              <!-- BOTÃO ÚNICO DE OPÇÕES (GMAIL / OUTLOOK) -->
+              <div id="wrapOpcoesEmail" style="position:relative;">
+                <button type="button" id="btnDropdownOpcoesEmail" onclick="toggleMenuOpcoesEmail(event)" class="btn" style="width:auto;background:#0f172a;border:1px solid #334155;color:#93c5fd;padding:8px 10px;font-size:12px;font-weight:600;white-space:nowrap;" title="Outras opções de webmail (Gmail, Outlook)">⚙️ Opções ▾</button>
+                <div id="menuOpcoesEmail" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:#0f172a;border:1.5px solid #38bdf8;border-radius:6px;width:250px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.6);padding:6px;">
+                  <button type="button" onclick="abrirEmailDanfeWebmail('gmail');fecharMenuOpcoesEmail();" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:#e2e8f0;padding:8px 10px;border-radius:4px;font-size:11.5px;cursor:pointer;text-align:left;font-weight:600;" onmouseover="this.style.background='#ef4444';this.style.color='#fff'" onmouseout="this.style.background='none';this.style.color='#e2e8f0'">
+                    <span>🔴</span> <div><b>Gmail Web (com PDF)</b><div style="font-size:10px;color:#94a3b8;font-weight:normal;">Baixa o PDF e abre a tela do Gmail</div></div>
+                  </button>
+                  <button type="button" onclick="abrirEmailDanfeWebmail('outlook');fecharMenuOpcoesEmail();" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:#e2e8f0;padding:8px 10px;border-radius:4px;font-size:11.5px;cursor:pointer;text-align:left;font-weight:600;" onmouseover="this.style.background='#0284c7';this.style.color='#fff'" onmouseout="this.style.background='none';this.style.color='#e2e8f0'">
+                    <span>🔵</span> <div><b>Outlook Web (com PDF)</b><div style="font-size:10px;color:#94a3b8;font-weight:normal;">Baixa o PDF e abre no Outlook Online</div></div>
+                  </button>
+                  <button type="button" onclick="abrirRascunhoComPdfAnexadoModalDFe();fecharMenuOpcoesEmail();" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:#e2e8f0;padding:8px 10px;border-radius:4px;font-size:11.5px;cursor:pointer;text-align:left;font-weight:600;" onmouseover="this.style.background='#334155';this.style.color='#fff'" onmouseout="this.style.background='none';this.style.color='#e2e8f0'">
+                    <span>📎</span> <div><b>Outlook Desktop (App)</b><div style="font-size:10px;color:#94a3b8;font-weight:normal;">Abre o rascunho com o PDF já anexado</div></div>
+                  </button>
+                </div>
               </div>
+
             </div>
-            <div style="display:flex;gap:6px;margin-top:6px;">
-              <input type="email" id="inpModalDFeEmail" placeholder="destinatario@empresa.com.br" style="flex:1;padding:8px 10px;font-size:12px;" />
-              <button type="button" id="btnDispararEmailModal" class="btn" style="width:auto;background:#2563eb;color:#fff;padding:8px 14px;font-size:12px;white-space:nowrap;" onclick="enviarEmailDanfeModalDFe()">✉️ Disparar E-mail</button>
-            </div>
-            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">💡 <b>Clientes que bloqueiam links:</b> O PDF oficial vai como anexo direto (sem links externos no texto). Para envio 100% automático pelo servidor, ative o SMTP em Configurações Fiscais.</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">💡 O servidor envia o PDF direto como anexo oficial (sem links externos).</div>
           </div>
+
         </div>
         <div id="avisoEnvioPdfModalDFe" style="display:none;margin-top:8px;padding:8px 12px;border-radius:6px;background:#064e3b;border:1px solid #10b981;color:#d1fae5;font-size:12px;"></div>
       </div>
@@ -9608,6 +10276,8 @@ def registrar_rotas_portal_fiscal(app: web.Application) -> None:
     app.router.add_get("/api/fiscal/recebidas/whatsapp-status", api_fiscal_recebidas_whatsapp_status)
     app.router.add_post("/api/fiscal/recebidas/whatsapp-conectar", api_fiscal_recebidas_whatsapp_conectar)
     app.router.add_post("/api/fiscal/recebidas/enviar-whatsapp-pdf", api_fiscal_recebidas_enviar_whatsapp_pdf)
+    app.router.add_post("/api/fiscal/canais-conectar-background", api_fiscal_canais_conectar_background)
+    app.router.add_get("/api/fiscal/canais-status", api_fiscal_canais_status)
     app.router.add_get("/api/fiscal/recebidas/xml/{nota_id}", api_fiscal_recebidas_xml_download)
 
     # Rotas da Aba de Detalhes de Despesas das Unidades & Gráficos (Alimentação, Gasolina, Hotel)
