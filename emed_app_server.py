@@ -9943,7 +9943,6 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
       font-weight: 900;
       padding: 2px 4px;
       text-transform: uppercase;
-      letter-spacing: 0.3px;
       border: 1px solid #000;
       border-bottom: none;
       margin-top: 4px;
