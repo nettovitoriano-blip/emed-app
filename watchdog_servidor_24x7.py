@@ -47,15 +47,20 @@ CF_TOKEN = os.environ.get("CF_TUNNEL_TOKEN", "eyJhIjoiYjMyZTc4YmVmNzk0Nzc0YTFkOT
 
 
 def porta_http_ok(url: str) -> bool:
-
     try:
-
         with urllib.request.urlopen(url, timeout=4) as r:
-
             return r.status in (200, 301, 302, 404)
-
     except Exception:
+        return False
 
+
+def porta_tcp_ok(host: str, port: int) -> bool:
+    try:
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(2)
+            return s.connect_ex((host, port)) == 0
+    except Exception:
         return False
 
 
@@ -432,7 +437,7 @@ def main():
 
         gps_script = os.path.join(BASE_DIR, "emed_gps_gateway.py")
 
-        if os.path.exists(gps_script) and (proc_gps is None or proc_gps.poll() is not None):
+        if os.path.exists(gps_script) and not porta_tcp_ok("127.0.0.1", 5023) and (proc_gps is None or proc_gps.poll() is not None):
 
             log_msg("Iniciando Receptor GPS J16 na porta 5023...")
 
