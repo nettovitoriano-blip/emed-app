@@ -4474,7 +4474,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EMED Fiscal – Faturamento & NFS-e Multi-Filial</title>
+  <title>EMED Fiscal v3.2.0 • Faturamento & NFS-e Multi-Filial</title>
   <link rel="icon" type="image/png" href="data:image/png;base64,{icon_b64}">
   <style>
     :root {{
@@ -4524,6 +4524,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
           {f'<img src="data:image/png;base64,{icon_b64}" width="38" height="38">' if icon_b64 else '🧾'}
           <h2 style="margin:0;color:#38bdf8;">EMED Fiscal • Módulo NF</h2>
+          <span class="badge" style="background:#0f172a;border:1px solid #38bdf8;color:#38bdf8;font-size:11px;padding:3px 7px;border-radius:5px;font-weight:800;">v3.2.0</span>
         </div>
         <p style="font-size:12.5px;color:var(--muted);margin-top:6px;">Portal de Faturamento, Emissão de Notas &amp; Gestão Tributária 24/7</p>
       </div>
@@ -4545,8 +4546,11 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         <div style="display:flex;align-items:center;gap:12px;">
           {f'<img src="data:image/png;base64,{icon_b64}" width="40" height="40">' if icon_b64 else '🧾'}
           <div>
-            <h3 style="margin:0;font-size:18px;">EMED Fiscal • Módulo Tributário Multi-Filial</h3>
-            <div style="font-size:12px;color:var(--muted);">Operador: <b id="lblOperador" style="color:#38bdf8;">NETTO</b> &bull; Cargo: <span id="lblCargo" style="color:#a5f3fc;">Diretoria &amp; Controladoria</span></div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <h3 style="margin:0;font-size:18px;">EMED Fiscal • Módulo Tributário Multi-Filial</h3>
+              <span class="badge" style="background:#0f172a;border:1px solid #38bdf8;color:#38bdf8;font-size:11px;padding:3px 8px;border-radius:6px;font-weight:800;letter-spacing:0.5px;">v3.2.0 (2026.11)</span>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">Operador: <b id="lblOperador" style="color:#38bdf8;">NETTO</b> &bull; Cargo: <span id="lblCargo" style="color:#a5f3fc;">Diretoria &amp; Controladoria</span></div>
           </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
@@ -4567,20 +4571,35 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       <!-- CARD DA UNIDADE ATIVA -->
       <div class="card card-highlight" id="cardUnidadeInfo"></div>
 
-      <!-- BARRA DE ABAS PRINCIPAIS DO PORTAL -->
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;background:#0f172a;padding:8px;border-radius:10px;border:1px solid #334155;">
-        <button type="button" id="tabBtn_FATURAMENTO" class="btn" onclick="alternarAbaPrincipalFiscal('FATURAMENTO')" style="background:var(--cyan);color:#0b132b;font-weight:900;padding:10px 18px;border-radius:8px;">
-          🧾 Faturamento, NFS-e &amp; Estoque Fiscal
+      <!-- BARRA DE MENUS PRINCIPAIS DO PORTAL FISCAL -->
+      <div id="navMenusPrincipaisFiscal" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;background:#0f172a;padding:10px;border-radius:12px;border:1px solid #334155;box-shadow:0 6px 20px rgba(0,0,0,0.35);">
+        <button type="button" id="menuBtn_EMISSAO" class="btn" onclick="selecionarMenuFiscal('EMISSAO')" style="background:var(--cyan);color:#0b132b;font-weight:900;padding:10px 15px;border-radius:8px;font-size:12.5px;">
+          🧾 1. Emissão &amp; NFS-e <span id="badgeMenuEmissao" style="background:rgba(11,19,43,0.2);padding:2px 7px;border-radius:999px;font-size:11px;margin-left:4px;">0</span>
         </button>
-        <button type="button" id="tabBtn_DESPESAS_UNIDADES" class="btn" onclick="alternarAbaPrincipalFiscal('DESPESAS_UNIDADES')" style="background:#1e293b;color:#f8fafc;border:1.5px solid #f59e0b;font-weight:900;padding:10px 18px;border-radius:8px;">
-          ⛽🍽️🏨 Detalhes de Despesas das Unidades &amp; Gráficos
+        <button type="button" id="menuBtn_RADAR_DFE" class="btn" onclick="selecionarMenuFiscal('RADAR_DFE')" style="background:#1e293b;color:#f8fafc;border:1.5px solid #0284c7;font-weight:900;padding:10px 15px;border-radius:8px;font-size:12.5px;">
+          📥 2. Radar DF-e &amp; Compras <span id="badgeMenuDFe" style="background:#0369a1;color:#fff;padding:2px 7px;border-radius:999px;font-size:11px;margin-left:4px;">0</span>
         </button>
-        <button type="button" id="tabBtn_CFOP" class="btn" onclick="alternarAbaPrincipalFiscal('CFOP')" style="background:#1e293b;color:#f8fafc;border:1.5px solid #38bdf8;font-weight:900;padding:10px 18px;border-radius:8px;">
-          📑 Análise &amp; Tabela de CFOP
+        <button type="button" id="menuBtn_ESTOQUE" class="btn" onclick="selecionarMenuFiscal('ESTOQUE')" style="background:#1e293b;color:#f8fafc;border:1.5px solid #10b981;font-weight:900;padding:10px 15px;border-radius:8px;font-size:12.5px;">
+          📦 3. Estoque &amp; Inventário <span id="badgeMenuEstoque" style="background:#065f46;color:#a7f3d0;padding:2px 7px;border-radius:999px;font-size:11px;margin-left:4px;">0</span>
         </button>
-        <button type="button" id="tabBtn_TUDO" class="btn" onclick="alternarAbaPrincipalFiscal('TUDO')" style="background:transparent;color:#94a3b8;border:1px solid #334155;font-weight:700;padding:10px 16px;border-radius:8px;">
-          🌐 Exibir Tudo na Mesma Página
+        <button type="button" id="menuBtn_CONTABIL_CFOP" class="btn" onclick="selecionarMenuFiscal('CONTABIL_CFOP')" style="background:#1e293b;color:#f8fafc;border:1.5px solid #38bdf8;font-weight:900;padding:10px 15px;border-radius:8px;font-size:12.5px;">
+          🏛️ 4. Contabilidade &amp; CFOP
         </button>
+        <button type="button" id="menuBtn_DESPESAS" class="btn" onclick="selecionarMenuFiscal('DESPESAS')" style="background:#1e293b;color:#f8fafc;border:1.5px solid #f59e0b;font-weight:900;padding:10px 15px;border-radius:8px;font-size:12.5px;">
+          ⛽ 5. Despesas &amp; Extratos
+        </button>
+        <button type="button" id="menuBtn_CONFIG" class="btn" onclick="selecionarMenuFiscal('CONFIG')" style="background:#1e293b;color:#f8fafc;border:1.5px solid #a78bfa;font-weight:900;padding:10px 15px;border-radius:8px;font-size:12.5px;">
+          ⚙️ 6. Configurações &amp; A1
+        </button>
+        <button type="button" id="menuBtn_TUDO" class="btn" onclick="selecionarMenuFiscal('TUDO')" style="background:transparent;color:#94a3b8;border:1px solid #334155;font-weight:700;padding:10px 14px;border-radius:8px;font-size:12px;margin-left:auto;">
+          🌐 Visão Completa (Tudo)
+        </button>
+      </div>
+
+      <!-- BARRA DE SUBMENUS CONTEXTUAL (MÓDULO SELECIONADO) -->
+      <div id="navSubmenusFiscal" style="background:#132338;border:1px solid #0284c7;border-left:4px solid var(--cyan);border-radius:10px;padding:10px 14px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;" id="boxBotoesSubmenuFiscal"></div>
+        <div id="lblBreadcrumbMenuFiscal" style="font-size:11.5px;color:#7dd3fc;font-weight:700;"></div>
       </div>
 
       <!-- ========================================================================= -->
@@ -4657,7 +4676,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </div>
 
           <!-- BARRA DE FILTROS DA ABA DE DESPESAS -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;margin-bottom:16px;">
+          <div id="secDespFiltros" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px;margin-bottom:16px;">
             <div>
               <label>🏢 Unidade / Filial:</label>
               <select id="selDespFiltroUnidade" onchange="aoMudarFiltroUnidadeDespesa(this.value)" style="font-weight:800;color:var(--cyan);">
@@ -4810,7 +4829,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </div>
 
           <!-- KPIS DE DESPESAS DAS UNIDADES -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:10px;margin-bottom:16px;">
+          <div id="secDespKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:10px;margin-bottom:16px;">
             <div style="background:#0f172a;border:1px solid #334155;border-top:3px solid var(--cyan);border-radius:8px;padding:12px;">
               <div style="font-size:11px;color:#94a3b8;font-weight:800;">💰 TOTAL DE DESPESAS (FILTRO)</div>
               <div id="kpiDespTotalGeral" style="font-size:23px;font-weight:900;color:var(--cyan);margin-top:4px;">R$ 0,00</div>
@@ -4840,7 +4859,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </div>
 
           <!-- PAINEL DE GRÁFICOS VISUAIS (3 GRÁFICOS INTERATIVOS) -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px;margin-bottom:16px;">
+          <div id="secDespGraficos" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px;margin-bottom:16px;">
             <!-- GRÁFICO 1: ROSCA SVG + DISTRIBUIÇÃO POR CATEGORIA -->
             <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;">
               <div style="font-weight:900;font-size:13.5px;color:var(--cyan);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
@@ -4867,7 +4886,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </div>
 
           <!-- TABELA DETALHADA DE DESPESAS DAS UNIDADES -->
-          <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;">
+          <div id="secDespTabela" style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
               <div style="font-weight:900;font-size:13.5px;color:var(--cyan);">📋 Relação Detalhada de Despesas Lançadas nas Unidades</div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -4929,7 +4948,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </div>
 
           <!-- KPIs CFOP & ISS -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
+          <div id="secCfopKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
             <div style="background:#0f172a;border:1px solid #334155;border-top:3px solid #38bdf8;border-radius:8px;padding:12px;">
               <div style="font-size:11px;color:#bae6fd;font-weight:800;">📑 REGRAS CFOP CADASTRADAS</div>
               <div id="kpiCfopTotalRegras" style="font-size:24px;font-weight:900;color:#38bdf8;margin-top:4px;">0</div>
@@ -5018,7 +5037,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </div>
 
           <!-- SEÇÃO 1: TABELA EDITÁVEL DE REGRAS DE CFOP -->
-          <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;margin-bottom:18px;">
+          <div id="secCfopRegras" style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;margin-bottom:18px;">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
               <div style="font-weight:900;font-size:14px;color:#38bdf8;">1. Tabela Mestre de Regras CFOP (Edite qualquer campo e clique em 💾 Salvar)</div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -5057,7 +5076,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </div>
 
           <!-- SEÇÃO 2: ANÁLISE & EDIÇÃO DE CFOP NO ESTOQUE DE PEÇAS -->
-          <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;margin-bottom:18px;">
+          <div id="secCfopEstoque" style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;margin-bottom:18px;">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
               <div>
                 <div style="font-weight:900;font-size:14px;color:#34d399;">2. Análise de CFOP nas Peças do Estoque (Individual ou em Lote)</div>
@@ -5118,7 +5137,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </div>
 
           <!-- SEÇÃO 3: ANÁLISE & EDIÇÃO DE CFOP NAS NOTAS FISCAIS EMITIDAS -->
-          <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;">
+          <div id="secCfopNotas" style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;">
             <div style="font-weight:900;font-size:14px;color:#fbbf24;margin-bottom:10px;">3. Análise &amp; Ajuste Manual de CFOP nas Notas Fiscais Registradas</div>
             <div style="overflow-x:auto;max-height:340px;overflow-y:auto;">
               <table>
@@ -5147,7 +5166,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       <div id="boxAbaFaturamentoFiscal">
 
       <!-- BARRA DE CONTROLE: EXPANDIR / RECOLHER TODAS AS SEÇÕES -->
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
+      <div id="barraControleSecoes" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 14px;">
         <div style="font-size:12.5px;color:var(--muted);font-weight:700;">
           📌 Todas as seções e módulos fiscais possuem controle individual de recolher/expandir (▼ / ▶).
         </div>
@@ -5190,7 +5209,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             <input type="checkbox" id="cfgReplicarCert" checked style="width:auto;" />
             🔗 Aplicar este mesmo Certificado A1 da EMED para todas as unidades (Matriz e Filial)
           </label>
-          <h4 style="margin:16px 0 6px 0;color:var(--cyan);">📡 Canais Oficiais de Envio da Empresa (E-mail &amp; WhatsApp em Background)</h4>
+          <h4 id="secCanaisOficiaisCfg" style="margin:16px 0 6px 0;color:var(--cyan);">📡 Canais Oficiais de Envio da Empresa (E-mail &amp; WhatsApp em Background)</h4>
           <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">
             Cadastre o e-mail corporativo e o WhatsApp da EMED. O sistema se conecta em segundo plano após a inicialização para permitir envio instantâneo de DANFEs e Notas Fiscais com PDF anexado.
           </div>
@@ -5229,6 +5248,13 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             </div>
           </div>
 
+          <div style="margin-top:14px;padding:10px 14px;background:#091224;border:1px solid #1e293b;border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:12px;color:#94a3b8;">
+              ℹ️ <b>Versão do Módulo Fiscal:</b> <span style="color:#38bdf8;font-weight:800;">EMED Fiscal v3.2.0 (Build 2026-11)</span> &bull; Motor Tributário &amp; NFS-e Nacional Ativo
+            </div>
+            <span class="badge" style="background:#0284c7;color:#fff;font-size:10.5px;padding:3px 8px;border-radius:4px;">PRODUÇÃO / 24x7</span>
+          </div>
+
           <div style="margin-top:12px;">
             <button class="btn btn-blue" id="btnSalvarCfgUnidade" onclick="salvarConfigFilial()">💾 Salvar Parâmetros da Unidade</button>
           </div>
@@ -5236,7 +5262,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       </details>
 
       <!-- KPIs -->
-      <div class="grid-3">
+      <div class="grid-3" id="secFaturamentoKpis">
         <div class="card"><div style="font-size:12px;color:var(--muted);">Total em Fila Fiscal</div><div class="kpi-num" id="kpiFila">0 OSs</div></div>
         <div class="card"><div style="font-size:12px;color:var(--muted);">Notas Fiscais Emitidas</div><div class="kpi-num" id="kpiEmitidas">0 NFs</div></div>
         <div class="card"><div style="font-size:12px;color:var(--muted);" id="lblKpiFaturado">Total Faturado</div><div class="kpi-num" id="kpiTotal">R$ 0,00</div></div>
@@ -5894,6 +5920,17 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         </div>
       </details>
       </div><!-- FIM boxAbaFaturamentoFiscal -->
+
+      <!-- RODAPÉ FISCAL COM VERSÃO E INFORMAÇÕES DE INTEGRIDADE -->
+      <footer style="margin-top:28px;padding:16px 12px;border-top:1px solid #334155;color:#64748b;font-size:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-weight:700;color:#94a3b8;">🏛️ EMED Fiscal &amp; Gestão Tributária</span>
+          <span class="badge" style="background:#0f172a;border:1px solid #0284c7;color:#38bdf8;font-size:11px;padding:2px 8px;border-radius:4px;font-weight:800;">v3.2.0 (2026.11)</span>
+        </div>
+        <div style="color:#64748b;font-size:11.5px;">
+          Homologação &amp; Produção Multi-Filial &bull; SEFAZ DF &amp; CE &bull; Receita Federal &bull; Conexão Segura Certificado A1
+        </div>
+      </footer>
     </div>
   </div>
 
@@ -5961,7 +5998,11 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       document.getElementById("appBox").style.display = "block";
       document.getElementById("lblOperador").textContent = (USUARIO_FISCAL?.username || "netto").toUpperCase();
       document.getElementById("lblCargo").textContent = USUARIO_FISCAL?.cargo || "Diretoria & Controladoria";
-      aplicarPermissoesUsuarioFiscal();
+      if (typeof restaurarMenuFiscalSalvo === "function") {{
+        restaurarMenuFiscalSalvo();
+      }} else {{
+        aplicarPermissoesUsuarioFiscal();
+      }}
       carregarDadosFiscais();
     }}
 
@@ -7469,6 +7510,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         document.getElementById("kpiRecPendManif").textContent = res.kpis.pend_manifestacao;
         document.getElementById("kpiRecPendEstoque").textContent = res.kpis.pend_estoque;
         document.getElementById("badgeQtdRecebidas").textContent = `${{res.kpis.total}} Notas`;
+        if (typeof atualizarBadgesMenusFiscal === "function") atualizarBadgesMenusFiscal();
 
         const tb = document.getElementById("tbodyNotasRecebidasDFe");
         tb.innerHTML = DFE_NOTAS_CACHE.map(n => {{
@@ -8321,51 +8363,388 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     // ABA DE DETALHES DE DESPESAS DAS UNIDADES (ALIMENTAÇÃO, GASOLINA, HOTEL)
     // =========================================================================
     let DESPESAS_UNIDADES_CACHE = [];
-    let ABA_PRINCIPAL_FISCAL = "FATURAMENTO";
+    let ABA_PRINCIPAL_FISCAL = "EMISSAO";
+    let SUBMENU_ATIVO_FISCAL = "EMISSAO_NF";
 
-    function alternarAbaPrincipalFiscal(aba) {{
-      ABA_PRINCIPAL_FISCAL = aba;
+    const MAPA_MENUS_FISCAL = {{
+      EMISSAO: {{
+        titulo: "🧾 1. Emissão & NFS-e",
+        cor: "var(--cyan)",
+        corTexto: "#0b132b",
+        submenus: [
+          {{ id: "EMISSAO_NF", label: "🚀 Emissão em 1 Clique & Fila de OSs" }},
+          {{ id: "HISTORICO_NF", label: "📜 Histórico de Notas (Livro de Saídas)" }},
+          {{ id: "TRANSFERENCIA", label: "📦 Transferência Filiais (CE ⇄ DF)" }},
+          {{ id: "CANCELAMENTO", label: "🚫 Cancelamento de NF" }},
+          {{ id: "TODOS_EMISSAO", label: "👁️ Ver Todos de Emissão" }}
+        ]
+      }},
+      RADAR_DFE: {{
+        titulo: "📥 2. Radar DF-e & Compras",
+        cor: "#38bdf8",
+        corTexto: "#0b132b",
+        submenus: [
+          {{ id: "RADAR_SEFAZ", label: "📡 Radar SEFAZ • Notas de Fornecedores & DANFE" }},
+          {{ id: "CONSUMIVEIS", label: "☕ Consumíveis Administrativos (Baixa Direta)" }},
+          {{ id: "TODOS_COMPRAS", label: "👁️ Ver Todos de Compras" }}
+        ]
+      }},
+      ESTOQUE: {{
+        titulo: "📦 3. Estoque & Inventário Fiscal",
+        cor: "#10b981",
+        corTexto: "#0b132b",
+        submenus: [
+          {{ id: "INVENTARIO_GERAL", label: "📋 Inventário Geral (Físico vs. Fiscal)" }},
+          {{ id: "NOVA_PECA", label: "➕ Cadastrar Nova Peça no Almoxarifado" }},
+          {{ id: "MOVIMENTACAO_AVULSA", label: "⚡ Movimentação Avulsa (Entrada / Saída)" }}
+        ]
+      }},
+      CONTABIL_CFOP: {{
+        titulo: "🏛️ 4. Contabilidade & CFOP",
+        cor: "#38bdf8",
+        corTexto: "#0b132b",
+        submenus: [
+          {{ id: "FECHAMENTO_CONTABIL", label: "🏛️ Fechamento Mensal & Relatórios Contábeis" }},
+          {{ id: "CFOP_REGRAS", label: "📑 1. Tabela Mestre de Regras CFOP" }},
+          {{ id: "CFOP_ESTOQUE", label: "📦 2. CFOP nas Peças do Estoque" }},
+          {{ id: "CFOP_NOTAS", label: "🧾 3. Ajuste de CFOP nas Notas" }},
+          {{ id: "TODOS_CONTABIL", label: "👁️ Visão Completa Contábil & CFOP" }}
+        ]
+      }},
+      DESPESAS: {{
+        titulo: "⛽ 5. Despesas & Extratos",
+        cor: "#f59e0b",
+        corTexto: "#0b132b",
+        submenus: [
+          {{ id: "PAINEL_DESPESAS", label: "📊 Painel Geral, Gráficos & Relação" }},
+          {{ id: "LANCAR_DESPESA", label: "➕ Lançar Nova Despesa (Câmera / QR Code)" }},
+          {{ id: "CONCILIAR_EXTRATO", label: "📂 Bater Extrato da Gestora (CSV / OFX)" }}
+        ]
+      }},
+      CONFIG: {{
+        titulo: "⚙️ 6. Configurações & Certificado A1",
+        cor: "#a78bfa",
+        corTexto: "#0b132b",
+        submenus: [
+          {{ id: "CERTIFICADO_DADOS", label: "🔐 Dados Fiscais da Unidade & Certificado A1" }},
+          {{ id: "CANAIS_ENVIO", label: "📡 Canais Oficiais (WhatsApp & E-mail SMTP)" }}
+        ]
+      }},
+      TUDO: {{
+        titulo: "🌐 Visão Completa (Todos os Módulos)",
+        cor: "var(--cyan)",
+        corTexto: "#0b132b",
+        submenus: [
+          {{ id: "TUDO_GERAL", label: "🌐 Todos os Módulos Abertos na Página" }},
+          {{ id: "RECOLHER_TUDO", label: "🔼 Recolher Todos os Painéis" }},
+          {{ id: "EXPANDIR_TUDO", label: "🔽 Expandir Todos os Painéis" }}
+        ]
+      }}
+    }};
+
+    function verificarIsGestorFiscal() {{
+      const cargo = String(USUARIO_FISCAL?.cargo || '').toLowerCase();
+      const role = String(USUARIO_FISCAL?.role || '').toLowerCase();
+      const user = String(USUARIO_FISCAL?.username || '').toLowerCase();
+      return (role === 'admin' || user === 'netto' || user === 'vitor' || cargo.includes('diretor') || cargo.includes('gest'));
+    }}
+
+    function atualizarBadgesMenusFiscal() {{
+      const bEm = document.getElementById("badgeMenuEmissao");
+      if (bEm && DADOS_ATUAIS?.kpis) {{
+        bEm.textContent = DADOS_ATUAIS.kpis.pendentes ?? 0;
+      }}
+      const bDfe = document.getElementById("badgeMenuDFe");
+      if (bDfe) {{
+        bDfe.textContent = (DFE_NOTAS_CACHE || []).length;
+      }}
+      const bEst = document.getElementById("badgeMenuEstoque");
+      if (bEst) {{
+        bEst.textContent = (INVENTARIO_ITENS || []).length;
+      }}
+    }}
+
+    function selecionarMenuFiscal(menu, submenuForcado) {{
+      if (!MAPA_MENUS_FISCAL[menu]) menu = "EMISSAO";
+      ABA_PRINCIPAL_FISCAL = menu;
+      const cfgMenu = MAPA_MENUS_FISCAL[menu];
+      const listaSubs = cfgMenu.submenus || [];
+      let subAlvo = submenuForcado;
+      if (!subAlvo || !listaSubs.some(s => s.id === subAlvo)) {{
+        subAlvo = listaSubs[0]?.id || "";
+      }}
+      SUBMENU_ATIVO_FISCAL = subAlvo;
+
+      try {{
+        localStorage.setItem("emed_fiscal_menu_ativo", menu);
+        localStorage.setItem("emed_fiscal_submenu_ativo", subAlvo);
+      }} catch (e) {{}}
+
+      // Estiliza botões de menu principal
+      Object.keys(MAPA_MENUS_FISCAL).forEach(k => {{
+        const btn = document.getElementById("menuBtn_" + k);
+        if (!btn) return;
+        if (k === menu) {{
+          btn.style.background = MAPA_MENUS_FISCAL[k].cor;
+          btn.style.color = MAPA_MENUS_FISCAL[k].corTexto;
+          btn.style.boxShadow = "0 0 12px rgba(100,223,223,0.35)";
+        }} else if (k === "TUDO") {{
+          btn.style.background = "transparent";
+          btn.style.color = "#94a3b8";
+          btn.style.boxShadow = "none";
+        }} else {{
+          btn.style.background = "#1e293b";
+          btn.style.color = "#f8fafc";
+          btn.style.boxShadow = "none";
+        }}
+      }});
+
+      renderizarSubmenusFiscal(menu, subAlvo);
+      aplicarVisibilidadeSubmenuFiscal(menu, subAlvo);
+    }}
+
+    function selecionarSubmenuFiscal(subId) {{
+      if (subId === "RECOLHER_TUDO") {{
+        toggleTodasSecoes(false);
+        return;
+      }}
+      if (subId === "EXPANDIR_TUDO") {{
+        toggleTodasSecoes(true);
+        return;
+      }}
+      SUBMENU_ATIVO_FISCAL = subId;
+      try {{
+        localStorage.setItem("emed_fiscal_submenu_ativo", subId);
+      }} catch (e) {{}}
+      renderizarSubmenusFiscal(ABA_PRINCIPAL_FISCAL, subId);
+      aplicarVisibilidadeSubmenuFiscal(ABA_PRINCIPAL_FISCAL, subId);
+    }}
+
+    function renderizarSubmenusFiscal(menu, subAtivo) {{
+      const cfgMenu = MAPA_MENUS_FISCAL[menu];
+      const box = document.getElementById("boxBotoesSubmenuFiscal");
+      const bread = document.getElementById("lblBreadcrumbMenuFiscal");
+      if (!box || !cfgMenu) return;
+
+      const subObj = (cfgMenu.submenus || []).find(s => s.id === subAtivo) || cfgMenu.submenus[0];
+      if (bread) {{
+        bread.innerHTML = `📍 <span style="color:#94a3b8;">Menu:</span> <b style="color:#fff;">${{cfgMenu.titulo}}</b> &rsaquo; <span style="color:var(--cyan);">${{subObj ? subObj.label : ''}}</span>`;
+      }}
+
+      box.innerHTML = `<span style="font-size:11.5px;font-weight:900;color:#94a3b8;margin-right:4px;">SUBMENUS:</span>` +
+        (cfgMenu.submenus || []).map(s => {{
+          const ativo = s.id === subAtivo;
+          const bg = ativo ? cfgMenu.cor : "#0f172a";
+          const fg = ativo ? cfgMenu.corTexto : "#e2e8f0";
+          const brd = ativo ? cfgMenu.cor : "#334155";
+          const fw = ativo ? "900" : "700";
+          return `<button type="button" class="btn" onclick="selecionarSubmenuFiscal('${{s.id}}')" style="background:${{bg}};color:${{fg}};border:1.5px solid ${{brd}};font-weight:${{fw}};padding:7px 13px;font-size:12px;border-radius:7px;">${{s.label}}</button>`;
+        }}).join("");
+    }}
+
+    function aplicarVisibilidadeSubmenuFiscal(menu, sub) {{
       const boxFat = document.getElementById("boxAbaFaturamentoFiscal");
       const boxDesp = document.getElementById("boxAbaDespesasUnidades");
       const boxCfop = document.getElementById("boxAbaCfop");
-      const btnFat = document.getElementById("tabBtn_FATURAMENTO");
-      const btnDesp = document.getElementById("tabBtn_DESPESAS_UNIDADES");
-      const btnCfop = document.getElementById("tabBtn_CFOP");
-      const btnTudo = document.getElementById("tabBtn_TUDO");
+      const isGestor = verificarIsGestorFiscal();
 
-      const resetBtns = () => {{
-        if (btnFat) {{ btnFat.style.background = "#1e293b"; btnFat.style.color = "#f8fafc"; }}
-        if (btnDesp) {{ btnDesp.style.background = "#1e293b"; btnDesp.style.color = "#f8fafc"; }}
-        if (btnCfop) {{ btnCfop.style.background = "#1e293b"; btnCfop.style.color = "#f8fafc"; }}
-        if (btnTudo) {{ btnTudo.style.background = "transparent"; btnTudo.style.color = "#94a3b8"; }}
+      const todasSecoesFat = [
+        "barraControleSecoes",
+        "bannerAcessoRestritoCfgFiscal",
+        "expanderConfiguracoesFiscais",
+        "secFaturamentoKpis",
+        "expanderFilaOs",
+        "expanderEmissaoNf",
+        "expanderTransferencia",
+        "expanderConsumiveis",
+        "expanderEstoqueFiscal",
+        "expanderFechamentoContabil",
+        "expanderNotasRecebidasDFe",
+        "expanderHistoricoNf",
+        "expanderCancelamentoNf"
+      ];
+
+      const setVisFat = (visiveisIds, abrirDetails = true) => {{
+        const setV = new Set(visiveisIds);
+        todasSecoesFat.forEach(id => {{
+          const el = document.getElementById(id);
+          if (!el) return;
+          if (setV.has(id)) {{
+            el.style.display = (id === "secFaturamentoKpis") ? "grid" : (id === "barraControleSecoes" ? "flex" : "block");
+            if (abrirDetails && el.tagName === "DETAILS") el.open = true;
+          }} else {{
+            el.style.display = "none";
+          }}
+        }});
       }};
-      resetBtns();
 
-      if (aba === "DESPESAS_UNIDADES") {{
-        if (boxFat) boxFat.style.display = "none";
-        if (boxDesp) boxDesp.style.display = "block";
-        if (boxCfop) boxCfop.style.display = "none";
-        if (btnDesp) {{ btnDesp.style.background = "#f59e0b"; btnDesp.style.color = "#0b132b"; }}
-        carregarDespesasUnidades();
-      }} else if (aba === "CFOP") {{
-        if (boxFat) boxFat.style.display = "none";
-        if (boxDesp) boxDesp.style.display = "none";
-        if (boxCfop) boxCfop.style.display = "block";
-        if (btnCfop) {{ btnCfop.style.background = "#38bdf8"; btnCfop.style.color = "#0b132b"; }}
-        carregarDadosCfop();
-      }} else if (aba === "TUDO") {{
+      const setVisCfop = (visiveisIds) => {{
+        const setV = new Set(visiveisIds);
+        ["secCfopKpis", "secCfopRegras", "secCfopEstoque", "secCfopNotas"].forEach(id => {{
+          const el = document.getElementById(id);
+          if (!el) return;
+          if (setV.has(id)) {{
+            el.style.display = (id === "secCfopKpis") ? "grid" : "block";
+          }} else {{
+            el.style.display = "none";
+          }}
+        }});
+      }};
+
+      if (menu === "EMISSAO") {{
         if (boxFat) boxFat.style.display = "block";
+        if (boxDesp) boxDesp.style.display = "none";
+        if (boxCfop) boxCfop.style.display = "none";
+        if (sub === "EMISSAO_NF") {{
+          setVisFat(["secFaturamentoKpis", "expanderFilaOs", "expanderEmissaoNf"]);
+        }} else if (sub === "HISTORICO_NF") {{
+          setVisFat(["secFaturamentoKpis", "expanderHistoricoNf"]);
+        }} else if (sub === "TRANSFERENCIA") {{
+          setVisFat(["expanderTransferencia"]);
+        }} else if (sub === "CANCELAMENTO") {{
+          setVisFat(["expanderCancelamentoNf"]);
+        }} else {{
+          setVisFat(["secFaturamentoKpis", "expanderFilaOs", "expanderEmissaoNf", "expanderHistoricoNf", "expanderTransferencia", "expanderCancelamentoNf"]);
+        }}
+      }} else if (menu === "RADAR_DFE") {{
+        if (boxFat) boxFat.style.display = "block";
+        if (boxDesp) boxDesp.style.display = "none";
+        if (boxCfop) boxCfop.style.display = "none";
+        if (sub === "RADAR_SEFAZ") {{
+          setVisFat(["expanderNotasRecebidasDFe"]);
+        }} else if (sub === "CONSUMIVEIS") {{
+          setVisFat(["expanderConsumiveis"]);
+        }} else {{
+          setVisFat(["expanderNotasRecebidasDFe", "expanderConsumiveis"]);
+        }}
+        carregarNotasRecebidasDFe();
+      }} else if (menu === "ESTOQUE") {{
+        if (boxFat) boxFat.style.display = "block";
+        if (boxDesp) boxDesp.style.display = "none";
+        if (boxCfop) boxCfop.style.display = "none";
+        setVisFat(["expanderEstoqueFiscal"]);
+        const boxNovo = document.getElementById("boxNovoItemInventario");
+        const boxAjuste = document.getElementById("boxAjusteRelativo");
+        if (sub === "NOVA_PECA") {{
+          if (boxNovo) boxNovo.style.display = "block";
+          if (boxAjuste) boxAjuste.style.display = "none";
+        }} else if (sub === "MOVIMENTACAO_AVULSA") {{
+          if (boxNovo) boxNovo.style.display = "none";
+          if (boxAjuste) boxAjuste.style.display = "block";
+        }} else {{
+          if (boxNovo) boxNovo.style.display = "none";
+          if (boxAjuste) boxAjuste.style.display = "none";
+        }}
+      }} else if (menu === "CONTABIL_CFOP") {{
+        if (boxDesp) boxDesp.style.display = "none";
+        if (sub === "FECHAMENTO_CONTABIL") {{
+          if (boxFat) boxFat.style.display = "block";
+          if (boxCfop) boxCfop.style.display = "none";
+          setVisFat(["expanderFechamentoContabil"]);
+          carregarFechamentoContabil();
+        }} else if (sub === "CFOP_REGRAS") {{
+          if (boxFat) boxFat.style.display = "none";
+          if (boxCfop) boxCfop.style.display = "block";
+          setVisCfop(["secCfopKpis", "secCfopRegras"]);
+          carregarDadosCfop();
+        }} else if (sub === "CFOP_ESTOQUE") {{
+          if (boxFat) boxFat.style.display = "none";
+          if (boxCfop) boxCfop.style.display = "block";
+          setVisCfop(["secCfopKpis", "secCfopEstoque"]);
+          carregarDadosCfop();
+        }} else if (sub === "CFOP_NOTAS") {{
+          if (boxFat) boxFat.style.display = "none";
+          if (boxCfop) boxCfop.style.display = "block";
+          setVisCfop(["secCfopKpis", "secCfopNotas"]);
+          carregarDadosCfop();
+        }} else {{
+          if (boxFat) boxFat.style.display = "block";
+          if (boxCfop) boxCfop.style.display = "block";
+          setVisFat(["expanderFechamentoContabil"]);
+          setVisCfop(["secCfopKpis", "secCfopRegras", "secCfopEstoque", "secCfopNotas"]);
+          carregarFechamentoContabil();
+          carregarDadosCfop();
+        }}
+      }} else if (menu === "DESPESAS") {{
+        if (boxFat) boxFat.style.display = "none";
+        if (boxCfop) boxCfop.style.display = "none";
         if (boxDesp) boxDesp.style.display = "block";
-        if (boxCfop) boxCfop.style.display = "block";
-        if (btnTudo) {{ btnTudo.style.background = "var(--cyan)"; btnTudo.style.color = "#0b132b"; }}
+        const boxFormDesp = document.getElementById("boxFormDespesaUnidade");
+        const boxExtrato = document.getElementById("boxConciliadorExtratoGestora");
+        const secGraf = document.getElementById("secDespGraficos");
+        const secKpis = document.getElementById("secDespKpis");
+        if (sub === "LANCAR_DESPESA") {{
+          if (boxExtrato) boxExtrato.style.display = "none";
+          toggleFormNovaDespesaUnidade(true);
+          if (secGraf) secGraf.style.display = "none";
+          if (secKpis) secKpis.style.display = "grid";
+        }} else if (sub === "CONCILIAR_EXTRATO") {{
+          if (boxFormDesp) boxFormDesp.style.display = "none";
+          toggleBoxExtratoGestora(true);
+          if (secGraf) secGraf.style.display = "none";
+          if (secKpis) secKpis.style.display = "grid";
+        }} else {{
+          if (boxFormDesp) boxFormDesp.style.display = "none";
+          if (boxExtrato) boxExtrato.style.display = "none";
+          if (secGraf) secGraf.style.display = "grid";
+          if (secKpis) secKpis.style.display = "grid";
+        }}
         carregarDespesasUnidades();
-        carregarDadosCfop();
+      }} else if (menu === "CONFIG") {{
+        if (boxFat) boxFat.style.display = "block";
+        if (boxDesp) boxDesp.style.display = "none";
+        if (boxCfop) boxCfop.style.display = "none";
+        if (isGestor) {{
+          setVisFat(["expanderConfiguracoesFiscais"]);
+          if (sub === "CANAIS_ENVIO") {{
+            setTimeout(() => {{
+              document.getElementById("secCanaisOficiaisCfg")?.scrollIntoView({{ behavior: "smooth", block: "center" }});
+            }}, 100);
+          }}
+        }} else {{
+          setVisFat(["bannerAcessoRestritoCfgFiscal"]);
+        }}
       }} else {{
+        // TUDO
         if (boxFat) boxFat.style.display = "block";
-        if (boxDesp) boxDesp.style.display = "none";
-        if (boxCfop) boxCfop.style.display = "none";
-        if (btnFat) {{ btnFat.style.background = "var(--cyan)"; btnFat.style.color = "#0b132b"; }}
+        if (boxDesp) boxDesp.style.display = "block";
+        if (boxCfop) boxCfop.style.display = "block";
+        const listaTudo = [
+          "barraControleSecoes",
+          isGestor ? "expanderConfiguracoesFiscais" : "bannerAcessoRestritoCfgFiscal",
+          "secFaturamentoKpis",
+          "expanderFilaOs",
+          "expanderEmissaoNf",
+          "expanderTransferencia",
+          "expanderConsumiveis",
+          "expanderEstoqueFiscal",
+          "expanderFechamentoContabil",
+          "expanderNotasRecebidasDFe",
+          "expanderHistoricoNf",
+          "expanderCancelamentoNf"
+        ];
+        setVisFat(listaTudo, false);
+        setVisCfop(["secCfopKpis", "secCfopRegras", "secCfopEstoque", "secCfopNotas"]);
+        carregarDespesasUnidades();
+        carregarDadosCfop();
       }}
+    }}
+
+    function restaurarMenuFiscalSalvo() {{
+      let m = "EMISSAO";
+      let s = "EMISSAO_NF";
+      try {{
+        m = localStorage.getItem("emed_fiscal_menu_ativo") || "EMISSAO";
+        s = localStorage.getItem("emed_fiscal_submenu_ativo") || "";
+      }} catch (e) {{}}
+      selecionarMenuFiscal(m, s);
+    }}
+
+    function alternarAbaPrincipalFiscal(aba) {{
+      if (aba === "DESPESAS_UNIDADES") selecionarMenuFiscal("DESPESAS", "PAINEL_DESPESAS");
+      else if (aba === "CFOP") selecionarMenuFiscal("CONTABIL_CFOP", "CFOP_REGRAS");
+      else if (aba === "TUDO") selecionarMenuFiscal("TUDO", "TUDO_GERAL");
+      else selecionarMenuFiscal("EMISSAO", "EMISSAO_NF");
     }}
 
     function aoMudarFiltroUnidadeDespesa(val) {{
@@ -8690,18 +9069,15 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     }}
 
     function aplicarPermissoesUsuarioFiscal() {{
-      const cargo = String(USUARIO_FISCAL?.cargo || '').toLowerCase();
-      const role = String(USUARIO_FISCAL?.role || '').toLowerCase();
-      const user = String(USUARIO_FISCAL?.username || '').toLowerCase();
-      const isGestor = (role === 'admin' || user === 'netto' || user === 'vitor' || cargo.includes('diretor') || cargo.includes('gest'));
-
+      const isGestor = verificarIsGestorFiscal();
       const secCfg = document.getElementById("expanderConfiguracoesFiscais");
       const bannerRestrito = document.getElementById("bannerAcessoRestritoCfgFiscal");
-      if (secCfg) {{
-        secCfg.style.display = isGestor ? "block" : "none";
-      }}
-      if (bannerRestrito) {{
-        bannerRestrito.style.display = isGestor ? "none" : "block";
+      if (ABA_PRINCIPAL_FISCAL === "CONFIG" || ABA_PRINCIPAL_FISCAL === "TUDO") {{
+        if (secCfg) secCfg.style.display = isGestor ? "block" : "none";
+        if (bannerRestrito) bannerRestrito.style.display = isGestor ? "none" : "block";
+      }} else {{
+        if (secCfg) secCfg.style.display = "none";
+        if (bannerRestrito) bannerRestrito.style.display = "none";
       }}
     }}
 
@@ -9158,7 +9534,8 @@ Por favor, confira os dados preenchidos.`);
     const _origCarregarDadosFiscais = carregarDadosFiscais;
     carregarDadosFiscais = async function(osId) {{
       await _origCarregarDadosFiscais(osId);
-      carregarNotasRecebidasDFe();
+      await carregarNotasRecebidasDFe();
+      if (typeof atualizarBadgesMenusFiscal === "function") atualizarBadgesMenusFiscal();
       const selUnid = document.getElementById("selDespFiltroUnidade");
       if (selUnid) selUnid.value = FILIAL_ATIVA || "CONSOLIDADO";
       carregarDespesasUnidades();

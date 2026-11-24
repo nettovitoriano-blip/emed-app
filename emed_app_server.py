@@ -9511,8 +9511,63 @@ def _obter_base_url_publica(request: web.Request) -> str:
     return "https://app.emedservice.med.br"
 
 
-async def api_fiscal_danfe(request: web.Request) -> web.Response:
+# =====================================================================
+# GERADOR DE DANFE OFICIAL BRASILEIRO (PADRÃO NACIONAL SEFAZ / RECEITA)
+# =====================================================================
+_CODE128_PATTERNS = [
+    "212222", "222122", "222221", "121223", "121322", "131222", "122213", "122312", "132212", "221213",
+    "221312", "231212", "112232", "122132", "122231", "113222", "123122", "123221", "223211", "221132",
+    "221231", "213212", "223112", "312131", "311222", "321122", "321221", "312212", "322112", "322211",
+    "212123", "212321", "232121", "111323", "131123", "131321", "112313", "132113", "132311", "211313",
+    "231113", "231311", "112133", "112331", "132131", "113123", "113321", "133121", "313121", "211331",
+    "231131", "213113", "213311", "213131", "311123", "311321", "331121", "312113", "312311", "332111",
+    "314111", "221411", "431111", "111224", "111422", "121124", "121421", "141122", "141221", "112214",
+    "112412", "122114", "122411", "142112", "142211", "241211", "221114", "413111", "241112", "134111",
+    "111242", "121142", "121241", "114212", "124112", "124211", "411212", "421112", "421211", "212141",
+    "214121", "412121", "111143", "111341", "131141", "114113", "114311", "411113", "411311", "113141",
+    "114131", "311141", "411131", "211412", "211214", "211232", "2331112"
+]
 
+def _gerar_code128c_svg(chave: str, height: int = 36, module_width: float = 1.25) -> str:
+    nums = "".join(c for c in str(chave or "") if c.isdigit())
+    if not nums:
+        nums = "23261003611974000108550010000001100482913824"
+    if len(nums) % 2 != 0:
+        nums = "0" + nums
+    pairs = [int(nums[i:i+2]) for i in range(0, len(nums), 2)]
+    start_c = 105
+    stop_code = 106
+    chk = start_c
+    for i, p in enumerate(pairs, start=1):
+        chk += p * i
+    chk = chk % 103
+    symbols = [start_c] + pairs + [chk, stop_code]
+    modules = []
+    for s in symbols:
+        pat = _CODE128_PATTERNS[s]
+        for idx, ch in enumerate(pat):
+            is_bar = (idx % 2 == 0)
+            modules.append((is_bar, int(ch)))
+    total_modules = sum(w for _, w in modules)
+    total_w = total_modules * module_width
+    svg_rects = []
+    x = 0.0
+    for is_bar, w in modules:
+        rect_w = w * module_width
+        if is_bar:
+            svg_rects.append(f'<rect x="{x:.1f}" y="0" width="{rect_w:.1f}" height="{height}" fill="#000" />')
+        x += rect_w
+    return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {total_w:.1f} {height}" preserveAspectRatio="none" style="width:100%;height:{height}px;max-height:{height}px;display:block;">{"".join(svg_rects)}</svg>'
+
+def _formatar_chave_44(chave: str) -> str:
+    digits = "".join(c for c in str(chave or "") if c.isdigit())
+    if not digits:
+        digits = "23261003611974000108550010000001100482913824"
+    digits = digits.ljust(44, "0")[:44]
+    return " ".join(digits[i:i+4] for i in range(0, 44, 4))
+
+
+async def api_fiscal_danfe(request: web.Request) -> web.Response:
     os_id = request.match_info.get("os_id", "").strip()
     nota_id = request.match_info.get("nota_id", "").strip()
     is_cliente_view = (request.query.get("view") == "cliente") or bool(request.headers.get("X-Cliente-Token"))
@@ -9520,637 +9575,802 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
     df = _carregar_df_direto()
 
     row_os = None
-
-    for idx, row in df.iterrows():
-
-        if str(obter_id_os(idx, row)) == os_id:
-
-            row_os = row
-
-            break
-
-
+    if os_id:
+        for idx, row in df.iterrows():
+            if str(obter_id_os(idx, row)) == os_id:
+                row_os = row
+                break
 
     dados_nf = {}
-
     with get_db_connection(DB_NAME) as conn:
-
         cur = conn.cursor()
-
         if nota_id:
             cur.execute("SELECT * FROM notas_fiscais WHERE id = ?", (nota_id,))
         else:
             cur.execute("SELECT * FROM notas_fiscais WHERE os_id = ?", (os_id,))
-
         r = cur.fetchone()
         if not r and not nota_id and os_id.isdigit():
             cur.execute("SELECT * FROM notas_fiscais WHERE id = ?", (int(os_id),))
             r = cur.fetchone()
-
         if r:
-
             cols = [d[0] for d in cur.description]
-
             dados_nf = dict(zip(cols, r))
 
+    if not os_id and dados_nf.get("os_id"):
+        os_id = str(dados_nf.get("os_id"))
+        if row_os is None:
+            for idx, row in df.iterrows():
+                if str(obter_id_os(idx, row)) == os_id:
+                    row_os = row
+                    break
+    if not os_id:
+        os_id = str(dados_nf.get("id") or "1")
 
-
-    # Fallback caso não esteja na tabela notas_fiscais ainda
-
+    # Dados do Tomador / Cliente
     cli_nome = limpar_texto(row_os.get("cliente") if row_os is not None else dados_nf.get("cliente", "CLIENTE EMED"), "CLIENTE EMED")
-
     cnpj_cli = limpar_texto(row_os.get("cnpj") if row_os is not None else dados_nf.get("cnpj_tomador", ""), "00.000.000/0000-00")
-
-    end_cli = limpar_texto(row_os.get("endereco") if row_os is not None else "", "UNIDADE HOSPITALAR")
-
-    cid_cli = limpar_texto(row_os.get("cidade") if row_os is not None else "", "FORTALEZA")
-
-    uf_cli = limpar_texto(row_os.get("estado") if row_os is not None else "", "CE")
-
-    equip_nome = limpar_texto(row_os.get("equipamento") if row_os is not None else "", "EQUIPAMENTO HOSPITALAR")
-
-    tec_nome = limpar_texto(row_os.get("tecnico_responsavel") if row_os is not None else "", "MARCOS")
-
-    srv_tipo = limpar_texto(row_os.get("tipo_servico") if row_os is not None else "", "CORRETIVA (GERAL)")
-
-
-
-    num_nf = dados_nf.get("numero_nf") or (row_os.get("numero_nf") if row_os is not None else "") or f"NFS-{os_id.zfill(4)}"
-
-    st_fiscal = dados_nf.get("status_fiscal") or (row_os.get("status_fiscal") if row_os is not None else "EMITIDA")
-
-    tipo_nota = dados_nf.get("tipo_nota") or "100% NOTA DE SERVIÇO (NFS-e)"
-
-    dt_emissao = dados_nf.get("data_emissao") or (row_os.get("data_agendamento") if row_os is not None else "") or obter_agora_brasil_str("%d/%m/%Y")
-
-    chave = dados_nf.get("chave_acesso") or f"2326 1003 6119 7400 0108 5500 1000 {os_id.zfill(4)} 1004 8291 3824"
-
-    val_srv = float(dados_nf.get("valor_servicos") or 0.0)
-
-    val_pec = float(dados_nf.get("valor_pecas") or 0.0)
-
-    if val_srv == 0 and val_pec == 0 and row_os is not None:
-
-        val_total_os = float(row_os.get("valor_os") or 0.0)
-
-        val_srv = val_total_os
-
-    val_total = val_srv + val_pec
-
-    descr = dados_nf.get("discriminacao_servico") or f"Prestação de serviços especializados de engenharia clínica e manutenção técnica no equipamento {equip_nome}. Atendimento OS #{os_id}."
-
-
-
-    # Peças vinculadas
-
-    pecas = []
-
-    with get_db_connection(DB_NAME) as conn:
-
-        cur = conn.cursor()
-
-        cur.execute("SELECT itens_solicitados, codigo_peca, tipo_origem_peca FROM solicitacoes_pecas WHERE os_id = ?", (os_id,))
-
-        for r_p in cur.fetchall():
-
-            pecas.append({"item": r_p[0], "codigo": r_p[1] or "PEC", "origem": r_p[2] or "NOVA_COM_NF"})
-
-
-
-    email_cli = limpar_texto(row_os.get("email") if row_os is not None else dados_nf.get("email_cliente", ""), "")
+    end_cli = limpar_texto(row_os.get("endereco") if row_os is not None else dados_nf.get("tomador_endereco", ""), "UNIDADE HOSPITALAR")
+    cid_cli = limpar_texto(row_os.get("cidade") if row_os is not None else dados_nf.get("tomador_cidade", ""), "FORTALEZA")
+    uf_cli = limpar_texto(row_os.get("estado") if row_os is not None else dados_nf.get("tomador_uf", ""), "CE")
+    bairro_cli = limpar_texto(row_os.get("bairro") if row_os is not None else "", "DIONÍSIO TORRES" if cid_cli == "FORTALEZA" else "CENTRO")
+    cep_cli = limpar_texto(row_os.get("cep") if row_os is not None else dados_nf.get("tomador_cep", ""), "60135-237" if cid_cli == "FORTALEZA" else "71987-360" if uf_cli == "DF" else "61769-470")
 
     whats_raw = row_os.get("whatsapp") if row_os is not None else ""
+    whats_cli = _limpar_telefone_exibicao(whats_raw) or "(85) 3254-2929"
 
-    whats_cli = _limpar_telefone_exibicao(whats_raw)
+    equip_nome = limpar_texto(row_os.get("equipamento") if row_os is not None else "", "EQUIPAMENTO HOSPITALAR")
+    tec_nome = limpar_texto(row_os.get("tecnico_responsavel") if row_os is not None else "", "VALFREDO NETTO")
+    srv_tipo = limpar_texto(row_os.get("tipo_servico") if row_os is not None else "", "CORRETIVA")
 
-    whats_digits = "".join([c for c in str(whats_raw) if c.isdigit()])
+    # Número da NF e Série
+    num_nf_raw = dados_nf.get("numero_nf") or (row_os.get("numero_nf") if row_os is not None else "") or f"NFS-{os_id.zfill(4)}"
+    digits_nf = "".join(c for c in str(num_nf_raw) if c.isdigit())
+    if digits_nf:
+        num_nf_fmt = f"{int(digits_nf):06d}"
+        num_nf_fmt = f"{num_nf_fmt[:3]}.{num_nf_fmt[3:]}"
+    else:
+        num_nf_fmt = f"000.{os_id.zfill(3)}"
+    serie = str(dados_nf.get("serie") or "1").zfill(3)
 
-    email_env_em = dados_nf.get("email_enviado_em", "")
+    st_fiscal = dados_nf.get("status_fiscal") or (row_os.get("status_fiscal") if row_os is not None else "EMITIDA")
+    tipo_nota = dados_nf.get("tipo_nota") or "100% NOTA DE SERVIÇO (NFS-e)"
 
-    lote_mes = dados_nf.get("lote_contabilidade_mes") or obter_agora_brasil_str("%Y-%m")
+    dt_emissao_raw = dados_nf.get("data_emissao") or (row_os.get("data_agendamento") if row_os is not None else "") or obter_agora_brasil_str("%Y-%m-%d %H:%M:%S")
+    dt_emissao_str = str(dt_emissao_raw)
+    if len(dt_emissao_str) >= 10 and "-" in dt_emissao_str[:10]:
+        p_dt = dt_emissao_str[:10].split("-")
+        dt_emissao = f"{p_dt[2]}/{p_dt[1]}/{p_dt[0]}"
+        hr_emissao = dt_emissao_str[11:19] if len(dt_emissao_str) >= 19 else "14:37:06"
+    else:
+        dt_emissao = dt_emissao_str[:10] if dt_emissao_str else "16/11/2026"
+        hr_emissao = "14:37:06"
 
-    try:
+    # Chave de Acesso (44 dígitos oficiais)
+    chave_existente = "".join(c for c in str(dados_nf.get("chave_acesso") or "") if c.isdigit())
+    if len(chave_existente) == 44:
+        chave_raw = chave_existente
+    else:
+        cod_uf = "53" if uf_cli == "DF" else "23"
+        ano_mes = "2611"
+        cnpj_emit_num = "03611974000280" if uf_cli == "DF" else "03611974000108"
+        modelo = "55"
+        ser_num = "001"
+        n_nf_num = str(int(digits_nf or os_id or "1")).zfill(9)
+        tp_emi = "1"
+        c_nf = "10048291"
+        chave_43 = f"{cod_uf}{ano_mes}{cnpj_emit_num}{modelo}{ser_num}{n_nf_num}{tp_emi}{c_nf}"
+        pesos = [2, 3, 4, 5, 6, 7, 8, 9] * 6
+        soma = sum(int(ch) * pesos[i] for i, ch in enumerate(reversed(chave_43)))
+        resto = soma % 11
+        dv = 0 if resto in (0, 1) else (11 - resto)
+        chave_raw = chave_43 + str(dv)
+    chave_fmt = _formatar_chave_44(chave_raw)
+    barcode_svg = _gerar_code128c_svg(chave_raw, height=36)
 
-        partes_l = lote_mes.split("-")
+    protocolo_autorizacao = dados_nf.get("protocolo_autorizacao") or f"1{chave_raw[:2]}26{os_id.zfill(9)} - {dt_emissao} {hr_emissao}"
+    nat_operacao = dados_nf.get("natureza_operacao") or "PRESTAÇÃO DE SERVIÇOS DE ENGENHARIA CLÍNICA / MANUTENÇÃO HOSPITALAR"
 
-        lote_mes_fmt = f"{partes_l[1]}/{partes_l[0]}" if len(partes_l) == 2 else lote_mes
+    # Valores
+    val_srv = float(dados_nf.get("valor_servicos") or 0.0)
+    val_pec = float(dados_nf.get("valor_pecas") or 0.0)
+    if val_srv == 0 and val_pec == 0 and row_os is not None:
+        val_total_os = float(row_os.get("valor_os") or 0.0)
+        val_srv = val_total_os
+    val_total = val_srv + val_pec
+    val_iss = float(dados_nf.get("valor_iss") or (val_srv * 0.05))
 
-    except Exception:
-
-        lote_mes_fmt = lote_mes
-
-    enviado_contab = dados_nf.get("enviado_contabilidade", 0)
-
-    data_envio_contab = dados_nf.get("data_envio_contabilidade", "")
-
-
-
-    base_pub = _obter_base_url_publica(request)
-    whats_msg = f"Olá, segue o espelho oficial da Nota Fiscal Eletrônica {num_nf} (OS #{os_id}) emitida pela EMED Eletromedicina: {base_pub}/api/fiscal/danfe/{os_id}"
-
-    whats_msg_enc = urllib.parse.quote(whats_msg)
-
-
-
-    badge_status_cliente = f"Enviada em {email_env_em}" if email_env_em else "Envio Pendente"
-
-    badge_style_cliente = "background:#dcfce7;color:#15803d;border:1px solid #86efac;" if email_env_em else "background:#fef3c7;color:#b45309;border:1px solid #fde68a;"
-
-    txt_contab = f"✅ Lote Transmitido à Contabilidade ({data_envio_contab})" if enviado_contab else "🟡 Na fila de envio contábil no final do mês"
-
-    cor_contab = "color:#059669;" if enviado_contab else "color:#d97706;"
-
-
-
+    # Prestador / Filial
     filial_emissora = dados_nf.get("filial_emissora") or ("FILIAL_DF" if uf_cli == "DF" else "MATRIZ_CE")
-
     prestador_razao = dados_nf.get("prestador_razao") or ("EMED ELETROMEDICINA LTDA. - FILIAL BRASÍLIA" if filial_emissora == "FILIAL_DF" else "EMED ELETROMEDICINA LTDA.")
-
     prestador_cnpj = dados_nf.get("prestador_cnpj") or ("03.611.974/0002-80" if filial_emissora == "FILIAL_DF" else "03.611.974/0001-08")
-
-    prestador_im = dados_nf.get("prestador_im") or ("61-3234-3647" if filial_emissora == "FILIAL_DF" else "123456-7")
-
-    prestador_end = dados_nf.get("prestador_endereco") or ("Rua 3, Chácara 46A, Lote 01 - Vicente Pires, CEP 72007-850" if filial_emissora == "FILIAL_DF" else "Rua Coronel Freire, 16 - Bairro Amador, CEP 61769-470")
-
+    prestador_im = dados_nf.get("prestador_im") or ("61-3234-3647 (CF/DF)" if filial_emissora == "FILIAL_DF" else "123456-7")
+    prestador_end = dados_nf.get("prestador_endereco") or ("ADE Conjunto 12, Lote 28 - Águas Claras" if filial_emissora == "FILIAL_DF" else "Rua Coronel Freire, 16 - Bairro Amador")
     prestador_cid = dados_nf.get("prestador_cidade") or ("Brasília" if filial_emissora == "FILIAL_DF" else "Eusébio")
-
     prestador_uf = dados_nf.get("prestador_uf") or ("DF" if filial_emissora == "FILIAL_DF" else "CE")
-
+    prestador_cep = "71987-360" if filial_emissora == "FILIAL_DF" else "61769-470"
     prestador_fone = dados_nf.get("prestador_fone") or ("(61) 3234-3647 / (61) 99658-5392" if filial_emissora == "FILIAL_DF" else "(85) 3254-2929")
-
     prestador_email = dados_nf.get("prestador_email") or ("brasilia@emed.med.br" if filial_emissora == "FILIAL_DF" else "financeiro@emed.med.br")
-
-    orgao_emissor = "SECRETARIA DE FAZENDA DO DISTRITO FEDERAL (SEFAZ-DF)" if filial_emissora == "FILIAL_DF" else "PREFEITURA MUNICIPAL DE EUSÉBIO - CE"
-
-    doc_aux_titulo = "DOCUMENTO AUXILIAR DA NFS-e DF" if filial_emissora == "FILIAL_DF" else "DOCUMENTO AUXILIAR DA NFS-e / NF-e"
-
     sub_titulo_unidade = "Unidade Brasília (DF)" if filial_emissora == "FILIAL_DF" else "Matriz Ceará"
 
+    # Logo base64
+    logo_b64 = ""
+    try:
+        p_circ = os.path.join(BASE_DIR, "emed_pwa_static", "logo_emed_circle.png")
+        if os.path.exists(p_circ):
+            with open(p_circ, "rb") as f_img:
+                logo_b64 = base64.b64encode(f_img.read()).decode("ascii")
+    except Exception:
+        pass
+    img_logo_src = f"data:image/png;base64,{logo_b64}" if logo_b64 else "/api/logo-circle"
 
+    # Peças vinculadas
+    pecas = []
+    with get_db_connection(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT itens_solicitados, codigo_peca, tipo_origem_peca FROM solicitacoes_pecas WHERE os_id = ?", (os_id,))
+        for r_p in cur.fetchall():
+            pecas.append({"item": r_p[0], "codigo": r_p[1] or "PEC", "origem": r_p[2] or "NOVA_COM_NF"})
+
+    # Por padrão fiscal oficial, retorna DIRETAMENTE o arquivo binário .PDF da DANFE no formato padrão brasileiro (A4)
+    if request.query.get("view") != "html":
+        try:
+            from emed_views.danfe_pdf_padrao import gerar_danfe_padrao_pdf_bytes
+            cfop_srv = str(dados_nf.get("cfop") or ("6933" if uf_cli != prestador_uf else "5933"))
+            itens_pdf = []
+            if val_srv > 0 or not pecas:
+                itens_pdf.append({
+                    "codigo": f"SRV-{os_id.zfill(4)}",
+                    "descricao": f"SERVICOS ENG. CLINICA ({equip_nome}) - OS #{os_id}",
+                    "ncm": "00000000",
+                    "cst": "0400",
+                    "cfop": cfop_srv,
+                    "unidade": "SV",
+                    "qtd": 1,
+                    "unitario": val_srv if val_srv > 0 else val_total,
+                    "total": val_srv if val_srv > 0 else val_total,
+                })
+            if val_pec > 0 or pecas:
+                qtd_p = max(1, len(pecas))
+                v_unit_p = val_pec / qtd_p if val_pec > 0 else 0.0
+                if pecas:
+                    for idx_p, p_it in enumerate(pecas, 1):
+                        itens_pdf.append({
+                            "codigo": str(p_it.get("codigo") or f"PEC-{idx_p}"),
+                            "descricao": str(p_it.get("item") or "PECA / COMPONENTE MEDICO"),
+                            "ncm": "90229090",
+                            "cst": "0102",
+                            "cfop": "6102" if uf_cli != prestador_uf else "5102",
+                            "unidade": "UN",
+                            "qtd": 1,
+                            "unitario": v_unit_p,
+                            "total": v_unit_p,
+                        })
+                elif val_pec > 0:
+                    itens_pdf.append({
+                        "codigo": f"PEC-{os_id.zfill(4)}",
+                        "descricao": f"PECAS / COMPONENTES APLICADOS NA OS #{os_id}",
+                        "ncm": "90229090",
+                        "cst": "0102",
+                        "cfop": "6102" if uf_cli != prestador_uf else "5102",
+                        "unidade": "UN",
+                        "qtd": 1,
+                        "unitario": val_pec,
+                        "total": val_pec,
+                    })
+
+            descr_compl = dados_nf.get("discriminacao_servico") or f"Prestacao de servicos especializados de engenharia clinica no equipamento {equip_nome}. OS #{os_id}."
+            texto_adic = (
+                f"{descr_compl}\n"
+                f"Status Fiscal: {st_fiscal} | Protocolo: {protocolo_autorizacao}\n"
+                f"Chave de Acesso: {chave_raw} | Tecnico Resp.: {tec_nome}"
+            )
+            nota_pdf_dict = {
+                "numero_nf": num_nf_raw,
+                "serie": serie,
+                "chave_acesso": chave_raw,
+                "protocolo": protocolo_autorizacao,
+                "emitente_nome": prestador_razao,
+                "emitente_cnpj": prestador_cnpj,
+                "emitente_uf": prestador_uf,
+                "emitente_endereco": f"{prestador_end}, {prestador_cid} - {prestador_uf}",
+                "emitente_ie": prestador_im,
+                "dest_nome": cli_nome,
+                "dest_cnpj": cnpj_cli,
+                "dest_end": end_cli,
+                "dest_bairro": bairro_cli,
+                "dest_cep": cep_cli,
+                "dest_mun": cid_cli,
+                "dest_uf": uf_cli,
+                "dest_ie": "ISENTO",
+                "dest_fone": whats_cli,
+                "valor_total": val_total,
+                "valor_servicos": val_srv,
+                "base_iss": val_srv,
+                "valor_iss": val_iss,
+                "iss_im": prestador_im,
+                "natureza_operacao": nat_operacao,
+                "data_emissao": f"{dt_emissao} {hr_emissao}",
+                "filial": filial_emissora,
+                "itens": itens_pdf,
+                "texto_dados_adicionais": texto_adic,
+            }
+            pdf_bytes = gerar_danfe_padrao_pdf_bytes(nota_pdf_dict)
+            disp_mode = "attachment" if request.query.get("download") == "1" else "inline"
+            return web.Response(
+                body=pdf_bytes,
+                content_type="application/pdf",
+                headers={"Content-Disposition": f'{disp_mode}; filename="DANFE_NFE_{num_nf_fmt.replace(".", "")}.pdf"'},
+            )
+        except Exception as e:
+            logger.error(f"Erro ao gerar PDF da DANFE: {e}")
+
+    # Itens HTML
+    linhas_itens_html = f"""
+      <tr>
+        <td style="text-align: center; font-weight: bold;">SRV-{os_id.zfill(4)}</td>
+        <td>
+          <b>PRESTAÇÃO DE SERVIÇOS ESPECIALIZADOS DE ENGENHARIA CLÍNICA</b><br/>
+          <span style="font-size: 6pt; color: #334155;">Manutenção técnica preventiva/corretiva e validação no equipamento {equip_nome}. Atendimento OS #{os_id}. Normas ANVISA RDC 611 e ABNT NBR IEC 60601.</span>
+        </td>
+        <td style="text-align: center;">0000.00.00</td>
+        <td style="text-align: center;">0400</td>
+        <td style="text-align: center; font-weight: bold;">{"6933" if uf_cli != prestador_uf else "5933"}</td>
+        <td style="text-align: center;">SV</td>
+        <td style="text-align: right; font-weight: bold;">1,00</td>
+        <td style="text-align: right;">R$ {val_srv:,.2f}</td>
+        <td style="text-align: right; font-weight: bold;">R$ {val_srv:,.2f}</td>
+        <td style="text-align: center;">5%</td>
+      </tr>
+    """
+    val_pec_un_str = f"{(val_pec / len(pecas)):,.2f}" if (val_pec > 0 and pecas) else "0,00"
+    for p in pecas:
+        linhas_itens_html += f"""
+      <tr>
+        <td style="text-align: center; font-weight: bold;">{p['codigo']}</td>
+        <td>
+          <b>{p['item']}</b><br/>
+          <span style="font-size: 6pt; color: #334155;">Origem: {p['origem']} • Componente aplicado em suporte técnico ao equipamento {equip_nome}</span>
+        </td>
+        <td style="text-align: center;">9022.90.90</td>
+        <td style="text-align: center;">0400</td>
+        <td style="text-align: center; font-weight: bold;">{"6949" if uf_cli != prestador_uf else "5949"}</td>
+        <td style="text-align: center;">UN</td>
+        <td style="text-align: right; font-weight: bold;">1,00</td>
+        <td style="text-align: right;">R$ {val_pec_un_str}</td>
+        <td style="text-align: right; font-weight: bold;">R$ {val_pec_un_str}</td>
+        <td style="text-align: center;">0%</td>
+      </tr>
+        """
 
     html_danfe = f"""<!DOCTYPE html>
-
 <html lang="pt-BR">
-
 <head>
-
   <meta charset="UTF-8">
-
-  <title>DANFE / Espelho da Nota Fiscal — OS #{os_id} ({num_nf})</title>
-
+  <title>DANFE Oficial — NF-e Nº {num_nf_raw} (OS #{os_id})</title>
   <style>
+    @page {{
+      size: A4 portrait;
+      margin: 6mm 7mm 6mm 7mm;
+    }}
+    * {{
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }}
+    body {{
+      font-family: Arial, Helvetica, sans-serif;
+      margin: 0;
+      padding: 12px;
+      background: #1e293b;
+      color: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }}
+    .danfe-card {{
+      width: 100%;
+      max-width: 210mm;
+      background: #fff;
+      padding: 8mm 9mm;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+      border-radius: 4px;
+    }}
+    
+    /* TOOLBAR NO-PRINT (SEM O BOTÃO 'ENVIAR P/ CLIENTE') */
+    .top-toolbar {{
+      width: 100%;
+      max-width: 210mm;
+      background: #0f172a;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    }}
+    .btn-action {{
+      border: none;
+      padding: 8px 16px;
+      border-radius: 5px;
+      font-weight: bold;
+      font-size: 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: 0.15s;
+    }}
+    .btn-print {{ background: #0284c7; color: #fff; }}
+    .btn-print:hover {{ background: #0369a1; }}
+    .btn-close {{ background: #475569; color: #fff; margin-left: 6px; }}
+    .btn-close:hover {{ background: #334155; }}
 
-    @page {{ size: A4 portrait; margin: 10mm; }}
-
-    * {{ box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }}
-
-    body {{ background: #f8fafc; margin: 0; padding: 20px; color: #0b132b; }}
-
-    .danfe-box {{ max-width: 820px; margin: 0 auto; background: #fff; border: 2px solid #002b54; border-radius: 8px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }}
-
-    .no-print {{ background: #002b54; color: #fff; padding: 10px 16px; margin: -20px -20px 20px -20px; border-radius: 6px 6px 0 0; display: flex; justify-content: space-between; align-items: center; }}
-
-    .btn-print {{ background: #0077b6; color: #fff; border: none; padding: 8px 16px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
-
-    .btn-print:hover {{ background: #023e8a; }}
-
-    .header-tbl {{ width: 100%; border-bottom: 2px solid #002b54; padding-bottom: 12px; margin-bottom: 12px; }}
-
-    .title-danfe {{ font-size: 16px; font-weight: 900; color: #002b54; text-transform: uppercase; }}
-
-    .badge-nf {{ background: #dcfce7; color: #15803d; border: 1.5px solid #86efac; padding: 3px 8px; border-radius: 4px; font-weight: 800; font-size: 11px; }}
-
-    .sec-header {{ background: #002b54; color: #fff; font-size: 11px; font-weight: 800; padding: 5px 8px; margin: 12px 0 4px 0; border-radius: 4px; text-transform: uppercase; }}
-
-    .data-tbl {{ width: 100%; border-collapse: collapse; font-size: 11.5px; margin-bottom: 6px; }}
-
-    .data-tbl td, .data-tbl th {{ border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }}
-
-    .data-tbl th {{ background: #f1f5f9; font-weight: 700; color: #334155; }}
-
-    .val-destaque {{ font-size: 15px; font-weight: 900; color: #059669; }}
-
-    @media print {{
-
-      body {{ background: #fff; padding: 0; }}
-
-      .danfe-box {{ border: 1px solid #000; box-shadow: none; max-width: 100%; padding: 12px; }}
-
-      .no-print {{ display: none !important; }}
-
+    /* TABELAS E GRIDS DANFE OFICIAL */
+    table.box-grid {{
+      width: 100%;
+      border-collapse: collapse;
+      border-spacing: 0;
+      margin-top: 0;
+      margin-bottom: 0;
+    }}
+    table.box-grid td, table.box-grid th {{
+      border: 1px solid #000;
+      vertical-align: top;
+      padding: 2px 4px;
+    }}
+    .fld-lbl {{
+      display: block;
+      font-size: 5.5pt;
+      font-weight: bold;
+      color: #000;
+      text-transform: uppercase;
+      line-height: 1.1;
+      margin-bottom: 1px;
+    }}
+    .fld-val {{
+      font-size: 7.5pt;
+      font-weight: bold;
+      color: #000;
+      line-height: 1.15;
+    }}
+    .sec-title {{
+      background: #000;
+      color: #fff;
+      font-size: 6.5pt;
+      font-weight: 900;
+      padding: 2px 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      border: 1px solid #000;
+      border-bottom: none;
+      margin-top: 4px;
+    }}
+    .picote {{
+      font-size: 6pt;
+      letter-spacing: 2px;
+      text-align: center;
+      color: #475569;
+      margin: 2px 0 3px 0;
+      overflow: hidden;
+      white-space: nowrap;
+    }}
+    .items-grid th {{
+      font-size: 6pt;
+      font-weight: 900;
+      color: #000;
+      text-align: center;
+      padding: 3px 2px;
+      background: #f1f5f9;
+      border: 1px solid #000;
+    }}
+    .items-grid td {{
+      font-size: 7pt;
+      padding: 3px 4px;
+      border: 1px solid #000;
+    }}
+    .danfe-footer {{
+      margin-top: 6px;
+      font-size: 6pt;
+      color: #475569;
+      text-align: center;
+      border-top: 1px dashed #94a3b8;
+      padding-top: 4px;
     }}
 
+    @media print {{
+      body {{
+        background: #fff;
+        padding: 0;
+        margin: 0;
+      }}
+      .top-toolbar, .no-print {{
+        display: none !important;
+      }}
+      .danfe-card {{
+        padding: 0;
+        margin: 0;
+        box-shadow: none;
+        border-radius: 0;
+        max-width: 100%;
+        width: 100%;
+      }}
+    }}
   </style>
-
 </head>
-
 <body>
 
-  <div class="danfe-box">
-
-    <div class="no-print">
-
-      <div style="font-weight: bold; font-size: 14px;">🧾 Sistema Fiscal EMED — Espelho Oficial de Nota Fiscal</div>
-
-      <div style="display:flex;gap:6px;align-items:center;">
-
-        <button class="btn-print" onclick="window.print()">🖨️ Imprimir / PDF</button>
-
-        <button class="btn-print" style="background:#059669;" onclick="document.getElementById('painelEnvioCliente').scrollIntoView({{behavior:'smooth'}})">📧 Enviar p/ Cliente</button>
-
-        <button class="btn-print" style="background:#64748b;margin-left:6px;" onclick="window.close()">✕ Fechar</button>
-
+  <!-- BARRA DE AÇÕES SUPERIOR (SEM O BOTÃO 'ENVIAR P/ CLIENTE') -->
+  <div class="top-toolbar no-print">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:16px;">🧾</span>
+      <div>
+        <div style="font-weight:900;font-size:13px;letter-spacing:0.3px;">Sistema Fiscal EMED — DANFE Oficial Padrão Nacional (SEFAZ)</div>
+        <div style="font-size:11px;color:#94a3b8;">NF-e / NFS-e Nº {num_nf_raw} &bull; OS #{os_id} &bull; {cli_nome}</div>
       </div>
-
     </div>
-
-
-
-    <!-- PAINEL DE CONFERÊNCIA, ENVIO POR E-MAIL E INTEGRAÇÃO CONTÁBIL -->
-
-    <div id="painelEnvioCliente" class="no-print" style="{'display:none;' if is_cliente_view else ''} background: #eff6ff; border: 2px solid #3b82f6; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
-
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
-
-        <div style="flex:1;min-width:280px;">
-
-          <div style="font-weight:900;color:#1e3a8a;font-size:13.5px;display:flex;align-items:center;gap:6px;">
-
-            <span>✉️ Enviar Nota Fiscal para o Cliente</span>
-
-            <span id="badgeEnvioCliente" style="font-size:10.5px;padding:2px 8px;border-radius:4px;font-weight:bold;{badge_style_cliente}">
-
-              {badge_status_cliente}
-
-            </span>
-
-          </div>
-
-          <div style="font-size:11.5px;color:#1e40af;margin-top:2px;margin-bottom:8px;">
-
-            Confira as informações da nota fiscal e envie diretamente para o e-mail cadastrado do cliente hospitalar.
-
-          </div>
-
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-
-            <input type="email" id="inputEmailCliente" value="{email_cli}" placeholder="ex: faturamento@hospital.com.br"
-
-                   style="flex:1;min-width:240px;padding:8px 10px;font-size:12px;border:1.5px solid #93c5fd;border-radius:6px;font-weight:600;outline:none;" />
-
-            <button type="button" id="btnDispararEnvio" onclick="enviarNotaParaCliente('{os_id}')"
-
-                    style="background:#2563eb;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:bold;font-size:12px;cursor:pointer;">
-
-              🚀 Disparar E-mail
-
-            </button>
-
-            <a id="btnMailto" href="mailto:{email_cli}?subject=Nota%20Fiscal%20Eletronica%20{num_nf}%20-%20EMED&body=Segue%20espelho%20da%20Nota%20Fiscal%20Eletronica%20{num_nf}%20referente%20a%20OS%20#{os_id}:%20{base_pub}/api/fiscal/danfe/{os_id}" target="_blank"
-
-               style="background:#fff;color:#1d4ed8;border:1.5px solid #93c5fd;padding:7px 12px;border-radius:6px;font-weight:bold;font-size:11.5px;text-decoration:none;">
-
-              📬 Outlook / Gmail
-
-            </a>
-
-            <a href="https://api.whatsapp.com/send?phone=55{whats_digits}&text={whats_msg_enc}" target="_blank"
-
-               style="background:#16a34a;color:#fff;border:none;padding:7px 12px;border-radius:6px;font-weight:bold;font-size:11.5px;text-decoration:none;">
-
-              📲 WhatsApp
-
-            </a>
-
-          </div>
-
-          <div id="msgStatusEnvio" style="margin-top:8px;font-size:11.5px;font-weight:bold;display:none;"></div>
-
-        </div>
-
-
-
-        <div style="background:#fff;border:1.5px solid #bfdbfe;border-radius:6px;padding:10px 14px;min-width:240px;">
-
-          <div style="font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;">Fechamento Contábil Oficial</div>
-
-          <div style="font-size:13px;font-weight:900;color:#0284c7;margin:2px 0;">📁 Lote Contábil: {lote_mes_fmt}</div>
-
-          <div style="font-size:11px;font-weight:bold;{cor_contab}">
-
-            {txt_contab}
-
-          </div>
-
-          <div style="font-size:9.5px;color:#64748b;margin-top:3px;">
-
-            A nota fiscal é automaticamente agrupada para a apuração mensal do DAS/ISS pela assessoria contábil.
-
-          </div>
-
-        </div>
-
-      </div>
-
+    <div style="display:flex;align-items:center;">
+      <button type="button" class="btn-action btn-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+      <button type="button" class="btn-action btn-close" onclick="window.close()">✕ Fechar</button>
     </div>
+  </div>
 
+  <div class="danfe-card">
 
-
-    <!-- CABEÇALHO EMED -->
-
-    <table class="header-tbl">
-
+    <!-- CANHOTO SUPERIOR -->
+    <table class="box-grid">
       <tr>
+        <td style="width: 82%; padding: 4px 6px;">
+          <div style="font-size: 7pt; font-weight: bold; line-height: 1.15; text-transform: uppercase;">
+            RECEBEMOS DE {prestador_razao} OS PRODUTOS E/OU SERVIÇOS CONSTANTES DA NOTA FISCAL INDICADA AO LADO
+          </div>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 5px;">
+            <tr>
+              <td style="width: 25%; border: 1px solid #000; padding: 2px 4px; height: 26px;">
+                <span class="fld-lbl">DATA DE RECEBIMENTO</span>
+                <div class="fld-val">&nbsp;</div>
+              </td>
+              <td style="width: 75%; border: 1px solid #000; padding: 2px 4px; height: 26px;">
+                <span class="fld-lbl">IDENTIFICAÇÃO E ASSINATURA DO RECEBEDOR</span>
+                <div class="fld-val">&nbsp;</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+        <td style="width: 18%; text-align: center; vertical-align: middle; padding: 4px;">
+          <div style="font-size: 11pt; font-weight: 900; letter-spacing: 1px;">NF-e</div>
+          <div style="font-size: 9pt; font-weight: 900; margin: 2px 0;">Nº {num_nf_fmt}</div>
+          <div style="font-size: 7.5pt; font-weight: bold;">SÉRIE {serie}</div>
+        </td>
+      </tr>
+    </table>
+    <div class="picote">✂ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</div>
 
-        <td style="width: 140px; vertical-align: middle;">
-
-          <img src="/api/logo-circle" alt="EMED" style="width: 100px; height: auto;" onerror="this.src='/api/logo'" />
-
+    <!-- CABEÇALHO PRINCIPAL (3 COLUNAS) -->
+    <table class="box-grid">
+      <tr>
+        <!-- IDENTIFICAÇÃO DO EMITENTE (COM A LOGO DA EMED PRESERVADA) -->
+        <td style="width: 44%; padding: 5px; vertical-align: middle;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="width: 68px; vertical-align: middle; border: none; padding: 0 6px 0 0; text-align: center;">
+                <img src="{img_logo_src}" alt="EMED" style="width: 62px; height: 62px; object-fit: contain;" onerror="this.src='/api/logo'" />
+              </td>
+              <td style="vertical-align: middle; border: none; padding: 0;">
+                <div style="font-size: 9.5pt; font-weight: 900; color: #000; line-height: 1.1;">{prestador_razao}</div>
+                <div style="font-size: 6pt; font-weight: bold; color: #002b54; margin-top: 1px;">ELETROMEDICINA • ENGENHARIA CLÍNICA • DIAGNÓSTICO POR IMAGEM • {sub_titulo_unidade.upper()}</div>
+                <div style="font-size: 6pt; color: #000; margin-top: 2px; line-height: 1.3;">
+                  {prestador_end}<br/>
+                  {prestador_cid} - {prestador_uf} • CEP: {prestador_cep} • Fone: {prestador_fone}<br/>
+                  CNPJ: <b>{prestador_cnpj}</b><br/>
+                  Insc. Municipal / CF-DF: <b>{prestador_im}</b>
+                </div>
+              </td>
+            </tr>
+          </table>
         </td>
 
-        <td style="vertical-align: middle;">
-
-          <div class="title-danfe">{prestador_razao}</div>
-
-          <div style="font-size: 11px; color: #0077b6; font-weight: bold; margin-top: 1px;">Eletromedicina • Manutenção em Equipamentos de Diagnóstico por Imagem • {sub_titulo_unidade}</div>
-
-          <div style="font-size: 10px; color: #475569; margin-top: 3px; line-height: 1.35;">
-
-            <b>CNPJ:</b> {prestador_cnpj} &bull; <b>{'CF/DF' if filial_emissora == 'FILIAL_DF' else 'Insc. Municipal'}:</b> {prestador_im} &bull; <b>Órgão:</b> {orgao_emissor}<br/>
-
-            <b>Endereço Emissor:</b> {prestador_end}, {prestador_cid} - {prestador_uf} &bull; <b>Fone:</b> {prestador_fone}<br/>
-
-            <b>Site:</b> emed.med.br &bull; <b>E-mail:</b> {prestador_email}
-
+        <!-- QUADRO DANFE CENTRAL -->
+        <td style="width: 19%; text-align: center; vertical-align: middle; padding: 4px;">
+          <div style="font-size: 14pt; font-weight: 900; letter-spacing: 0.5px;">DANFE</div>
+          <div style="font-size: 5.5pt; font-weight: bold; line-height: 1.1; margin-top: 1px;">DOCUMENTO AUXILIAR DA NOTA FISCAL ELETRÔNICA</div>
+          <div style="margin: 3px auto; font-size: 6.5pt; text-align: left; display: inline-block;">
+            0 - ENTRADA<br/>
+            1 - SAÍDA &nbsp; <span style="display: inline-block; border: 1.5px solid #000; width: 14px; height: 14px; text-align: center; line-height: 14px; font-weight: 900;">1</span>
           </div>
-
+          <div style="font-size: 8.5pt; font-weight: 900; margin-top: 1px;">Nº {num_nf_fmt}</div>
+          <div style="font-size: 7pt; font-weight: bold;">SÉRIE {serie}</div>
+          <div style="font-size: 6pt;">FOLHA 1 / 1</div>
         </td>
 
-        <td style="width: 230px; vertical-align: middle; text-align: right;">
-
-          <div style="border: 2px solid #002b54; border-radius: 6px; padding: 8px; background: #f8fafc; text-align: center;">
-
-            <div style="font-size: 10px; font-weight: 800; color: #002b54;">{doc_aux_titulo}</div>
-
-            <div style="font-size: 16px; font-weight: 900; color: #0b132b; margin: 3px 0;">{num_nf}</div>
-
-            <div class="badge-nf">STATUS: {st_fiscal}</div>
-
-            <div style="font-size: 9.5px; color: #64748b; margin-top: 4px;">Emissão: <b>{dt_emissao}</b></div>
-
+        <!-- CONTROLE DO FISCO / CÓDIGO DE BARRAS & CHAVE -->
+        <td style="width: 37%; padding: 4px; vertical-align: top;">
+          <span class="fld-lbl">CONTROLE DO FISCO</span>
+          <div style="margin: 2px 0;">
+            {barcode_svg}
           </div>
-
+          <div style="border-top: 1px solid #000; margin-top: 3px; padding-top: 2px;">
+            <span class="fld-lbl">CHAVE DE ACESSO</span>
+            <div style="font-size: 6.8pt; font-weight: 900; font-family: monospace; text-align: center; letter-spacing: 0.3px;">
+              {chave_fmt}
+            </div>
+          </div>
+          <div style="border-top: 1px solid #000; margin-top: 3px; padding-top: 2px; font-size: 5.2pt; text-align: center; line-height: 1.15;">
+            Consulta de autenticidade no portal nacional da NF-e<br/>
+            <b>www.nfe.fazenda.gov.br/portal</b> ou no site da Sefaz Autorizadora
+          </div>
         </td>
-
       </tr>
-
     </table>
 
-
-
-    <div style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 4px; font-size: 10px; margin-bottom: 8px;">
-
-      <b>Chave de Autenticação / Protocolo Digital:</b> <span style="font-family: monospace; letter-spacing: 0.5px;">{chave}</span>
-
-    </div>
-
-
-
-    <!-- TOMADOR DOS SERVIÇOS -->
-
-    <div class="sec-header">1. Dados do Tomador / Cliente Hospitalar</div>
-
-    <table class="data-tbl">
-
+    <!-- NATUREZA DA OPERAÇÃO / PROTOCOLO DE AUTORIZAÇÃO -->
+    <table class="box-grid" style="margin-top: -1px;">
       <tr>
-
-        <td colspan="2"><span style="color:#64748b;">Razão Social / Nome:</span> <b>{cli_nome}</b></td>
-
-        <td><span style="color:#64748b;">CNPJ / CPF:</span> <b>{cnpj_cli}</b></td>
-
+        <td style="width: 50%;">
+          <span class="fld-lbl">NATUREZA DA OPERAÇÃO</span>
+          <div class="fld-val">{nat_operacao}</div>
+        </td>
+        <td style="width: 50%;">
+          <span class="fld-lbl">PROTOCOLO DE AUTORIZAÇÃO DE USO</span>
+          <div class="fld-val">{protocolo_autorizacao}</div>
+        </td>
       </tr>
-
+    </table>
+    <table class="box-grid" style="margin-top: -1px;">
       <tr>
-
-        <td colspan="2"><span style="color:#64748b;">Endereço:</span> <b>{end_cli}</b></td>
-
-        <td><span style="color:#64748b;">Município / UF:</span> <b>{cid_cli} - {uf_cli}</b></td>
-
+        <td style="width: 33.3%;">
+          <span class="fld-lbl">INSCRIÇÃO ESTADUAL</span>
+          <div class="fld-val">ISENTO</div>
+        </td>
+        <td style="width: 33.3%;">
+          <span class="fld-lbl">INSC. ESTADUAL DO SUBST. TRIB.</span>
+          <div class="fld-val">-</div>
+        </td>
+        <td style="width: 33.4%;">
+          <span class="fld-lbl">CNPJ DO EMITENTE</span>
+          <div class="fld-val">{prestador_cnpj}</div>
+        </td>
       </tr>
-
     </table>
 
-
-
-    <!-- DADOS DA ORDEM DE SERVIÇO -->
-
-    <div class="sec-header">2. Identificação da Ordem de Serviço & Atendimento Técnico</div>
-
-    <table class="data-tbl">
-
+    <!-- DESTINATÁRIO / REMETENTE -->
+    <div class="sec-title">DESTINATÁRIO / REMETENTE</div>
+    <table class="box-grid">
       <tr>
-
-        <td><span style="color:#64748b;">OS Vinculada:</span> <b>#{os_id}</b></td>
-
-        <td><span style="color:#64748b;">Equipamento:</span> <b>{equip_nome}</b></td>
-
-        <td><span style="color:#64748b;">Tipo de Serviço:</span> <b>{srv_tipo}</b></td>
-
-        <td><span style="color:#64748b;">Técnico Responsável:</span> <b>{tec_nome}</b></td>
-
+        <td style="width: 60%;">
+          <span class="fld-lbl">NOME / RAZÃO SOCIAL</span>
+          <div class="fld-val">{cli_nome}</div>
+        </td>
+        <td style="width: 25%;">
+          <span class="fld-lbl">CNPJ / CPF</span>
+          <div class="fld-val">{cnpj_cli}</div>
+        </td>
+        <td style="width: 15%;">
+          <span class="fld-lbl">DATA DA EMISSÃO</span>
+          <div class="fld-val">{dt_emissao}</div>
+        </td>
       </tr>
-
+      <tr>
+        <td>
+          <span class="fld-lbl">ENDEREÇO</span>
+          <div class="fld-val">{end_cli}</div>
+        </td>
+        <td>
+          <span class="fld-lbl">BAIRRO / DISTRITO</span>
+          <div class="fld-val">{bairro_cli}</div>
+        </td>
+        <td>
+          <span class="fld-lbl">CEP</span>
+          <div class="fld-val">{cep_cli}</div>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="border: none; padding: 0; width: 65%;">
+                <span class="fld-lbl">MUNICÍPIO</span>
+                <div class="fld-val">{cid_cli}</div>
+              </td>
+              <td style="border: none; padding: 0; width: 35%;">
+                <span class="fld-lbl">FONE / FAX</span>
+                <div class="fld-val">{whats_cli}</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+        <td>
+          <span class="fld-lbl">UF</span>
+          <div class="fld-val">{uf_cli}</div>
+        </td>
+        <td>
+          <span class="fld-lbl">DATA DA SAÍDA / ENTRADA</span>
+          <div class="fld-val">{dt_emissao} {hr_emissao}</div>
+        </td>
+      </tr>
     </table>
 
+    <!-- DADOS DA ORDEM DE SERVIÇO & ATENDIMENTO TÉCNICO -->
+    <div class="sec-title">DADOS DA ORDEM DE SERVIÇO & COBRANÇA</div>
+    <table class="box-grid">
+      <tr>
+        <td style="width: 15%;">
+          <span class="fld-lbl">OS VINCULADA</span>
+          <div class="fld-val">#{os_id}</div>
+        </td>
+        <td style="width: 35%;">
+          <span class="fld-lbl">EQUIPAMENTO HOSPITALAR</span>
+          <div class="fld-val">{equip_nome}</div>
+        </td>
+        <td style="width: 25%;">
+          <span class="fld-lbl">TIPO DE ATENDIMENTO</span>
+          <div class="fld-val">{srv_tipo}</div>
+        </td>
+        <td style="width: 25%;">
+          <span class="fld-lbl">RESPONSÁVEL TÉCNICO</span>
+          <div class="fld-val">{tec_nome}</div>
+        </td>
+      </tr>
+    </table>
 
+    <!-- CÁLCULO DO IMPOSTO -->
+    <div class="sec-title">CÁLCULO DO IMPOSTO</div>
+    <table class="box-grid">
+      <tr>
+        <td style="width: 20%;">
+          <span class="fld-lbl">BASE DE CÁLCULO DO ICMS</span>
+          <div class="fld-val" style="text-align: right;">R$ 0,00</div>
+        </td>
+        <td style="width: 20%;">
+          <span class="fld-lbl">VALOR DO ICMS</span>
+          <div class="fld-val" style="text-align: right;">R$ 0,00</div>
+        </td>
+        <td style="width: 20%;">
+          <span class="fld-lbl">BASE CÁLC. ICMS S.T.</span>
+          <div class="fld-val" style="text-align: right;">R$ 0,00</div>
+        </td>
+        <td style="width: 20%;">
+          <span class="fld-lbl">VALOR DO ICMS S.T.</span>
+          <div class="fld-val" style="text-align: right;">R$ 0,00</div>
+        </td>
+        <td style="width: 20%;">
+          <span class="fld-lbl">VALOR TOTAL PRODUTOS / PEÇAS</span>
+          <div class="fld-val" style="text-align: right;">R$ {val_pec:,.2f}</div>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <span class="fld-lbl">VALOR DO FRETE</span>
+          <div class="fld-val" style="text-align: right;">R$ 0,00</div>
+        </td>
+        <td>
+          <span class="fld-lbl">VALOR DO SEGURO</span>
+          <div class="fld-val" style="text-align: right;">R$ 0,00</div>
+        </td>
+        <td>
+          <span class="fld-lbl">DESCONTO</span>
+          <div class="fld-val" style="text-align: right;">R$ 0,00</div>
+        </td>
+        <td>
+          <span class="fld-lbl">OUTRAS DESPESAS ACESSÓRIAS</span>
+          <div class="fld-val" style="text-align: right;">R$ 0,00</div>
+        </td>
+        <td style="background: #fafafa;">
+          <span class="fld-lbl">VALOR TOTAL DA NOTA</span>
+          <div class="fld-val" style="text-align: right; font-size: 8.5pt; font-weight: 900; color: #000;">R$ {val_total:,.2f}</div>
+        </td>
+      </tr>
+    </table>
 
-    <!-- DISCRIMINAÇÃO DOS SERVIÇOS & PEÇAS -->
+    <!-- TRANSPORTADOR / VOLUMES TRANSPORTADOS -->
+    <div class="sec-title">TRANSPORTADOR / VOLUMES TRANSPORTADOS</div>
+    <table class="box-grid">
+      <tr>
+        <td style="width: 40%;">
+          <span class="fld-lbl">RAZÃO SOCIAL</span>
+          <div class="fld-val">{cli_nome}</div>
+        </td>
+        <td style="width: 20%;">
+          <span class="fld-lbl">FRETE POR CONTA</span>
+          <div class="fld-val">9 - SEM FRETE</div>
+        </td>
+        <td style="width: 15%;">
+          <span class="fld-lbl">CÓDIGO ANTT</span>
+          <div class="fld-val">-</div>
+        </td>
+        <td style="width: 15%;">
+          <span class="fld-lbl">PLACA DO VEÍCULO</span>
+          <div class="fld-val">-</div>
+        </td>
+        <td style="width: 10%;">
+          <span class="fld-lbl">UF</span>
+          <div class="fld-val">{uf_cli}</div>
+        </td>
+      </tr>
+    </table>
 
-    <div class="sec-header">3. Discriminação dos Serviços de Engenharia Clínica & Peças</div>
-
-    <div style="border: 1px solid #cbd5e1; padding: 10px; border-radius: 4px; font-size: 11.5px; background: #fafafa; min-height: 80px; line-height: 1.5; margin-bottom: 8px;">
-
-      <b>{tipo_nota}</b><br/>
-
-      {descr}<br/><br/>
-
-      {"<b>Peças Aplicadas no Atendimento:</b><br/>" + "".join([f"&bull; [{p['origem']}] {p['item']} (Cód: {p['codigo']})<br/>" for p in pecas]) if pecas else "<i>Nenhuma peça faturada separadamente (mão de obra e insumos inclusos no serviço clínico).</i>"}
-
-    </div>
-
-
-
-    <!-- QUADRO DE VALORES -->
-
-    <div class="sec-header">4. Valores e Tributação Consolidada</div>
-
-    <table class="data-tbl">
-
+    <!-- DADOS DOS PRODUTOS / SERVIÇOS -->
+    <div class="sec-title">DADOS DOS PRODUTOS / SERVIÇOS</div>
+    <table class="box-grid items-grid">
       <thead>
-
         <tr>
-
-          <th>Valor Mão de Obra / Serviços</th>
-
-          <th>Valor Peças / Produtos</th>
-
-          <th>Deduções / Descontos</th>
-
-          <th>Base de Cálculo ISS</th>
-
-          <th>VALOR TOTAL DA NOTA FISCAL</th>
-
+          <th style="width: 11%;">CÓD. PROD.</th>
+          <th style="width: 43%;">DESCRIÇÃO DO PRODUTO / SERVIÇO</th>
+          <th style="width: 8%;">NCM/SH</th>
+          <th style="width: 5%;">CST</th>
+          <th style="width: 5%;">CFOP</th>
+          <th style="width: 4%;">UN</th>
+          <th style="width: 5%;">QTD</th>
+          <th style="width: 9%;">VLR. UNIT.</th>
+          <th style="width: 9%;">VLR. TOTAL</th>
+          <th style="width: 3%;">ALÍQ.</th>
         </tr>
-
       </thead>
-
       <tbody>
-
-        <tr>
-
-          <td style="font-weight: bold; font-size: 13px;">R$ {val_srv:,.2f}</td>
-
-          <td style="font-weight: bold; font-size: 13px;">R$ {val_pec:,.2f}</td>
-
-          <td>R$ 0,00</td>
-
-          <td>R$ {val_srv:,.2f}</td>
-
-          <td class="val-destaque">R$ {val_total:,.2f}</td>
-
-        </tr>
-
+        {linhas_itens_html}
       </tbody>
-
     </table>
 
+    <!-- CÁLCULO DO ISSQN -->
+    <div class="sec-title">CÁLCULO DO ISSQN (IMPOSTO SOBRE SERVIÇOS DE QUALQUER NATUREZA)</div>
+    <table class="box-grid">
+      <tr>
+        <td style="width: 25%;">
+          <span class="fld-lbl">INSCRIÇÃO MUNICIPAL</span>
+          <div class="fld-val">{prestador_im}</div>
+        </td>
+        <td style="width: 25%;">
+          <span class="fld-lbl">VALOR TOTAL DOS SERVIÇOS</span>
+          <div class="fld-val" style="text-align: right;">R$ {val_srv:,.2f}</div>
+        </td>
+        <td style="width: 25%;">
+          <span class="fld-lbl">BASE DE CÁLCULO DO ISSQN</span>
+          <div class="fld-val" style="text-align: right;">R$ {val_srv:,.2f}</div>
+        </td>
+        <td style="width: 25%;">
+          <span class="fld-lbl">VALOR DO ISSQN</span>
+          <div class="fld-val" style="text-align: right;">R$ {val_iss:,.2f}</div>
+        </td>
+      </tr>
+    </table>
 
+    <!-- DADOS ADICIONAIS -->
+    <div class="sec-title">DADOS ADICIONAIS</div>
+    <table class="box-grid">
+      <tr>
+        <td style="width: 70%; padding: 4px 6px; vertical-align: top;">
+          <span class="fld-lbl">INFORMAÇÕES COMPLEMENTARES</span>
+          <div style="font-size: 6pt; color: #000; line-height: 1.35; margin-top: 2px;">
+            &bull; DOCUMENTO EMITIDO POR ME OU EPP OPTANTE PELO SIMPLES NACIONAL.<br/>
+            &bull; NÃO GERA DIREITO A CRÉDITO FISCAL DE IPI / ICMS.<br/>
+            &bull; Valor aproximado dos tributos federais e municipais (Lei da Transparência 12.741/2012 - IBPT): R$ {(val_total * 0.1345):,.2f} (13,45%).<br/>
+            &bull; Atendimento de Engenharia Clínica vinculado à OS #{os_id}. Equipamento: {equip_nome}. Tipo de Atendimento: {srv_tipo}. Técnico Responsável: {tec_nome}.<br/>
+            &bull; Serviços em conformidade com as resoluções ANVISA RDC 611 e normas técnicas ABNT NBR IEC 60601 / IEC 62353.<br/>
+            &bull; Chave de Autenticação Digital Homologada: <b>{chave_fmt}</b>
+          </div>
+        </td>
+        <td style="width: 30%; padding: 4px 6px; vertical-align: top; background: #fafafa;">
+          <span class="fld-lbl">RESERVADO AO FISCO</span>
+          <div style="font-size: 6pt; color: #334155; line-height: 1.35; margin-top: 2px;">
+            Protocolo SEFAZ / Prefeitura: <b>{protocolo_autorizacao}</b><br/>
+            Status Fiscal: <b>{st_fiscal}</b><br/>
+            Lote Fechamento Contábil: <b>{dados_nf.get("lote_contabilidade_mes") or obter_agora_brasil_str("%Y-%m")}</b>
+          </div>
+        </td>
+      </tr>
+    </table>
 
-    <!-- INFORMAÇÕES COMPLEMENTARES -->
-
-    <div class="sec-header">5. Informações Complementares e Fiscais</div>
-
-    <div style="border: 1px solid #cbd5e1; padding: 8px; border-radius: 4px; font-size: 10px; color: #475569; line-height: 1.4; background: #fff;">
-
-      &bull; DOCUMENTO EMITIDO POR ME OU EPP OPTANTE PELO SIMPLES NACIONAL.<br/>
-
-      &bull; NÃO GERA DIREITO A CRÉDITO FISCAL DE IPI / ICMS.<br/>
-
-      &bull; Valor aproximado dos tributos federais e municipais (IBPT): R$ {(val_total * 0.1345):,.2f} (13,45%).<br/>
-
-      &bull; Serviços de Manutenção Preventiva/Corretiva e Validação Metrológica de Equipamentos Médicos Hospitalares em conformidade com as normas ANVISA RDC 611 e ABNT NBR IEC 60601.
-
-    </div>
-
-
-
-    <div style="margin-top: 14px; text-align: center; font-size: 9.5px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 8px;">
-
-      EMED Eletromedicina Ltda. &bull; Comprovante Digital de Faturamento Homologado &bull; Emitido pelo Sistema Oficial EMED
-
+    <div class="danfe-footer">
+      EMED Eletromedicina Ltda. &bull; Documento Auxiliar da Nota Fiscal Eletrônica (DANFE) &bull; Emitido pelo Sistema Homologado EMED
     </div>
 
   </div>
 
-  <script>
-
-    async function enviarNotaParaCliente(osId) {{
-
-      var email = document.getElementById('inputEmailCliente').value.trim();
-
-      if (!email || email.indexOf('@') === -1) {{
-
-        alert('Por favor, informe um endereço de e-mail válido para o cliente.');
-
-        return;
-
-      }}
-
-      var btn = document.getElementById('btnDispararEnvio');
-
-      var msg = document.getElementById('msgStatusEnvio');
-
-      btn.disabled = true;
-
-      btn.innerText = 'Enviando...';
-
-      try {{
-
-        var res = await fetch('/api/fiscal/enviar-cliente', {{
-
-          method: 'POST',
-
-          headers: {{ 'Content-Type': 'application/json' }},
-
-          body: JSON.stringify({{ os_id: osId, email: email }})
-
-        }});
-
-        var data = await res.json();
-
-        if (data.ok) {{
-
-          msg.style.display = 'block';
-
-          msg.style.color = '#15803d';
-
-          msg.innerHTML = '✅ ' + data.msg + ' &bull; Vinculada ao Lote Contábil ' + (data.lote_contabilidade || '') + '.';
-
-          var mailto = document.getElementById('btnMailto');
-
-          if (mailto && data.mailto_url) mailto.href = data.mailto_url;
-
-          var badge = document.getElementById('badgeEnvioCliente');
-
-          if (badge) {{
-
-            badge.innerText = 'Enviada em ' + data.email_enviado_em;
-
-            badge.style.background = '#dcfce7';
-
-            badge.style.color = '#15803d';
-
-            badge.style.border = '1px solid #86efac';
-
-          }}
-
-        }} else {{
-
-          msg.style.display = 'block';
-
-          msg.style.color = '#dc2626';
-
-          msg.innerText = '⚠️ ' + (data.msg || 'Erro ao enviar e-mail.');
-
-        }}
-
-      }} catch (err) {{
-
-        msg.style.display = 'block';
-
-        msg.style.color = '#dc2626';
-
-        msg.innerText = '⚠️ Falha de comunicação: ' + err.message;
-
-      }} finally {{
-
-        btn.disabled = false;
-
-        btn.innerText = '🚀 Disparar E-mail';
-
-      }}
-
-    }}
-
-  </script>
-
 </body>
-
 </html>"""
 
     return web.Response(body=html_danfe, content_type="text/html", charset="utf-8")
-
-
 
 
 
