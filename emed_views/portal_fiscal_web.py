@@ -4474,7 +4474,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EMED Fiscal – Faturamento & NFS-e Multi-Filial</title>
+  <title>EMED Fiscal v3.2.0 • Faturamento & NFS-e Multi-Filial</title>
   <link rel="icon" type="image/png" href="data:image/png;base64,{icon_b64}">
   <style>
     :root {{
@@ -4524,6 +4524,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
           {f'<img src="data:image/png;base64,{icon_b64}" width="38" height="38">' if icon_b64 else '🧾'}
           <h2 style="margin:0;color:#38bdf8;">EMED Fiscal • Módulo NF</h2>
+          <span class="badge" style="background:#0f172a;border:1px solid #38bdf8;color:#38bdf8;font-size:11px;padding:3px 7px;border-radius:5px;font-weight:800;">v3.2.0</span>
         </div>
         <p style="font-size:12.5px;color:var(--muted);margin-top:6px;">Portal de Faturamento, Emissão de Notas &amp; Gestão Tributária 24/7</p>
       </div>
@@ -4545,8 +4546,11 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         <div style="display:flex;align-items:center;gap:12px;">
           {f'<img src="data:image/png;base64,{icon_b64}" width="40" height="40">' if icon_b64 else '🧾'}
           <div>
-            <h3 style="margin:0;font-size:18px;">EMED Fiscal • Módulo Tributário Multi-Filial</h3>
-            <div style="font-size:12px;color:var(--muted);">Operador: <b id="lblOperador" style="color:#38bdf8;">NETTO</b> &bull; Cargo: <span id="lblCargo" style="color:#a5f3fc;">Diretoria &amp; Controladoria</span></div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <h3 style="margin:0;font-size:18px;">EMED Fiscal • Módulo Tributário Multi-Filial</h3>
+              <span class="badge" style="background:#0f172a;border:1px solid #38bdf8;color:#38bdf8;font-size:11px;padding:3px 8px;border-radius:6px;font-weight:800;letter-spacing:0.5px;">v3.2.0 (2026.11)</span>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">Operador: <b id="lblOperador" style="color:#38bdf8;">NETTO</b> &bull; Cargo: <span id="lblCargo" style="color:#a5f3fc;">Diretoria &amp; Controladoria</span></div>
           </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
@@ -5244,6 +5248,13 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             </div>
           </div>
 
+          <div style="margin-top:14px;padding:10px 14px;background:#091224;border:1px solid #1e293b;border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:12px;color:#94a3b8;">
+              ℹ️ <b>Versão do Módulo Fiscal:</b> <span style="color:#38bdf8;font-weight:800;">EMED Fiscal v3.2.0 (Build 2026-11)</span> &bull; Motor Tributário &amp; NFS-e Nacional Ativo
+            </div>
+            <span class="badge" style="background:#0284c7;color:#fff;font-size:10.5px;padding:3px 8px;border-radius:4px;">PRODUÇÃO / 24x7</span>
+          </div>
+
           <div style="margin-top:12px;">
             <button class="btn btn-blue" id="btnSalvarCfgUnidade" onclick="salvarConfigFilial()">💾 Salvar Parâmetros da Unidade</button>
           </div>
@@ -5909,6 +5920,17 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         </div>
       </details>
       </div><!-- FIM boxAbaFaturamentoFiscal -->
+
+      <!-- RODAPÉ FISCAL COM VERSÃO E INFORMAÇÕES DE INTEGRIDADE -->
+      <footer style="margin-top:28px;padding:16px 12px;border-top:1px solid #334155;color:#64748b;font-size:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-weight:700;color:#94a3b8;">🏛️ EMED Fiscal &amp; Gestão Tributária</span>
+          <span class="badge" style="background:#0f172a;border:1px solid #0284c7;color:#38bdf8;font-size:11px;padding:2px 8px;border-radius:4px;font-weight:800;">v3.2.0 (2026.11)</span>
+        </div>
+        <div style="color:#64748b;font-size:11.5px;">
+          Homologação &amp; Produção Multi-Filial &bull; SEFAZ DF &amp; CE &bull; Receita Federal &bull; Conexão Segura Certificado A1
+        </div>
+      </footer>
     </div>
   </div>
 

@@ -9712,8 +9712,13 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
         for r_p in cur.fetchall():
             pecas.append({"item": r_p[0], "codigo": r_p[1] or "PEC", "origem": r_p[2] or "NOVA_COM_NF"})
 
-    # Retorna o arquivo binário .PDF caso expressamente solicitado via query string ?formato=pdf ou ?view=pdf
-    if request.query.get("formato") == "pdf" or request.query.get("view") == "pdf":
+<<<<<<< HEAD
+    # Por padrão fiscal oficial, retorna DIRETAMENTE o arquivo binário .PDF da DANFE no formato padrão brasileiro (A4)
+    if request.query.get("view") != "html":
+=======
+    # Por padrão fiscal oficial, retorna DIRETAMENTE o arquivo binário .PDF da DANFE no formato padrão brasileiro (A4)
+    if request.query.get("view") != "html":
+>>>>>>> origin/main
         try:
             from emed_views.danfe_pdf_padrao import gerar_danfe_padrao_pdf_bytes
             cfop_srv = str(dados_nf.get("cfop") or ("6933" if uf_cli != prestador_uf else "5933"))
@@ -9943,6 +9948,7 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
       font-weight: 900;
       padding: 2px 4px;
       text-transform: uppercase;
+      letter-spacing: 0.3px;
       border: 1px solid #000;
       border-bottom: none;
       margin-top: 4px;
