@@ -80,10 +80,18 @@ class GT06ClientSession:
         buffer = bytearray()
         try:
             while not self.reader.at_eof():
-                chunk = await self.reader.read(1024)
+                try:
+                    chunk = await asyncio.wait_for(self.reader.read(1024), timeout=60.0)
+                except asyncio.TimeoutError:
+                    print(f"⏱️ [EMED-GPS] Timeout de inatividade (60s) encerrando sessão: {self.addr}")
+                    break
                 if not chunk:
                     break
                 buffer.extend(chunk)
+                if len(buffer) > 8192:
+                    print(f"⚠️ [EMED-GPS] Buffer excessivo (>8KB) descartado para: {self.addr}")
+                    buffer.clear()
+                    break
 
                 # Processa todos os pacotes completos no buffer
                 while len(buffer) >= 5:
@@ -194,12 +202,14 @@ class GT06ClientSession:
                 print(f"📍 [EMED-GPS] {dt_str} | Satélites: {sat_count} | Lat: {lat}, Lon: {lon} | Vel: {vel} km/h")
 
                 # Sincroniza com a tabela oficial de veículos e viagens da EMED
+                ignicao_status = 1 if vel > 0 else (1 if getattr(self, 'acc_ligado', False) else 0)
                 payload_telemetria = {
                     "placa": self.placa,
                     "imei": self.imei or "",
                     "latitude": lat,
                     "longitude": lon,
                     "velocidade_kmh": vel,
+                    "ignicao": ignicao_status,
                     "data_inicio": dt_str,
                     "data_fim": dt_str,
                     "acao": "ATUALIZAR_TELEMETRIA",
@@ -211,12 +221,27 @@ class GT06ClientSession:
 
         # 3. Heartbeat / Status de Ignição e Bateria (0x13)
         elif proto == 0x13:
+            try:
+                term_info = packet[4]
+                self.acc_ligado = bool(term_info & 0x02)  # Bit 1 = ACC (ignição)
+                voltagem = packet[5]
+                gsm_nivel = packet[6]
+                ign_txt = "LIGADA" if self.acc_ligado else "DESLIGADA"
+                print(f"💓 [EMED-GPS] Heartbeat J16: Ignição {ign_txt} | Bat Nível {voltagem} | GSM {gsm_nivel}/4")
+
+                # Atualiza ignição instantânea no banco
+                with sqlite3.connect(self.db_name, timeout=5.0) as conn:
+                    conn.execute("UPDATE veiculos SET ignicao_ligada = ? WHERE REPLACE(UPPER(placa), '-', '') = ?",
+                                 (1 if self.acc_ligado else 0, self.placa.replace("-", "").upper()))
+            except Exception as e_hb:
+                print(f"Aviso decodificacao heartbeat: {e_hb}")
+
             serial_bytes = packet[9:11] if len(packet) >= 13 else bytes([0x00, 0x01])
             # Envia ACK do Heartbeat para manter a conexão aberta
             ack = gerar_pacote_ack(0x13, serial_bytes)
             self.writer.write(ack)
             await self.writer.drain()
-            print(f"💓 [EMED-GPS] Heartbeat recebido e ACK confirmado.")
+            print(f"✅ [EMED-GPS] Heartbeat ACK confirmado ao rastreador.")
 
 async def main(host: str = "0.0.0.0", port: int = 5023, db_name: str = "emed.db"):
     db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), db_name)

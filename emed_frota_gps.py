@@ -566,12 +566,17 @@ def registrar_telemetria_ou_viagem_gps(db_name: str, payload: Dict[str, Any]) ->
             km_rodado = 0.0
 
         alerta_revisao = novo_km >= (km_prox_rev - 1000)
-        if acao == "INICIAR_VIAGEM":
-            status_manut = "Em Viagem / Campo"
+        if "ignicao" in payload and payload["ignicao"] is not None:
+            ignicao = 1 if payload["ignicao"] in (1, True, "1", "true", "TRUE") else 0
+        elif vel > 0 or acao == "INICIAR_VIAGEM":
             ignicao = 1
         else:
-            status_manut = "REVISÃO PREVENTIVA NECESSÁRIA" if novo_km >= km_prox_rev else ("Alerta de Revisão Próxima" if alerta_revisao else "Disponível")
             ignicao = 0
+
+        if ignicao == 1 or acao == "INICIAR_VIAGEM":
+            status_manut = "Em Viagem / Campo"
+        else:
+            status_manut = "REVISÃO PREVENTIVA NECESSÁRIA" if novo_km >= km_prox_rev else ("Alerta de Revisão Próxima" if alerta_revisao else "Disponível")
 
                 # Geofencing EMED (250 Metros): Auto-Checkin na OS
         autocheckin = verificar_e_disparar_autocheckin_250m(conn, condutor, lat, lon, agora_str)

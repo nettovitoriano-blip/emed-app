@@ -252,6 +252,7 @@ def main():
     proc_nav = None
 
     proc_gps = None
+    proc_bore = None
 
 
 
@@ -450,6 +451,20 @@ def main():
                 )
 
 
+
+
+
+        # 6. Túnel Público TCP do Rastreador Veicular J16 (bore.pub:26835)
+        bore_exe = os.path.join(BASE_DIR, "bore.exe")
+        if os.path.exists(bore_exe) and (proc_bore is None or proc_bore.poll() is not None):
+            log_msg("Iniciando Túnel TCP do Rastreador J16 (bore.pub:26835)...")
+            with open(LOG_FILE, "a", encoding="utf-8") as lf:
+                proc_bore = subprocess.Popen(
+                    [bore_exe, "local", "5023", "--to", "bore.pub", "--port", "26835"],
+                    cwd=BASE_DIR,
+                    stdout=lf,
+                    stderr=lf,
+                )
 
         time.sleep(5)
 

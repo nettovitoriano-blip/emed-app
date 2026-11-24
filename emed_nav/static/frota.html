@@ -1128,30 +1128,31 @@
 
       map = L.map('map', { zoomControl: false, attributionControl: false }).setView([myRealLat, myRealLon], 13);
       
-      // CartoDB Voyager como camada primária oficial da Frota (100% livre de tela preta e CORS)
-      tileCarto = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19,
-        subdomains: 'abcd'
-      }).addTo(map);
-
+      // Google Roads como camada primária oficial da Frota (100% nítido, rápido e sem marca d'água)
       tileRoads = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
         maxZoom: 20,
         subdomains: ['0', '1', '2', '3']
-      });
+      }).addTo(map);
 
       tileSat = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
         maxZoom: 20,
         subdomains: ['0', '1', '2', '3']
       });
 
-      // Proteção de contingência: se CartoDB falhar, chaveia para Google Roads
+      // OpenStreetMap como contingência
+      tileOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        subdomains: ['a', 'b', 'c']
+      });
+
+      // Proteção de contingência: se Google Roads falhar, chaveia para OSM
       let tileFails = 0;
-      tileCarto.on('tileerror', () => {
+      tileRoads.on('tileerror', () => {
         tileFails++;
         if (tileFails >= 2 && !isSat) {
-          console.warn('CartoDB com oscilação na Frota. Alternando para Google Roads...');
-          try { map.removeLayer(tileCarto); } catch(e){}
-          tileRoads.addTo(map);
+          console.warn('Google Roads com oscilação na Frota. Alternando para OSM...');
+          try { map.removeLayer(tileRoads); } catch(e){}
+          tileOSM.addTo(map);
         }
       });
 
@@ -1191,7 +1192,11 @@
     ];
 
     function renderEmedBases() {
-      emedBaseLayer.clearLayers();
+      if (!emedBaseLayer) {
+        if (!map || typeof L === 'undefined') return;
+        emedBaseLayer = L.layerGroup().addTo(map);
+      }
+      try { emedBaseLayer.clearLayers(); } catch(e){}
       EMED_BASES.forEach(b => {
         const iconHtml = `
           <div style="background:#0f172a; width:36px; height:36px; border-radius:50%; border:3px solid #f59e0b; display:flex; align-items:center; justify-content:center; box-shadow:0 0 16px rgba(245,158,11,0.85); position:relative; cursor:pointer;" title="${b.nome}">
