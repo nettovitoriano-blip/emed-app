@@ -2359,149 +2359,7 @@ async def api_fiscal_recebidas_danfe(request: web.Request) -> web.Response:
 
     {"window.addEventListener('load', () => setTimeout(() => window.print(), 350));" if auto_print else ""}
   
-    function toggleMenuContatosWhats(e) {{
-      if (e) e.stopPropagation();
-      fecharMenuEnvioWhats();
-      fecharMenuOpcoesEmail();
-      const m = document.getElementById("menuContatosWhats");
-      if (!m) return;
-      const aberto = m.style.display === "block";
-      m.style.display = aberto ? "none" : "block";
-      if (!aberto) renderDropdownContatosWhats();
-    }}
-
-    function fecharMenuContatosWhats() {{
-      const m = document.getElementById("menuContatosWhats");
-      if (m) m.style.display = "none";
-    }}
-
-    function toggleMenuEnvioWhats(e) {{
-      if (e) e.stopPropagation();
-      fecharMenuContatosWhats();
-      fecharMenuOpcoesEmail();
-      const m = document.getElementById("menuEnvioWhats");
-      if (!m) return;
-      m.style.display = m.style.display === "block" ? "none" : "block";
-    }}
-
-    function fecharMenuEnvioWhats() {{
-      const m = document.getElementById("menuEnvioWhats");
-      if (m) m.style.display = "none";
-    }}
-
-    function toggleMenuOpcoesEmail(e) {{
-      if (e) e.stopPropagation();
-      fecharMenuContatosWhats();
-      fecharMenuEnvioWhats();
-      const m = document.getElementById("menuOpcoesEmail");
-      if (!m) return;
-      m.style.display = m.style.display === "block" ? "none" : "block";
-    }}
-
-    function fecharMenuOpcoesEmail() {{
-      const m = document.getElementById("menuOpcoesEmail");
-      if (m) m.style.display = "none";
-    }}
-
-    function renderDropdownContatosWhats() {{
-      const box = document.getElementById("listaContatosDropdownWhats");
-      if (!box) return;
-      const lista = getContatosRapidosWhatsDFe();
-      if (!lista.length) {{
-        box.innerHTML = '<div style="padding:6px 8px;font-size:11px;color:#94a3b8;">Nenhum contato salvo ainda. Digite um número e clique em <b>+ Salvar</b>.</div>';
-        return;
-      }}
-      box.innerHTML = lista.map((c, idx) => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:4px;cursor:pointer;" onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background='none'">
-          <div onclick="selecionarContatoWhats('${{c.numero}}')" style="flex:1;">
-            <div style="font-size:11.5px;color:#e2e8f0;font-weight:600;">${{c.nome}}</div>
-            <div style="font-size:10.5px;color:#4ade80;">+${{c.numero}}</div>
-          </div>
-          <button type="button" onclick="removerContatoRapidoWhatsDFe(${{idx}});event.stopPropagation();renderDropdownContatosWhats();" style="background:none;border:none;color:#f87171;font-size:14px;cursor:pointer;padding:2px 4px;" title="Remover">&times;</button>
-        </div>
-      `).join("");
-    }}
-
-    function selecionarContatoWhats(num) {{
-      const inp = document.getElementById("inpModalDFeWhats");
-      if (inp) inp.value = num;
-      fecharMenuContatosWhats();
-    }}
-
-    function copiarMensagemLimpaWhatsModalDFe() {{
-      const n = DFE_NOTA_ATUAL_MODAL;
-      if (!n) return;
-      const emitNome = n.emitente_nome || n.emitente_razao || "Fornecedor";
-      const cnpjEmit = n.emitente_cnpj || "";
-      const numNf = n.numero_nf || "";
-      const valTot = Number(n.valor_total || 0).toLocaleString("pt-BR", {{ minimumFractionDigits: 2 }});
-      const chave = n.chave_acesso || "";
-
-      const linhas = [
-        "🧾 *DANFE OFICIAL (PADRÃO BRASILEIRO)*",
-        `• *NF-e Nº:* ${{numNf}}`,
-        `• *Fornecedor:* ${{emitNome}}`,
-        cnpjEmit ? `• *CNPJ:* ${{cnpjEmit}}` : "",
-        n.data_emissao ? `• *Data Emissão:* ${{n.data_emissao}}` : "",
-        `• *Valor Total:* R$ ${{valTot}}`,
-        chave ? ("• *Chave de Acesso:* " + chave) : "",
-        "",
-        `📎 *Arquivo Oficial em Anexo:* DANFE_NFe_${{numNf}}.pdf (sem links)`
-      ].filter(Boolean).join(String.fromCharCode(10));
-
-      try {{
-        if (navigator.clipboard && navigator.clipboard.writeText) {{
-          navigator.clipboard.writeText(linhas);
-          mostrarAvisoPdfModal("📋 <b>Texto da nota copiado com sucesso!</b> (Sem links externos)");
-        }}
-      }} catch (e) {{}}
-    }}
-
-    document.addEventListener("click", function(e) {{
-      if (!e.target.closest("#wrapContatosWhats")) fecharMenuContatosWhats();
-      if (!e.target.closest("#wrapEnvioWhats")) fecharMenuEnvioWhats();
-      if (!e.target.closest("#wrapOpcoesEmail")) fecharMenuOpcoesEmail();
-    }});
-
-    // Conexão em Background após inicialização das páginas (aguarda sistema carregar)
-    setTimeout(function() {{
-      testarConexaoCanaisBackground();
-    }}, 4000);
-
-    async function testarConexaoCanaisBackground() {{
-      try {{
-        const resp = await fetch("/api/fiscal/canais-conectar-background", {{ method: "POST" }});
-        if (!resp.ok) return;
-        const res = await resp.json();
-        const bW = document.getElementById("badgeCanaisWhatsStatus");
-        const bW2 = document.getElementById("cfgWhatsStatusBadge");
-        if (res.whatsapp_status === "CONECTADO") {{
-          if (bW) {{ bW.innerHTML = "🟢 WhatsApp Conectado"; bW.style.color = "#4ade80"; }}
-          if (bW2) {{ bW2.innerHTML = "🟢 Conectado em Background"; bW2.style.color = "#4ade80"; }}
-        }} else if (res.whatsapp_status === "AGUARDANDO_QRCODE") {{
-          if (bW) {{ bW.innerHTML = "📷 QR Code Pendente"; bW.style.color = "#fbbf24"; }}
-          if (bW2) {{ bW2.innerHTML = "📷 Aguardando Leitura QR Code"; bW2.style.color = "#fbbf24"; }}
-        }}
-
-        const bE = document.getElementById("badgeCanaisEmailStatus");
-        const bE2 = document.getElementById("cfgEmailStatusBadge");
-        if (res.email_status === "CONECTADO") {{
-          if (bE) {{ bE.innerHTML = "🟢 E-mail Ativo"; bE.style.color = "#60a5fa"; }}
-          if (bE2) {{ bE2.innerHTML = "🟢 Conectado / Pronto"; bE2.style.color = "#60a5fa"; }}
-        }} else if (res.email_status === "NAO_CONFIGURADO") {{
-          if (bE) {{ bE.innerHTML = "⚪ Servidor SMTP Opcional"; bE.style.color = "#94a3b8"; }}
-          if (bE2) {{ bE2.innerHTML = "⚪ Não configurado"; bE2.style.color = "#94a3b8"; }}
-        }} else {{
-          if (bE) {{ bE.innerHTML = "⚠️ Falha SMTP"; bE.style.color = "#f87171"; }}
-          if (bE2) {{ bE2.innerHTML = "⚠️ Falha: " + (res.email_msg || "Erro login"); bE2.style.color = "#f87171"; }}
-        }}
-      }} catch (e) {{
-        console.warn("Background warmup canais:", e);
-      }}
-    }}
-
-
-  </script>
+</script>
 </body>
 </html>"""
     return web.Response(text=html_danfe, content_type="text/html")
@@ -8309,6 +8167,149 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         abrirEmailDanfeWebmail("mailto", email);
       }}
     }}
+
+    
+    function toggleMenuContatosWhats(e) {{
+      if (e) e.stopPropagation();
+      fecharMenuEnvioWhats();
+      fecharMenuOpcoesEmail();
+      const m = document.getElementById("menuContatosWhats");
+      if (!m) return;
+      const aberto = m.style.display === "block";
+      m.style.display = aberto ? "none" : "block";
+      if (!aberto) renderDropdownContatosWhats();
+    }}
+
+    function fecharMenuContatosWhats() {{
+      const m = document.getElementById("menuContatosWhats");
+      if (m) m.style.display = "none";
+    }}
+
+    function toggleMenuEnvioWhats(e) {{
+      if (e) e.stopPropagation();
+      fecharMenuContatosWhats();
+      fecharMenuOpcoesEmail();
+      const m = document.getElementById("menuEnvioWhats");
+      if (!m) return;
+      m.style.display = m.style.display === "block" ? "none" : "block";
+    }}
+
+    function fecharMenuEnvioWhats() {{
+      const m = document.getElementById("menuEnvioWhats");
+      if (m) m.style.display = "none";
+    }}
+
+    function toggleMenuOpcoesEmail(e) {{
+      if (e) e.stopPropagation();
+      fecharMenuContatosWhats();
+      fecharMenuEnvioWhats();
+      const m = document.getElementById("menuOpcoesEmail");
+      if (!m) return;
+      m.style.display = m.style.display === "block" ? "none" : "block";
+    }}
+
+    function fecharMenuOpcoesEmail() {{
+      const m = document.getElementById("menuOpcoesEmail");
+      if (m) m.style.display = "none";
+    }}
+
+    function renderDropdownContatosWhats() {{
+      const box = document.getElementById("listaContatosDropdownWhats");
+      if (!box) return;
+      const lista = getContatosRapidosWhatsDFe();
+      if (!lista.length) {{
+        box.innerHTML = '<div style="padding:6px 8px;font-size:11px;color:#94a3b8;">Nenhum contato salvo ainda. Digite um número e clique em <b>+ Salvar</b>.</div>';
+        return;
+      }}
+      box.innerHTML = lista.map((c, idx) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:4px;cursor:pointer;" onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background='none'">
+          <div onclick="selecionarContatoWhats('${{c.numero}}')" style="flex:1;">
+            <div style="font-size:11.5px;color:#e2e8f0;font-weight:600;">${{c.nome}}</div>
+            <div style="font-size:10.5px;color:#4ade80;">+${{c.numero}}</div>
+          </div>
+          <button type="button" onclick="removerContatoRapidoWhatsDFe(${{idx}});event.stopPropagation();renderDropdownContatosWhats();" style="background:none;border:none;color:#f87171;font-size:14px;cursor:pointer;padding:2px 4px;" title="Remover">&times;</button>
+        </div>
+      `).join("");
+    }}
+
+    function selecionarContatoWhats(num) {{
+      const inp = document.getElementById("inpModalDFeWhats");
+      if (inp) inp.value = num;
+      fecharMenuContatosWhats();
+    }}
+
+    function copiarMensagemLimpaWhatsModalDFe() {{
+      const n = DFE_NOTA_ATUAL_MODAL;
+      if (!n) return;
+      const emitNome = n.emitente_nome || n.emitente_razao || "Fornecedor";
+      const cnpjEmit = n.emitente_cnpj || "";
+      const numNf = n.numero_nf || "";
+      const valTot = Number(n.valor_total || 0).toLocaleString("pt-BR", {{ minimumFractionDigits: 2 }});
+      const chave = n.chave_acesso || "";
+
+      const linhas = [
+        "🧾 *DANFE OFICIAL (PADRÃO BRASILEIRO)*",
+        `• *NF-e Nº:* ${{numNf}}`,
+        `• *Fornecedor:* ${{emitNome}}`,
+        cnpjEmit ? `• *CNPJ:* ${{cnpjEmit}}` : "",
+        n.data_emissao ? `• *Data Emissão:* ${{n.data_emissao}}` : "",
+        `• *Valor Total:* R$ ${{valTot}}`,
+        chave ? ("• *Chave de Acesso:* " + chave) : "",
+        "",
+        `📎 *Arquivo Oficial em Anexo:* DANFE_NFe_${{numNf}}.pdf (sem links)`
+      ].filter(Boolean).join(String.fromCharCode(10));
+
+      try {{
+        if (navigator.clipboard && navigator.clipboard.writeText) {{
+          navigator.clipboard.writeText(linhas);
+          mostrarAvisoPdfModal("📋 <b>Texto da nota copiado com sucesso!</b> (Sem links externos)");
+        }}
+      }} catch (e) {{}}
+    }}
+
+    document.addEventListener("click", function(e) {{
+      if (!e.target.closest("#wrapContatosWhats")) fecharMenuContatosWhats();
+      if (!e.target.closest("#wrapEnvioWhats")) fecharMenuEnvioWhats();
+      if (!e.target.closest("#wrapOpcoesEmail")) fecharMenuOpcoesEmail();
+    }});
+
+    // Conexão em Background após inicialização das páginas (aguarda sistema carregar)
+    setTimeout(function() {{
+      testarConexaoCanaisBackground();
+    }}, 4000);
+
+    async function testarConexaoCanaisBackground() {{
+      try {{
+        const resp = await fetch("/api/fiscal/canais-conectar-background", {{ method: "POST" }});
+        if (!resp.ok) return;
+        const res = await resp.json();
+        const bW = document.getElementById("badgeCanaisWhatsStatus");
+        const bW2 = document.getElementById("cfgWhatsStatusBadge");
+        if (res.whatsapp_status === "CONECTADO") {{
+          if (bW) {{ bW.innerHTML = "🟢 WhatsApp Conectado"; bW.style.color = "#4ade80"; }}
+          if (bW2) {{ bW2.innerHTML = "🟢 Conectado em Background"; bW2.style.color = "#4ade80"; }}
+        }} else if (res.whatsapp_status === "AGUARDANDO_QRCODE") {{
+          if (bW) {{ bW.innerHTML = "📷 QR Code Pendente"; bW.style.color = "#fbbf24"; }}
+          if (bW2) {{ bW2.innerHTML = "📷 Aguardando Leitura QR Code"; bW2.style.color = "#fbbf24"; }}
+        }}
+
+        const bE = document.getElementById("badgeCanaisEmailStatus");
+        const bE2 = document.getElementById("cfgEmailStatusBadge");
+        if (res.email_status === "CONECTADO") {{
+          if (bE) {{ bE.innerHTML = "🟢 E-mail Ativo"; bE.style.color = "#60a5fa"; }}
+          if (bE2) {{ bE2.innerHTML = "🟢 Conectado / Pronto"; bE2.style.color = "#60a5fa"; }}
+        }} else if (res.email_status === "NAO_CONFIGURADO") {{
+          if (bE) {{ bE.innerHTML = "⚪ Servidor SMTP Opcional"; bE.style.color = "#94a3b8"; }}
+          if (bE2) {{ bE2.innerHTML = "⚪ Não configurado"; bE2.style.color = "#94a3b8"; }}
+        }} else {{
+          if (bE) {{ bE.innerHTML = "⚠️ Falha SMTP"; bE.style.color = "#f87171"; }}
+          if (bE2) {{ bE2.innerHTML = "⚠️ Falha: " + (res.email_msg || "Erro login"); bE2.style.color = "#f87171"; }}
+        }}
+      }} catch (e) {{
+        console.warn("Background warmup canais:", e);
+      }}
+    }}
+
 
     function fecharModalItensDFe() {{
       document.getElementById("modalItensDFe").style.display = "none";
