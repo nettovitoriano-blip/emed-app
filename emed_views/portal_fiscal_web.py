@@ -81,8 +81,23 @@ async def api_fiscal_v2_login(request: web.Request) -> web.Response:
         except Exception as e:
             return web.json_response({"ok": False, "msg": f"Token QR inválido: {e}"}, status=400)
 
+    ip_origem = (
+        request.headers.get("CF-Connecting-IP")
+        or request.headers.get("X-Real-IP")
+        or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+        or (request.remote or "127.0.0.1")
+    )
+    ua_hdr = request.headers.get("User-Agent", "")
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+
     if u in USUARIOS_FISCAL and USUARIOS_FISCAL[u]["senha"] == p:
         info = USUARIOS_FISCAL[u]
+        try:
+            from emed_views.supervisorio_web import registrar_auditoria_login
+            registrar_auditoria_login("PORTAL_FISCAL", u, ip_origem, "SUCESSO", f"Operador fiscal autenticado: {info['cargo']}", ua_hdr, "Navegador Web", db_name)
+        except Exception:
+            pass
+
         resp = web.json_response({
             "ok": True,
             "username": u,
@@ -96,6 +111,14 @@ async def api_fiscal_v2_login(request: web.Request) -> web.Response:
         except Exception:
             pass
         return resp
+
+    try:
+        from emed_views.supervisorio_web import registrar_auditoria_login
+        st_res = "SENHA_INCORRETA" if u in USUARIOS_FISCAL else "USUARIO_INEXISTENTE"
+        registrar_auditoria_login("PORTAL_FISCAL", u, ip_origem, st_res, "Credenciais de operador fiscal inválidas", ua_hdr, "Navegador Web", db_name)
+    except Exception:
+        pass
+
     return web.json_response({"ok": False, "msg": "Usuário ou senha inválidos."}, status=401)
 
 
@@ -170,7 +193,7 @@ async def api_fiscal_v2_dados(request: web.Request) -> web.Response:
 
     
         cfg_smtp_raw = {}
-        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from"):
+        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from", "whatsapp_empresa"):
             r_s = conn.execute("SELECT valor FROM configuracoes_sistema WHERE chave = ?", (k,)).fetchone()
             cfg_smtp_raw[k] = r_s[0] if (r_s and r_s[0]) else ""
         cfg_smtp_safe = {
@@ -179,6 +202,7 @@ async def api_fiscal_v2_dados(request: web.Request) -> web.Response:
             "smtp_user": cfg_smtp_raw.get("smtp_user", ""),
             "smtp_from": cfg_smtp_raw.get("smtp_from", ""),
             "has_pass": bool(cfg_smtp_raw.get("smtp_pass")),
+            "whatsapp_empresa": cfg_smtp_raw.get("whatsapp_empresa", ""),
         }
 
     total_nf, emitidas, total_faturar = cur_tot if cur_tot else (0, 0, 0.0)
@@ -279,7 +303,7 @@ async def api_fiscal_v2_salvar_config(request: web.Request) -> web.Response:
         msg_cert = " | " + msg_c
 
     with _get_db_connection(db_name) as conn:
-        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_from"):
+        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_from", "whatsapp_empresa"):
             if k in body:
                 val = str(body.get(k, "")).strip()
                 conn.execute("INSERT INTO configuracoes_sistema (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor", (k, val))
@@ -1686,6 +1710,74 @@ async def api_fiscal_recebidas_enviar_email_pdf(request: web.Request) -> web.Res
 
 
 
+async def api_fiscal_canais_status(request: web.Request) -> web.Response:
+    from emed_views.whatsapp_pdf_bot import WHATSAPP_BOT
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+    res_w = await asyncio.to_thread(WHATSAPP_BOT.status)
+    with _get_db_connection(db_name) as conn:
+        cfg = {}
+        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_from", "whatsapp_empresa"):
+            r = conn.execute("SELECT valor FROM configuracoes_sistema WHERE chave = ?", (k,)).fetchone()
+            cfg[k] = r[0] if (r and r[0]) else ""
+    return web.json_response({
+        "ok": True,
+        "whatsapp_status": res_w.get("status", "DESCONECTADO"),
+        "whatsapp_empresa": cfg.get("whatsapp_empresa", ""),
+        "smtp_host": cfg.get("smtp_host", ""),
+        "smtp_user": cfg.get("smtp_user", ""),
+        "smtp_configurado": bool(cfg.get("smtp_host") and cfg.get("smtp_user"))
+    })
+
+
+async def api_fiscal_canais_conectar_background(request: web.Request) -> web.Response:
+    from emed_views.whatsapp_pdf_bot import WHATSAPP_BOT
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+
+    st_whats = "DESCONECTADO"
+    try:
+        res_w = await asyncio.to_thread(WHATSAPP_BOT.status)
+        st_whats = res_w.get("status", "DESCONECTADO")
+        if st_whats == "DESCONECTADO" and res_w.get("perfil_existe"):
+            res_c = await asyncio.to_thread(WHATSAPP_BOT.conectar_qrcode)
+            st_whats = res_c.get("status", st_whats)
+    except Exception as e:
+        st_whats = f"ERRO: {e}"
+
+    st_email = "NAO_CONFIGURADO"
+    msg_email = ""
+    with _get_db_connection(db_name) as conn:
+        cfg = {}
+        for k in ("smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from", "whatsapp_empresa"):
+            r = conn.execute("SELECT valor FROM configuracoes_sistema WHERE chave = ?", (k,)).fetchone()
+            if r and r[0]:
+                cfg[k] = r[0]
+
+        if cfg.get("smtp_host") and cfg.get("smtp_user") and cfg.get("smtp_pass"):
+            try:
+                import smtplib
+                port = int(cfg.get("smtp_port") or 587)
+                if port == 465:
+                    with smtplib.SMTP_SSL(cfg["smtp_host"], port, timeout=6) as srv:
+                        srv.login(cfg["smtp_user"], cfg["smtp_pass"])
+                else:
+                    with smtplib.SMTP(cfg["smtp_host"], port, timeout=6) as srv:
+                        srv.starttls()
+                        srv.login(cfg["smtp_user"], cfg["smtp_pass"])
+                st_email = "CONECTADO"
+                msg_email = f"SMTP ({cfg['smtp_user']}) ativo e pronto"
+            except Exception as em_err:
+                st_email = "ERRO_AUTENTICACAO"
+                msg_email = str(em_err)
+
+    return web.json_response({
+        "ok": True,
+        "whatsapp_status": st_whats,
+        "email_status": st_email,
+        "email_msg": msg_email,
+        "whatsapp_empresa": cfg.get("whatsapp_empresa", ""),
+    })
+
+
 async def api_fiscal_recebidas_whatsapp_status(request: web.Request) -> web.Response:
 
     from emed_views.whatsapp_pdf_bot import WHATSAPP_BOT
@@ -2266,6 +2358,149 @@ async def api_fiscal_recebidas_danfe(request: web.Request) -> web.Response:
     }}
 
     {"window.addEventListener('load', () => setTimeout(() => window.print(), 350));" if auto_print else ""}
+  
+    function toggleMenuContatosWhats(e) {{
+      if (e) e.stopPropagation();
+      fecharMenuEnvioWhats();
+      fecharMenuOpcoesEmail();
+      const m = document.getElementById("menuContatosWhats");
+      if (!m) return;
+      const aberto = m.style.display === "block";
+      m.style.display = aberto ? "none" : "block";
+      if (!aberto) renderDropdownContatosWhats();
+    }}
+
+    function fecharMenuContatosWhats() {{
+      const m = document.getElementById("menuContatosWhats");
+      if (m) m.style.display = "none";
+    }}
+
+    function toggleMenuEnvioWhats(e) {{
+      if (e) e.stopPropagation();
+      fecharMenuContatosWhats();
+      fecharMenuOpcoesEmail();
+      const m = document.getElementById("menuEnvioWhats");
+      if (!m) return;
+      m.style.display = m.style.display === "block" ? "none" : "block";
+    }}
+
+    function fecharMenuEnvioWhats() {{
+      const m = document.getElementById("menuEnvioWhats");
+      if (m) m.style.display = "none";
+    }}
+
+    function toggleMenuOpcoesEmail(e) {{
+      if (e) e.stopPropagation();
+      fecharMenuContatosWhats();
+      fecharMenuEnvioWhats();
+      const m = document.getElementById("menuOpcoesEmail");
+      if (!m) return;
+      m.style.display = m.style.display === "block" ? "none" : "block";
+    }}
+
+    function fecharMenuOpcoesEmail() {{
+      const m = document.getElementById("menuOpcoesEmail");
+      if (m) m.style.display = "none";
+    }}
+
+    function renderDropdownContatosWhats() {{
+      const box = document.getElementById("listaContatosDropdownWhats");
+      if (!box) return;
+      const lista = getContatosRapidosWhatsDFe();
+      if (!lista.length) {{
+        box.innerHTML = '<div style="padding:6px 8px;font-size:11px;color:#94a3b8;">Nenhum contato salvo ainda. Digite um número e clique em <b>+ Salvar</b>.</div>';
+        return;
+      }}
+      box.innerHTML = lista.map((c, idx) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:4px;cursor:pointer;" onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background='none'">
+          <div onclick="selecionarContatoWhats('${{c.numero}}')" style="flex:1;">
+            <div style="font-size:11.5px;color:#e2e8f0;font-weight:600;">${{c.nome}}</div>
+            <div style="font-size:10.5px;color:#4ade80;">+${{c.numero}}</div>
+          </div>
+          <button type="button" onclick="removerContatoRapidoWhatsDFe(${{idx}});event.stopPropagation();renderDropdownContatosWhats();" style="background:none;border:none;color:#f87171;font-size:14px;cursor:pointer;padding:2px 4px;" title="Remover">&times;</button>
+        </div>
+      `).join("");
+    }}
+
+    function selecionarContatoWhats(num) {{
+      const inp = document.getElementById("inpModalDFeWhats");
+      if (inp) inp.value = num;
+      fecharMenuContatosWhats();
+    }}
+
+    function copiarMensagemLimpaWhatsModalDFe() {{
+      const n = DFE_NOTA_ATUAL_MODAL;
+      if (!n) return;
+      const emitNome = n.emitente_nome || n.emitente_razao || "Fornecedor";
+      const cnpjEmit = n.emitente_cnpj || "";
+      const numNf = n.numero_nf || "";
+      const valTot = Number(n.valor_total || 0).toLocaleString("pt-BR", {{ minimumFractionDigits: 2 }});
+      const chave = n.chave_acesso || "";
+
+      const linhas = [
+        "🧾 *DANFE OFICIAL (PADRÃO BRASILEIRO)*",
+        `• *NF-e Nº:* ${{numNf}}`,
+        `• *Fornecedor:* ${{emitNome}}`,
+        cnpjEmit ? `• *CNPJ:* ${{cnpjEmit}}` : "",
+        n.data_emissao ? `• *Data Emissão:* ${{n.data_emissao}}` : "",
+        `• *Valor Total:* R$ ${{valTot}}`,
+        chave ? ("• *Chave de Acesso:* " + chave) : "",
+        "",
+        `📎 *Arquivo Oficial em Anexo:* DANFE_NFe_${{numNf}}.pdf (sem links)`
+      ].filter(Boolean).join(String.fromCharCode(10));
+
+      try {{
+        if (navigator.clipboard && navigator.clipboard.writeText) {{
+          navigator.clipboard.writeText(linhas);
+          mostrarAvisoPdfModal("📋 <b>Texto da nota copiado com sucesso!</b> (Sem links externos)");
+        }}
+      }} catch (e) {{}}
+    }}
+
+    document.addEventListener("click", function(e) {{
+      if (!e.target.closest("#wrapContatosWhats")) fecharMenuContatosWhats();
+      if (!e.target.closest("#wrapEnvioWhats")) fecharMenuEnvioWhats();
+      if (!e.target.closest("#wrapOpcoesEmail")) fecharMenuOpcoesEmail();
+    }});
+
+    // Conexão em Background após inicialização das páginas (aguarda sistema carregar)
+    setTimeout(function() {{
+      testarConexaoCanaisBackground();
+    }}, 4000);
+
+    async function testarConexaoCanaisBackground() {{
+      try {{
+        const resp = await fetch("/api/fiscal/canais-conectar-background", {{ method: "POST" }});
+        if (!resp.ok) return;
+        const res = await resp.json();
+        const bW = document.getElementById("badgeCanaisWhatsStatus");
+        const bW2 = document.getElementById("cfgWhatsStatusBadge");
+        if (res.whatsapp_status === "CONECTADO") {{
+          if (bW) {{ bW.innerHTML = "🟢 WhatsApp Conectado"; bW.style.color = "#4ade80"; }}
+          if (bW2) {{ bW2.innerHTML = "🟢 Conectado em Background"; bW2.style.color = "#4ade80"; }}
+        }} else if (res.whatsapp_status === "AGUARDANDO_QRCODE") {{
+          if (bW) {{ bW.innerHTML = "📷 QR Code Pendente"; bW.style.color = "#fbbf24"; }}
+          if (bW2) {{ bW2.innerHTML = "📷 Aguardando Leitura QR Code"; bW2.style.color = "#fbbf24"; }}
+        }}
+
+        const bE = document.getElementById("badgeCanaisEmailStatus");
+        const bE2 = document.getElementById("cfgEmailStatusBadge");
+        if (res.email_status === "CONECTADO") {{
+          if (bE) {{ bE.innerHTML = "🟢 E-mail Ativo"; bE.style.color = "#60a5fa"; }}
+          if (bE2) {{ bE2.innerHTML = "🟢 Conectado / Pronto"; bE2.style.color = "#60a5fa"; }}
+        }} else if (res.email_status === "NAO_CONFIGURADO") {{
+          if (bE) {{ bE.innerHTML = "⚪ Servidor SMTP Opcional"; bE.style.color = "#94a3b8"; }}
+          if (bE2) {{ bE2.innerHTML = "⚪ Não configurado"; bE2.style.color = "#94a3b8"; }}
+        }} else {{
+          if (bE) {{ bE.innerHTML = "⚠️ Falha SMTP"; bE.style.color = "#f87171"; }}
+          if (bE2) {{ bE2.innerHTML = "⚠️ Falha: " + (res.email_msg || "Erro login"); bE2.style.color = "#f87171"; }}
+        }}
+      }} catch (e) {{
+        console.warn("Background warmup canais:", e);
+      }}
+    }}
+
+
   </script>
 </body>
 </html>"""
@@ -5097,16 +5332,43 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
             <input type="checkbox" id="cfgReplicarCert" checked style="width:auto;" />
             🔗 Aplicar este mesmo Certificado A1 da EMED para todas as unidades (Matriz e Filial)
           </label>
-          <h4 style="margin:16px 0 6px 0;color:var(--cyan);">✉️ Envio Automático de E-mails / SMTP Corporativo (Opcional)</h4>
-          <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">
-            Configure caso deseje disparo automático de DANFEs em PDF pelo servidor. Se não configurado, o envio funciona com 1 clique abrindo diretamente no <b>Gmail Web</b>, <b>Outlook Web</b> ou <b>App Padrão</b>.
+          <h4 style="margin:16px 0 6px 0;color:var(--cyan);">📡 Canais Oficiais de Envio da Empresa (E-mail &amp; WhatsApp em Background)</h4>
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">
+            Cadastre o e-mail corporativo e o WhatsApp da EMED. O sistema se conecta em segundo plano após a inicialização para permitir envio instantâneo de DANFEs e Notas Fiscais com PDF anexado.
           </div>
-          <div class="grid-2">
-            <div><label>Servidor SMTP (Host):</label><input id="cfgSmtpHost" placeholder="ex: smtp.gmail.com ou smtp.office365.com" /></div>
-            <div><label>Porta SMTP:</label><input id="cfgSmtpPort" type="number" placeholder="587 ou 465" /></div>
-            <div><label>E-mail / Usuário SMTP:</label><input id="cfgSmtpUser" placeholder="ex: fiscal@emed.med.br" /></div>
-            <div><label>Senha / Senha de App SMTP:</label><input id="cfgSmtpPass" type="password" placeholder="Preencha apenas para alterar" /></div>
-            <div><label>Nome / Remetente Oficial:</label><input id="cfgSmtpFrom" placeholder="ex: EMED Fiscal &lt;fiscal@emed.med.br&gt;" /></div>
+          <div class="grid-2" style="gap:12px;">
+            <!-- WHATSAPP CORPORATIVO -->
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <label style="color:#4ade80;font-weight:700;margin:0;">📲 WhatsApp Corporativo da EMED:</label>
+                <span id="cfgWhatsStatusBadge" style="font-size:11px;font-weight:bold;color:#fbbf24;">Aguardando verificação</span>
+              </div>
+              <div style="margin-bottom:8px;">
+                <label style="font-size:11px;color:#94a3b8;">Número Oficial com DDD (ex: 85996197923):</label>
+                <input id="cfgWhatsEmpresa" placeholder="85996197923 ou 6132343647" style="margin-top:2px;" />
+              </div>
+              <div style="display:flex;gap:6px;margin-top:8px;">
+                <button type="button" class="btn btn-outline" style="font-size:11px;padding:5px 10px;border-color:#38bdf8;color:#38bdf8;" onclick="perguntarOndeConectarWhatsApp()">📷 Conectar / Ler QR Code</button>
+                <button type="button" class="btn btn-outline" style="font-size:11px;padding:5px 10px;" onclick="testarConexaoCanaisBackground()">🔄 Testar Conexão</button>
+              </div>
+            </div>
+
+            <!-- E-MAIL CORPORATIVO SMTP -->
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <label style="color:#60a5fa;font-weight:700;margin:0;">✉️ E-mail Corporativo (SMTP):</label>
+                <span id="cfgEmailStatusBadge" style="font-size:11px;font-weight:bold;color:#94a3b8;">Não verificado</span>
+              </div>
+              <div class="grid-2" style="gap:6px;">
+                <div><label style="font-size:11px;">Host SMTP:</label><input id="cfgSmtpHost" placeholder="smtp.terraempresas.com.br" /></div>
+                <div><label style="font-size:11px;">Porta:</label><input id="cfgSmtpPort" type="number" placeholder="587" /></div>
+              </div>
+              <div style="margin-top:6px;"><label style="font-size:11px;">E-mail / Usuário:</label><input id="cfgSmtpUser" placeholder="financeiro@emed.med.br" /></div>
+              <div class="grid-2" style="gap:6px;margin-top:6px;">
+                <div><label style="font-size:11px;">Senha:</label><input id="cfgSmtpPass" type="password" placeholder="Preencha p/ alterar" /></div>
+                <div><label style="font-size:11px;">Remetente:</label><input id="cfgSmtpFrom" placeholder="EMED Fiscal &lt;fiscal@emed.med.br&gt;" /></div>
+              </div>
+            </div>
           </div>
 
           <div style="margin-top:12px;">
@@ -5902,6 +6164,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       if (document.getElementById("cfgSmtpPort")) document.getElementById("cfgSmtpPort").value = smtp.smtp_port || "587";
       if (document.getElementById("cfgSmtpUser")) document.getElementById("cfgSmtpUser").value = smtp.smtp_user || "";
       if (document.getElementById("cfgSmtpFrom")) document.getElementById("cfgSmtpFrom").value = smtp.smtp_from || "";
+      if (document.getElementById("cfgWhatsEmpresa")) document.getElementById("cfgWhatsEmpresa").value = smtp.whatsapp_empresa || "";
       if (document.getElementById("cfgSmtpPass")) {{
         document.getElementById("cfgSmtpPass").value = "";
         document.getElementById("cfgSmtpPass").placeholder = smtp.has_pass ? "•••••••• (Senha já gravada - preencha p/ trocar)" : "Senha do e-mail ou senha de app";
@@ -6100,6 +6363,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           smtp_user: document.getElementById("cfgSmtpUser")?.value || "",
           smtp_pass: document.getElementById("cfgSmtpPass")?.value || "",
           smtp_from: document.getElementById("cfgSmtpFrom")?.value || "",
+          whatsapp_empresa: document.getElementById("cfgWhatsEmpresa")?.value || "",
           usuario: USUARIO_FISCAL?.username || "netto"
         }})
       }}).then(r => r.json());
@@ -9275,40 +9539,88 @@ Por favor, confira os dados preenchidos.`);
         </div>
       </div>
 
-      <!-- PAINEL RÁPIDO DE ENVIO POR WHATSAPP OU E-MAIL -->
-      <div id="boxShareModalDFe" style="display:none;background:#132338;border:1.5px solid #0284c7;border-radius:8px;padding:12px;margin-bottom:10px;">
+      <!-- PAINEL RÁPIDO DE ENVIO POR WHATSAPP OU E-MAIL (ENXUTO E OTIMIZADO) -->
+      <div id="boxShareModalDFe" style="display:none;background:#132338;border:1.5px solid #0284c7;border-radius:8px;padding:12px;margin-bottom:10px;box-shadow:0 4px 15px rgba(0,0,0,0.3);">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px;">
+          
+          <!-- COLUNA 1: WHATSAPP COM PDF -->
           <div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px;flex-wrap:wrap;">
-              <label style="color:#4ade80;font-size:12px;font-weight:700;margin:0;">📲 Enviar por WhatsApp:</label>
-              <div style="display:flex;gap:5px;">
-                <button type="button" id="btnConectarWhatsPrompt" onclick="perguntarOndeConectarWhatsApp()" style="background:#0f172a;border:1px solid #38bdf8;color:#38bdf8;border-radius:4px;font-size:11px;padding:3px 8px;cursor:pointer;" title="Conectar no seu navegador padrão ou no robô local">🌐 Conectar WhatsApp...</button>
-                <button type="button" onclick="salvarContatoRapidoWhatsDFe()" style="background:none;border:1px solid #4ade80;color:#4ade80;border-radius:4px;font-size:11px;padding:3px 8px;cursor:pointer;" title="Salvar os números digitados como atalho rápido">+ Salvar Contato</button>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="color:#4ade80;font-size:12px;font-weight:700;margin:0;">📲 WhatsApp (PDF Anexo Sem Links):</label>
+              <span id="badgeCanaisWhatsStatus" style="font-size:11px;color:#94a3b8;">Conectado em background</span>
+            </div>
+            
+            <div style="display:flex;gap:6px;position:relative;">
+              <input type="text" id="inpModalDFeWhats" placeholder="DDD + Número (ex: 85996197923)" onkeydown="if(event.key==='Enter'){{enviarWhatsNavegadorPadraoModalDFe();event.preventDefault();}}" style="flex:1;min-width:130px;padding:8px 10px;font-size:12px;" />
+              
+              <!-- BOTÃO ÚNICO DE CONTATOS -->
+              <div id="wrapContatosWhats" style="position:relative;">
+                <button type="button" id="btnDropdownContatosWhats" onclick="toggleMenuContatosWhats(event)" class="btn" style="width:auto;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:8px 10px;font-size:12px;font-weight:600;white-space:nowrap;" title="Abrir lista de contatos salvos">👥 Contatos ▾</button>
+                <div id="menuContatosWhats" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:#0f172a;border:1.5px solid #38bdf8;border-radius:6px;width:240px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.6);padding:6px;">
+                  <div style="font-size:11px;font-weight:700;color:#38bdf8;padding:4px 6px;border-bottom:1px solid #334155;display:flex;justify-content:space-between;align-items:center;">
+                    <span>CONTATOS RÁPIDOS</span>
+                    <button type="button" onclick="salvarContatoRapidoWhatsDFe()" style="background:#16a34a;border:none;color:#fff;border-radius:3px;font-size:10px;padding:2px 6px;cursor:pointer;font-weight:700;" title="Salvar número digitado">+ Salvar</button>
+                  </div>
+                  <div id="listaContatosDropdownWhats" style="max-height:160px;overflow-y:auto;padding:4px 0;"></div>
+                  <div style="border-top:1px solid #334155;padding-top:4px;margin-top:4px;">
+                    <a href="javascript:void(0)" onclick="perguntarOndeConectarWhatsApp()" style="display:block;padding:5px 8px;font-size:11px;color:#94a3b8;text-decoration:none;border-radius:4px;" onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background='none'">🌐 Conectar WhatsApp...</a>
+                  </div>
+                </div>
               </div>
+
+              <!-- BOTÃO ÚNICO DE ENVIO WHATSAPP -->
+              <div id="wrapEnvioWhats" style="position:relative;">
+                <button type="button" id="btnDropdownEnviarWhats" onclick="toggleMenuEnvioWhats(event)" class="btn" style="width:auto;background:#16a34a;color:#fff;padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(22,163,74,0.3);" title="Opções de envio no WhatsApp">🚀 Enviar ▾</button>
+                <div id="menuEnvioWhats" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:#0f172a;border:1.5px solid #22c55e;border-radius:6px;width:260px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.6);padding:6px;">
+                  <button type="button" onclick="enviarWhatsNavegadorPadraoModalDFe();fecharMenuEnvioWhats();" style="display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;color:#e2e8f0;padding:8px 10px;border-radius:4px;font-size:11.5px;cursor:pointer;text-align:left;font-weight:600;" onmouseover="this.style.background='#16a34a';this.style.color='#fff'" onmouseout="this.style.background='none';this.style.color='#e2e8f0'">
+                    <span>🚀</span> <div><b>WhatsApp Web (Navegador)</b><div style="font-size:10px;color:#94a3b8;font-weight:normal;">Baixa o PDF e abre a conversa</div></div>
+                  </button>
+                  <button type="button" onclick="enviarWhatsDanfeModalDFe();fecharMenuEnvioWhats();" style="display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;color:#e2e8f0;padding:8px 10px;border-radius:4px;font-size:11.5px;cursor:pointer;text-align:left;font-weight:600;" onmouseover="this.style.background='#0284c7';this.style.color='#fff'" onmouseout="this.style.background='none';this.style.color='#e2e8f0'">
+                    <span>🤖</span> <div><b>Envio Automático (Robô Local)</b><div style="font-size:10px;color:#94a3b8;font-weight:normal;">Anexa o PDF via automação em 1 clique</div></div>
+                  </button>
+                  <button type="button" onclick="copiarMensagemLimpaWhatsModalDFe();fecharMenuEnvioWhats();" style="display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;color:#e2e8f0;padding:8px 10px;border-radius:4px;font-size:11.5px;cursor:pointer;text-align:left;font-weight:600;" onmouseover="this.style.background='#334155';this.style.color='#fff'" onmouseout="this.style.background='none';this.style.color='#e2e8f0'">
+                    <span>📋</span> <div><b>Copiar Mensagem (Sem Links)</b><div style="font-size:10px;color:#94a3b8;font-weight:normal;">Copia o texto formatado da nota</div></div>
+                  </button>
+                </div>
+              </div>
+
             </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <input type="text" id="inpModalDFeWhats" placeholder="DDD + Número (ex: 85996197923)" onkeydown="if(event.key==='Enter'){{enviarWhatsNavegadorPadraoModalDFe();event.preventDefault();}}" style="flex:1;min-width:180px;padding:8px 10px;font-size:12px;" />
-              <button type="button" id="btnDispararWhatsNavegadorPadrao" class="btn" style="width:auto;background:#16a34a;color:#fff;padding:8px 14px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(22,163,74,0.4);" onclick="enviarWhatsNavegadorPadraoModalDFe()" title="Abre diretamente na aba do WhatsApp Web já aberta no seu navegador">🚀 Enviar pelo seu WhatsApp Aberto (Navegador)</button>
-              <button type="button" id="btnDispararWhatsPdfAuto" class="btn" style="width:auto;background:#0369a1;color:#fff;padding:8px 10px;font-size:11px;white-space:nowrap;" onclick="enviarWhatsDanfeModalDFe()" title="Anexa o arquivo PDF físico via robô local no servidor">🤖 Enviar PDF Anexo (Robô Local)</button>
-            </div>
-            <div id="boxContatosRapidosWhatsDFe" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;"></div>
-            <div style="font-size:11px;color:#cbd5e1;margin-top:4px;">💡 <b>Recomendado:</b> Como você já tem o WhatsApp aberto na aba ao lado, clique em <b style="color:#4ade80;">🚀 Enviar pelo seu WhatsApp Aberto</b> para enviar a DANFE oficial em 1 clique!</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">💡 O PDF oficial é anexado diretamente, 100% sem links externos.</div>
           </div>
+
+          <!-- COLUNA 2: E-MAIL COM PDF ANEXO -->
           <div>
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-              <label style="color:#60a5fa;font-size:12px;font-weight:700;margin:0;">✉️ Enviar DANFE com PDF Anexo (Sem Links):</label>
-              <div style="display:flex;gap:4px;flex-wrap:wrap;">
-                <button type="button" onclick="abrirEmailDanfeWebmail('gmail')" style="background:#450a0a;border:1px solid #ef4444;color:#fca5a5;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer;font-weight:600;" title="Baixa o PDF oficial e abre no Gmail Web">🔴 Gmail (com PDF)</button>
-                <button type="button" onclick="abrirEmailDanfeWebmail('outlook')" style="background:#082f49;border:1px solid #0284c7;color:#7dd3fc;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer;font-weight:600;" title="Baixa o PDF oficial e abre no Outlook Web">🔵 Outlook Web</button>
-                <button type="button" onclick="abrirRascunhoComPdfAnexadoModalDFe()" style="background:#0f172a;border:1px solid #38bdf8;color:#38bdf8;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer;font-weight:600;" title="Abre o Outlook Desktop com o PDF já anexado no clipe">📎 Outlook (PDF já no Anexo)</button>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <label style="color:#60a5fa;font-size:12px;font-weight:700;margin:0;">✉️ E-mail (PDF Anexo Sem Links):</label>
+              <span id="badgeCanaisEmailStatus" style="font-size:11px;color:#94a3b8;">Servidor SMTP ativo</span>
+            </div>
+
+            <div style="display:flex;gap:6px;position:relative;">
+              <input type="email" id="inpModalDFeEmail" placeholder="destinatario@empresa.com.br" onkeydown="if(event.key==='Enter'){{enviarEmailDanfeModalDFe();event.preventDefault();}}" style="flex:1;min-width:130px;padding:8px 10px;font-size:12px;" />
+              
+              <!-- BOTÃO DE ENVIO DIRETO PELO SERVIDOR -->
+              <button type="button" id="btnDispararEmailModal" class="btn" style="width:auto;background:#2563eb;color:#fff;padding:8px 13px;font-size:12px;font-weight:700;white-space:nowrap;" onclick="enviarEmailDanfeModalDFe()" title="Disparar e-mail em segundo plano pelo servidor da empresa">✉️ Disparar</button>
+              
+              <!-- BOTÃO ÚNICO DE OPÇÕES (GMAIL / OUTLOOK) -->
+              <div id="wrapOpcoesEmail" style="position:relative;">
+                <button type="button" id="btnDropdownOpcoesEmail" onclick="toggleMenuOpcoesEmail(event)" class="btn" style="width:auto;background:#0f172a;border:1px solid #334155;color:#93c5fd;padding:8px 10px;font-size:12px;font-weight:600;white-space:nowrap;" title="Outras opções de webmail (Gmail, Outlook)">⚙️ Opções ▾</button>
+                <div id="menuOpcoesEmail" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:#0f172a;border:1.5px solid #38bdf8;border-radius:6px;width:250px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.6);padding:6px;">
+                  <button type="button" onclick="abrirEmailDanfeWebmail('gmail');fecharMenuOpcoesEmail();" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:#e2e8f0;padding:8px 10px;border-radius:4px;font-size:11.5px;cursor:pointer;text-align:left;font-weight:600;" onmouseover="this.style.background='#ef4444';this.style.color='#fff'" onmouseout="this.style.background='none';this.style.color='#e2e8f0'">
+                    <span>🔴</span> <div><b>Gmail Web (com PDF)</b><div style="font-size:10px;color:#94a3b8;font-weight:normal;">Baixa o PDF e abre a tela do Gmail</div></div>
+                  </button>
+                  <button type="button" onclick="abrirEmailDanfeWebmail('outlook');fecharMenuOpcoesEmail();" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:#e2e8f0;padding:8px 10px;border-radius:4px;font-size:11.5px;cursor:pointer;text-align:left;font-weight:600;" onmouseover="this.style.background='#0284c7';this.style.color='#fff'" onmouseout="this.style.background='none';this.style.color='#e2e8f0'">
+                    <span>🔵</span> <div><b>Outlook Web (com PDF)</b><div style="font-size:10px;color:#94a3b8;font-weight:normal;">Baixa o PDF e abre no Outlook Online</div></div>
+                  </button>
+                  <button type="button" onclick="abrirRascunhoComPdfAnexadoModalDFe();fecharMenuOpcoesEmail();" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:#e2e8f0;padding:8px 10px;border-radius:4px;font-size:11.5px;cursor:pointer;text-align:left;font-weight:600;" onmouseover="this.style.background='#334155';this.style.color='#fff'" onmouseout="this.style.background='none';this.style.color='#e2e8f0'">
+                    <span>📎</span> <div><b>Outlook Desktop (App)</b><div style="font-size:10px;color:#94a3b8;font-weight:normal;">Abre o rascunho com o PDF já anexado</div></div>
+                  </button>
+                </div>
               </div>
+
             </div>
-            <div style="display:flex;gap:6px;margin-top:6px;">
-              <input type="email" id="inpModalDFeEmail" placeholder="destinatario@empresa.com.br" style="flex:1;padding:8px 10px;font-size:12px;" />
-              <button type="button" id="btnDispararEmailModal" class="btn" style="width:auto;background:#2563eb;color:#fff;padding:8px 14px;font-size:12px;white-space:nowrap;" onclick="enviarEmailDanfeModalDFe()">✉️ Disparar E-mail</button>
-            </div>
-            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">💡 <b>Clientes que bloqueiam links:</b> O PDF oficial vai como anexo direto (sem links externos no texto). Para envio 100% automático pelo servidor, ative o SMTP em Configurações Fiscais.</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">💡 O servidor envia o PDF direto como anexo oficial (sem links externos).</div>
           </div>
+
         </div>
         <div id="avisoEnvioPdfModalDFe" style="display:none;margin-top:8px;padding:8px 12px;border-radius:6px;background:#064e3b;border:1px solid #10b981;color:#d1fae5;font-size:12px;"></div>
       </div>
@@ -9608,6 +9920,8 @@ def registrar_rotas_portal_fiscal(app: web.Application) -> None:
     app.router.add_get("/api/fiscal/recebidas/whatsapp-status", api_fiscal_recebidas_whatsapp_status)
     app.router.add_post("/api/fiscal/recebidas/whatsapp-conectar", api_fiscal_recebidas_whatsapp_conectar)
     app.router.add_post("/api/fiscal/recebidas/enviar-whatsapp-pdf", api_fiscal_recebidas_enviar_whatsapp_pdf)
+    app.router.add_post("/api/fiscal/canais-conectar-background", api_fiscal_canais_conectar_background)
+    app.router.add_get("/api/fiscal/canais-status", api_fiscal_canais_status)
     app.router.add_get("/api/fiscal/recebidas/xml/{nota_id}", api_fiscal_recebidas_xml_download)
 
     # Rotas da Aba de Detalhes de Despesas das Unidades & Gráficos (Alimentação, Gasolina, Hotel)

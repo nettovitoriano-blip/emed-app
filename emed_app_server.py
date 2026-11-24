@@ -2574,7 +2574,15 @@ async def api_auth_login(request: web.Request) -> web.Response:
 
 
 
+    ua_hdr = request.headers.get("User-Agent", "")
+    dev_str = f"{device_info.get('modelo', '')} ({device_info.get('so', '')})" if device_info else ""
+
     if not _check_rate_limit(ident_ip) or not _check_rate_limit(ident_usr):
+        try:
+            from emed_views.supervisorio_web import registrar_auditoria_login
+            registrar_auditoria_login("PWA_COLABORADOR", usuario, ip_origem, "BLOQUEADO_RATE_LIMIT", "Muitas tentativas incorretas consecutivas", ua_hdr, dev_str, DB_NAME)
+        except Exception:
+            pass
 
         return web.json_response({
 
@@ -2605,6 +2613,11 @@ async def api_auth_login(request: web.Request) -> web.Response:
                 _record_auth_failure(ident_ip)
 
                 _record_auth_failure(ident_usr)
+                try:
+                    from emed_views.supervisorio_web import registrar_auditoria_login
+                    registrar_auditoria_login("PWA_COLABORADOR", usuario, ip_origem, "USUARIO_INEXISTENTE", "Usuário não cadastrado na base", ua_hdr, dev_str, DB_NAME)
+                except Exception:
+                    pass
 
                 return web.json_response({"ok": False, "msg": "Usuário não encontrado."}, status=401)
 
@@ -2617,6 +2630,11 @@ async def api_auth_login(request: web.Request) -> web.Response:
                 _record_auth_failure(ident_ip)
 
                 _record_auth_failure(ident_usr)
+                try:
+                    from emed_views.supervisorio_web import registrar_auditoria_login
+                    registrar_auditoria_login("PWA_COLABORADOR", usuario, ip_origem, "SENHA_INCORRETA", "Senha incorreta digitada", ua_hdr, dev_str, DB_NAME)
+                except Exception:
+                    pass
 
                 return web.json_response({"ok": False, "msg": "Senha incorreta."}, status=401)
 
@@ -2797,6 +2815,12 @@ async def api_auth_login(request: web.Request) -> web.Response:
                 conn.commit()
 
 
+
+            try:
+                from emed_views.supervisorio_web import registrar_auditoria_login
+                registrar_auditoria_login("PWA_COLABORADOR", usuario, ip_origem, "SUCESSO", f"Login efetuado com sucesso ({perfil_usr})", ua_hdr, dev_str, DB_NAME)
+            except Exception:
+                pass
 
             token = gerar_token_sessao(row["id"], row["nome"], row["perfil"])
 
@@ -3657,13 +3681,33 @@ async def api_auth_status(request: web.Request) -> web.Response:
 async def auth_api_middleware(request: web.Request, handler):
     path = request.path
 
+    # Defesa Ativa contra Ataques de Robôs / Botnets: Verificação de IP em Quarentena
+    ip_cliente = (
+        request.headers.get("CF-Connecting-IP")
+        or request.headers.get("X-Real-IP")
+        or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+        or (request.remote or "127.0.0.1")
+    )
+    try:
+        from emed_views.supervisorio_web import verificar_ip_bloqueado
+        bloqueado, motivo_bloq = verificar_ip_bloqueado(ip_cliente, DB_NAME)
+        if bloqueado:
+            return web.json_response({
+                "ok": False,
+                "msg": f"⛔ Acesso temporariamente bloqueado por motivos de segurança cibernética: {motivo_bloq}",
+                "bloqueado": True
+            }, status=403)
+    except Exception:
+        pass
+
     # Lista estrita de recursos estáticos e públicos (Deny by Default)
     if (
         path in (
             "/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping",
             "/api/logo", "/api/icone-autosave", "/api/logo-circle",
             "/api/app-icon/192", "/api/app-icon/512", "/api/app-icon/180", "/api/app-icon/maskable", "/api/app-icon/favicon",
-            "/nav", "/gps", "/frota", "/apresentacao", "/portal-cliente", "/api/simbolo-emed"
+            "/nav", "/gps", "/frota", "/apresentacao", "/portal-cliente", "/api/simbolo-emed",
+            "/supervisorio"
         )
         or path.startswith("/static/")
         or path.startswith("/api/app-icon/")
@@ -3680,6 +3724,7 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/lab/r/")
         or path.startswith("/proposta/")
         or path == "/api/proposta/responder"
+        or path.startswith("/api/supervisorio/")
         or path == "/api/pix/webhook"
         or path == "/api/cliente/acesso/login"
         or path == "/api/cliente/portal-dados"
@@ -20016,6 +20061,14 @@ async def api_cliente_acesso_login(request: web.Request) -> web.Response:
     body = await request.json()
     usuario = limpar_texto(body.get("usuario"), "").lower()
     senha = str(body.get("senha") or "").strip()
+    ip_origem = (
+        request.headers.get("CF-Connecting-IP")
+        or request.headers.get("X-Real-IP")
+        or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+        or (request.remote or "127.0.0.1")
+    )
+    ua_hdr = request.headers.get("User-Agent", "")
+
     if not usuario or not senha:
         return web.json_response({"ok": False, "msg": "Informe usuário e senha."}, status=400)
 
@@ -20024,10 +20077,31 @@ async def api_cliente_acesso_login(request: web.Request) -> web.Response:
         _garantir_schema_acessos_cliente(conn)
         conn.row_factory = sqlite3.Row
         row = conn.execute("SELECT * FROM clientes_acessos_portal WHERE LOWER(usuario) = ? AND ativo = 1", (usuario,)).fetchone()
-        if not row or row["senha_hash"] != _hash_senha_portal(senha):
+        if not row:
+            try:
+                from emed_views.supervisorio_web import registrar_auditoria_login
+                registrar_auditoria_login("PORTAL_CLIENTE", usuario, ip_origem, "USUARIO_INEXISTENTE", "Unidade hospitalar não cadastrada", ua_hdr, "Navegador Web", DB_NAME)
+            except Exception:
+                pass
             return web.json_response({"ok": False, "msg": "Usuário ou senha inválidos."}, status=401)
+
+        if row["senha_hash"] != _hash_senha_portal(senha):
+            try:
+                from emed_views.supervisorio_web import registrar_auditoria_login
+                registrar_auditoria_login("PORTAL_CLIENTE", usuario, ip_origem, "SENHA_INCORRETA", f"Senha incorreta para a unidade {row['cliente_nome']}", ua_hdr, "Navegador Web", DB_NAME)
+            except Exception:
+                pass
+            return web.json_response({"ok": False, "msg": "Usuário ou senha inválidos."}, status=401)
+
         conn.execute("UPDATE clientes_acessos_portal SET ultimo_acesso = ? WHERE id = ?", (agora, row["id"]))
         conn.commit()
+
+        try:
+            from emed_views.supervisorio_web import registrar_auditoria_login
+            registrar_auditoria_login("PORTAL_CLIENTE", usuario, ip_origem, "SUCESSO", f"Acesso autenticado ao portal da unidade: {row['cliente_nome']}", ua_hdr, "Navegador Web", DB_NAME)
+        except Exception:
+            pass
+
     return web.json_response({
         "ok": True,
         "token": row["token_acesso"],
@@ -26274,6 +26348,9 @@ def criar_app() -> web.Application:
     try:
         from emed_views.portal_fiscal_web import registrar_rotas_portal_fiscal
         registrar_rotas_portal_fiscal(app)
+
+        from emed_views.supervisorio_web import registrar_rotas_supervisorio
+        registrar_rotas_supervisorio(app)
     except Exception as _ef:
         print(f"Aviso ao registrar portal fiscal nativo: {_ef}")
 
@@ -26285,6 +26362,7 @@ def criar_app() -> web.Application:
 
     async def _on_startup_keepalive(_app):
         asyncio.create_task(_background_keep_alive_task())
+        asyncio.create_task(_background_warmup_canais_task())
     app.on_startup.append(_on_startup_keepalive)
 
     return app
@@ -26467,6 +26545,18 @@ async def api_almoxarifado_cautela_registrar(request: web.Request) -> web.Respon
 
 
 
+async def _background_warmup_canais_task():
+    """Aguarda o servidor carregar completamente e conecta em background o WhatsApp e SMTP corporativos para envio rápido."""
+    await asyncio.sleep(8)
+    try:
+        from emed_views.whatsapp_pdf_bot import WHATSAPP_BOT
+        res = await asyncio.to_thread(WHATSAPP_BOT.status)
+        if res.get("status") == "DESCONECTADO" and res.get("perfil_existe"):
+            await asyncio.to_thread(WHATSAPP_BOT.conectar_qrcode)
+    except Exception:
+        pass
+
+
 async def _background_keep_alive_task():
 
 
@@ -26638,6 +26728,9 @@ async def iniciar_app_com_keepalive():
     try:
         from emed_views.portal_fiscal_web import registrar_rotas_portal_fiscal
         registrar_rotas_portal_fiscal(app)
+
+        from emed_views.supervisorio_web import registrar_rotas_supervisorio
+        registrar_rotas_supervisorio(app)
     except Exception as _ef:
         print(f"Aviso ao registrar portal fiscal nativo: {_ef}")
 
