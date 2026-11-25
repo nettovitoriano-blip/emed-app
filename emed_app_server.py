@@ -2294,21 +2294,22 @@ def _check_rate_limit(ident: str) -> bool:
 
 
 
-def _record_auth_failure(ident: str):
-
+def _get_auth_failure_count(ident: str) -> int:
     now = time.time()
-
     attempts = _AUTH_FAIL_LOG.get(ident, [])
-
-    attempts = [t for t in attempts if now - t < 60]
-
-    attempts.append(now)
-
+    attempts = [t for t in attempts if now - t < 900]
     _AUTH_FAIL_LOG[ident] = attempts
+    return len(attempts)
 
-    if len(attempts) >= 5:
-
+def _record_auth_failure(ident: str) -> int:
+    now = time.time()
+    attempts = _AUTH_FAIL_LOG.get(ident, [])
+    attempts = [t for t in attempts if now - t < 900]
+    attempts.append(now)
+    _AUTH_FAIL_LOG[ident] = attempts
+    if len(attempts) == 5:
         _AUTH_LOCKS[ident] = now + 300 # Bloqueia por 5 minutos (300s)
+    return len(attempts)
 
 
 
@@ -2753,20 +2754,41 @@ async def api_auth_login(request: web.Request) -> web.Response:
     ua_hdr = request.headers.get("User-Agent", "")
     dev_str = f"{device_info.get('modelo', '')} ({device_info.get('so', '')})" if device_info else ""
 
-    if not _check_rate_limit(ident_ip) or not _check_rate_limit(ident_usr):
+    fail_count = max(_get_auth_failure_count(ident_ip), _get_auth_failure_count(ident_usr))
+    if fail_count >= 5:
+        _record_auth_failure(ident_ip)
+        _record_auth_failure(ident_usr)
+        if fail_count == 5:
+            try:
+                from emed_views.supervisorio_web import registrar_auditoria_login
+                registrar_auditoria_login("PWA_COLABORADOR", usuario, ip_origem, "BLOQUEADO_RATE_LIMIT", "Muitas tentativas incorretas (5x). Bloqueado por 5 min.", ua_hdr, dev_str, DB_NAME)
+            except Exception:
+                pass
+            return web.json_response({
+                "ok": False,
+                "msg": "Muitas tentativas incorretas. Acesso bloqueado temporariamente por 5 minutos por segurança."
+            }, status=429)
+
+        # 6ª tentativa ou mais: Ataque persistente de forca bruta / bot detectado!
+        # DECEPTION HONEYPOT ATIVO: O atacante pensa que teve sucesso e e redirecionado para a armadilha Decoy
         try:
+            from emed_views.honeypot_deception import registrar_invasor_honeypot
+            registrar_invasor_honeypot(ip_origem, usuario, senha, ua_hdr, dev_str, request, DB_NAME)
             from emed_views.supervisorio_web import registrar_auditoria_login
-            registrar_auditoria_login("PWA_COLABORADOR", usuario, ip_origem, "BLOQUEADO_RATE_LIMIT", "Muitas tentativas incorretas consecutivas", ua_hdr, dev_str, DB_NAME)
+            registrar_auditoria_login("HONEYPOT_DECEPTION", usuario, ip_origem, "CAPTURA_DECEPTION", f"Invasor capturado na armadilha! Forca bruta persistente ({fail_count+1} tentativas)", ua_hdr, dev_str, DB_NAME)
         except Exception:
             pass
 
-        return web.json_response({
-
-            "ok": False,
-
-            "msg": "Muitas tentativas incorretas. Acesso bloqueado temporariamente por 5 minutos por segurança."
-
-        }, status=429)
+        resp = web.json_response({
+            "ok": True,
+            "token": "HONEYPOT_DECEPTION_SESSION_TOKEN_ROOT",
+            "redirect": "/admin/dashboard",
+            "is_honeypot": True,
+            "usuario": {"nome": usuario or "ROOT_ADMIN", "perfil": "GESTOR"},
+            "msg": "Acesso concedido. Inicializando console administrativo..."
+        }, status=200)
+        resp.set_cookie("emed_session", "HONEYPOT_DECEPTION_SESSION_TOKEN_ROOT", max_age=86400, path="/")
+        return resp
 
 
 
@@ -3882,12 +3904,36 @@ def _validar_token_portal_cliente_raw(conn: sqlite3.Connection, request: web.Req
 async def auth_api_middleware(request: web.Request, handler):
     path = request.path
 
+    # 0. Rotas da Armadilha Deception Honeypot (sempre abertas para o invasor em quarentena interagir)
+    if path in ("/admin/dashboard", "/api/honeypot/beacon", "/api/honeypot/fake-terminal"):
+        return await handler(request)
+
     # Defesa Ativa contra Ataques de Robôs / Botnets: Verificação de IP em Quarentena
     ip_cliente = obter_ip_real(request)
     try:
         from emed_views.supervisorio_web import verificar_ip_bloqueado
         bloqueado, motivo_bloq = verificar_ip_bloqueado(ip_cliente, DB_NAME)
         if bloqueado:
+            # Se o IP já está em quarentena/bloqueado e continua insistindo no login (ataque de robô/força bruta):
+            # Ativa o Deception Honeypot imediatamente para prender e colher provas do invasor!
+            if path in ("/api/auth/login", "/api/cliente/acesso/login"):
+                try:
+                    from emed_views.honeypot_deception import registrar_invasor_honeypot
+                    registrar_invasor_honeypot(ip_cliente, "IP_BLOQUEADO_PERSISTENTE", "[FORCANDO_LOGIN_APOS_BLOQUEIO]", request.headers.get("User-Agent", ""), "SCRIPT_BOTNET", request, DB_NAME)
+                    from emed_views.supervisorio_web import registrar_auditoria_login
+                    registrar_auditoria_login("HONEYPOT_DECEPTION", "IP_BLOQUEADO", ip_cliente, "CAPTURA_DECEPTION", f"Invasor bloqueado insistiu no ataque e foi direcionado para a armadilha Decoy ({motivo_bloq})", request.headers.get("User-Agent", ""), "Script / Botnet", DB_NAME)
+                except Exception:
+                    pass
+                resp = web.json_response({
+                    "ok": True,
+                    "token": "HONEYPOT_DECEPTION_SESSION_TOKEN_ROOT",
+                    "redirect": "/admin/dashboard",
+                    "is_honeypot": True,
+                    "msg": "Autenticação aceita. Redirecionando para console administrativo..."
+                }, status=200)
+                resp.set_cookie("emed_session", "HONEYPOT_DECEPTION_SESSION_TOKEN_ROOT", max_age=86400, path="/")
+                return resp
+
             return web.json_response({
                 "ok": False,
                 "msg": f"⛔ Acesso temporariamente bloqueado por motivos de segurança cibernética: {motivo_bloq}",
@@ -3908,7 +3954,7 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/static/")
         or path.startswith("/api/app-icon/")
         # Autenticação pública estrita (impede enumeração de usuários em /api/auth/usuarios)
-        or path in ("/api/auth/login", "/api/auth/logout", "/api/auth/status", "/api/fiscal/v2/login", "/api/cliente/acesso/login", "/api/cliente/acesso/logout")
+        or path in ("/api/auth/login", "/api/auth/logout", "/api/auth/status", "/api/fiscal/v2/login", "/api/cliente/acesso/login", "/api/cliente/acesso/logout", "/admin/dashboard", "/api/honeypot/beacon", "/api/honeypot/fake-terminal")
         # Handshake público de dispositivos (bloqueia /listar, /acao, /codigo/gerar sem login de gestor)
         or path in ("/api/dispositivos/status", "/api/dispositivos/registrar", "/api/dispositivos/liberar-com-codigo")
         or path.startswith("/qrcode/")
@@ -4178,7 +4224,11 @@ async def handle_index(request: web.Request) -> web.Response:
 
             with open(caminho_login, "r", encoding="utf-8") as f:
 
-                return web.Response(text=f.read(), content_type="text/html", headers={"Cache-Control": "no-cache"})
+                return web.Response(text=f.read(), content_type="text/html", headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+
+    next_url = str(request.query.get("next") or "").strip()
+    if next_url.startswith("/") and not next_url.startswith("//") and "\\" not in next_url:
+        raise web.HTTPFound(next_url)
 
 
 
@@ -9946,7 +9996,7 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
     filial_emissora = dados_nf.get("filial_emissora") or ("FILIAL_DF" if uf_cli == "DF" else "MATRIZ_CE")
     prestador_razao = "EMED ELETROMEDICINA LTDA."
     prestador_subtitulo = "MANUTENÇÃO EM EQUIPAMENTOS DE DIAGNÓSTICO POR IMAGEM"
-    prestador_unidade_tag = "FILIAL / DF" if filial_emissora == "FILIAL_DF" else "MATRIZ / CE"
+    prestador_unidade_tag = "FILIAL / DF" if filial_emissora == "FILIAL_DF" else "MATRIZ"
     prestador_cnpj = "03.611.974/0002-80" if filial_emissora == "FILIAL_DF" else "03.611.974/0001-08"
     prestador_im = dados_nf.get("prestador_im") or ("61-3234-3647 (CF/DF)" if filial_emissora == "FILIAL_DF" else "123456-7")
 
@@ -20391,13 +20441,37 @@ async def api_cliente_acesso_login(request: web.Request) -> web.Response:
 
     ident_ip = f"cli_ip:{ip_origem}"
     ident_usr = f"cli_usr:{usuario}"
-    if not _check_rate_limit(ident_ip) or not _check_rate_limit(ident_usr):
+    fail_count = max(_get_auth_failure_count(ident_ip), _get_auth_failure_count(ident_usr))
+    if fail_count >= 5:
+        _record_auth_failure(ident_ip)
+        _record_auth_failure(ident_usr)
+        if fail_count == 5:
+            try:
+                from emed_views.supervisorio_web import registrar_auditoria_login
+                registrar_auditoria_login("PORTAL_CLIENTE", usuario, ip_origem, "BLOQUEADO_RATE_LIMIT", "Muitas tentativas incorretas (5x). Bloqueado por 5 min.", ua_hdr, "Navegador Web", DB_NAME)
+            except Exception:
+                pass
+            return web.json_response({"ok": False, "msg": "Muitas tentativas incorretas. Aguarde 5 minutos."}, status=429)
+
+        # 6ª tentativa ou mais: Ataque persistente no portal do cliente!
         try:
+            from emed_views.honeypot_deception import registrar_invasor_honeypot
+            registrar_invasor_honeypot(ip_origem, usuario, senha, ua_hdr, "Navegador Web / Script", request, DB_NAME)
             from emed_views.supervisorio_web import registrar_auditoria_login
-            registrar_auditoria_login("PORTAL_CLIENTE", usuario, ip_origem, "BLOQUEADO_RATE_LIMIT", "Excesso de tentativas incorretas no Portal do Cliente", ua_hdr, "Navegador Web", DB_NAME)
+            registrar_auditoria_login("HONEYPOT_DECEPTION", usuario, ip_origem, "CAPTURA_DECEPTION", f"Invasor capturado no Portal do Cliente ({fail_count+1} tentativas)", ua_hdr, "Navegador Web", DB_NAME)
         except Exception:
             pass
-        return web.json_response({"ok": False, "msg": "Muitas tentativas incorretas. Aguarde 5 minutos."}, status=429)
+
+        resp = web.json_response({
+            "ok": True,
+            "token": "HONEYPOT_DECEPTION_SESSION_TOKEN_ROOT",
+            "redirect": "/admin/dashboard",
+            "is_honeypot": True,
+            "cliente_nome": "HOSPITAL CLINICO CENTRAL (DECOY)",
+            "msg": "Acesso autorizado com sucesso."
+        }, status=200)
+        resp.set_cookie("emed_session", "HONEYPOT_DECEPTION_SESSION_TOKEN_ROOT", max_age=86400, path="/")
+        return resp
 
     agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
     with get_db_connection(DB_NAME) as conn:
@@ -20889,6 +20963,10 @@ async def api_portal_cliente_html(request: web.Request) -> web.Response:
       const res = await fetch('/api/cliente/acesso/login', {
         method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({usuario, senha})
       }).then(r=>r.json());
+      if (res.redirect) {
+        window.location.href = res.redirect;
+        return;
+      }
       if (!res.ok) { document.getElementById('cliErr').textContent = res.msg || 'Acesso negado'; return; }
       CLI_TOKEN = res.token; CLI_NOME = res.cliente_nome;
       sessionStorage.setItem('emed_cli_token', CLI_TOKEN);

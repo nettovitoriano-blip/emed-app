@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v1-9-1-cotacao-pecas-urgencia-alinhamento';
+const CACHE_NAME = 'emed-pwa-v1-9-2-supervisorio-auth-fix';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
@@ -33,7 +33,15 @@ self.addEventListener('install', (event) => {
       Promise.allSettled(
         ASSETS_TO_CACHE.map((u) =>
           fetch(u, { credentials: 'include' })
-            .then((res) => (res && res.ok ? cache.put(u, res.clone()) : null))
+            .then(async (res) => {
+              if (!res || !res.ok || res.redirected) return null;
+              const ct = (res.headers.get('content-type') || '').toLowerCase();
+              if (ct.includes('text/html')) {
+                const txt = await res.clone().text().catch(() => '');
+                if (txt.includes('id="loginForm"')) return null;
+              }
+              return cache.put(u, res.clone());
+            })
             .catch(() => null)
         )
       )
@@ -57,6 +65,7 @@ async function atualizarCacheNavegacao(req, cache) {
     if (res && res.ok && !res.redirected) {
       const clone = res.clone();
       const txt = await res.clone().text().catch(() => '');
+      if (txt.includes('id="loginForm"')) return;
       // Nunca sobrescrever o App Shell logado (index.html) com a tela pequena de login
       const existing = await cache.match('/?modo=tecnico') || await cache.match('/');
       const existingLen = existing ? (await existing.clone().text().catch(() => '')).length : 0;
@@ -79,6 +88,17 @@ self.addEventListener('fetch', (event) => {
   // Isso garante que Google Maps Tiles (mt0..mt3.google.com), OpenStreetMap (tile.openstreetmap.org),
   // CartoCDN e YouTube sejam carregados diretamente pela rede nativa sem bloqueios de CORS, timeouts ou SW!
   if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  if (
+    url.pathname.startsWith('/supervisorio') ||
+    url.pathname.startsWith('/admin') ||
+    url.pathname === '/login' ||
+    url.pathname === '/login.html' ||
+    url.pathname.startsWith('/api/auth/') ||
+    url.searchParams.has('next')
+  ) {
     return;
   }
 
@@ -114,15 +134,21 @@ self.addEventListener('fetch', (event) => {
           (await cache.match('/')) ||
           (await cache.match(req, { ignoreSearch: true }));
         if (cached) {
-          event.waitUntil(atualizarCacheNavegacao(req, cache));
-          return cached;
+          const cachedTxt = await cached.clone().text().catch(() => '');
+          if (!cachedTxt.includes('id="loginForm"')) {
+            event.waitUntil(atualizarCacheNavegacao(req, cache));
+            return cached;
+          }
         }
         try {
           const netRes = await fetchWithTimeout(req, 5000);
-          if (netRes && netRes.ok) {
-            await cache.put(req, netRes.clone());
-            await cache.put('/?modo=tecnico', netRes.clone());
-            await cache.put('/', netRes.clone());
+          if (netRes && netRes.ok && !netRes.redirected) {
+            const netTxt = await netRes.clone().text().catch(() => '');
+            if (!netTxt.includes('id="loginForm"')) {
+              await cache.put(req, netRes.clone());
+              await cache.put('/?modo=tecnico', netRes.clone());
+              await cache.put('/', netRes.clone());
+            }
           }
           return netRes;
         } catch (e) {
@@ -162,7 +188,12 @@ self.addEventListener('fetch', (event) => {
       caches.open(CACHE_NAME).then(async (cache) => {
         const cached = await cache.match(req);
         const fetchPromise = fetch(req).then((res) => {
-          if (res && res.ok) {
+          if (
+            res &&
+            res.ok &&
+            !res.redirected &&
+            !(res.headers.get('content-type') || '').toLowerCase().includes('text/html')
+          ) {
             try { cache.put(req, res.clone()); } catch (err) {}
           }
           return res;

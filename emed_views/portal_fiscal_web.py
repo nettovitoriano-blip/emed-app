@@ -5377,7 +5377,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
           </button>
         </div>
         <div id="boxResultadoEmissao" style="margin-top:14px;"></div>
-      </div>
+        </div>
+      </details>
 
       <!-- TRANSFERÊNCIA AVULSA ENTRE FILIAIS (CE <-> DF) -->
       <details class="card" id="expanderTransferencia" style="cursor:pointer;margin-bottom:16px;">
@@ -6023,7 +6024,16 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       ["FILIAL_DF", "MATRIZ_CE", "CONSOLIDADO"].forEach(c => {{
         document.getElementById("pill_" + c)?.classList.toggle("active", c === cod);
       }});
+      const selDespUnid = document.getElementById("selDespFiltroUnidade");
+      if (selDespUnid) selDespUnid.value = cod;
+      const selDfeUnid = document.getElementById("selFiltroUnidadeDFe");
+      if (selDfeUnid) selDfeUnid.value = cod;
+      const selFechUnid = document.getElementById("selFilialFechamento");
+      if (selFechUnid) selFechUnid.value = cod;
       carregarDadosFiscais();
+      if (ABA_PRINCIPAL_FISCAL === "DESPESAS") carregarDespesasUnidades();
+      else if (ABA_PRINCIPAL_FISCAL === "RADAR_DFE") carregarNotasRecebidasDFe();
+      else if (ABA_PRINCIPAL_FISCAL === "CONTABIL_CFOP") carregarDadosCfop();
     }}
 
     async function carregarDadosFiscais(osId = "") {{

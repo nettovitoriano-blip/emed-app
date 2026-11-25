@@ -246,7 +246,7 @@ def gerar_danfe_padrao_pdf_bytes(nota: Dict[str, Any]) -> bytes:
     pdf.set_xy(X0 + 1.5, y + 6.0)
     pdf.cell(w_emit - 3.0, 2.6, _txt(emit_sub), align="C")
 
-    filial_tag = "FILIAL / DF" if is_df else "MATRIZ / CE"
+    filial_tag = "FILIAL / DF" if is_df else "MATRIZ"
     pdf.set_font("Helvetica", "B", 6.2)
     pdf.set_xy(X0 + 1.5, y + 9.2)
     pdf.cell(w_emit - 3.0, 3.0, _txt(f"CNPJ: {emit_cnpj} - {filial_tag}"), align="C")

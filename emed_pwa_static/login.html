@@ -1071,6 +1071,31 @@
 
 
 
+    function obterDestinoPosLogin(padrao) {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const nxt = (params.get('next') || '').trim();
+        if (nxt && nxt.startsWith('/') && !nxt.startsWith('//') && !nxt.includes('\\')) {
+          return nxt;
+        }
+      } catch (e) {}
+      return padrao;
+    }
+
+    async function limparCacheLoginSW(destino) {
+      try {
+        if (!('caches' in window)) return;
+        const keys = await caches.keys();
+        const alvos = ['/', '/index.html', '/?modo=gestor', '/?modo=tecnico', '/supervisorio', destino];
+        await Promise.allSettled(
+          keys.map(async (k) => {
+            const c = await caches.open(k);
+            await Promise.allSettled(alvos.map((u) => c.delete(u, { ignoreSearch: false })));
+          })
+        );
+      } catch (e) {}
+    }
+
     async function realizarLogin(e) {
 
       if (e) e.preventDefault();
@@ -1142,7 +1167,10 @@
 
 
         if (resp.ok && res.ok) {
-
+          if (res.redirect) {
+            window.location.href = res.redirect;
+            return;
+          }
           pararPolling();
 
           fb.textContent = `Acesso autorizado! Bem-vindo(a), ${res.usuario.nome}!`;
@@ -1162,9 +1190,12 @@
           localStorage.setItem('emed_tec_filtro', isGestor1 ? 'TODOS' : res.usuario.nome);
           localStorage.setItem('emed_token', res.token);
 
-          setTimeout(() => {
-            window.location.href = isGestor1 ? '/?modo=gestor' : '/?modo=tecnico';
-          }, 400);
+          const destinoFinal = obterDestinoPosLogin(isGestor1 ? '/?modo=gestor' : '/?modo=tecnico');
+          limparCacheLoginSW(destinoFinal).finally(() => {
+            setTimeout(() => {
+              window.location.href = destinoFinal;
+            }, 300);
+          });
 
         } else if (res.status === 'DISPOSITIVO_PENDENTE') {
 
@@ -1413,7 +1444,10 @@
 
 
         if (resp.ok && res.ok) {
-
+          if (res.redirect) {
+            window.location.href = res.redirect;
+            return;
+          }
           pararPolling();
 
           if (fb) {
@@ -1480,10 +1514,13 @@
             localStorage.setItem('emed_tec_filtro', isGestor2 ? 'TODOS' : (res.usuario?.nome || usuario));
           }
 
-          setTimeout(() => {
-            const redirectUrl = (isGestor2 ? '/?modo=gestor' : '/?modo=tecnico') + (res.token ? ('&token=' + encodeURIComponent(res.token)) : '');
-            window.location.href = redirectUrl;
-          }, 600);
+          const nextDestino = obterDestinoPosLogin('');
+          const redirectUrl = nextDestino || ((isGestor2 ? '/?modo=gestor' : '/?modo=tecnico') + (res.token ? ('&token=' + encodeURIComponent(res.token)) : ''));
+          limparCacheLoginSW(redirectUrl).finally(() => {
+            setTimeout(() => {
+              window.location.href = redirectUrl;
+            }, 400);
+          });
 
         } else {
 

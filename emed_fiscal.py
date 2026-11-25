@@ -537,7 +537,7 @@ class MultiFilialFiscalProvider(FiscalProvider):
             <div class="title-danfe" style="font-size: 13px; font-weight: 900; color: #000; letter-spacing: 0.3px; text-transform: uppercase;">{prestador_razao}</div>
             <div style="font-size: 8.5px; color: #002b54; font-weight: 800; margin-top: 1px; white-space: nowrap;">MANUTENÇÃO EM EQUIPAMENTOS DE DIAGNÓSTICO POR IMAGEM</div>
             <div style="font-size: 9px; font-weight: 900; color: #000; margin-top: 2px;">
-              CNPJ: {prestador_cnpj} &bull; {'FILIAL / DF' if filial_emissora == 'FILIAL_DF' else 'MATRIZ / CE'}
+              CNPJ: {prestador_cnpj} &bull; {'FILIAL / DF' if filial_emissora == 'FILIAL_DF' else 'MATRIZ'}
             </div>
             <div style="font-size: 8px; color: #334155; margin-top: 2px; line-height: 1.3;">
               {prestador_end}, {prestador_cid} - {prestador_uf}<br/>
