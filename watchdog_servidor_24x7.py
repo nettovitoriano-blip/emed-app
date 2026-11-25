@@ -42,6 +42,8 @@ LOG_FILE = os.path.join(BASE_DIR, "servidor_24x7.log")
 
 CF_TOKEN = os.environ.get("CF_TUNNEL_TOKEN", "eyJhIjoiYjMyZTc4YmVmNzk0Nzc0YTFkOTA1MTVlMTJlYzMwNTIiLCJ0IjoiMWNkZmEwNDMtYTVkYi00Mzg0LWJjMTctNDQzMGY3Mzg2NjhmIiwicyI6IlpXSXpOamhsTWprdE1UTTVZaTAwTXpRekxXSXlZVGN0TWpGa016SmtNalV6T0dVeCJ9")
 
+CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+
 
 
 
@@ -339,6 +341,8 @@ def main():
 
                         stderr=lf,
 
+                        creationflags=CREATE_NO_WINDOW,
+
                     )
 
                 for _ in range(30):
@@ -381,6 +385,8 @@ def main():
 
                         stderr=lf,
 
+                        creationflags=CREATE_NO_WINDOW,
+
                     )
 
 
@@ -402,6 +408,8 @@ def main():
                     stdout=lf,
 
                     stderr=lf,
+
+                    creationflags=CREATE_NO_WINDOW,
 
                 )
 
@@ -429,6 +437,8 @@ def main():
 
                         stderr=lf,
 
+                        creationflags=CREATE_NO_WINDOW,
+
                     )
 
 
@@ -453,6 +463,8 @@ def main():
 
                     stderr=lf,
 
+                    creationflags=CREATE_NO_WINDOW,
+
                 )
 
 
@@ -469,6 +481,7 @@ def main():
                     cwd=BASE_DIR,
                     stdout=lf,
                     stderr=lf,
+                    creationflags=CREATE_NO_WINDOW,
                 )
 
         time.sleep(5)

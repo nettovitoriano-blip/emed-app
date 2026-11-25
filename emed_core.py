@@ -3227,7 +3227,12 @@ def registrar_aplicacao_definitiva_e_fluxo_cobranca(
 
 
 
-        natureza_op = f"VENDA/APLICAÇÃO DE {cod_peca} + MÃO DE OBRA [{condicao_pagamento}]"
+        if valor_servicos > 0 and valor_total_pecas > 0:
+            natureza_op = "PRESTAÇÃO DE SERVIÇOS COM FORNECIMENTO DE PEÇAS"
+        elif valor_total_pecas > 0:
+            natureza_op = "VENDA DE MERCADORIA / PEÇAS DE REPOSIÇÃO"
+        else:
+            natureza_op = "PRESTAÇÃO DE SERVIÇOS DE MANUTENÇÃO E REPARAÇÃO TÉCNICA"
 
 
 

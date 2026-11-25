@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v1-9-0-dossie-sst-dosimetria-scanner';
+const CACHE_NAME = 'emed-pwa-v1-9-1-cotacao-pecas-urgencia-alinhamento';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

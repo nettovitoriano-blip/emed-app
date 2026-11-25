@@ -524,19 +524,25 @@ class MultiFilialFiscalProvider(FiscalProvider):
       </table>
     </div>
 
-    <!-- CABEÇALHO EMED -->
+    <!-- CABEÇALHO EMED PADRÃO HOMOLOGADO COM CARIMBO D'ÁGUA -->
     <table class="header-tbl">
       <tr>
-        <td style="width: 95px; vertical-align: middle; border: none;">
-          <img src="/api/logo-circle" alt="EMED" style="width: 75px; height: auto;" onerror="this.src='/api/logo'" />
-        </td>
-        <td style="vertical-align: middle; border: none; padding-left: 6px;">
-          <div class="title-danfe">{prestador_razao} <span style="font-size: 10px; font-weight: 800; color: #0284c7; letter-spacing: 0;">&bull; {filial_badge}</span></div>
-          <div style="font-size: 10px; color: #0077b6; font-weight: 800; margin-top: 1px; margin-bottom: 1px;">Manutenção em Equipamentos de Diagnóstico por Imagem</div>
-          <div style="font-size: 8.5px; color: #475569; margin-top: 1px; line-height: 1.25;">
-            <b>CNPJ:</b> {prestador_cnpj} &bull; <b>{'CF/DF' if filial_emissora == 'FILIAL_DF' else 'Insc. Municipal'}:</b> {prestador_im} &bull; <b>Órgão:</b> {orgao_emissor}<br/>
-            <b>Endereço Emissor:</b> {prestador_end}, {prestador_cid} - {prestador_uf} &bull; <b>Fone:</b> {prestador_fone}<br/>
-            <b>Site:</b> emed.med.br &bull; <b>E-mail:</b> {prestador_email}
+        <td style="vertical-align: middle; border: none; text-align: center; position: relative; overflow: hidden; padding: 6px 4px;">
+          <!-- CARIMBO / MARCA D'ÁGUA OFICIAL DA EMED -->
+          <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-10deg); width: 105px; height: 105px; opacity: 0.10; pointer-events: none; z-index: 1;">
+            <img src="/api/logo-circle" alt="" style="width: 100%; height: 100%; object-fit: contain;" />
+          </div>
+
+          <div style="position: relative; z-index: 2; width: 92%; margin: 0 auto; text-align: center;">
+            <div class="title-danfe" style="font-size: 13px; font-weight: 900; color: #000; letter-spacing: 0.3px; text-transform: uppercase;">{prestador_razao}</div>
+            <div style="font-size: 8.5px; color: #002b54; font-weight: 800; margin-top: 1px; white-space: nowrap;">MANUTENÇÃO EM EQUIPAMENTOS DE DIAGNÓSTICO POR IMAGEM</div>
+            <div style="font-size: 9px; font-weight: 900; color: #000; margin-top: 2px;">
+              CNPJ: {prestador_cnpj} &bull; {'FILIAL / DF' if filial_emissora == 'FILIAL_DF' else 'MATRIZ / CE'}
+            </div>
+            <div style="font-size: 8px; color: #334155; margin-top: 2px; line-height: 1.3;">
+              {prestador_end}, {prestador_cid} - {prestador_uf}<br/>
+              CEP: {'71987-360' if filial_emissora == 'FILIAL_DF' else '61769-470'} &bull; Fone: {prestador_fone}
+            </div>
           </div>
         </td>
         <td style="width: 270px; vertical-align: middle; text-align: right; border: none;">

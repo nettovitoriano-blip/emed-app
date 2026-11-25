@@ -8,6 +8,8 @@ eliminando qualquer risco de suspensão de container secundário no Render.
 
 import os
 import asyncio
+import hmac
+import hashlib
 import io
 import csv
 import zipfile
@@ -27,10 +29,10 @@ from emed_fiscal import (
 )
 
 USUARIOS_FISCAL = {
-    "netto": {"senha": "12345", "role": "admin", "cargo": "Diretoria & Controladoria"},
-    "vitor": {"senha": "12345", "role": "admin", "cargo": "Diretoria & Gestão Geral"},
-    "faturamento": {"senha": "123", "role": "faturamento", "cargo": "Faturamento & Emissão Fiscal"},
-    "financeiro": {"senha": "123", "role": "financeiro", "cargo": "Financeiro & Contabilidade"},
+    "netto": {"senha": os.environ.get("EMED_FISCAL_PASS_NETTO", "12345"), "role": "admin", "cargo": "Diretoria & Controladoria"},
+    "vitor": {"senha": os.environ.get("EMED_FISCAL_PASS_VITOR", "12345"), "role": "admin", "cargo": "Diretoria & Gestão Geral"},
+    "faturamento": {"senha": os.environ.get("EMED_FISCAL_PASS_FATURAMENTO", "123"), "role": "faturamento", "cargo": "Faturamento & Emissão Fiscal"},
+    "financeiro": {"senha": os.environ.get("EMED_FISCAL_PASS_FINANCEIRO", "123"), "role": "financeiro", "cargo": "Financeiro & Contabilidade"},
 }
 
 
@@ -50,20 +52,44 @@ def _obter_logo_b64() -> str:
 
 
 async def api_fiscal_v2_login(request: web.Request) -> web.Response:
+    from emed_app_server import (
+        EMED_AUTH_SECRET,
+        obter_ip_real,
+        requisicao_https,
+        gerar_token_sessao,
+        _check_rate_limit,
+        _record_auth_failure,
+        _clear_auth_failure,
+    )
     body = await request.json()
     u = str(body.get("username", "")).strip().lower()
     p = str(body.get("password", "")).strip()
     token_qr = str(body.get("token", "")).strip()
 
+    ip_origem = obter_ip_real(request)
+    ua_hdr = request.headers.get("User-Agent", "")
+    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
+
+    ident_ip = f"fisc_ip:{ip_origem}"
+    if not _check_rate_limit(ident_ip):
+        return web.json_response({"ok": False, "msg": "Muitas tentativas incorretas. Aguarde 5 minutos."}, status=429)
+
     if token_qr:
         try:
-            raw = base64.urlsafe_b64decode(token_qr.encode("ascii")).decode("utf-8")
+            if "." not in token_qr:
+                return web.json_response({"ok": False, "msg": "Token QR sem assinatura criptográfica."}, status=401)
+            raw_b64, sig_qr = token_qr.split(".", 1)
+            expected_sig = hmac.new(EMED_AUTH_SECRET.encode("utf-8"), raw_b64.encode("utf-8"), hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(sig_qr, expected_sig):
+                _record_auth_failure(ident_ip)
+                return web.json_response({"ok": False, "msg": "Assinatura de Token QR inválida."}, status=401)
+            raw = base64.urlsafe_b64decode(raw_b64.encode("ascii")).decode("utf-8")
             data = json.loads(raw)
             usr = str(data.get("username", "")).strip().lower()
-            is_perm = bool(data.get("perm"))
             ts = float(data.get("ts", 0))
-            ttl = float(data.get("ttl", 1800))
-            if (is_perm or (time.time() - ts <= ttl)) and usr in USUARIOS_FISCAL:
+            ttl = min(float(data.get("ttl", 1800)), 86400)
+            if (time.time() - ts <= ttl) and usr in USUARIOS_FISCAL:
+                _clear_auth_failure(ident_ip)
                 info = USUARIOS_FISCAL[usr]
                 resp = web.json_response({
                     "ok": True,
@@ -71,26 +97,16 @@ async def api_fiscal_v2_login(request: web.Request) -> web.Response:
                     "role": info["role"],
                     "cargo": info["cargo"],
                 })
-                try:
-                    from emed_app_server import gerar_token_sessao
-                    tkn = gerar_token_sessao(1, usr, info["role"])
-                    resp.set_cookie("emed_session", tkn, max_age=30*86400, httponly=True, samesite="Lax", path="/")
-                except Exception:
-                    pass
+                tkn = gerar_token_sessao(1, usr, info["role"])
+                resp.set_cookie("emed_session", tkn, max_age=30*86400, httponly=True, samesite="Lax", secure=requisicao_https(request), path="/")
                 return resp
-        except Exception as e:
-            return web.json_response({"ok": False, "msg": f"Token QR inválido: {e}"}, status=400)
+            return web.json_response({"ok": False, "msg": "Token QR expirado."}, status=401)
+        except Exception:
+            _record_auth_failure(ident_ip)
+            return web.json_response({"ok": False, "msg": "Token QR inválido."}, status=400)
 
-    ip_origem = (
-        request.headers.get("CF-Connecting-IP")
-        or request.headers.get("X-Real-IP")
-        or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-        or (request.remote or "127.0.0.1")
-    )
-    ua_hdr = request.headers.get("User-Agent", "")
-    db_name = request.app.get("db_name") or str(Path(__file__).resolve().parent.parent / "emed.db")
-
-    if u in USUARIOS_FISCAL and USUARIOS_FISCAL[u]["senha"] == p:
+    if u in USUARIOS_FISCAL and hmac.compare_digest(USUARIOS_FISCAL[u]["senha"], p):
+        _clear_auth_failure(ident_ip)
         info = USUARIOS_FISCAL[u]
         try:
             from emed_views.supervisorio_web import registrar_auditoria_login
@@ -104,14 +120,11 @@ async def api_fiscal_v2_login(request: web.Request) -> web.Response:
             "role": info["role"],
             "cargo": info["cargo"],
         })
-        try:
-            from emed_app_server import gerar_token_sessao
-            tkn = gerar_token_sessao(1, u, info["role"])
-            resp.set_cookie("emed_session", tkn, max_age=30*86400, httponly=True, samesite="Lax", path="/")
-        except Exception:
-            pass
+        tkn = gerar_token_sessao(1, u, info["role"])
+        resp.set_cookie("emed_session", tkn, max_age=30*86400, httponly=True, samesite="Lax", secure=requisicao_https(request), path="/")
         return resp
 
+    _record_auth_failure(ident_ip)
     try:
         from emed_views.supervisorio_web import registrar_auditoria_login
         st_res = "SENHA_INCORRETA" if u in USUARIOS_FISCAL else "USUARIO_INEXISTENTE"
@@ -2765,7 +2778,7 @@ async def api_fiscal_v2_inventario_novo_item(request: web.Request) -> web.Respon
 
 
 async def api_fiscal_v2_peca_detalhes(request: web.Request) -> web.Response:
-    """Retorna todos os dados fiscais, tributários, de precificação e engenharia clínica de uma peça."""
+    """Retorna todos os dados fiscais, tributários, de precificação e suporte técnico de uma peça."""
     db_name = request.app.get("db_path", "emed.db")
     peca_id = int(request.match_info.get("peca_id", 0))
     with _get_db_connection(db_name) as conn:
@@ -5491,7 +5504,7 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
         <summary style="font-weight:800;color:#fde047;font-size:14px;">☕ Lançamento de Consumíveis Administrativos (Café, Copa, Limpeza — Baixa Direta)</summary>
         <div style="cursor:default;margin-top:14px;">
           <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
-            Permite escriturar a Nota Fiscal de compra de materiais de uso/consumo da empresa no Fisco e na Despesa Operacional, enquanto o <b>estoque físico de peças de engenharia permanece em zero</b> (consumo imediato), sem poluir a lista técnica dos hospitais.
+            Permite escriturar a Nota Fiscal de compra de materiais de uso/consumo da empresa no Fisco e na Despesa Operacional, enquanto o <b>estoque físico de peças técnicas permanece em zero</b> (consumo imediato), sem poluir a lista técnica dos hospitais.
           </div>
 
           <div class="grid-3" style="margin-bottom:10px;">
@@ -5987,7 +6000,8 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
       }}
     }}
 
-    function logoutFiscal() {{
+    async function logoutFiscal() {{
+      try {{ await fetch("/api/auth/logout", {{ method: "POST" }}); }} catch(e) {{}}
       localStorage.removeItem("emed_fiscal_user");
       window.location.href = window.location.pathname;
     }}
@@ -6014,7 +6028,14 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
 
     async function carregarDadosFiscais(osId = "") {{
       const url = `/api/fiscal/v2/dados?filial=${{encodeURIComponent(FILIAL_ATIVA)}}&os_id=${{encodeURIComponent(osId)}}`;
-      const res = await fetch(url).then(r => r.json());
+      const respRaw = await fetch(url);
+      if (respRaw.status === 401) {{
+        localStorage.removeItem("emed_fiscal_user");
+        document.getElementById("appBox").style.display = "none";
+        document.getElementById("loginBox").style.display = "block";
+        return;
+      }}
+      const res = await respRaw.json();
       if (!res.ok) return;
       DADOS_ATUAIS = res;
       const cfg = res.cfg_ativa || {{}};
@@ -6309,6 +6330,70 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     }}
 
 
+    async function atualizarApenasHistoricoSemReset(osId, numNf) {{
+      try {{
+        const url = `/api/fiscal/v2/dados?filial=${{encodeURIComponent(FILIAL_ATIVA)}}&os_id=${{encodeURIComponent(osId || '')}}`;
+        const res = await fetch(url).then(r => r.json());
+        if (!res.ok) return;
+        DADOS_ATUAIS = res;
+        if (document.getElementById("kpiFila")) document.getElementById("kpiFila").textContent = `${{res.kpis.pendentes}} OSs`;
+        if (document.getElementById("kpiEmitidas")) document.getElementById("kpiEmitidas").textContent = `${{res.kpis.emitidas}} NFs`;
+        if (document.getElementById("kpiTotal")) document.getElementById("kpiTotal").textContent = `R$ ${{Number(res.kpis.total_faturar || 0).toLocaleString('pt-BR', {{minimumFractionDigits:2}})}}`;
+
+        const tbFila = document.getElementById("tbodyFilaOs");
+        if (tbFila) {{
+          tbFila.innerHTML = (res.fila_os || []).map(o => `
+            <tr>
+              <td><b>#${{o.id}}</b></td>
+              <td>${{o.cliente}}</td>
+              <td>${{o.cidade}} - ${{o.estado}}</td>
+              <td>${{o.equipamento}}</td>
+              <td>${{o.peca}}</td>
+              <td>R$ ${{Number(o.valor_liquido).toLocaleString('pt-BR', {{minimumFractionDigits:2}})}}</td>
+              <td>${{o.numero_nf ? '✅ ' + o.numero_nf : o.status_fiscal}}</td>
+            </tr>
+          `).join("") || `<tr><td colspan="7" style="text-align:center;color:var(--muted);">Nenhuma OS concluída nesta unidade.</td></tr>`;
+        }}
+
+        const tbHist = document.getElementById("tbodyHistoricoNf");
+        if (tbHist) {{
+          tbHist.innerHTML = (res.historico || []).map(h => `
+            <tr>
+              <td><b>${{h.numero_nf}}</b></td>
+              <td>${{h.serie}}</td>
+              <td>${{Number(h.os_id) > 0 ? '#' + h.os_id : '<span class="badge" style="background:#0f172a;border:1px solid #334155;">AVULSA</span>'}}</td>
+              <td>${{h.cliente}}</td>
+              <td>${{h.filial}}</td>
+              <td style="font-size:11px;">${{h.cfop ? 'CFOP ' + h.cfop : (String(h.chave || '').length === 50 ? '🏛️ NFS-e Nacional' : 'NFS-e')}}</td>
+              <td>R$ ${{Number(h.valor_liquido).toLocaleString('pt-BR', {{minimumFractionDigits:2}})}}</td>
+              <td>${{h.data_emissao}}</td>
+              <td>${{h.status_fiscal}}</td>
+              <td>
+                <a href="/api/fiscal/danfe/${{Number(h.os_id) > 0 ? h.os_id : encodeURIComponent(h.numero_nf)}}?formato=pdf" target="_blank" class="btn btn-blue" style="padding:4px 8px;font-size:11px;">🖨️ DANFE</a>
+                <a href="/api/fiscal/v2/xml/${{Number(h.os_id) > 0 ? h.os_id : encodeURIComponent(h.numero_nf)}}" class="btn btn-outline" style="padding:4px 8px;font-size:11px;">📥 XML</a>
+              </td>
+            </tr>
+          `).join("") || `<tr><td colspan="10" style="text-align:center;color:var(--muted);">Nenhuma nota fiscal emitida registrada ainda nesta unidade.</td></tr>`;
+        }}
+
+        const selCanc = document.getElementById("selNotaCancelar");
+        if (selCanc) {{
+          const ativas = (res.historico || []).filter(h => !String(h.status_fiscal).toUpperCase().includes("CANCELAD"));
+          selCanc.innerHTML = ativas.map(h => `<option value="${{h.id}}">NFS-e Nº ${{h.numero_nf}} — ${{h.cliente}} (R$ ${{Number(h.valor_liquido).toFixed(2)}})</option>`).join("")
+            || `<option value="">-- Nenhuma nota ativa para cancelar --</option>`;
+        }}
+
+        if (res.pecas_almox) {{
+          INVENTARIO_ITENS = res.pecas_almox;
+          if (typeof renderizarInventario === "function") renderizarInventario();
+        }}
+        if (typeof carregarFechamentoContabil === "function") carregarFechamentoContabil();
+        if (typeof atualizarBadgesMenusFiscal === "function") atualizarBadgesMenusFiscal();
+      }} catch (e) {{
+        console.warn("Erro ao atualizar histórico em background:", e);
+      }}
+    }}
+
     async function emitirNotaFiscalAgora(modo = 'SIMULACAO', forcarDuplicidade = false) {{
       const osId = document.getElementById("selOsEmissao").value;
       if (!osId) {{ alert("Por favor, selecione uma Ordem de Serviço para emissão."); return; }}
@@ -6420,17 +6505,17 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
               A <b>Nota Fiscal Nº ${{ne.numero_nf}}</b> referente à <b>OS #${{ne.os_id}}</b> já foi emitida com sucesso em <b>${{ne.data_emissao}}</b> para o cliente <b>${{ne.cliente}}</b> no valor de <b>R$ ${{Number(ne.valor_liquido).toFixed(2)}}</b>!
             </div>
             <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-              <a href="${{ne.link_danfe}}" target="_blank" class="btn btn-blue" style="font-weight:800;">📄 Abrir Espelho da Nota Já Emitida (DANFE)</a>
-              <a href="${{ne.link_pdf}}" download="DANFE_${{ne.numero_nf}}.pdf" class="btn" style="background:#0284c7;color:#fff;font-weight:800;">📥 Baixar PDF Existente</a>
+              <a href="${{ne.link_pdf || (ne.link_danfe + '?formato=pdf')}}" target="_blank" class="btn btn-blue" style="font-weight:800;">📄 Abrir Espelho da Nota Já Emitida (DANFE)</a>
+              <a href="${{ne.link_pdf || (ne.link_danfe + '?formato=pdf')}}" download="DANFE_${{ne.numero_nf}}.pdf" class="btn" style="background:#0284c7;color:#fff;font-weight:800;">📥 Baixar PDF Existente</a>
               <button type="button" onclick="emitirNotaFiscalAgora('${{modo}}', true)" class="btn" style="background:#dc2626;color:#fff;font-weight:900;border:1.5px solid #fca5a5;">⚡ Sim, Desejo Emitir Outra Nota Mesmo Assim</button>
               <button type="button" onclick="document.getElementById('boxResultadoEmissao').innerHTML=''" class="btn btn-outline" style="color:#94a3b8;">✕ Manter Nota Existente</button>
             </div>
             <div style="margin-top:14px;background:#fff;border-radius:6px;overflow:hidden;border:1px solid #cbd5e1;">
               <div style="background:#0f172a;color:#fff;padding:6px 12px;font-size:11.5px;font-weight:800;display:flex;justify-content:space-between;align-items:center;">
                 <span>📄 Espelho Oficial da Nota Fiscal Já Emitida (OS #${{ne.os_id}} • NFS-e ${{ne.numero_nf}})</span>
-                <a href="${{ne.link_danfe}}" target="_blank" style="color:#38bdf8;font-size:11px;text-decoration:none;">↗️ Abrir em Nova Aba</a>
+                <a href="${{ne.link_pdf || (ne.link_danfe + '?formato=pdf')}}" target="_blank" style="color:#38bdf8;font-size:11px;text-decoration:none;">↗️ Abrir em Nova Aba</a>
               </div>
-              <iframe src="${{ne.link_danfe}}" style="width:100%;height:480px;border:none;background:#fff;"></iframe>
+              <iframe src="${{ne.link_pdf || (ne.link_danfe + '?formato=pdf')}}" style="width:100%;height:480px;border:none;background:#fff;"></iframe>
             </div>
           </div>
         `;
@@ -10045,7 +10130,7 @@ Por favor, confira os dados preenchidos.`);
 
       <!-- ABAS DO MODAL -->
       <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid #1e293b;padding-bottom:8px;overflow-x:auto;">
-        <button type="button" class="btn btn-blue" id="tabBtn_ident" onclick="mudarTabFicha('ident')" style="font-size:12px;padding:6px 12px;">🏷️ Identificação &amp; Engenharia</button>
+        <button type="button" class="btn btn-blue" id="tabBtn_ident" onclick="mudarTabFicha('ident')" style="font-size:12px;padding:6px 12px;">🏷️ Identificação &amp; Suporte Técnico</button>
         <button type="button" class="btn btn-outline" id="tabBtn_icms" onclick="mudarTabFicha('icms')" style="font-size:12px;padding:6px 12px;">🏛️ ICMS, NCM &amp; Estados</button>
         <button type="button" class="btn btn-outline" id="tabBtn_fed" onclick="mudarTabFicha('fed')" style="font-size:12px;padding:6px 12px;">🇧🇷 Tributos Federais (PIS/COFINS/IPI)</button>
         <button type="button" class="btn btn-outline" id="tabBtn_preco" onclick="mudarTabFicha('preco')" style="font-size:12px;padding:6px 12px;">💰 Precificação &amp; Margens</button>
@@ -10054,7 +10139,7 @@ Por favor, confira os dados preenchidos.`);
       <input type="hidden" id="fch_id" />
       <div id="fch_box_alerta_reajuste" style="display:none;margin-bottom:14px;"></div>
 
-      <!-- ABA 1: IDENTIFICAÇÃO & ENGENHARIA CLÍNICA (RDC 611) -->
+      <!-- ABA 1: IDENTIFICAÇÃO & SUPORTE TÉCNICO (RDC 611) -->
       <div id="tabContent_ident">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
           <div style="grid-column:1/-1;">

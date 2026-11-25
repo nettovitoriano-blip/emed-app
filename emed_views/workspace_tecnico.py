@@ -203,7 +203,7 @@ def render_workspace_tecnico(ctx: AppContext):
                                 st.success(f"🎉 IT {it['codigo_it']} aprovada com sucesso! Agora disponível para todos os técnicos.")
                                 st.rerun()
                         else:
-                            st.info("⏳ Esta IT está em análise pela Engenharia Clínica / Gestor para publicação oficial.")
+                            st.info("⏳ Esta IT está em análise pela Coordenação Técnica / Gestor para publicação oficial.")
 
     # 3. CARTAO
     with tab_cartao:
@@ -213,7 +213,7 @@ def render_workspace_tecnico(ctx: AppContext):
         with c_card_cfg:
             st.markdown("#### ⚙️ Dados do Cartão")
             cartao_nome = st.text_input("Nome Completo:", value=tecnico_atual)
-            cartao_cargo = st.text_input("Cargo / Especialidade:", value="Especialista em Engenharia Clínica & Diagnóstico por Imagem")
+            cartao_cargo = st.text_input("Cargo / Especialidade:", value="Especialista em Manutenção Técnica & Diagnóstico por Imagem")
             cartao_tel = st.text_input("WhatsApp / Telefone:", value="(85) 99106-5585")
             cartao_email = st.text_input("E-mail Profissional:", value=f"{tecnico_atual.lower().replace(' ', '.')}@emed.med.br")
             cartao_reg = st.text_input("Registro Profissional:", value="CFT/CREA 2026-EMED")

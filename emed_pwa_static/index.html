@@ -2120,7 +2120,7 @@
       const msg = d.mensagem_dia || {
         saudacao: "Bom dia, Família eMED! ☀️",
         slogan: "Que o dia seja abençoado, produtivo e com máxima segurança nos atendimentos!",
-        tema: "🎯 Engenharia Clínica de Excelência",
+        tema: "🎯 Suporte Técnico Hospitalar de Excelência",
         dica_tecnica: "A precisão dos equipamentos médicos salva vidas diariamente. Rigor absoluto em calibração e segurança elétrica.",
         missao_do_dia: "Realizar 100% dos testes e coletar assinatura touch em cada atendimento.",
         data_formatada: ""
@@ -2768,10 +2768,10 @@
           aviso.style.background = "#f5f3ff";
           aviso.style.borderColor = "#ddd6fe";
           aviso.style.color = "#6b21a8";
-          aviso.innerHTML = "<b>♻️ REGRA TRIBUTÁRIA ATIVA:</b> Peça Usada sem nota de entrada no estoque. O valor total está alocado em Serviços Especializados de Engenharia Clínica (NFS-e), com Peças travadas em R$ 0,00.";
+          aviso.innerHTML = "<b>♻️ REGRA TRIBUTÁRIA ATIVA:</b> Peça Usada sem nota de entrada no estoque. O valor total está alocado em Serviços Especializados de Manutenção e Reparação Técnica (NFS-e), com Peças travadas em R$ 0,00.";
         }
         if (descr && (!descr.value || !descr.value.trim()) && os) {
-          descr.value = `Prestação de serviços especializados de engenharia clínica e manutenção corretiva/preventiva no equipamento ${os.equipamento || 'médico-hospitalar'}, incluindo recondicionamento e adequação técnica. OS #${os.id}.`;
+          descr.value = `Prestação de serviços especializados de manutenção e reparação técnica hospitalar no equipamento ${os.equipamento || 'médico-hospitalar'}, incluindo recondicionamento e adequação técnica. OS #${os.id}.`;
         }
       } else {
         if (inpPec) { inpPec.removeAttribute("readonly"); inpPec.style.background = "#fff"; }
@@ -2823,9 +2823,9 @@
       }
       if (descr) {
         if (temPecaUsadaSemNf) {
-          descr.value = `Prestação de serviços especializados de engenharia clínica e manutenção técnica no equipamento ${os.equipamento || 'médico'}, com aplicação de peças recondicionadas sem lastro fiscal de entrada. Faturamento 100% como serviço. OS #${os.id}.`;
+          descr.value = `Prestação de serviços especializados de manutenção e reparação técnica no equipamento ${os.equipamento || 'médico'}, com aplicação de peças recondicionadas sem lastro fiscal de entrada. Faturamento 100% como serviço. OS #${os.id}.`;
         } else {
-          descr.value = `Prestação de serviços especializados de engenharia clínica e manutenção corretiva/preventiva no equipamento ${os.equipamento || 'médico-hospitalar'}. OS #${os.id}.`;
+          descr.value = `Prestação de serviços especializados de manutenção e reparação técnica hospitalar no equipamento ${os.equipamento || 'médico-hospitalar'}. OS #${os.id}.`;
         }
       }
       aoMudarRegraFiscalModal(regra);
@@ -5844,7 +5844,7 @@ async function efetuarLogout() {
               <span style="font-size:20px;">🏥</span>
               <div>
                 <div style="font-size:14.5px; font-weight:900; color:#38bdf8; letter-spacing:0.3px;">EMED ELETROMEDICINA — CULTURA &amp; VALORES</div>
-                <div style="font-size:11px; color:#cbd5e1;">Engenharia Clínica e Diagnóstico por Imagem (emed.med.br)</div>
+                <div style="font-size:11px; color:#cbd5e1;">Manutenção e Reparação Técnica &bull; Diagnóstico por Imagem (emed.med.br)</div>
               </div>
             </div>
             <div style="display:grid; grid-template-columns:1fr; gap:10px;">
@@ -5857,7 +5857,7 @@ async function efetuarLogout() {
               <div style="background:rgba(255,255,255,0.06); border-left:3px solid #f59e0b; padding:10px 12px; border-radius:6px;">
                 <div style="font-size:11.5px; font-weight:800; color:#fbbf24; margin-bottom:3px;">🔭 VISÃO</div>
                 <div style="font-size:12px; line-height:1.45; color:#f1f5f9;">
-                  Ser referência nacional e parceiro estratégico de hospitais, clínicas e centros de diagnóstico pela excelência técnica, agilidade e alto padrão de qualidade em engenharia clínica.
+                  Ser referência nacional e parceiro estratégico de hospitais, clínicas e centros de diagnóstico pela excelência técnica, agilidade e alto padrão de qualidade em manutenção e reparação de equipamentos médico-hospitalares.
                 </div>
               </div>
               <div style="background:rgba(255,255,255,0.06); border-left:3px solid #22c55e; padding:10px 12px; border-radius:6px;">
@@ -6570,11 +6570,77 @@ Deseja confirmar mesmo assim com justificativa de chegada?`);
       `;
     }
         window._subAbaPecasAtiva = window._subAbaPecasAtiva || "SOLICITAR";
+    window._pecaUrgenciaSelecionada = window._pecaUrgenciaSelecionada || "NORMAL";
+    window._compraUrgenciaSelecionada = window._compraUrgenciaSelecionada || "NORMAL";
+
+    function selecionarUrgenciaPeca(nivel, prefixo = "ped") {
+      if (prefixo === "pedCompra") {
+        window._compraUrgenciaSelecionada = nivel;
+      } else {
+        window._pecaUrgenciaSelecionada = nivel;
+      }
+      const inp = document.getElementById(prefixo + "Urgencia");
+      if (inp) inp.value = nivel;
+
+      const niveis = ["NORMAL", "FINANCEIRO", "URGENTE"];
+      niveis.forEach(n => {
+        const btn = document.getElementById(prefixo + "Circulo_" + n);
+        const check = document.getElementById(prefixo + "Check_" + n);
+        if (btn) {
+          const ativo = (n === nivel);
+          btn.style.transform = ativo ? "scale(1.15)" : "scale(1)";
+          btn.style.boxShadow = ativo ? (n === 'NORMAL' ? '0 0 0 3px #ffffff, 0 0 10px rgba(34,197,94,0.8)' : n === 'FINANCEIRO' ? '0 0 0 3px #ffffff, 0 0 10px rgba(234,179,8,0.8)' : '0 0 0 3px #ffffff, 0 0 10px rgba(239,68,68,0.8)') : 'none';
+          btn.style.opacity = ativo ? "1" : "0.45";
+        }
+        if (check) {
+          check.style.display = (n === nivel) ? "inline" : "none";
+        }
+      });
+
+      const txt = document.getElementById(prefixo + "UrgenciaTexto");
+      if (txt) {
+        if (nivel === "URGENTE") {
+          txt.innerHTML = "<span style='color:#ef4444; font-weight:900;'>🚨 Urgente (Máq. Parada)</span>";
+        } else if (nivel === "FINANCEIRO") {
+          txt.innerHTML = "<span style='color:#eab308; font-weight:900;'>🟡 Financeiro Avalia</span>";
+        } else {
+          txt.innerHTML = "<span style='color:#22c55e; font-weight:900;'>🟢 Normal (Reposição)</span>";
+        }
+      }
+    }
+
+    function buscarCotacaoWeb(destino = 'google_shopping') {
+      const item = (document.getElementById("pedCompraItem")?.value || "").trim();
+      const modelo = (document.getElementById("pedCompraModelo")?.value || "").trim();
+      const pn = (document.getElementById("pedCompraPN")?.value || "").trim();
+      const termoCompleto = [item, pn, modelo].filter(Boolean).join(" ");
+      if (!termoCompleto) {
+        mostrarToast("⚠️ Digite o nome da peça ou modelo para buscar cotações.");
+        document.getElementById("pedCompraItem")?.focus();
+        return;
+      }
+      let url = "";
+      if (destino === 'google_shopping') {
+        url = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(termoCompleto + ' peça médica hospitalar')}`;
+      } else if (destino === 'mercadolivre') {
+        url = `https://lista.mercadolivre.com.br/${encodeURIComponent(termoCompleto)}`;
+      } else if (destino === 'google_web') {
+        url = `https://www.google.com/search?q=${encodeURIComponent(termoCompleto + ' reposição equipamento médico distribuidor')}`;
+      } else {
+        url = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(termoCompleto)}`;
+      }
+      window.open(url, '_blank');
+    }
+
     function trocarSubAbaPecas(aba) {
       window._subAbaPecasAtiva = aba;
-      renderMenuTecPecas(document.getElementById("conteudoPrincipal"));
+      const box = document.getElementById("mainContainer") || document.getElementById("conteudoPrincipal");
+      if (box) renderMenuTecPecas(box);
     }
+
     function renderMenuTecPecas(box) {
+      if (!box) box = document.getElementById("mainContainer") || document.getElementById("conteudoPrincipal");
+      if (!box) return;
       const d = STATE.data || {};
       const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "VALFREDO NETTO").toUpperCase();
       const tecnicos = (d.tecnicos || []).map(t => t.nome);
@@ -6589,25 +6655,33 @@ Deseja confirmar mesmo assim com justificativa de chegada?`);
         return f.status === "EM_USO" && (fTec === usuarioNome || (usuarioNome.includes("NETTO") && fTec.includes("NETTO")) || usuarioNome === "NETTO");
       });
       const aba = window._subAbaPecasAtiva || "SOLICITAR";
+      const urgPed = window._pecaUrgenciaSelecionada || "NORMAL";
+      const urgCompra = window._compraUrgenciaSelecionada || "NORMAL";
+
       box.innerHTML = `
         <div style="max-width:900px; margin:0 auto;">
-          <!-- NAVEGAÇÃO DE SUB-ABAS SUPERIORES -->
-          <div style="display:flex; gap:6px; background:#0f172a; padding:6px; border-radius:10px; margin-bottom:14px; border:1px solid #334155;">
-            <button type="button" onclick="trocarSubAbaPecas('SOLICITAR')" style="flex:1; padding:9px 6px; border-radius:7px; font-weight:800; font-size:12.5px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; background:${aba === 'SOLICITAR' ? '#0284c7' : 'transparent'}; color:${aba === 'SOLICITAR' ? '#ffffff' : '#94a3b8'};">
+          <!-- NAVEGAÇÃO DE SUB-ABAS SUPERIORES DEFINITIVAMENTE ALINHADA -->
+          <div style="display:flex; gap:6px; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; background:#0f172a; padding:6px; border-radius:12px; margin-bottom:14px; border:1px solid #334155; width:100%; box-sizing:border-box;">
+            <button type="button" onclick="trocarSubAbaPecas('SOLICITAR')" style="flex:1 0 auto; height:42px; min-height:42px; max-height:42px; padding:0 12px; border-radius:8px; font-weight:800; font-size:12px; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; background:${aba === 'SOLICITAR' ? '#0284c7' : '#1e293b'}; color:${aba === 'SOLICITAR' ? '#ffffff' : '#94a3b8'}; border:${aba === 'SOLICITAR' ? '1px solid #38bdf8' : '1px solid #334155'}; box-shadow:${aba === 'SOLICITAR' ? '0 2px 8px rgba(2,132,199,0.4)' : 'none'}; transition:all 0.2s;">
               <span>📝</span>
-              <span>Solicitar Peça</span>
+              <span>Pedir Peça</span>
             </button>
-            <button type="button" onclick="trocarSubAbaPecas('ACOMPANHAMENTO')" style="flex:1; padding:9px 6px; border-radius:7px; font-weight:800; font-size:12.5px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; background:${aba === 'ACOMPANHAMENTO' ? '#0284c7' : 'transparent'}; color:${aba === 'ACOMPANHAMENTO' ? '#ffffff' : '#94a3b8'}; position:relative;">
+            <button type="button" onclick="trocarSubAbaPecas('COMPRA')" style="flex:1 0 auto; height:42px; min-height:42px; max-height:42px; padding:0 12px; border-radius:8px; font-weight:800; font-size:12px; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; background:${aba === 'COMPRA' ? '#0284c7' : '#1e293b'}; color:${aba === 'COMPRA' ? '#ffffff' : '#94a3b8'}; border:${aba === 'COMPRA' ? '1px solid #38bdf8' : '1px solid #334155'}; box-shadow:${aba === 'COMPRA' ? '0 2px 8px rgba(2,132,199,0.4)' : 'none'}; transition:all 0.2s;">
+              <span>🛒</span>
+              <span>Cotação / Compra</span>
+            </button>
+            <button type="button" onclick="trocarSubAbaPecas('ACOMPANHAMENTO')" style="flex:1 0 auto; height:42px; min-height:42px; max-height:42px; padding:0 12px; border-radius:8px; font-weight:800; font-size:12px; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; background:${aba === 'ACOMPANHAMENTO' ? '#0284c7' : '#1e293b'}; color:${aba === 'ACOMPANHAMENTO' ? '#ffffff' : '#94a3b8'}; border:${aba === 'ACOMPANHAMENTO' ? '1px solid #38bdf8' : '1px solid #334155'}; box-shadow:${aba === 'ACOMPANHAMENTO' ? '0 2px 8px rgba(2,132,199,0.4)' : 'none'}; transition:all 0.2s;">
               <span>📋</span>
               <span>Acompanhamento</span>
               <span style="background:${pedidosTec.length ? '#f59e0b' : '#475569'}; color:#0f172a; font-size:10px; padding:1px 6px; border-radius:10px; font-weight:900;">${pedidosTec.length}</span>
             </button>
-            <button type="button" onclick="trocarSubAbaPecas('FERRAMENTAS')" style="flex:1; padding:9px 6px; border-radius:7px; font-weight:800; font-size:12.5px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; background:${aba === 'FERRAMENTAS' ? '#0284c7' : 'transparent'}; color:${aba === 'FERRAMENTAS' ? '#ffffff' : '#94a3b8'};">
+            <button type="button" onclick="trocarSubAbaPecas('FERRAMENTAS')" style="flex:1 0 auto; height:42px; min-height:42px; max-height:42px; padding:0 12px; border-radius:8px; font-weight:800; font-size:12px; border:none; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; background:${aba === 'FERRAMENTAS' ? '#0284c7' : '#1e293b'}; color:${aba === 'FERRAMENTAS' ? '#ffffff' : '#94a3b8'}; border:${aba === 'FERRAMENTAS' ? '1px solid #38bdf8' : '1px solid #334155'}; box-shadow:${aba === 'FERRAMENTAS' ? '0 2px 8px rgba(2,132,199,0.4)' : 'none'}; transition:all 0.2s;">
               <span>🧰</span>
-              <span>Painel de Ferramentas</span>
+              <span>Ferramentas</span>
               <span style="background:${ferramentasTec.length ? '#22c55e' : '#475569'}; color:#0f172a; font-size:10px; padding:1px 6px; border-radius:10px; font-weight:900;">${ferramentasTec.length}</span>
             </button>
           </div>
+
           <!-- SUB-ABA 1: SOLICITAR PEÇAS AO ALMOXARIFADO -->
           ${aba === "SOLICITAR" ? `
             <div class="section-box" style="background:#0f172a; border:1px solid rgba(56,189,248,0.3); border-radius:12px; padding:18px;">
@@ -6621,19 +6695,30 @@ Deseja confirmar mesmo assim com justificativa de chegada?`);
                 <span class="badge ativo" style="background:#0284c7; color:#fff;">👷 Solicitante: ${esc(usuarioNome)}</span>
               </div>
               <div style="display:grid; grid-template-columns:1fr; gap:12px;">
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:end;">
                   <div>
-                    <label class="field-label" style="font-size:11px; font-weight:800; color:#cbd5e1;">Técnico Solicitante</label>
-                    <select id="pedTec" class="select" style="background:#1e293b; color:#fff; border-color:#475569;">
+                    <label class="field-label" style="font-size:11px; font-weight:800; color:#cbd5e1; margin-bottom:4px; display:block;">👷 Técnico Solicitante</label>
+                    <select id="pedTec" class="select" style="background:#1e293b; color:#fff; border-color:#475569; height:42px; border-radius:8px; width:100%;">
                       ${tecnicos.map(t => `<option value="${esc(t)}" ${t.toUpperCase() === usuarioNome ? 'selected' : ''}>${esc(t)}</option>`).join("")}
                     </select>
                   </div>
                   <div>
-                    <label class="field-label" style="font-size:11px; font-weight:800; color:#cbd5e1;">Nível de Urgência / Prioridade</label>
-                    <select id="pedUrgencia" class="select" style="background:#1e293b; color:#fff; border-color:#475569;">
-                      <option value="NORMAL">🟢 Normal (Reposição / Preventiva)</option>
-                      <option value="URGENTE">🚨 URGENTE (Equipamento Parado no Hospital)</option>
-                    </select>
+                    <label class="field-label" style="font-size:11px; font-weight:800; color:#cbd5e1; margin-bottom:4px; display:block;">⚡ Nível de Urgência (Clique para Selecionar)</label>
+                    <input type="hidden" id="pedUrgencia" value="${urgPed}">
+                    <div style="display:flex; align-items:center; gap:8px; background:#1e293b; padding:4px 8px; border-radius:8px; border:1px solid #475569; height:42px; box-sizing:border-box;">
+                      <button type="button" id="pedCirculo_NORMAL" onclick="selecionarUrgenciaPeca('NORMAL', 'ped')" title="Normal (Reposição / Preventiva)" style="width:30px; height:30px; min-width:30px; border-radius:50%; background:#22c55e; border:2px solid ${urgPed === 'NORMAL' ? '#ffffff' : 'transparent'}; box-shadow:${urgPed === 'NORMAL' ? '0 0 0 3px #ffffff, 0 0 10px rgba(34,197,94,0.8)' : 'none'}; opacity:${urgPed === 'NORMAL' ? '1' : '0.45'}; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#ffffff; font-size:13px; font-weight:900; transform:${urgPed === 'NORMAL' ? 'scale(1.15)' : 'scale(1)'}; transition:all 0.2s;">
+                        <span id="pedCheck_NORMAL" class="circulo-check" style="display:${urgPed === 'NORMAL' ? 'inline' : 'none'};">✓</span>
+                      </button>
+                      <button type="button" id="pedCirculo_FINANCEIRO" onclick="selecionarUrgenciaPeca('FINANCEIRO', 'ped')" title="Financeiro Avalia (Atenção / Aprovação)" style="width:30px; height:30px; min-width:30px; border-radius:50%; background:#eab308; border:2px solid ${urgPed === 'FINANCEIRO' ? '#ffffff' : 'transparent'}; box-shadow:${urgPed === 'FINANCEIRO' ? '0 0 0 3px #ffffff, 0 0 10px rgba(234,179,8,0.8)' : 'none'}; opacity:${urgPed === 'FINANCEIRO' ? '1' : '0.45'}; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#000000; font-size:13px; font-weight:900; transform:${urgPed === 'FINANCEIRO' ? 'scale(1.15)' : 'scale(1)'}; transition:all 0.2s;">
+                        <span id="pedCheck_FINANCEIRO" class="circulo-check" style="display:${urgPed === 'FINANCEIRO' ? 'inline' : 'none'};">✓</span>
+                      </button>
+                      <button type="button" id="pedCirculo_URGENTE" onclick="selecionarUrgenciaPeca('URGENTE', 'ped')" title="URGENTE (Equipamento Parado no Hospital)" style="width:30px; height:30px; min-width:30px; border-radius:50%; background:#ef4444; border:2px solid ${urgPed === 'URGENTE' ? '#ffffff' : 'transparent'}; box-shadow:${urgPed === 'URGENTE' ? '0 0 0 3px #ffffff, 0 0 10px rgba(239,68,68,0.8)' : 'none'}; opacity:${urgPed === 'URGENTE' ? '1' : '0.45'}; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#ffffff; font-size:13px; font-weight:900; transform:${urgPed === 'URGENTE' ? 'scale(1.15)' : 'scale(1)'}; transition:all 0.2s;">
+                        <span id="pedCheck_URGENTE" class="circulo-check" style="display:${urgPed === 'URGENTE' ? 'inline' : 'none'};">✓</span>
+                      </button>
+                      <span id="pedUrgenciaTexto" style="font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:800; flex:1;">
+                        ${urgPed === 'URGENTE' ? "<span style='color:#ef4444; font-weight:900;'>🚨 Urgente (Máq. Parada)</span>" : urgPed === 'FINANCEIRO' ? "<span style='color:#eab308; font-weight:900;'>🟡 Financeiro Avalia</span>" : "<span style='color:#22c55e; font-weight:900;'>🟢 Normal (Reposição)</span>"}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div>
@@ -6652,7 +6737,7 @@ Deseja confirmar mesmo assim com justificativa de chegada?`);
                 </div>
                 <div>
                   <label class="field-label" style="font-size:11px; font-weight:800; color:#cbd5e1;">Instrumentos / Ferramentas Específicas (Opcional)</label>
-                  <input id="pedInst" list="listaInstAlmox" class="input" placeholder="Ex: Multímetro 1000V, Dosímetro, Fantoma de Mamografia..." style="background:#1e293b; color:#fff; border-color:#475569;" />
+                  <input id="pedInst" list="listaInstAlmox" class="input" placeholder="Ex: Multímetro 1000V, Dosímetro, Phantom de Mamografia..." style="background:#1e293b; color:#fff; border-color:#475569;" />
                   <datalist id="listaInstAlmox">
                     ${(d.estoque || []).filter(e => String(e.categoria).includes('INSTRUMENTO') || String(e.categoria).includes('IMOBILIZADO')).map(e => `<option value="#${esc(e.codigo)} — ${esc(e.nome_peca)}">`).join('')}
                   </datalist>
@@ -6663,15 +6748,117 @@ Deseja confirmar mesmo assim com justificativa de chegada?`);
               </div>
             </div>
           ` : ''}
-          <!-- SUB-ABA 2: ACOMPANHAMENTO DE SOLICITAÇÕES REALIZADAS -->
+
+          <!-- SUB-ABA 2: SOLICITAÇÃO DE COMPRA DE MATERIAL/PEÇA & COTAÇÃO -->
+          ${aba === "COMPRA" ? `
+            <div class="section-box" style="background:#0f172a; border:1px solid rgba(168,85,247,0.4); border-radius:12px; padding:18px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+                <div>
+                  <div style="font-size:15px; font-weight:900; color:#c084fc; display:flex; align-items:center; gap:6px;">
+                    <span>🛒 Solicitação de Compra & Cotações Externas</span>
+                  </div>
+                  <div style="font-size:11.5px; color:#94a3b8;">Para peças e materiais fora de estoque. O setor de compras/estoque recebe para cotação e aprovação.</div>
+                </div>
+                <span class="badge ativo" style="background:#7e22ce; color:#fff;">👷 Solicitante: ${esc(usuarioNome)}</span>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr; gap:12px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:end;">
+                  <div>
+                    <label class="field-label" style="font-size:11px; font-weight:800; color:#cbd5e1; margin-bottom:4px; display:block;">👷 Técnico Solicitante</label>
+                    <select id="pedCompraTec" class="select" style="background:#1e293b; color:#fff; border-color:#475569; height:42px; border-radius:8px; width:100%;">
+                      ${tecnicos.map(t => `<option value="${esc(t)}" ${t.toUpperCase() === usuarioNome ? 'selected' : ''}>${esc(t)}</option>`).join("")}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="field-label" style="font-size:11px; font-weight:800; color:#cbd5e1; margin-bottom:4px; display:block;">⚡ Nível de Urgência (Clique para Selecionar)</label>
+                    <input type="hidden" id="pedCompraUrgencia" value="${urgCompra}">
+                    <div style="display:flex; align-items:center; gap:8px; background:#1e293b; padding:4px 8px; border-radius:8px; border:1px solid #475569; height:42px; box-sizing:border-box;">
+                      <button type="button" id="pedCompraCirculo_NORMAL" onclick="selecionarUrgenciaPeca('NORMAL', 'pedCompra')" title="Normal (Reposição / Preventiva)" style="width:30px; height:30px; min-width:30px; border-radius:50%; background:#22c55e; border:2px solid ${urgCompra === 'NORMAL' ? '#ffffff' : 'transparent'}; box-shadow:${urgCompra === 'NORMAL' ? '0 0 0 3px #ffffff, 0 0 10px rgba(34,197,94,0.8)' : 'none'}; opacity:${urgCompra === 'NORMAL' ? '1' : '0.45'}; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#ffffff; font-size:13px; font-weight:900; transform:${urgCompra === 'NORMAL' ? 'scale(1.15)' : 'scale(1)'}; transition:all 0.2s;">
+                        <span id="pedCompraCheck_NORMAL" class="circulo-check" style="display:${urgCompra === 'NORMAL' ? 'inline' : 'none'};">✓</span>
+                      </button>
+                      <button type="button" id="pedCompraCirculo_FINANCEIRO" onclick="selecionarUrgenciaPeca('FINANCEIRO', 'pedCompra')" title="Financeiro Avalia (Atenção / Aprovação)" style="width:30px; height:30px; min-width:30px; border-radius:50%; background:#eab308; border:2px solid ${urgCompra === 'FINANCEIRO' ? '#ffffff' : 'transparent'}; box-shadow:${urgCompra === 'FINANCEIRO' ? '0 0 0 3px #ffffff, 0 0 10px rgba(234,179,8,0.8)' : 'none'}; opacity:${urgCompra === 'FINANCEIRO' ? '1' : '0.45'}; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#000000; font-size:13px; font-weight:900; transform:${urgCompra === 'FINANCEIRO' ? 'scale(1.15)' : 'scale(1)'}; transition:all 0.2s;">
+                        <span id="pedCompraCheck_FINANCEIRO" class="circulo-check" style="display:${urgCompra === 'FINANCEIRO' ? 'inline' : 'none'};">✓</span>
+                      </button>
+                      <button type="button" id="pedCompraCirculo_URGENTE" onclick="selecionarUrgenciaPeca('URGENTE', 'pedCompra')" title="URGENTE (Equipamento Parado no Hospital)" style="width:30px; height:30px; min-width:30px; border-radius:50%; background:#ef4444; border:2px solid ${urgCompra === 'URGENTE' ? '#ffffff' : 'transparent'}; box-shadow:${urgCompra === 'URGENTE' ? '0 0 0 3px #ffffff, 0 0 10px rgba(239,68,68,0.8)' : 'none'}; opacity:${urgCompra === 'URGENTE' ? '1' : '0.45'}; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; color:#ffffff; font-size:13px; font-weight:900; transform:${urgCompra === 'URGENTE' ? 'scale(1.15)' : 'scale(1)'}; transition:all 0.2s;">
+                        <span id="pedCompraCheck_URGENTE" class="circulo-check" style="display:${urgCompra === 'URGENTE' ? 'inline' : 'none'};">✓</span>
+                      </button>
+                      <span id="pedCompraUrgenciaTexto" style="font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:800; flex:1;">
+                        ${urgCompra === 'URGENTE' ? "<span style='color:#ef4444; font-weight:900;'>🚨 Urgente (Máq. Parada)</span>" : urgCompra === 'FINANCEIRO' ? "<span style='color:#eab308; font-weight:900;'>🟡 Financeiro Avalia</span>" : "<span style='color:#22c55e; font-weight:900;'>🟢 Normal (Reposição)</span>"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label class="field-label" style="font-size:11px; font-weight:800; color:#cbd5e1;">Hospital / Cliente / OS de Aplicação</label>
+                  <input id="pedCompraCli" list="listaClientesAlmox" class="input" placeholder="Digite hospital, clínica ou número da OS..." style="background:#1e293b; color:#fff; border-color:#475569;" />
+                </div>
+                <div>
+                  <label class="field-label" style="font-size:11px; font-weight:800; color:#cbd5e1;">Nome ou Especificações da Peça / Insumo *</label>
+                  <input id="pedCompraItem" class="input" placeholder="Ex: Tubo de RX Varian Rad-14, Transdutor Convexo GE E8C, Placa KV Control, Fonte 24V..." style="background:#1e293b; color:#fff; border-color:#475569; font-weight:700;" />
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr 100px; gap:10px;">
+                  <div>
+                    <label class="field-label" style="font-size:11px; font-weight:800; color:#cbd5e1;">Fabricante / Modelo Equipamento</label>
+                    <input id="pedCompraModelo" class="input" placeholder="Ex: GE BrightSpeed, Siemens Somatom..." style="background:#1e293b; color:#fff; border-color:#475569;" />
+                  </div>
+                  <div>
+                    <label class="field-label" style="font-size:11px; font-weight:800; color:#cbd5e1;">Código P/N (Part Number)</label>
+                    <input id="pedCompraPN" class="input" placeholder="Ex: 5184200, 2289456-2..." style="background:#1e293b; color:#fff; border-color:#475569;" />
+                  </div>
+                  <div>
+                    <label class="field-label" style="font-size:11px; font-weight:800; color:#cbd5e1;">Qtd</label>
+                    <input id="pedCompraQtd" type="number" min="1" value="1" class="input" style="background:#1e293b; color:#fff; border-color:#475569; text-align:center;" />
+                  </div>
+                </div>
+                <div>
+                  <label class="field-label" style="font-size:11px; font-weight:800; color:#cbd5e1;">Justificativa Técnica / Defeito Observado (Opcional)</label>
+                  <input id="pedCompraObs" class="input" placeholder="Ex: Equipamento apresentando erro no filamento do tubo, peça não recuperável em bancada..." style="background:#1e293b; color:#fff; border-color:#475569;" />
+                </div>
+
+                <!-- PAINEL DE BUSCA DE COTAÇÕES NA INTERNET -->
+                <div style="background:#1e1b4b; border:1px solid #6366f1; border-radius:10px; padding:12px; margin-top:4px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
+                    <div style="font-size:12.5px; font-weight:900; color:#a5b4fc; display:flex; align-items:center; gap:6px;">
+                      <span>🌐</span>
+                      <span>Pesquisa Rápida de Cotações na Internet</span>
+                    </div>
+                    <span style="font-size:10.5px; color:#c7d2fe;">Busca instantânea de preços e distribuidores</span>
+                  </div>
+                  <div style="font-size:11.5px; color:#cbd5e1; margin-bottom:10px; line-height:1.4;">
+                    Clique em qualquer canal abaixo para consultar preços, disponibilidade e referências de mercado para a peça preenchida acima:
+                  </div>
+                  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:8px;">
+                    <button type="button" onclick="buscarCotacaoWeb('google_shopping')" class="btn btn-sm" style="background:#312e81; border:1px solid #818cf8; color:#ffffff; font-weight:800; padding:8px 10px; border-radius:7px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                      <span>🛍️</span>
+                      <span>Google Shopping</span>
+                    </button>
+                    <button type="button" onclick="buscarCotacaoWeb('mercadolivre')" class="btn btn-sm" style="background:#312e81; border:1px solid #818cf8; color:#ffffff; font-weight:800; padding:8px 10px; border-radius:7px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                      <span>📦</span>
+                      <span>Mercado Livre</span>
+                    </button>
+                    <button type="button" onclick="buscarCotacaoWeb('google_web')" class="btn btn-sm" style="background:#312e81; border:1px solid #818cf8; color:#ffffff; font-weight:800; padding:8px 10px; border-radius:7px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                      <span>🔍</span>
+                      <span>Distribuidores Web</span>
+                    </button>
+                  </div>
+                </div>
+
+                <button class="btn btn-primary btn-block" onclick="enviarPedidoCompra()" style="background:#7e22ce; padding:13px; font-size:14px; font-weight:900; margin-top:6px; box-shadow:0 4px 14px rgba(126,34,206,0.35);">
+                  🚀 Enviar Requisição para Cotação do Estoque/Compras
+                </button>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- SUB-ABA 3: ACOMPANHAMENTO DE SOLICITAÇÕES REALIZADAS -->
           ${aba === "ACOMPANHAMENTO" ? `
             <div class="section-box" style="background:#0f172a; border:1px solid rgba(56,189,248,0.3); border-radius:12px; padding:18px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
                 <div>
                   <div style="font-size:15px; font-weight:900; color:#38bdf8;">📋 Acompanhamento de Solicitações Realizadas</div>
-                  <div style="font-size:11.5px; color:#94a3b8;">Histórico e status em tempo real das suas requisições ao almoxarifado</div>
+                  <div style="font-size:11.5px; color:#94a3b8;">Histórico e status em tempo real das suas requisições ao almoxarifado e compras</div>
                 </div>
-                <button type="button" onclick="sincronizarTudo(false).then(() => renderMenuTecPecas(document.getElementById('conteudoPrincipal')))" class="btn btn-sm" style="background:#1e293b; border:1px solid #475569; color:#38bdf8;">
+                <button type="button" onclick="sincronizarTudo(false).then(() => renderMenuTecPecas(document.getElementById('mainContainer')))" class="btn btn-sm" style="background:#1e293b; border:1px solid #475569; color:#38bdf8;">
                   🔄 Atualizar Status
                 </button>
               </div>
@@ -6679,7 +6866,7 @@ Deseja confirmar mesmo assim com justificativa de chegada?`);
                 <div style="text-align:center; padding:32px 16px; background:#1e293b; border-radius:10px; color:#94a3b8;">
                   <div style="font-size:32px; margin-bottom:8px;">📦</div>
                   <div style="font-size:13.5px; font-weight:800; color:#f8fafc;">Nenhuma solicitação de peças registrada no momento</div>
-                  <div style="font-size:11.5px; margin-top:4px;">Suas solicitações de peças e kits aparecerão aqui para acompanhamento contínuo.</div>
+                  <div style="font-size:11.5px; margin-top:4px;">Suas solicitações de peças, cotações e kits aparecerão aqui para acompanhamento contínuo.</div>
                   <button type="button" onclick="trocarSubAbaPecas('SOLICITAR')" class="btn btn-primary btn-sm" style="margin-top:12px; background:#0284c7;">
                     ➕ Fazer Nova Solicitação
                   </button>
@@ -6688,6 +6875,7 @@ Deseja confirmar mesmo assim com justificativa de chegada?`);
                 <div style="display:flex; flex-direction:column; gap:10px;">
                   ${pedidosTec.map(p => {
                     const st = String(p.status_pedido || '').toUpperCase();
+                    const isCompra = (p.tipo_origem_peca === 'COMPRA_EXTERNA') || st.includes('COTAÇÃO') || st.includes('COMPRA');
                     let stCor = '#f59e0b';
                     let stBg = 'rgba(245,158,11,0.15)';
                     let stIcon = '⏳';
@@ -6703,18 +6891,36 @@ Deseja confirmar mesmo assim com justificativa de chegada?`);
                       stCor = '#ef4444';
                       stBg = 'rgba(239,68,68,0.15)';
                       stIcon = '❌';
+                    } else if (isCompra) {
+                      stCor = '#c084fc';
+                      stBg = 'rgba(192,132,252,0.15)';
+                      stIcon = '🛒';
                     }
+                    const termCotacao = encodeURIComponent(String(p.itens_solicitados || '').replace(/\[.*?\]|\(.*?\)/g, '').trim() + ' peca equipamento medico');
                     return `
-                      <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; padding:13px; display:flex; flex-direction:column; gap:6px;">
+                      <div style="background:#1e293b; border:1px solid ${isCompra ? 'rgba(192,132,252,0.35)' : '#334155'}; border-radius:10px; padding:13px; display:flex; flex-direction:column; gap:6px;">
                         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-                          <span style="font-size:13px; font-weight:900; color:#f8fafc;">Pedido #${p.id} • 📅 ${esc(p.data_pedido || 'Hoje')}</span>
+                          <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:13px; font-weight:900; color:#f8fafc;">Pedido #${p.id} • 📅 ${esc(p.data_pedido || 'Hoje')}</span>
+                            ${isCompra ? `<span style="background:rgba(168,85,247,0.2); color:#c084fc; border:1px solid #a855f7; font-size:10px; padding:1px 6px; border-radius:4px; font-weight:800;">🛒 COTAÇÃO COMPRA</span>` : ''}
+                          </div>
                           <span style="background:${stBg}; color:${stCor}; border:1px solid ${stCor}; font-size:11px; padding:2px 8px; border-radius:6px; font-weight:800;">
                             ${stIcon} ${esc(p.status_pedido)}
                           </span>
                         </div>
                         <div style="font-size:12px; color:#cbd5e1;"><b>🏥 Destino:</b> ${esc(p.destino_cliente || 'Uso em Campo')}</div>
-                        <div style="font-size:12.5px; color:#38bdf8; font-weight:700;"><b>🔩 Peças:</b> ${esc(p.itens_solicitados)}</div>
-                        ${p.instrumentos_solicitados ? `<div style="font-size:11.5px; color:#94a3b8;"><b>🧰 Instrumentos:</b> ${esc(p.instrumentos_solicitados)}</div>` : ''}
+                        <div style="font-size:12.5px; color:${isCompra ? '#c084fc' : '#38bdf8'}; font-weight:700;"><b>🔩 Peças:</b> ${esc(p.itens_solicitados)}</div>
+                        ${p.instrumentos_solicitados ? `<div style="font-size:11.5px; color:#94a3b8;"><b>🧰 Detalhes / Instrumentos:</b> ${esc(p.instrumentos_solicitados)}</div>` : ''}
+                        ${isCompra ? `
+                          <div style="margin-top:4px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                            <a href="https://www.google.com/search?tbm=shop&q=${termCotacao}" target="_blank" rel="noopener" style="font-size:11px; color:#a5b4fc; text-decoration:none; background:#312e81; padding:3px 8px; border-radius:6px; border:1px solid #6366f1; display:inline-flex; align-items:center; gap:4px;">
+                              <span>🌐</span> Ver Cotações no Google Shopping
+                            </a>
+                            <a href="https://lista.mercadolivre.com.br/${encodeURIComponent(String(p.itens_solicitados || '').replace(/\[.*?\]|\(.*?\)/g, '').trim())}" target="_blank" rel="noopener" style="font-size:11px; color:#fde047; text-decoration:none; background:rgba(234,179,8,0.15); padding:3px 8px; border-radius:6px; border:1px solid #eab308; display:inline-flex; align-items:center; gap:4px;">
+                              <span>📦</span> Mercado Livre
+                            </a>
+                          </div>
+                        ` : ''}
                       </div>
                     `;
                   }).join('')}
@@ -6722,7 +6928,8 @@ Deseja confirmar mesmo assim com justificativa de chegada?`);
               `}
             </div>
           ` : ''}
-          <!-- SUB-ABA 3: PAINEL DE FERRAMENTAS DO TÉCNICO -->
+
+          <!-- SUB-ABA 4: PAINEL DE FERRAMENTAS DO TÉCNICO -->
           ${aba === "FERRAMENTAS" ? `
             <div class="section-box" style="background:#0f172a; border:1px solid rgba(56,189,248,0.3); border-radius:12px; padding:18px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
@@ -6770,6 +6977,47 @@ Deseja confirmar mesmo assim com justificativa de chegada?`);
         </div>
       `;
     }
+
+    async function enviarPedidoCompra() {
+      const tecVal = document.getElementById("pedCompraTec")?.value || (localStorage.getItem("emed_tecnico_selecionado") || "VALFREDO NETTO");
+      const cliVal = document.getElementById("pedCompraCli")?.value || "Demanda em Campo";
+      const itemVal = document.getElementById("pedCompraItem")?.value?.trim();
+      const modeloVal = document.getElementById("pedCompraModelo")?.value?.trim() || "";
+      const pnVal = document.getElementById("pedCompraPN")?.value?.trim() || "";
+      const qtdVal = document.getElementById("pedCompraQtd")?.value?.trim() || "1";
+      const obsVal = document.getElementById("pedCompraObs")?.value?.trim() || "";
+      const urgVal = document.getElementById("pedCompraUrgencia")?.value || "NORMAL";
+
+      if (!itemVal) {
+        mostrarToast("⚠️ Por favor, informe o nome ou especificação da peça para cotação.");
+        document.getElementById("pedCompraItem")?.focus();
+        return;
+      }
+
+      mostrarToast("⏳ Enviando solicitação de compra para cotação...");
+      const res = await apiPost("/api/solicitar-peca", {
+        tipo: "SOLICITACAO_COMPRA",
+        tecnico: tecVal,
+        cliente: cliVal,
+        itens: itemVal,
+        modelo_equipamento: modeloVal,
+        part_number: pnVal,
+        quantidade: qtdVal,
+        observacoes: obsVal,
+        urgencia: urgVal
+      });
+
+      if (res && res.ok) {
+        mostrarToast(res.msg || "🛒 Solicitação enviada com sucesso para o setor de compras!");
+        window._subAbaPecasAtiva = "ACOMPANHAMENTO";
+      } else {
+        mostrarToast("❌ " + (res?.msg || "Falha ao registrar solicitação de compra"));
+      }
+      await sincronizarTudo(false);
+      const box = document.getElementById("mainContainer") || document.getElementById("conteudoPrincipal");
+      if (box) renderMenuTecPecas(box);
+    }
+
     async function enviarPedidoPeca(tipo) {
       if (tipo === "BAIXA_CONSUMIVEL") {
         const res = await apiPost("/api/solicitar-peca", {
@@ -6790,14 +7038,15 @@ Deseja confirmar mesmo assim com justificativa de chegada?`);
           mostrarToast("⚠️ Por favor, informe a peça ou instrumento desejado.");
           return;
         }
-        const clienteFormatado = `${cliVal}${urgVal === 'URGENTE' ? ' [🚨 PARADA DE MÁQUINA URGENTE]' : ''}`;
+        const clienteFormatado = `${cliVal}${urgVal === 'URGENTE' ? ' [🚨 PARADA DE MÁQUINA URGENTE]' : urgVal === 'FINANCEIRO' ? ' [🟡 FINANCEIRO AVALIA]' : ''}`;
         mostrarToast("⏳ Enviando solicitação ao Almoxarifado...");
         const res = await apiPost("/api/solicitar-peca", {
           tipo: "PEDIDO_PECA",
           tecnico: tecVal,
           cliente: clienteFormatado,
           itens: itensVal,
-          instrumentos: instVal
+          instrumentos: instVal,
+          urgencia: urgVal
         });
         if (res && res.ok) {
           mostrarToast(res.msg || "✅ Solicitação de peças enviada com sucesso!");
@@ -6807,7 +7056,8 @@ Deseja confirmar mesmo assim com justificativa de chegada?`);
         }
       }
       await sincronizarTudo(false);
-      renderMenuTecPecas(document.getElementById("conteudoPrincipal"));
+      const box = document.getElementById("mainContainer") || document.getElementById("conteudoPrincipal");
+      if (box) renderMenuTecPecas(box);
     }
     /********************************************************************
      * MENU 4 (TÉCNICO): MANUAIS TÉCNICOS, POPs & VÍDEOS MP4
@@ -8019,7 +8269,7 @@ function renderMenuGesMural(box) {
       msg += `⚙️ *Status Operacional:* ${st}\n\n`;
       msg += `📝 *Parecer Técnico / Ocorrência:*\n${desc}\n\n`;
       msg += `📄 *Acesse o Relatório / Laudo Oficial em PDF:*\nhttps://emedservice.med.br/api/pdf/${o.id}\n\n`;
-      msg += `Atenciosamente,\n*Equipe de Engenharia Clínica & Atendimento EMED*`;
+      msg += `Atenciosamente,\n*Equipe de Suporte Técnico & Atendimento EMED*`;
       let tel = (o.whatsapp || o.contato_responsavel || o.telefone_tecnico || "").replace(/\D/g, "");
       if (tel && !tel.startsWith("55") && tel.length >= 10) tel = "55" + tel;
       const url = tel ? `https://api.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(msg)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
@@ -12275,7 +12525,7 @@ function fecharModalInsumosViagem() {
                           ⚖️ REGRA FISCAL: PEÇA USADA SEM NF DE ENTRADA ➔ FATURAMENTO 100% SERVIÇO (NFS-e)
                         </div>
                         <div style="font-size:11px;color:#581c87;margin-top:2px;line-height:1.4;">
-                          Como o item não teve nota de entrada no estoque da EMED, é <b>vedada a emissão de nota de produto/venda</b>. O faturamento integral (R$ ${valTotal.toFixed(2)}) deve ser gerado como <b>Nota Fiscal de Serviços (NFS-e)</b> com discriminação de engenharia clínica e recondicionamento.
+                          Como o item não teve nota de entrada no estoque da EMED, é <b>vedada a emissão de nota de produto/venda</b>. O faturamento integral (R$ ${valTotal.toFixed(2)}) deve ser gerado como <b>Nota Fiscal de Serviços (NFS-e)</b> com discriminação de manutenção e reparação técnica e recondicionamento.
                         </div>
                       </div>
                     ` : (temPecaNovaComNf ? `
@@ -12513,7 +12763,7 @@ function fecharModalInsumosViagem() {
         porCliente[cli] = (porCliente[cli] || 0) + v;
       });
       const topClientes = Object.entries(porCliente).sort((a,b) => b[1] - a[1]).slice(0, 5);
-      const custoEstimadoPecas = receitaTotal * 0.28; // Média histórica de CMV em engenharia clínica (28%)
+      const custoEstimadoPecas = receitaTotal * 0.28; // Média histórica de CMV em manutenção hospitalar (28%)
       const margemBruta = Math.max(0, receitaTotal - custoEstimadoPecas);
       const percMargem = receitaTotal > 0 ? ((margemBruta / receitaTotal) * 100).toFixed(1) : 0;
       return `
@@ -18127,7 +18377,7 @@ async function abrirPainelPMPAnual() {
                   📅 PLANO ANUAL DE PREVENTIVAS (PMP EMED - 3 ETAPAS ANUAIS)
                 </div>
                 <div style="font-size:11.5px;color:#c7d2fe;margin-top:2px;">
-                  Ciclo Quadrimestral Oficial (RDC 509 ANVISA / ONA) — Restrito à Gestão e Engenharia Clínica.
+                  Ciclo Quadrimestral Oficial (RDC 509 ANVISA / ONA) — Restrito à Gestão e Coordenação Técnica.
                 </div>
               </div>
               <button onclick="document.getElementById('modalPMPAnualBox')?.remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;padding:4px 8px;">✕</button>
@@ -18371,13 +18621,13 @@ async function abrirPainelPMPAnual() {
       tel = tel.replace(/\D/g, "");
       if (tel.length < 10) { alert("Telefone inválido."); return; }
       if (!tel.startsWith("55")) tel = "55" + tel;
-      let msg = `*EMED ELETROMEDICINA — ENGENHARIA CLÍNICA ESPECIALIZADA*\n\n` +
+      let msg = `*EMED ELETROMEDICINA — MANUTENÇÃO E REPARAÇÃO HOSPITALAR ESPECIALIZADA*\n\n` +
                 `Olá, *${op.contato_decisor || 'Diretoria / Coordenação'}* (${op.cliente})!\n\n` +
                 `Em nossa última análise técnica do equipamento *${op.equipamento}*, identificamos uma oportunidade estratégica de otimização de custos e segurança operacional:\n\n` +
                 `📌 *Tema:* ${op.tipo_oportunidade}\n` +
                 `📋 *Contexto:* ${op.descricao}\n\n` +
                 `Gostaríamos de apresentar uma proposta técnica sob medida para apoiar a instituição.\n\n` +
-                `_Departamento Comercial & Engenharia Clínica — EMED_\nwww.emedservice.med.br`;
+                `_Departamento Comercial & Suporte Técnico — EMED_\nwww.emedservice.med.br`;
       window.open(`https://api.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(msg)}`, '_blank');
     }
     async function atualizarStatusOportunidade(opId, novoStatus) {
@@ -19797,7 +20047,7 @@ async function abrirPainelPMPAnual() {
       const linkPdf = `https://emedservice.med.br/api/imprimir/${encodeURIComponent(osId)}`;
       const texto = `*EMED ELETROMEDICINA — LAUDO TÉCNICO OFICIAL*\n\n` +
                     `Olá, *${nomeResp}*!\n\n` +
-                    `Informamos que o atendimento técnico referente à *OS #${osId}* do equipamento *${equip}* no *${hospital}* foi concluído pela equipe de engenharia clínica da EMED.\n\n` +
+                    `Informamos que o atendimento técnico referente à *OS #${osId}* do equipamento *${equip}* no *${hospital}* foi concluído pela equipe de suporte técnico da EMED.\n\n` +
                     `📋 *Condição Final:* ${condicao}\n` +
                     `👨‍🔧 *Técnico Responsável:* ${tec}\n\n` +
                     `📄 *Acesse o Laudo Técnico Digital (PDF A4 com Assinaturas):*\n${linkPdf}\n\n` +
@@ -20079,7 +20329,7 @@ async function abrirPainelPMPAnual() {
     function enviarFichaPreInstalacaoWhatsApp(osId) {
       const ordens = STATE.data?.ordens || [];
       const os = ordens.find(o => String(o.id) === String(osId)) || STATE.osAberta || {};
-      const nomeResp = (os.responsavel_hospital || os.contato_responsavel || "Engenharia Clínica / Diretoria").trim();
+      const nomeResp = (os.responsavel_hospital || os.contato_responsavel || "Gestão Hospitalar / Diretoria").trim();
       const hospital = os.cliente || "Hospital";
       const equip = os.equipamento || "Equipamento Médico";
       const telRaw = (os.whatsapp || os.telefone || "").replace(/\D/g, "");
@@ -20103,7 +20353,7 @@ async function abrirPainelPMPAnual() {
                     `- Ar-condicionado 24h (18°C a 22°C)\n` +
                     `- Portas e corredores livres (largura mín. 1,20m) para movimentação mecânica\n\n` +
                     `_Por gentileza, confirme o aceite e prontidão da sala para envio da equipe técnica especializada._\n\n` +
-                    `Atenciosamente,\n*Departamento de Engenharia Clínica — EMED Eletromedicina*`;
+                    `Atenciosamente,\n*Departamento Técnico — EMED Eletromedicina*`;
       const urlWa = `https://api.whatsapp.com/send?phone=${tel}&text=${encodeURIComponent(texto)}`;
       window.open(urlWa, "_blank");
     }
@@ -20259,7 +20509,7 @@ async function abrirPainelPMPAnual() {
       const txt = 
 `🏥 *COMUNICADO DE AUTORIZAÇÃO DE ENTRADA & ACESSO TÉCNICO*
 Empresa: *EMED Eletromedicina Ltda.* (CNPJ: 07.283.365/0001-10)
-À Portaria, Recepção e Engenharia Clínica do *${os.hospital}*
+À Portaria, Recepção e Setor de Manutenção do *${os.hospital}*
 A/C: *${os.responsavel_hospital || 'Sra. Damares / William'}*
 Informamos que a equipe técnica credenciada da EMED comparecerá para atendimento na *OS #${os.os_id}*:
 🔧 *Equipamento:* ${os.equipamento}

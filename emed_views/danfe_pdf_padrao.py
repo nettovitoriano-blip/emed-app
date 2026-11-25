@@ -228,12 +228,33 @@ def gerar_danfe_padrao_pdf_bytes(nota: Dict[str, Any]) -> bytes:
 
     # Emitente
     pdf.rect(X0, y, w_emit, h_cab)
-    pdf.set_font("Helvetica", "B", 10.0)
-    pdf.set_xy(X0 + 2.0, y + 2.5)
-    pdf.multi_cell(w_emit - 4.0, 4.2, _txt(emit_nome[:70]), align="C")
-    pdf.set_font("Helvetica", "", 7.2)
-    pdf.set_xy(X0 + 2.0, y + 16.5)
-    pdf.multi_cell(w_emit - 4.0, 3.4, _txt(f"{emit_end}\nUF: {emit_uf} | CNPJ: {emit_cnpj}"), align="L")
+
+    # Marca d'água / carimbo oficial centralizado atrás dos dados
+    p_wm = os.path.join(os.path.dirname(os.path.dirname(__file__)), "emed_pwa_static", "logo_emed_watermark.png")
+    if os.path.exists(p_wm):
+        try:
+            pdf.image(p_wm, x=X0 + (w_emit - 24.0) / 2.0, y=y + 4.0, w=24.0)
+        except Exception:
+            pass
+
+    pdf.set_font("Helvetica", "B", 8.8)
+    pdf.set_xy(X0 + 1.5, y + 2.0)
+    pdf.multi_cell(w_emit - 3.0, 3.6, _txt(emit_nome[:70]), align="C")
+
+    emit_sub = str(nota.get("emitente_subtitulo") or "MANUTENCAO EM EQUIPAMENTOS DE DIAGNOSTICO POR IMAGEM").strip()
+    pdf.set_font("Helvetica", "B", 5.5)
+    pdf.set_xy(X0 + 1.5, y + 6.0)
+    pdf.cell(w_emit - 3.0, 2.6, _txt(emit_sub), align="C")
+
+    filial_tag = "FILIAL / DF" if is_df else "MATRIZ / CE"
+    pdf.set_font("Helvetica", "B", 6.2)
+    pdf.set_xy(X0 + 1.5, y + 9.2)
+    pdf.cell(w_emit - 3.0, 3.0, _txt(f"CNPJ: {emit_cnpj} - {filial_tag}"), align="C")
+
+    pdf.set_font("Helvetica", "", 6.0)
+    pdf.set_xy(X0 + 2.0, y + 13.0)
+    emit_txt_end = f"{emit_end}\nFone: {nota.get('emitente_fone', '(85) 3254-2929')}"
+    pdf.multi_cell(w_emit - 4.0, 2.8, _txt(emit_txt_end), align="C")
 
     # Quadro DANFE central
     xd = X0 + w_emit

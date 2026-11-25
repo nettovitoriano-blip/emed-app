@@ -62,6 +62,7 @@ conectada em tempo real ao banco SQLite (emed.db) e à planilha Excel (base_clie
 
 
 import os
+import re
 
 
 
@@ -1899,7 +1900,7 @@ def _listar_manuais_homologados() -> list:
 
         ("Video_Tutorial_Fluxo_Kits_Separacao_Entrega_Devolucao.mp4", "🎬 Tutorial Logística: Fluxo de Kits de Ferramentas (Separação, Envio, Entrega e Devolução)", "TREINAMENTO_SISTEMA", "ALMOXARIFADO & KITS"),
 
-        ("Video_Tutorial_Solicitacao_Pecas_Baseada_na_IT.mp4", "🎬 Tutorial Engenharia: Solicitação de Peças e Insumos Críticos com Base na IT", "TREINAMENTO_SISTEMA", "ESTOQUE & PEÇAS"),
+        ("Video_Tutorial_Solicitacao_Pecas_Baseada_na_IT.mp4", "🎬 Tutorial Técnico: Solicitação de Peças e Insumos Críticos com Base na IT", "TREINAMENTO_SISTEMA", "ESTOQUE & PEÇAS"),
 
         ("Video_Guia_Completo_Cliente_EmedOnline_Com_NotaFiscal.mp4", "🎬 Guia Completo: Portal do Cliente Integrado ao Faturamento e Nota Fiscal (NFS-e)", "TREINAMENTO_SISTEMA", "MÓDULO FISCAL"),
 
@@ -3855,18 +3856,34 @@ async def api_auth_status(request: web.Request) -> web.Response:
 
 
 
+def _validar_token_portal_cliente_raw(conn: sqlite3.Connection, request: web.Request) -> Optional[str]:
+    _garantir_schema_acessos_cliente(conn)
+    sess_cookie = str(request.cookies.get("emed_cli_session") or "").strip()
+    if sess_cookie:
+        payload = verificar_token_portal_cliente_assinado(sess_cookie)
+        if payload and payload.get("tok"):
+            row = conn.execute(
+                "SELECT cliente_nome FROM clientes_acessos_portal WHERE token_acesso = ? AND ativo = 1",
+                (str(payload["tok"]),),
+            ).fetchone()
+            if row:
+                return str(row[0])
+    auth_h = str(request.headers.get("Authorization") or "").strip()
+    bearer_tok = auth_h[7:].strip() if auth_h.lower().startswith("bearer ") else ""
+    tok = str(request.headers.get("X-Cliente-Token") or request.query.get("token") or bearer_tok or "").strip()
+    if not tok:
+        return None
+    row = conn.execute("SELECT cliente_nome FROM clientes_acessos_portal WHERE token_acesso = ? AND ativo = 1", (tok,)).fetchone()
+    return str(row[0]) if row else None
+
+
 @web.middleware
 
 async def auth_api_middleware(request: web.Request, handler):
     path = request.path
 
     # Defesa Ativa contra Ataques de Robôs / Botnets: Verificação de IP em Quarentena
-    ip_cliente = (
-        request.headers.get("CF-Connecting-IP")
-        or request.headers.get("X-Real-IP")
-        or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-        or (request.remote or "127.0.0.1")
-    )
+    ip_cliente = obter_ip_real(request)
     try:
         from emed_views.supervisorio_web import verificar_ip_bloqueado
         bloqueado, motivo_bloq = verificar_ip_bloqueado(ip_cliente, DB_NAME)
@@ -3882,19 +3899,16 @@ async def auth_api_middleware(request: web.Request, handler):
     # Lista estrita de recursos estáticos e públicos (Deny by Default)
     if (
         path in (
-            "/", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping",
+            "/", "/login", "/login.html", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping",
             "/api/logo", "/api/icone-autosave", "/api/logo-circle",
             "/api/app-icon/192", "/api/app-icon/512", "/api/app-icon/180", "/api/app-icon/maskable", "/api/app-icon/favicon",
             "/nav", "/gps", "/frota", "/apresentacao", "/portal-cliente", "/api/simbolo-emed",
-            "/supervisorio"
+            "/fiscal"
         )
         or path.startswith("/static/")
         or path.startswith("/api/app-icon/")
-        # Autenticação pública restrita (impede enumeração de usuários em /api/auth/usuarios)
-        or path in ("/api/auth/login", "/api/auth/logout", "/api/auth/status")
-        # Rotas fiscais públicas e operacionais do portal fiscal
-        or path == "/fiscal"
-        or path.startswith("/api/fiscal/")
+        # Autenticação pública estrita (impede enumeração de usuários em /api/auth/usuarios)
+        or path in ("/api/auth/login", "/api/auth/logout", "/api/auth/status", "/api/fiscal/v2/login", "/api/cliente/acesso/login", "/api/cliente/acesso/logout")
         # Handshake público de dispositivos (bloqueia /listar, /acao, /codigo/gerar sem login de gestor)
         or path in ("/api/dispositivos/status", "/api/dispositivos/registrar", "/api/dispositivos/liberar-com-codigo")
         or path.startswith("/qrcode/")
@@ -3903,11 +3917,7 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/lab/r/")
         or path.startswith("/proposta/")
         or path == "/api/proposta/responder"
-        or path.startswith("/api/supervisorio/")
-        or path == "/api/pix/webhook"
-        or path == "/api/cliente/acesso/login"
-        or path == "/api/cliente/portal-dados"
-        or path == "/api/cliente/portal-salvar-doc"
+        or path.startswith("/api/fiscal/danfe/")
         # Proxies para visualização de navegação/radares no veículo (Apenas leituras GET)
         or (request.method == "GET" and (
             path.startswith("/api/car")
@@ -3921,43 +3931,99 @@ async def auth_api_middleware(request: web.Request, handler):
     ):
         return await handler(request)
 
+    auth_h = request.headers.get("Authorization", "").strip()
+    api_k = (request.headers.get("X-API-Key", "") or request.query.get("api_key", "")).strip()
 
-
-    # Token oficial de telemetria GPS
-
-    auth_h = request.headers.get("Authorization", "")
-
-    api_k = request.headers.get("X-API-Key", "") or request.query.get("api_key", "")
-
-    if auth_h.startswith("Bearer ") and auth_h[7:].strip() in (TOKEN_OFICIAL_GPS, "EMED-2026-PILOTO"):
-
-        return await handler(request)
-
-    if api_k in (TOKEN_OFICIAL_GPS, "EMED-2026-PILOTO"):
-
-        return await handler(request)
-
-
-
-    # Checa sessão de usuário
-
+    # 1. Sessão oficial de colaborador/gestor EMED (cookie HttpOnly, Bearer ou ?token=)
     token = request.query.get("token") or request.cookies.get("emed_session")
-
-    if not token and auth_h.startswith("Bearer "):
-
+    if not token and auth_h.lower().startswith("bearer "):
         token = auth_h[7:].strip()
 
-    
-
     user = verificar_token_sessao(token)
-
     if user:
-
         request["_emed_user"] = user
+        rotas_gestor = (
+            "/supervisorio",
+            "/api/supervisorio/",
+            "/api/dispositivos/listar",
+            "/api/dispositivos/acao",
+            "/api/dispositivos/codigo/gerar",
+            "/api/dispositivos/codigo/ativo",
+            "/api/cliente/acesso/gerar",
+            "/api/cliente/acesso/listar",
+            "/api/auditoria/",
+            "/api/pix/simular-webhook",
+            "/api/estoque/precificacao-atualizar",
+            "/api/tecnico/salvar",
+        )
+        if any(path == r or path.startswith(r) for r in rotas_gestor) and not _eh_gestor_ou_admin(user):
+            if path == "/supervisorio":
+                return web.Response(text="⛔ Acesso restrito a Gestores e Administradores.", status=403)
+            return web.json_response({"ok": False, "msg": "⛔ Acesso restrito a Gestores e Administradores."}, status=403)
+
+        rotas_fiscal_restritas = (
+            "/api/fiscal/cancelar-nota",
+            "/api/fiscal/v2/cancelar",
+            "/api/fiscal/v2/salvar-config",
+            "/api/fiscal/v2/emitir",
+            "/api/fiscal/liberar-quarentena",
+            "/api/fiscal/enviar-contabilidade",
+            "/api/fiscal/relatorio-contabil-csv",
+            "/api/fiscal/v2/cfop/",
+            "/api/fiscal/v2/despesas-unidades",
+        )
+        if any(path.startswith(r) for r in rotas_fiscal_restritas) and not _eh_fiscal_ou_gestor(user):
+            return web.json_response({"ok": False, "msg": "⛔ Operação fiscal restrita ao perfil Fiscal/Gestor."}, status=403)
 
         return await handler(request)
 
+    # 2. Sessão exclusiva do Portal do Cliente (escopada estritamente às rotas da unidade)
+    if (
+        path in (
+            "/api/cliente/portal-dados",
+            "/api/cliente/portal-salvar-doc",
+            "/api/unidade/gestor-resumo",
+            "/api/unidade/registro/salvar",
+            "/api/unidade/registro/excluir",
+            "/api/unidade/pgts/imprimir",
+            "/api/cliente/dossie-radiologico/imprimir",
+        )
+        or path.startswith("/api/cliente/dossie-radiologico/arquivo/")
+        or path.startswith("/api/imprimir/")
+    ):
+        try:
+            with get_db_connection(DB_NAME) as conn:
+                cli_auth = _validar_token_portal_cliente_raw(conn, request)
+        except Exception:
+            cli_auth = None
+        if cli_auth:
+            request["_emed_cliente"] = cli_auth
+            return await handler(request)
 
+    # 3. Chave de API de telemetria GPS/Frota (escopo restrito, sem acesso ao ERP)
+    if (
+        path.startswith("/api/gps/")
+        or path.startswith("/api/v1/veiculos")
+        or path.startswith("/api/v1/frota/")
+        or path in ("/api/frota/webhook-detran",)
+    ):
+        cand_gps = (auth_h[7:].strip() if auth_h.lower().startswith("bearer ") else "") or api_k
+        if cand_gps and TOKEN_OFICIAL_GPS and hmac.compare_digest(cand_gps, TOKEN_OFICIAL_GPS):
+            return await handler(request)
+
+    # 4. Webhook bancário PIX autenticado por segredo dedicado
+    if path == "/api/pix/webhook":
+        pix_sec = (
+            request.headers.get("X-Webhook-Secret", "").strip()
+            or (auth_h[7:].strip() if auth_h.lower().startswith("bearer ") else "")
+            or str(request.query.get("secret") or "").strip()
+        )
+        if pix_sec and EMED_PIX_WEBHOOK_SECRET and hmac.compare_digest(pix_sec, EMED_PIX_WEBHOOK_SECRET):
+            return await handler(request)
+        return web.json_response({"ok": False, "erro": "Webhook PIX não autorizado (X-Webhook-Secret inválido)."}, status=401)
+
+    if path == "/supervisorio":
+        raise web.HTTPFound("/?next=/supervisorio")
 
     if path.startswith("/api/"):
 
@@ -3970,8 +4036,6 @@ async def auth_api_middleware(request: web.Request, handler):
             "requer_login": True
 
         }, status=401)
-
-
 
     return await handler(request)
 
@@ -9788,6 +9852,13 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
     # Dados do Tomador / Cliente
     cli_nome = limpar_texto(row_os.get("cliente") if row_os is not None else dados_nf.get("cliente", "CLIENTE EMED"), "CLIENTE EMED")
+    cli_sess = str(request.get("_emed_cliente") or "").strip().upper()
+    if cli_sess:
+        cli_ok = (cli_sess == cli_nome.strip().upper())
+        if not cli_ok and dados_nf:
+            cli_ok = (cli_sess == limpar_texto(dados_nf.get("cliente"), "").upper())
+        if not cli_ok:
+            return web.Response(text="⛔ DANFE pertence a outra unidade hospitalar.", status=403)
     cnpj_cli = limpar_texto(row_os.get("cnpj") if row_os is not None else dados_nf.get("cnpj_tomador", ""), "00.000.000/0000-00")
     end_cli = limpar_texto(row_os.get("endereco") if row_os is not None else dados_nf.get("tomador_endereco", ""), "UNIDADE HOSPITALAR")
     cid_cli = limpar_texto(row_os.get("cidade") if row_os is not None else dados_nf.get("tomador_cidade", ""), "FORTALEZA")
@@ -9796,7 +9867,18 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
     cep_cli = limpar_texto(row_os.get("cep") if row_os is not None else dados_nf.get("tomador_cep", ""), "60135-237" if cid_cli == "FORTALEZA" else "71987-360" if uf_cli == "DF" else "61769-470")
 
     whats_raw = row_os.get("whatsapp") if row_os is not None else ""
-    whats_cli = _limpar_telefone_exibicao(whats_raw) or "(85) 3254-2929"
+    whats_raw_str = str(whats_raw or "").strip()
+    if whats_raw_str.endswith(".0"):
+        whats_raw_str = whats_raw_str[:-2]
+    whats_digits = "".join(c for c in whats_raw_str if c.isdigit())
+    if whats_digits.startswith("55") and len(whats_digits) in (12, 13):
+        whats_digits = whats_digits[2:]
+    if len(whats_digits) == 11:
+        whats_cli = f"({whats_digits[:2]}) {whats_digits[2:7]}-{whats_digits[7:]}"
+    elif len(whats_digits) == 10:
+        whats_cli = f"({whats_digits[:2]}) {whats_digits[2:6]}-{whats_digits[6:]}"
+    else:
+        whats_cli = _limpar_telefone_exibicao(whats_raw) or "(85) 3254-2929"
 
     equip_nome = limpar_texto(row_os.get("equipamento") if row_os is not None else "", "EQUIPAMENTO HOSPITALAR")
     tec_nome = limpar_texto(row_os.get("tecnico_responsavel") if row_os is not None else "", "VALFREDO NETTO")
@@ -9848,7 +9930,8 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
     barcode_svg = _gerar_code128c_svg(chave_raw, height=36)
 
     protocolo_autorizacao = dados_nf.get("protocolo_autorizacao") or f"1{chave_raw[:2]}26{os_id.zfill(9)} - {dt_emissao} {hr_emissao}"
-    nat_operacao = dados_nf.get("natureza_operacao") or "PRESTAÇÃO DE SERVIÇOS DE ENGENHARIA CLÍNICA / MANUTENÇÃO HOSPITALAR"
+    nat_operacao_raw = dados_nf.get("natureza_operacao") or "PRESTAÇÃO DE SERVIÇOS DE MANUTENÇÃO E REPARAÇÃO TÉCNICA HOSPITALAR"
+    nat_operacao = re.sub(r"engenharia\s*cl[ií]nica", "Manutenção e Reparação Técnica", str(nat_operacao_raw), flags=re.IGNORECASE)
 
     # Valores
     val_srv = float(dados_nf.get("valor_servicos") or 0.0)
@@ -9861,15 +9944,30 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
 
     # Prestador / Filial
     filial_emissora = dados_nf.get("filial_emissora") or ("FILIAL_DF" if uf_cli == "DF" else "MATRIZ_CE")
-    prestador_razao = dados_nf.get("prestador_razao") or ("EMED ELETROMEDICINA LTDA. - FILIAL BRASÍLIA" if filial_emissora == "FILIAL_DF" else "EMED ELETROMEDICINA LTDA.")
-    prestador_cnpj = dados_nf.get("prestador_cnpj") or ("03.611.974/0002-80" if filial_emissora == "FILIAL_DF" else "03.611.974/0001-08")
+    prestador_razao = "EMED ELETROMEDICINA LTDA."
+    prestador_subtitulo = "MANUTENÇÃO EM EQUIPAMENTOS DE DIAGNÓSTICO POR IMAGEM"
+    prestador_unidade_tag = "FILIAL / DF" if filial_emissora == "FILIAL_DF" else "MATRIZ / CE"
+    prestador_cnpj = "03.611.974/0002-80" if filial_emissora == "FILIAL_DF" else "03.611.974/0001-08"
     prestador_im = dados_nf.get("prestador_im") or ("61-3234-3647 (CF/DF)" if filial_emissora == "FILIAL_DF" else "123456-7")
-    prestador_end = dados_nf.get("prestador_endereco") or ("ADE Conjunto 12, Lote 28 - Águas Claras" if filial_emissora == "FILIAL_DF" else "Rua Coronel Freire, 16 - Bairro Amador")
-    prestador_cid = dados_nf.get("prestador_cidade") or ("Brasília" if filial_emissora == "FILIAL_DF" else "Eusébio")
-    prestador_uf = dados_nf.get("prestador_uf") or ("DF" if filial_emissora == "FILIAL_DF" else "CE")
-    prestador_cep = "71987-360" if filial_emissora == "FILIAL_DF" else "61769-470"
-    prestador_fone = dados_nf.get("prestador_fone") or ("(61) 3234-3647 / (61) 99658-5392" if filial_emissora == "FILIAL_DF" else "(85) 3254-2929")
-    prestador_email = dados_nf.get("prestador_email") or ("brasilia@emed.med.br" if filial_emissora == "FILIAL_DF" else "financeiro@emed.med.br")
+
+    if filial_emissora == "FILIAL_DF":
+        prestador_logradouro = "ADE Conjunto 12, Lote 28"
+        prestador_bairro = "Águas Claras"
+        prestador_cid = "Brasília"
+        prestador_uf = "DF"
+        prestador_cep = "71987-360"
+        prestador_fone = "(61) 3234-3647 / (61) 99658-5392"
+        prestador_email = "brasilia@emed.med.br"
+    else:
+        prestador_logradouro = "Rua Coronel Freire, 16"
+        prestador_bairro = "Bairro Amador"
+        prestador_cid = "Eusébio"
+        prestador_uf = "CE"
+        prestador_cep = "61769-470"
+        prestador_fone = "(85) 3254-2929"
+        prestador_email = "financeiro@emed.med.br"
+
+    prestador_end = f"{prestador_logradouro} - {prestador_bairro} - {prestador_cid}/{prestador_uf}"
     sub_titulo_unidade = "Unidade Brasília (DF)" if filial_emissora == "FILIAL_DF" else "Matriz Ceará"
 
     # Logo base64
@@ -9891,6 +9989,35 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
         for r_p in cur.fetchall():
             pecas.append({"item": r_p[0], "codigo": r_p[1] or "PEC", "origem": r_p[2] or "NOVA_COM_NF"})
 
+    # ----------------------------------------------------
+    # FILTRO DINÂMICO DA NATUREZA DA OPERAÇÃO (SEFAZ)
+    # Classificação rigorosa: Serviço, Venda de Peças ou Conjugada (Serviço + Peças)
+    # ----------------------------------------------------
+    nat_raw = str(dados_nf.get("natureza_operacao") or "").strip()
+    tp_up = str(tipo_nota or "").upper()
+    is_poluida = any(k in nat_raw.upper() for k in ["VENDA/APLICAÇÃO", "VALOR FINAL", "BOLETO", "[", "]", "PEC-"])
+
+    if "RETORNO" in tp_up or "RETORNO" in nat_raw.upper():
+        nat_operacao = "RETORNO DE EQUIPAMENTO/BEM RECEBIDO PARA CONSERTO"
+    elif "REMESSA" in tp_up or "REMESSA" in nat_raw.upper():
+        nat_operacao = "REMESSA DE EQUIPAMENTO/BEM PARA CONSERTO OU REPARO"
+    elif "COMODATO" in tp_up or "COMODATO" in nat_raw.upper():
+        nat_operacao = "REMESSA DE BEM EM REGIME DE COMODATO"
+    elif nat_raw and not is_poluida and "TRIBUTAÇÃO" not in nat_raw.upper():
+        nat_operacao = re.sub(r"engenharia\s*cl[ií]nica", "Manutenção e Reparação Técnica", nat_raw, flags=re.IGNORECASE)
+    else:
+        # Filtrado de acordo com a composição real da nota fiscal
+        if val_srv > 0 and val_pec > 0:
+            nat_operacao = "PRESTAÇÃO DE SERVIÇOS COM FORNECIMENTO DE PEÇAS"
+        elif val_pec > 0 and val_srv == 0:
+            nat_operacao = "VENDA DE MERCADORIA / PEÇAS DE REPOSIÇÃO"
+        elif val_srv > 0 and val_pec == 0:
+            nat_operacao = "PRESTAÇÃO DE SERVIÇOS DE MANUTENÇÃO E REPARAÇÃO TÉCNICA"
+        elif "PEÇA" in tp_up or pecas:
+            nat_operacao = "VENDA DE MERCADORIA / PEÇAS DE REPOSIÇÃO"
+        else:
+            nat_operacao = "PRESTAÇÃO DE SERVIÇOS DE MANUTENÇÃO E REPARAÇÃO TÉCNICA"
+
     # Retorna o arquivo binário .PDF caso expressamente solicitado via query string ?formato=pdf ou ?view=pdf
     if request.query.get("formato") == "pdf" or request.query.get("view") == "pdf":
         try:
@@ -9900,7 +10027,7 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
             if val_srv > 0 or not pecas:
                 itens_pdf.append({
                     "codigo": f"SRV-{os_id.zfill(4)}",
-                    "descricao": f"SERVICOS ENG. CLINICA ({equip_nome}) - OS #{os_id}",
+                    "descricao": f"SERVICOS DE MANUTENCAO E REPARACAO TECNICA ({equip_nome}) - OS #{os_id}",
                     "ncm": "00000000",
                     "cst": "0400",
                     "cfop": cfop_srv,
@@ -9938,7 +10065,8 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
                         "total": val_pec,
                     })
 
-            descr_compl = dados_nf.get("discriminacao_servico") or f"Prestacao de servicos especializados de engenharia clinica no equipamento {equip_nome}. OS #{os_id}."
+            descr_compl_raw = dados_nf.get("discriminacao_servico") or f"Prestacao de servicos especializados de manutencao e reparacao tecnica no equipamento {equip_nome}. OS #{os_id}."
+            descr_compl = re.sub(r"engenharia\s*cl[ií]nica", "manutencao e reparacao tecnica", str(descr_compl_raw), flags=re.IGNORECASE)
             texto_adic = (
                 f"{descr_compl}\n"
                 f"Status Fiscal: {st_fiscal} | Protocolo: {protocolo_autorizacao}\n"
@@ -9950,9 +10078,10 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
                 "chave_acesso": chave_raw,
                 "protocolo": protocolo_autorizacao,
                 "emitente_nome": prestador_razao,
+                "emitente_subtitulo": prestador_subtitulo,
                 "emitente_cnpj": prestador_cnpj,
                 "emitente_uf": prestador_uf,
-                "emitente_endereco": f"{prestador_end}, {prestador_cid} - {prestador_uf}",
+                "emitente_endereco": f"{prestador_logradouro} - {prestador_bairro} - {prestador_cid} - {prestador_uf} - CEP: {prestador_cep}",
                 "emitente_ie": prestador_im,
                 "dest_nome": cli_nome,
                 "dest_cnpj": cnpj_cli,
@@ -9985,25 +10114,30 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
             logger.error(f"Erro ao gerar PDF da DANFE: {e}")
 
     # Itens HTML
-    linhas_itens_html = f"""
+    linhas_itens_html = ""
+    # Renderiza linha de serviços se houver valor de serviço ou se não houver peças
+    if val_srv > 0 or not pecas:
+        cfop_serv = "6933" if uf_cli != prestador_uf else "5933"
+        linhas_itens_html += f"""
       <tr>
         <td style="text-align: center; font-weight: bold;">SRV-{os_id.zfill(4)}</td>
         <td>
-          <b>PRESTAÇÃO DE SERVIÇOS ESPECIALIZADOS DE ENGENHARIA CLÍNICA</b><br/>
+          <b>PRESTAÇÃO DE SERVIÇOS ESPECIALIZADOS DE MANUTENÇÃO E REPARAÇÃO TÉCNICA</b><br/>
           <span style="font-size: 6pt; color: #334155;">Manutenção técnica preventiva/corretiva e validação no equipamento {equip_nome}. Atendimento OS #{os_id}. Normas ANVISA RDC 611 e ABNT NBR IEC 60601.</span>
         </td>
         <td style="text-align: center;">0000.00.00</td>
         <td style="text-align: center;">0400</td>
-        <td style="text-align: center; font-weight: bold;">{"6933" if uf_cli != prestador_uf else "5933"}</td>
+        <td style="text-align: center; font-weight: bold;">{cfop_serv}</td>
         <td style="text-align: center;">SV</td>
         <td style="text-align: right; font-weight: bold;">1,00</td>
         <td style="text-align: right;">R$ {val_srv:,.2f}</td>
         <td style="text-align: right; font-weight: bold;">R$ {val_srv:,.2f}</td>
         <td style="text-align: center;">5%</td>
       </tr>
-    """
+        """
     val_pec_un_str = f"{(val_pec / len(pecas)):,.2f}" if (val_pec > 0 and pecas) else "0,00"
     for p in pecas:
+        cfop_pec = ("6102" if val_pec > 0 else "6949") if uf_cli != prestador_uf else ("5102" if val_pec > 0 else "5949")
         linhas_itens_html += f"""
       <tr>
         <td style="text-align: center; font-weight: bold;">{p['codigo']}</td>
@@ -10013,7 +10147,7 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
         </td>
         <td style="text-align: center;">9022.90.90</td>
         <td style="text-align: center;">0400</td>
-        <td style="text-align: center; font-weight: bold;">{"6949" if uf_cli != prestador_uf else "5949"}</td>
+        <td style="text-align: center; font-weight: bold;">{cfop_pec}</td>
         <td style="text-align: center;">UN</td>
         <td style="text-align: right; font-weight: bold;">1,00</td>
         <td style="text-align: right;">R$ {val_pec_un_str}</td>
@@ -10122,7 +10256,6 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
       font-weight: 900;
       padding: 2px 4px;
       text-transform: uppercase;
-      letter-spacing: 0.3px;
       border: 1px solid #000;
       border-bottom: none;
       margin-top: 4px;
@@ -10230,25 +10363,24 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
     <!-- CABEÇALHO PRINCIPAL (3 COLUNAS) -->
     <table class="box-grid">
       <tr>
-        <!-- IDENTIFICAÇÃO DO EMITENTE (COM A LOGO DA EMED PRESERVADA) -->
-        <td style="width: 44%; padding: 5px; vertical-align: middle;">
-          <table style="width: 100%; border-collapse: collapse;">
-            <tr>
-              <td style="width: 68px; vertical-align: middle; border: none; padding: 0 6px 0 0; text-align: center;">
-                <img src="{img_logo_src}" alt="EMED" style="width: 62px; height: 62px; object-fit: contain;" onerror="this.src='/api/logo'" />
-              </td>
-              <td style="vertical-align: middle; border: none; padding: 0;">
-                <div style="font-size: 9.5pt; font-weight: 900; color: #000; line-height: 1.1;">{prestador_razao}</div>
-                <div style="font-size: 6pt; font-weight: bold; color: #002b54; margin-top: 1px;">ELETROMEDICINA • ENGENHARIA CLÍNICA • DIAGNÓSTICO POR IMAGEM • {sub_titulo_unidade.upper()}</div>
-                <div style="font-size: 6pt; color: #000; margin-top: 2px; line-height: 1.3;">
-                  {prestador_end}<br/>
-                  {prestador_cid} - {prestador_uf} • CEP: {prestador_cep} • Fone: {prestador_fone}<br/>
-                  CNPJ: <b>{prestador_cnpj}</b><br/>
-                  Insc. Municipal / CF-DF: <b>{prestador_im}</b>
-                </div>
-              </td>
-            </tr>
-          </table>
+        <!-- IDENTIFICAÇÃO DO EMITENTE (TEXTO CENTRALIZADO EXTENDIDO OCUPANDO 90% COM CARIMBO D'ÁGUA CENTRALIZADO GRANDE) -->
+        <td style="width: 44%; padding: 6px 8px; vertical-align: middle; position: relative; overflow: hidden; text-align: center;">
+          <!-- CARIMBO / MARCA D'ÁGUA OFICIAL DA EMED CENTRALIZADO E GRANDE ATRÁS DOS DADOS -->
+          <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-10deg); width: 114px; height: 114px; opacity: 0.11; pointer-events: none; z-index: 1;">
+            <img src="{img_logo_src}" alt="" style="width: 100%; height: 100%; object-fit: contain;" />
+          </div>
+
+          <div style="position: relative; z-index: 2; width: 94%; margin: 0 auto; text-align: center;">
+            <div style="font-size: 10.2pt; font-weight: 900; color: #000; line-height: 1.15; letter-spacing: 0.4px; text-transform: uppercase;">{prestador_razao}</div>
+            <div style="font-size: 5.7pt; font-weight: 800; color: #002b54; margin-top: 2px; letter-spacing: -0.18px; white-space: nowrap;">MANUTENÇÃO EM EQUIPAMENTOS DE DIAGNÓSTICO POR IMAGEM</div>
+            <div style="font-size: 6.5pt; font-weight: 900; color: #000; margin-top: 3px; letter-spacing: 0.2px;">
+              CNPJ: {prestador_cnpj} &bull; {prestador_unidade_tag}
+            </div>
+            <div style="font-size: 5.9pt; color: #1e293b; margin-top: 3px; line-height: 1.35;">
+              {prestador_logradouro} - {prestador_bairro} - {prestador_cid} - {prestador_uf}<br/>
+              CEP: {prestador_cep} &bull; Fone: {prestador_fone}
+            </div>
+          </div>
         </td>
 
         <!-- QUADRO DANFE CENTRAL -->
@@ -10525,7 +10657,7 @@ async def api_fiscal_danfe(request: web.Request) -> web.Response:
             &bull; DOCUMENTO EMITIDO POR ME OU EPP OPTANTE PELO SIMPLES NACIONAL.<br/>
             &bull; NÃO GERA DIREITO A CRÉDITO FISCAL DE IPI / ICMS.<br/>
             &bull; Valor aproximado dos tributos federais e municipais (Lei da Transparência 12.741/2012 - IBPT): R$ {(val_total * 0.1345):,.2f} (13,45%).<br/>
-            &bull; Atendimento de Engenharia Clínica vinculado à OS #{os_id}. Equipamento: {equip_nome}. Tipo de Atendimento: {srv_tipo}. Técnico Responsável: {tec_nome}.<br/>
+            &bull; Atendimento Técnico Especializado vinculado à OS #{os_id}. Equipamento: {equip_nome}. Tipo de Atendimento: {srv_tipo}. Técnico Responsável: {tec_nome}.<br/>
             &bull; Serviços em conformidade com as resoluções ANVISA RDC 611 e normas técnicas ABNT NBR IEC 60601 / IEC 62353.<br/>
             &bull; Chave de Autenticação Digital Homologada: <b>{chave_fmt}</b>
           </div>
@@ -13278,66 +13410,43 @@ async def api_solicitar_peca_kit(request: web.Request) -> web.Response:
 
 
 
-        else:
+        elif tipo == "SOLICITACAO_COMPRA":
+            urgencia = limpar_texto(body.get("urgencia"), "NORMAL").upper()
+            obs = limpar_texto(body.get("observacoes"), "")
+            fab_mod = limpar_texto(body.get("modelo_equipamento"), "")
+            part_number = limpar_texto(body.get("part_number"), "")
+            qtd = limpar_texto(body.get("quantidade"), "1")
 
+            detalhes_item = f"{qtd}x {itens}"
+            if fab_mod:
+                detalhes_item += f" [Mod: {fab_mod}]"
+            if part_number:
+                detalhes_item += f" [P/N: {part_number}]"
+            if obs:
+                detalhes_item += f" (Obs: {obs})"
 
-
-
-
-
+            dest = f"{cliente}"
+            if urgencia == "URGENTE":
+                dest += " [🚨 PARADA DE MÁQUINA URGENTE]"
+            elif urgencia == "FINANCEIRO":
+                dest += " [🟡 FINANCEIRO AVALIA]"
 
             cur.execute("""
-
-
-
-
-
-
-
                 INSERT INTO solicitacoes_pecas
-
-
-
-
-
-
-
-                (tecnico, destino_cliente, itens_solicitados, instrumentos_solicitados, status_pedido, data_pedido)
-
-
-
-
-
-
-
-                VALUES (?, ?, ?, ?, ?, ?)
-
-
-
-
-
-
-
-            """, (tecnico, cliente, itens, instrumentos, "A SEPARAR (SOLICITADO PELO APP)", agora))
-
-
-
-
-
-
-
+                (tecnico, destino_cliente, itens_solicitados, instrumentos_solicitados, status_pedido, data_pedido, tipo_origem_peca, status_compra)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (tecnico, dest, detalhes_item, f"URGÊNCIA: {urgencia}", "COTAÇÃO / COMPRA SOLICITADA", agora, "COMPRA_EXTERNA", "EM COTAÇÃO"))
             conn.commit()
-
-
-
-
-
-
-
             novo_pedido_id = cur.lastrowid
-
-
-
+            return web.json_response({"ok": True, "id": novo_pedido_id, "msg": f"🛒 Solicitação de compra #{novo_pedido_id} enviada para o setor de compras/cotação!"})
+        else:
+            cur.execute("""
+                INSERT INTO solicitacoes_pecas
+                (tecnico, destino_cliente, itens_solicitados, instrumentos_solicitados, status_pedido, data_pedido)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (tecnico, cliente, itens, instrumentos, "A SEPARAR (SOLICITADO PELO APP)", agora))
+            conn.commit()
+            novo_pedido_id = cur.lastrowid
             return web.json_response({"ok": True, "id": novo_pedido_id, "msg": f"📦 Pedido #{novo_pedido_id} enviado para o Almoxarifado EMED com sucesso!"})
 
 
@@ -13835,53 +13944,19 @@ async def api_tecnico_salvar(request: web.Request) -> web.Response:
 
 
     with get_db_connection(DB_NAME) as conn:
-
-
-
-
-
-
-
-        conn.execute("""
-
-
-
-
-
-
-
-            INSERT OR REPLACE INTO tecnicos
-
-
-
-
-
-
-
-            (nome, telefone, partida, sede, senha, perfil, assinatura_padrao, rubrica_img)
-
-
-
-
-
-
-
-            VALUES (?, ?, ?, ?, '1234', ?, ?, '')
-
-
-
-
-
-
-
-        """, (nome, tel, sede, sede, perfil, ass))
-
-
-
-
-
-
-
+        row_ex = conn.execute("SELECT id, senha FROM tecnicos WHERE UPPER(nome) = ?", (nome,)).fetchone()
+        if row_ex:
+            conn.execute("""
+                UPDATE tecnicos
+                SET telefone = ?, partida = ?, sede = ?, perfil = ?, assinatura_padrao = ?
+                WHERE id = ?
+            """, (tel, sede, sede, perfil, ass, row_ex[0]))
+        else:
+            conn.execute("""
+                INSERT INTO tecnicos
+                (nome, telefone, partida, sede, senha, perfil, assinatura_padrao, rubrica_img)
+                VALUES (?, ?, ?, ?, ?, ?, ?, '')
+            """, (nome, tel, sede, sede, hash_senha_forte("1234"), perfil, ass))
         conn.commit()
 
 
@@ -17307,7 +17382,9 @@ async def api_pdf_os(request: web.Request) -> web.Response:
 
         if str(obter_id_os(idx, row)) == os_id:
 
-
+            cli_sess = str(request.get("_emed_cliente") or "").strip().upper()
+            if cli_sess and limpar_texto(row.get("cliente"), "").upper() != cli_sess:
+                return web.Response(text="⛔ Laudo pertence a outra unidade hospitalar.", status=403)
 
 
 
@@ -17471,7 +17548,9 @@ async def api_html_os(request: web.Request) -> web.Response:
 
         if str(obter_id_os(idx, row)) == os_id:
 
-
+            cli_sess = str(request.get("_emed_cliente") or "").strip().upper()
+            if cli_sess and limpar_texto(row.get("cliente"), "").upper() != cli_sess:
+                return web.Response(text="⛔ Laudo pertence a outra unidade hospitalar.", status=403)
 
 
 
@@ -17583,7 +17662,9 @@ async def api_imprimir_os(request: web.Request) -> web.Response:
 
         if str(obter_id_os(idx, row)) == os_id:
 
-
+            cli_sess = str(request.get("_emed_cliente") or "").strip().upper()
+            if cli_sess and limpar_texto(row.get("cliente"), "").upper() != cli_sess:
+                return web.Response(text="⛔ Laudo pertence a outra unidade hospitalar.", status=403)
 
 
 
@@ -18630,175 +18711,23 @@ async def api_exportar_excel(request: web.Request) -> web.Response:
 
 
 
-TOKEN_OFICIAL_GPS = os.environ.get("EMED_GPS_API_KEY", "EMED-GPS-2026-TOKEN-OFICIAL")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+TOKEN_OFICIAL_GPS = _obter_ou_criar_segredo_arquivo("EMED_GPS_API_KEY", ".emed_gps_secret", 24)
 
 
 def _validar_token_gps(request: web.Request) -> bool:
-
-
-
-
-
-
-
     """
-
-
-
-
-
-
-
-    Suporta autenticação via:
-
-
-
-
-
-
-
-      - Header `Authorization: Bearer EMED-GPS-2026-TOKEN-OFICIAL`
-
-
-
-
-
-
-
-      - Header `X-API-Key: EMED-GPS-2026-TOKEN-OFICIAL`
-
-
-
-
-
-
-
-      - Query param `?api_key=EMED-GPS-2026-TOKEN-OFICIAL`
-
-
-
-
-
-
-
-    Se nenhum header de token externo for enviado (chamada interna do PWA), permite a operação;
-
-
-
-
-
-
-
-    se um token for enviado, valida contra a chave oficial configurada.
-
-
-
-
-
-
-
+    Valida acesso aos endpoints de telemetria GPS/Frota:
+      - Sessão interna autenticada do sistema EMED (`_emed_user`), OU
+      - Chave oficial `EMED_GPS_API_KEY` (Header Bearer / X-API-Key / ?api_key=).
     """
-
-
-
-
-
-
-
-    auth_h = request.headers.get("Authorization", "").strip()
-
-
-
-
-
-
-
-    api_k = request.headers.get("X-API-Key", "").strip() or request.query.get("api_key", "").strip()
-
-
-
-
-
-
-
-    if not auth_h and not api_k:
-
-
-
-
-
-
-
+    if request.get("_emed_user"):
         return True
-
-
-
-
-
-
-
-    if auth_h.lower().startswith("bearer "):
-
-
-
-
-
-
-
-        tok = auth_h[7:].strip()
-
-
-
-
-
-
-
-        return tok in (TOKEN_OFICIAL_GPS, "EMED-2026-PILOTO")
-
-
-
-
-
-
-
-    if api_k:
-
-
-
-
-
-
-
-        return api_k in (TOKEN_OFICIAL_GPS, "EMED-2026-PILOTO")
-
-
-
-
-
-
-
-    return True
+    auth_h = request.headers.get("Authorization", "").strip()
+    api_k = request.headers.get("X-API-Key", "").strip() or request.query.get("api_key", "").strip()
+    tok = auth_h[7:].strip() if auth_h.lower().startswith("bearer ") else api_k
+    if not tok or not TOKEN_OFICIAL_GPS:
+        return False
+    return hmac.compare_digest(tok, TOKEN_OFICIAL_GPS)
 
 
 
@@ -18871,14 +18800,7 @@ async def api_gps_telemetria(request: web.Request) -> web.Response:
 
 
     if not _validar_token_gps(request):
-
-
-
-
-
-
-
-        return web.json_response({"ok": False, "erro": "Token de API inválido (use Authorization: Bearer EMED-GPS-2026-TOKEN-OFICIAL)"}, status=401)
+        return web.json_response({"ok": False, "erro": "Token de API GPS inválido ou ausente."}, status=401)
 
 
 
@@ -20264,16 +20186,10 @@ async def api_cliente_dossie_radiologico_salvar(request: web.Request) -> web.Res
 
     arq_path = ""
     if arq_b64 and arq_nome:
-        try:
-            pasta = os.path.join(BASE_DIR, "uploads_os", "dossie_visa")
-            os.makedirs(pasta, exist_ok=True)
-            b64_clean = arq_b64.split(",", 1)[1] if "," in arq_b64 else arq_b64
-            safe_name = _re.sub(r"[^A-Za-z0-9._-]", "_", arq_nome)
-            arq_path = os.path.join(pasta, f"VISA_{int(_dt.now().timestamp())}_{safe_name}")
-            with open(arq_path, "wb") as fh:
-                fh.write(base64.b64decode(b64_clean))
-        except Exception:
-            arq_path = ""
+        arq_path, arq_nome_safe = _salvar_arquivo_b64_seguro(arq_b64, "dossie_visa", "VISA", arq_nome)
+        if not arq_path:
+            return web.json_response({"ok": False, "msg": "Anexo inválido ou formato não permitido (apenas PDF, PNG, JPG ou WEBP até 15 MB)."}, status=400)
+        arq_nome = arq_nome_safe
 
     with sqlite3.connect(DB_NAME) as conn:
         conn.execute("""
@@ -20300,11 +20216,17 @@ async def api_cliente_dossie_radiologico_salvar(request: web.Request) -> web.Res
 async def api_cliente_dossie_arquivo(request: web.Request) -> web.Response:
     """Serve o arquivo anexo (PDF/Imagem) de um documento do Dossiê Sanitário."""
     doc_id = str(request.match_info.get("id", "")).strip()
+    cli_sess = str(request.get("_emed_cliente") or "").strip().upper()
     with sqlite3.connect(DB_NAME) as conn:
-        row = conn.execute("SELECT arquivo_path, arquivo_nome FROM dossie_radiologico_documentos WHERE CAST(id AS TEXT) = ?", (doc_id,)).fetchone()
-    if not row or not row[0] or not os.path.exists(str(row[0])):
+        row = conn.execute(
+            "SELECT arquivo_path, arquivo_nome, cliente_nome FROM dossie_radiologico_documentos WHERE CAST(id AS TEXT) = ?",
+            (doc_id,),
+        ).fetchone()
+    if not row:
         return web.Response(text="Arquivo anexo não encontrado.", status=404)
-    return web.FileResponse(str(row[0]))
+    if cli_sess and limpar_texto(row[2], "").upper() not in ("", cli_sess):
+        return web.Response(text="⛔ Documento pertence a outra unidade hospitalar.", status=403)
+    return _servir_arquivo_seguro(row[0], row[1])
 
 
 async def api_cliente_dossie_excluir(request: web.Request) -> web.Response:
@@ -20322,7 +20244,8 @@ async def api_cliente_dossie_excluir(request: web.Request) -> web.Response:
 async def api_cliente_dossie_imprimir(request: web.Request) -> web.Response:
     """Gera o Dossiê Completo de Fiscalização & Vigilância Sanitária (A4 imprimível)."""
     import html as _h
-    cliente = limpar_texto(request.query.get("cliente", ""), "")
+    cli_sess = str(request.get("_emed_cliente") or "").strip().upper()
+    cliente = cli_sess if cli_sess else limpar_texto(request.query.get("cliente", ""), "")
     with sqlite3.connect(DB_NAME) as conn:
         conn.row_factory = sqlite3.Row
         if cliente:
@@ -20393,8 +20316,7 @@ def _garantir_schema_acessos_cliente(conn: sqlite3.Connection) -> None:
 
 
 def _hash_senha_portal(senha: str) -> str:
-    import hashlib
-    return hashlib.sha256(("EMED_PORTAL_SALT_2026:" + str(senha)).encode("utf-8")).hexdigest()
+    return hash_senha_forte(senha)
 
 
 async def api_cliente_acesso_gerar(request: web.Request) -> web.Response:
@@ -20411,8 +20333,8 @@ async def api_cliente_acesso_gerar(request: web.Request) -> web.Response:
     gestor_email = limpar_texto(body.get("gestor_email"), "")
     slug = _re.sub(r"[^a-z0-9]+", ".", cliente_nome.lower()).strip(".")[:24] or "unidade"
     usuario = limpar_texto(body.get("usuario"), slug).lower()
-    senha_plana = limpar_texto(body.get("senha"), "") or f"emed{secrets.randbelow(9000)+1000}"
-    token = secrets.token_hex(16)
+    senha_plana = limpar_texto(body.get("senha"), "") or f"Emed@{secrets.token_hex(4).upper()}"
+    token = secrets.token_hex(24)
     agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
 
     with get_db_connection(DB_NAME) as conn:
@@ -20423,7 +20345,7 @@ async def api_cliente_acesso_gerar(request: web.Request) -> web.Response:
                 UPDATE clientes_acessos_portal
                 SET usuario = ?, senha_hash = ?, gestor_nome = ?, gestor_whatsapp = ?, gestor_email = ?, token_acesso = ?, ativo = 1
                 WHERE id = ?
-            """, (usuario, _hash_senha_portal(senha_plana), gestor_nome, gestor_wpp, gestor_email, token, row_ex[0]))
+            """, (usuario, hash_senha_forte(senha_plana), gestor_nome, gestor_wpp, gestor_email, token, row_ex[0]))
         else:
             while conn.execute("SELECT 1 FROM clientes_acessos_portal WHERE usuario = ?", (usuario,)).fetchone():
                 usuario = f"{slug}.{secrets.randbelow(90)+10}"
@@ -20431,7 +20353,7 @@ async def api_cliente_acesso_gerar(request: web.Request) -> web.Response:
                 INSERT INTO clientes_acessos_portal (
                     cliente_nome, usuario, senha_hash, gestor_nome, gestor_whatsapp, gestor_email, token_acesso, ativo, criado_em
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
-            """, (cliente_nome, usuario, _hash_senha_portal(senha_plana), gestor_nome, gestor_wpp, gestor_email, token, agora))
+            """, (cliente_nome, usuario, hash_senha_forte(senha_plana), gestor_nome, gestor_wpp, gestor_email, token, agora))
         conn.commit()
 
     return web.json_response({
@@ -20461,16 +20383,21 @@ async def api_cliente_acesso_login(request: web.Request) -> web.Response:
     body = await request.json()
     usuario = limpar_texto(body.get("usuario"), "").lower()
     senha = str(body.get("senha") or "").strip()
-    ip_origem = (
-        request.headers.get("CF-Connecting-IP")
-        or request.headers.get("X-Real-IP")
-        or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-        or (request.remote or "127.0.0.1")
-    )
+    ip_origem = obter_ip_real(request)
     ua_hdr = request.headers.get("User-Agent", "")
 
     if not usuario or not senha:
         return web.json_response({"ok": False, "msg": "Informe usuário e senha."}, status=400)
+
+    ident_ip = f"cli_ip:{ip_origem}"
+    ident_usr = f"cli_usr:{usuario}"
+    if not _check_rate_limit(ident_ip) or not _check_rate_limit(ident_usr):
+        try:
+            from emed_views.supervisorio_web import registrar_auditoria_login
+            registrar_auditoria_login("PORTAL_CLIENTE", usuario, ip_origem, "BLOQUEADO_RATE_LIMIT", "Excesso de tentativas incorretas no Portal do Cliente", ua_hdr, "Navegador Web", DB_NAME)
+        except Exception:
+            pass
+        return web.json_response({"ok": False, "msg": "Muitas tentativas incorretas. Aguarde 5 minutos."}, status=429)
 
     agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
     with get_db_connection(DB_NAME) as conn:
@@ -20478,6 +20405,8 @@ async def api_cliente_acesso_login(request: web.Request) -> web.Response:
         conn.row_factory = sqlite3.Row
         row = conn.execute("SELECT * FROM clientes_acessos_portal WHERE LOWER(usuario) = ? AND ativo = 1", (usuario,)).fetchone()
         if not row:
+            _record_auth_failure(ident_ip)
+            _record_auth_failure(ident_usr)
             try:
                 from emed_views.supervisorio_web import registrar_auditoria_login
                 registrar_auditoria_login("PORTAL_CLIENTE", usuario, ip_origem, "USUARIO_INEXISTENTE", "Unidade hospitalar não cadastrada", ua_hdr, "Navegador Web", DB_NAME)
@@ -20485,7 +20414,10 @@ async def api_cliente_acesso_login(request: web.Request) -> web.Response:
                 pass
             return web.json_response({"ok": False, "msg": "Usuário ou senha inválidos."}, status=401)
 
-        if row["senha_hash"] != _hash_senha_portal(senha):
+        senha_ok, precisa_rehash = verificar_senha_segura(senha, row["senha_hash"], legacy_salt="EMED_PORTAL_SALT_2026:")
+        if not senha_ok:
+            _record_auth_failure(ident_ip)
+            _record_auth_failure(ident_usr)
             try:
                 from emed_views.supervisorio_web import registrar_auditoria_login
                 registrar_auditoria_login("PORTAL_CLIENTE", usuario, ip_origem, "SENHA_INCORRETA", f"Senha incorreta para a unidade {row['cliente_nome']}", ua_hdr, "Navegador Web", DB_NAME)
@@ -20493,7 +20425,12 @@ async def api_cliente_acesso_login(request: web.Request) -> web.Response:
                 pass
             return web.json_response({"ok": False, "msg": "Usuário ou senha inválidos."}, status=401)
 
-        conn.execute("UPDATE clientes_acessos_portal SET ultimo_acesso = ? WHERE id = ?", (agora, row["id"]))
+        _clear_auth_failure(ident_ip)
+        _clear_auth_failure(ident_usr)
+        if precisa_rehash:
+            conn.execute("UPDATE clientes_acessos_portal SET senha_hash = ?, ultimo_acesso = ? WHERE id = ?", (hash_senha_forte(senha), agora, row["id"]))
+        else:
+            conn.execute("UPDATE clientes_acessos_portal SET ultimo_acesso = ? WHERE id = ?", (agora, row["id"]))
         conn.commit()
 
         try:
@@ -20502,19 +20439,52 @@ async def api_cliente_acesso_login(request: web.Request) -> web.Response:
         except Exception:
             pass
 
-    return web.json_response({
+    sess_tok = gerar_token_portal_cliente_assinado(row["cliente_nome"], row["token_acesso"])
+    resp = web.json_response({
         "ok": True,
-        "token": row["token_acesso"],
+        "token": sess_tok,
         "cliente_nome": row["cliente_nome"],
         "gestor_nome": row["gestor_nome"] or row["cliente_nome"],
     })
+    resp.set_cookie(
+        "emed_cli_session",
+        sess_tok,
+        max_age=7 * 86400,
+        httponly=True,
+        samesite="Lax",
+        secure=requisicao_https(request),
+        path="/",
+    )
+    return resp
+
+
+async def api_cliente_acesso_logout(request: web.Request) -> web.Response:
+    resp = web.json_response({"ok": True})
+    resp.del_cookie("emed_cli_session", path="/")
+    return resp
 
 
 def _validar_token_portal_cliente(conn: sqlite3.Connection, request: web.Request) -> Optional[str]:
+    cli_mid = str(getattr(request, "get", lambda *_: "")("_emed_cliente") or "").strip()
+    if cli_mid:
+        return cli_mid
     _garantir_schema_acessos_cliente(conn)
+    sess_cookie = str(request.cookies.get("emed_cli_session") or "").strip()
+    if sess_cookie:
+        payload = verificar_token_portal_cliente_assinado(sess_cookie)
+        if payload and payload.get("tok"):
+            row = conn.execute("SELECT cliente_nome FROM clientes_acessos_portal WHERE token_acesso = ? AND ativo = 1", (str(payload["tok"]),)).fetchone()
+            if row:
+                return str(row[0])
     tok = str(request.headers.get("X-Cliente-Token") or request.query.get("token") or "").strip()
     if not tok:
         return None
+    if "." in tok:
+        payload = verificar_token_portal_cliente_assinado(tok)
+        if not payload or not payload.get("tok"):
+            return None
+        row = conn.execute("SELECT cliente_nome FROM clientes_acessos_portal WHERE token_acesso = ? AND ativo = 1", (str(payload["tok"]),)).fetchone()
+        return str(row[0]) if row else None
     row = conn.execute("SELECT cliente_nome FROM clientes_acessos_portal WHERE token_acesso = ? AND ativo = 1", (tok,)).fetchone()
     return str(row[0]) if row else None
 
@@ -20579,7 +20549,7 @@ async def api_cliente_portal_dados(request: web.Request) -> web.Response:
             "estado": "",
             "telefone": "",
             "email": "",
-            "tipo_contrato": "CONTRATO DE MANUTENÇÃO & ENGENHARIA CLÍNICA"
+            "tipo_contrato": "CONTRATO DE MANUTENÇÃO E ASSISTÊNCIA TÉCNICA"
         }
         cnpj_cli = ficha_cliente.get("cpf_cnpj", "") or ""
         cnpj_limpo = "".join([c for c in str(cnpj_cli) if c.isdigit()])
@@ -20609,7 +20579,7 @@ async def api_cliente_portal_dados(request: web.Request) -> web.Response:
                 "data_emissao": d_nf.get("data_emissao") or "-",
                 "valor_total": float(d_nf.get("valor_liquido") or 0.0),
                 "status_fiscal": d_nf.get("status_fiscal") or "AUTORIZADA",
-                "servico": d_nf.get("discriminacao_servico") or "Prestação de serviços técnicos de engenharia clínica e manutenção hospitalar",
+                "servico": re.sub(r"engenharia\s*cl[ií]nica", "manutenção e reparação técnica", str(d_nf.get("discriminacao_servico") or "Prestação de serviços técnicos de manutenção e reparação técnica hospitalar"), flags=re.IGNORECASE),
                 "danfe_url": danfe_url,
             })
 
@@ -20702,7 +20672,7 @@ async def api_cliente_alerta_gestor(request: web.Request) -> web.Response:
 
     base_url = f"https://{request.host}" if "emedservice.med.br" in request.host else f"{request.scheme}://{request.host}"
     linhas.append(f"🔗 *Acesse seu Dossiê & Laudos no Portal do Cliente:*\n{base_url}/portal-cliente")
-    linhas.append("\n_EMED Eletromedicina — Engenharia Clínica & Radioproteção_")
+    linhas.append("\n_EMED Eletromedicina — Eletromedicina & Manutenção Técnica_")
 
     return web.json_response({
         "ok": True,
@@ -20714,10 +20684,12 @@ async def api_cliente_alerta_gestor(request: web.Request) -> web.Response:
 
 
 async def api_unidade_gestor_resumo(request: web.Request) -> web.Response:
-    cliente = limpar_texto(request.query.get("cliente"), "").upper()
+    cli_sess = str(request.get("_emed_cliente") or "").strip().upper()
     with get_db_connection(DB_NAME) as conn:
-        if not cliente:
-            cliente = (_validar_token_portal_cliente(conn, request) or "").upper()
+        if cli_sess:
+            cliente = cli_sess
+        else:
+            cliente = (limpar_texto(request.query.get("cliente"), "") or (_validar_token_portal_cliente(conn, request) or "")).upper()
         if not cliente:
             return web.json_response({"ok": False, "msg": "Informe o cliente."}, status=400)
         resumo = carregar_resumo_gestor_unidade(conn, cliente)
@@ -20730,10 +20702,14 @@ async def api_unidade_registro_salvar(request: web.Request) -> web.Response:
     tipo = limpar_texto(body.get("tipo"), "").upper()
     agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
     hoje_iso = obter_agora_brasil_str("%Y-%m-%d")
+    cli_sess = str(request.get("_emed_cliente") or "").strip().upper()
 
     with get_db_connection(DB_NAME) as conn:
         garantir_schema_gestor_unidade(conn)
-        cli = (_validar_token_portal_cliente(conn, request) or limpar_texto(body.get("cliente_nome"), "")).upper()
+        if cli_sess:
+            cli = cli_sess
+        else:
+            cli = (_validar_token_portal_cliente(conn, request) or limpar_texto(body.get("cliente_nome"), "")).upper()
         if not cli:
             return web.json_response({"ok": False, "msg": "Unidade não identificada."}, status=400)
 
@@ -20795,7 +20771,7 @@ async def api_unidade_registro_salvar(request: web.Request) -> web.Response:
             nova_os = cur.lastrowid
             conn.commit()
             invalidar_cache_bootstrap()
-            return web.json_response({"ok": True, "os_id": nova_os, "msg": f"🚨 Chamado #{nova_os} enviado à Engenharia Clínica EMED para {eqp}!"})
+            return web.json_response({"ok": True, "os_id": nova_os, "msg": f"🚨 Chamado #{nova_os} enviado ao Suporte Técnico EMED para {eqp}!"})
 
     return web.json_response({"ok": False, "msg": "Tipo de registro inválido."}, status=400)
 
@@ -20813,18 +20789,28 @@ async def api_unidade_registro_excluir(request: web.Request) -> web.Response:
     tbl = mapa.get(tipo)
     if not tbl or not rid:
         return web.json_response({"ok": False, "msg": "Parâmetros inválidos."}, status=400)
+    cli_sess = str(request.get("_emed_cliente") or "").strip().upper()
     with get_db_connection(DB_NAME) as conn:
         garantir_schema_gestor_unidade(conn)
-        conn.execute(f"DELETE FROM {tbl} WHERE CAST(id AS TEXT) = ?", (rid,))
+        if cli_sess:
+            cur = conn.execute(f"DELETE FROM {tbl} WHERE CAST(id AS TEXT) = ? AND UPPER(TRIM(cliente_nome)) = ?", (rid, cli_sess))
+            if cur.rowcount == 0:
+                return web.json_response({"ok": False, "msg": "Registro não encontrado nesta unidade."}, status=403)
+        else:
+            conn.execute(f"DELETE FROM {tbl} WHERE CAST(id AS TEXT) = ?", (rid,))
         conn.commit()
     return web.json_response({"ok": True, "msg": "🗑️ Registro removido."})
 
 
 async def api_unidade_pgts_imprimir(request: web.Request) -> web.Response:
-    cliente = limpar_texto(request.query.get("cliente"), "").upper()
-    if not cliente:
-        with get_db_connection(DB_NAME) as conn:
-            cliente = (_validar_token_portal_cliente(conn, request) or "UNIDADE").upper()
+    cli_sess = str(request.get("_emed_cliente") or "").strip().upper()
+    if cli_sess:
+        cliente = cli_sess
+    else:
+        cliente = limpar_texto(request.query.get("cliente"), "").upper()
+        if not cliente:
+            with get_db_connection(DB_NAME) as conn:
+                cliente = (_validar_token_portal_cliente(conn, request) or "UNIDADE").upper()
     return web.Response(text=gerar_html_pgts_unidade(DB_NAME, cliente), content_type="text/html", charset="utf-8")
 
 
@@ -20909,7 +20895,7 @@ async def api_portal_cliente_html(request: web.Request) -> web.Response:
       sessionStorage.setItem('emed_cli_nome', CLI_NOME);
       carregarPortal();
     }
-    function sairCli() { sessionStorage.clear(); location.reload(); }
+    async function sairCli() { try { await fetch('/api/cliente/acesso/logout', {method:'POST'}); } catch(e) {} sessionStorage.clear(); location.reload(); }
     function imprimirDossie() { window.open('/api/cliente/dossie-radiologico/imprimir?cliente=' + encodeURIComponent(CLI_NOME), '_blank'); }
     function imprimirPgts() { window.open('/api/unidade/pgts/imprimir?cliente=' + encodeURIComponent(CLI_NOME), '_blank'); }
     function setTab(t, el) {
@@ -21030,7 +21016,7 @@ async def api_portal_cliente_html(request: web.Request) -> web.Response:
             <div class="grid2" style="font-size:12.5px;color:#cbd5e1;">
               <div><b>Nome Fantasia / Unidade:</b> ${fc.nome || DATA.cliente_nome}</div>
               <div><b>CNPJ/CPF:</b> ${fc.cpf_cnpj || 'Cadastrado'}</div>
-              <div><b>Tipo de Contrato:</b> ${fc.tipo_contrato || 'Contrato de Manutenção e Engenharia Clínica'}</div>
+              <div><b>Tipo de Contrato:</b> ${fc.tipo_contrato || 'Contrato de Manutenção e Assistência Técnica'}</div>
               <div><b>Endereço:</b> ${fc.endereco || '-'} ${fc.cidade ? `(${fc.cidade}/${fc.estado||'BR'})` : ''}</div>
               <div><b>Contato:</b> ${fc.contato || fc.telefone || 'Gestão da Unidade'} ${fc.email ? `• ${fc.email}` : ''}</div>
               <div><b>Parque Tecnológico Próprio:</b> ${(DATA.equipamentos||[]).length} equipamento(s) vinculado(s)</div>
@@ -21695,7 +21681,7 @@ async def api_remessas_diagnostico_guia(request: web.Request) -> web.Response:
 
       <div class="logo">🏥 eMED ELETROMEDICINA</div>
 
-      <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Engenharia Clínica e Hospitalar Especializada</div>
+      <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Manutenção e Reparação Hospitalar Especializada</div>
 
     </div>
 
@@ -23315,7 +23301,7 @@ async def api_financeiro_relatorio_contabil_imprimir(request: web.Request) -> we
 
       <div class="logo">🏥 eMED ELETROMEDICINA</div>
 
-      <div style="font-size: 11.5px; color: #475569; margin-top: 2px;">CNPJ: 07.842.190/0001-44 &bull; Engenharia Clínica &amp; Manutenção Hospitalar</div>
+      <div style="font-size: 11.5px; color: #475569; margin-top: 2px;">CNPJ: 07.842.190/0001-44 &bull; Manutenção e Reparação de Equipamentos Hospitalares</div>
 
       <div style="font-size: 11px; color: #64748b;">Fortaleza - CE &bull; Tel: (85) 3299-4400</div>
 
@@ -24949,7 +24935,8 @@ def _iniciar_emed_nav_background():
 
         if os.path.exists(nav_script):
 
-            subprocess.Popen([sys.executable, nav_script, "5000"], cwd=BASE_DIR)
+            _cnw = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            subprocess.Popen([sys.executable, nav_script, "5000"], cwd=BASE_DIR, creationflags=_cnw)
 
             print("🚀 [EMED-NAV] Servidor dedicado de navegação e GPS iniciado automaticamente na porta 5000!")
 
@@ -25608,7 +25595,8 @@ async def api_protocolo_entrega_imprimir(request: web.Request) -> web.Response:
         return web.Response(text="Protocolo não encontrado.", status=404)
 
     tipo_lbl = "DEVOLUÇÃO DE PEÇA AO CLIENTE" if r["tipo_protocolo"] == "DEVOLUCAO_PECA" else "ENTREGA DE MATERIAL / PEÇA"
-    ass_tag = f'<img src="{r["assinatura_recebedor_img"]}" style="max-height:70px;max-width:260px;" />' if str(r["assinatura_recebedor_img"] or "").startswith("data:image") else "<div style='height:45px;'></div>"
+    ass_ok = str(r["assinatura_recebedor_img"] or "").startswith(("data:image/png;base64,", "data:image/jpeg;base64,", "data:image/webp;base64,"))
+    ass_tag = f'<img src="{_h.escape(str(r["assinatura_recebedor_img"]), quote=True)}" style="max-height:70px;max-width:260px;" />' if ass_ok else "<div style='height:45px;'></div>"
     html_out = f"""<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="utf-8"><title>Protocolo {_h.escape(r['codigo_protocolo'])} — EMED</title>
 <style>
@@ -25750,16 +25738,15 @@ async def api_equipe_dosimetria_salvar(request: web.Request) -> web.Response:
     foto_nome = limpar_texto(body.get("foto_nome"), "dosimetro.jpg")
     foto_path = ""
     if foto_b64:
-        try:
-            pasta = os.path.join(BASE_DIR, "uploads_os", "dosimetria_emed")
-            os.makedirs(pasta, exist_ok=True)
-            b64_clean = foto_b64.split(",", 1)[1] if "," in foto_b64 else foto_b64
-            safe_n = _re.sub(r"[^A-Za-z0-9._-]", "_", foto_nome)
-            foto_path = os.path.join(pasta, f"DOS_{int(_dt.now().timestamp())}_{safe_n}")
-            with open(foto_path, "wb") as fh:
-                fh.write(base64.b64decode(b64_clean))
-        except Exception:
-            foto_path = ""
+        foto_path, _ = _salvar_arquivo_b64_seguro(
+            foto_b64,
+            "dosimetria_emed",
+            "DOS",
+            foto_nome,
+            allowed_exts=(".png", ".jpg", ".jpeg", ".webp"),
+        )
+        if not foto_path:
+            return web.json_response({"ok": False, "msg": "Foto inválida ou formato não permitido (apenas PNG, JPG ou WEBP)."}, status=400)
 
     with get_db_connection(DB_NAME) as conn:
         _garantir_schema_dosimetria_emed(conn)
@@ -25777,9 +25764,9 @@ async def api_equipe_dosimetria_foto(request: web.Request) -> web.Response:
     did = str(request.match_info.get("id", "")).strip()
     with get_db_connection(DB_NAME) as conn:
         row = conn.execute("SELECT foto_path FROM emed_dosimetria_tecnicos WHERE CAST(id AS TEXT) = ?", (did,)).fetchone()
-    if not row or not row[0] or not os.path.exists(str(row[0])):
+    if not row or not row[0]:
         return web.Response(text="Foto não encontrada.", status=404)
-    return web.FileResponse(str(row[0]))
+    return _servir_arquivo_seguro(row[0])
 
 
 async def api_equipe_colaborador_dossie(request: web.Request) -> web.Response:
@@ -25822,16 +25809,10 @@ async def api_equipe_colaborador_salvar(request: web.Request) -> web.Response:
     arq_nome = limpar_texto(body.get("arquivo_nome"), "")
     arq_path = ""
     if arq_b64 and arq_nome:
-        try:
-            pasta = os.path.join(BASE_DIR, "uploads_os", "colaboradores_dossie")
-            os.makedirs(pasta, exist_ok=True)
-            b64_clean = arq_b64.split(",", 1)[1] if "," in arq_b64 else arq_b64
-            safe_n = _re.sub(r"[^A-Za-z0-9._-]", "_", arq_nome)
-            arq_path = os.path.join(pasta, f"COLAB_{int(_dt.now().timestamp())}_{safe_n}")
-            with open(arq_path, "wb") as fh:
-                fh.write(base64.b64decode(b64_clean))
-        except Exception:
-            arq_path = ""
+        arq_path, arq_nome_safe = _salvar_arquivo_b64_seguro(arq_b64, "colaboradores_dossie", "COLAB", arq_nome)
+        if not arq_path:
+            return web.json_response({"ok": False, "msg": "Anexo inválido ou formato não permitido (apenas PDF, PNG, JPG ou WEBP até 15 MB)."}, status=400)
+        arq_nome = arq_nome_safe
 
     with get_db_connection(DB_NAME) as conn:
         _garantir_schema_dosimetria_emed(conn)
@@ -25858,10 +25839,10 @@ async def api_equipe_colaborador_excluir(request: web.Request) -> web.Response:
 async def api_equipe_colaborador_arquivo(request: web.Request) -> web.Response:
     did = str(request.match_info.get("id", "")).strip()
     with get_db_connection(DB_NAME) as conn:
-        row = conn.execute("SELECT arquivo_path FROM emed_colaboradores_dossie WHERE CAST(id AS TEXT) = ?", (did,)).fetchone()
-    if not row or not row[0] or not os.path.exists(str(row[0])):
+        row = conn.execute("SELECT arquivo_path, arquivo_nome FROM emed_colaboradores_dossie WHERE CAST(id AS TEXT) = ?", (did,)).fetchone()
+    if not row or not row[0]:
         return web.Response(text="Anexo não encontrado.", status=404)
-    return web.FileResponse(str(row[0]))
+    return _servir_arquivo_seguro(row[0], row[1])
 
 
 async def api_equipe_colaborador_imprimir(request: web.Request) -> web.Response:
@@ -25993,6 +25974,8 @@ async def api_auditoria_historico_modificacoes(request: web.Request) -> web.Resp
 def criar_app() -> web.Application:
 
     garantir_schema_dispositivos(DB_NAME)
+
+    _migrar_senhas_legadas(DB_NAME)
 
     _iniciar_emed_nav_background()
 
@@ -26270,6 +26253,7 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/cliente/acesso/gerar", api_cliente_acesso_gerar)
     app.router.add_get("/api/cliente/acesso/listar", api_cliente_acesso_listar)
     app.router.add_post("/api/cliente/acesso/login", api_cliente_acesso_login)
+    app.router.add_post("/api/cliente/acesso/logout", api_cliente_acesso_logout)
     app.router.add_get("/api/cliente/portal-dados", api_cliente_portal_dados)
     app.router.add_post("/api/cliente/portal-salvar-doc", api_cliente_portal_salvar_doc)
     app.router.add_get("/api/cliente/dossie-radiologico/alerta-gestor", api_cliente_alerta_gestor)
