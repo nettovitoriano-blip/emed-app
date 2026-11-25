@@ -4350,7 +4350,15 @@ async def handle_sw(request: web.Request) -> web.Response:
 
 
 
-    return web.Response(text=conteudo, content_type="application/javascript", headers={"Cache-Control": "no-cache"})
+    return web.Response(
+        text=conteudo,
+        content_type="application/javascript",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "CDN-Cache-Control": "no-store",
+            "Cloudflare-CDN-Cache-Control": "no-store",
+        },
+    )
 
 
 
