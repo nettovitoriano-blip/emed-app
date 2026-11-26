@@ -20903,8 +20903,12 @@ async def api_unidade_pgts_imprimir(request: web.Request) -> web.Response:
 
 async def api_central_urls_html(request: web.Request) -> web.Response:
     """Serve a Pasta Oficial / Central de URLs do Sistema EMED (restrita a Gestor/Admin)."""
-    arq = os.path.join(BASE_DIR, "Central_URLs_EMED", "Central_URLs_EMED.html")
-    if not os.path.isfile(arq):
+    cands = [
+        os.path.join(BASE_DIR, "Central_URLs_EMED", "Central_URLs_EMED.html"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "Central_URLs_EMED", "Central_URLs_EMED.html"),
+    ]
+    arq = next((p for p in cands if os.path.isfile(p)), "")
+    if not arq:
         return web.Response(text="Pasta Central_URLs_EMED não encontrada.", status=404)
     with open(arq, "r", encoding="utf-8") as fh:
         return web.Response(text=fh.read(), content_type="text/html", charset="utf-8", headers={"Cache-Control": "no-store"})
