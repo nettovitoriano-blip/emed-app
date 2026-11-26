@@ -439,14 +439,27 @@ async def handle_honeypot_dashboard(request: web.Request) -> web.Response:
     return web.Response(text=html, content_type="text/html", status=200)
 
 
+_BEACONS_RATE_LIMIT: Dict[str, list] = {}
+
+
 async def api_honeypot_beacon(request: web.Request) -> web.Response:
-    """Recebe a telemetria do invasor e salva no banco de perícia forense."""
+    """Recebe a telemetria do invasor e salva no banco de perícia forense (com rate-limit anti-DoS e auto-purge)."""
     try:
         body = await request.json()
     except Exception:
         body = {}
         
     ip_origem = obter_ip_real_honeypot(request)
+    agora_epoch = time.time()
+    
+    # Rate limit: máximo de 10 beacons em janela de 10 minutos por IP
+    historico = _BEACONS_RATE_LIMIT.get(ip_origem, [])
+    historico = [t for t in historico if agora_epoch - t < 600]
+    if len(historico) >= 10:
+        return web.json_response({"ok": True, "status": "BEACON_ACK", "throttled": True})
+    historico.append(agora_epoch)
+    _BEACONS_RATE_LIMIT[ip_origem] = historico
+
     screen = body.get("screen", "")
     timezone = body.get("timezone", "")
     gpu = body.get("gpu", "")

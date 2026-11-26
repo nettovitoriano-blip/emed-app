@@ -61,12 +61,49 @@ def garantir_schema_supervisorio(conn: sqlite3.Connection) -> None:
             user_agent TEXT DEFAULT '',
             dispositivo_info TEXT DEFAULT '',
             geoloc_info TEXT DEFAULT '',
-            bloqueio_ativo INTEGER DEFAULT 0
+            bloqueio_ativo INTEGER DEFAULT 0,
+            score_risco INTEGER DEFAULT 1,
+            nivel_risco TEXT DEFAULT 'BAIXO'
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_login_dt ON auditoria_tentativas_login(data_hora)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_login_ip ON auditoria_tentativas_login(ip_origem)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_login_st ON auditoria_tentativas_login(status_resultado)")
+    try:
+        conn.execute("ALTER TABLE auditoria_tentativas_login ADD COLUMN score_risco INTEGER DEFAULT 1")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE auditoria_tentativas_login ADD COLUMN nivel_risco TEXT DEFAULT 'BAIXO'")
+    except Exception:
+        pass
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ips_whitelist_seguranca (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip TEXT UNIQUE NOT NULL,
+            descricao TEXT DEFAULT '',
+            adicionado_em TEXT NOT NULL,
+            adicionado_por TEXT DEFAULT 'GESTOR'
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS alertas_seguranca_soc (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data_hora TEXT NOT NULL,
+            nivel TEXT NOT NULL,
+            titulo TEXT NOT NULL,
+            mensagem TEXT NOT NULL,
+            ip_origem TEXT DEFAULT '',
+            usuario TEXT DEFAULT '',
+            visualizado INTEGER DEFAULT 0
+        )
+    """)
+    # Pre-popula whitelist padrao
+    for w_ip, w_desc in [("127.0.0.1", "Localhost IPv4"), ("::1", "Localhost IPv6"), ("localhost", "Local loopback")]:
+        try:
+            conn.execute("INSERT OR IGNORE INTO ips_whitelist_seguranca (ip, descricao, adicionado_em) VALUES (?, ?, 'SISTEMA')", (w_ip, w_desc))
+        except Exception:
+            pass
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS ips_bloqueados_seguranca (
@@ -80,6 +117,100 @@ def garantir_schema_supervisorio(conn: sqlite3.Connection) -> None:
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_ips_bloq_ativo ON ips_bloqueados_seguranca(ip, ativo)")
+
+
+
+def calcular_score_risco_heuristico(usuario: str, status: str, motivo: str, user_agent: str, ip: str) -> Tuple[int, str]:
+    """Calcula a pontuação de risco heurístico (1 a 10) e a categoria (BAIXO, MÉDIO, CRÍTICO)."""
+    score = 1
+    u_upper = (usuario or "").upper()
+    m_upper = (motivo or "").upper()
+    ua_lower = (user_agent or "").lower()
+
+    if any(k in u_upper for k in ["ROOT", "ADMIN", "MASTER", "DECOY", "DIRETORIA", "DATABASE"]):
+        score += 4
+
+    if status in ("BOT_SCANNER_DETECTADO", "IP_BLOQUEADO_PERSISTENTE", "HONEYPOT_DECEPTION_DECOY"):
+        score += 5
+    elif status in ("SENHA_INCORRETA", "USUARIO_INEXISTENTE"):
+        score += 3
+
+    if any(p in u_upper or p in m_upper for p in ["'", "UNION", "SELECT", "<SCRIPT", "../", "SLEEP(", "OR 1=1"]):
+        score += 5
+
+    if any(b in ua_lower for b in ["curl", "python", "sqlmap", "nmap", "nikto", "gobuster", "wpscan"]):
+        score += 3
+
+    score = min(10, max(1, score))
+    nivel = "CRÍTICO" if score >= 8 else ("MÉDIO" if score >= 4 else "BAIXO")
+    return score, nivel
+
+
+def eh_ip_ou_usuario_protegido(ip: str, usuario: str, db_path: str) -> bool:
+    """Proteção Anti-Lockout: Garante que Gestor NETTO e IPs seguros nunca sejam auto-bloqueados."""
+    u_upper = (usuario or "").strip().upper()
+    if any(k in u_upper for k in ("NETTO", "VALFREDO", "DIRETORIA")):
+        return True
+    if ip in ("127.0.0.1", "::1", "localhost"):
+        return True
+    try:
+        import ipaddress
+        addr = ipaddress.ip_address(ip.split("%")[0])
+        if addr.is_loopback:
+            return True
+    except Exception:
+        pass
+    try:
+        with sqlite3.connect(db_path) as conn:
+            r = conn.execute("SELECT id FROM ips_whitelist_seguranca WHERE ip = ?", (ip,)).fetchone()
+            if r:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def disparar_alerta_soc_critico(ip: str, usuario: str, motivo: str, nivel: str, score: int, agora_str: str, db_path: str) -> None:
+    """Registra alerta no banco SOC para visualizacao e envio imediato no WhatsApp do Gestor NETTO."""
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute("""
+                INSERT INTO alertas_seguranca_soc (data_hora, nivel, titulo, mensagem, ip_origem, usuario, visualizado)
+                VALUES (?, ?, ?, ?, ?, ?, 0)
+            """, (
+                agora_str, nivel, f"Incidente SOC {nivel} (Score {score}/10)",
+                f"Tentativa de ataque no IP {ip} com usuário '{usuario}'. Detalhes: {motivo}",
+                ip, usuario
+            ))
+            conn.commit()
+    except Exception as e:
+        print(f"[SUPERVISORIO] Erro ao gravar alerta SOC: {e}")
+
+
+def sanitizar_campo_csv(val: Any) -> str:
+    """Sanitiza campos contra CSV Formula Injection (RFC 4180 / OWASP)."""
+    s = str(val or "").strip()
+    if s and s[0] in ("=", "+", "-", "@", "\t", "\r"):
+        s = "'" + s
+    return s.replace('"', '""')
+
+
+def executar_limpeza_automatica_logs(db_path: str) -> int:
+    """Mantém a base leve mantendo os 10.000 registros mais recentes da auditoria."""
+    try:
+        with sqlite3.connect(db_path) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                DELETE FROM auditoria_tentativas_login 
+                WHERE id NOT IN (
+                    SELECT id FROM auditoria_tentativas_login ORDER BY id DESC LIMIT 10000
+                )
+            """)
+            del_count = cur.rowcount
+            conn.commit()
+            return del_count
+    except Exception as e:
+        return 0
 
 
 def recarregar_cache_ips_bloqueados(db_path: str) -> None:
@@ -168,17 +299,23 @@ def registrar_auditoria_login(
         status = "BOT_SCANNER_DETECTADO"
         motivo = f"Varredor automatizado detectado no User-Agent ({user_agent[:40]})"
 
-    # Verificação de Auto-Ban por Brute-Force
+    # 1. Cálculo de Risco Heurístico Inteligente
+    score_risco, nivel_risco = calcular_score_risco_heuristico(usuario, status, motivo, user_agent, ip)
+
+    # 2. Verificação de Proteção Anti-Lockout (Gestor NETTO e Whitelist nunca são banidos)
+    is_protegido = eh_ip_ou_usuario_protegido(ip, usuario, db_p)
+
     bloqueio_gerado = 0
-    if status in ("SENHA_INCORRETA", "USUARIO_INEXISTENTE", "BOT_SCANNER_DETECTADO"):
+    if is_protegido and status != "SUCESSO":
+        motivo = f"[ANTI-LOCKOUT ATIVO] {motivo or 'Acesso protegido para Administrador/IP Seguro'}"
+    elif status in ("SENHA_INCORRETA", "USUARIO_INEXISTENTE", "BOT_SCANNER_DETECTADO", "HONEYPOT_DECEPTION_DECOY"):
         lista = _FALHAS_RECENTES_IP.get(ip, [])
-        lista = [t for t in lista if agora_epoch - t < 300]  # janela de 5 minutos
+        lista = [t for t in lista if agora_epoch - t < 300]
         lista.append(agora_epoch)
         _FALHAS_RECENTES_IP[ip] = lista
 
-        # Mais de 5 falhas ou bot detectado -> Auto-Ban de 15 minutos (ou 24h para bots)
         duracao_min = 60 if is_bot_ua else 15
-        if len(lista) >= 5 or is_bot_ua:
+        if len(lista) >= 5 or is_bot_ua or status == "HONEYPOT_DECEPTION_DECOY":
             bloqueio_gerado = 1
             expira_iso = (agora_dt + datetime.timedelta(minutes=duracao_min)).isoformat()
             _IPS_BLOQUEADOS_CACHE[ip] = agora_epoch + (duracao_min * 60)
@@ -193,10 +330,14 @@ def registrar_auditoria_login(
                             bloqueado_em = excluded.bloqueado_em,
                             expira_em = excluded.expira_em,
                             ativo = 1
-                    """, (ip, f"Excesso de tentativas incorretas ({len(lista)} em 5min)", agora_str, expira_iso))
+                    """, (ip, f"Bloqueio Auto-Ban ({len(lista)} falhas em 5min / Ataque)", agora_str, expira_iso))
                     conn.commit()
             except Exception as e:
                 print(f"[SUPERVISORIO] Erro ao registrar auto-ban para {ip}: {e}")
+
+    # 3. Disparo de Alerta SOC Crítico
+    if bloqueio_gerado == 1 or nivel_risco == "CRÍTICO":
+        disparar_alerta_soc_critico(ip, usuario, motivo, nivel_risco, score_risco, agora_str, db_p)
 
     try:
         with sqlite3.connect(db_p) as conn:
@@ -205,11 +346,12 @@ def registrar_auditoria_login(
                 INSERT INTO auditoria_tentativas_login (
                     data_hora, timestamp_epoch, tipo_sistema, usuario_tentado,
                     ip_origem, status_resultado, motivo_detalhado, user_agent,
-                    dispositivo_info, geoloc_info, bloqueio_ativo
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?)
+                    dispositivo_info, geoloc_info, bloqueio_ativo, score_risco, nivel_risco
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?)
             """, (
                 agora_str, agora_epoch, tipo_sistema, (usuario or 'ANONIMO').upper(),
-                ip, status, motivo, user_agent[:250], dispositivo[:200], bloqueio_gerado
+                ip, status, motivo, user_agent[:250], dispositivo[:200], bloqueio_gerado,
+                score_risco, nivel_risco
             ))
             conn.commit()
     except Exception as e:
@@ -420,7 +562,9 @@ async def api_supervisorio_auditoria_listar(request: web.Request) -> web.Respons
     query = "SELECT * FROM auditoria_tentativas_login WHERE 1=1"
     params = []
 
-    if status_filtro == "FALHAS":
+    if status_filtro == "CRITICOS":
+        query += " AND (score_risco >= 8 OR nivel_risco = 'CRÍTICO' OR bloqueio_ativo = 1 OR status_resultado LIKE 'BOT%' OR status_resultado LIKE 'HONEYPOT%' OR status_resultado LIKE 'IP_BLOQUEADO%')"
+    elif status_filtro == "FALHAS":
         query += " AND status_resultado != 'SUCESSO'"
     elif status_filtro == "SUCESSO":
         query += " AND status_resultado = 'SUCESSO'"
@@ -456,14 +600,18 @@ async def api_supervisorio_exportar_csv(request: web.Request) -> web.Response:
         rows = conn.execute("SELECT * FROM auditoria_tentativas_login ORDER BY id DESC LIMIT 5000").fetchall()
 
     csv_lines = [
-        "\ufeff\"ID\";\"DATA_HORA\";\"SISTEMA\";\"USUARIO\";\"IP_ORIGEM\";\"STATUS\";\"MOTIVO\";\"USER_AGENT\";\"BLOQUEADO\""
+        "\ufeff\"ID\";\"DATA_HORA\";\"SISTEMA\";\"USUARIO\";\"IP_ORIGEM\";\"RISCO\";\"SCORE\";\"STATUS\";\"MOTIVO\";\"USER_AGENT\";\"BLOQUEADO\""
     ]
     for r in rows:
-        ua_limpo = str(r["user_agent"] or "").replace('"', '""')
-        mot_limpo = str(r["motivo_detalhado"] or "").replace('"', '""')
+        ua_limpo = sanitizar_campo_csv(r["user_agent"])
+        mot_limpo = sanitizar_campo_csv(r["motivo_detalhado"])
+        usr_limpo = sanitizar_campo_csv(r["usuario_tentado"])
+        sis_limpo = sanitizar_campo_csv(r["tipo_sistema"])
+        score_val = r["score_risco"] if "score_risco" in r.keys() and r["score_risco"] else 1
+        nivel_val = r["nivel_risco"] if "nivel_risco" in r.keys() and r["nivel_risco"] else ("CRÍTICO" if score_val >= 8 else "BAIXO")
         csv_lines.append(
-            f'"{r["id"]}";"{r["data_hora"]}";"{r["tipo_sistema"]}";"{r["usuario_tentado"]}";"{r["ip_origem"]}";'
-            f'"{r["status_resultado"]}";"{mot_limpo}";"{ua_limpo}";"{r["bloqueio_ativo"]}"'
+            f'"{r["id"]}";"{r["data_hora"]}";"{sis_limpo}";"{usr_limpo}";"{r["ip_origem"]}";'
+            f'"{nivel_val}";"{score_val}";"{r["status_resultado"]}";"{mot_limpo}";"{ua_limpo}";"{r["bloqueio_ativo"]}"'
         )
 
     csv_data = "\r\n".join(csv_lines).encode("utf-8")
@@ -631,6 +779,8 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
       </div>
       <div class="top-actions">
         <button class="btn btn-primary" onclick="abrirModalGeradorAcesso()" style="background:#10b981; border-color:#10b981;">🔑 Gerar Acesso de Cliente</button>
+        <button class="btn" onclick="abrirModalWhitelist()" style="background:#0369a1; border-color:#38bdf8; color:#fff; font-weight:700;">🛡️ Lista Branca Anti-Lockout</button>
+        <button class="btn" onclick="abrirModalAlertasSoc()" style="background:#065f46; border-color:#22c55e; color:#fff; font-weight:700;">📲 Alertas SOC WhatsApp</button>
         <button class="btn btn-primary" onclick="executarVarreduraAgora()">🔍 Escanear Servidor Agora</button>
         <a class="btn" href="/api/supervisorio/exportar-csv" target="_blank">📥 Exportar Log CSV</a>
         <button class="btn" id="btnAutoRefresh" onclick="toggleAutoRefresh()">⏸️ Pausar (5s)</button>
@@ -747,8 +897,9 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
         </div>
         <div class="filters-bar">
           <button class="tab-pill active" onclick="setFiltro('TODOS', this)">Todos</button>
+          <button class="tab-pill" style="border-color:#ef4444; color:#fca5a5; font-weight:800;" onclick="setFiltro('CRITICOS', this)">🚨 Apenas Críticos</button>
           <button class="tab-pill" onclick="setFiltro('FALHAS', this)">⚠️ Apenas Falhas</button>
-          <button class="tab-pill" onclick="setFiltro('BLOQUEADOS', this)">🚨 Bloqueios Anti-Robô</button>
+          <button class="tab-pill" onclick="setFiltro('BLOQUEADOS', this)">⛔ Bloqueios Anti-Robô</button>
           <button class="tab-pill" onclick="setFiltro('SUCESSO', this)">✅ Sucessos</button>
           <input type="text" id="inpBusca" class="inp-search" placeholder="🔍 Buscar usuário ou IP..." oninput="filtrarLocal()" />
         </div>
@@ -759,6 +910,7 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
           <thead>
             <tr>
               <th>Data / Horário</th>
+              <th>Nível / Risco</th>
               <th>Sistema</th>
               <th>Usuário Tentado</th>
               <th>IP de Origem</th>
@@ -990,14 +1142,29 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
           stBadge = '<span class="badge badge-danger">🚨 BLOQUEADO / BRUTE FORCE</span>';
         } else if (r.status_resultado.includes('BOT')) {
           stBadge = '<span class="badge badge-danger">🤖 ROBÔ DETECTADO</span>';
+        } else if (r.status_resultado.includes('HONEYPOT')) {
+          stBadge = '<span class="badge badge-danger" style="background:#581c87; border-color:#a855f7;">🪤 HONEYPOT ATIVO</span>';
+        }
+
+        const score = r.score_risco || 1;
+        const nivel = (r.nivel_risco || (score >= 8 ? 'CRÍTICO' : (score >= 4 ? 'MÉDIO' : 'BAIXO'))).toUpperCase();
+        let rBadge = '<span class="badge badge-ok">🟢 BAIXO (1/10)</span>';
+        if (nivel.includes('CRÍT') || score >= 8) {
+          rBadge = `<span class="badge" style="background:#450a0a; color:#fca5a5; border:1px solid #ef4444; font-weight:800;">🔴 CRÍTICO (${score}/10)</span>`;
+        } else if (nivel.includes('MÉD') || score >= 4) {
+          rBadge = `<span class="badge" style="background:#451a03; color:#fde047; border:1px solid #f59e0b; font-weight:700;">🟡 MÉDIO (${score}/10)</span>`;
+        } else {
+          rBadge = `<span class="badge badge-ok">🟢 BAIXO (${score}/10)</span>`;
         }
 
         const isLocal = (r.ip_origem === '127.0.0.1' || r.ip_origem === '::1');
-        const btnBlock = isLocal ? '' : `<button class="btn btn-danger" style="padding:2px 6px; font-size:10px;" data-ip="${_escapeHtml(r.ip_origem)}" onclick="bloquearIpManual(this.dataset.ip)">⛔ Bloquear IP</button>`;
+        const btnBlock = isLocal ? '' : `<button class="btn btn-danger" style="padding:2px 6px; font-size:10px;" data-ip="${_escapeHtml(r.ip_origem)}" onclick="bloquearIpManual(this.dataset.ip)">⛔ Bloquear</button>`;
+        const btnSafe = isLocal ? '' : `<button class="btn" style="padding:2px 6px; font-size:10px; background:#0284c7; border-color:#38bdf8; color:#fff; margin-left:4px;" data-ip="${_escapeHtml(r.ip_origem)}" onclick="adicionarIpWhitelistRapido(this.dataset.ip)">🛡️ Whitelist</button>`;
 
         return `
           <tr>
             <td style="white-space:nowrap; font-weight:bold;">${_escapeHtml(r.data_hora)}</td>
+            <td>${rBadge}</td>
             <td><span class="badge badge-sys">${_escapeHtml(r.tipo_sistema)}</span></td>
             <td><b style="color:#e2e8f0;">${_escapeHtml(r.usuario_tentado)}</b></td>
             <td><code>${_escapeHtml(r.ip_origem)}</code></td>
@@ -1006,11 +1173,157 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
             <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--muted);" title="${_escapeHtml(r.user_agent)}">
               ${_escapeHtml(r.user_agent ? r.user_agent.slice(0, 32) + '...' : '-')}
             </td>
-            <td>${btnBlock}</td>
+            <td style="white-space:nowrap;">${btnBlock}${btnSafe}</td>
           </tr>
         `;
       }).join('');
     }
+
+    
+    // ==========================================
+    // FUNÇÕES DA LISTA BRANCA ANTI-LOCKOUT
+    // ==========================================
+    async function abrirModalWhitelist() {
+      document.getElementById('modalWhitelist').style.display = 'flex';
+      carregarListaWhitelist();
+    }
+
+    function fecharModalWhitelist() {
+      document.getElementById('modalWhitelist').style.display = 'none';
+    }
+
+    async function carregarListaWhitelist() {
+      const tb = document.getElementById('tbodyWhitelist');
+      tb.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:10px; color:var(--muted);">Carregando...</td></tr>';
+      try {
+        const res = await fetch('/api/supervisorio/whitelist').then(r => r.json());
+        if (!res.ok || !res.whitelist || res.whitelist.length === 0) {
+          tb.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:12px; color:var(--muted);">Nenhum IP na Lista Branca além dos padrões.</td></tr>';
+          return;
+        }
+        tb.innerHTML = res.whitelist.map(w => `
+          <tr>
+            <td><code style="color:#38bdf8; font-weight:bold;">${_escapeHtml(w.ip)}</code></td>
+            <td style="color:#cbd5e1;">${_escapeHtml(w.descricao || '-')}</td>
+            <td style="font-size:11px; color:var(--muted);">${_escapeHtml(w.adicionado_em || '-')}</td>
+            <td style="text-align:right;">
+              <button class="btn btn-danger" style="padding:2px 7px; font-size:10px;" data-ip="${_escapeHtml(w.ip)}" onclick="removerIpWhitelist(this.dataset.ip)">✕ Remover</button>
+            </td>
+          </tr>
+        `).join('');
+      } catch(e) {
+        tb.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:10px; color:#f87171;">Erro ao carregar lista branca.</td></tr>';
+      }
+    }
+
+    async function salvarIpWhitelist() {
+      const ip = document.getElementById('inpWlIp').value.trim();
+      const descricao = document.getElementById('inpWlDesc').value.trim();
+      if (!ip) {
+        alert('Informe o endereço IP que deseja proteger contra bloqueios.');
+        return;
+      }
+      try {
+        const res = await fetch('/api/supervisorio/whitelist/adicionar', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ ip, descricao: descricao || 'IP Seguro Cadastrado' })
+        }).then(r => r.json());
+        alert(res.msg || 'IP adicionado com sucesso!');
+        document.getElementById('inpWlIp').value = '';
+        document.getElementById('inpWlDesc').value = '';
+        carregarListaWhitelist();
+      } catch(e) {
+        alert('Erro ao cadastrar IP na lista branca.');
+      }
+    }
+
+    async function adicionarIpWhitelistRapido(ip) {
+      const desc = prompt(`Adicionar o IP ${ip} à Lista Branca Anti-Lockout (Imune a Bloqueios)?\nInforme a identificação:`, 'Dispositivo Seguro / Escritório') || '';
+      if (!desc) return;
+      try {
+        const res = await fetch('/api/supervisorio/whitelist/adicionar', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ ip, descricao: desc })
+        }).then(r => r.json());
+        alert(res.msg || 'IP protegido na Lista Branca com sucesso!');
+        carregarAuditoria();
+      } catch(e) {
+        alert('Erro ao salvar IP na Lista Branca.');
+      }
+    }
+
+    async function removerIpWhitelist(ip) {
+      if (!confirm(`Deseja remover o IP ${ip} da Lista Branca? Ele voltará a ser monitorado normalmente.`)) return;
+      try {
+        const res = await fetch('/api/supervisorio/whitelist/remover', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ ip })
+        }).then(r => r.json());
+        alert(res.msg || 'Removido com sucesso');
+        carregarListaWhitelist();
+      } catch(e) {
+        alert('Erro ao remover IP.');
+      }
+    }
+
+    // ==========================================
+    // FUNÇÕES DA CENTRAL DE ALERTAS SOC WHATSAPP
+    // ==========================================
+    let CACHE_ALERTAS_SOC = [];
+
+    async function abrirModalAlertasSoc() {
+      document.getElementById('modalAlertasSoc').style.display = 'flex';
+      carregarAlertasSoc();
+    }
+
+    function fecharModalAlertasSoc() {
+      document.getElementById('modalAlertasSoc').style.display = 'none';
+    }
+
+    async function carregarAlertasSoc() {
+      const tb = document.getElementById('tbodyAlertasSoc');
+      tb.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:10px; color:var(--muted);">Carregando alertas...</td></tr>';
+      try {
+        const res = await fetch('/api/supervisorio/alertas-soc').then(r => r.json());
+        if (!res.ok || !res.alertas || res.alertas.length === 0) {
+          tb.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:12px; color:var(--muted);">Nenhum alerta crítico ativo no momento. Tudo seguro!</td></tr>';
+          return;
+        }
+        CACHE_ALERTAS_SOC = res.alertas;
+        tb.innerHTML = res.alertas.map(a => `
+          <tr>
+            <td style="white-space:nowrap; font-size:11px;">${_escapeHtml(a.data_hora)}</td>
+            <td><span class="badge" style="background:#450a0a; color:#fca5a5; border:1px solid #ef4444; font-weight:800;">🔴 ${a.nivel}</span></td>
+            <td><b>${_escapeHtml(a.titulo)}</b><br><small style="color:var(--muted);">${_escapeHtml(a.mensagem || a.detalhes || '')}</small></td>
+            <td><code>${_escapeHtml(a.ip_origem || '-')}</code></td>
+            <td style="white-space:nowrap;">
+              <button class="btn" style="background:#22c55e; color:#052e16; font-size:10px; font-weight:800; padding:2px 6px;"
+                data-titulo="${_escapeHtml(a.titulo)}" data-detalhes="${_escapeHtml(a.mensagem || a.detalhes || '')}" data-ip="${_escapeHtml(a.ip_origem)}"
+                onclick="dispararWhatsAppIncidente(this.dataset.titulo, this.dataset.detalhes, this.dataset.ip)">
+                📲 Wpp NETTO
+              </button>
+            </td>
+          </tr>
+        `).join('');
+      } catch(e) {
+        tb.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:10px; color:#f87171;">Erro ao carregar alertas.</td></tr>';
+      }
+    }
+
+    function dispararWhatsAppIncidente(titulo, detalhes, ip) {
+      const msg = `🚨 *[ALERTA SOC eMED - INCIDENTE CRÍTICO]*%0A%0A*Ameaça:* ${encodeURIComponent(titulo)}%0A*IP Invasor:* ${encodeURIComponent(ip)}%0A*Detalhes:* ${encodeURIComponent(detalhes)}%0A%0A*Ação Tomada:* O IP foi isolado preventivamente. Verifique o console supervisório:%0Ahttps://emedservice.med.br/supervisorio`;
+      window.open(`https://wa.me/5585999150273?text=${msg}`, '_blank');
+    }
+
+    function enviarAlertaResumoWhatsApp() {
+      const qtd = CACHE_ALERTAS_SOC.length;
+      const msg = `🛡️ *[eMED SOC - RESUMO DE SEGURANÇA]*%0A%0AOlá Gestor NETTO,%0AO sistema registrou *${qtd} alerta(s) crítico(s)* nas últimas horas.%0AServidor eMED operando com Honeypot ativo e bloqueio automático.%0A%0AAcesse o painel para auditar:%0Ahttps://emedservice.med.br/supervisorio`;
+      window.open(`https://wa.me/5585999150273?text=${msg}`, '_blank');
+    }
+
 
     function _escapeHtml(s) {
       if (s === null || s === undefined) return '';
@@ -1090,6 +1403,93 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
       document.getElementById('modalVarredura').style.display = 'none';
     }
   </script>
+  <!-- MODAL DE LISTA BRANCA ANTI-LOCKOUT -->
+  <div id="modalWhitelist" class="modal-backdrop">
+    <div class="modal-box" style="max-width:680px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h3 style="font-size:16px; font-weight:800; color:#38bdf8; display:flex; align-items:center; gap:8px;">
+          <span>🛡️ Lista Branca Anti-Lockout (IPs Imunes a Bloqueio)</span>
+        </h3>
+        <button class="btn" onclick="fecharModalWhitelist()" style="padding:4px 8px;">✕</button>
+      </div>
+
+      <div style="background:#082f49; border-left:4px solid #38bdf8; padding:10px 12px; border-radius:6px; font-size:11.5px; color:#bae6fd; margin-bottom:14px;">
+        <b>Proteção de Acesso:</b> IPs e usuários cadastrados nesta lista <u>nunca serão bloqueados</u> pela proteção de Auto-Ban contra Brute-Force, garantindo que o Gestor NETTO e filiais autorizadas mantenham acesso contínuo.
+      </div>
+
+      <!-- FORMULÁRIO DE ADIÇÃO DE IP -->
+      <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
+        <input type="text" id="inpWlIp" class="inp-search" placeholder="Endereço IP (ex: 201.24.55.12)" style="flex:1; min-width:180px;" />
+        <input type="text" id="inpWlDesc" class="inp-search" placeholder="Descrição / Identificação (ex: PC Escritório NETTO)" style="flex:1.5; min-width:200px;" />
+        <button class="btn btn-primary" onclick="salvarIpWhitelist()" style="background:#0284c7; font-weight:700;">+ Adicionar à Lista</button>
+      </div>
+
+      <!-- TABELA DE IPS NA WHITELIST -->
+      <div style="max-height:260px; overflow-y:auto; border:1px solid var(--card-border); border-radius:8px;">
+        <table>
+          <thead>
+            <tr>
+              <th>IP Seguro</th>
+              <th>Descrição / Finalidade</th>
+              <th>Cadastrado Em</th>
+              <th style="text-align:right;">Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyWhitelist">
+            <tr><td colspan="4" style="text-align:center; padding:12px; color:var(--muted);">Carregando Lista Branca...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:14px; text-align:right;">
+        <button class="btn" onclick="fecharModalWhitelist()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE ALERTAS SOC WHATSAPP -->
+  <div id="modalAlertasSoc" class="modal-backdrop">
+    <div class="modal-box" style="max-width:700px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h3 style="font-size:16px; font-weight:800; color:#4ade80; display:flex; align-items:center; gap:8px;">
+          <span>📲 Central de Alertas SOC WhatsApp (Gestor NETTO)</span>
+        </h3>
+        <button class="btn" onclick="fecharModalAlertasSoc()" style="padding:4px 8px;">✕</button>
+      </div>
+
+      <div style="background:#052e16; border-left:4px solid #22c55e; padding:10px 12px; border-radius:6px; font-size:11.5px; color:#bbf7d0; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <b>Notificações Críticas de Segurança:</b> Alertas em tempo real enviados diretamente ao telefone do Gestor NETTO (<b>85 99915-0273</b>).
+        </div>
+        <button class="btn" style="background:#22c55e; color:#052e16; font-weight:900; font-size:11px;" onclick="enviarAlertaResumoWhatsApp()">📲 Enviar Resumo ao WhatsApp</button>
+      </div>
+
+      <!-- TABELA DE INCIDENTES CRÍTICOS -->
+      <div style="font-weight:700; font-size:12px; color:#cbd5e1; margin-bottom:6px;">Últimos Incidentes Críticos Registrados:</div>
+      <div style="max-height:280px; overflow-y:auto; border:1px solid var(--card-border); border-radius:8px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Horário</th>
+              <th>Nível</th>
+              <th>Título / Ameaça</th>
+              <th>IP Origem</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyAlertasSoc">
+            <tr><td colspan="5" style="text-align:center; padding:12px; color:var(--muted);">Carregando alertas do SOC...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:14px; display:flex; justify-content:space-between; align-items:center;">
+        <button class="btn" onclick="carregarAlertasSoc()" style="font-size:11px;">🔄 Atualizar Lista</button>
+        <button class="btn" onclick="fecharModalAlertasSoc()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL GERADOR DE ACESSOS DO CLIENTE -->
   <div id="modalGeradorAcesso" class="modal-backdrop">
     <div class="modal-box" style="max-width:720px;">
@@ -1288,6 +1688,58 @@ _Guarde esta credencial com segurança. Acesso 24/7 aos equipamentos, laudos e D
     return web.Response(text=html_page, content_type="text/html", charset="utf-8", headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
 
 
+
+
+async def api_supervisorio_whitelist_listar(request: web.Request) -> web.Response:
+    """Lista todos os IPs cadastrados na Lista Branca Anti-Lockout."""
+    db_name = _obter_db_path(request.app)
+    with sqlite3.connect(db_name) as conn:
+        garantir_schema_supervisorio(conn)
+        conn.row_factory = sqlite3.Row
+        rows = [dict(r) for r in conn.execute("SELECT * FROM ips_whitelist_seguranca ORDER BY id ASC").fetchall()]
+    return web.json_response({"ok": True, "total": len(rows), "whitelist": rows})
+
+
+async def api_supervisorio_whitelist_adicionar(request: web.Request) -> web.Response:
+    """Adiciona um IP confiável à Lista Branca para imunidade de Auto-Ban."""
+    db_name = _obter_db_path(request.app)
+    body = await request.json()
+    ip = str(body.get("ip", "")).strip()
+    desc = str(body.get("descricao", "IP Confiável")).strip()
+    if not ip or len(ip) < 3:
+        return web.json_response({"ok": False, "msg": "Informe um IP válido."}, status=400)
+    agora_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    with sqlite3.connect(db_name) as conn:
+        garantir_schema_supervisorio(conn)
+        conn.execute("INSERT OR REPLACE INTO ips_whitelist_seguranca (ip, descricao, adicionado_em) VALUES (?, ?, ?)", (ip, desc, agora_str))
+        conn.commit()
+    # Remove de eventual quarentena
+    _IPS_BLOQUEADOS_CACHE.pop(ip, None)
+    return web.json_response({"ok": True, "msg": f"IP {ip} adicionado à Lista Branca com sucesso (Imune a bloqueio)."})
+
+
+async def api_supervisorio_whitelist_remover(request: web.Request) -> web.Response:
+    """Remove um IP da Lista Branca."""
+    db_name = _obter_db_path(request.app)
+    body = await request.json()
+    ip = str(body.get("ip", "")).strip()
+    with sqlite3.connect(db_name) as conn:
+        garantir_schema_supervisorio(conn)
+        conn.execute("DELETE FROM ips_whitelist_seguranca WHERE ip = ?", (ip,))
+        conn.commit()
+    return web.json_response({"ok": True, "msg": f"IP {ip} removido da Lista Branca."})
+
+
+async def api_supervisorio_alertas_soc(request: web.Request) -> web.Response:
+    """Retorna alertas de incidentes críticos para notificação do Gestor."""
+    db_name = _obter_db_path(request.app)
+    with sqlite3.connect(db_name) as conn:
+        garantir_schema_supervisorio(conn)
+        conn.row_factory = sqlite3.Row
+        rows = [dict(r) for r in conn.execute("SELECT * FROM alertas_seguranca_soc ORDER BY id DESC LIMIT 20").fetchall()]
+    return web.json_response({"ok": True, "total": len(rows), "alertas": rows})
+
+
 async def api_supervisorio_clientes_lista(request: web.Request) -> web.Response:
     """Retorna a lista de todas as unidades/hospitais distintos cadastrados no sistema."""
     db_name = _obter_db_path(request.app)
@@ -1377,6 +1829,10 @@ def registrar_rotas_supervisorio(app: web.Application) -> None:
     app.router.add_get("/api/supervisorio/clientes-lista", api_supervisorio_clientes_lista)
     app.router.add_get("/api/supervisorio/clientes-acessos", api_supervisorio_clientes_acessos)
     app.router.add_post("/api/supervisorio/cliente-acesso-gerar", api_supervisorio_cliente_acesso_gerar)
+    app.router.add_get("/api/supervisorio/whitelist", api_supervisorio_whitelist_listar)
+    app.router.add_post("/api/supervisorio/whitelist/adicionar", api_supervisorio_whitelist_adicionar)
+    app.router.add_post("/api/supervisorio/whitelist/remover", api_supervisorio_whitelist_remover)
+    app.router.add_get("/api/supervisorio/alertas-soc", api_supervisorio_alertas_soc)
 
     # Módulo de Defesa Cibernética Ativa: Deception Honeypot & Forense Digital
     try:
