@@ -4142,33 +4142,26 @@ async def handle_proxy_nav(request: web.Request) -> web.Response:
                 return web.Response(body=body, status=resp.status, headers=resp_headers)
 
         except Exception as e:
-
             # Fallback nativo 100% resiliente: serve a interface mesmo se a porta 5000 estiver iniciando
-
             base_nav = os.path.join(BASE_DIR, "emed_nav", "static")
-
             if path in ("/", "/nav", "/gps", "/emedcar"):
-
                 idx_file = os.path.join(base_nav, "index.html")
-
                 if os.path.exists(idx_file):
-
                     with open(idx_file, "r", encoding="utf-8") as f_html:
-
-                        return web.Response(text=f_html.read(), content_type="text/html; charset=utf-8")
+                        return web.Response(text=f_html.read(), content_type="text/html", charset="utf-8")
 
             elif path in ("/frota", "/admin"):
                 frota_file = os.path.join(base_nav, "frota.html")
                 if os.path.exists(frota_file):
                     with open(frota_file, "r", encoding="utf-8") as f_frota:
-                        return web.Response(text=f_frota.read(), content_type="text/html; charset=utf-8")
+                        return web.Response(text=f_frota.read(), content_type="text/html", charset="utf-8")
 
             elif path == "/api/clients":
                 # Fallback redundante imediato: entrega os clientes do arquivo offline de alta fidelidade
                 offline_file = os.path.join(base_nav, "clientes_offline.json")
                 if os.path.exists(offline_file):
                     with open(offline_file, "r", encoding="utf-8") as f_cli:
-                        return web.Response(text=f_cli.read(), content_type="application/json; charset=utf-8")
+                        return web.Response(text=f_cli.read(), content_type="application/json", charset="utf-8")
                 return web.json_response({"destinos": [], "total": 0})
 
             elif path == "/api/radars":
@@ -4176,7 +4169,7 @@ async def handle_proxy_nav(request: web.Request) -> web.Response:
                 offline_radars = os.path.join(base_nav, "radares_corredor_offline.json")
                 if os.path.exists(offline_radars):
                     with open(offline_radars, "r", encoding="utf-8") as f_rad:
-                        return web.Response(text=f_rad.read(), content_type="application/json; charset=utf-8")
+                        return web.Response(text=f_rad.read(), content_type="application/json", charset="utf-8")
                 return web.json_response({"success": True, "radars": [], "total_db": 16480})
 
             elif path.startswith("/api/car"):
@@ -4188,10 +4181,21 @@ async def handle_proxy_nav(request: web.Request) -> web.Response:
                     }
                 })
 
+            elif path.startswith("/api/fleet"):
+                return web.json_response({
+                    "success": True,
+                    "vehicles": [
+                        {
+                            "placa": "EMD-2026", "modelo": "Renault Captur Zen", "motorista": "Valfredo Netto",
+                            "status": "ONLINE", "lat": -3.7965, "lon": -38.5678, "speed": 0, "ignicao": False
+                        }
+                    ]
+                })
+
             elif path.startswith("/api/"):
                 return web.json_response({"success": False, "error": f"Servidor GPS em inicializacao ({e})", "vehicles": [], "days": [], "points": []})
 
-            return web.Response(text=f"Carregando EmedNav GPS... Por favor atualize em instantes ({e})", status=200)
+            return web.Response(text=f"Carregando EmedNav GPS... Por favor atualize em instantes ({e})", status=200, content_type="text/plain", charset="utf-8")
 
 
 
@@ -25021,8 +25025,10 @@ def _iniciar_emed_nav_background():
 
         if os.path.exists(nav_script):
 
-            _cnw = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-            subprocess.Popen([sys.executable, nav_script, "5000"], cwd=BASE_DIR, creationflags=_cnw)
+            kwargs = {}
+            if sys.platform == "win32":
+                kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            subprocess.Popen([sys.executable, nav_script, "5000"], cwd=BASE_DIR, **kwargs)
 
             print("🚀 [EMED-NAV] Servidor dedicado de navegação e GPS iniciado automaticamente na porta 5000!")
 

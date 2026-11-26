@@ -1764,16 +1764,16 @@
           updateWhenIdle: true
         }).setView([state.carLat, state.carLon], 15);
 
-        // 1. CartoDB Voyager (Padrão Primário Ultra Rápido e Nítido - Suporte 100% Nativo a CORS e Mobile)
-        tileCartoVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-          maxZoom: 19,
-          subdomains: 'abcd'
-        });
-
-        // 2. OpenStreetMap (Fallback regional resiliente)
+        // 1. OpenStreetMap (Padrão de Ultra Alta Disponibilidade e Confiabilidade Mobile)
         tileOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           subdomains: ['a', 'b', 'c']
+        });
+
+        // 2. CartoDB Voyager
+        tileCartoVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19,
+          subdomains: 'abcd'
         });
 
         // 3. Google Roads (Sem crossOrigin forçado para evitar bloqueio CORS no Android)
@@ -1788,17 +1788,17 @@
           subdomains: ['0', '1', '2', '3']
         });
 
-        activeTileLayer = tileCartoVoyager;
+        activeTileLayer = tileOSM;
         activeTileLayer.addTo(map);
 
-        // Proteção automática contra tela preta: se CartoDB falhar 2 tiles, chaveia para OSM
+        // Proteção automática contra tela preta: se o provedor falhar 2 tiles, chaveia para CartoDB
         var tileFails = 0;
-        tileCartoVoyager.on('tileerror', function() {
+        tileOSM.on('tileerror', function() {
           tileFails++;
-          if (tileFails >= 2 && activeTileLayer === tileCartoVoyager) {
-            console.warn('[EMED-GPS] Chaveando para OpenStreetMap...');
-            try { map.removeLayer(tileCartoVoyager); } catch(e){}
-            activeTileLayer = tileOSM;
+          if (tileFails >= 2 && activeTileLayer === tileOSM) {
+            console.warn('[EMED-GPS] Chaveando para CartoDB Voyager...');
+            try { map.removeLayer(tileOSM); } catch(e){}
+            activeTileLayer = tileCartoVoyager;
             activeTileLayer.addTo(map);
           }
         });
@@ -3318,24 +3318,14 @@
 
     // ALTERNADOR DE MAPA: GOOGLE RUAS ➔ GOOGLE SATÉLITE ➔ OSM
     document.getElementById('btn-toggle-layers').addEventListener('click', () => {
-      if (state.mapMode === 'ROADS') {
-        map.removeLayer(tileGoogleRoads);
-        tileGoogleHybrid.addTo(map);
-        state.mapMode = 'SAT';
+      if (state.mapMode !== 'SAT') {
+        setMapBaseLayer('SAT');
         document.getElementById('btn-toggle-layers').innerText = '🗺️';
-        showToast('🛰️ Mapa alterado para Satélite Google');
-      } else if (state.mapMode === 'SAT') {
-        map.removeLayer(tileGoogleHybrid);
-        tileOSM.addTo(map);
-        state.mapMode = 'OSM';
-        document.getElementById('btn-toggle-layers').innerText = '🌐';
-        showToast('🌐 Mapa alterado para OpenStreetMap');
+        showToast('🛰️ Mapa alterado para Satélite Híbrido');
       } else {
-        map.removeLayer(tileOSM);
-        tileGoogleRoads.addTo(map);
-        state.mapMode = 'ROADS';
+        setMapBaseLayer('OSM');
         document.getElementById('btn-toggle-layers').innerText = '🛰️';
-        showToast('🗺️ Mapa alterado para Google Ruas Oficial');
+        showToast('🗺️ Mapa alterado para Vias e Rodovias (OpenStreetMap)');
       }
     });
 
@@ -4581,19 +4571,23 @@
     function setMapBaseLayer(mode) {
       const bRoads = document.getElementById('btn-style-roads');
       const bSat = document.getElementById('btn-style-sat');
-      if (mode === 'ROADS') {
-        map.removeLayer(tileGoogleHybrid);
-        tileGoogleRoads.addTo(map);
-        state.mapMode = 'ROADS';
-        if (bRoads) bRoads.classList.add('active');
-        if (bSat) bSat.classList.remove('active');
-      } else {
-        map.removeLayer(tileGoogleRoads);
+      try { if (tileOSM && map.hasLayer(tileOSM)) map.removeLayer(tileOSM); } catch(e){}
+      try { if (tileCartoVoyager && map.hasLayer(tileCartoVoyager)) map.removeLayer(tileCartoVoyager); } catch(e){}
+      try { if (tileGoogleRoads && map.hasLayer(tileGoogleRoads)) map.removeLayer(tileGoogleRoads); } catch(e){}
+      try { if (tileGoogleHybrid && map.hasLayer(tileGoogleHybrid)) map.removeLayer(tileGoogleHybrid); } catch(e){}
+
+      if (mode === 'SAT') {
         tileGoogleHybrid.addTo(map);
         state.mapMode = 'SAT';
         if (bSat) bSat.classList.add('active');
         if (bRoads) bRoads.classList.remove('active');
+      } else {
+        tileOSM.addTo(map);
+        state.mapMode = 'OSM';
+        if (bRoads) bRoads.classList.add('active');
+        if (bSat) bSat.classList.remove('active');
       }
+      setTimeout(() => { if (map) map.invalidateSize(); }, 60);
     }
 
     function setAudioAlertPreference(enabled) {
