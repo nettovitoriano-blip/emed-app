@@ -973,8 +973,8 @@
       <!-- BOTÕES FLUTUANTES NO MAPA (MINIMALISTA & MENOS POLUIÇÃO) -->
       <div class="map-fab-stack">
         <button id="btn-center-car" class="map-fab" title="Centralizar no Carro" style="border-color:#22c55e; background:linear-gradient(135deg, #15803d 0%, #0f172a 100%); color:#4ade80;">🎯</button>
-        <button id="btn-toggle-clients" class="map-fab" title="Filtro de Clientes eMED (Todos / Contrato / Avulso / Oculto)" style="border-color:#38bdf8; background:#ffffff; color:#38bdf8; padding:3px; display:flex; align-items:center; justify-content:center;">
-          <img src="/static/simbolo_emed_clean.svg" alt="@eMED" style="width:26px; height:26px; object-fit:contain; display:block;" />
+        <button id="btn-toggle-clients" class="map-fab" onclick="alternarFiltroClientes()" title="Filtro de Clientes eMED (Todos / Contrato / Avulso / Oculto)" style="border-color:#38bdf8; background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color:#38bdf8; padding:3px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 15px rgba(56,189,248,0.25);">
+          <img id="img-toggle-clients" src="/static/simbolo_emed_clean.svg" alt="@eMED" style="width:26px; height:26px; object-fit:contain; display:block;" />
         </button>
         <button id="btn-toggle-radars" class="map-fab" title="Radares e Velocidade" style="border-color:#f59e0b; background:#1e293b; color:#fbbf24;">📷</button>
         <button id="btn-toggle-layers" class="map-fab" title="Satélite / Vias">🛰️</button>
@@ -4499,6 +4499,22 @@
       }, 50);
     });
 
+    function alternarFiltroClientes() {
+      if (clientFilterMode === 'TODOS') {
+        setMapClientLayer('CONTRATO');
+        showToast('🔵 Exibindo somente Clientes CONTRATO (@eMED Azul)');
+      } else if (clientFilterMode === 'CONTRATO') {
+        setMapClientLayer('AVULSO');
+        showToast('🔴 Exibindo somente Clientes AVULSOS (@eMED Vermelho)');
+      } else if (clientFilterMode === 'AVULSO') {
+        setMapClientLayer('OCULTO');
+        showToast('🙈 Clientes eMED OCULTOS');
+      } else {
+        setMapClientLayer('TODOS');
+        showToast('🌐 Exibindo TODOS os Clientes eMED (Contrato + Avulso)');
+      }
+    }
+
     function setMapClientLayer(mode) {
       clientFilterMode = mode;
       localStorage.setItem('emednav_client_mode', mode);
@@ -4509,36 +4525,40 @@
         if (!map.hasLayer(clientsLayerAvulso)) map.addLayer(clientsLayerAvulso);
         if (btn) {
           btn.style.borderColor = '#38bdf8';
-          btn.style.background = '#ffffff';
+          btn.style.background = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
+          btn.style.boxShadow = '0 4px 15px rgba(56,189,248,0.35)';
           btn.style.opacity = '1';
-          btn.innerHTML = `<img src="/static/simbolo_emed_clean.svg" alt="@eMED" style="width:28px; height:28px; object-fit:contain;" />`;
+          btn.innerHTML = `<img src="/static/simbolo_emed_clean.svg" alt="@eMED" style="width:26px; height:26px; object-fit:contain;" />`;
         }
       } else if (mode === 'CONTRATO') {
         if (!map.hasLayer(clientsLayerContrato)) map.addLayer(clientsLayerContrato);
         if (map.hasLayer(clientsLayerAvulso)) map.removeLayer(clientsLayerAvulso);
         if (btn) {
           btn.style.borderColor = '#0095d9';
-          btn.style.background = '#ffffff';
+          btn.style.background = 'linear-gradient(135deg, #0369a1 0%, #0f172a 100%)';
+          btn.style.boxShadow = '0 4px 15px rgba(2,132,199,0.5)';
           btn.style.opacity = '1';
-          btn.innerHTML = `<img src="/static/simbolo_emed_clean.svg" alt="@eMED" style="width:28px; height:28px; object-fit:contain;" />`;
+          btn.innerHTML = `<img src="/static/simbolo_emed_clean.svg" alt="@eMED" style="width:26px; height:26px; object-fit:contain;" />`;
         }
       } else if (mode === 'AVULSO') {
         if (map.hasLayer(clientsLayerContrato)) map.removeLayer(clientsLayerContrato);
         if (!map.hasLayer(clientsLayerAvulso)) map.addLayer(clientsLayerAvulso);
         if (btn) {
           btn.style.borderColor = '#ef4444';
-          btn.style.background = '#ffffff';
+          btn.style.background = 'linear-gradient(135deg, #991b1b 0%, #0f172a 100%)';
+          btn.style.boxShadow = '0 4px 15px rgba(239,68,68,0.5)';
           btn.style.opacity = '1';
-          btn.innerHTML = `<img src="/static/simbolo_emed_red.svg" alt="@eMED" style="width:28px; height:28px; object-fit:contain;" />`;
+          btn.innerHTML = `<img src="/static/simbolo_emed_red.svg" alt="@eMED" style="width:26px; height:26px; object-fit:contain;" />`;
         }
       } else if (mode === 'OCULTO') {
         if (map.hasLayer(clientsLayerContrato)) map.removeLayer(clientsLayerContrato);
         if (map.hasLayer(clientsLayerAvulso)) map.removeLayer(clientsLayerAvulso);
         if (btn) {
           btn.style.borderColor = '#64748b';
-          btn.style.background = 'rgba(30, 41, 59, 0.7)';
-          btn.style.opacity = '0.6';
-          btn.innerHTML = `<img src="/static/simbolo_emed_clean.svg" alt="@eMED" style="width:28px; height:28px; object-fit:contain; filter:grayscale(1);" />`;
+          btn.style.background = '#0f172a';
+          btn.style.boxShadow = 'none';
+          btn.style.opacity = '0.5';
+          btn.innerHTML = `<img src="/static/simbolo_emed_clean.svg" alt="@eMED" style="width:26px; height:26px; object-fit:contain; filter:grayscale(1);" />`;
         }
       }
       if (typeof updateVisibleClientsViewport === 'function') {
