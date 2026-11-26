@@ -2178,6 +2178,10 @@ def _validar_magic_bytes_arquivo(raw_bytes: bytes, ext: str) -> bool:
         return raw_bytes.startswith(b"\xff\xd8\xff")
     if e == ".webp":
         return len(raw_bytes) >= 12 and raw_bytes[:4] == b"RIFF" and raw_bytes[8:12] == b"WEBP"
+    if e in (".mp4", ".mov", ".m4v"):
+        return len(raw_bytes) >= 12 and raw_bytes[4:8] in (b"ftyp", b"moov", b"wide", b"free", b"mdat", b"skip")
+    if e == ".webm":
+        return raw_bytes.startswith(b"\x1a\x45\xdf\xa3")
     if e == ".txt":
         return b"\x00" not in raw_bytes[:1024]
     return False
@@ -2198,8 +2202,14 @@ def _salvar_arquivo_b64_seguro(
         return "", ""
     header = ""
     encoded = raw_txt
-    if "," in raw_txt and raw_txt[:80].lower().startswith("data:"):
-        header, encoded = raw_txt.split(",", 1)
+    low_head = raw_txt[:120].lower()
+    if low_head.startswith("data:"):
+        b64_mark = low_head.find(";base64,")
+        if b64_mark != -1:
+            header = raw_txt[:b64_mark + 7]
+            encoded = raw_txt[b64_mark + 8:]
+        elif "," in raw_txt[:120]:
+            header, encoded = raw_txt.split(",", 1)
     safe_n = _re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(str(filename_hint or "anexo")))
     _, ext = os.path.splitext(safe_n)
     ext = ext.lower()
@@ -2213,6 +2223,12 @@ def _salvar_arquivo_b64_seguro(
             ext = ".webp"
         elif "image/jpeg" in hl or "image/jpg" in hl:
             ext = ".jpg"
+        elif "video/webm" in hl:
+            ext = ".webm"
+        elif "video/quicktime" in hl:
+            ext = ".mov"
+        elif "video/mp4" in hl or "video/x-m4v" in hl:
+            ext = ".mp4"
         else:
             return "", ""
     if ext not in allowed_exts:
@@ -2225,7 +2241,7 @@ def _salvar_arquivo_b64_seguro(
         return "", ""
     if not _validar_magic_bytes_arquivo(decoded, ext):
         return "", ""
-    pasta = os.path.realpath(os.path.join(BASE_DIR, "uploads_os", subpasta))
+    pasta = os.path.realpath(os.path.join(BASE_DIR, "uploads_os", subpasta)) if subpasta else os.path.realpath(os.path.join(BASE_DIR, "uploads_os"))
     os.makedirs(pasta, exist_ok=True)
     stem = _re.sub(r"[^A-Za-z0-9_-]", "_", os.path.splitext(safe_n)[0])[:40] or "arquivo"
     arq_nome_final = f"{prefixo}_{int(time.time())}_{secrets.token_hex(4)}_{stem}{ext}"
@@ -4037,6 +4053,8 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/api/cliente/dossie-radiologico/arquivo/")
         or path.startswith("/api/imprimir/")
         or path.startswith("/api/fiscal/danfe/")
+        or path.startswith("/api/foto/")
+        or path == "/api/video"
     ):
         try:
             with get_db_connection(DB_NAME) as conn:
@@ -5904,6 +5922,10 @@ async def api_bootstrap(request: web.Request) -> web.Response:
             "foto_evidencia": f_ant,
             "foto_depois": f_dep,
             "fotos_adicionais": limpar_texto(row.get("fotos_adicionais"), ""),
+            "video_evidencia": limpar_texto(row.get("video_evidencia"), ""),
+            "pre_atendimento": limpar_texto(row.get("pre_atendimento"), ""),
+            "responsavel_hospital": limpar_texto(row.get("responsavel_hospital"), ""),
+            "contato_responsavel": limpar_texto(row.get("contato_responsavel"), ""),
             "assinatura_cliente": limpar_texto(row.get("assinatura_cliente"), ""),
             "assinatura_cliente_img": limpar_texto(row.get("assinatura_cliente_img"), ""),
             "imprimir_defeito": limpar_texto(row.get("imprimir_defeito"), "SIM").upper() or "SIM",
@@ -9682,7 +9704,18 @@ def _salvar_base64_em_arquivo(b64_str: str, prefixo: str, os_id: str) -> str:
 
 
 
-    if not b64_str or not str(b64_str).startswith("data:image"):
+    raw_s = str(b64_str or "").strip()
+    if raw_s.startswith("data:video"):
+        arq_path, _ = _salvar_arquivo_b64_seguro(
+            raw_s,
+            "",
+            f"{prefixo}_OS{os_id}",
+            "video.mp4",
+            allowed_exts=(".mp4", ".webm", ".mov", ".m4v"),
+            max_bytes=40 * 1024 * 1024,
+        )
+        return arq_path
+    if not raw_s or not raw_s.startswith("data:image"):
 
 
 
@@ -17552,16 +17585,47 @@ async def api_pdf_os(request: web.Request) -> web.Response:
 
 
 
+def _arquivo_pertence_ao_cliente(conn, cliente_nome: str, nome_arquivo: str) -> bool:
+    cli_up = str(cliente_nome or "").strip().upper()
+    alvo = os.path.basename(str(nome_arquivo or "").replace("\\", "/")).strip()
+    if not cli_up or not alvo:
+        return False
+    rows = conn.execute(
+        """SELECT foto_evidencia, foto_depois, fotos_adicionais, video_evidencia
+           FROM clientes_equipamentos
+           WHERE UPPER(TRIM(cliente)) = ?""",
+        (cli_up,),
+    ).fetchall()
+    for r in rows:
+        vals = [r[0], r[1], r[2], r[3]] if not hasattr(r, "keys") else [
+            r["foto_evidencia"], r["foto_depois"], r["fotos_adicionais"], r["video_evidencia"]
+        ]
+        for campo in vals:
+            if not campo:
+                continue
+            for parte in str(campo).split(";"):
+                p_nome = os.path.basename(parte.strip().replace("\\", "/"))
+                if p_nome and p_nome == alvo:
+                    return True
+    return False
+
+
 async def api_foto_os(request: web.Request) -> web.Response:
-    """Serve fotos/evidencias salvas em uploads_os com protecao contra path traversal."""
+    """Serve fotos/evidencias salvas em uploads_os com protecao contra path traversal e IDOR."""
     nome_raw = request.match_info.get("nome", "").strip()
     nome = os.path.basename(nome_raw.replace("\\", "/"))
     if not nome or nome in (".", ".."):
         return web.Response(status=404, text="Foto nao encontrada")
-    caminho = os.path.join(BASE_DIR, "uploads_os", nome)
-    if not os.path.isfile(caminho):
+    cli_sess = str(request.get("_emed_cliente") or "").strip().upper()
+    if cli_sess:
+        with get_db_connection(DB_NAME) as conn:
+            if not _arquivo_pertence_ao_cliente(conn, cli_sess, nome):
+                return web.Response(status=403, text="Acesso negado ao anexo.")
+    caminho = os.path.realpath(os.path.join(BASE_DIR, "uploads_os", nome))
+    pasta_uploads = os.path.realpath(os.path.join(BASE_DIR, "uploads_os"))
+    if os.path.commonpath([caminho, pasta_uploads]) != pasta_uploads or not os.path.isfile(caminho):
         return web.Response(status=404, text="Foto nao encontrada")
-    return web.FileResponse(caminho, headers={"Cache-Control": "public, max-age=86400"})
+    return web.FileResponse(caminho, headers={"Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff"})
 
 
 async def api_html_os(request: web.Request) -> web.Response:
@@ -18393,71 +18457,33 @@ async def api_video_stream(request: web.Request) -> web.Response:
 
 
 
-    nome_vid = os.path.basename(request.query.get("name", ""))
-
-
-
-
-
-
-
-    if not nome_vid:
-
-
-
-
-
-
-
+    nome_vid = os.path.basename(request.query.get("name", "").replace("\\", "/")).strip()
+    if not nome_vid or nome_vid in (".", ".."):
         return web.Response(status=404)
-
-
-
-
-
-
-
+    cli_sess = str(request.get("_emed_cliente") or "").strip().upper()
+    if cli_sess:
+        with get_db_connection(DB_NAME) as conn:
+            if not _arquivo_pertence_ao_cliente(conn, cli_sess, nome_vid):
+                return web.Response(status=403, text="Acesso negado ao vídeo.")
+    cand_os = os.path.join(BASE_DIR, "uploads_os", nome_vid)
     cand1 = os.path.join(BASE_DIR, "Videos_Treinamento_ITs", nome_vid)
-
-
-
-
-
-
-
     cand2 = os.path.join(BASE_DIR, nome_vid)
-
-
-
-
-
-
-
-    alvo = cand1 if os.path.exists(cand1) else (cand2 if os.path.exists(cand2) else None)
-
-
-
-
-
-
-
+    alvo = None
+    if cli_sess:
+        alvo = cand_os if os.path.isfile(cand_os) else None
+    else:
+        for cand in (cand_os, cand1, cand2):
+            if os.path.isfile(cand):
+                alvo = cand
+                break
     if not alvo:
-
-
-
-
-
-
-
         return web.Response(status=404)
-
-
-
-
-
-
-
-    return web.FileResponse(alvo, headers={"Accept-Ranges": "bytes", "Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*"})
+    ext_v = os.path.splitext(alvo)[1].lower()
+    ctype_map = {".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime", ".m4v": "video/mp4"}
+    hdrs = {"Accept-Ranges": "bytes", "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff"}
+    if ext_v in ctype_map:
+        hdrs["Content-Type"] = ctype_map[ext_v]
+    return web.FileResponse(alvo, headers=hdrs)
 
 
 
@@ -20590,14 +20616,31 @@ async def api_cliente_portal_dados(request: web.Request) -> web.Response:
         cli_up = cli_nome.strip().upper()
 
         # 1. Ordens de Serviço estritamente desta unidade
-        os_rows = [dict(r) for r in cur.execute(
-            """SELECT id, equipamento, tipo_servico, status, data_agendamento, 
-                      checkin_hora, checkout_hora, tecnico_responsavel, defeito_relatado 
-               FROM clientes_equipamentos 
-               WHERE UPPER(TRIM(cliente)) = ? 
+        os_rows = []
+        for r in cur.execute(
+            """SELECT id, equipamento, tipo_servico, status, data_agendamento,
+                      checkin_hora, checkout_hora, tecnico_responsavel, defeito_relatado,
+                      pre_atendimento, foto_evidencia, foto_depois, fotos_adicionais, video_evidencia
+               FROM clientes_equipamentos
+               WHERE UPPER(TRIM(cliente)) = ?
                ORDER BY id DESC LIMIT 100""",
             (cli_up,)
-        ).fetchall()]
+        ).fetchall():
+            o = dict(r)
+            fotos_list = []
+            for col in ("foto_evidencia", "foto_depois", "fotos_adicionais"):
+                raw_val = str(o.pop(col, "") or "").strip()
+                if not raw_val or raw_val == "-":
+                    continue
+                for part in raw_val.split(";"):
+                    fn = os.path.basename(part.strip().replace("\\", "/"))
+                    if fn and fn not in fotos_list:
+                        fotos_list.append(fn)
+            vid_raw = str(o.pop("video_evidencia", "") or "").strip()
+            vid_fn = os.path.basename(vid_raw.replace("\\", "/"))
+            o["fotos_nomes"] = fotos_list
+            o["video_nome"] = "" if vid_fn in ("", "-") else vid_fn
+            os_rows.append(o)
 
         # 2. Resumo PGTS (Equipe, EPIs, Treinamentos, Tecnovigilância)
         unidade_resumo = carregar_resumo_gestor_unidade(conn, cli_nome)
@@ -20849,19 +20892,114 @@ async def api_unidade_registro_salvar(request: web.Request) -> web.Response:
 
         if tipo == "SOLICITAR_INTERVENCAO":
             eqp = limpar_texto(body.get("equipamento"), "EQUIPAMENTO DA UNIDADE").upper()
-            sintoma = limpar_texto(body.get("descricao"), "Solicitação de avaliação técnica pelo gestor da unidade.")
+            setor = limpar_texto(body.get("setor"), "").upper()
+            tipo_srv = limpar_texto(body.get("tipo_servico"), "CORRETIVA").upper()
+            if tipo_srv not in ("CORRETIVA", "PREVENTIVA", "AVALIAÇÃO TÉCNICA", "INSTALAÇÃO / CALIBRAÇÃO", "SUPORTE REMOTO"):
+                tipo_srv = "CORRETIVA"
             urg = limpar_texto(body.get("urgencia"), "NORMAL").upper()
+            parado_raw = body.get("equipamento_parado")
+            parado = str(parado_raw).strip().lower() in ("1", "true", "sim", "yes") or "PARADO" in urg
+            cod_erro = limpar_texto(body.get("codigo_erro"), "").upper()
+            sintoma = limpar_texto(body.get("descricao"), "")
+            if not sintoma:
+                return web.json_response({"ok": False, "msg": "Descreva o problema ou solicitação antes de abrir o chamado."}, status=400)
+            sol_nome = limpar_texto(body.get("solicitante_nome"), "GESTOR DA UNIDADE").upper()
+            sol_tel = limpar_texto(body.get("solicitante_telefone"), "")
+
+            fotos_input = body.get("fotos_b64")
+            if not isinstance(fotos_input, list):
+                fotos_input = []
+            caminhos_fotos = []
+            for idx_f, item_f in enumerate(fotos_input[:6]):
+                if isinstance(item_f, dict):
+                    b64_f = item_f.get("data_url") or item_f.get("b64") or ""
+                    nome_f = item_f.get("name") or f"foto_{idx_f + 1}.jpg"
+                else:
+                    b64_f = str(item_f or "")
+                    nome_f = f"foto_{idx_f + 1}.jpg"
+                if not str(b64_f).strip():
+                    continue
+                arq_f, _ = _salvar_arquivo_b64_seguro(
+                    b64_f,
+                    "",
+                    "PORTAL_FOTO",
+                    nome_f,
+                    allowed_exts=(".png", ".jpg", ".jpeg", ".webp"),
+                    max_bytes=15 * 1024 * 1024,
+                )
+                if not arq_f:
+                    return web.json_response({"ok": False, "msg": "Uma das imagens anexadas é inválida ou excede 15 MB (use JPG, PNG ou WEBP)."}, status=400)
+                caminhos_fotos.append(arq_f)
+
+            vid_b64 = str(body.get("video_b64") or "").strip()
+            vid_nome = limpar_texto(body.get("video_nome"), "video_chamado.mp4")
+            caminho_video = ""
+            if vid_b64:
+                caminho_video, _ = _salvar_arquivo_b64_seguro(
+                    vid_b64,
+                    "",
+                    "PORTAL_VIDEO",
+                    vid_nome,
+                    allowed_exts=(".mp4", ".webm", ".mov", ".m4v"),
+                    max_bytes=40 * 1024 * 1024,
+                )
+                if not caminho_video:
+                    return web.json_response({"ok": False, "msg": "Vídeo inválido, corrompido ou maior que 40 MB (use MP4, WebM ou MOV)."}, status=400)
+
+            resumo_partes = [f"[{urg}]"]
+            if parado:
+                resumo_partes.append("EQUIPAMENTO PARADO")
+            if setor:
+                resumo_partes.append(f"Setor: {setor}")
+            if cod_erro:
+                resumo_partes.append(f"Código Erro: {cod_erro}")
+            resumo_partes.append(sintoma)
+            defeito_fmt = " • ".join(resumo_partes)
+
+            pre_linhas = [
+                f"🚨 CHAMADO ABERTO PELO PORTAL DO CLIENTE ({agora})",
+                f"Solicitante: {sol_nome}" + (f" ({sol_tel})" if sol_tel else ""),
+                f"Prioridade: {urg} | Equipamento parado: {'SIM' if parado else 'NÃO'}",
+            ]
+            if setor:
+                pre_linhas.append(f"Setor / Sala: {setor}")
+            if cod_erro:
+                pre_linhas.append(f"Código / Alarme no Visor: {cod_erro}")
+            pre_linhas.append(f"Relato: {sintoma}")
+            pre_linhas.append(f"Anexos recebidos: {len(caminhos_fotos)} foto(s)" + (" + 1 vídeo" if caminho_video else ""))
+            pre_atend_txt = "\n".join(pre_linhas)
+
+            foto_principal = caminhos_fotos[0] if caminhos_fotos else ""
+            fotos_joined = ";".join(caminhos_fotos)
             cur = conn.cursor()
             cur.execute("""
                 INSERT INTO clientes_equipamentos (
                     cliente, equipamento, tipo_servico, tecnico_responsavel, data_agendamento,
-                    status, defeito_relatado, pendencias
-                ) VALUES (?, ?, 'CORRETIVA', 'A DEFINIR', ?, ?, ?, ?)
-            """, (cli, eqp, hoje_iso, f"SOLICITADO PELO GESTOR ({urg})", sintoma, f"[PORTAL GESTOR - {agora}] {sintoma}"))
+                    status, defeito_relatado, pendencias, pre_atendimento,
+                    responsavel_hospital, contato_responsavel,
+                    foto_evidencia, fotos_adicionais, video_evidencia
+                ) VALUES (?, ?, ?, 'A DEFINIR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                cli, eqp, tipo_srv, hoje_iso,
+                f"SOLICITADO PELO GESTOR ({urg})", defeito_fmt,
+                f"[PORTAL GESTOR - {agora}] {defeito_fmt}", pre_atend_txt,
+                sol_nome, sol_tel, foto_principal, fotos_joined, caminho_video,
+            ))
             nova_os = cur.lastrowid
             conn.commit()
             invalidar_cache_bootstrap()
-            return web.json_response({"ok": True, "os_id": nova_os, "msg": f"🚨 Chamado #{nova_os} enviado ao Suporte Técnico EMED para {eqp}!"})
+            fotos_nomes = [os.path.basename(p) for p in caminhos_fotos]
+            vid_nome_out = os.path.basename(caminho_video) if caminho_video else ""
+            anexo_msg = ""
+            if fotos_nomes or vid_nome_out:
+                anexo_msg = f" ({len(fotos_nomes)} foto(s)" + (" + 1 vídeo" if vid_nome_out else "") + " anexados)"
+            return web.json_response({
+                "ok": True,
+                "os_id": nova_os,
+                "fotos_nomes": fotos_nomes,
+                "video_nome": vid_nome_out,
+                "msg": f"🚨 Chamado #{nova_os} aberto e enviado à Engenharia Clínica EMED para {eqp}{anexo_msg}!",
+            })
 
     return web.json_response({"ok": False, "msg": "Tipo de registro inválido."}, status=400)
 
@@ -20938,6 +21076,18 @@ async def api_portal_cliente_html(request: web.Request) -> web.Response:
   table { width:100%; border-collapse:collapse; font-size:12px; }
   th, td { border-bottom:1px solid #1e293b; padding:8px 6px; text-align:left; }
   th { color:#94a3b8; font-size:10.5px; text-transform:uppercase; }
+  .modal-ov { display:none; position:fixed; inset:0; background:rgba(2,6,23,.84); backdrop-filter:blur(4px); z-index:9999; align-items:center; justify-content:center; padding:14px; overflow-y:auto; }
+  .modal-ov.open { display:flex; }
+  .modal-box { background:#0f172a; border:1px solid #334155; border-radius:16px; width:100%; max-width:740px; max-height:92vh; overflow-y:auto; padding:18px; box-shadow:0 24px 60px rgba(0,0,0,.65); margin:auto; }
+  .lbl { font-size:11.5px; color:#94a3b8; font-weight:700; display:block; margin-top:8px; }
+  .lbl .req { color:#f87171; }
+  .upload-zone { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:12px; border:1.5px dashed #38bdf8; border-radius:10px; background:#020617; cursor:pointer; text-align:center; margin-top:6px; transition:border-color .15s, background .15s; }
+  .upload-zone:hover { border-color:#7dd3fc; background:#0b1324; }
+  .upload-zone input { display:none; }
+  .thumb-grid { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .thumb-wrap { position:relative; display:inline-block; }
+  .thumb-img { width:72px; height:72px; object-fit:cover; border-radius:8px; border:1.5px solid #38bdf8; cursor:pointer; display:block; }
+  .thumb-del { position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:#ef4444; color:#fff; border:none; font-size:11px; font-weight:800; cursor:pointer; line-height:1; }
 </style></head>
 <body>
   <div class="wrap">
@@ -20979,12 +21129,139 @@ async def api_portal_cliente_html(request: web.Request) -> web.Response:
       <div id="paneBody"></div>
     </div>
   </div>
+
+  <!-- Modal Completo de Abertura de Chamado com Fotos & Vídeo -->
+  <div id="modalChamadoPortal" class="modal-ov" onclick="if(event.target===this) fecharModalChamadoPortal()">
+    <div class="modal-box">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;border-bottom:1px solid #1e293b;padding-bottom:10px;">
+        <div>
+          <div style="font-size:11px;color:#f87171;font-weight:800;text-transform:uppercase;">Suporte Engenharia Clínica EMED</div>
+          <h3 style="margin:2px 0 0;">🚨 Abertura Completa de Chamado Técnico</h3>
+        </div>
+        <button class="btn" style="background:#334155;padding:5px 10px;" onclick="fecharModalChamadoPortal()">✕</button>
+      </div>
+
+      <div class="grid2" style="margin-top:8px;">
+        <div>
+          <label class="lbl">Equipamento <span class="req">*</span></label>
+          <select id="chEqpSel" class="inp" onchange="onPortalEqpChange()">
+            <option value="">Selecione o equipamento...</option>
+          </select>
+          <div id="chEqpOutroBox" style="display:none;margin-top:6px;">
+            <input id="chEqpOutro" class="inp" placeholder="Informe o nome / modelo do equipamento *" />
+          </div>
+        </div>
+        <div>
+          <label class="lbl">Setor / Sala na Unidade</label>
+          <input id="chSetor" class="inp" placeholder="Ex: Sala Mamografia, Raio-X 01, UTI, Centro Cirúrgico" />
+        </div>
+      </div>
+
+      <div class="grid2" style="margin-top:4px;">
+        <div>
+          <label class="lbl">Tipo de Solicitação</label>
+          <select id="chTipoSrv" class="inp">
+            <option value="CORRETIVA">🔧 Manutenção Corretiva / Quebra</option>
+            <option value="AVALIAÇÃO TÉCNICA">🔍 Avaliação Técnica / Diagnóstico</option>
+            <option value="PREVENTIVA">🛡️ Manutenção Preventiva / Calibração</option>
+            <option value="SUPORTE REMOTO">📞 Orientação / Suporte Remoto</option>
+            <option value="INSTALAÇÃO / CALIBRAÇÃO">⚙️ Instalação / Movimentação</option>
+          </select>
+        </div>
+        <div>
+          <label class="lbl">Nível de Urgência</label>
+          <select id="chUrg" class="inp">
+            <option value="CRÍTICA (EQUIP. PARADO)">🚨 CRÍTICA — Equipamento Parado / Atendimento Suspenso</option>
+            <option value="ALTA" selected>⚠️ ALTA — Falha Intermitente / Urgente</option>
+            <option value="NORMAL">🟢 NORMAL — Programável</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid2" style="margin-top:4px;">
+        <div>
+          <label class="lbl">Código de Erro / Alarme no Visor</label>
+          <input id="chCodErro" class="inp" placeholder="Ex: ERR 402, Overheat, Falha de disparo..." />
+        </div>
+        <div style="display:flex;align-items:flex-end;padding-bottom:6px;">
+          <label style="display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:#fca5a5;font-weight:700;cursor:pointer;">
+            <input type="checkbox" id="chParado" /> Equipamento está parado neste momento
+          </label>
+        </div>
+      </div>
+
+      <div class="grid2" style="margin-top:4px;">
+        <div>
+          <label class="lbl">Nome do Solicitante</label>
+          <input id="chSolNome" class="inp" placeholder="Quem está reportando o chamado" />
+        </div>
+        <div>
+          <label class="lbl">Telefone / WhatsApp para Retorno</label>
+          <input id="chSolTel" class="inp" placeholder="(00) 00000-0000" />
+        </div>
+      </div>
+
+      <div style="margin-top:6px;">
+        <label class="lbl">Descrição Detalhada do Problema / Sintoma <span class="req">*</span></label>
+        <textarea id="chDesc" class="inp" rows="4" placeholder="Descreva o que aconteceu, quando começou, mensagens exibidas no monitor, ruídos anormais, calibração, etc."></textarea>
+      </div>
+
+      <div class="grid2" style="margin-top:8px;">
+        <div>
+          <label class="lbl">📷 Anexar Fotos (até 6 imagens — tela, peça ou falha)</label>
+          <label class="upload-zone">
+            <span style="font-size:12.5px;font-weight:700;color:#38bdf8;">📸 Selecionar ou Tirar Fotos</span>
+            <span style="font-size:11px;color:#94a3b8;">JPG, PNG ou WEBP • Compactação automática</span>
+            <input id="chFotosInp" type="file" accept="image/*" multiple onchange="onPortalFotosSelect(this)" />
+          </label>
+          <div id="chFotosPreview" class="thumb-grid"></div>
+        </div>
+        <div>
+          <label class="lbl">🎬 Anexar / Gravar Vídeo Curto (1 vídeo até 35 MB)</label>
+          <label class="upload-zone" style="border-color:#a855f7;">
+            <span style="font-size:12.5px;font-weight:700;color:#c084fc;">🎥 Selecionar ou Gravar Vídeo</span>
+            <span style="font-size:11px;color:#94a3b8;">MP4, WebM ou MOV • Ideal para ruídos/erros</span>
+            <input id="chVideoInp" type="file" accept="video/*,video/mp4,video/webm,video/quicktime" onchange="onPortalVideoSelect(this)" />
+          </label>
+          <div id="chVideoPreview" style="margin-top:8px;"></div>
+        </div>
+      </div>
+
+      <div id="chStatusMsg" style="font-size:12px;margin-top:10px;color:#fca5a5;"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;border-top:1px solid #1e293b;padding-top:12px;">
+        <button class="btn" style="background:#334155;" onclick="fecharModalChamadoPortal()">Cancelar</button>
+        <button id="btnEnviarChamado" class="btn btn-warn" onclick="enviarChamadoPortal()">🚀 Enviar Chamado para EMED</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lightbox de Mídia (Fotos e Vídeo) -->
+  <div id="modalMediaPortal" class="modal-ov" onclick="if(event.target===this) fecharMidiaPortal()">
+    <div class="modal-box" style="max-width:780px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <b id="mediaPortalTitulo" style="color:#38bdf8;">Evidência Anexada</b>
+        <button class="btn" style="background:#334155;padding:4px 10px;" onclick="fecharMidiaPortal()">✕</button>
+      </div>
+      <div id="mediaPortalBody" style="text-align:center;"></div>
+    </div>
+  </div>
   <script>
     let CLI_TOKEN = sessionStorage.getItem('emed_cli_token') || '';
     let CLI_NOME = sessionStorage.getItem('emed_cli_nome') || '';
     let DATA = {};
     let ABA = 'PGTS';
+    let CH_FOTOS = [];
+    let CH_VIDEO = null;
     if (CLI_TOKEN) carregarPortal();
+
+    function _esc(v) {
+      return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
 
     async function fazerLoginCli() {
       const usuario = document.getElementById('cliUser').value.trim();
@@ -21036,12 +21313,219 @@ async def api_portal_cliente_html(request: web.Request) -> web.Response:
       });
       carregarPortal();
     }
+    function onPortalEqpChange() {
+      const sel = document.getElementById('chEqpSel');
+      const box = document.getElementById('chEqpOutroBox');
+      if (sel && box) box.style.display = (sel.value === '__OUTRO__') ? 'block' : 'none';
+    }
+    function fecharModalChamadoPortal() {
+      document.getElementById('modalChamadoPortal').classList.remove('open');
+      CH_FOTOS = [];
+      if (CH_VIDEO && CH_VIDEO.objUrl) try { URL.revokeObjectURL(CH_VIDEO.objUrl); } catch(e) {}
+      CH_VIDEO = null;
+    }
+    function abrirMidiaPortal(tipo, url, titulo) {
+      document.getElementById('mediaPortalTitulo').textContent = titulo || 'Evidência Anexada';
+      const body = document.getElementById('mediaPortalBody');
+      if (tipo === 'video') {
+        body.innerHTML = `<video controls autoplay playsinline src="${_esc(url)}" style="max-width:100%;max-height:74vh;border-radius:10px;background:#000;"></video><div style="margin-top:8px;"><a class="btn" style="text-decoration:none;" href="${_esc(url)}" target="_blank">⬇️ Baixar / Abrir Vídeo</a></div>`;
+      } else {
+        body.innerHTML = `<img src="${_esc(url)}" style="max-width:100%;max-height:76vh;border-radius:10px;border:1px solid #334155;" />`;
+      }
+      document.getElementById('modalMediaPortal').classList.add('open');
+    }
+    function fecharMidiaPortal() {
+      document.getElementById('modalMediaPortal').classList.remove('open');
+      document.getElementById('mediaPortalBody').innerHTML = '';
+    }
+    function _comprimirFotoPortal(file, maxDim = 1400, q = 0.78) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const dataUrl = ev.target.result;
+          const img = new Image();
+          img.onload = () => {
+            try {
+              let w = img.width || 1, h = img.height || 1;
+              if (w > maxDim || h > maxDim) {
+                const ratio = Math.min(maxDim / w, maxDim / h);
+                w = Math.max(1, Math.round(w * ratio));
+                h = Math.max(1, Math.round(h * ratio));
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = w; canvas.height = h;
+              canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+              resolve(canvas.toDataURL('image/jpeg', q));
+            } catch (e) { resolve(dataUrl); }
+          };
+          img.onerror = () => resolve(dataUrl);
+          img.src = dataUrl;
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
+    }
+    function renderPortalFotosPreview() {
+      const grid = document.getElementById('chFotosPreview');
+      if (!grid) return;
+      grid.innerHTML = CH_FOTOS.map((f, idx) => `
+        <div class="thumb-wrap">
+          <img class="thumb-img" src="${f.data_url}" title="${_esc(f.name)}" onclick="abrirMidiaPortal('foto', CH_FOTOS[${idx}].data_url, CH_FOTOS[${idx}].name)" />
+          <button type="button" class="thumb-del" onclick="removerPortalFoto(${idx})">✕</button>
+        </div>
+      `).join('');
+    }
+    function removerPortalFoto(idx) {
+      CH_FOTOS.splice(idx, 1);
+      renderPortalFotosPreview();
+    }
+    async function onPortalFotosSelect(inp) {
+      const files = Array.from(inp.files || []);
+      if (!files.length) return;
+      const errEl = document.getElementById('chStatusMsg');
+      errEl.textContent = '';
+      for (const file of files) {
+        if (CH_FOTOS.length >= 6) {
+          errEl.textContent = 'Limite máximo de 6 fotos por chamado atingido.';
+          break;
+        }
+        if (file.size > 15 * 1024 * 1024) {
+          errEl.textContent = `A imagem ${file.name} excede 15 MB.`;
+          continue;
+        }
+        const b64 = await _comprimirFotoPortal(file);
+        if (b64) CH_FOTOS.push({ name: file.name || `foto_${CH_FOTOS.length + 1}.jpg`, data_url: b64 });
+      }
+      inp.value = '';
+      renderPortalFotosPreview();
+    }
+    function removerPortalVideo() {
+      if (CH_VIDEO && CH_VIDEO.objUrl) try { URL.revokeObjectURL(CH_VIDEO.objUrl); } catch(e) {}
+      CH_VIDEO = null;
+      const inp = document.getElementById('chVideoInp');
+      if (inp) inp.value = '';
+      document.getElementById('chVideoPreview').innerHTML = '';
+    }
+    function onPortalVideoSelect(inp) {
+      const file = inp.files && inp.files[0];
+      if (!file) return;
+      const errEl = document.getElementById('chStatusMsg');
+      errEl.textContent = '';
+      const mb = file.size / (1024 * 1024);
+      if (mb > 35) {
+        errEl.textContent = `Vídeo muito grande (${mb.toFixed(1)} MB). Envie um vídeo curto de até 35 MB.`;
+        inp.value = '';
+        return;
+      }
+      const box = document.getElementById('chVideoPreview');
+      box.innerHTML = `<div style="font-size:12px;color:#38bdf8;">⏳ Carregando vídeo (${mb.toFixed(1)} MB)...</div>`;
+      const objUrl = URL.createObjectURL(file);
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        if (CH_VIDEO && CH_VIDEO.objUrl) try { URL.revokeObjectURL(CH_VIDEO.objUrl); } catch(e) {}
+        CH_VIDEO = { name: file.name || 'video_chamado.mp4', data_url: ev.target.result, objUrl };
+        box.innerHTML = `
+          <video controls playsinline src="${objUrl}" style="width:100%;max-height:170px;border-radius:8px;background:#000;border:1px solid #475569;"></video>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:11.5px;color:#cbd5e1;">
+            <span>🎬 ${_esc(file.name)} (${mb.toFixed(1)} MB)</span>
+            <button type="button" class="btn btn-warn" style="padding:3px 8px;font-size:11px;" onclick="removerPortalVideo()">🗑️ Remover</button>
+          </div>`;
+      };
+      reader.onerror = () => {
+        box.innerHTML = '';
+        errEl.textContent = 'Não foi possível ler o arquivo de vídeo selecionado.';
+      };
+      reader.readAsDataURL(file);
+    }
     function abrirIntervencaoRapida(eqpNome) {
-      const eqp = eqpNome || prompt('Qual equipamento precisa de avaliação / intervenção?', '') || '';
-      if (!eqp) return;
-      const sint = prompt(`Descreva o que está acontecendo com ${eqp} (ex: ruído anormal, erro de disparo, aquecimento):`, '');
-      if (!sint) return;
-      salvarReg({ tipo: 'SOLICITAR_INTERVENCAO', equipamento: eqp, descricao: sint, urgencia: 'PRIORITÁRIA' });
+      CH_FOTOS = [];
+      removerPortalVideo();
+      const eqSel = document.getElementById('chEqpSel');
+      const eqps = DATA.equipamentos || [];
+      let opts = '<option value="">Selecione o equipamento...</option>';
+      eqps.forEach(e => {
+        const lbl = e.numero_serie && e.numero_serie !== '-' ? `${e.nome} (Série: ${e.numero_serie})` : e.nome;
+        opts += `<option value="${_esc(e.nome)}">${_esc(lbl)}</option>`;
+      });
+      opts += '<option value="__OUTRO__">➕ Outro equipamento / não listado</option>';
+      eqSel.innerHTML = opts;
+      document.getElementById('chEqpOutro').value = '';
+      if (eqpNome) {
+        const achou = eqps.some(e => String(e.nome || '').toUpperCase() === String(eqpNome).toUpperCase());
+        if (achou) {
+          const optMatch = Array.from(eqSel.options).find(o => o.value.toUpperCase() === String(eqpNome).toUpperCase());
+          if (optMatch) eqSel.value = optMatch.value;
+        } else {
+          eqSel.value = '__OUTRO__';
+          document.getElementById('chEqpOutro').value = eqpNome;
+        }
+      }
+      onPortalEqpChange();
+      document.getElementById('chSetor').value = '';
+      document.getElementById('chTipoSrv').value = 'CORRETIVA';
+      document.getElementById('chUrg').value = 'ALTA';
+      document.getElementById('chCodErro').value = '';
+      document.getElementById('chParado').checked = false;
+      const fc = DATA.ficha_cliente || {};
+      document.getElementById('chSolNome').value = fc.contato || '';
+      document.getElementById('chSolTel').value = fc.telefone || '';
+      document.getElementById('chDesc').value = '';
+      document.getElementById('chFotosInp').value = '';
+      document.getElementById('chFotosPreview').innerHTML = '';
+      document.getElementById('chStatusMsg').textContent = '';
+      const btn = document.getElementById('btnEnviarChamado');
+      btn.disabled = false;
+      btn.textContent = '🚀 Enviar Chamado para EMED';
+      document.getElementById('modalChamadoPortal').classList.add('open');
+    }
+    async function enviarChamadoPortal() {
+      const errEl = document.getElementById('chStatusMsg');
+      errEl.textContent = '';
+      const eqSel = document.getElementById('chEqpSel').value;
+      const eqNome = (eqSel === '__OUTRO__') ? document.getElementById('chEqpOutro').value.trim() : eqSel.trim();
+      const desc = document.getElementById('chDesc').value.trim();
+      if (!eqNome) { errEl.textContent = '⚠️ Selecione ou informe qual equipamento precisa de atendimento.'; return; }
+      if (!desc) { errEl.textContent = '⚠️ Descreva o que está acontecendo com o equipamento.'; return; }
+      const btn = document.getElementById('btnEnviarChamado');
+      btn.disabled = true;
+      btn.textContent = '⏳ Enviando chamado e mídias...';
+      try {
+        const resp = await fetch('/api/unidade/registro/salvar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Cliente-Token': CLI_TOKEN },
+          body: JSON.stringify({
+            tipo: 'SOLICITAR_INTERVENCAO',
+            equipamento: eqNome,
+            setor: document.getElementById('chSetor').value.trim(),
+            tipo_servico: document.getElementById('chTipoSrv').value,
+            urgencia: document.getElementById('chUrg').value,
+            codigo_erro: document.getElementById('chCodErro').value.trim(),
+            equipamento_parado: document.getElementById('chParado').checked,
+            solicitante_nome: document.getElementById('chSolNome').value.trim(),
+            solicitante_telefone: document.getElementById('chSolTel').value.trim(),
+            descricao: desc,
+            fotos_b64: CH_FOTOS,
+            video_b64: CH_VIDEO ? CH_VIDEO.data_url : '',
+            video_nome: CH_VIDEO ? CH_VIDEO.name : ''
+          })
+        });
+        const res = await resp.json();
+        if (!res.ok) {
+          errEl.textContent = '⚠️ ' + (res.msg || 'Erro ao abrir chamado.');
+          btn.disabled = false;
+          btn.textContent = '🚀 Enviar Chamado para EMED';
+          return;
+        }
+        fecharModalChamadoPortal();
+        alert(res.msg || 'Chamado aberto com sucesso!');
+        await carregarPortal();
+        const btnOsTab = document.querySelectorAll('.tab')[6];
+        if (btnOsTab) setTab('OS', btnOsTab);
+      } catch (e) {
+        errEl.textContent = '⚠️ Falha de comunicação ao enviar chamado. Verifique sua conexão e tente novamente.';
+        btn.disabled = false;
+        btn.textContent = '🚀 Enviar Chamado para EMED';
+      }
     }
 
     function renderPane() {
@@ -21057,11 +21541,11 @@ async def api_portal_cliente_html(request: web.Request) -> web.Response:
             <div class="card"><b>MTTR Médio</b><div style="font-size:24px;font-weight:900;color:#fbbf24;">${k.mttr_horas||0}h</div></div>
             <div class="card"><b>OS (Prev / Corr)</b><div style="font-size:22px;font-weight:900;color:#c084fc;">${k.total_os||0} <span style="font-size:12px;">(${k.preventivas||0}P / ${k.corretivas||0}C)</span></div></div>
           </div>
-          ${alertas.length ? `<div class="card" style="border-left:5px solid #ef4444;"><b style="color:#f87171;">⚠️ Equipamentos com Sinal de Atenção / Intervenção (${alertas.length})</b><div style="margin-top:8px;">${alertas.map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #1e293b;"><span><b>${a.equipamento}</b> (${a.numero_serie}) — ${a.motivo}</span><button class="btn btn-warn" onclick="abrirIntervencaoRapida('${a.equipamento}')">🚨 Pedir Intervenção</button></div>`).join('')}</div></div>` : ''}
+          ${alertas.length ? `<div class="card" style="border-left:5px solid #ef4444;"><b style="color:#f87171;">⚠️ Equipamentos com Sinal de Atenção / Intervenção (${alertas.length})</b><div style="margin-top:8px;">${alertas.map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #1e293b;"><span><b>${_esc(a.equipamento)}</b> (${_esc(a.numero_serie)}) — ${_esc(a.motivo)}</span><button class="btn btn-warn" data-eqp="${_esc(a.equipamento)}" onclick="abrirIntervencaoRapida(this.dataset.eqp)">🚨 Pedir Intervenção</button></div>`).join('')}</div></div>` : ''}
           <div class="card" style="overflow-x:auto;">
             <h3 style="margin:0 0 10px;">🖥️ Parque de Equipamentos (${(DATA.equipamentos||[]).length})</h3>
             <table><thead><tr><th>Equipamento</th><th>Categoria</th><th>Série</th><th>Status</th><th>Ação Rápida</th></tr></thead>
-            <tbody>${(DATA.equipamentos||[]).map(e=>`<tr><td><b>${e.nome}</b></td><td>${e.categoria||'-'}</td><td>${e.numero_serie||'-'}</td><td>${e.status||'ATIVO'}</td><td><button class="btn btn-warn" style="padding:4px 8px;font-size:11px;" onclick="abrirIntervencaoRapida('${e.nome}')">🚨 Avisar EMED</button></td></tr>`).join('')}</tbody></table>
+            <tbody>${(DATA.equipamentos||[]).map(e=>`<tr><td><b>${_esc(e.nome)}</b></td><td>${_esc(e.categoria||'-')}</td><td>${_esc(e.numero_serie||'-')}</td><td>${_esc(e.status||'ATIVO')}</td><td><button class="btn btn-warn" style="padding:4px 8px;font-size:11px;" data-eqp="${_esc(e.nome)}" onclick="abrirIntervencaoRapida(this.dataset.eqp)">🚨 Avisar EMED</button></td></tr>`).join('')}</tbody></table>
           </div>`;
       } else if (ABA === 'VISA') {
         el.innerHTML = `
@@ -21176,10 +21660,19 @@ async def api_portal_cliente_html(request: web.Request) -> web.Response:
           </div>
         `;
       } else {
-        el.innerHTML = `<div class="card" style="overflow-x:auto;"><h3 style="margin:0 0 10px;">🛠️ Ordens de Serviço &amp; Laudos (${(DATA.ordens||[]).length})</h3><table><thead><tr><th>OS</th><th>Equipamento</th><th>Serviço</th><th>Status</th><th>Laudo PDF</th><th>DANFE Faturamento</th></tr></thead><tbody>${(DATA.ordens||[]).map(o=>{
-          const danfe = (DATA.notas_danfe||[]).find(n => String(n.os_id) === String(o.id));
-          return `<tr><td>#${o.id}</td><td><b>${o.equipamento}</b></td><td>${o.tipo_servico}</td><td>${o.status}</td><td><a style="color:#34d399;" target="_blank" href="/api/imprimir/${o.id}">📄 PDF</a></td><td>${danfe ? `<a class="btn btn-ok" target="_blank" href="${danfe.danfe_url}" style="text-decoration:none;padding:3px 7px;font-size:11px;">📄 DANFE NF #${danfe.numero_nf}</a>` : '<span style="color:#64748b;font-size:11px;">-</span>'}</td></tr>`;
-        }).join('')}</tbody></table></div>`;
+        el.innerHTML = `<div class="card" style="overflow-x:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+            <h3 style="margin:0;">🛠️ Ordens de Serviço &amp; Laudos (${(DATA.ordens||[]).length})</h3>
+            <button class="btn btn-warn" onclick="abrirIntervencaoRapida('')">🚨 Abrir Novo Chamado</button>
+          </div>
+          <table><thead><tr><th>OS</th><th>Equipamento / Ocorrência</th><th>Serviço</th><th>Status</th><th>Mídias / Anexos</th><th>Laudo PDF</th><th>DANFE Faturamento</th></tr></thead><tbody>${(DATA.ordens||[]).map(o=>{
+            const danfe = (DATA.notas_danfe||[]).find(n => String(n.os_id) === String(o.id));
+            const fotos = Array.isArray(o.fotos_nomes) ? o.fotos_nomes : [];
+            const fotosHtml = fotos.map((fn, i) => `<img src="/api/foto/${encodeURIComponent(fn)}" style="width:34px;height:34px;object-fit:cover;border-radius:6px;border:1px solid #38bdf8;cursor:pointer;" title="Ver foto ${i+1}" data-url="/api/foto/${encodeURIComponent(fn)}" data-tit="OS #${_esc(o.id)} - Foto ${i+1}" onclick="abrirMidiaPortal('foto', this.dataset.url, this.dataset.tit)" />`).join('');
+            const vidHtml = o.video_nome ? `<button type="button" class="btn" style="padding:3px 7px;font-size:10.5px;background:#7c3aed;" data-url="/api/video?name=${encodeURIComponent(o.video_nome)}" data-tit="OS #${_esc(o.id)} - Vídeo do Chamado" onclick="abrirMidiaPortal('video', this.dataset.url, this.dataset.tit)">🎬 Vídeo</button>` : '';
+            const resumoTxt = o.defeito_relatado ? `<div style="font-size:11px;color:#94a3b8;max-width:260px;white-space:normal;margin-top:2px;">${_esc(String(o.defeito_relatado).slice(0,120))}</div>` : '';
+            return `<tr><td>#${_esc(o.id)}</td><td><b>${_esc(o.equipamento)}</b>${resumoTxt}</td><td>${_esc(o.tipo_servico)}</td><td>${_esc(o.status)}</td><td><div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">${fotosHtml}${vidHtml}${(!fotosHtml && !vidHtml)?'<span style="color:#64748b;font-size:11px;">-</span>':''}</div></td><td><a style="color:#34d399;" target="_blank" href="/api/imprimir/${encodeURIComponent(o.id)}">📄 PDF</a></td><td>${danfe ? `<a class="btn btn-ok" target="_blank" href="${_esc(danfe.danfe_url)}" style="text-decoration:none;padding:3px 7px;font-size:11px;">📄 DANFE NF #${_esc(danfe.numero_nf)}</a>` : '<span style="color:#64748b;font-size:11px;">-</span>'}</td></tr>`;
+          }).join('')}</tbody></table></div>`;
       }
     }
   </script>
@@ -26108,7 +26601,7 @@ def criar_app() -> web.Application:
 
     garantir_schema_medicina_trabalho(DB_NAME)
 
-    app = web.Application(middlewares=[gzip_middleware, rate_limiting_middleware, security_headers_middleware, auth_api_middleware], client_max_size=25 * 1024 * 1024)
+    app = web.Application(middlewares=[gzip_middleware, rate_limiting_middleware, security_headers_middleware, auth_api_middleware], client_max_size=64 * 1024 * 1024)
 
 
 

@@ -15551,6 +15551,32 @@ ${linkProp}`;
         grid.appendChild(div);
       });
     }
+    function renderizarPreviewVideoSalvoModalOS(videoSalvoRaw) {
+      const box = document.getElementById("previewVideoInfo");
+      if (!box) return;
+      const b64 = window._videoEvidenciaB64;
+      if (b64 && String(b64).startsWith("data:video")) {
+        box.innerHTML = `
+          <div style="margin-bottom:4px;">🎬 Novo vídeo pronto para envio no salvamento</div>
+          <video controls preload="metadata" src="${b64}" style="width:100%;max-height:200px;border-radius:8px;background:#000;"></video>
+        `;
+        return;
+      }
+      const raw = String(videoSalvoRaw || "").trim();
+      if (!raw || raw === "-") {
+        box.innerHTML = "";
+        return;
+      }
+      const fname = raw.split(/[\\/]/).pop();
+      const vUrl = `/api/video?name=${encodeURIComponent(fname)}`;
+      box.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:4px;">
+          <span>🎬 Vídeo anexado ao chamado</span>
+          <a href="${vUrl}" target="_blank" style="color:#0284c7;font-size:11px;text-decoration:underline;">Abrir em nova aba</a>
+        </div>
+        <video controls preload="metadata" src="${vUrl}" style="width:100%;max-height:210px;border-radius:8px;background:#000;"></video>
+      `;
+    }
     async function abrirModalOS(osId) {
       window._osAtivaId = osId;
       try { const ord = STATE.data?.ordens || []; window._osAtivaObj = ord.find(x => String(x.id) === String(osId)); } catch(e){}
@@ -15970,6 +15996,7 @@ ${linkProp}`;
       if (typeof calcularTelemetriaTuboEmissor === "function") calcularTelemetriaTuboEmissor();
       carregarChecklistModal();
       if (typeof renderizarPreviewFotosSalvasModalOS === "function") renderizarPreviewFotosSalvasModalOS();
+      if (typeof renderizarPreviewVideoSalvoModalOS === "function") renderizarPreviewVideoSalvoModalOS(os.video_evidencia);
       verificarCheckinAutomaticoProximidade(os);
     }
     function fecharModalOS() {
@@ -16333,7 +16360,11 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
       const reader = new FileReader();
       reader.onload = (e) => {
         window._videoEvidenciaB64 = e.target.result;
-        if (preview) preview.innerText = `🎬 Vídeo anexado: ${file.name} (${tamMb} MB)`;
+        if (typeof renderizarPreviewVideoSalvoModalOS === "function") {
+          renderizarPreviewVideoSalvoModalOS("");
+        } else if (preview) {
+          preview.innerText = `🎬 Vídeo anexado: ${file.name} (${tamMb} MB)`;
+        }
         autoSalvarRascunho();
         mostrarToast("🎬 Vídeo da operação anexado com sucesso!");
       };
