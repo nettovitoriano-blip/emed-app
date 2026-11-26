@@ -4509,6 +4509,11 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
     .grid-4 {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }}
     label {{ display: block; font-size: 11.5px; color: #cbd5e1; font-weight: 700; margin-bottom: 4px; }}
     input, select, textarea {{ width: 100%; background: #0f172a; color: #fff; border: 1px solid #475569; border-radius: 6px; padding: 9px 11px; font-size: 13px; }}
+    /* PADRONIZAÇÃO AUTOMÁTICA EM CAIXA ALTA (OFICIAL EMED) */
+    input:not([type="password"]):not([type="email"]):not([type="url"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not(.no-uppercase),
+    textarea:not(.no-uppercase) {{
+      text-transform: uppercase;
+    }}
     input:focus, select:focus, textarea:focus {{ outline: none; border-color: var(--cyan); }}
     .btn {{ cursor: pointer; border: none; border-radius: 6px; padding: 10px 16px; font-weight: 800; font-size: 13px; transition: 0.15s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }}
     .btn-primary {{ background: var(--cyan); color: #0b132b; width: 100%; }}
@@ -5947,6 +5952,36 @@ async def handle_pagina_fiscal_nativa(request: web.Request) -> web.Response:
   </div>
 
   <script>
+    // PADRONIZAÇÃO AUTOMÁTICA EM CAIXA ALTA (OFICIAL EMED)
+    document.addEventListener("input", function(e) {{
+      var el = e.target;
+      if (!el || !el.tagName) return;
+      var tag = el.tagName.toUpperCase();
+      if (tag !== "INPUT" && tag !== "TEXTAREA") return;
+      var type = (el.type || "text").toLowerCase();
+      if (type === "password" || type === "email" || type === "url" || 
+          type === "file" || type === "hidden" || type === "checkbox" || 
+          type === "radio" || type === "range" || type === "color" || 
+          type === "date" || type === "time" || type === "datetime-local" || type === "number") {{
+        return;
+      }}
+      if (el.classList.contains("no-uppercase") || el.classList.contains("no-upper") || 
+          el.dataset.noUppercase === "true" || el.dataset.noUpper === "true") {{
+        return;
+      }}
+      if (typeof el.value === "string") {{
+        var upper = el.value.toUpperCase();
+        if (el.value !== upper) {{
+          var start = el.selectionStart;
+          var end = el.selectionEnd;
+          el.value = upper;
+          if (start !== null && end !== null && typeof el.setSelectionRange === "function") {{
+            try {{ el.setSelectionRange(start, end); }} catch(err) {{}}
+          }}
+        }}
+      }}
+    }}, true);
+
     let FILIAL_ATIVA = "FILIAL_DF";
     let DADOS_ATUAIS = null;
     let USUARIO_FISCAL = null;

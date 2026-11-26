@@ -342,6 +342,14 @@
       border: 1.5px solid #334155; border-radius: 10px;
       padding: 12px 14px; font-size: 14px; font-weight: 600;
       outline: none;
+      text-transform: uppercase;
+    }
+    .dest-input#input-custom-playlist,
+    .dest-input.no-uppercase,
+    .dest-input[type="password"],
+    .dest-input[type="email"],
+    .dest-input[type="url"] {
+      text-transform: none;
     }
     .dest-input:focus { border-color: #38bdf8; }
 
@@ -1698,6 +1706,36 @@
         endereco: 'Rua Coronel Freire, 16 - Amador, Eusébio / CE'
       }
     ];
+
+    // PADRONIZAÇÃO AUTOMÁTICA EM CAIXA ALTA (OFICIAL EMED)
+    document.addEventListener("input", function(e) {
+      var el = e.target;
+      if (!el || !el.tagName) return;
+      var tag = el.tagName.toUpperCase();
+      if (tag !== "INPUT" && tag !== "TEXTAREA") return;
+      var type = (el.type || "text").toLowerCase();
+      if (type === "password" || type === "email" || type === "url" || 
+          type === "file" || type === "hidden" || type === "checkbox" || 
+          type === "radio" || type === "range" || type === "color" || 
+          type === "date" || type === "time" || type === "datetime-local" || type === "number") {
+        return;
+      }
+      if (el.id === "input-custom-playlist" || el.classList.contains("no-uppercase") || 
+          el.classList.contains("no-upper") || el.dataset.noUppercase === "true" || el.dataset.noUpper === "true") {
+        return;
+      }
+      if (typeof el.value === "string") {
+        var upper = el.value.toUpperCase();
+        if (el.value !== upper) {
+          var start = el.selectionStart;
+          var end = el.selectionEnd;
+          el.value = upper;
+          if (start !== null && end !== null && typeof el.setSelectionRange === "function") {
+            try { el.setSelectionRange(start, end); } catch(err) {}
+          }
+        }
+      }
+    }, true);
 
     // ESTADO DA APLICAÇÃO (Inicia na localização real em Fortaleza / GPS Ativo)
     const state = {

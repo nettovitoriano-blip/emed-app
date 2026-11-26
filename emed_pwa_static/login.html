@@ -195,24 +195,19 @@
     }
 
     select, input[type="text"], input[type="password"] {
-
       width: 100%;
-
       height: 48px;
-
       background: rgba(15, 23, 42, 0.75);
-
       border: 1px solid rgba(255, 255, 255, 0.16);
-
       border-radius: 12px;
-
       padding: 0 16px;
-
       color: #ffffff;
-
       font-size: 14.5px;
-
       transition: all 0.2s ease;
+    }
+    input[type="text"]:not([type="password"]):not([type="email"]):not(.no-uppercase) {
+      text-transform: uppercase;
+    }
 
       outline: none;
 
@@ -854,6 +849,35 @@
 
 
   <script>
+    // PADRONIZAÇÃO AUTOMÁTICA EM CAIXA ALTA (OFICIAL EMED)
+    document.addEventListener("input", function(e) {
+      var el = e.target;
+      if (!el || !el.tagName) return;
+      var tag = el.tagName.toUpperCase();
+      if (tag !== "INPUT" && tag !== "TEXTAREA") return;
+      var type = (el.type || "text").toLowerCase();
+      if (type === "password" || type === "email" || type === "url" || 
+          type === "file" || type === "hidden" || type === "checkbox" || 
+          type === "radio" || type === "range" || type === "color" || 
+          type === "date" || type === "time" || type === "datetime-local" || type === "number") {
+        return;
+      }
+      if (el.classList.contains("no-uppercase") || el.classList.contains("no-upper") || 
+          el.dataset.noUppercase === "true" || el.dataset.noUpper === "true") {
+        return;
+      }
+      if (typeof el.value === "string") {
+        var upper = el.value.toUpperCase();
+        if (el.value !== upper) {
+          var start = el.selectionStart;
+          var end = el.selectionEnd;
+          el.value = upper;
+          if (start !== null && end !== null && typeof el.setSelectionRange === "function") {
+            try { el.setSelectionRange(start, end); } catch(err) {}
+          }
+        }
+      }
+    }, true);
 
     let gPollingTimer = null;
 

@@ -386,6 +386,12 @@
       border: 1px solid #334155; background: #060b16; color: #f8fafc;
       font-size: 13px;
     }
+    /* PADRONIZAÇÃO AUTOMÁTICA EM CAIXA ALTA (OFICIAL EMED) */
+    .form-input:not([type="password"]):not([type="email"]):not([type="url"]):not([type="date"]):not([type="number"]):not(.no-uppercase),
+    input:not([type="password"]):not([type="email"]):not([type="url"]):not([type="date"]):not([type="number"]):not(.no-uppercase),
+    textarea:not(.no-uppercase) {
+      text-transform: uppercase;
+    }
 
     .mobile-sheet-toggle-bar {
       display: none;
@@ -1104,6 +1110,36 @@
   </div>
 
   <script>
+    // PADRONIZAÇÃO AUTOMÁTICA EM CAIXA ALTA (OFICIAL EMED)
+    document.addEventListener("input", function(e) {
+      var el = e.target;
+      if (!el || !el.tagName) return;
+      var tag = el.tagName.toUpperCase();
+      if (tag !== "INPUT" && tag !== "TEXTAREA") return;
+      var type = (el.type || "text").toLowerCase();
+      if (type === "password" || type === "email" || type === "url" || 
+          type === "file" || type === "hidden" || type === "checkbox" || 
+          type === "radio" || type === "range" || type === "color" || 
+          type === "date" || type === "time" || type === "datetime-local" || type === "number") {
+        return;
+      }
+      if (el.classList.contains("no-uppercase") || el.classList.contains("no-upper") || 
+          el.dataset.noUppercase === "true" || el.dataset.noUpper === "true") {
+        return;
+      }
+      if (typeof el.value === "string") {
+        var upper = el.value.toUpperCase();
+        if (el.value !== upper) {
+          var start = el.selectionStart;
+          var end = el.selectionEnd;
+          el.value = upper;
+          if (start !== null && end !== null && typeof el.setSelectionRange === "function") {
+            try { el.setSelectionRange(start, end); } catch(err) {}
+          }
+        }
+      }
+    }, true);
+
     // Inicia centralizado em Fortaleza / CE (localização real)
     let myRealLat = -3.7965;
     let myRealLon = -38.5678;
