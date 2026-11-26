@@ -544,16 +544,27 @@
       border-radius: 14px;
       overflow: hidden;
       box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+      max-height: 94vh;
+      display: flex;
+      flex-direction: column;
     }
-    .modal-header {
+    .modal-header, .modal-head {
       background: var(--emed-navy);
       color: #fff;
       padding: 12px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
     }
-    .modal-body { padding: 14px 16px; }
+    .modal-body {
+      padding: 14px 16px;
+      overflow-y: auto;
+      flex: 1;
+    }
     .form-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -1461,7 +1472,7 @@
             </span>
           </div>
         </div>
-        <button class="btn btn-sm btn-outline" onclick="fecharModalOS()">✕ Fechar</button>
+        <button class="btn btn-sm btn-outline" onclick="fecharModalOS()" style="display:inline-flex;align-items:center;gap:6px;font-weight:800;font-size:13px;padding:6px 14px;background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.4);color:#ffffff;border-radius:8px;cursor:pointer;">← Voltar / ✕ Fechar</button>
       </div>
       <div class="modal-body" id="modalOSBody"></div>
     </div>
@@ -1473,7 +1484,7 @@
     <div class="modal-box" style="max-width:560px;">
       <div class="modal-header">
         <div id="modalEqTitulo" style="font-size:15px;font-weight:900;">🔬 Gerenciar Equipamento</div>
-        <button class="btn btn-sm btn-outline" onclick="fecharModalEditarEquipamento()">✕</button>
+        <button class="btn btn-sm btn-outline" onclick="fecharModalEditarEquipamento()" style="display:inline-flex;align-items:center;gap:4px;font-weight:800;padding:4px 10px;background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.4);color:#fff;border-radius:8px;cursor:pointer;">← Voltar / ✕</button>
       </div>
       <div class="modal-body" style="padding:16px;">
         <input type="hidden" id="eqFormId" value="" />
@@ -2225,15 +2236,20 @@
         modal = document.createElement("div");
         modal.id = "modalEquipeSetoresEMED";
         modal.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;";
+        modal.onclick = (e) => { if (e.target === modal) fecharModalEquipeSetores(); };
         document.body.appendChild(modal);
       }
       window._abaEquipeAtiva = abaInicial || "ANIVERSARIOS";
       renderConteudoModalEquipeSetores();
       modal.style.display = "flex";
+      empilharModalHistorico("modalEquipeSetoresEMED", () => fecharModalEquipeSetores(false));
     }
-    function fecharModalEquipeSetores() {
+    function fecharModalEquipeSetores(sincronizarHistorico = true) {
       const modal = document.getElementById("modalEquipeSetoresEMED");
-      if (modal) modal.style.display = "none"; const pwIn = document.getElementById("cancelaSenhaConfirmacao"); if(pwIn) pwIn.value = "";
+      if (modal) modal.style.display = "none";
+      const pwIn = document.getElementById("cancelaSenhaConfirmacao");
+      if (pwIn) pwIn.value = "";
+      if (sincronizarHistorico) desempilharModalHistorico("modalEquipeSetoresEMED");
     }
     function renderConteudoModalEquipeSetores() {
       const modal = document.getElementById("modalEquipeSetoresEMED");
@@ -2244,11 +2260,11 @@
       const aba = window._abaEquipeAtiva || "ANIVERSARIOS";
       let inner = `
         <div style="background:#fff; border-radius:14px; max-width:760px; width:100%; max-height:92vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
-          <div style="background:#002b54; color:#fff; padding:14px 18px; display:flex; justify-content:space-between; align-items:center;">
+          <div style="background:#002b54; color:#fff; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:100; box-shadow:0 2px 8px rgba(0,0,0,0.15);">
             <div style="font-weight:900; font-size:15px; display:flex; align-items:center; gap:8px;">
               <span>👥 Gestão de Equipe, SST, Dosimetria & Setores Internos</span>
             </div>
-            <button onclick="fecharModalEquipeSetores()" style="background:none; border:none; color:#fff; font-size:22px; cursor:pointer; font-weight:bold;">&times;</button>
+            <button onclick="fecharModalEquipeSetores()" style="background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.35); color:#fff; font-size:12px; font-weight:800; border-radius:6px; padding:6px 12px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">← Voltar / ✕ Fechar</button>
           </div>
           <div style="display:flex; flex-wrap:wrap; border-bottom:2px solid #e2e8f0; background:#f8fafc;">
             <button onclick="window._abaEquipeAtiva='ANIVERSARIOS'; renderConteudoModalEquipeSetores();" style="flex:1; min-width:130px; padding:11px 8px; font-weight:800; font-size:12.5px; border:none; cursor:pointer; background:${aba==='ANIVERSARIOS'?'#fff':'#f1f5f9'}; color:${aba==='ANIVERSARIOS'?'#002b54':'#64748b'}; border-bottom:${aba==='ANIVERSARIOS'?'3px solid #002b54':'none'};">
@@ -3362,6 +3378,90 @@
       osAberta: null,
       deferredPrompt: null
     };
+
+    // ========================================================
+    // GERENCIADOR NATIVO DE HISTÓRICO & BOTÃO VOLTAR PWA
+    // ========================================================
+    window._pilhaModaisAbertos = window._pilhaModaisAbertos || [];
+    window._historicoMenusNavegacao = window._historicoMenusNavegacao || [STATE.menuAtivo];
+
+    function empilharModalHistorico(modalId, fecharFn) {
+      window._pilhaModaisAbertos.push({ id: modalId, fechar: fecharFn });
+      try {
+        window.history.pushState({ emedTipo: 'modal', modalId: modalId, timestamp: Date.now() }, "");
+      } catch (e) {}
+    }
+
+    function desempilharModalHistorico(modalId) {
+      const idx = window._pilhaModaisAbertos.findIndex(m => m.id === modalId);
+      if (idx !== -1) {
+        window._pilhaModaisAbertos.splice(idx, 1);
+      }
+      if (window.history.state && window.history.state.emedTipo === 'modal') {
+        try { window.history.back(); } catch(e){}
+      }
+    }
+
+    // Ouvinte universal de retorno nativo (Android, Gestos iOS e Teclado)
+    window.addEventListener("popstate", function(e) {
+      // 1. Fechar modais da pilha se existirem
+      if (window._pilhaModaisAbertos.length > 0) {
+        const item = window._pilhaModaisAbertos.pop();
+        if (item && typeof item.fechar === "function") {
+          item.fechar(false);
+          return;
+        }
+      }
+
+      // 2. Fechar modais abertos no DOM (fallback abrangente)
+      const modaisAbertos = document.querySelectorAll(
+        '.modal-backdrop.open, .modal-overlay.open, .modal-overlay.active, #modalEquipeSetoresEMED'
+      );
+      for (const m of modaisAbertos) {
+        if (m.id === "modalEquipeSetoresEMED" && m.style.display !== "flex") continue;
+        if (m.id === "modalOS") { fecharModalOS(false); return; }
+        if (m.id === "modalVisualizadorOS") { fecharVisualizadorOS(false); return; }
+        if (m.id === "modalEquipeSetoresEMED") { fecharModalEquipeSetores(false); return; }
+        if (m.id === "modalGerenciarEquipamento") { fecharModalEditarEquipamento(false); return; }
+        if (m.id === "modalQR") { fecharModalQR(); return; }
+        m.classList.remove("open", "active");
+        if (m.style.display && m.style.display !== "none") m.style.display = "none";
+        return;
+      }
+
+      // 3. Fechar menu lateral se aberto
+      const drawer = document.getElementById("appDrawer");
+      if (drawer && drawer.classList.contains("open")) {
+        fecharDrawer();
+        return;
+      }
+
+      // 4. Voltar para o menu anterior no histórico interno de navegação
+      if (window._historicoMenusNavegacao && window._historicoMenusNavegacao.length > 1) {
+        window._historicoMenusNavegacao.pop(); // remove menu atual
+        const menuAnt = window._historicoMenusNavegacao.pop();
+        if (menuAnt) {
+          selecionarMenu(menuAnt, null, false);
+          return;
+        }
+      }
+    });
+
+    window.addEventListener("keydown", function(e) {
+      if (e.key === "Escape") {
+        const modais = document.querySelectorAll('.modal-backdrop.open, .modal-overlay.open, .modal-overlay.active, #modalEquipeSetoresEMED');
+        for (const m of modais) {
+          if (m.id === "modalEquipeSetoresEMED" && m.style.display !== "flex") continue;
+          if (m.id === "modalOS") { fecharModalOS(); break; }
+          if (m.id === "modalVisualizadorOS") { fecharVisualizadorOS(); break; }
+          if (m.id === "modalEquipeSetoresEMED") { fecharModalEquipeSetores(); break; }
+          if (m.id === "modalGerenciarEquipamento") { fecharModalEditarEquipamento(); break; }
+          m.classList.remove("open", "active");
+          if (m.style.display && m.style.display !== "none") m.style.display = "none";
+          break;
+        }
+      }
+    });
     const MENUS_POR_PERFIL = {
       FULL: [
         { id: "GES_MURAL", icone: "📊", titulo: "Mural & Despacho", desc: "Escala diária por técnico e disparo rápido no WhatsApp" },
@@ -3893,7 +3993,7 @@ async function processarFilaOffline() {
       renderizarNavegacao();
       renderizarTelaPrincipal();
     }
-function selecionarMenu(menuId, perfilOpcional = null) {
+function selecionarMenu(menuId, perfilOpcional = null, registrarHistorico = true) {
       const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase();
       const usuarioPerfil = (localStorage.getItem("emed_perfil_usuario") || "").toUpperCase();
       const isGestor = ((usuarioNome === "NETTO" || usuarioNome === "VALFREDO NETTO")) || usuarioPerfil.includes("GESTOR") || usuarioPerfil.includes("MASTER") || (usuarioNome === "");
@@ -3905,6 +4005,15 @@ function selecionarMenu(menuId, perfilOpcional = null) {
         abrirModalAssinaturaTecnico();
         fecharDrawer();
         return;
+      }
+      if (registrarHistorico) {
+        window._historicoMenusNavegacao = window._historicoMenusNavegacao || [];
+        if (window._historicoMenusNavegacao[window._historicoMenusNavegacao.length - 1] !== menuId) {
+          window._historicoMenusNavegacao.push(menuId);
+          try {
+            window.history.pushState({ emedTipo: 'menu', menuId: menuId }, "");
+          } catch(e){}
+        }
       }
       if (STATE.perfil === "FULL") {
         STATE.menuAtivo = menuId;
@@ -4313,9 +4422,15 @@ function selecionarMenu(menuId, perfilOpcional = null) {
       const modalEl = document.getElementById("modalGerenciarEquipamento");
       modalEl.classList.add("open");
       modalEl.style.display = "flex";
+      empilharModalHistorico("modalGerenciarEquipamento", () => fecharModalEditarEquipamento(false));
     }
-    function fecharModalEditarEquipamento() {
-      document.getElementById("modalGerenciarEquipamento").style.display = "none";
+    function fecharModalEditarEquipamento(sincronizarHistorico = true) {
+      const el = document.getElementById("modalGerenciarEquipamento");
+      if (el) {
+        el.style.display = "none";
+        el.classList.remove("open");
+      }
+      if (sincronizarHistorico) desempilharModalHistorico("modalGerenciarEquipamento");
     }
     // Modal de Insumos de Viagem Longa
     function abrirChecklistInsumosViagem(cidade) {
@@ -4492,7 +4607,16 @@ async function efetuarLogout() {
       // Barra horizontal de pílulas do perfil atual
       const strip = document.getElementById("submenuStrip");
       const menusAtuais = MENUS_POR_PERFIL[STATE.perfil] || MENUS_POR_PERFIL.TECNICO;
-      strip.innerHTML = menusAtuais.map(m => {
+      const menuHomeId = STATE.perfil === "TECNICO" ? "TEC_OS" : "GES_MURAL";
+      let btnVoltarHtml = "";
+      if (STATE.menuAtivo !== menuHomeId) {
+        btnVoltarHtml = `
+          <button class="submenu-pill btn-voltar-home" onclick="selecionarMenu('${menuHomeId}')" style="background:rgba(56, 189, 248, 0.18); border:1.5px solid #38bdf8; color:#38bdf8; font-weight:800; display:inline-flex; align-items:center; gap:5px; box-shadow:0 2px 6px rgba(56, 189, 248, 0.2);" title="Retornar ao Painel Inicial">
+            <span>← Início</span>
+          </button>
+        `;
+      }
+      strip.innerHTML = btnVoltarHtml + menusAtuais.map(m => {
         const cnt = obterContadorMenu(m.id);
         const badgeHtml = cnt !== "" ? `<span class="submenu-badge">${cnt}</span>` : "";
         return `
@@ -16050,14 +16174,16 @@ ${linkProp}`;
         </div>
       `;
       document.getElementById("modalOS").classList.add("open");
+      empilharModalHistorico("modalOS", () => fecharModalOS(false));
       if (typeof calcularTelemetriaTuboEmissor === "function") calcularTelemetriaTuboEmissor();
       carregarChecklistModal();
       if (typeof renderizarPreviewFotosSalvasModalOS === "function") renderizarPreviewFotosSalvasModalOS();
       if (typeof renderizarPreviewVideoSalvoModalOS === "function") renderizarPreviewVideoSalvoModalOS(os.video_evidencia);
       verificarCheckinAutomaticoProximidade(os);
     }
-    function fecharModalOS() {
+    function fecharModalOS(sincronizarHistorico = true) {
       document.getElementById("modalOS").classList.remove("open");
+      if (sincronizarHistorico) desempilharModalHistorico("modalOS");
     }
     function alternarPecaManual() {
       const sel = document.getElementById("osPecaSel");
@@ -16458,10 +16584,12 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
       btnBaixar.href = `/api/pdf/${encodeURIComponent(osId)}`;
       if (btnImprimir) btnImprimir.href = `/api/imprimir/${encodeURIComponent(osId)}`;
       modal.classList.add("open");
+      empilharModalHistorico("modalVisualizadorOS", () => fecharVisualizadorOS(false));
     }
-    function fecharVisualizadorOS() {
+    function fecharVisualizadorOS(sincronizarHistorico = true) {
       document.getElementById("modalVisualizadorOS").classList.remove("open");
       document.getElementById("iframeLaudoOS").src = "about:blank";
+      if (sincronizarHistorico) desempilharModalHistorico("modalVisualizadorOS");
     }
     function imprimirIframeOS() {
       const iframe = document.getElementById("iframeLaudoOS");
@@ -17401,13 +17529,16 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
   <!-- MODAL DE VISUALIZAÇÃO DIRETA DA OS EM PDF / LAUDO -->
   <div id="modalVisualizadorOS" class="modal-overlay" style="display:none;">
     <div class="modal" style="max-width:920px; width:95%; height:92vh; display:flex; flex-direction:column; padding:0;">
-      <div class="modal-head" style="padding:12px 16px; border-bottom:1px solid #cbd5e1;">
-        <div class="modal-title" id="tituloVisualizadorOS">📄 Laudo Técnico Oficial da Ordem de Serviço</div>
-        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+      <div class="modal-head" style="padding:12px 16px; border-bottom:1px solid #cbd5e1; display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button class="btn btn-sm btn-outline" onclick="fecharVisualizadorOS()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.4);color:#fff;font-weight:800;display:inline-flex;align-items:center;gap:4px;cursor:pointer;">← Voltar</button>
+          <div class="modal-title" id="tituloVisualizadorOS">📄 Laudo Técnico Oficial da Ordem de Serviço</div>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
           <a id="btnImprimirA4Visualizador" class="btn btn-primary btn-sm" href="#" target="_blank" style="background:#0f766e;border-color:#0f766e;">🖨️ Imprimir A4 Direto</a>
           <a id="btnBaixarPDFVisualizador" class="btn btn-outline btn-sm" href="#" target="_blank">📥 Baixar PDF</a>
           <button id="btnZapVisualizador" class="btn btn-sm" onclick="interativaDispararZapOS(window._osVisualizadorAtual)" style="background:#22c55e;color:#fff;border:none;font-weight:800;display:inline-flex;align-items:center;gap:4px;" title="Enviar Relatório Oficial no WhatsApp">📲 Enviar Relatório no WhatsApp</button>
-          <button class="modal-close" onclick="fecharVisualizadorOS()">✕</button>
+          <button class="modal-close" onclick="fecharVisualizadorOS()" title="Fechar visualizador">✕ Fechar</button>
         </div>
       </div>
       <div style="flex:1; background:#f1f5f9; position:relative;">

@@ -16450,10 +16450,18 @@ async def api_proposta_publica_html(request: web.Request) -> web.Response:
     cidade = _h.escape(_dados_prop["cidade"])
     estado = _h.escape(_dados_prop["estado"] or "-")
     contato = _h.escape(_dados_prop["whatsapp"] if _dados_prop["whatsapp"] != "N/D" else "-")
-    resp_local = _h.escape(limpar_texto(row.get("assinatura_cliente") or row.get("responsavel_hospital"), "Coordenação Local"))
-    equip = _h.escape(limpar_texto(row.get("equipamento"), "EQUIPAMENTO"))
-    tipo_srv = _h.escape(limpar_texto(row.get("tipo_servico"), "CORRETIVA"))
     tec_resp = _h.escape(limpar_texto(row.get("tecnico_responsavel"), "-"))
+    
+    # Blindagem estrita: Jamais permitir que o nome do técnico apareça como responsável do cliente/hospital
+    _resp_cand = limpar_texto(row.get("assinatura_cliente") or row.get("responsavel_hospital"), "")
+    _tecs_check = ["VALFREDO", "NETTO", "ANTONIO MATOS", "ARQUIMEDES", "MARCOS GILSON", "DIOGENES", "WANDSON", "GABRIEL SOARES", "TONY GANZAROLI", "JONATHAN", "LUCAS", "MARCOS AURELIO"]
+    _resp_cand_up = _resp_cand.strip().upper()
+    _tec_resp_up = tec_resp.strip().upper()
+    if not _resp_cand or _resp_cand_up == _tec_resp_up or any(t in _resp_cand_up for t in _tecs_check if len(t) > 3) or (_tec_resp_up and _tec_resp_up in _resp_cand_up):
+        resp_local = "Coordenação / Engenharia Clínica"
+    else:
+        resp_local = _h.escape(_resp_cand)
+    equip = _h.escape(limpar_texto(row.get("equipamento"), "EQUIPAMENTO"))
     data_os = _h.escape(limpar_texto(row.get("data_agendamento"), obter_agora_brasil().strftime("%d/%m/%Y")))
     defeito = _h.escape(limpar_texto(row.get("defeito_relatado"), "-"))
     peca = _h.escape(limpar_texto(row.get("peca_selecionada") or row.get("peca_aplicada") or row.get("peca_baixada_ref"), "A definir / Conforme laudo técnico"))

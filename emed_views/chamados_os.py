@@ -365,7 +365,18 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
     cidade = dados_cli["cidade"]
     estado = dados_cli["estado"] or "-"
     whats_cli = dados_cli["whatsapp"]
-    resp_hosp = limpar_texto(row_c.get("assinatura_cliente"), "") or limpar_texto(row_c.get("responsavel_hospital"), "Coordenação Local")
+    resp_hosp = limpar_texto(row_c.get("assinatura_cliente"), "") or limpar_texto(row_c.get("responsavel_hospital"), "")
+
+    tec_princ = limpar_texto(row_c.get("tecnico_responsavel"), "VALFREDO V. DE OLIVEIRA NETTO")
+    if tec_princ.strip().upper() in ["NETTO", "NETTO VITORIANO", "VITORIANO"]:
+        tec_princ = "VALFREDO V. DE OLIVEIRA NETTO"
+
+    # Blindagem estrita: Jamais repetir o nome do técnico na assinatura do cliente
+    _tecs_conhecidos = ["VALFREDO", "NETTO", "ANTONIO MATOS", "ARQUIMEDES", "MARCOS GILSON", "DIOGENES", "WANDSON", "GABRIEL SOARES", "TONY GANZAROLI", "JONATHAN", "LUCAS", "MARCOS AURELIO"]
+    _resp_up = resp_hosp.strip().upper()
+    _tec_up = tec_princ.strip().upper()
+    if not resp_hosp or _resp_up == _tec_up or any(t in _resp_up for t in _tecs_conhecidos if len(t) > 3) or (_tec_up and _tec_up in _resp_up):
+        resp_hosp = "Coordenação / Engenharia Clínica"
 
     raw_eq = limpar_texto(row_c.get("equipamento"), "-")
     ns_embutido = ""
