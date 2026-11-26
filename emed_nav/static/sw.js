@@ -1,5 +1,5 @@
-// EmedNav Service Worker - v34 (Ultra Resiliente, Suporte Offline e Zero Bloqueios)
-const CACHE_NAME = 'emednav-v34-bulletproof';
+// EmedNav Service Worker - v35 (Logo Oficial @eMED Padronizada e Imutável)
+const CACHE_NAME = 'emednav-v35-official-arroba-logo';
 
 const ASSETS_TO_CACHE = [
   '/',

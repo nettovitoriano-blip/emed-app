@@ -973,7 +973,9 @@
       <!-- BOTÕES FLUTUANTES NO MAPA (MINIMALISTA & MENOS POLUIÇÃO) -->
       <div class="map-fab-stack">
         <button id="btn-center-car" class="map-fab" title="Centralizar no Carro" style="border-color:#22c55e; background:linear-gradient(135deg, #15803d 0%, #0f172a 100%); color:#4ade80;">🎯</button>
-        <button id="btn-toggle-clients" class="map-fab" title="Filtro de Clientes (Todos / Contrato / Avulso / Oculto)" style="border-color:#38bdf8; background:#0f172a; color:#38bdf8;">🏥</button>
+        <button id="btn-toggle-clients" class="map-fab" title="Filtro de Clientes eMED (Todos / Contrato / Avulso / Oculto)" style="border-color:#38bdf8; background:#ffffff; color:#38bdf8; padding:3px; display:flex; align-items:center; justify-content:center;">
+          <img src="/static/simbolo_emed_clean.svg" alt="@eMED" style="width:26px; height:26px; object-fit:contain; display:block;" />
+        </button>
         <button id="btn-toggle-radars" class="map-fab" title="Radares e Velocidade" style="border-color:#f59e0b; background:#1e293b; color:#fbbf24;">📷</button>
         <button id="btn-toggle-layers" class="map-fab" title="Satélite / Vias">🛰️</button>
         <button id="btn-fab-music" class="map-fab" onclick="openMusicModal()" title="Música na Viagem (YouTube, Deezer, Spotify)" style="border-color:#f472b6; background:linear-gradient(135deg, #a855f7 0%, #ec4899 100%); color:#ffffff; font-size:18px; box-shadow:0 0 12px rgba(236,72,153,0.35);">🎵</button>
@@ -2856,41 +2858,17 @@
     const btnToggleClients = document.getElementById('btn-toggle-clients');
     if (btnToggleClients) btnToggleClients.addEventListener('click', () => {
       if (clientFilterMode === 'TODOS') {
-        clientFilterMode = 'CONTRATO';
-        if (!map.hasLayer(clientsLayerContrato)) map.addLayer(clientsLayerContrato);
-        if (map.hasLayer(clientsLayerAvulso)) map.removeLayer(clientsLayerAvulso);
-        btnToggleClients.style.borderColor = '#0095d9';
-        btnToggleClients.style.background = '#0f172a';
-        btnToggleClients.style.color = '#38bdf8';
-        btnToggleClients.innerText = '🔵';
-        showToast('🔵 Exibindo somente Clientes CONTRATO');
+        setMapClientLayer('CONTRATO');
+        showToast('🔵 Exibindo somente Clientes CONTRATO (@eMED Azul)');
       } else if (clientFilterMode === 'CONTRATO') {
-        clientFilterMode = 'AVULSO';
-        if (map.hasLayer(clientsLayerContrato)) map.removeLayer(clientsLayerContrato);
-        if (!map.hasLayer(clientsLayerAvulso)) map.addLayer(clientsLayerAvulso);
-        btnToggleClients.style.borderColor = '#ef4444';
-        btnToggleClients.style.background = '#0f172a';
-        btnToggleClients.style.color = '#f87171';
-        btnToggleClients.innerText = '🔴';
-        showToast('🔴 Exibindo somente Clientes AVULSOS');
+        setMapClientLayer('AVULSO');
+        showToast('🔴 Exibindo somente Clientes AVULSOS (@eMED Vermelho)');
       } else if (clientFilterMode === 'AVULSO') {
-        clientFilterMode = 'OCULTO';
-        if (map.hasLayer(clientsLayerContrato)) map.removeLayer(clientsLayerContrato);
-        if (map.hasLayer(clientsLayerAvulso)) map.removeLayer(clientsLayerAvulso);
-        btnToggleClients.style.borderColor = '#64748b';
-        btnToggleClients.style.background = 'rgba(30, 41, 59, 0.7)';
-        btnToggleClients.style.color = '#94a3b8';
-        btnToggleClients.innerText = '🚫';
+        setMapClientLayer('OCULTO');
         showToast('🙈 Clientes eMED OCULTOS');
       } else {
-        clientFilterMode = 'TODOS';
-        if (!map.hasLayer(clientsLayerContrato)) map.addLayer(clientsLayerContrato);
-        if (!map.hasLayer(clientsLayerAvulso)) map.addLayer(clientsLayerAvulso);
-        btnToggleClients.style.borderColor = '#38bdf8';
-        btnToggleClients.style.background = '#0f172a';
-        btnToggleClients.style.color = '#38bdf8';
-        btnToggleClients.innerText = '🏥';
-        showToast('🏥 Exibindo TODOS os Clientes (Contrato + Avulso)');
+        setMapClientLayer('TODOS');
+        showToast('🌐 Exibindo TODOS os Clientes eMED (Contrato + Avulso)');
       }
     });
 
