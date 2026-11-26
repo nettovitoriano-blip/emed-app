@@ -2787,7 +2787,7 @@ async def api_auth_login(request: web.Request) -> web.Response:
             "usuario": {"nome": usuario or "ROOT_ADMIN", "perfil": "GESTOR"},
             "msg": "Acesso concedido. Inicializando console administrativo..."
         }, status=200)
-        resp.set_cookie("emed_session", "HONEYPOT_DECEPTION_SESSION_TOKEN_ROOT", max_age=86400, path="/")
+        resp.set_cookie("emed_session", "HONEYPOT_DECEPTION_SESSION_TOKEN_ROOT", max_age=86400, httponly=True, samesite="Lax", secure=requisicao_https(request), path="/")
         return resp
 
 
@@ -3931,7 +3931,7 @@ async def auth_api_middleware(request: web.Request, handler):
                     "is_honeypot": True,
                     "msg": "Autenticação aceita. Redirecionando para console administrativo..."
                 }, status=200)
-                resp.set_cookie("emed_session", "HONEYPOT_DECEPTION_SESSION_TOKEN_ROOT", max_age=86400, path="/")
+                resp.set_cookie("emed_session", "HONEYPOT_DECEPTION_SESSION_TOKEN_ROOT", max_age=86400, httponly=True, samesite="Lax", secure=requisicao_https(request), path="/")
                 return resp
 
             return web.json_response({
@@ -3963,7 +3963,6 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/lab/r/")
         or path.startswith("/proposta/")
         or path == "/api/proposta/responder"
-        or path.startswith("/api/fiscal/danfe/")
         # Proxies para visualização de navegação/radares no veículo (Apenas leituras GET)
         or (request.method == "GET" and (
             path.startswith("/api/car")
@@ -4036,6 +4035,7 @@ async def auth_api_middleware(request: web.Request, handler):
         )
         or path.startswith("/api/cliente/dossie-radiologico/arquivo/")
         or path.startswith("/api/imprimir/")
+        or path.startswith("/api/fiscal/danfe/")
     ):
         try:
             with get_db_connection(DB_NAME) as conn:
@@ -19222,7 +19222,7 @@ async def api_v1_odometro_doc(request: web.Request) -> web.Response:
 
 
 
-        "autenticacao_suportada": "Authorization: Bearer EMED-GPS-2026-TOKEN-OFICIAL",
+        "autenticacao_suportada": "Authorization: Bearer <EMED_GPS_API_KEY>",
 
 
 
@@ -20482,7 +20482,7 @@ async def api_cliente_acesso_login(request: web.Request) -> web.Response:
             "cliente_nome": "HOSPITAL CLINICO CENTRAL (DECOY)",
             "msg": "Acesso autorizado com sucesso."
         }, status=200)
-        resp.set_cookie("emed_session", "HONEYPOT_DECEPTION_SESSION_TOKEN_ROOT", max_age=86400, path="/")
+        resp.set_cookie("emed_session", "HONEYPOT_DECEPTION_SESSION_TOKEN_ROOT", max_age=86400, httponly=True, samesite="Lax", secure=requisicao_https(request), path="/")
         return resp
 
     agora = obter_agora_brasil_str("%d/%m/%Y %H:%M")
@@ -24283,33 +24283,47 @@ async def handle_simbolo_emed(request: web.Request) -> web.Response:
 
 async def handle_static_nav(request: web.Request) -> web.Response:
     """Serve arquivos estáticos para o EmedNav (SVGs, PNGs, ícones, sons, etc)."""
-    tail = request.match_info.get("tail", "")
-    candidatos = [
-        os.path.join(BASE_DIR, "emed_nav", "static", tail),
-        os.path.join(BASE_DIR, "emed_pwa_static", tail),
+    tail = str(request.match_info.get("tail", "") or "").lstrip("/\\")
+    if not tail or ".." in tail.replace("\\", "/").split("/"):
+        return web.Response(status=404)
+    cts = {
+        ".svg": "image/svg+xml",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".ico": "image/x-icon",
+        ".css": "text/css",
+        ".js": "application/javascript",
+        ".json": "application/json",
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".html": "text/html",
+        ".woff": "font/woff",
+        ".woff2": "font/woff2",
+    }
+    roots = [
+        os.path.realpath(os.path.join(BASE_DIR, "emed_nav", "static")),
+        os.path.realpath(os.path.join(BASE_DIR, "emed_pwa_static")),
     ]
-    for c in candidatos:
-        if os.path.exists(c) and os.path.isfile(c):
-            ext = os.path.splitext(c)[1].lower()
-            cts = {
-                ".svg": "image/svg+xml",
-                ".png": "image/png",
-                ".jpg": "image/jpeg",
-                ".jpeg": "image/jpeg",
-                ".ico": "image/x-icon",
-                ".css": "text/css",
-                ".js": "application/javascript",
-                ".json": "application/json",
-                ".mp3": "audio/mpeg",
-                ".wav": "audio/wav"
-            }
-            ct = cts.get(ext, "application/octet-stream")
-            headers = {"Cache-Control": "public, max-age=86400"}
+    for root in roots:
+        cand = os.path.realpath(os.path.join(root, tail))
+        try:
+            if os.path.commonpath([cand, root]) != root:
+                continue
+        except ValueError:
+            continue
+        if os.path.isfile(cand):
+            ext = os.path.splitext(cand)[1].lower()
+            if ext not in cts:
+                return web.Response(status=403)
+            ct = cts[ext]
+            headers = {"Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff"}
             if tail == "sw.js" or tail.endswith("/sw.js"):
                 headers["Service-Worker-Allowed"] = "/"
                 headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-            with open(c, "rb") as f:
-                return web.Response(body=f.read(), content_type=ct, charset="utf-8" if ext in (".css", ".js", ".json") else None, headers=headers)
+            with open(cand, "rb") as f:
+                return web.Response(body=f.read(), content_type=ct, charset="utf-8" if ext in (".css", ".js", ".json", ".html") else None, headers=headers)
     return web.Response(status=404)
 
 

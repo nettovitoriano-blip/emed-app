@@ -7,6 +7,9 @@ com coleta de evidências forenses e geração de laudo pericial para a Polícia
 """
 
 import os
+import asyncio
+import html as _h
+import ipaddress
 import json
 import time
 import hashlib
@@ -18,16 +21,62 @@ DB_NAME = "emed.db"
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def _obter_db_honeypot(request: Optional[web.Request] = None, fallback_db: str = DB_NAME) -> str:
+    raw_app = getattr(request, "app", None) if request else None
+    raw_val = raw_app.get("db_name") if raw_app is not None and hasattr(raw_app, "get") else None
+    db_p = raw_val.strip() if isinstance(raw_val, str) else ""
+    cand = db_p or fallback_db
+    return cand if os.path.isabs(cand) else os.path.join(BASE_DIR, cand)
+
+
+def _garantir_schema_honeypot(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS honeypot_evidencias_forenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data_hora TEXT NOT NULL,
+            ip_origem TEXT NOT NULL,
+            sistema_alvo TEXT DEFAULT 'HONEYPOT_DECEPTION_DECOY',
+            usuario_tentado TEXT DEFAULT '',
+            senhas_tentadas TEXT DEFAULT '',
+            user_agent TEXT DEFAULT '',
+            headers_json TEXT DEFAULT '{}',
+            dispositivo_info TEXT DEFAULT '',
+            screen_resolution TEXT DEFAULT '',
+            timezone TEXT DEFAULT '',
+            gpu_renderer TEXT DEFAULT '',
+            canvas_hash TEXT DEFAULT '',
+            tempo_na_armadilha_segundos REAL DEFAULT 0.0,
+            acoes_executadas TEXT DEFAULT '',
+            status_pericia TEXT DEFAULT 'EVIDENCIAS_COLETADAS',
+            criado_em TEXT NOT NULL
+        )
+    """)
+
+
 def obter_ip_real_honeypot(request: web.Request) -> str:
-    """Extrai o IP real considerando Cloudflare, Nginx e proxies reversos."""
-    for header in ("CF-Connecting-IP", "X-Forwarded-For", "X-Real-IP"):
-        val = request.headers.get(header)
-        if val:
-            ip = val.split(",")[0].strip()
-            if ip:
-                return ip
-    peer = request.transport.get_extra_info("peername") if request.transport else None
-    return peer[0] if peer else "127.0.0.1"
+    """Extrai o IP real apenas de proxies locais/privados confiaveis (anti-spoofing)."""
+    peer = str(request.remote or "").strip()
+    if not peer and request.transport:
+        pn = request.transport.get_extra_info("peername")
+        peer = str(pn[0]) if pn else "127.0.0.1"
+    peer = peer or "127.0.0.1"
+    is_proxy = False
+    try:
+        addr = ipaddress.ip_address(peer.split("%")[0])
+        is_proxy = addr.is_loopback or addr.is_private
+    except Exception:
+        is_proxy = False
+    if is_proxy:
+        for header in ("CF-Connecting-IP", "X-Real-IP", "X-Forwarded-For"):
+            val = request.headers.get(header)
+            if val:
+                cand = val.split(",")[0].strip()
+                try:
+                    ipaddress.ip_address(cand.split("%")[0])
+                    return cand
+                except Exception:
+                    continue
+    return peer
 
 
 def registrar_invasor_honeypot(
@@ -44,9 +93,10 @@ def registrar_invasor_honeypot(
     headers_dict = dict(request.headers)
     headers_json = json.dumps(headers_dict, ensure_ascii=False)
     
-    full_db_path = os.path.join(BASE_DIR, db_path) if not os.path.isabs(db_path) else db_path
+    full_db_path = _obter_db_honeypot(request, db_path)
     
     with sqlite3.connect(full_db_path) as conn:
+        _garantir_schema_honeypot(conn)
         cur = conn.cursor()
         # Verifica se já existe captura recente desse IP nas últimas 2 horas
         cur.execute("""
@@ -329,7 +379,11 @@ async def handle_honeypot_dashboard(request: web.Request) -> web.Response:
         termInput.value = '';
 
         const lineCmd = document.createElement('div');
-        lineCmd.innerHTML = `<span style="color:#38bdf8;">root@emed-srv-01:~#</span> ${{cmd}}`;
+        const prefixSpan = document.createElement('span');
+        prefixSpan.style.color = '#38bdf8';
+        prefixSpan.textContent = 'root@emed-srv-01:~# ';
+        lineCmd.appendChild(prefixSpan);
+        lineCmd.appendChild(document.createTextNode(cmd));
         termOutput.appendChild(lineCmd);
 
         // Tar pit delay (800ms) para realismo
@@ -370,7 +424,7 @@ async def handle_honeypot_dashboard(request: web.Request) -> web.Response:
       
       // Delay de 3.5 segundos para prender o atacante
       setTimeout(() => {{
-        const dummy = "ESTE ARQUIVO É UMA ARMADILHA DECEPTION REGISTRADA NA POLÍCIA CIVIL.\nIP E FINGERPRINT COLETADOS COM SUCESSO.";
+        const dummy = "ESTE ARQUIVO É UMA ARMADILHA DECEPTION REGISTRADA NA POLÍCIA CIVIL.\\nIP E FINGERPRINT COLETADOS COM SUCESSO.";
         const blob = new Blob([dummy], {{ type: 'application/octet-stream' }});
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -401,9 +455,10 @@ async def api_honeypot_beacon(request: web.Request) -> web.Response:
     arquivo = body.get("arquivo", "")
     
     agora_iso = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-    full_db_path = os.path.join(BASE_DIR, DB_NAME)
+    full_db_path = _obter_db_honeypot(request)
     
     with sqlite3.connect(full_db_path) as conn:
+        _garantir_schema_honeypot(conn)
         cur = conn.cursor()
         cur.execute("""
             SELECT id, acoes_executadas FROM honeypot_evidencias_forenses
@@ -443,8 +498,8 @@ async def api_honeypot_fake_terminal(request: web.Request) -> web.Response:
     cmd = str(body.get("comando", "")).strip()
     ip_origem = obter_ip_real_honeypot(request)
     
-    # Tar pit: espera 400ms para simular latência de servidor real
-    time.sleep(0.4)
+    # Tar pit nao bloqueante para simular latencia sem travar o loop asyncio
+    await asyncio.sleep(0.4)
     
     cmd_lower = cmd.lower()
     if cmd_lower in ("help", "?"):
@@ -465,8 +520,9 @@ async def api_honeypot_fake_terminal(request: web.Request) -> web.Response:
         saida = f"bash: {cmd}: comando executado com retorno 0 (OK)."
         
     agora_iso = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-    full_db_path = os.path.join(BASE_DIR, DB_NAME)
+    full_db_path = _obter_db_honeypot(request)
     with sqlite3.connect(full_db_path) as conn:
+        _garantir_schema_honeypot(conn)
         cur = conn.cursor()
         cur.execute("""
             SELECT id, acoes_executadas FROM honeypot_evidencias_forenses
@@ -487,8 +543,9 @@ async def api_honeypot_fake_terminal(request: web.Request) -> web.Response:
 
 async def api_supervisorio_honeypot_listar(request: web.Request) -> web.Response:
     """Lista todos os invasores capturados na armadilha para o Supervisório."""
-    full_db_path = os.path.join(BASE_DIR, DB_NAME)
+    full_db_path = _obter_db_honeypot(request)
     with sqlite3.connect(full_db_path) as conn:
+        _garantir_schema_honeypot(conn)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         cur.execute("""
@@ -510,9 +567,10 @@ async def api_supervisorio_gerar_dossie_policia(request: web.Request) -> web.Res
     para ser anexado a um Boletim de Ocorrência (B.O.) de Crime Cibernético (Lei 12.737/2012).
     """
     ev_id = request.match_info.get("id", "").strip()
-    full_db_path = os.path.join(BASE_DIR, DB_NAME)
+    full_db_path = _obter_db_honeypot(request)
     
     with sqlite3.connect(full_db_path) as conn:
+        _garantir_schema_honeypot(conn)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         cur.execute("SELECT * FROM honeypot_evidencias_forenses WHERE id = ?", (ev_id,))
@@ -523,6 +581,19 @@ async def api_supervisorio_gerar_dossie_policia(request: web.Request) -> web.Res
         
     dados = dict(row)
     hash_evidencia = hashlib.sha256(f"{dados['id']}_{dados['ip_origem']}_{dados['data_hora']}_{dados.get('headers_json')}".encode()).hexdigest()
+    e_id = _h.escape(str(dados['id']))
+    e_dt = _h.escape(str(dados['data_hora']))
+    e_ip = _h.escape(str(dados['ip_origem']))
+    e_sis = _h.escape(str(dados.get('sistema_alvo') or 'Console de Autenticação / PWA'))
+    e_usr = _h.escape(str(dados.get('usuario_tentado') or 'root'))
+    e_sen = _h.escape(str(dados.get('senhas_tentadas') or '-'))
+    e_ua = _h.escape(str(dados.get('user_agent') or '-'))
+    e_scr = _h.escape(str(dados.get('screen_resolution') or 'Não identificada'))
+    e_tz = _h.escape(str(dados.get('timezone') or 'Não identificado'))
+    e_gpu = _h.escape(str(dados.get('gpu_renderer') or 'Não identificada'))
+    e_cvs = _h.escape(str(dados.get('canvas_hash') or 'Desconhecido'))
+    e_acoes = _h.escape(str(dados.get('acoes_executadas') or '[SEM COMANDOS ADICIONAIS REGISTRADOS]'))
+    tempo_seg = float(dados.get('tempo_na_armadilha_segundos') or 0.0)
     
     html_dossie = f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -566,26 +637,26 @@ async def api_supervisorio_gerar_dossie_policia(request: web.Request) -> web.Res
 
   <div class="section-title">1. Identificação do Incidente &amp; Parâmetros de Conexão</div>
   <table>
-    <tr><th>ID do Registro Forense</th><td>#{dados['id']}</td></tr>
-    <tr><th>Data e Hora do Ataque (Brasília)</th><td><b>{dados['data_hora']}</b></td></tr>
-    <tr><th>Endereço IP Real do Invasor</th><td><b style="color:#b91c1c; font-size:11pt;">{dados['ip_origem']}</b></td></tr>
-    <tr><th>Sistema Hospitalar Alvo</th><td>{dados.get('sistema_alvo', 'Console de Autenticação / PWA')}</td></tr>
-    <tr><th>Usuário Tentado no Ataque</th><td><b>{dados.get('usuario_tentado', 'root')}</b></td></tr>
-    <tr><th>Dicionário / Senhas Utilizadas</th><td><span style="font-family:monospace; color:#991b1b;">{dados.get('senhas_tentadas', '-')}</span></td></tr>
+    <tr><th>ID do Registro Forense</th><td>#{e_id}</td></tr>
+    <tr><th>Data e Hora do Ataque (Brasília)</th><td><b>{e_dt}</b></td></tr>
+    <tr><th>Endereço IP Real do Invasor</th><td><b style="color:#b91c1c; font-size:11pt;">{e_ip}</b></td></tr>
+    <tr><th>Sistema Hospitalar Alvo</th><td>{e_sis}</td></tr>
+    <tr><th>Usuário Tentado no Ataque</th><td><b>{e_usr}</b></td></tr>
+    <tr><th>Dicionário / Senhas Utilizadas</th><td><span style="font-family:monospace; color:#991b1b;">{e_sen}</span></td></tr>
   </table>
 
   <div class="section-title">2. Impressão Digital de Hardware &amp; Dispositivo do Atacante (Fingerprint)</div>
   <table>
-    <tr><th>User-Agent Completo</th><td style="font-family:monospace; font-size:8pt;">{dados.get('user_agent', '-')}</td></tr>
-    <tr><th>Resolução da Tela</th><td>{dados.get('screen_resolution', 'Não identificada')}</td></tr>
-    <tr><th>Fuso Horário Local do Invasor</th><td>{dados.get('timezone', 'Não identificado')}</td></tr>
-    <tr><th>Placa de Vídeo / GPU (WebGL)</th><td>{dados.get('gpu_renderer', 'Não identificada')}</td></tr>
-    <tr><th>Hash Gráfico de Hardware (Canvas)</th><td><span style="font-family:monospace;">{dados.get('canvas_hash', 'Desconhecido')}</span></td></tr>
-    <tr><th>Tempo Retido na Armadilha</th><td>{dados.get('tempo_na_armadilha_segundos', 0):.1f} segundos</td></tr>
+    <tr><th>User-Agent Completo</th><td style="font-family:monospace; font-size:8pt;">{e_ua}</td></tr>
+    <tr><th>Resolução da Tela</th><td>{e_scr}</td></tr>
+    <tr><th>Fuso Horário Local do Invasor</th><td>{e_tz}</td></tr>
+    <tr><th>Placa de Vídeo / GPU (WebGL)</th><td>{e_gpu}</td></tr>
+    <tr><th>Hash Gráfico de Hardware (Canvas)</th><td><span style="font-family:monospace;">{e_cvs}</span></td></tr>
+    <tr><th>Tempo Retido na Armadilha</th><td>{tempo_seg:.1f} segundos</td></tr>
   </table>
 
   <div class="section-title">3. Linha do Tempo de Ações Executadas pelo Invasor (Timeline Forense)</div>
-  <div class="code-box">{dados.get('acoes_executadas') or '[SEM COMANDOS ADICIONAIS REGISTRADOS]'}</div>
+  <div class="code-box">{e_acoes}</div>
 
   <div class="section-title">4. Integridade da Prova Digital &amp; Autenticação</div>
   <table>

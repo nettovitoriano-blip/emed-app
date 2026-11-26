@@ -818,29 +818,29 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
 
         tbody.innerHTML = res.invasores.map(inv => {
           const fps = [
-            inv.gpu_renderer ? `GPU: ${inv.gpu_renderer}` : '',
-            inv.canvas_hash ? `Hash: ${inv.canvas_hash}` : '',
-            inv.screen_resolution ? `Tela: ${inv.screen_resolution}` : ''
+            inv.gpu_renderer ? `GPU: ${_escapeHtml(inv.gpu_renderer)}` : '',
+            inv.canvas_hash ? `Hash: ${_escapeHtml(inv.canvas_hash)}` : '',
+            inv.screen_resolution ? `Tela: ${_escapeHtml(inv.screen_resolution)}` : ''
           ].filter(Boolean).join('<br>') || '<span style="color:#64748b;">Aguardando beacon...</span>';
 
-          const tempo = inv.tempo_na_armadilha_segundos ? `${inv.tempo_na_armadilha_segundos}s` : 'Ativo';
-          const senhas = inv.senhas_tentadas ? inv.senhas_tentadas.substring(0, 35) + (inv.senhas_tentadas.length > 35 ? '...' : '') : '-';
+          const tempo = inv.tempo_na_armadilha_segundos ? `${Number(inv.tempo_na_armadilha_segundos)}s` : 'Ativo';
+          const senhas = inv.senhas_tentadas ? _escapeHtml(inv.senhas_tentadas.substring(0, 35) + (inv.senhas_tentadas.length > 35 ? '...' : '')) : '-';
 
           return `<tr>
-            <td style="font-weight:bold; color:#a78bfa;">#${inv.id}</td>
-            <td style="white-space:nowrap;">${inv.data_hora}</td>
-            <td><code style="background:#0f172a; padding:2px 5px; border-radius:4px; color:#38bdf8;">${inv.ip_origem}</code></td>
-            <td style="font-weight:bold; color:#fbbf24;">${inv.usuario_tentado || '-'}</td>
+            <td style="font-weight:bold; color:#a78bfa;">#${Number(inv.id) || 0}</td>
+            <td style="white-space:nowrap;">${_escapeHtml(inv.data_hora)}</td>
+            <td><code style="background:#0f172a; padding:2px 5px; border-radius:4px; color:#38bdf8;">${_escapeHtml(inv.ip_origem)}</code></td>
+            <td style="font-weight:bold; color:#fbbf24;">${_escapeHtml(inv.usuario_tentado || '-')}</td>
             <td style="font-size:11px; color:#f87171;">${senhas}</td>
             <td style="font-size:10.5px; line-height:1.3; max-width:240px;">${fps}</td>
             <td style="color:#34d399; font-weight:bold;">${tempo}</td>
-            <td><span class="badge badge-ok">${inv.status_pericia || 'COLETADO'}</span></td>
+            <td><span class="badge badge-ok">${_escapeHtml(inv.status_pericia || 'COLETADO')}</span></td>
             <td>
               <div style="display:flex; gap:6px;">
-                <a href="/api/supervisorio/dossie-forense/${inv.id}" target="_blank" class="btn" style="background:#0369a1; border-color:#0284c7; padding:3px 8px; font-size:11px;">
+                <a href="/api/supervisorio/dossie-forense/${encodeURIComponent(String(inv.id || ''))}" target="_blank" class="btn" style="background:#0369a1; border-color:#0284c7; padding:3px 8px; font-size:11px;">
                   📄 Laudo Polícia
                 </a>
-                <button onclick="bloquearIpManual('${inv.ip_origem}')" class="btn btn-danger" style="padding:3px 8px; font-size:11px;">
+                <button data-ip="${_escapeHtml(inv.ip_origem)}" onclick="bloquearIpManual(this.dataset.ip)" class="btn btn-danger" style="padding:3px 8px; font-size:11px;">
                   🛑 Bloquear IP
                 </button>
               </div>
@@ -918,13 +918,13 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
           pIps.style.display = 'block';
           document.getElementById('tbodyIpsBloq').innerHTML = ipsBloq.map(b => `
             <tr>
-              <td><b style="color:#f87171;">${b.ip}</b></td>
-              <td>${b.motivo}</td>
-              <td>${b.bloqueado_em}</td>
-              <td>${b.expira_em || 'Permanente'}</td>
-              <td><span class="badge badge-sys">${b.bloqueado_por}</span></td>
+              <td><b style="color:#f87171;">${_escapeHtml(b.ip)}</b></td>
+              <td>${_escapeHtml(b.motivo)}</td>
+              <td>${_escapeHtml(b.bloqueado_em)}</td>
+              <td>${_escapeHtml(b.expira_em || 'Permanente')}</td>
+              <td><span class="badge badge-sys">${_escapeHtml(b.bloqueado_por)}</span></td>
               <td>
-                <button class="btn btn-success" style="padding:3px 8px; font-size:11px;" onclick="desbloquearIp('${b.ip}')">
+                <button class="btn btn-success" style="padding:3px 8px; font-size:11px;" data-ip="${_escapeHtml(b.ip)}" onclick="desbloquearIp(this.dataset.ip)">
                   🔓 Desbloquear
                 </button>
               </td>
@@ -992,16 +992,16 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
         }
 
         const isLocal = (r.ip_origem === '127.0.0.1' || r.ip_origem === '::1');
-        const btnBlock = isLocal ? '' : `<button class="btn btn-danger" style="padding:2px 6px; font-size:10px;" onclick="bloquearIpManual('${r.ip_origem}')">⛔ Bloquear IP</button>`;
+        const btnBlock = isLocal ? '' : `<button class="btn btn-danger" style="padding:2px 6px; font-size:10px;" data-ip="${_escapeHtml(r.ip_origem)}" onclick="bloquearIpManual(this.dataset.ip)">⛔ Bloquear IP</button>`;
 
         return `
           <tr>
-            <td style="white-space:nowrap; font-weight:bold;">${r.data_hora}</td>
-            <td><span class="badge badge-sys">${r.tipo_sistema}</span></td>
-            <td><b style="color:#e2e8f0;">${r.usuario_tentado}</b></td>
-            <td><code>${r.ip_origem}</code></td>
+            <td style="white-space:nowrap; font-weight:bold;">${_escapeHtml(r.data_hora)}</td>
+            <td><span class="badge badge-sys">${_escapeHtml(r.tipo_sistema)}</span></td>
+            <td><b style="color:#e2e8f0;">${_escapeHtml(r.usuario_tentado)}</b></td>
+            <td><code>${_escapeHtml(r.ip_origem)}</code></td>
             <td>${stBadge}</td>
-            <td style="max-width:240px; color:#cbd5e1;">${r.motivo_detalhado || '-'}</td>
+            <td style="max-width:240px; color:#cbd5e1;">${_escapeHtml(r.motivo_detalhado || '-')}</td>
             <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--muted);" title="${_escapeHtml(r.user_agent)}">
               ${_escapeHtml(r.user_agent ? r.user_agent.slice(0, 32) + '...' : '-')}
             </td>
@@ -1012,8 +1012,8 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
     }
 
     function _escapeHtml(s) {
-      if (!s) return '';
-      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      if (s === null || s === undefined) return '';
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     async function bloquearIpManual(ip) {
@@ -1187,13 +1187,17 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
 
     function sugerirSlugUsuario() {
       const cli = document.getElementById('genCliNome').value.trim();
-      const slug = cli.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, ".").replace(/^\.+|\.+$/g, "").slice(0, 24);
+      const slug = cli.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, ".").replace(/^\\.+|\\.+$/g, "").slice(0, 24);
       document.getElementById('genCliUsuario').value = slug || '';
     }
 
     function gerarSenhaAleatoria() {
-      const r = Math.floor(1000 + Math.random() * 9000);
-      document.getElementById('genCliSenha').value = 'emed' + r;
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789@#';
+      const arr = new Uint32Array(8);
+      (window.crypto || window.msCrypto).getRandomValues(arr);
+      let suf = '';
+      for (let i = 0; i < arr.length; i++) suf += chars[arr[i] % chars.length];
+      document.getElementById('genCliSenha').value = 'Emed@' + suf;
     }
 
     async function executarCriacaoAcessoCliente() {
@@ -1220,7 +1224,7 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
 🔑 *Senha:* ${res.senha}
 
 _Guarde esta credencial com segurança. Acesso 24/7 aos equipamentos, laudos e DANFEs da sua unidade._`;
-      WPP_GERADO_ATUAL = gestor_whatsapp.replace(/\D/g, '');
+      WPP_GERADO_ATUAL = gestor_whatsapp.replace(/\\D/g, '');
 
       document.getElementById('txtMsgGerada').textContent = MSG_GERADA_ATUAL;
       document.getElementById('boxResultadoGerado').style.display = 'block';
@@ -1250,13 +1254,16 @@ _Guarde esta credencial com segurança. Acesso 24/7 aos equipamentos, laudos e D
         }
         tb.innerHTML = rows.map(r => `
           <tr>
-            <td><b>${r.cliente_nome}</b></td>
-            <td><code style="color:#38bdf8;">${r.usuario}</code></td>
-            <td>${r.gestor_nome || '-'}</td>
-            <td>${r.gestor_whatsapp || '-'}</td>
-            <td>${r.ultimo_acesso || 'Nunca'}</td>
+            <td><b>${_escapeHtml(r.cliente_nome)}</b></td>
+            <td><code style="color:#38bdf8;">${_escapeHtml(r.usuario)}</code></td>
+            <td>${_escapeHtml(r.gestor_nome || '-')}</td>
+            <td>${_escapeHtml(r.gestor_whatsapp || '-')}</td>
+            <td>${_escapeHtml(r.ultimo_acesso || 'Nunca')}</td>
             <td>
-              <button class="btn" style="padding:2px 7px; font-size:10.5px; background:#0284c7;" onclick="prepararRedefinicao('${_escapeHtml(r.cliente_nome)}', '${_escapeHtml(r.usuario)}', '${_escapeHtml(r.gestor_nome||'')}', '${_escapeHtml(r.gestor_whatsapp||'')}')">
+              <button class="btn" style="padding:2px 7px; font-size:10.5px; background:#0284c7;"
+                data-cli="${_escapeHtml(r.cliente_nome)}" data-usr="${_escapeHtml(r.usuario)}"
+                data-gst="${_escapeHtml(r.gestor_nome||'')}" data-wpp="${_escapeHtml(r.gestor_whatsapp||'')}"
+                onclick="prepararRedefinicao(this.dataset.cli, this.dataset.usr, this.dataset.gst, this.dataset.wpp)">
                 ✏️ Redefinir Senha
               </button>
             </td>
@@ -1308,7 +1315,7 @@ async def api_supervisorio_cliente_acesso_gerar(request: web.Request) -> web.Res
     """Gera ou redefine credenciais de acesso do cliente a partir do painel supervisório."""
     import re as _re
     import secrets
-    import hashlib
+    from emed_app_server import hash_senha_forte, _garantir_schema_acessos_cliente
     db_name = _obter_db_path(request.app)
     body = await request.json()
     cliente_nome = str(body.get("cliente_nome", "")).strip().upper()
@@ -1321,13 +1328,14 @@ async def api_supervisorio_cliente_acesso_gerar(request: web.Request) -> web.Res
 
     slug = _re.sub(r"[^a-z0-9]+", ".", cliente_nome.lower()).strip(".")[:24] or "unidade"
     usuario = str(body.get("usuario") or slug).strip().lower()
-    senha_plana = str(body.get("senha") or "").strip() or f"emed{secrets.randbelow(9000)+1000}"
-    senha_hash = hashlib.sha256(("EMED_PORTAL_SALT_2026:" + str(senha_plana)).encode("utf-8")).hexdigest()
-    token = secrets.token_hex(16)
+    senha_plana = str(body.get("senha") or "").strip() or f"Emed@{secrets.token_hex(4).upper()}"
+    senha_hash = hash_senha_forte(senha_plana)
+    token = secrets.token_hex(24)
     agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
 
     with sqlite3.connect(db_name) as conn:
         garantir_schema_supervisorio(conn)
+        _garantir_schema_acessos_cliente(conn)
         row_ex = conn.execute("SELECT id FROM clientes_acessos_portal WHERE UPPER(cliente_nome) = ?", (cliente_nome,)).fetchone()
         if row_ex:
             conn.execute("""
@@ -1336,6 +1344,8 @@ async def api_supervisorio_cliente_acesso_gerar(request: web.Request) -> web.Res
                 WHERE id = ?
             """, (usuario, senha_hash, gestor_nome, gestor_wpp, gestor_email, token, row_ex[0]))
         else:
+            while conn.execute("SELECT 1 FROM clientes_acessos_portal WHERE usuario = ?", (usuario,)).fetchone():
+                usuario = f"{slug}.{secrets.randbelow(90)+10}"
             conn.execute("""
                 INSERT INTO clientes_acessos_portal (
                     cliente_nome, usuario, senha_hash, gestor_nome, gestor_whatsapp, gestor_email, token_acesso, ativo, criado_em
