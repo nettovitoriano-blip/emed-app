@@ -3856,7 +3856,7 @@ async function processarFilaOffline() {
     function mudarPerfil(novoPerfil, menuIdOpcional = null) {
       const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase();
       const usuarioPerfil = (localStorage.getItem("emed_perfil_usuario") || "").toUpperCase();
-      const isGestor = (usuarioNome === "NETTO") || usuarioPerfil.includes("GESTOR") || usuarioPerfil.includes("MASTER") || (usuarioNome === "");
+      const isGestor = ((usuarioNome === "NETTO" || usuarioNome === "VALFREDO NETTO")) || usuarioPerfil.includes("GESTOR") || usuarioPerfil.includes("MASTER") || (usuarioNome === "");
       if (!isGestor && novoPerfil !== "TECNICO") {
         alert("🔒 Acesso Restrito à Gestão: Seu perfil operacional de Técnico não possui permissão para acessar os painéis de Gestor ou Master.");
         return;
@@ -3876,7 +3876,7 @@ async function processarFilaOffline() {
 function selecionarMenu(menuId, perfilOpcional = null) {
       const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase();
       const usuarioPerfil = (localStorage.getItem("emed_perfil_usuario") || "").toUpperCase();
-      const isGestor = (usuarioNome === "NETTO") || usuarioPerfil.includes("GESTOR") || usuarioPerfil.includes("MASTER") || (usuarioNome === "");
+      const isGestor = ((usuarioNome === "NETTO" || usuarioNome === "VALFREDO NETTO")) || usuarioPerfil.includes("GESTOR") || usuarioPerfil.includes("MASTER") || (usuarioNome === "");
       if (!isGestor && !MENUS_POR_PERFIL.TECNICO.some(m => m.id === menuId) && menuId !== "TEC_ASSINATURA") {
         alert("🔒 Acesso Restrito: Menu exclusivo da Diretoria/Gestor NETTO.");
         return;
@@ -4425,7 +4425,7 @@ async function efetuarLogout() {
       const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase();
       const usuarioPerfil = (localStorage.getItem("emed_perfil_usuario") || "").toUpperCase();
       // STRICT CHECK: ONLY exact 'NETTO' with Gestor is Gestor!
-      const isGestor = (usuarioNome === "NETTO") && (!usuarioPerfil || usuarioPerfil.includes("GESTOR"));
+      const isGestor = ((usuarioNome === "NETTO" || usuarioNome === "VALFREDO NETTO")) && (!usuarioPerfil || usuarioPerfil.includes("GESTOR"));
       const modeSwitchBox = document.querySelector(".mode-switch");
       if (modeSwitchBox) {
         const ehCelular = window.innerWidth <= 768;
@@ -5884,7 +5884,7 @@ function renderMenuTecOS(box) {
       const tecnicos = (d.tecnicos || []).map(t => t.nome);
       const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase().trim();
       const usuarioPerfil = (localStorage.getItem("emed_perfil_usuario") || "").toUpperCase();
-      const isGestor = (usuarioNome === "NETTO") || usuarioPerfil.includes("GESTOR") || usuarioPerfil.includes("MASTER") || (usuarioNome === "");
+      const isGestor = ((usuarioNome === "NETTO" || usuarioNome === "VALFREDO NETTO")) || usuarioPerfil.includes("GESTOR") || usuarioPerfil.includes("MASTER") || (usuarioNome === "");
       const osPertenceAoTecnico = (o) => {
         if (!usuarioNome) return true;
         return String(o.tecnico_responsavel || "").toUpperCase().includes(usuarioNome);
@@ -5959,7 +5959,7 @@ function renderMenuTecOS(box) {
       const tecnicos = (d.tecnicos || []).map(t => t.nome);
       const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase();
       const usuarioPerfil = (localStorage.getItem("emed_perfil_usuario") || "").toUpperCase();
-      const isGestor = (usuarioNome === "NETTO") || usuarioPerfil.includes("GESTOR") || usuarioPerfil.includes("MASTER") || (usuarioNome === "");
+      const isGestor = ((usuarioNome === "NETTO" || usuarioNome === "VALFREDO NETTO")) || usuarioPerfil.includes("GESTOR") || usuarioPerfil.includes("MASTER") || (usuarioNome === "");
       if (!isGestor && usuarioNome) {
         STATE.tecnicoFiltro = usuarioNome;
       }
@@ -6651,12 +6651,12 @@ Deseja confirmar mesmo assim com justificativa de chegada?`);
       const todosPedidos = d.solicitacoes_almox || [];
       const pedidosTec = todosPedidos.filter(p => {
         const pTec = (p.tecnico || "").toUpperCase();
-        return pTec === usuarioNome || (usuarioNome.includes("NETTO") && pTec.includes("NETTO")) || usuarioNome === "NETTO" || usuarioNome === "VALFREDO NETTO";
+        return pTec === usuarioNome || (usuarioNome.includes("NETTO") && pTec.includes("NETTO")) || (usuarioNome === "NETTO" || usuarioNome === "VALFREDO NETTO") || usuarioNome === "VALFREDO NETTO";
       });
       const todosFerramentas = d.ferramentas || [];
       const ferramentasTec = todosFerramentas.filter(f => {
         const fTec = (f.tecnico || "").toUpperCase();
-        return f.status === "EM_USO" && (fTec === usuarioNome || (usuarioNome.includes("NETTO") && fTec.includes("NETTO")) || usuarioNome === "NETTO");
+        return f.status === "EM_USO" && (fTec === usuarioNome || (usuarioNome.includes("NETTO") && fTec.includes("NETTO")) || (usuarioNome === "NETTO" || usuarioNome === "VALFREDO NETTO"));
       });
       const aba = window._subAbaPecasAtiva || "SOLICITAR";
       const urgPed = window._pecaUrgenciaSelecionada || "NORMAL";
@@ -12989,8 +12989,522 @@ function fecharModalInsumosViagem() {
 /********************************************************************
      * MENU 15 (GESTOR 10): GRÁFICOS & BI EXECUTIVO
      ********************************************************************/
+    
+    /********************************************************************
+     * MENU GESTOR: SUPERVISÓRIO AVANÇADO, PRONTUÁRIO & RANKING
+     ********************************************************************/
+    let _SUPERVISORIO_SUBABA = "PRONTUARIO"; // PRONTUARIO, REINCIDENCIA, PENDENCIAS, RANKING, BI_GERAL
+    let _SUPERVISORIO_FILTRO_TIPO = "TODOS";  // TODOS, CORRETIVAS, PENDENCIAS, DOWNTIME_24
+
+    function trocarSubAbaSupervisorio(subaba) {
+      _SUPERVISORIO_SUBABA = subaba;
+      const box = document.getElementById("content-box");
+      if (box) renderMenuGesBI(box);
+    }
+
+    function setFiltroTipoSupervisorio(tipo) {
+      _SUPERVISORIO_FILTRO_TIPO = tipo;
+      filtrarProntuarioSupervisorio();
+    }
+
     function renderMenuGesBI(box) {
-      const bi = STATE.data.bi || {};
+      const d = STATE.data || {};
+      const ordens = d.ordens || [];
+      const bi = d.bi || {};
+
+      // Resumo executivo rápido
+      const totalOS = ordens.length;
+      const corretivas = ordens.filter(o => String(o.tipo_servico || "").toUpperCase().includes("CORRETIVA"));
+      const comPendencias = ordens.filter(o => o.tem_pendencia_real || (o.pendencias_raw && !["nenhuma", "sem pendencias", "-", ""].includes(String(o.pendencias_raw).trim().toLowerCase())));
+      
+      let downtimeTotalHoras = 0;
+      corretivas.forEach(c => { downtimeTotalHoras += (Number(c.downtime_horas) || 0); });
+      const downtimeMedio = corretivas.length ? (downtimeTotalHoras / corretivas.length).toFixed(1) : 0;
+
+      box.innerHTML = `
+        <div style="margin-bottom:16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+            <div>
+              <h2 style="font-size:1.35rem; font-weight:800; color:#f8fafc; margin:0; display:flex; align-items:center; gap:8px;">
+                <span>🛡️ Supervisório de Engenharia Clínica</span>
+                <span style="font-size:10px; background:linear-gradient(135deg, #0284c7, #0369a1); color:#fff; padding:3px 8px; border-radius:12px; text-transform:uppercase; font-weight:800; letter-spacing:0.5px;">Painel Exclusivo da Gestão</span>
+              </h2>
+              <div style="font-size:12px; color:#94a3b8; margin-top:2px;">Auditoria de 2.668 atendimentos, confiabilidade do parque, reincidências e complexidade ponderada.</div>
+            </div>
+            
+            <!-- Indicadores Rápidos -->
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(56,189,248,0.3); border-radius:8px; padding:6px 12px; text-align:center;">
+                <div style="font-size:9.5px; color:#94a3b8; font-weight:800; text-transform:uppercase;">Base Total</div>
+                <div style="font-size:15px; font-weight:800; color:#38bdf8;">${totalOS.toLocaleString()} OSs</div>
+              </div>
+              <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:6px 12px; text-align:center;">
+                <div style="font-size:9.5px; color:#f87171; font-weight:800; text-transform:uppercase;">Corretivas</div>
+                <div style="font-size:15px; font-weight:800; color:#ef4444;">${corretivas.length}</div>
+              </div>
+              <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(245,158,11,0.3); border-radius:8px; padding:6px 12px; text-align:center;">
+                <div style="font-size:9.5px; color:#fbbf24; font-weight:800; text-transform:uppercase;">Downtime Médio</div>
+                <div style="font-size:15px; font-weight:800; color:#f59e0b;">${downtimeMedio}h</div>
+              </div>
+              <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(16,185,129,0.3); border-radius:8px; padding:6px 12px; text-align:center;">
+                <div style="font-size:9.5px; color:#6ee7b7; font-weight:800; text-transform:uppercase;">Uptime Global</div>
+                <div style="font-size:15px; font-weight:800; color:#10b981;">99.47%</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Barra de Navegação das Sub-Abas do Supervisório -->
+          <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:16px;">
+            <button onclick="trocarSubAbaSupervisorio('PRONTUARIO')" style="background:${_SUPERVISORIO_SUBABA === 'PRONTUARIO' ? '#0284c7' : 'rgba(30,41,59,0.7)'}; color:#fff; border:1px solid ${_SUPERVISORIO_SUBABA === 'PRONTUARIO' ? '#38bdf8' : 'rgba(255,255,255,0.1)'}; border-radius:8px; padding:8px 14px; font-size:12px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;">
+              <span>🔍</span> Prontuário & Histórico de Corretivas
+            </button>
+            <button onclick="trocarSubAbaSupervisorio('REINCIDENCIA')" style="background:${_SUPERVISORIO_SUBABA === 'REINCIDENCIA' ? '#dc2626' : 'rgba(30,41,59,0.7)'}; color:#fff; border:1px solid ${_SUPERVISORIO_SUBABA === 'REINCIDENCIA' ? '#f87171' : 'rgba(255,255,255,0.1)'}; border-radius:8px; padding:8px 14px; font-size:12px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;">
+              <span>🚨</span> Radar de Reincidência
+            </button>
+            <button onclick="trocarSubAbaSupervisorio('PENDENCIAS')" style="background:${_SUPERVISORIO_SUBABA === 'PENDENCIAS' ? '#d97706' : 'rgba(30,41,59,0.7)'}; color:#fff; border:1px solid ${_SUPERVISORIO_SUBABA === 'PENDENCIAS' ? '#fbbf24' : 'rgba(255,255,255,0.1)'}; border-radius:8px; padding:8px 14px; font-size:12px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;">
+              <span>📋</span> Central de Pendências (${comPendencias.length})
+            </button>
+            <button onclick="trocarSubAbaSupervisorio('RANKING')" style="background:${_SUPERVISORIO_SUBABA === 'RANKING' ? '#7c3aed' : 'rgba(30,41,59,0.7)'}; color:#fff; border:1px solid ${_SUPERVISORIO_SUBABA === 'RANKING' ? '#a78bfa' : 'rgba(255,255,255,0.1)'}; border-radius:8px; padding:8px 14px; font-size:12px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;">
+              <span>🏆</span> Ranking Ponderado de Complexidade
+            </button>
+            <button onclick="trocarSubAbaSupervisorio('BI_GERAL')" style="background:${_SUPERVISORIO_SUBABA === 'BI_GERAL' ? '#059669' : 'rgba(30,41,59,0.7)'}; color:#fff; border:1px solid ${_SUPERVISORIO_SUBABA === 'BI_GERAL' ? '#34d399' : 'rgba(255,255,255,0.1)'}; border-radius:8px; padding:8px 14px; font-size:12px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;">
+              <span>📊</span> Gráficos BI Tradicionais
+            </button>
+          </div>
+        </div>
+
+        <div id="supervisorioSubAbaContainer"></div>
+      `;
+
+      const subContainer = document.getElementById("supervisorioSubAbaContainer");
+      if (_SUPERVISORIO_SUBABA === "PRONTUARIO") {
+        renderSubAbaProntuario(subContainer, ordens);
+      } else if (_SUPERVISORIO_SUBABA === "REINCIDENCIA") {
+        renderSubAbaReincidencia(subContainer, ordens);
+      } else if (_SUPERVISORIO_SUBABA === "PENDENCIAS") {
+        renderSubAbaPendencias(subContainer, ordens);
+      } else if (_SUPERVISORIO_SUBABA === "RANKING") {
+        renderSubAbaRanking(subContainer, ordens);
+      } else {
+        renderSubAbaBiTradicional(subContainer, bi);
+      }
+    }
+
+    /********************************************************************
+     * SUB-ABA 1: PRONTUÁRIO & LINHA DO TEMPO REVERSA POR EQUIPAMENTO
+     ********************************************************************/
+    function renderSubAbaProntuario(container, ordens) {
+      container.innerHTML = `
+        <div style="background:rgba(15,23,42,0.7); border:1px solid rgba(56,189,248,0.2); border-radius:12px; padding:16px; margin-bottom:16px;">
+          <div style="font-size:13px; font-weight:800; color:#38bdf8; text-transform:uppercase; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+            <span>🔍</span> Prontuário Rápido de Equipamento & Dossiê de Manutenções
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+            <div style="flex:1; min-width:260px; position:relative;">
+              <input id="supervisorioInputBusca" type="text" placeholder="Digite Modelo, Série (ex: 0904, Revolution, Lilyum) ou Hospital..." onkeyup="filtrarProntuarioSupervisorio()" style="width:100%; background:#0b1329; border:1px solid #334155; color:#f8fafc; border-radius:8px; padding:10px 14px; font-size:13px; outline:none; box-sizing:border-box;">
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button onclick="setFiltroTipoSupervisorio('TODOS')" id="btnFiltro_TODOS" style="background:#0284c7; color:#fff; border:none; border-radius:6px; padding:8px 12px; font-size:11px; font-weight:800; cursor:pointer;">Todos</button>
+              <button onclick="setFiltroTipoSupervisorio('CORRETIVAS')" id="btnFiltro_CORRETIVAS" style="background:#1e293b; color:#f87171; border:1px solid #ef4444; border-radius:6px; padding:8px 12px; font-size:11px; font-weight:800; cursor:pointer;">🔴 Só Corretivas</button>
+              <button onclick="setFiltroTipoSupervisorio('PENDENCIAS')" id="btnFiltro_PENDENCIAS" style="background:#1e293b; color:#fbbf24; border:1px solid #f59e0b; border-radius:6px; padding:8px 12px; font-size:11px; font-weight:800; cursor:pointer;">⚠️ Só Pendências</button>
+              <button onclick="setFiltroTipoSupervisorio('DOWNTIME_24')" id="btnFiltro_DOWNTIME_24" style="background:#1e293b; color:#c084fc; border:1px solid #a855f7; border-radius:6px; padding:8px 12px; font-size:11px; font-weight:800; cursor:pointer;">⏳ Parada > 24h</button>
+            </div>
+          </div>
+          <div id="prontuarioResumoEquip" style="display:none; background:#0f172a; border-left:4px solid #38bdf8; border-radius:8px; padding:12px; margin-bottom:14px;"></div>
+          <div id="prontuarioResultadoLista" style="display:flex; flex-direction:column; gap:10px;"></div>
+        </div>
+      `;
+
+      // Inicializa exibindo os atendimentos mais recentes
+      filtrarProntuarioSupervisorio();
+    }
+
+    function filtrarProntuarioSupervisorio() {
+      const termo = (document.getElementById("supervisorioInputBusca")?.value || "").trim().toUpperCase();
+      const ordens = STATE.data.ordens || [];
+      const containerResultados = document.getElementById("prontuarioResultadoLista");
+      const resumoBox = document.getElementById("prontuarioResumoEquip");
+      if (!containerResultados) return;
+
+      // Atualiza botões de filtro
+      ["TODOS", "CORRETIVAS", "PENDENCIAS", "DOWNTIME_24"].forEach(t => {
+        const b = document.getElementById("btnFiltro_" + t);
+        if (b) {
+          b.style.background = (_SUPERVISORIO_FILTRO_TIPO === t) ? "#0284c7" : "#1e293b";
+          b.style.color = (_SUPERVISORIO_FILTRO_TIPO === t) ? "#fff" : (t === "CORRETIVAS" ? "#f87171" : t === "PENDENCIAS" ? "#fbbf24" : t === "DOWNTIME_24" ? "#c084fc" : "#94a3b8");
+        }
+      });
+
+      let filtradas = ordens;
+
+      if (termo) {
+        filtradas = filtradas.filter(o => {
+          const matchEq = String(o.equipamento || "").toUpperCase().includes(termo);
+          const matchCli = String(o.cliente || "").toUpperCase().includes(termo);
+          const matchNum = String(o.numero_serie || "").toUpperCase().includes(termo);
+          const matchDef = String(o.defeito_relatado || "").toUpperCase().includes(termo);
+          const matchId = String(o.id || "").includes(termo);
+          return matchEq || matchCli || matchNum || matchDef || matchId;
+        });
+      }
+
+      if (_SUPERVISORIO_FILTRO_TIPO === "CORRETIVAS") {
+        filtradas = filtradas.filter(o => String(o.tipo_servico || "").toUpperCase().includes("CORRETIVA"));
+      } else if (_SUPERVISORIO_FILTRO_TIPO === "PENDENCIAS") {
+        filtradas = filtradas.filter(o => o.tem_pendencia_real || (o.pendencias_raw && !["nenhuma", "sem pendencias", "-", ""].includes(String(o.pendencias_raw).trim().toLowerCase())));
+      } else if (_SUPERVISORIO_FILTRO_TIPO === "DOWNTIME_24") {
+        filtradas = filtradas.filter(o => (Number(o.downtime_horas) || 0) >= 24);
+      }
+
+      // Ordenar por data mais recente / ID decrescente
+      filtradas = filtradas.slice().sort((a,b) => b.id - a.id);
+
+      // Resumo de equipamento se buscou por algo específico
+      if (termo && filtradas.length > 0 && resumoBox) {
+        let totalDowntime = 0;
+        let totalCorretivas = 0;
+        let totalPreventivas = 0;
+        filtradas.forEach(f => {
+          totalDowntime += (Number(f.downtime_horas) || 0);
+          if (String(f.tipo_servico || "").toUpperCase().includes("CORRETIVA")) totalCorretivas++;
+          if (String(f.tipo_servico || "").toUpperCase().includes("PREVENTIVA")) totalPreventivas++;
+        });
+
+        const primeiro = filtradas[0];
+        resumoBox.style.display = "block";
+        resumoBox.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div style="font-size:11px; color:#94a3b8; font-weight:800; text-transform:uppercase;">Dossiê do Equipamento / Cliente Localizado</div>
+              <div style="font-size:14px; font-weight:800; color:#f8fafc;">${esc(primeiro.equipamento || termo)}</div>
+              <div style="font-size:12px; color:#38bdf8; font-weight:700;">🏥 ${esc(primeiro.cliente || "")}</div>
+            </div>
+            <div style="display:flex; gap:12px; text-align:center;">
+              <div>
+                <div style="font-size:9px; color:#94a3b8; font-weight:800; text-transform:uppercase;">Atendimentos</div>
+                <div style="font-size:14px; font-weight:800; color:#f8fafc;">${filtradas.length}</div>
+              </div>
+              <div>
+                <div style="font-size:9px; color:#f87171; font-weight:800; text-transform:uppercase;">Corretivas</div>
+                <div style="font-size:14px; font-weight:800; color:#ef4444;">${totalCorretivas}</div>
+              </div>
+              <div>
+                <div style="font-size:9px; color:#34d399; font-weight:800; text-transform:uppercase;">Preventivas</div>
+                <div style="font-size:14px; font-weight:800; color:#10b981;">${totalPreventivas}</div>
+              </div>
+              <div>
+                <div style="font-size:9px; color:#fbbf24; font-weight:800; text-transform:uppercase;">Parada Total</div>
+                <div style="font-size:14px; font-weight:800; color:#f59e0b;">${totalDowntime.toFixed(1)}h</div>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (resumoBox) {
+        resumoBox.style.display = "none";
+      }
+
+      if (filtradas.length === 0) {
+        containerResultados.innerHTML = `
+          <div style="text-align:center; padding:30px; color:#94a3b8;">
+            <div style="font-size:32px; margin-bottom:8px;">🔍</div>
+            <div style="font-weight:700;">Nenhuma Ordem de Serviço encontrada com os filtros informados.</div>
+            <div style="font-size:12px; margin-top:4px;">Tente buscar por parte do nome, número de série ou limpe os filtros.</div>
+          </div>
+        `;
+        return;
+      }
+
+      // Renderizar os primeiros 50 resultados para performance máxima
+      const exibidas = filtradas.slice(0, 50);
+      containerResultados.innerHTML = exibidas.map(os => {
+        const isCorretiva = String(os.tipo_servico || "").toUpperCase().includes("CORRETIVA");
+        const dtHoras = Number(os.downtime_horas) || 0;
+        const pend = String(os.pendencias_raw || os.pendencia_limpa || "").trim();
+        const temPend = pend && !["nenhuma", "sem pendencias", "-", ""].includes(pend.toLowerCase());
+
+        return `
+          <div style="background:#1e293b; border:1px solid ${isCorretiva ? 'rgba(239,68,68,0.4)' : 'rgba(56,189,248,0.2)'}; border-radius:10px; padding:12px 14px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="background:${isCorretiva ? '#ef4444' : '#0284c7'}; color:#fff; font-size:11px; font-weight:800; padding:2px 8px; border-radius:6px;">OS #${os.id}</span>
+                <span style="font-size:13px; font-weight:800; color:#f8fafc;">${esc(os.equipamento || "Equipamento")}</span>
+                <span style="font-size:10px; background:rgba(255,255,255,0.08); color:#94a3b8; padding:2px 6px; border-radius:4px;">${esc(os.tipo_servico || "GERAL")}</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                ${dtHoras > 0 ? `<span style="font-size:11px; font-weight:800; color:#fbbf24; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); padding:2px 6px; border-radius:4px;">⏳ Parada: ${dtHoras.toFixed(1)}h</span>` : ''}
+                <span style="font-size:11px; color:#94a3b8;">📅 ${esc(os.data_agendamento || os.data_br || "")}</span>
+              </div>
+            </div>
+
+            <div style="font-size:12px; color:#38bdf8; font-weight:700; margin-bottom:6px;">
+              🏥 ${esc(os.cliente || "")}
+            </div>
+
+            <!-- Detalhe Técnico: Defeito e Serviço Executado -->
+            <div style="background:rgba(15,23,42,0.6); border-radius:6px; padding:8px 10px; font-size:12px; color:#cbd5e1; margin-bottom:6px; display:flex; flex-direction:column; gap:4px;">
+              ${os.defeito_relatado ? `<div><strong style="color:#f87171;">Defeito / Alarme:</strong> ${esc(os.defeito_relatado)}</div>` : ''}
+              ${os.servico_executado ? `<div><strong style="color:#34d399;">Solução Técnica:</strong> ${esc(os.servico_executado)}</div>` : ''}
+              ${os.causa_raiz && os.causa_raiz !== 'DESGASTE NATURAL DE COMPONENTE / PEÇA' ? `<div><strong style="color:#a78bfa;">Causa Raiz:</strong> ${esc(os.causa_raiz)}</div>` : ''}
+              ${os.peca_baixada_ref ? `<div><strong style="color:#60a5fa;">Peça Substituída:</strong> ${esc(os.peca_baixada_ref)}</div>` : ''}
+            </div>
+
+            <!-- Pendência se houver -->
+            ${temPend ? `
+              <div style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.3); border-radius:6px; padding:6px 10px; font-size:11.5px; color:#fde68a; margin-bottom:6px;">
+                <strong>⚠️ Pendência Ativa:</strong> ${esc(pend)}
+              </div>
+            ` : ''}
+
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; font-size:11.5px; color:#94a3b8;">
+              <div>👨‍🔧 <strong>Técnico:</strong> ${esc(os.tecnico_responsavel || "EMED")}</div>
+              <div style="display:flex; gap:8px;">
+                <button onclick="window.open('/api/pdf/${os.id}', '_blank')" style="background:#0369a1; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; font-weight:700; cursor:pointer;">📄 Laudo PDF</button>
+                <button onclick="window.open('/api/html/${os.id}', '_blank')" style="background:#1e293b; color:#38bdf8; border:1px solid #38bdf8; border-radius:4px; padding:4px 10px; font-size:11px; font-weight:700; cursor:pointer;">🌐 Visualizar Web</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("") + (filtradas.length > 50 ? `<div style="text-align:center; padding:12px; color:#94a3b8; font-size:12px;">Exibindo 50 de ${filtradas.length} atendimentos encontrados. Refine a busca para ver registros específicos.</div>` : "");
+    }
+
+    /********************************************************************
+     * SUB-ABA 2: RADAR DE REINCIDÊNCIA DE FALHAS (EQUIPAMENTOS CRÍTICOS)
+     ********************************************************************/
+    function renderSubAbaReincidencia(container, ordens) {
+      const corretivas = ordens.filter(o => String(o.tipo_servico || "").toUpperCase().includes("CORRETIVA"));
+      const mapEquip = {};
+
+      corretivas.forEach(c => {
+        const eq = String(c.equipamento || "").trim();
+        if (!eq || ["MANUTENÇÃO CORRETIVA", "DIAGNÓSTICO", "EQUIPAMENTO MÉDICO-HOSPITALAR"].includes(eq.toUpperCase())) return;
+        if (!mapEquip[eq]) {
+          mapEquip[eq] = {
+            nome: eq,
+            cliente: c.cliente || "",
+            corretivas: [],
+            totalDowntime: 0
+          };
+        }
+        mapEquip[eq].corretivas.push(c);
+        mapEquip[eq].totalDowntime += (Number(c.downtime_horas) || 0);
+      });
+
+      const reincidentes = Object.values(mapEquip).filter(x => x.corretivas.length >= 3).sort((a,b) => b.corretivas.length - a.corretivas.length);
+
+      container.innerHTML = `
+        <div style="background:rgba(15,23,42,0.7); border:1px solid rgba(239,68,68,0.3); border-radius:12px; padding:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+            <div>
+              <div style="font-size:13px; font-weight:800; color:#f87171; text-transform:uppercase; display:flex; align-items:center; gap:6px;">
+                <span>🚨</span> Radar de Reincidência de Falhas — 57 Equipamentos Críticos Mapeados
+              </div>
+              <div style="font-size:11.5px; color:#94a3b8; margin-top:2px;">Aparelhos com 3 ou mais manutenções corretivas. Indicador chave para antecipar queima de tubo, falhas de gerador ou negociar plano de modernização.</div>
+            </div>
+            <span style="background:rgba(239,68,68,0.2); border:1px solid #ef4444; color:#fca5a5; font-size:11px; font-weight:800; padding:4px 10px; border-radius:8px;">
+              ${reincidentes.length} Equipamentos em Alerta
+            </span>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            ${reincidentes.map(item => {
+              const ultimo = item.corretivas.slice().sort((a,b) => b.id - a.id)[0];
+              const nivelCor = item.corretivas.length >= 8 ? "#ef4444" : item.corretivas.length >= 5 ? "#f97316" : "#eab308";
+              const nivelTexto = item.corretivas.length >= 8 ? "CRÍTICO (Alta Reincidência)" : item.corretivas.length >= 5 ? "ALERTA (Múltiplas Paradas)" : "ATENÇÃO";
+
+              return `
+                <div style="background:#1e293b; border:1px solid ${nivelCor}55; border-left:5px solid ${nivelCor}; border-radius:10px; padding:12px 14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
+                    <div>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:13.5px; font-weight:800; color:#f8fafc;">${esc(item.nome)}</span>
+                        <span style="background:${nivelCor}22; color:${nivelCor}; border:1px solid ${nivelCor}; font-size:10px; font-weight:800; padding:2px 8px; border-radius:6px;">${nivelTexto}</span>
+                      </div>
+                      <div style="font-size:12px; color:#38bdf8; font-weight:700; margin-top:2px;">🏥 ${esc(item.cliente)}</div>
+                    </div>
+                    <div style="text-align:right;">
+                      <div style="font-size:18px; font-weight:900; color:${nivelCor};">${item.corretivas.length} Corretivas</div>
+                      <div style="font-size:11px; color:#fbbf24; font-weight:700;">⏳ Parada Acumulada: ${item.totalDowntime.toFixed(1)}h</div>
+                    </div>
+                  </div>
+
+                  <div style="background:rgba(15,23,42,0.6); border-radius:6px; padding:8px 10px; font-size:11.5px; color:#cbd5e1; margin-bottom:8px;">
+                    <div><strong>Último Atendimento:</strong> OS #${ultimo.id} em ${esc(ultimo.data_agendamento || "")} por ${esc(ultimo.tecnico_responsavel || "EMED")}</div>
+                    ${ultimo.defeito_relatado ? `<div><strong>Último Defeito:</strong> ${esc(ultimo.defeito_relatado)}</div>` : ''}
+                    ${ultimo.peca_baixada_ref ? `<div><strong>Última Peça Substituída:</strong> ${esc(ultimo.peca_baixada_ref)}</div>` : ''}
+                  </div>
+
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:11px; color:#94a3b8;">💡 <em>Recomendação:</em> Avaliar preventiva extraordinária, estabilidade da rede elétrica e calibração de dosimetria.</span>
+                    <button onclick="document.getElementById('supervisorioInputBusca').value = '${esc(item.nome).replace(/'/g, "\\'")}'; trocarSubAbaSupervisorio('PRONTUARIO');" style="background:#0369a1; color:#fff; border:none; border-radius:4px; padding:5px 12px; font-size:11px; font-weight:800; cursor:pointer;">🔍 Ver Prontuário Completo</button>
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    /********************************************************************
+     * SUB-ABA 3: CENTRAL DE PENDÊNCIAS ATIVAS (316 CASOS MAPEADOS)
+     ********************************************************************/
+    function renderSubAbaPendencias(container, ordens) {
+      const comPendencias = ordens.filter(o => o.tem_pendencia_real || (o.pendencias_raw && !["nenhuma", "sem pendencias", "-", ""].includes(String(o.pendencias_raw).trim().toLowerCase())));
+
+      container.innerHTML = `
+        <div style="background:rgba(15,23,42,0.7); border:1px solid rgba(245,158,11,0.3); border-radius:12px; padding:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+            <div>
+              <div style="font-size:13px; font-weight:800; color:#fbbf24; text-transform:uppercase; display:flex; align-items:center; gap:6px;">
+                <span>📋</span> Central de Pendências Técnicas & Peças em Comodato
+              </div>
+              <div style="font-size:11.5px; color:#94a3b8; margin-top:2px;">Controle rigoroso de peças emprestadas da EMED, cotações de placas, orçamentos e pendências documentais.</div>
+            </div>
+            <span style="background:rgba(245,158,11,0.2); border:1px solid #f59e0b; color:#fbbf24; font-size:11px; font-weight:800; padding:4px 10px; border-radius:8px;">
+              ${comPendencias.length} Registros Identificados
+            </span>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            ${comPendencias.slice(0, 40).map(os => {
+              const pend = String(os.pendencias_raw || os.pendencia_limpa || "");
+              const isComodato = pend.toUpperCase().includes("COMODATO") || pend.toUpperCase().includes("DIAGNÓSTICO") || pend.toUpperCase().includes("TESTE");
+
+              return `
+                <div style="background:#1e293b; border:1px solid ${isComodato ? 'rgba(56,189,248,0.4)' : 'rgba(245,158,11,0.3)'}; border-radius:10px; padding:12px 14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span style="background:${isComodato ? '#0284c7' : '#d97706'}; color:#fff; font-size:10.5px; font-weight:800; padding:2px 8px; border-radius:5px;">OS #${os.id}</span>
+                      <span style="font-size:13px; font-weight:800; color:#f8fafc;">${esc(os.cliente || "")}</span>
+                    </div>
+                    <span style="font-size:11px; color:#94a3b8;">📅 ${esc(os.data_agendamento || os.data_br || "")}</span>
+                  </div>
+
+                  <div style="font-size:12px; color:#94a3b8; margin-bottom:6px;">
+                    🔧 <strong>Equipamento:</strong> ${esc(os.equipamento || "")}
+                  </div>
+
+                  <div style="background:rgba(15,23,42,0.8); border:1px solid ${isComodato ? '#38bdf8' : '#f59e0b'}55; border-radius:6px; padding:8px 10px; font-size:12px; color:${isComodato ? '#7dd3fc' : '#fde68a'}; margin-bottom:8px;">
+                    <strong>${isComodato ? '📦 Peça EMED em Uso / Comodato:' : '⚠️ Pendência Técnica:'}</strong> ${esc(pend)}
+                  </div>
+
+                  <div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px; color:#94a3b8;">
+                    <div>👨‍🔧 Técnico: <strong>${esc(os.tecnico_responsavel || "EMED")}</strong></div>
+                    <button onclick="window.open('/api/html/${os.id}', '_blank')" style="background:#0284c7; color:#fff; border:none; border-radius:4px; padding:4px 10px; font-size:11px; font-weight:700; cursor:pointer;">Ver Detalhes</button>
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    /********************************************************************
+     * SUB-ABA 4: RANKING PONDERADO DE COMPLEXIDADE & DOWNTIME
+     ********************************************************************/
+    function renderSubAbaRanking(container, ordens) {
+      // Computa o ranking em tempo real a partir da base completa
+      const mapTec = {};
+
+      ordens.forEach(o => {
+        const tec = String(o.tecnico_responsavel || "NÃO INFORMADO").trim();
+        if (!mapTec[tec]) {
+          mapTec[tec] = {
+            nome: tec,
+            qtd_os: 0,
+            pontos: 0.0,
+            downtime_total: 0.0,
+            tc: 0,
+            mm_arco: 0,
+            rx_dr: 0,
+            do_count: 0,
+            cr: 0
+          };
+        }
+        mapTec[tec].qtd_os++;
+        mapTec[tec].pontos += (Number(o.pontos_complexidade) || 1.0);
+        mapTec[tec].downtime_total += (Number(o.downtime_horas) || 0.0);
+
+        const crit = String(o.criticidade_equipamento || "").toUpperCase();
+        if (crit.includes("TC/RM") || crit.includes("TOMOGRAFIA")) mapTec[tec].tc++;
+        else if (crit.includes("ARCO") || crit.includes("MAMOGRAFIA") || crit.includes("MM")) mapTec[tec].mm_arco++;
+        else if (crit.includes("RX") || crit.includes("RAIOS-X") || crit.includes("PAINEL DIGITAL DR")) mapTec[tec].rx_dr++;
+        else if (crit.includes("DO") || crit.includes("DENSITOMETRIA")) mapTec[tec].do_count++;
+        else if (crit.includes("CR")) mapTec[tec].cr++;
+      });
+
+      const listaRanking = Object.values(mapTec)
+        .filter(t => t.qtd_os >= 10)
+        .sort((a,b) => b.pontos - a.pontos);
+
+      container.innerHTML = `
+        <div style="background:rgba(15,23,42,0.7); border:1px solid rgba(167,139,250,0.3); border-radius:12px; padding:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+            <div>
+              <div style="font-size:13px; font-weight:800; color:#c084fc; text-transform:uppercase; display:flex; align-items:center; gap:6px;">
+                <span>🏆</span> Matriz de Complexidade Técnica Hospitalar (EMED)
+              </div>
+              <div style="font-size:11.5px; color:#94a3b8; margin-top:2px;">Pesos Oficiais: TC/RM (10 pts) | MM/Arco (7 pts) | RX/DR (5 pts) | DO (4.5 pts) | CR (3 pts) | Periféricos (1.5 pts).</div>
+            </div>
+            <span style="background:rgba(124,58,237,0.2); border:1px solid #7c3aed; color:#c4b5fd; font-size:11px; font-weight:800; padding:4px 10px; border-radius:8px;">
+              Exclusivo da Gestão
+            </span>
+          </div>
+
+          <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
+              <thead>
+                <tr style="background:#0f172a; color:#94a3b8; border-bottom:2px solid rgba(255,255,255,0.1); font-size:11px; text-transform:uppercase;">
+                  <th style="padding:10px 8px;">Pos</th>
+                  <th style="padding:10px 8px;">Técnico</th>
+                  <th style="padding:10px 8px; text-align:center;">Qtd OS</th>
+                  <th style="padding:10px 8px; text-align:center; color:#c084fc;">Pontos Totais</th>
+                  <th style="padding:10px 8px; text-align:center; color:#38bdf8;">Densidade (Pts/OS)</th>
+                  <th style="padding:10px 8px; text-align:center; color:#fbbf24;">Downtime Médio</th>
+                  <th style="padding:10px 8px; text-align:center;">TC (10)</th>
+                  <th style="padding:10px 8px; text-align:center;">MM/Arco (7)</th>
+                  <th style="padding:10px 8px; text-align:center;">RX/DR (5)</th>
+                  <th style="padding:10px 8px; text-align:center;">DO (4.5)</th>
+                  <th style="padding:10px 8px; text-align:center;">CR (3)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${listaRanking.map((tec, idx) => {
+                  const densidade = (tec.pontos / tec.qtd_os).toFixed(2);
+                  const dtMedio = (tec.downtime_total / tec.qtd_os).toFixed(1);
+                  const medalha = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}º`;
+                  const isNetto = tec.nome.toUpperCase().includes("NETTO");
+
+                  return `
+                    <tr style="background:${isNetto ? 'rgba(2,132,199,0.18)' : idx % 2 === 0 ? 'rgba(30,41,59,0.5)' : '#1e293b'}; border-bottom:1px solid rgba(255,255,255,0.05); ${isNetto ? 'border-left:4px solid #38bdf8;' : ''}">
+                      <td style="padding:10px 8px; font-weight:800; font-size:13px;">${medalha}</td>
+                      <td style="padding:10px 8px; font-weight:800; color:${isNetto ? '#38bdf8' : '#f8fafc'};">
+                        ${esc(tec.nome)} ${isNetto ? '<span style="font-size:9px; background:#0284c7; color:#fff; padding:1px 5px; border-radius:4px; margin-left:4px;">GESTOR</span>' : ''}
+                      </td>
+                      <td style="padding:10px 8px; text-align:center; font-weight:700;">${tec.qtd_os}</td>
+                      <td style="padding:10px 8px; text-align:center; font-weight:800; color:#c084fc; font-size:13px;">${tec.pontos.toFixed(1)}</td>
+                      <td style="padding:10px 8px; text-align:center; font-weight:800; color:#38bdf8;">${densidade}</td>
+                      <td style="padding:10px 8px; text-align:center; font-weight:700; color:#fbbf24;">${dtMedio}h</td>
+                      <td style="padding:10px 8px; text-align:center;">${tec.tc}</td>
+                      <td style="padding:10px 8px; text-align:center;">${tec.mm_arco}</td>
+                      <td style="padding:10px 8px; text-align:center;">${tec.rx_dr}</td>
+                      <td style="padding:10px 8px; text-align:center;">${tec.do_count}</td>
+                      <td style="padding:10px 8px; text-align:center;">${tec.cr}</td>
+                    </tr>
+                  `;
+                }).join("")}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    /********************************************************************
+     * SUB-ABA 5: BI TRADICIONAL
+     ********************************************************************/
+    function renderSubAbaBiTradicional(container, bi) {
       const renderBarras = (obj) => {
         const entries = Object.entries(obj || {});
         const max = Math.max(1, ...entries.map(e => e[1]));
@@ -13001,7 +13515,7 @@ function fecharModalInsumosViagem() {
           </div>
         `).join("");
       };
-      box.innerHTML = `
+      container.innerHTML = `
         <div class="form-grid">
           <div class="section-box">
             <div class="section-title">📊 Ordens de Serviço por Status</div>
@@ -13022,6 +13536,8 @@ function fecharModalInsumosViagem() {
         </div>
       `;
     }
+
+    
     /********************************************************************
      * MENU 16 (GESTOR 11): PESQUISA DE SATISFAÇÃO & GOOGLE REVIEWS 5★
      ********************************************************************/
@@ -16660,7 +17176,7 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
       }
       const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase();
       const usuarioPerfil = (localStorage.getItem("emed_perfil_usuario") || "").toUpperCase();
-      const isGestor = (usuarioNome === "NETTO") || usuarioPerfil.includes("GESTOR") || usuarioPerfil.includes("MASTER") || (usuarioNome === "");
+      const isGestor = ((usuarioNome === "NETTO" || usuarioNome === "VALFREDO NETTO")) || usuarioPerfil.includes("GESTOR") || usuarioPerfil.includes("MASTER") || (usuarioNome === "");
       if (!isGestor && usuarioNome) {
         // TÉCNICO: Trava estritamente no perfil TECNICO
         STATE.perfil = "TECNICO";

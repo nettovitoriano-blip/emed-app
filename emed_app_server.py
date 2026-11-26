@@ -5993,6 +5993,9 @@ async def api_bootstrap(request: web.Request) -> web.Response:
             "latitude": limpar_float(row.get("latitude"), 0.0),
             "longitude": limpar_float(row.get("longitude"), 0.0),
             "deslocamento_inicio_hora": limpar_texto(row.get("deslocamento_inicio_hora"), ""),
+            "criticidade_equipamento": limpar_texto(row.get("criticidade_equipamento"), "NÍVEL 1 - BÁSICA"),
+            "pontos_complexidade": float(row.get("pontos_complexidade") or 1.0),
+            "downtime_horas": float(row.get("downtime_horas") or 0.0),
 
 
 
