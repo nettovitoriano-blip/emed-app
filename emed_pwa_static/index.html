@@ -2141,6 +2141,10 @@
               <button onclick="abrirModalEquipeSetores('SETORES')" style="background:#0284c7; border:none; color:#fff; border-radius:6px; padding:5px 11px; font-size:11.5px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:5px; box-shadow:0 2px 4px rgba(0,0,0,0.15);">
                 🏢 Setores
               </button>
+              ${(STATE.perfilAtivo === 'GESTOR' || STATE.perfilAtivo === 'FULL' || String(localStorage.getItem('emed_perfil')||'').toUpperCase() === 'GESTOR') ? `
+              <a href="/urls" target="_blank" style="background:#0f172a; border:1px solid #38bdf8; color:#38bdf8; border-radius:6px; padding:5px 11px; font-size:11.5px; font-weight:800; text-decoration:none; display:flex; align-items:center; gap:5px; box-shadow:0 2px 4px rgba(0,0,0,0.15);">
+                🗂️ URLs
+              </a>` : ''}
             </div>
           </div>
           <div style="background:rgba(0,0,0,0.22); border-radius:8px; padding:10px 12px; margin-bottom:10px; border-left:3px solid #38bdf8;">

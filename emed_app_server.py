@@ -3989,6 +3989,7 @@ async def auth_api_middleware(request: web.Request, handler):
         request["_emed_user"] = user
         rotas_gestor = (
             "/supervisorio",
+            "/urls",
             "/api/supervisorio/",
             "/api/dispositivos/listar",
             "/api/dispositivos/acao",
@@ -4002,7 +4003,7 @@ async def auth_api_middleware(request: web.Request, handler):
             "/api/tecnico/salvar",
         )
         if any(path == r or path.startswith(r) for r in rotas_gestor) and not _eh_gestor_ou_admin(user):
-            if path == "/supervisorio":
+            if path in ("/supervisorio", "/urls"):
                 return web.Response(text="⛔ Acesso restrito a Gestores e Administradores.", status=403)
             return web.json_response({"ok": False, "msg": "⛔ Acesso restrito a Gestores e Administradores."}, status=403)
 
@@ -4068,8 +4069,8 @@ async def auth_api_middleware(request: web.Request, handler):
             return await handler(request)
         return web.json_response({"ok": False, "erro": "Webhook PIX não autorizado (X-Webhook-Secret inválido)."}, status=401)
 
-    if path == "/supervisorio":
-        raise web.HTTPFound("/?next=/supervisorio")
+    if path in ("/supervisorio", "/urls"):
+        raise web.HTTPFound(f"/?next={path}")
 
     if path.startswith("/api/"):
 
@@ -20900,6 +20901,15 @@ async def api_unidade_pgts_imprimir(request: web.Request) -> web.Response:
     return web.Response(text=gerar_html_pgts_unidade(DB_NAME, cliente), content_type="text/html", charset="utf-8")
 
 
+async def api_central_urls_html(request: web.Request) -> web.Response:
+    """Serve a Pasta Oficial / Central de URLs do Sistema EMED (restrita a Gestor/Admin)."""
+    arq = os.path.join(BASE_DIR, "Central_URLs_EMED", "Central_URLs_EMED.html")
+    if not os.path.isfile(arq):
+        return web.Response(text="Pasta Central_URLs_EMED não encontrada.", status=404)
+    with open(arq, "r", encoding="utf-8") as fh:
+        return web.Response(text=fh.read(), content_type="text/html", charset="utf-8", headers={"Cache-Control": "no-store"})
+
+
 async def api_portal_cliente_html(request: web.Request) -> web.Response:
     """Portal web exclusivo para clientes/parceiros (Suite Completa RDC 509/611 + Intervencao Proativa)."""
     html_out = """<!DOCTYPE html>
@@ -26364,6 +26374,7 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/cliente/portal-salvar-doc", api_cliente_portal_salvar_doc)
     app.router.add_get("/api/cliente/dossie-radiologico/alerta-gestor", api_cliente_alerta_gestor)
     app.router.add_get("/portal-cliente", api_portal_cliente_html)
+    app.router.add_get("/urls", api_central_urls_html)
     app.router.add_get("/api/unidade/gestor-resumo", api_unidade_gestor_resumo)
     app.router.add_post("/api/unidade/registro/salvar", api_unidade_registro_salvar)
     app.router.add_post("/api/unidade/registro/excluir", api_unidade_registro_excluir)

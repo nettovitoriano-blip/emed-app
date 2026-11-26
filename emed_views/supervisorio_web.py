@@ -635,6 +635,7 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
         <a class="btn" href="/api/supervisorio/exportar-csv" target="_blank">📥 Exportar Log CSV</a>
         <button class="btn" id="btnAutoRefresh" onclick="toggleAutoRefresh()">⏸️ Pausar (5s)</button>
         <a class="btn" href="/portal-cliente" target="_blank" style="background:#0f172a;">🏥 Portal do Cliente</a>
+        <a class="btn" href="/urls" target="_blank" style="background:#1e3a8a; border-color:#3b82f6;">🗂️ Pasta de URLs</a>
       </div>
     </div>
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v1-10-0-security-hardening';
+const CACHE_NAME = 'emed-pwa-v1-10-1-central-urls';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',

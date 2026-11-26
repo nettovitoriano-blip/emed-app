@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pasta Oficial de URLs — Sistema EMED Eletromedicina</title>
+  <style>
+    :root {
+      --bg: #020617;
+      --card: #0f172a;
+      --border: #1e293b;
+      --accent: #38bdf8;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 18px 14px 48px;
+      font-size: 13.5px;
+    }
+    .wrap { max-width: 1120px; margin: 0 auto; }
+    .hero {
+      background: linear-gradient(135deg, #001f3f 0%, #0b2545 55%, #0369a1 100%);
+      border: 1px solid rgba(56,189,248,0.35);
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .hero h1 { margin: 0; font-size: 19px; font-weight: 900; letter-spacing: 0.3px; }
+    .hero p { margin: 4px 0 0; color: #bae6fd; font-size: 12.5px; }
+    .controls {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .inp, .sel {
+      background: #1e293b;
+      color: #fff;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 8px 11px;
+      font-size: 13px;
+      outline: none;
+    }
+    .inp:focus, .sel:focus { border-color: var(--accent); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 15px 16px;
+      margin-bottom: 16px;
+    }
+    .cat-title {
+      font-size: 15px;
+      font-weight: 900;
+      color: var(--accent);
+      margin: 0 0 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    .url-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 10px 8px;
+      border-bottom: 1px solid #172033;
+    }
+    .url-row:last-child { border-bottom: none; }
+    .url-row:hover { background: rgba(56,189,248,0.05); border-radius: 8px; }
+    .url-name { font-weight: 800; font-size: 13.5px; color: #f1f5f9; }
+    .url-desc { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+    .url-path {
+      display: inline-block;
+      margin-top: 5px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      background: #020617;
+      border: 1px solid #1e293b;
+      color: #7dd3fc;
+      padding: 3px 8px;
+      border-radius: 6px;
+      word-break: break-all;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 999px;
+      margin-left: 6px;
+      vertical-align: middle;
+      text-transform: uppercase;
+    }
+    .b-pub { background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid rgba(16,185,129,0.4); }
+    .b-login { background: rgba(56,189,248,0.18); color: #38bdf8; border: 1px solid rgba(56,189,248,0.4); }
+    .b-gestor { background: rgba(245,158,11,0.18); color: #fbbf24; border: 1px solid rgba(245,158,11,0.45); }
+    .b-cli { background: rgba(168,85,247,0.18); color: #c084fc; border: 1px solid rgba(168,85,247,0.45); }
+    .b-trap { background: rgba(239,68,68,0.18); color: #f87171; border: 1px solid rgba(239,68,68,0.45); }
+    .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn {
+      border: none;
+      border-radius: 7px;
+      padding: 6px 11px;
+      font-size: 11.5px;
+      font-weight: 800;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-open { background: #0284c7; color: #fff; }
+    .btn-copy { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; }
+    .info-cli {
+      border-left: 4px solid #10b981;
+      background: linear-gradient(135deg, #06281e 0%, #0f172a 100%);
+    }
+    .toast {
+      position: fixed; bottom: 18px; right: 18px;
+      background: #10b981; color: #052e16; font-weight: 900;
+      padding: 9px 15px; border-radius: 8px; display: none; z-index: 9999;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div>
+        <h1>🗂️ Pasta Oficial de URLs do Sistema EMED</h1>
+        <p>Diretório completo de portais, relatórios PDF/A4, códigos QR, telemetria GPS e APIs de integração.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <a class="btn btn-open" href="/" target="_blank">🏠 App EMED</a>
+        <a class="btn" style="background:#10b981;color:#052e16;" href="/portal-cliente" target="_blank">🏥 Portal do Cliente</a>
+        <a class="btn" style="background:#f59e0b;color:#111827;" href="/supervisorio" target="_blank">🛡️ Supervisório SOC</a>
+      </div>
+    </div>
+
+    <div class="card info-cli">
+      <div class="cat-title" style="color:#34d399;border-color:rgba(16,185,129,0.25);">🔐 Acesso &amp; Geração de Login do Portal do Cliente (<span id="lblPortalUrl"></span>)</div>
+      <div style="font-size:12.5px;line-height:1.55;color:#cbd5e1;">
+        O <b>Portal do Cliente (/portal-cliente)</b> usa autenticação individual e isolada por hospital/clínica (banco <code>clientes_acessos_portal</code> com hash <b>PBKDF2</b>).<br/>
+        • Para <b>criar ou redefinir o usuário e senha</b> de qualquer hospital, abra o <b>Supervisório SOC (/supervisorio)</b> &rarr; botão <b>🔑 Gerar Acesso de Cliente</b> (ou no App principal em <b>Triagem / Portal do Cliente</b> &rarr; <b>🔑 Gerar Acesso</b>).<br/>
+        • O sistema gera usuário + senha forte aleatória + mensagem pronta para enviar via WhatsApp ao gestor da unidade.
+      </div>
+    </div>
+
+    <div class="controls">
+      <label style="font-size:12px;font-weight:800;color:#94a3b8;">Ambiente Base:</label>
+      <select id="selBase" class="sel" onchange="onBaseChange()">
+        <option value="AUTO">🌐 Automático (Servidor Atual)</option>
+        <option value="http://127.0.0.1:8502">💻 Local neste PC (http://127.0.0.1:8502)</option>
+        <option value="https://emedservice.med.br">☁️ Produção Domínio (https://emedservice.med.br)</option>
+        <option value="https://app.emedservice.med.br">📱 Subdomínio App (https://app.emedservice.med.br)</option>
+        <option value="https://emed-app-6ofv.onrender.com">🚀 Render Cloud (https://emed-app-6ofv.onrender.com)</option>
+      </select>
+      <input id="inpBaseCustom" class="inp" style="min-width:230px;flex:1;" placeholder="Ou digite URL base (ex: http://192.168.1.50:8502)" oninput="renderCatalog()" />
+      <input id="inpFilter" class="inp" style="min-width:220px;flex:1;" placeholder="🔍 Buscar URL, módulo ou perfil..." oninput="renderCatalog()" />
+    </div>
+
+    <div id="catalogRoot"></div>
+  </div>
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const GRUPOS = [
+      {
+        titulo: "1. Portais Principais & Acesso de Usuários",
+        itens: [
+          { nome: "App Principal EMED (PWA)", path: "/", nivel: "LOGIN", badge: "b-login", desc: "Sistema principal de OS, Técnico, Gestor e Triagem. Redireciona para o login caso não autenticado." },
+          { nome: "App no Modo Gestor", path: "/?modo=gestor", nivel: "GESTOR", badge: "b-gestor", desc: "Abre direto no painel administrativo do Gestor (Mural, Frota, Financeiro, Clientes, Equipe)." },
+          { nome: "App no Modo Técnico", path: "/?modo=tecnico", nivel: "LOGIN", badge: "b-login", desc: "Abre direto na visão de campo do técnico (OS, Check-in/out, Peças, Assinatura)." },
+          { nome: "Tela de Login & Liberação de Aparelho", path: "/login", nivel: "PÚBLICO", badge: "b-pub", desc: "Autenticação de colaboradores EMED e vínculo de celular via código de 6 dígitos (alias: /login.html)." },
+          { nome: "Portal do Cliente / Gestor da Unidade", path: "/portal-cliente", nivel: "CLIENTE", badge: "b-cli", desc: "Acesso exclusivo dos hospitais e clínicas: PGTS RDC 509, Dossiê VISA RDC 611, EPIs, Equipe, DANFEs, Laudos PDF e Solicitação de Intervenção." },
+          { nome: "Portal Fiscal Web (NFS-e & Radar DF-e)", path: "/fiscal", nivel: "FISCAL / GESTOR", badge: "b-login", desc: "Emissão e cancelamento de Notas Fiscais, DANFEs, XMLs, fechamento contábil e Radar SEFAZ (login próprio)." },
+          { nome: "Sistema Supervisório SOC & Gerador de Acessos", path: "/supervisorio", nivel: "GESTOR / ADMIN", badge: "b-gestor", desc: "Auditoria de logins, IPs bloqueados, varredura do servidor, captura Honeypot e gerador de credenciais do Portal do Cliente." },
+          { nome: "Pasta / Central Oficial de URLs", path: "/urls", nivel: "GESTOR / ADMIN", badge: "b-gestor", desc: "Esta central navegável com todos os URLs do Sistema EMED." }
+        ]
+      },
+      {
+        titulo: "2. Mapas, Telemetria, Frota & Fabricantes",
+        itens: [
+          { nome: "Mapa do Gestor, Telemetria RX & Dossiê RDC 611", path: "/mapa-gestor", nivel: "LOGIN", badge: "b-login", desc: "Mapa geolocalizado de clientes e chamados, painel de telemetria TLF (Raio-X) e documentos RDC (aliases: /gestao/mapa, /telemetria, /dossie-rdc)." },
+          { nome: "EmedNav GPS Veicular", path: "/nav", nivel: "LOGIN / NAV", badge: "b-login", desc: "Navegador GPS com radares e roteamento para veículos da equipe técnica (aliases: /gps, /emedcar)." },
+          { nome: "Painel de Frota Veicular", path: "/frota", nivel: "LOGIN / NAV", badge: "b-login", desc: "Acompanhamento ao vivo dos veículos da frota EMED." },
+          { nome: "Central Konica Minolta (Base & Histórico)", path: "/konica-central", nivel: "LOGIN", badge: "b-login", desc: "Painel dedicado ao parque instalado e OS Konica Minolta (alias: /api/konica/central)." },
+          { nome: "Checklist Instalação Konica FR_SE00003_03", path: "/formulario-konica-rx", nivel: "LOGIN", badge: "b-login", desc: "Formulário interativo de vistoria/instalação Konica Minolta com impressão em 12 páginas." },
+          { nome: "Apresentação Institucional EMED", path: "/apresentacao", nivel: "PÚBLICO", badge: "b-pub", desc: "Slides interativos de apresentação do Sistema EMED Eletromedicina." }
+        ]
+      },
+      {
+        titulo: "3. Links Diretos com QR Code / Token / ID (Externos & Campo)",
+        itens: [
+          { nome: "Prontuário QR do Equipamento", path: "/qrcode/equipamento/{id}", nivel: "QR PÚBLICO", badge: "b-pub", desc: "Página mobile ao escanear a etiqueta QR colada no equipamento hospitalar (trocar {id} pelo ID do equipamento)." },
+          { nome: "Etiqueta QR de Patrimônio (Impressão)", path: "/qrcode/equipamento/{id}/etiqueta", nivel: "QR PÚBLICO", badge: "b-pub", desc: "Etiqueta pronta para imprimir e colar no equipamento." },
+          { nome: "Rastreio Público de Laboratório QR", path: "/lab/r/{token}", nivel: "TOKEN PÚBLICO", badge: "b-pub", desc: "Linha do tempo ao vivo para o cliente acompanhar o equipamento enviado à bancada EMED." },
+          { nome: "Proposta / Orçamento Digital Interativo", path: "/proposta/{os_id}", nivel: "LINK CLIENTE", badge: "b-pub", desc: "Orçamento online para aprovação ou recusa pelo cliente (trocar {os_id} pelo número da OS)." },
+          { nome: "Autorização de Entrada na Portaria Hospitalar", path: "/api/hospital/autorizacao-entrada/{id}/imprimir", nivel: "PORTARIA", badge: "b-pub", desc: "Ofício formal de credenciamento do técnico e veículo para apresentar na portaria do hospital." },
+          { nome: "Protocolo de Entrega / Devolução de Peças", path: "/api/protocolo-entrega/imprimir/{id}", nivel: "PROTOCOLO", badge: "b-pub", desc: "Comprovante A4 com assinatura touch de entrega de material ou devolução de peça." },
+          { nome: "Folha A4 de Etiquetas QR (Laboratório)", path: "/api/lab/etiquetas-qr", nivel: "LOGIN", badge: "b-login", desc: "Gera folha A4 de etiquetas QR para itens em bancada." },
+          { nome: "Folha A4 de Etiquetas QR (Ferramentas)", path: "/api/ferramentas/etiquetas-qr", nivel: "LOGIN", badge: "b-login", desc: "Gera folha A4 de etiquetas QR para instrumentos/cautela." }
+        ]
+      },
+      {
+        titulo: "4. Relatórios A4, SST, Médico do Trabalho & PDFs",
+        itens: [
+          { nome: "Laudo Técnico da OS (A4 Imprimível)", path: "/api/imprimir/{os_id}", nivel: "LOGIN / CLIENTE", badge: "b-login", desc: "Laudo oficial completo da Ordem de Serviço com fotos e assinaturas (trocar {os_id})." },
+          { nome: "Download PDF da OS", path: "/api/pdf/{os_id}", nivel: "LOGIN", badge: "b-login", desc: "Versão PDF direta da Ordem de Serviço." },
+          { nome: "DANFE / NFS-e por OS ou Nota", path: "/api/fiscal/danfe/{os_id}", nivel: "FISCAL / CLIENTE", badge: "b-login", desc: "Visualização/PDF oficial da DANFE da OS (ou /api/fiscal/danfe/nfe/{nota_id})." },
+          { nome: "PGTS Completo da Unidade (RDC 509)", path: "/api/unidade/pgts/imprimir?cliente={NOME}", nivel: "LOGIN / CLIENTE", badge: "b-cli", desc: "Plano de Gerenciamento de Tecnologias em Saúde completo do hospital/clínica." },
+          { nome: "Dossiê Vigilância Sanitária (RDC 611)", path: "/api/cliente/dossie-radiologico/imprimir?cliente={NOME}", nivel: "LOGIN / CLIENTE", badge: "b-cli", desc: "Dossiê A4 completo de laudos radiométricos, calibração e alvarás para fiscalização." },
+          { nome: "Ficha Completa SST do Colaborador EMED", path: "/api/equipe/colaborador/imprimir?nome={NOME}", nivel: "LOGIN EMED", badge: "b-login", desc: "Consolida ASOs (Médico do Trabalho), Dosimetria, EPIs, Fardamento, Equipamentos e Treinamentos." },
+          { nome: "Relatório PPR/CNEN de Dosimetria EMED", path: "/api/equipe/dosimetria/imprimir", nivel: "LOGIN EMED", badge: "b-login", desc: "Mapa mensal de doses (mSv) e controle de troca dos dosímetros da equipe técnica." },
+          { nome: "Relatório Contábil & Exportação Excel", path: "/api/financeiro/relatorio-contabil/imprimir", nivel: "GESTOR", badge: "b-gestor", desc: "Fechamento financeiro imprimível (e /api/exportar-excel para planilha completa)." },
+          { nome: "Exportação CSV de Auditoria de Logins", path: "/api/supervisorio/exportar-csv", nivel: "GESTOR / ADMIN", badge: "b-gestor", desc: "Extrai todas as tentativas de login e bloqueios em CSV RFC 4180." }
+        ]
+      },
+      {
+        titulo: "5. Integrações Técnicas, Saúde & Segurança",
+        itens: [
+          { nome: "Healthcheck / Ping do Servidor", path: "/healthz", nivel: "MONITOR", badge: "b-pub", desc: "Verifica se o servidor está online (alias: /api/ping)." },
+          { nome: "Telemetria GPS Rastreadores J16 (POST/PUT)", path: "/api/gps/telemetria", nivel: "API KEY GPS", badge: "b-login", desc: "Recebe posição, ignição ACC e hodômetro via EMED_GPS_API_KEY (alias: /api/v1/veiculos/odometro)." },
+          { nome: "Webhook Bancário PIX (POST)", path: "/api/pix/webhook", nivel: "WEBHOOK SECRET", badge: "b-login", desc: "Conciliação automática bancária protegida por header X-Webhook-Secret." },
+          { nome: "Armadilha Decoy / Deception Honeypot", path: "/admin/dashboard", nivel: "ARMADILHA SOC", badge: "b-trap", desc: "NÃO usar para trabalho! Rota falsa usada para capturar robôs e atacantes em quarentena." }
+        ]
+      }
+    ];
+
+    (function initBaseSelector() {
+      const sel = document.getElementById("selBase");
+      const ori = window.location.origin;
+      if (ori && ori.startsWith("http")) {
+        sel.value = "AUTO";
+      } else {
+        sel.value = "http://127.0.0.1:8502";
+      }
+      renderCatalog();
+    })();
+
+    function getBaseUrl() {
+      const custom = (document.getElementById("inpBaseCustom").value || "").trim().replace(/\/+$/, "");
+      if (custom) return custom;
+      const sel = document.getElementById("selBase").value;
+      if (sel === "AUTO") {
+        const ori = window.location.origin;
+        return (ori && ori.startsWith("http")) ? ori : "http://127.0.0.1:8502";
+      }
+      return sel;
+    }
+
+    function onBaseChange() {
+      document.getElementById("inpBaseCustom").value = "";
+      renderCatalog();
+    }
+
+    function esc(s) {
+      return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+
+    function copyUrl(url) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => showToast("✅ Copiado: " + url));
+      } else {
+        prompt("Copie o endereço abaixo:", url);
+      }
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.style.display = "block";
+      clearTimeout(window._tUrls);
+      window._tUrls = setTimeout(() => { t.style.display = "none"; }, 2600);
+    }
+
+    function renderCatalog() {
+      const base = getBaseUrl();
+      const q = (document.getElementById("inpFilter").value || "").trim().toLowerCase();
+      document.getElementById("lblPortalUrl").textContent = base + "/portal-cliente";
+
+      let html = "";
+      GRUPOS.forEach(g => {
+        const filtered = g.itens.filter(it => !q || (it.nome + " " + it.path + " " + it.desc + " " + it.nivel).toLowerCase().includes(q));
+        if (!filtered.length) return;
+        html += `<div class="card"><div class="cat-title">${esc(g.titulo)} <span style="font-size:11px;color:#94a3b8;font-weight:700;">(${filtered.length})</span></div>`;
+        filtered.forEach(it => {
+          const full = base + it.path;
+          const temPlaceholder = it.path.includes("{");
+          html += `
+            <div class="url-row">
+              <div style="flex:1;min-width:260px;">
+                <div class="url-name">${esc(it.nome)} <span class="badge ${it.badge}">${esc(it.nivel)}</span></div>
+                <div class="url-desc">${esc(it.desc)}</div>
+                <div class="url-path">${esc(full)}</div>
+              </div>
+              <div class="actions">
+                <button class="btn btn-copy" data-url="${esc(full)}" onclick="copyUrl(this.dataset.url)">📋 Copiar</button>
+                ${temPlaceholder ? '' : `<a class="btn btn-open" href="${esc(full)}" target="_blank">🔗 Abrir</a>`}
+              </div>
+            </div>
+          `;
+        });
+        html += `</div>`;
+      });
+
+      document.getElementById("catalogRoot").innerHTML = html || `<div class="card" style="text-align:center;color:#94a3b8;">Nenhuma URL encontrada para "${esc(q)}".</div>`;
+    }
+  </script>
+</body>
+</html>
