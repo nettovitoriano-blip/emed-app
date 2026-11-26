@@ -625,6 +625,8 @@ from emed_views.chamados_os import (
 
 
     _extrair_pendencia_limpa,
+    mapa_clientes_por_db,
+    resolver_dados_cliente_os,
 
 
 
@@ -4829,54 +4831,21 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
     grupos_rotas = {}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    with get_db_connection(DB_NAME) as _c_cli_boot:
+        _cli_nome_map, _cli_cnpj_map = mapa_clientes_por_db(_c_cli_boot)
 
     for idx, row in df.iterrows():
-
-
-
-
-
-
-
         os_id = str(obter_id_os(idx, row))
-
-
-
-
-
-
-
         st_os = limpar_texto(row.get("status"), "ATIVO").upper()
-
-
-
-
-
-
-
         cli = limpar_texto(row.get("cliente"), "N/D")
-
-
-
-
-
-
-
-        cid = limpar_texto(row.get("cidade"), "FORTALEZA").upper()
+        _cnpj_digits = "".join(ch for ch in str(row.get("cnpj") or "") if ch.isdigit())
+        _info_cli = _cli_cnpj_map.get(_cnpj_digits) or _cli_nome_map.get(cli.strip().upper())
+        _res_cli = resolver_dados_cliente_os(row, info_cli=_info_cli)
+        cid = _res_cli["cidade"].upper() or "N/D"
+        _uf_os_res = _res_cli["estado"].upper()
+        _end_os_res = _res_cli["endereco"]
+        _cnpj_os_res = _res_cli["cnpj"]
+        _whats_os_res = _res_cli["whatsapp"]
 
 
 
@@ -5589,38 +5558,12 @@ async def api_bootstrap(request: web.Request) -> web.Response:
 
 
             "cidade": cid,
-
-
-
-
-
-
-
-            "estado": limpar_texto(row.get("estado"), "CE"),
-
-
-
-
-
-
-
+            "estado": _uf_os_res or "-",
+            "cnpj": _cnpj_os_res,
+            "endereco": _end_os_res,
             "email": limpar_texto(row.get("email"), ""),
-
-
-
-
-
-
-
-            "whatsapp": _limpar_telefone_exibicao(row.get("whatsapp") or row.get("contato_responsavel")),
-
-
-
-
-
-
-
-            "contato_responsavel": _limpar_telefone_exibicao(row.get("contato_responsavel") or row.get("whatsapp")),
+            "whatsapp": _whats_os_res,
+            "contato_responsavel": _limpar_telefone_exibicao(row.get("contato_responsavel") or _whats_os_res),
 
 
 
@@ -12562,15 +12505,29 @@ async def api_nova_os(request: web.Request) -> web.Response:
     data_ag = limpar_texto(body.get('data_agendamento'), obter_agora_brasil().strftime('%Y-%m-%d'))
 
     resp_hosp = limpar_texto(body.get('responsavel_hospital'), '').upper()
-
     contato = _limpar_telefone_exibicao(body.get('contato_responsavel') or body.get('whatsapp'))
-
-    endereco = limpar_texto(body.get('endereco'), 'UNIDADE HOSPITALAR').upper()
-
-    cidade = limpar_texto(body.get('cidade'), 'FORTALEZA').upper()
-
+    endereco = limpar_texto(body.get('endereco'), '').upper()
+    cidade = limpar_texto(body.get('cidade'), '').upper()
+    estado = limpar_texto(body.get('estado'), '').upper()
     cnpj = limpar_texto(body.get('cnpj'), '')
-
+    with get_db_connection(DB_NAME) as _conn_cli_os:
+        _dados_cli_os = resolver_dados_cliente_os(
+            {
+                'cliente': cliente,
+                'cnpj': cnpj,
+                'cidade': cidade,
+                'estado': estado,
+                'endereco': endereco,
+                'contato_responsavel': contato if contato != 'N/D' else '',
+            },
+            conn=_conn_cli_os,
+        )
+    cidade = _dados_cli_os['cidade'] if _dados_cli_os['cidade'] not in ('', 'N/D', '-') else 'N/D'
+    estado = _dados_cli_os['estado']
+    endereco = _dados_cli_os['endereco'] if _dados_cli_os['endereco'] not in ('', '-', 'N/D') else 'UNIDADE HOSPITALAR'
+    cnpj = _dados_cli_os['cnpj'] if _dados_cli_os['cnpj'] != '-' else cnpj
+    if contato in ('', '-', 'N/D') and _dados_cli_os['whatsapp'] not in ('', '-', 'N/D'):
+        contato = _dados_cli_os['whatsapp']
     respostas_triagem = limpar_texto(body.get('respostas_triagem'), '')
 
 
@@ -12637,13 +12594,9 @@ async def api_nova_os(request: web.Request) -> web.Response:
             'id': novo_id,
 
             'cliente': cliente,
-
             'cnpj': cnpj,
-
             'cidade': cidade,
-
-            'estado': 'CE',
-
+            'estado': estado,
             'equipamento': equipamento,
 
             'endereco': endereco,
@@ -16485,12 +16438,13 @@ async def api_proposta_publica_html(request: web.Request) -> web.Response:
 
     import base64
     import html as _h
+    _dados_prop = resolver_dados_cliente_os(row, db_file=DB_NAME)
     cliente = _h.escape(limpar_texto(row.get("cliente"), "CLIENTE"))
-    cnpj = _h.escape(limpar_texto(row.get("cnpj"), "-"))
-    endereco = _h.escape(limpar_texto(row.get("endereco"), "-"))
-    cidade = _h.escape(limpar_texto(row.get("cidade"), "-"))
-    estado = _h.escape(limpar_texto(row.get("estado"), "CE"))
-    contato = _h.escape(limpar_texto(row.get("whatsapp") or row.get("contato_responsavel"), "-"))
+    cnpj = _h.escape(_dados_prop["cnpj"])
+    endereco = _h.escape(_dados_prop["endereco"])
+    cidade = _h.escape(_dados_prop["cidade"])
+    estado = _h.escape(_dados_prop["estado"] or "-")
+    contato = _h.escape(_dados_prop["whatsapp"] if _dados_prop["whatsapp"] != "N/D" else "-")
     resp_local = _h.escape(limpar_texto(row.get("assinatura_cliente") or row.get("responsavel_hospital"), "Coordenação Local"))
     equip = _h.escape(limpar_texto(row.get("equipamento"), "EQUIPAMENTO"))
     tipo_srv = _h.escape(limpar_texto(row.get("tipo_servico"), "CORRETIVA"))
@@ -20971,19 +20925,30 @@ async def api_unidade_registro_salvar(request: web.Request) -> web.Response:
 
             foto_principal = caminhos_fotos[0] if caminhos_fotos else ""
             fotos_joined = ";".join(caminhos_fotos)
+            _dados_ch_cli = resolver_dados_cliente_os(
+                {"cliente": cli, "contato_responsavel": sol_tel},
+                conn=conn,
+            )
+            _cid_ch = _dados_ch_cli["cidade"]
+            _uf_ch = _dados_ch_cli["estado"]
+            _end_ch = _dados_ch_cli["endereco"]
+            _cnpj_ch = _dados_ch_cli["cnpj"] if _dados_ch_cli["cnpj"] != "-" else ""
+            _tel_ch = sol_tel or (_dados_ch_cli["whatsapp"] if _dados_ch_cli["whatsapp"] != "N/D" else "")
             cur = conn.cursor()
             cur.execute("""
                 INSERT INTO clientes_equipamentos (
-                    cliente, equipamento, tipo_servico, tecnico_responsavel, data_agendamento,
+                    cliente, cnpj, endereco, cidade, estado,
+                    equipamento, tipo_servico, tecnico_responsavel, data_agendamento,
                     status, defeito_relatado, pendencias, pre_atendimento,
                     responsavel_hospital, contato_responsavel,
                     foto_evidencia, fotos_adicionais, video_evidencia
-                ) VALUES (?, ?, ?, 'A DEFINIR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'A DEFINIR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                cli, eqp, tipo_srv, hoje_iso,
+                cli, _cnpj_ch, _end_ch, _cid_ch, _uf_ch,
+                eqp, tipo_srv, hoje_iso,
                 f"SOLICITADO PELO GESTOR ({urg})", defeito_fmt,
                 f"[PORTAL GESTOR - {agora}] {defeito_fmt}", pre_atend_txt,
-                sol_nome, sol_tel, foto_principal, fotos_joined, caminho_video,
+                sol_nome, _tel_ch, foto_principal, fotos_joined, caminho_video,
             ))
             nova_os = cur.lastrowid
             conn.commit()

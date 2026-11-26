@@ -229,6 +229,113 @@ def extrair_local_instalacao(equip_nome, end_atend):
         setor = "Engenharia / Sala Técnica de Equipamentos Médicos"
     return setor
 
+
+def mapa_clientes_por_db(conn) -> tuple:
+    """Retorna mapas (por_nome, por_cnpj) da tabela clientes para resolver cidade/UF/contato oficiais."""
+    por_nome, por_cnpj, dup_nomes = {}, {}, set()
+    try:
+        conn.row_factory = sqlite3.Row
+        for r in conn.execute(
+            "SELECT nome, cpf_cnpj, endereco, cidade, estado, telefone, email FROM clientes"
+        ).fetchall():
+            d = dict(r)
+            nm = limpar_texto(d.get("nome"), "").upper()
+            if nm:
+                if nm in por_nome:
+                    dup_nomes.add(nm)
+                else:
+                    por_nome[nm] = d
+            cn = "".join(ch for ch in str(d.get("cpf_cnpj") or "") if ch.isdigit())
+            if cn and cn not in por_cnpj:
+                por_cnpj[cn] = d
+        for nm in dup_nomes:
+            por_nome.pop(nm, None)
+    except Exception:
+        pass
+    return por_nome, por_cnpj
+
+
+def resolver_dados_cliente_os(row_os, info_cli=None, conn=None, db_file: str = "") -> dict:
+    """Resolve cidade, estado, cnpj, endereco e contato oficiais cruzando a OS com o cadastro em clientes."""
+    if info_cli is None and conn is None and db_file and os.path.exists(db_file):
+        try:
+            with sqlite3.connect(db_file) as c_tmp:
+                return resolver_dados_cliente_os(row_os, info_cli=None, conn=c_tmp)
+        except Exception:
+            info_cli = None
+    elif info_cli is None and conn is not None:
+        try:
+            conn.row_factory = sqlite3.Row
+            cnpj_num = "".join(ch for ch in str(row_os.get("cnpj") or "") if ch.isdigit())
+            if cnpj_num:
+                r_c = conn.execute(
+                    "SELECT nome, cpf_cnpj, endereco, cidade, estado, telefone, email FROM clientes "
+                    "WHERE REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(cpf_cnpj,''),'.',''),'-',''),'/',''),' ','') = ? LIMIT 1",
+                    (cnpj_num,),
+                ).fetchone()
+                if r_c:
+                    info_cli = dict(r_c)
+            if info_cli is None:
+                cli_nm = limpar_texto(row_os.get("cliente"), "").upper()
+                if cli_nm:
+                    rows_nm = conn.execute(
+                        "SELECT nome, cpf_cnpj, endereco, cidade, estado, telefone, email FROM clientes "
+                        "WHERE UPPER(TRIM(nome)) = ? LIMIT 2",
+                        (cli_nm,),
+                    ).fetchall()
+                    if len(rows_nm) == 1:
+                        info_cli = dict(rows_nm[0])
+        except Exception:
+            info_cli = None
+
+    ic = info_cli or {}
+    c_cid = limpar_texto(ic.get("cidade"), "").upper()
+    c_uf = limpar_texto(ic.get("estado"), "").upper()
+    c_cnpj = limpar_texto(ic.get("cpf_cnpj"), "")
+    c_end = limpar_texto(ic.get("endereco"), "")
+    c_tel = _limpar_telefone_exibicao(ic.get("telefone"))
+
+    os_cid = limpar_texto(row_os.get("cidade"), "").upper()
+    os_uf = limpar_texto(row_os.get("estado"), "").upper()
+    os_cnpj = limpar_texto(row_os.get("cnpj"), "")
+    os_end = limpar_texto(row_os.get("endereco"), "")
+    os_tel = _limpar_telefone_exibicao(row_os.get("whatsapp") or row_os.get("contato_responsavel"))
+
+    cidade, estado = os_cid, os_uf
+    if c_cid or c_uf:
+        if (not os_cid or os_cid in ("N/D", "-") or (os_cid == "FORTALEZA" and c_cid not in ("", "N/D", "-", "FORTALEZA"))) and c_cid not in ("", "N/D", "-"):
+            cidade = c_cid
+        if (not os_uf or os_uf in ("N/D", "-") or (os_uf == "CE" and c_uf not in ("", "N/D", "-", "CE"))) and c_uf not in ("", "N/D", "-"):
+            estado = c_uf
+
+    if estado == "DF" and cidade in ("", "N/D", "-", "FORTALEZA"):
+        cidade = "BRASÍLIA"
+
+    if not cidade or cidade in ("N/D", "-"):
+        cidade = c_cid if c_cid not in ("", "N/D", "-") else "N/D"
+    if not estado or estado in ("N/D", "-"):
+        if c_uf not in ("", "N/D", "-"):
+            estado = c_uf
+        elif cidade in ("BRASÍLIA", "BRASILIA", "TAGUATINGA", "CEILÂNDIA", "GAMA", "SOBRADINHO", "PARANOÁ", "ÁGUAS CLARAS"):
+            estado = "DF"
+        else:
+            estado = ""
+
+    cnpj = os_cnpj if os_cnpj not in ("", "-", "N/D") else (c_cnpj or "-")
+    endereco = os_end if os_end not in ("", "-", "N/D", "FORTALEZA - CE", "Fortaleza - CE") else (c_end or (f"{cidade} - {estado}" if estado else cidade))
+    if not endereco or endereco in ("-", "N/D"):
+        endereco = c_end or (f"{cidade} - {estado}" if estado else cidade)
+    whats = os_tel if os_tel not in ("", "-", "N/D") else (c_tel if c_tel not in ("", "-", "N/D") else "N/D")
+
+    return {
+        "cidade": cidade,
+        "estado": estado,
+        "cnpj": cnpj,
+        "endereco": endereco,
+        "whatsapp": whats,
+    }
+
+
 def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: dict = None, incluir_botao_print: bool = True) -> str:
     """Gera o Relatório de Atendimento e OS Oficial EMED ocupando toda a Página 1 A4,
     e joga Anexos / Fotos / Checklist automaticamente para a Página 2."""
@@ -252,11 +359,12 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
 
     id_os_c = str(id_os_c)
     cliente = limpar_texto(row_c.get("cliente"), "HOSPITAL SAO LUIZ LTDA")
-    cnpj = limpar_texto(row_c.get("cnpj"), "-")
-    endereco_atend = limpar_texto(row_c.get("endereco"), "Fortaleza - CE")
-    cidade = limpar_texto(row_c.get("cidade"), "FORTALEZA")
-    estado = limpar_texto(row_c.get("estado"), "CE")
-    whats_cli = _limpar_telefone_exibicao(row_c.get("whatsapp") or row_c.get("contato_responsavel"))
+    dados_cli = resolver_dados_cliente_os(row_c, db_file=db_file)
+    cnpj = dados_cli["cnpj"]
+    endereco_atend = dados_cli["endereco"]
+    cidade = dados_cli["cidade"]
+    estado = dados_cli["estado"] or "-"
+    whats_cli = dados_cli["whatsapp"]
     resp_hosp = limpar_texto(row_c.get("assinatura_cliente"), "") or limpar_texto(row_c.get("responsavel_hospital"), "Coordenação Local")
 
     raw_eq = limpar_texto(row_c.get("equipamento"), "-")
