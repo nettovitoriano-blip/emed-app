@@ -903,6 +903,10 @@ from emed_frota_gps import (
 
 
     carregar_painel_frota_gps_multas,
+    registrar_abastecimento_km,
+    alternar_ignorar_viagem_metrica,
+    calcular_metrica_quilometragem_frota,
+    gerar_html_relatorio_quilometragem,
 
 
 
@@ -4019,6 +4023,7 @@ async def auth_api_middleware(request: web.Request, handler):
             "/api/pix/simular-webhook",
             "/api/estoque/precificacao-atualizar",
             "/api/tecnico/salvar",
+            "/api/frota/viagem/ignorar-metrica",
         )
         if any(path == r or path.startswith(r) for r in rotas_gestor) and not _eh_gestor_ou_admin(user):
             if path in ("/supervisorio", "/urls"):
@@ -21030,6 +21035,11 @@ async def api_portal_cliente_html(request: web.Request) -> web.Response:
   .wrap { max-width:1040px; margin:0 auto; padding:16px 14px 44px; }
   .card { background:#0f172a; border:1px solid #1e293b; border-radius:14px; padding:16px; margin-bottom:14px; }
   .inp { width:100%; box-sizing:border-box; padding:9px 11px; border-radius:8px; border:1px solid #334155; background:#1e293b; color:#fff; font-size:13.5px; margin-top:4px; }
+  .inp:not([type="password"]):not([type="email"]):not([type="url"]):not(.no-uppercase):not([data-no-uppercase]),
+  input:not([type="password"]):not([type="email"]):not([type="url"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not(.no-uppercase):not([data-no-uppercase]),
+  textarea:not(.no-uppercase):not([data-no-uppercase]) {
+    text-transform: uppercase;
+  }
   .btn { background:#0284c7; color:#fff; border:none; border-radius:8px; padding:8px 14px; font-weight:800; cursor:pointer; font-size:12.5px; }
   .btn-ok { background:#10b981; color:#064e3b; }
   .btn-warn { background:#dc2626; color:#fff; }
@@ -21211,6 +21221,36 @@ async def api_portal_cliente_html(request: web.Request) -> web.Response:
     </div>
   </div>
   <script>
+    // Padronização automática em maiúsculas (Caixa Alta Oficial EMED)
+    document.addEventListener("input", function(e) {
+      var el = e.target;
+      if (!el || !el.tagName) return;
+      var tag = el.tagName.toUpperCase();
+      if (tag !== "INPUT" && tag !== "TEXTAREA") return;
+      var type = (el.type || "text").toLowerCase();
+      if (type === "password" || type === "email" || type === "url" || 
+          type === "file" || type === "hidden" || type === "checkbox" || 
+          type === "radio" || type === "range" || type === "color" || 
+          type === "date" || type === "time" || type === "datetime-local" || type === "number") {
+        return;
+      }
+      if (el.classList.contains("no-uppercase") || el.classList.contains("no-upper") || 
+          el.classList.contains("case-sensitive") || el.dataset.noUppercase === "true" || el.dataset.noUpper === "true") {
+        return;
+      }
+      if (typeof el.value === "string") {
+        var upper = el.value.toUpperCase();
+        if (el.value !== upper) {
+          var start = el.selectionStart;
+          var end = el.selectionEnd;
+          el.value = upper;
+          if (start !== null && end !== null && typeof el.setSelectionRange === "function") {
+            try { el.setSelectionRange(start, end); } catch(err) {}
+          }
+        }
+      }
+    }, true);
+
     let CLI_TOKEN = sessionStorage.getItem('emed_cli_token') || '';
     let CLI_NOME = sessionStorage.getItem('emed_cli_nome') || '';
     let DATA = {};
@@ -27304,6 +27344,11 @@ def criar_app() -> web.Application:
 
     app.router.add_post("/api/frota/checklist-salvar", api_frota_checklist_salvar)
 
+    app.router.add_get("/api/frota/metricas-km", api_frota_metricas_km)
+    app.router.add_get("/api/frota/metricas-km/imprimir", api_frota_metricas_km_imprimir)
+    app.router.add_post("/api/frota/abastecimento/salvar", api_frota_abastecimento_salvar)
+    app.router.add_post("/api/frota/viagem/ignorar-metrica", api_frota_viagem_ignorar_metrica)
+
     app.router.add_get("/api/almoxarifado/sugestao-pecas", api_almoxarifado_sugestao_pecas)
 
     app.router.add_get("/api/almoxarifado/ferramentas-cautela", api_almoxarifado_cautela_painel)
@@ -27445,6 +27490,67 @@ async def api_frota_checklist_salvar(request: web.Request) -> web.Response:
 
     except Exception as e:
 
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_frota_metricas_km(request: web.Request) -> web.Response:
+    """Retorna metricas consolidadas de quilometragem rodada, consumo (KM/L) e custo/KM."""
+    try:
+        periodo = request.query.get("periodo", "30d")
+        placa = request.query.get("placa", "")
+        incluir_anom = str(request.query.get("incluir_anomalias", "0")).strip().lower() in ("1", "true", "sim")
+        di = request.query.get("data_inicio", "")
+        df = request.query.get("data_fim", "")
+        dados = calcular_metrica_quilometragem_frota(DB_NAME, periodo, placa, incluir_anom, di, df)
+        return web.json_response(dados)
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_frota_metricas_km_imprimir(request: web.Request) -> web.Response:
+    """Relatorio executivo A4 de quilometragem rodada, consumo e custos da frota."""
+    try:
+        periodo = request.query.get("periodo", "30d")
+        placa = request.query.get("placa", "")
+        incluir_anom = str(request.query.get("incluir_anomalias", "0")).strip().lower() in ("1", "true", "sim")
+        di = request.query.get("data_inicio", "")
+        df = request.query.get("data_fim", "")
+        html_out = gerar_html_relatorio_quilometragem(DB_NAME, periodo, placa, incluir_anom, di, df)
+        return web.Response(text=html_out, content_type="text/html", charset="utf-8")
+    except Exception as e:
+        return web.Response(text=f"Erro ao gerar relatório: {e}", status=500)
+
+
+async def api_frota_abastecimento_salvar(request: web.Request) -> web.Response:
+    """Registra abastecimento/hodometro calculando KM rodado do trecho, KM/L e R$/KM."""
+    try:
+        body = await request.json()
+        usr = request.get("_emed_user") or {}
+        if not body.get("condutor") and usr.get("nome"):
+            body["condutor"] = usr["nome"]
+        res = registrar_abastecimento_km(DB_NAME, body)
+        if not res.get("ok"):
+            return web.json_response(res, status=400)
+        invalidar_cache_bootstrap()
+        return web.json_response(res)
+    except Exception as e:
+        return web.json_response({"ok": False, "msg": str(e)}, status=500)
+
+
+async def api_frota_viagem_ignorar_metrica(request: web.Request) -> web.Response:
+    """Marca ou desmarca uma viagem sintetica/salto para nao distorcer metricas de KM."""
+    try:
+        body = await request.json()
+        vid = int(body.get("viagem_id") or 0)
+        ignorar = bool(body.get("ignorar", True))
+        if vid <= 0:
+            return web.json_response({"ok": False, "msg": "ID de viagem inválido."}, status=400)
+        res = alternar_ignorar_viagem_metrica(DB_NAME, vid, ignorar)
+        if not res.get("ok"):
+            return web.json_response(res, status=404)
+        invalidar_cache_bootstrap()
+        return web.json_response(res)
+    except Exception as e:
         return web.json_response({"ok": False, "msg": str(e)}, status=500)
 
 

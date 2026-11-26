@@ -400,6 +400,13 @@
       background: #fff;
       color: var(--text-main);
     }
+    /* PADRONIZAÇÃO AUTOMÁTICA EM CAIXA ALTA (OFICIAL EMED) */
+    input:not([type="password"]):not([type="email"]):not([type="url"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not(.no-uppercase):not(.no-upper):not([data-no-uppercase]):not([data-no-upper]),
+    textarea:not(.no-uppercase):not(.no-upper):not([data-no-uppercase]):not([data-no-upper]),
+    .input:not([type="password"]):not([type="email"]):not([type="url"]):not(.no-uppercase):not(.no-upper),
+    .textarea:not(.no-uppercase):not(.no-upper) {
+      text-transform: uppercase;
+    }
     .input:focus, .select:focus, .textarea:focus {
       outline: none;
       border-color: var(--emed-blue);
@@ -1586,18 +1593,25 @@
       else { alert('⚠️ ' + msg); }
     };
     // =========================================================================
-    // PADRONIZAÇÃO AUTOMÁTICA EM MAIÚSCULAS
-    // =========================================================================
     // PADRONIZAÇÃO AUTOMÁTICA EM MAIÚSCULAS (CAIXA ALTA) PARA TODOS OS CAMPOS
     // =========================================================================
     document.addEventListener("input", function(e) {
       var el = e.target;
       if (!el || !el.tagName) return;
       var tag = el.tagName.toUpperCase();
-      var type = (el.type || "").toLowerCase();
-      if ((tag === "INPUT" || tag === "TEXTAREA") && 
-          type !== "email" && type !== "password" && type !== "url" && 
-          !el.classList.contains("no-upper") && !el.dataset.noUpper) {
+      if (tag !== "INPUT" && tag !== "TEXTAREA") return;
+      var type = (el.type || "text").toLowerCase();
+      if (type === "password" || type === "email" || type === "url" || 
+          type === "file" || type === "hidden" || type === "checkbox" || 
+          type === "radio" || type === "range" || type === "color" || 
+          type === "date" || type === "time" || type === "datetime-local" || type === "number") {
+        return;
+      }
+      if (el.classList.contains("no-uppercase") || el.classList.contains("no-upper") || 
+          el.classList.contains("case-sensitive") || el.dataset.noUppercase === "true" || el.dataset.noUpper === "true") {
+        return;
+      }
+      if (typeof el.value === "string") {
         var start = el.selectionStart;
         var end = el.selectionEnd;
         var upper = el.value.toUpperCase();
@@ -7194,8 +7208,40 @@ Deseja confirmar mesmo assim com justificativa de chegada?`);
       const veiculos = STATE.data.veiculos || [];
       const tecnicos = (STATE.data.tecnicos || []).map(t => t.nome);
       const viagens = STATE.data.frota_gps_multas?.viagens_gps || [];
+      const mk = STATE.data.frota_gps_multas?.metricas_km || null;
+      const mRes = mk?.resumo || {};
+      const tecAt = String(STATE.tecnicoFiltro || STATE.usuarioAtual?.nome || "").trim().toUpperCase();
+      const meuCond = (mk?.por_condutor || []).find(c => String(c.condutor || "").toUpperCase() === tecAt) || null;
       const ativas = (STATE.data.ordens || []).filter(o => !(o.status||"").includes("CONCLU"));
       box.innerHTML = `
+        <div class="section-box" style="background:linear-gradient(135deg,#0f172a 0%,#0369a1 100%);color:#fff;border:none;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+            <div>
+              <div style="font-size:11px;font-weight:800;color:#7dd3fc;text-transform:uppercase;">Métrica de Quilometragem Rodada (Últimos 30 dias)</div>
+              <div style="font-size:15px;font-weight:900;">🛣️ Deslocamento, Hodômetro &amp; Abastecimento</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn btn-sm" style="background:#10b981;color:#064e3b;font-weight:900;border:none;" onclick="abrirModalAbastecimentoFrota('')">⛽ Registrar Abastecimento</button>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px;">
+            <div style="background:rgba(255,255,255,0.12);border-radius:8px;padding:9px 10px;">
+              <div style="font-size:10.5px;color:#bae6fd;font-weight:700;">MINHA RODAGEM (30D)</div>
+              <div style="font-size:18px;font-weight:900;">${meuCond ? Number(meuCond.km_rodado||0).toLocaleString('pt-BR', {maximumFractionDigits:1}) : '0'} km</div>
+              <div style="font-size:10px;color:#e0f2fe;">${meuCond ? `${meuCond.qtd_viagens} viagens • ${meuCond.os_distintas} OS` : (tecAt || 'Selecione seu perfil')}</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.12);border-radius:8px;padding:9px 10px;">
+              <div style="font-size:10.5px;color:#bae6fd;font-weight:700;">FROTA TOTAL (30D)</div>
+              <div style="font-size:18px;font-weight:900;">${Number(mRes.km_total||0).toLocaleString('pt-BR', {maximumFractionDigits:1})} km</div>
+              <div style="font-size:10px;color:#e0f2fe;">Média ${Number(mRes.media_km_dia||0).toLocaleString('pt-BR', {maximumFractionDigits:1})} km/dia</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.12);border-radius:8px;padding:9px 10px;">
+              <div style="font-size:10.5px;color:#bae6fd;font-weight:700;">CONSUMO MÉDIO FROTA</div>
+              <div style="font-size:18px;font-weight:900;">${Number(mRes.consumo_medio_kml||0) > 0 ? `${Number(mRes.consumo_medio_kml).toFixed(2)} km/L` : '--'}</div>
+              <div style="font-size:10px;color:#e0f2fe;">${Number(mRes.litros_total||0) > 0 ? `${Number(mRes.litros_total).toFixed(1)} L abastecidos` : 'Lance no posto p/ medir'}</div>
+            </div>
+          </div>
+        </div>
         <div class="section-box" style="background:#eff6ff;border-color:#93c5fd;">
           <div class="section-title">
             <span>🛰️ Rastreamento GPS do Condutor & Atualização Automática de Odômetro</span>
@@ -13690,6 +13736,8 @@ function fecharModalInsumosViagem() {
       const logsRobo = fgm.logs_robo_detran || [];
       const agoraPadrao = new Date().toLocaleDateString('pt-BR') + " 09:30";
       box.innerHTML = `
+        <!-- PAINEL 0: MÉTRICA DE QUILOMETRAGEM RODADA, CONSUMO KM/L & CUSTO/KM -->
+        <div id="painelMetricasKmFrota" class="section-box" style="border-top:4px solid #0284c7;background:#f8fafc;margin-bottom:14px;"></div>
         <!-- PAINEL 1: ROBÔ DIÁRIO DETRAN / AUTARQUIA & CRUZAMENTO DE MULTAS -->
         <div class="section-box" style="border-left:4px solid #dc2626;background:#fff;">
           <div class="section-title">
@@ -13986,6 +14034,9 @@ function fecharModalInsumosViagem() {
           </div>
         </div>
       `;
+      if (typeof renderizarPainelMetricasKmFrota === "function") {
+        renderizarPainelMetricasKmFrota(window._frotaKmState?.dados || fgm.metricas_km);
+      }
     }
     async function executarRoboDetranAgora() {
       mostrarToast("🤖 Consultando bases DETRAN / Autarquia e cruzando horários com o GPS...");
@@ -17632,6 +17683,70 @@ function comprimirImagemBase64(file, maxLargura = 1280, qualidade = 0.72) {
       </div>
     </div>
   </div>
+  <!-- MODAL REGISTRAR ABASTECIMENTO & HODÔMETRO (KM/L e R$/KM) -->
+  <div id="modalAbastecimentoFrota" class="modal-overlay" style="display:none; z-index:999999;">
+    <div class="modal-box" style="max-width:580px;width:95%;">
+      <div class="modal-head" style="display:flex;justify-content:space-between;align-items:center;background:#059669;color:#fff;padding:12px 16px;border-radius:8px 8px 0 0;">
+        <div style="font-weight:900;font-size:14px;">⛽ Registrar Abastecimento &amp; Leitura de Hodômetro</div>
+        <button type="button" class="btn btn-xs" onclick="fecharModalAbastecimentoFrota()" style="background:rgba(255,255,255,0.2);color:#fff;border:none;cursor:pointer;font-size:16px;">✕</button>
+      </div>
+      <div class="modal-body" style="padding:16px;">
+        <div class="form-grid">
+          <div class="field">
+            <label class="field-label">Veículo / Placa</label>
+            <select id="abast_placa" class="field-input"></select>
+          </div>
+          <div class="field">
+            <label class="field-label">Condutor / Técnico</label>
+            <input type="text" id="abast_condutor" class="field-input" style="text-transform:uppercase;" />
+          </div>
+          <div class="field">
+            <label class="field-label">Data / Hora do Abastecimento</label>
+            <input type="datetime-local" id="abast_data" class="field-input" />
+          </div>
+          <div class="field">
+            <label class="field-label">Hodômetro no Painel (KM) *</label>
+            <input type="number" id="abast_km" class="field-input" placeholder="Ex: 29450" />
+          </div>
+          <div class="field">
+            <label class="field-label">Litros Abastecidos (L)</label>
+            <input type="number" step="0.01" id="abast_litros" class="field-input" placeholder="Ex: 42.50" oninput="atualizarPrevAbast()" />
+          </div>
+          <div class="field">
+            <label class="field-label">Valor Total Pago (R$)</label>
+            <input type="number" step="0.01" id="abast_valor" class="field-input" placeholder="Ex: 265.00" oninput="atualizarPrevAbast()" />
+          </div>
+          <div class="field">
+            <label class="field-label">Combustível</label>
+            <select id="abast_combustivel" class="field-input">
+              <option value="GASOLINA">⛽ Gasolina</option>
+              <option value="ETANOL">🌱 Etanol</option>
+              <option value="DIESEL">🚛 Diesel</option>
+              <option value="GNV">🔵 GNV</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">Posto / Cidade</label>
+            <input type="text" id="abast_posto" class="field-input" placeholder="Ex: Posto Shell - Brasília/DF" />
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px;">
+          <label style="font-size:12px;font-weight:700;color:#0f172a;display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="checkbox" id="abast_tanque_cheio" checked /> Tanque completado (calcula KM/L real)
+          </label>
+          <span id="abast_prev_litro" style="font-size:12px;font-weight:800;color:#059669;"></span>
+        </div>
+        <div class="field" style="margin-top:8px;">
+          <label class="field-label">Observações / NF Cupom</label>
+          <input type="text" id="abast_obs" class="field-input" placeholder="Opcional (nº cupom, revisão, etc.)" />
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="fecharModalAbastecimentoFrota()">Cancelar</button>
+          <button type="button" id="btnSalvarAbastFrota" class="btn btn-success btn-sm" onclick="salvarAbastecimentoFrota()">💾 Registrar Abastecimento &amp; KM</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <!-- MODAL CHECKLIST RÁPIDO DE ZELO (SEM BUROCRACIA) -->
   <!-- MODAL COPILOTO DE DIAGNÓSTICO TÉCNICO & CÓDIGOS DE ERRO EMED -->
   <div id="modalCopilotoFalhas" class="modal-overlay" style="display:none; z-index:999999;">
@@ -20095,6 +20210,317 @@ async function abrirPainelPMPAnual() {
       await sincronizarTudo(false);
       abrirFichaVeiculo(vid);
     }
+    window._frotaKmState = { periodo: "30d", placa: "", incluir_anomalias: false, subTab: "VEICULOS", dados: null };
+    function setSubTabFrotaKm(tab) {
+      window._frotaKmState.subTab = tab;
+      renderizarPainelMetricasKmFrota(window._frotaKmState.dados || STATE.data?.frota_gps_multas?.metricas_km);
+    }
+    async function atualizarPainelMetricasKM(opts = {}) {
+      if (opts.periodo !== undefined) window._frotaKmState.periodo = opts.periodo;
+      if (opts.placa !== undefined) window._frotaKmState.placa = opts.placa;
+      if (opts.incluir_anomalias !== undefined) window._frotaKmState.incluir_anomalias = !!opts.incluir_anomalias;
+      const st = window._frotaKmState;
+      const qs = new URLSearchParams({
+        periodo: st.periodo || "30d",
+        placa: st.placa || "",
+        incluir_anomalias: st.incluir_anomalias ? "1" : "0"
+      });
+      const res = await apiGet(`/api/frota/metricas-km?${qs.toString()}`);
+      if (res && res.ok) {
+        st.dados = res;
+        if (STATE.data?.frota_gps_multas) STATE.data.frota_gps_multas.metricas_km = res;
+        renderizarPainelMetricasKmFrota(res);
+      } else {
+        mostrarToast(res?.msg || "Não foi possível atualizar métricas de quilometragem.", "erro");
+      }
+    }
+    function abrirRelatorioKmA4() {
+      const st = window._frotaKmState;
+      const qs = new URLSearchParams({
+        periodo: st.periodo || "30d",
+        placa: st.placa || "",
+        incluir_anomalias: st.incluir_anomalias ? "1" : "0"
+      });
+      window.open(`/api/frota/metricas-km/imprimir?${qs.toString()}`, "_blank");
+    }
+    async function alternarIgnorarViagemKm(viagemId, ignorar) {
+      const res = await apiPost("/api/frota/viagem/ignorar-metrica", { viagem_id: viagemId, ignorar }, false);
+      if (res && res.ok) {
+        mostrarToast(res.msg || "Viagem atualizada na métrica.");
+        await atualizarPainelMetricasKM();
+      } else {
+        mostrarToast(res?.msg || "Erro ao atualizar viagem (somente Gestor).", "erro");
+      }
+    }
+    function abrirModalAbastecimentoFrota(placaPref = "") {
+      const modal = document.getElementById("modalAbastecimentoFrota");
+      if (!modal) return;
+      const veiculos = STATE.data?.veiculos || [];
+      const sel = document.getElementById("abast_placa");
+      sel.innerHTML = veiculos.map(v => `<option value="${esc(v.placa)}">${esc(v.placa)} — ${esc(v.modelo)} (${(v.km_atual||0).toLocaleString('pt-BR')} km)</option>`).join("");
+      if (placaPref) sel.value = placaPref;
+      const vAtual = veiculos.find(v => v.placa === sel.value) || veiculos[0] || {};
+      document.getElementById("abast_condutor").value = String(STATE.tecnicoFiltro || STATE.usuarioAtual?.nome || vAtual.condutor_atual || "").toUpperCase();
+      const now = new Date();
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      document.getElementById("abast_data").value = now.toISOString().slice(0, 16);
+      document.getElementById("abast_km").value = vAtual.km_atual || "";
+      document.getElementById("abast_litros").value = "";
+      document.getElementById("abast_valor").value = "";
+      document.getElementById("abast_posto").value = "";
+      document.getElementById("abast_obs").value = "";
+      document.getElementById("abast_tanque_cheio").checked = true;
+      document.getElementById("abast_prev_litro").textContent = "";
+      sel.onchange = () => {
+        const vv = veiculos.find(x => x.placa === sel.value);
+        if (vv) document.getElementById("abast_km").value = vv.km_atual || "";
+      };
+      modal.style.display = "flex";
+    }
+    function fecharModalAbastecimentoFrota() {
+      const m = document.getElementById("modalAbastecimentoFrota");
+      if (m) m.style.display = "none";
+    }
+    function atualizarPrevAbast() {
+      const lit = parseFloat(document.getElementById("abast_litros")?.value || 0);
+      const val = parseFloat(document.getElementById("abast_valor")?.value || 0);
+      const el = document.getElementById("abast_prev_litro");
+      if (el) el.textContent = (lit > 0 && val > 0) ? `Preço calculado: R$ ${(val / lit).toFixed(3)}/L` : "";
+    }
+    async function salvarAbastecimentoFrota() {
+      const btn = document.getElementById("btnSalvarAbastFrota");
+      if (btn) btn.disabled = true;
+      try {
+        const res = await apiPost("/api/frota/abastecimento/salvar", {
+          placa: document.getElementById("abast_placa").value,
+          condutor: document.getElementById("abast_condutor").value,
+          data_abastecimento: document.getElementById("abast_data").value,
+          km_odometro: parseInt(document.getElementById("abast_km").value || 0, 10),
+          litros: parseFloat(document.getElementById("abast_litros").value || 0),
+          valor_total: parseFloat(document.getElementById("abast_valor").value || 0),
+          tipo_combustivel: document.getElementById("abast_combustivel").value,
+          posto_uf: document.getElementById("abast_posto").value,
+          tanque_cheio: document.getElementById("abast_tanque_cheio").checked,
+          observacoes: document.getElementById("abast_obs").value
+        }, false);
+        if (res && res.ok) {
+          mostrarToast(res.msg || "⛽ Abastecimento salvo!");
+          fecharModalAbastecimentoFrota();
+          await sincronizarTudo(false);
+          if (document.getElementById("painelMetricasKmFrota")) await atualizarPainelMetricasKM();
+        } else {
+          mostrarToast(res?.msg || "Verifique os dados do abastecimento.", "erro");
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+    function renderizarPainelMetricasKmFrota(dadosKm) {
+      const el = document.getElementById("painelMetricasKmFrota");
+      if (!el) return;
+      const d = dadosKm || STATE.data?.frota_gps_multas?.metricas_km || {};
+      window._frotaKmState.dados = d;
+      const st = window._frotaKmState;
+      const r = d.resumo || {};
+      const veiculos = STATE.data?.veiculos || [];
+      const porV = d.por_veiculo || [];
+      const porC = d.por_condutor || [];
+      const porOs = d.por_os_cliente || [];
+      const abasts = d.abastecimentos || [];
+      const vgs = d.viagens_recentes || [];
+      const periodoBtns = [
+        ["hoje", "Hoje"],
+        ["7d", "7 dias"],
+        ["30d", "30 dias"],
+        ["mes", "Mês Atual"],
+        ["todos", "Todo Histórico"]
+      ];
+      let subHtml = "";
+      if (st.subTab === "VEICULOS") {
+        subHtml = `
+          <div class="form-grid" style="gap:12px;">
+            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:10px;overflow-x:auto;">
+              <div style="font-size:12.5px;font-weight:900;color:#002b54;margin-bottom:8px;">🚘 KM Rodado &amp; Eficiência por Veículo</div>
+              <table class="data-table" style="width:100%;font-size:11.5px;">
+                <thead><tr><th>Veículo</th><th>Hodômetro</th><th>KM Período</th><th>Viagens</th><th>Média</th><th>Custo/KM</th></tr></thead>
+                <tbody>
+                  ${porV.length ? porV.map(v => `
+                    <tr>
+                      <td><b>${esc(v.placa)}</b><div style="font-size:10px;color:#64748b;">${esc(v.modelo)}</div></td>
+                      <td>${(v.km_atual_odometro||0).toLocaleString('pt-BR')} km</td>
+                      <td><b style="color:#0284c7;">${Number(v.km_rodado||0).toLocaleString('pt-BR', {maximumFractionDigits:1})} km</b></td>
+                      <td>${v.qtd_viagens}</td>
+                      <td>${v.consumo_medio_kml > 0 ? `${v.consumo_medio_kml.toFixed(2)} km/L` : '--'}</td>
+                      <td>${v.custo_por_km > 0 ? `R$ ${v.custo_por_km.toFixed(2)}` : '--'}</td>
+                    </tr>
+                  `).join("") : `<tr><td colspan="6" style="text-align:center;color:#64748b;padding:12px;">Sem rodagem registrada no período.</td></tr>`}
+                </tbody>
+              </table>
+            </div>
+            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:10px;overflow-x:auto;">
+              <div style="font-size:12.5px;font-weight:900;color:#002b54;margin-bottom:8px;">👷 Ranking de Quilometragem por Condutor</div>
+              <table class="data-table" style="width:100%;font-size:11.5px;">
+                <thead><tr><th>Condutor</th><th>KM Rodado</th><th>Part.</th><th>Viagens</th><th>OS</th><th>KM/OS</th></tr></thead>
+                <tbody>
+                  ${porC.length ? porC.map(c => `
+                    <tr>
+                      <td><b>${esc(c.condutor)}</b>
+                        <div style="background:#e2e8f0;height:4px;border-radius:3px;margin-top:3px;overflow:hidden;"><div style="background:#0284c7;height:100%;width:${Math.min(100, c.pct_total||0)}%;"></div></div>
+                      </td>
+                      <td><b style="color:#0369a1;">${Number(c.km_rodado||0).toLocaleString('pt-BR', {maximumFractionDigits:1})} km</b></td>
+                      <td>${Number(c.pct_total||0).toFixed(1)}%</td>
+                      <td>${c.qtd_viagens}</td>
+                      <td>${c.os_distintas}</td>
+                      <td>${Number(c.km_por_os||0).toFixed(1)}</td>
+                    </tr>
+                  `).join("") : `<tr><td colspan="6" style="text-align:center;color:#64748b;padding:12px;">Sem deslocamentos atribuídos no período.</td></tr>`}
+                </tbody>
+              </table>
+            </div>
+          </div>`;
+      } else if (st.subTab === "OS") {
+        subHtml = `
+          <div style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:10px;overflow-x:auto;">
+            <div style="font-size:12.5px;font-weight:900;color:#002b54;margin-bottom:8px;">🏥 Quilometragem por OS / Unidade Atendida</div>
+            <table class="data-table" style="width:100%;font-size:11.5px;">
+              <thead><tr><th>Ref / OS</th><th>Destino / Unidade</th><th>KM Total</th><th>Viagens</th><th>Condutor(es)</th></tr></thead>
+              <tbody>
+                ${porOs.length ? porOs.map(o => `
+                  <tr>
+                    <td><b>${esc(o.referencia)}</b></td>
+                    <td>${esc(o.destino)}</td>
+                    <td><b style="color:#0284c7;">${Number(o.km_rodado||0).toLocaleString('pt-BR', {maximumFractionDigits:1})} km</b></td>
+                    <td>${o.qtd_viagens}</td>
+                    <td>${esc(o.condutores)}</td>
+                  </tr>
+                `).join("") : `<tr><td colspan="5" style="text-align:center;color:#64748b;padding:12px;">Sem deslocamentos no período.</td></tr>`}
+              </tbody>
+            </table>
+          </div>`;
+      } else if (st.subTab === "ABAST") {
+        subHtml = `
+          <div style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:10px;overflow-x:auto;">
+            <div style="font-size:12.5px;font-weight:900;color:#059669;margin-bottom:8px;">⛽ Abastecimentos &amp; Rendimento Registrado</div>
+            <table class="data-table" style="width:100%;font-size:11.5px;">
+              <thead><tr><th>Data</th><th>Placa</th><th>Condutor</th><th>Hodômetro</th><th>Trecho</th><th>Litros</th><th>Valor</th><th>KM/L</th><th>R$/KM</th></tr></thead>
+              <tbody>
+                ${abasts.length ? abasts.map(a => `
+                  <tr>
+                    <td>${esc(a.data_abastecimento)}</td>
+                    <td><b>${esc(a.placa)}</b></td>
+                    <td>${esc(a.condutor)}</td>
+                    <td>${(a.km_odometro||0).toLocaleString('pt-BR')} km</td>
+                    <td>${a.km_rodado_trecho > 0 ? `+${Number(a.km_rodado_trecho).toFixed(1)} km` : '-'}</td>
+                    <td>${Number(a.litros||0).toFixed(2)} L</td>
+                    <td><b>R$ ${Number(a.valor_total||0).toFixed(2)}</b></td>
+                    <td style="color:#059669;font-weight:bold;">${a.km_por_litro > 0 ? `${a.km_por_litro.toFixed(2)}` : '-'}</td>
+                    <td>${a.custo_por_km > 0 ? `R$ ${a.custo_por_km.toFixed(2)}` : '-'}</td>
+                  </tr>
+                `).join("") : `<tr><td colspan="9" style="text-align:center;color:#64748b;padding:14px;">Nenhum abastecimento lançado no período. Clique em <b>⛽ + Abastecimento</b> para iniciar o controle de consumo real (KM/L e R$/km).</td></tr>`}
+              </tbody>
+            </table>
+          </div>`;
+      } else {
+        subHtml = `
+          <div style="background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:10px;overflow-x:auto;">
+            <div style="font-size:12.5px;font-weight:900;color:#002b54;margin-bottom:8px;">🛰️ Auditoria de Trechos GPS (Últimos 50 registros do período)</div>
+            <table class="data-table" style="width:100%;font-size:11px;">
+              <thead><tr><th>ID</th><th>Data/Hora</th><th>Placa</th><th>Condutor</th><th>Odômetro</th><th>KM Trecho</th><th>Status</th><th>Ação Métrica</th></tr></thead>
+              <tbody>
+                ${vgs.length ? vgs.map(v => `
+                  <tr style="${v.ignorar_metrica ? 'opacity:0.55;background:#f1f5f9;' : (v.eh_anomalia ? 'background:#fef3c7;' : '')}">
+                    <td>#${v.id}</td>
+                    <td>${esc(v.data_hora_inicio)}</td>
+                    <td><b>${esc(v.placa)}</b></td>
+                    <td>${esc(v.condutor)}</td>
+                    <td>${(v.km_inicial||0).toLocaleString('pt-BR')} → ${(v.km_final||0).toLocaleString('pt-BR')}</td>
+                    <td><b>${Number(v.km_percorrido||0).toLocaleString('pt-BR', {maximumFractionDigits:1})} km</b> ${v.eh_anomalia ? '<span title="Salto acima de 1.200km isolado automaticamente">⚠️</span>' : ''}</td>
+                    <td>${esc(v.status_viagem)}</td>
+                    <td>
+                      <button type="button" class="btn btn-xs ${v.ignorar_metrica ? 'btn-success' : 'btn-outline'}" onclick="alternarIgnorarViagemKm(${v.id}, ${v.ignorar_metrica ? 'false' : 'true'})">
+                        ${v.ignorar_metrica ? '↩️ Restaurar' : '🚫 Desconsiderar'}
+                      </button>
+                    </td>
+                  </tr>
+                `).join("") : `<tr><td colspan="8" style="text-align:center;color:#64748b;padding:12px;">Sem trechos no período.</td></tr>`}
+              </tbody>
+            </table>
+          </div>`;
+      }
+      el.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+          <div>
+            <div class="section-title" style="margin:0;color:#002b54;font-size:15px;">🛣️ Métrica de Quilometragem Rodada, Consumo &amp; Custo/KM</div>
+            <div style="font-size:11.5px;color:#475569;margin-top:2px;">Período ativo: <b>${esc(r.periodo_label || 'Últimos 30 dias')}</b> • ${r.qtd_viagens || 0} viagem(ns) contabilizada(s)</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <button type="button" class="btn btn-success btn-sm" onclick="abrirModalAbastecimentoFrota('${esc(st.placa || '')}')">⛽ + Abastecimento</button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="abrirRelatorioKmA4()">🖨️ Relatório A4</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px;background:#fff;padding:8px 10px;border-radius:10px;border:1px solid #cbd5e1;">
+          <div style="display:flex;gap:4px;flex-wrap:wrap;">
+            ${periodoBtns.map(([val, lbl]) => `
+              <button type="button" class="btn btn-xs ${st.periodo === val ? 'btn-primary' : 'btn-outline'}" onclick="atualizarPainelMetricasKM({periodo:'${val}'})">${lbl}</button>
+            `).join("")}
+          </div>
+          <select class="select" style="width:auto;min-width:170px;padding:4px 8px;font-size:11.5px;margin:0;" onchange="atualizarPainelMetricasKM({placa:this.value})">
+            <option value="">🚘 Todos os Veículos</option>
+            ${veiculos.map(v => `<option value="${esc(v.placa.replace(/-/g,''))}" ${st.placa === v.placa.replace(/-/g,'') ? 'selected' : ''}>${esc(v.placa)} — ${esc(v.modelo)}</option>`).join("")}
+          </select>
+          <label style="font-size:11px;color:#475569;display:inline-flex;align-items:center;gap:4px;cursor:pointer;margin-left:auto;">
+            <input type="checkbox" ${st.incluir_anomalias ? 'checked' : ''} onchange="atualizarPainelMetricasKM({incluir_anomalias:this.checked})" /> Incluir saltos &gt;1.200km
+          </label>
+        </div>
+        ${(r.qtd_anomalias > 0 && !st.incluir_anomalias) ? `
+          <div style="background:#fffbeb;border:1px solid #fcd34d;border-left:4px solid #d97706;border-radius:8px;padding:7px 10px;font-size:11.5px;color:#92400e;margin-bottom:10px;">
+            🛡️ <b>Saneamento Automático:</b> ${r.qtd_anomalias} registro(s) com salto acima de 1.200 km em uma única viagem (totalizando ${Number(r.km_anomalias_oculto||0).toLocaleString('pt-BR', {maximumFractionDigits:1})} km de ajuste/simulação) foram isolados da média. Confira na aba <b>Trechos GPS</b>.
+          </div>
+        ` : ''}
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin-bottom:12px;">
+          <div class="kpi-card" style="background:#fff;border-top:3px solid #0284c7;">
+            <div class="kpi-lbl">KM Rodado (${esc(r.periodo_label||'30d')})</div>
+            <div class="kpi-val" style="color:#0284c7;">${Number(r.km_total||0).toLocaleString('pt-BR', {maximumFractionDigits:1})} km</div>
+            <div style="font-size:10px;color:#64748b;">${r.qtd_viagens||0} viagens GPS</div>
+          </div>
+          <div class="kpi-card" style="background:#fff;border-top:3px solid #0ea5e9;">
+            <div class="kpi-lbl">Média KM / Dia</div>
+            <div class="kpi-val" style="color:#0369a1;">${Number(r.media_km_dia||0).toLocaleString('pt-BR', {maximumFractionDigits:1})} km/d</div>
+            <div style="font-size:10px;color:#64748b;">${Number(r.media_km_viagem||0).toFixed(1)} km / viagem</div>
+          </div>
+          <div class="kpi-card" style="background:#fff;border-top:3px solid #059669;">
+            <div class="kpi-lbl">Consumo Médio</div>
+            <div class="kpi-val" style="color:#059669;">${r.consumo_medio_kml > 0 ? `${Number(r.consumo_medio_kml).toFixed(2)} km/L` : '--'}</div>
+            <div style="font-size:10px;color:#64748b;">${Number(r.litros_total||0).toFixed(1)} L abastecidos</div>
+          </div>
+          <div class="kpi-card" style="background:#fff;border-top:3px solid #d97706;">
+            <div class="kpi-lbl">Combustível + Manut.</div>
+            <div class="kpi-val" style="color:#b45309;">R$ ${Number(r.custo_total_operacional||0).toLocaleString('pt-BR', {minimumFractionDigits:2})}</div>
+            <div style="font-size:10px;color:#64748b;">Comb: R$ ${Number(r.gasto_combustivel||0).toFixed(0)} • Man: R$ ${Number(r.gasto_manutencao||0).toFixed(0)}</div>
+          </div>
+          <div class="kpi-card" style="background:#fff;border-top:3px solid #7c3aed;">
+            <div class="kpi-lbl">Custo Real / KM</div>
+            <div class="kpi-val" style="color:#6d28d9;">${r.custo_por_km > 0 ? `R$ ${Number(r.custo_por_km).toFixed(2)}` : '--'}</div>
+            <div style="font-size:10px;color:#64748b;">Eficiência financeira</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+          <button type="button" class="btn btn-xs ${st.subTab==='VEICULOS'?'btn-primary':'btn-outline'}" onclick="setSubTabFrotaKm('VEICULOS')">🚘 Por Veículo &amp; Condutor</button>
+          <button type="button" class="btn btn-xs ${st.subTab==='OS'?'btn-primary':'btn-outline'}" onclick="setSubTabFrotaKm('OS')">🏥 KM por OS / Cliente (${porOs.length})</button>
+          <button type="button" class="btn btn-xs ${st.subTab==='ABAST'?'btn-primary':'btn-outline'}" onclick="setSubTabFrotaKm('ABAST')">⛽ Abastecimentos (${abasts.length})</button>
+          <button type="button" class="btn btn-xs ${st.subTab==='TRECHOS'?'btn-primary':'btn-outline'}" onclick="setSubTabFrotaKm('TRECHOS')">🛰️ Trechos GPS (${vgs.length})</button>
+        </div>
+        ${subHtml}
+      `;
+    }
+    window.atualizarPainelMetricasKM = atualizarPainelMetricasKM;
+    window.setSubTabFrotaKm = setSubTabFrotaKm;
+    window.abrirModalAbastecimentoFrota = abrirModalAbastecimentoFrota;
+    window.fecharModalAbastecimentoFrota = fecharModalAbastecimentoFrota;
+    window.atualizarPrevAbast = atualizarPrevAbast;
+    window.salvarAbastecimentoFrota = salvarAbastecimentoFrota;
+    window.alternarIgnorarViagemKm = alternarIgnorarViagemKm;
+    window.abrirRelatorioKmA4 = abrirRelatorioKmA4;
     function abrirModalChecklistVeiculo(vid) {
       const veiculos = STATE.data?.veiculos || [];
       const v = veiculos.find(x => x.id === vid) || veiculos[0];

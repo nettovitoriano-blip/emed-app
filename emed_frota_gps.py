@@ -96,6 +96,44 @@ def garantir_tabelas_frota_gps_multas(db_name: str = "emed.db") -> None:
             )
         """)
 
+        # Coluna ignorar_metrica em frota_viagens_gps para expurgo auditável de saltos/testes
+        cols_vg = {r[1] for r in cur.execute("PRAGMA table_info(frota_viagens_gps)").fetchall()}
+        if "ignorar_metrica" not in cols_vg:
+            try:
+                cur.execute("ALTER TABLE frota_viagens_gps ADD COLUMN ignorar_metrica INTEGER DEFAULT 0")
+            except Exception:
+                pass
+
+        # 4. Tabela de Abastecimentos & Leituras Oficiais de Hodômetro (KM/L e R$/KM)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS frota_abastecimentos_km (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                veiculo_id INTEGER,
+                placa TEXT NOT NULL,
+                modelo TEXT DEFAULT '',
+                condutor TEXT NOT NULL,
+                data_abastecimento TEXT NOT NULL,
+                km_odometro INTEGER NOT NULL,
+                km_anterior INTEGER DEFAULT 0,
+                km_rodado_trecho REAL DEFAULT 0.0,
+                litros REAL DEFAULT 0.0,
+                valor_total REAL DEFAULT 0.0,
+                preco_litro REAL DEFAULT 0.0,
+                tipo_combustivel TEXT DEFAULT 'GASOLINA',
+                posto_uf TEXT DEFAULT '',
+                tanque_cheio INTEGER DEFAULT 1,
+                observacoes TEXT DEFAULT '',
+                km_por_litro REAL DEFAULT 0.0,
+                custo_por_km REAL DEFAULT 0.0,
+                data_criacao TEXT DEFAULT ''
+            )
+        """)
+        try:
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_frota_vg_placa ON frota_viagens_gps(placa)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_frota_abast_placa ON frota_abastecimentos_km(placa, km_odometro)")
+        except Exception:
+            pass
+
         # Semear dados reais iniciais de demonstração se as tabelas estiverem vazias
         cur.execute("SELECT COUNT(*) FROM frota_viagens_gps")
         if cur.fetchone()[0] == 0:
@@ -868,4 +906,582 @@ def carregar_painel_frota_gps_multas(db_name: str = "emed.db") -> Dict[str, Any]
         "viagens_gps": viagens,
         "multas_taxas": multas,
         "logs_robo_detran": logs_robo,
+        "metricas_km": calcular_metrica_quilometragem_frota(db_name, periodo="30d"),
     }
+
+
+def _parse_dt_frota(txt: Any) -> Optional[datetime.datetime]:
+    s = str(txt or "").strip()
+    if not s or s.upper() in ("EM TRÂNSITO", "EM ANDAMENTO", "N/D", "-"):
+        return None
+    for fmt in (
+        "%d/%m/%Y %H:%M:%S",
+        "%d/%m/%Y %H:%M",
+        "%d/%m/%Y",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%dT%H:%M",
+    ):
+        try:
+            return datetime.datetime.strptime(s[:19], fmt)
+        except Exception:
+            continue
+    return None
+
+
+def registrar_abastecimento_km(db_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Registra abastecimento/leitura de hodometro calculando KM rodado, KM/L e R$/KM."""
+    garantir_tabelas_frota_gps_multas(db_name)
+    vid_raw = limpar_int(payload.get("veiculo_id"), 0)
+    placa_in = limpar_texto(payload.get("placa"), "").upper()
+    placa_clean = placa_in.replace("-", "").strip()
+    condutor = limpar_texto(payload.get("condutor"), "CONDUTOR EMED").upper()
+    km_odo = limpar_int(payload.get("km_odometro"), 0)
+    litros = float(limpar_float(payload.get("litros"), 0.0) or 0.0)
+    valor_total = float(limpar_float(payload.get("valor_total"), 0.0) or 0.0)
+    combustivel = limpar_texto(payload.get("tipo_combustivel"), "GASOLINA").upper()
+    posto = limpar_texto(payload.get("posto_uf"), "")
+    tanque_cheio = 1 if str(payload.get("tanque_cheio", True)).strip().lower() not in ("0", "false", "nao") else 0
+    obs = limpar_texto(payload.get("observacoes"), "")
+    forcar_ajuste = str(payload.get("forcar_ajuste", False)).strip().lower() in ("1", "true", "sim")
+    dt_raw = limpar_texto(payload.get("data_abastecimento"), "")
+    dt_parsed = _parse_dt_frota(dt_raw) or datetime.datetime.now()
+    dt_iso_str = dt_parsed.strftime("%Y-%m-%d %H:%M")
+    agora_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    if km_odo <= 0:
+        return {"ok": False, "msg": "Informe o hodômetro atual válido (> 0 km)."}
+
+    with get_db_connection(db_name) as conn:
+        conn.row_factory = None
+        cur = conn.cursor()
+        row_v = None
+        if vid_raw > 0:
+            row_v = cur.execute("SELECT id, placa, modelo, km_atual FROM veiculos WHERE id = ?", (vid_raw,)).fetchone()
+        if row_v is None and placa_clean:
+            row_v = cur.execute(
+                "SELECT id, placa, modelo, km_atual FROM veiculos WHERE REPLACE(UPPER(placa), '-', '') = ?",
+                (placa_clean,),
+            ).fetchone()
+        if row_v is None:
+            return {"ok": False, "msg": "Veículo não encontrado na frota."}
+
+        v_id, v_placa, v_modelo, km_veic_atual = int(row_v[0]), str(row_v[1]), str(row_v[2] or ""), int(row_v[3] or 0)
+        row_ult = cur.execute(
+            "SELECT km_odometro FROM frota_abastecimentos_km WHERE REPLACE(UPPER(placa), '-', '') = ? ORDER BY km_odometro DESC, id DESC LIMIT 1",
+            (v_placa.replace("-", "").upper(),),
+        ).fetchone()
+        km_anterior = int(row_ult[0]) if row_ult and row_ult[0] else 0
+
+        if km_anterior > 0 and km_odo < km_anterior and not forcar_ajuste:
+            return {
+                "ok": False,
+                "msg": f"⚠️ Hodômetro informado ({km_odo:,} km) é menor que o último abastecimento ({km_anterior:,} km).",
+            }
+
+        km_rodado = float(max(0, km_odo - km_anterior)) if km_anterior > 0 else 0.0
+        preco_litro = round(valor_total / litros, 3) if litros > 0 and valor_total > 0 else 0.0
+        km_por_litro = round(km_rodado / litros, 2) if (tanque_cheio and litros > 0 and 0 < km_rodado <= 2000) else 0.0
+        custo_por_km = round(valor_total / km_rodado, 2) if (valor_total > 0 and 0 < km_rodado <= 2000) else 0.0
+
+        cur.execute("""
+            INSERT INTO frota_abastecimentos_km (
+                veiculo_id, placa, modelo, condutor, data_abastecimento,
+                km_odometro, km_anterior, km_rodado_trecho, litros, valor_total, preco_litro,
+                tipo_combustivel, posto_uf, tanque_cheio, observacoes,
+                km_por_litro, custo_por_km, data_criacao
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            v_id, v_placa, v_modelo, condutor, dt_iso_str,
+            km_odo, km_anterior, round(km_rodado, 1), round(litros, 2), round(valor_total, 2), preco_litro,
+            combustivel, posto, tanque_cheio, obs,
+            km_por_litro, custo_por_km, agora_str,
+        ))
+        abast_id = cur.lastrowid
+
+        if km_odo > km_veic_atual:
+            cur.execute("UPDATE veiculos SET km_atual = ?, condutor_atual = ? WHERE id = ?", (km_odo, condutor, v_id))
+        conn.commit()
+
+    resumo_cons = f" • Média: {km_por_litro} km/L" if km_por_litro > 0 else ""
+    resumo_ckm = f" • R$ {custo_por_km:.2f}/km" if custo_por_km > 0 else ""
+    return {
+        "ok": True,
+        "id": abast_id,
+        "placa": v_placa,
+        "km_odometro": km_odo,
+        "km_anterior": km_anterior,
+        "km_rodado_trecho": round(km_rodado, 1),
+        "km_por_litro": km_por_litro,
+        "custo_por_km": custo_por_km,
+        "msg": f"⛽ Abastecimento #{abast_id} registrado ({v_placa} • {km_odo:,} km{resumo_cons}{resumo_ckm})!",
+    }
+
+
+def alternar_ignorar_viagem_metrica(db_name: str, viagem_id: int, ignorar: bool = True) -> Dict[str, Any]:
+    """Permite ao gestor desconsiderar/restaurar um trecho especifico das metricas de KM mantendo o log intacto."""
+    garantir_tabelas_frota_gps_multas(db_name)
+    flag = 1 if ignorar else 0
+    with get_db_connection(db_name) as conn:
+        cur = conn.execute("UPDATE frota_viagens_gps SET ignorar_metrica = ? WHERE id = ?", (flag, int(viagem_id)))
+        if cur.rowcount == 0:
+            return {"ok": False, "msg": f"Viagem #{viagem_id} não encontrada."}
+        conn.commit()
+    txt = "desconsiderada das métricas" if ignorar else "restaurada nas métricas"
+    return {"ok": True, "viagem_id": int(viagem_id), "ignorar_metrica": flag, "msg": f"✅ Viagem #{viagem_id} {txt}."}
+
+
+def _periodo_bounds(periodo: str, data_inicio: str = "", data_fim: str = "") -> Tuple[Optional[datetime.datetime], Optional[datetime.datetime], str]:
+    agora = datetime.datetime.now()
+    p = str(periodo or "30d").strip().lower()
+    if data_inicio or data_fim:
+        di = _parse_dt_frota(data_inicio) if data_inicio else None
+        df = _parse_dt_frota(data_fim) if data_fim else None
+        if di:
+            di = di.replace(hour=0, minute=0, second=0, microsecond=0)
+        if df:
+            df = df.replace(hour=23, minute=59, second=59, microsecond=999999)
+        return di, df, f"{data_inicio or '...'} até {data_fim or '...'}"
+    if p == "hoje":
+        ini = agora.replace(hour=0, minute=0, second=0, microsecond=0)
+        return ini, agora, "Hoje"
+    if p == "7d":
+        ini = (agora - datetime.timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+        return ini, agora, "Últimos 7 dias"
+    if p == "mes":
+        ini = agora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        return ini, agora, "Mês Atual"
+    if p == "todos":
+        return None, None, "Todo o Histórico"
+    ini = (agora - datetime.timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return ini, agora, "Últimos 30 dias"
+
+
+def calcular_metrica_quilometragem_frota(
+    db_name: str = "emed.db",
+    periodo: str = "30d",
+    placa: str = "",
+    incluir_anomalias: bool = False,
+    data_inicio: str = "",
+    data_fim: str = "",
+) -> Dict[str, Any]:
+    """Consolida metrica de quilometragem rodada por veiculo, condutor, OS/cliente, consumo KM/L e R$/KM."""
+    garantir_tabelas_frota_gps_multas(db_name)
+    dt_ini, dt_fim, periodo_label = _periodo_bounds(periodo, data_inicio, data_fim)
+    placa_filtro = str(placa or "").strip().upper().replace("-", "")
+    limite_salto_km = 1200.0
+
+    with get_db_connection(db_name) as conn:
+        conn.row_factory = None
+        cur = conn.cursor()
+
+        veic_map: Dict[str, Dict[str, Any]] = {}
+        for r in cur.execute(
+            "SELECT id, modelo, placa, km_atual, km_ultima_revisao, km_proxima_revisao, condutor_atual, combustivel, ultima_atualizacao_gps FROM veiculos ORDER BY id ASC"
+        ).fetchall():
+            pl = str(r[2] or "").strip().upper()
+            pl_key = pl.replace("-", "")
+            if placa_filtro and pl_key != placa_filtro:
+                continue
+            veic_map[pl_key] = {
+                "veiculo_id": int(r[0]),
+                "modelo": str(r[1] or ""),
+                "placa": pl,
+                "km_atual_odometro": int(r[3] or 0),
+                "km_ultima_revisao": int(r[4] or 0),
+                "km_proxima_revisao": int(r[5] or 50000),
+                "km_restante_revisao": int(r[5] or 50000) - int(r[3] or 0),
+                "condutor_atual": str(r[6] or "Base"),
+                "combustivel": str(r[7] or "Flex"),
+                "ultima_atualizacao_gps": str(r[8] or ""),
+                "km_gps": 0.0,
+                "km_abastecimentos": 0.0,
+                "km_rodado": 0.0,
+                "qtd_viagens": 0,
+                "vel_max": 0.0,
+                "litros": 0.0,
+                "gasto_combustivel": 0.0,
+                "gasto_manutencao": 0.0,
+                "gasto_multas": 0.0,
+                "consumo_medio_kml": 0.0,
+                "custo_por_km": 0.0,
+            }
+
+        viagens_raw = cur.execute("""
+            SELECT id, placa, modelo, condutor, os_id_vinculada, destino_hospital,
+                   data_hora_inicio, data_hora_fim, km_inicial, km_final, km_percorrido,
+                   velocidade_max_kmh, status_viagem, COALESCE(ignorar_metrica, 0)
+            FROM frota_viagens_gps
+            ORDER BY id DESC
+        """).fetchall()
+
+        cond_map: Dict[str, Dict[str, Any]] = {}
+        os_map: Dict[str, Dict[str, Any]] = {}
+        serie_dia: Dict[str, Dict[str, Any]] = {}
+        viagens_recentes: List[Dict[str, Any]] = []
+        km_gps_total = 0.0
+        qtd_viagens = 0
+        qtd_anomalias = 0
+        km_anomalias_oculto = 0.0
+        min_dt_v, max_dt_v = None, None
+
+        for r in viagens_raw:
+            vg_id, pl, mod, cond, os_id, dest, d_ini_s, d_fim_s, kmi, kmf, kmp, vmax, st, ign_m = r
+            pl_str = str(pl or "").strip().upper()
+            pl_key = pl_str.replace("-", "")
+            if placa_filtro and pl_key != placa_filtro:
+                continue
+
+            dt_v = _parse_dt_frota(d_ini_s) or _parse_dt_frota(d_fim_s)
+            if dt_ini and (dt_v is None or dt_v < dt_ini):
+                continue
+            if dt_fim and (dt_v is None or dt_v > dt_fim):
+                continue
+
+            km_val = float(kmp or 0.0)
+            eh_anomalia = km_val > limite_salto_km
+            ignorado = bool(ign_m)
+            desconsiderado = ignorado or (eh_anomalia and not incluir_anomalias)
+
+            if len(viagens_recentes) < 50:
+                viagens_recentes.append({
+                    "id": int(vg_id),
+                    "placa": pl_str,
+                    "modelo": str(mod or ""),
+                    "condutor": str(cond or "").upper(),
+                    "os_id_vinculada": str(os_id or ""),
+                    "destino_hospital": str(dest or ""),
+                    "data_hora_inicio": str(d_ini_s or ""),
+                    "km_inicial": int(kmi or 0),
+                    "km_final": int(kmf or 0),
+                    "km_percorrido": round(km_val, 2),
+                    "velocidade_max_kmh": round(float(vmax or 0.0), 1),
+                    "status_viagem": str(st or ""),
+                    "ignorar_metrica": 1 if ignorado else 0,
+                    "eh_anomalia": eh_anomalia,
+                    "contabilizada": not desconsiderado,
+                })
+
+            if eh_anomalia and not ignorado:
+                qtd_anomalias += 1
+                km_anomalias_oculto += km_val
+
+            if desconsiderado:
+                continue
+
+            km_gps_total += km_val
+            qtd_viagens += 1
+            if dt_v:
+                if min_dt_v is None or dt_v < min_dt_v:
+                    min_dt_v = dt_v
+                if max_dt_v is None or dt_v > max_dt_v:
+                    max_dt_v = dt_v
+                dia_k = dt_v.strftime("%d/%m/%Y")
+                sd = serie_dia.setdefault(dia_k, {"data": dia_k, "_ord": dt_v.strftime("%Y-%m-%d"), "km_rodado": 0.0, "viagens": 0})
+                sd["km_rodado"] += km_val
+                sd["viagens"] += 1
+
+            if pl_key not in veic_map:
+                veic_map[pl_key] = {
+                    "veiculo_id": 0, "modelo": str(mod or ""), "placa": pl_str,
+                    "km_atual_odometro": int(kmf or 0), "km_ultima_revisao": 0,
+                    "km_proxima_revisao": 50000, "km_restante_revisao": 50000 - int(kmf or 0),
+                    "condutor_atual": str(cond or ""), "combustivel": "Flex",
+                    "ultima_atualizacao_gps": str(d_fim_s or d_ini_s or ""),
+                    "km_gps": 0.0, "km_abastecimentos": 0.0, "km_rodado": 0.0, "qtd_viagens": 0,
+                    "vel_max": 0.0, "litros": 0.0, "gasto_combustivel": 0.0,
+                    "gasto_manutencao": 0.0, "gasto_multas": 0.0, "consumo_medio_kml": 0.0, "custo_por_km": 0.0,
+                }
+            vm = veic_map[pl_key]
+            vm["km_gps"] += km_val
+            vm["qtd_viagens"] += 1
+            vm["vel_max"] = max(vm["vel_max"], float(vmax or 0.0))
+
+            cond_key = str(cond or "NÃO IDENTIFICADO").strip().upper()
+            cm = cond_map.setdefault(cond_key, {
+                "condutor": cond_key, "km_rodado": 0.0, "qtd_viagens": 0,
+                "os_set": set(), "vel_max": 0.0, "ultima_viagem": str(d_ini_s or ""),
+            })
+            cm["km_rodado"] += km_val
+            cm["qtd_viagens"] += 1
+            if str(os_id or "").strip():
+                cm["os_set"].add(str(os_id).strip())
+            cm["vel_max"] = max(cm["vel_max"], float(vmax or 0.0))
+
+            os_key = f"OS #{str(os_id).strip()}" if str(os_id or "").strip() else str(dest or "ROTA GERAL").split("[")[0][:60].strip()
+            om = os_map.setdefault(os_key, {
+                "referencia": os_key,
+                "os_id": str(os_id or "").strip(),
+                "destino": str(dest or "DESLOCAMENTO DE CAMPO").split("[")[0][:70],
+                "km_rodado": 0.0,
+                "qtd_viagens": 0,
+                "condutores_set": set(),
+            })
+            om["km_rodado"] += km_val
+            om["qtd_viagens"] += 1
+            om["condutores_set"].add(cond_key)
+
+        # Abastecimentos e custos de combustível
+        abast_rows = cur.execute("""
+            SELECT id, placa, modelo, condutor, data_abastecimento, km_odometro, km_anterior,
+                   km_rodado_trecho, litros, valor_total, preco_litro, tipo_combustivel,
+                   posto_uf, tanque_cheio, km_por_litro, custo_por_km, observacoes
+            FROM frota_abastecimentos_km
+            ORDER BY km_odometro DESC, id DESC
+        """).fetchall()
+        abastecimentos: List[Dict[str, Any]] = []
+        litros_total = 0.0
+        gasto_combustivel = 0.0
+        km_abast_total = 0.0
+        km_abast_com_litros = 0.0
+        litros_com_trecho = 0.0
+        for a in abast_rows:
+            a_id, pl, mod, cond, d_ab, km_o, km_a, km_tr, lit, val, pr_l, comb, posto, t_cheio, kml, ckm, obs = a
+            pl_str = str(pl or "").strip().upper()
+            pl_key = pl_str.replace("-", "")
+            if placa_filtro and pl_key != placa_filtro:
+                continue
+            dt_a = _parse_dt_frota(d_ab)
+            if dt_ini and (dt_a is None or dt_a < dt_ini):
+                continue
+            if dt_fim and (dt_a is None or dt_a > dt_fim):
+                continue
+
+            lit_f = float(lit or 0.0)
+            val_f = float(val or 0.0)
+            km_tr_f = float(km_tr or 0.0)
+            litros_total += lit_f
+            gasto_combustivel += val_f
+            km_abast_total += km_tr_f
+            if km_tr_f > 0 and lit_f > 0 and bool(t_cheio):
+                km_abast_com_litros += km_tr_f
+                litros_com_trecho += lit_f
+            if pl_key in veic_map:
+                veic_map[pl_key]["litros"] += lit_f
+                veic_map[pl_key]["gasto_combustivel"] += val_f
+                veic_map[pl_key]["km_abastecimentos"] += km_tr_f
+            if len(abastecimentos) < 30:
+                abastecimentos.append({
+                    "id": int(a_id), "placa": pl_str, "modelo": str(mod or ""), "condutor": str(cond or ""),
+                    "data_abastecimento": str(d_ab or ""), "km_odometro": int(km_o or 0), "km_anterior": int(km_a or 0),
+                    "km_rodado_trecho": round(km_tr_f, 1), "litros": round(lit_f, 2), "valor_total": round(val_f, 2),
+                    "preco_litro": round(float(pr_l or 0.0), 3), "tipo_combustivel": str(comb or ""),
+                    "posto_uf": str(posto or ""), "km_por_litro": round(float(kml or 0.0), 2),
+                    "custo_por_km": round(float(ckm or 0.0), 2), "observacoes": str(obs or ""),
+                })
+
+        # Manutenções e multas por veículo no período
+        gasto_manut_total = 0.0
+        for m in cur.execute("SELECT placa, data_registro, valor_total FROM frota_manutencoes").fetchall():
+            pl_key = str(m[0] or "").strip().upper().replace("-", "")
+            if placa_filtro and pl_key != placa_filtro:
+                continue
+            dt_m = _parse_dt_frota(m[1])
+            if dt_ini and (dt_m is None or dt_m < dt_ini):
+                continue
+            if dt_fim and (dt_m is None or dt_m > dt_fim):
+                continue
+            v_m = float(m[2] or 0.0)
+            gasto_manut_total += v_m
+            if pl_key in veic_map:
+                veic_map[pl_key]["gasto_manutencao"] += v_m
+
+        gasto_multas_total = 0.0
+        for mu in cur.execute("SELECT placa, data_hora_infracao, valor_original FROM frota_multas_taxas").fetchall():
+            pl_key = str(mu[0] or "").strip().upper().replace("-", "")
+            if placa_filtro and pl_key != placa_filtro:
+                continue
+            dt_mu = _parse_dt_frota(mu[1])
+            if dt_ini and (dt_mu is None or dt_mu < dt_ini):
+                continue
+            if dt_fim and (dt_mu is None or dt_mu > dt_fim):
+                continue
+            v_mu = float(mu[2] or 0.0)
+            gasto_multas_total += v_mu
+            if pl_key in veic_map:
+                veic_map[pl_key]["gasto_multas"] += v_mu
+
+    # Finaliza calculos por veiculo
+    por_veiculo = []
+    km_total_ref = 0.0
+    for vm in veic_map.values():
+        km_ref_v = vm["km_gps"] if vm["km_gps"] > 0 else vm["km_abastecimentos"]
+        vm["km_rodado"] = round(km_ref_v, 1)
+        vm["km_gps"] = round(vm["km_gps"], 1)
+        vm["km_abastecimentos"] = round(vm["km_abastecimentos"], 1)
+        vm["vel_max"] = round(vm["vel_max"], 1)
+        vm["litros"] = round(vm["litros"], 2)
+        vm["gasto_combustivel"] = round(vm["gasto_combustivel"], 2)
+        vm["gasto_manutencao"] = round(vm["gasto_manutencao"], 2)
+        vm["gasto_multas"] = round(vm["gasto_multas"], 2)
+        custo_v = vm["gasto_combustivel"] + vm["gasto_manutencao"]
+        if vm["litros"] > 0 and vm["km_abastecimentos"] > 0:
+            vm["consumo_medio_kml"] = round(vm["km_abastecimentos"] / vm["litros"], 2)
+        elif vm["litros"] > 0 and km_ref_v > 0:
+            vm["consumo_medio_kml"] = round(km_ref_v / vm["litros"], 2)
+        if km_ref_v > 0 and custo_v > 0:
+            vm["custo_por_km"] = round(custo_v / km_ref_v, 2)
+        km_total_ref += km_ref_v
+        por_veiculo.append(vm)
+    por_veiculo.sort(key=lambda x: x["km_rodado"], reverse=True)
+
+    km_base = km_gps_total if km_gps_total > 0 else km_abast_total
+    por_condutor = []
+    for cm in cond_map.values():
+        os_cnt = len(cm["os_set"])
+        km_c = round(cm["km_rodado"], 1)
+        por_condutor.append({
+            "condutor": cm["condutor"],
+            "km_rodado": km_c,
+            "pct_total": round((cm["km_rodado"] / km_base) * 100, 1) if km_base > 0 else 0.0,
+            "qtd_viagens": cm["qtd_viagens"],
+            "os_distintas": os_cnt,
+            "km_por_os": round(km_c / os_cnt, 1) if os_cnt > 0 else 0.0,
+            "vel_max": round(cm["vel_max"], 1),
+            "ultima_viagem": cm["ultima_viagem"],
+        })
+    por_condutor.sort(key=lambda x: x["km_rodado"], reverse=True)
+
+    por_os_cliente = []
+    for om in os_map.values():
+        por_os_cliente.append({
+            "referencia": om["referencia"],
+            "os_id": om["os_id"],
+            "destino": om["destino"],
+            "km_rodado": round(om["km_rodado"], 1),
+            "qtd_viagens": om["qtd_viagens"],
+            "condutores": ", ".join(sorted(om["condutores_set"])),
+        })
+    por_os_cliente.sort(key=lambda x: x["km_rodado"], reverse=True)
+
+    serie_diaria = sorted(serie_dia.values(), key=lambda x: x["_ord"], reverse=True)[:15]
+    for s in serie_diaria:
+        s["km_rodado"] = round(s["km_rodado"], 1)
+        s.pop("_ord", None)
+    serie_diaria.reverse()
+
+    if dt_ini and dt_fim:
+        dias_periodo = max(1, (dt_fim.date() - dt_ini.date()).days + 1)
+    elif min_dt_v and max_dt_v:
+        dias_periodo = max(1, (max_dt_v.date() - min_dt_v.date()).days + 1)
+    else:
+        dias_periodo = 1
+
+    custo_op = round(gasto_combustivel + gasto_manut_total, 2)
+    consumo_global = round(km_abast_com_litros / litros_com_trecho, 2) if litros_com_trecho > 0 else (round(km_base / litros_total, 2) if litros_total > 0 and km_base > 0 else 0.0)
+    custo_km_global = round(custo_op / km_base, 2) if km_base > 0 and custo_op > 0 else 0.0
+
+    return {
+        "ok": True,
+        "filtros": {
+            "periodo": periodo,
+            "periodo_label": periodo_label,
+            "placa": placa_filtro,
+            "incluir_anomalias": bool(incluir_anomalias),
+        },
+        "resumo": {
+            "km_total": round(km_total_ref, 1),
+            "km_gps": round(km_gps_total, 1),
+            "km_abastecimentos": round(km_abast_total, 1),
+            "qtd_viagens": qtd_viagens,
+            "media_km_dia": round(km_total_ref / dias_periodo, 1) if km_total_ref > 0 else 0.0,
+            "media_km_viagem": round(km_gps_total / qtd_viagens, 1) if qtd_viagens > 0 else 0.0,
+            "litros_total": round(litros_total, 2),
+            "gasto_combustivel": round(gasto_combustivel, 2),
+            "gasto_manutencao": round(gasto_manut_total, 2),
+            "gasto_multas": round(gasto_multas_total, 2),
+            "custo_total_operacional": custo_op,
+            "consumo_medio_kml": consumo_global,
+            "custo_por_km": custo_km_global,
+            "qtd_anomalias": qtd_anomalias,
+            "km_anomalias_oculto": round(km_anomalias_oculto, 1),
+            "dias_periodo": dias_periodo,
+            "periodo_label": periodo_label,
+        },
+        "por_veiculo": por_veiculo,
+        "por_condutor": por_condutor,
+        "por_os_cliente": por_os_cliente[:20],
+        "serie_diaria": serie_diaria,
+        "abastecimentos": abastecimentos,
+        "viagens_recentes": viagens_recentes,
+    }
+
+
+def gerar_html_relatorio_quilometragem(
+    db_name: str = "emed.db",
+    periodo: str = "30d",
+    placa: str = "",
+    incluir_anomalias: bool = False,
+    data_inicio: str = "",
+    data_fim: str = "",
+) -> str:
+    """Gera relatorio executivo A4 timbrado EMED com metricas de KM rodado, consumo KM/L e R$/KM."""
+    import html as _h
+    dados = calcular_metrica_quilometragem_frota(db_name, periodo, placa, incluir_anomalias, data_inicio, data_fim)
+    r = dados["resumo"]
+    agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    rows_v = "".join(
+        f"<tr><td><b>{_h.escape(v['placa'])}</b></td><td>{_h.escape(v['modelo'])}</td>"
+        f"<td>{_h.escape(v['condutor_atual'])}</td><td>{v['km_atual_odometro']:,} km</td>"
+        f"<td><b>{v['km_rodado']:,.1f} km</b></td><td>{v['qtd_viagens']}</td>"
+        f"<td>{v['consumo_medio_kml']:.2f} km/L</td><td>R$ {v['custo_por_km']:.2f}/km</td>"
+        f"<td>{v['km_restante_revisao']:,} km</td></tr>"
+        for v in dados["por_veiculo"]
+    ) or '<tr><td colspan="9" style="text-align:center;">Sem registros no período.</td></tr>'
+
+    rows_c = "".join(
+        f"<tr><td><b>{_h.escape(c['condutor'])}</b></td><td><b>{c['km_rodado']:,.1f} km</b></td>"
+        f"<td>{c['pct_total']:.1f}%</td><td>{c['qtd_viagens']}</td>"
+        f"<td>{c['os_distintas']}</td><td>{c['km_por_os']:.1f} km/OS</td><td>{c['vel_max']:.0f} km/h</td></tr>"
+        for c in dados["por_condutor"]
+    ) or '<tr><td colspan="7" style="text-align:center;">Sem viagens no período.</td></tr>'
+
+    rows_ab = "".join(
+        f"<tr><td>{_h.escape(a['data_abastecimento'])}</td><td><b>{_h.escape(a['placa'])}</b></td>"
+        f"<td>{_h.escape(a['condutor'])}</td><td>{a['km_odometro']:,} km</td>"
+        f"<td>+{a['km_rodado_trecho']:,.1f} km</td><td>{a['litros']:.2f} L</td>"
+        f"<td>R$ {a['valor_total']:,.2f}</td><td>{a['km_por_litro']:.2f} km/L</td></tr>"
+        for a in dados["abastecimentos"][:15]
+    ) or '<tr><td colspan="8" style="text-align:center;">Nenhum abastecimento lançado no período.</td></tr>'
+
+    return f"""<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório de Quilometragem — Frota EMED</title>
+<style>
+  body {{ font-family:'Segoe UI',Arial,sans-serif; margin:16px; color:#0f172a; font-size:11px; }}
+  .hdr {{ display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #002b54; padding-bottom:8px; margin-bottom:12px; }}
+  .kpis {{ display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-bottom:14px; }}
+  .kpi {{ border:1px solid #cbd5e1; border-radius:8px; padding:8px; text-align:center; background:#f8fafc; }}
+  .kpi b {{ display:block; font-size:14px; color:#002b54; margin-top:2px; }}
+  h3 {{ background:#002b54; color:#fff; padding:5px 8px; margin:12px 0 6px; font-size:11.5px; border-radius:4px; }}
+  table {{ width:100%; border-collapse:collapse; margin-bottom:10px; }}
+  th, td {{ border:1px solid #cbd5e1; padding:5px 6px; text-align:left; }}
+  th {{ background:#f1f5f9; font-size:10px; text-transform:uppercase; }}
+  @media print {{ @page {{ size:A4 portrait; margin:10mm; }} .no-print {{ display:none; }} }}
+</style></head><body>
+  <div class="no-print" style="margin-bottom:10px;text-align:right;">
+    <button onclick="window.print()" style="background:#002b54;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-weight:bold;cursor:pointer;">🖨️ Imprimir / Salvar PDF A4</button>
+  </div>
+  <div class="hdr">
+    <div><b style="font-size:15px;color:#002b54;">RELATÓRIO EXECUTIVO DE QUILOMETRAGEM RODADA &amp; CUSTOS</b>
+      <div>Período: <b>{_h.escape(r['periodo_label'])}</b> • Filtro Placa: <b>{_h.escape(placa or 'TODAS')}</b></div>
+    </div>
+    <div style="text-align:right;"><b>EMED ELETROMEDICINA LTDA.</b><div>Emitido em {agora}</div></div>
+  </div>
+  <div class="kpis">
+    <div class="kpi">KM Rodado<b>{r['km_total']:,.1f} km</b></div>
+    <div class="kpi">Viagens GPS<b>{r['qtd_viagens']}</b></div>
+    <div class="kpi">Média/Dia<b>{r['media_km_dia']:,.1f} km/d</b></div>
+    <div class="kpi">Consumo Frota<b>{r['consumo_medio_kml']:.2f} km/L</b></div>
+    <div class="kpi">Gasto Operacional<b>R$ {r['custo_total_operacional']:,.2f}</b></div>
+    <div class="kpi">Custo Real/KM<b>R$ {r['custo_por_km']:.2f}/km</b></div>
+  </div>
+  <h3>1. Consolidado por Veículo</h3>
+  <table><thead><tr><th>Placa</th><th>Modelo</th><th>Condutor Atual</th><th>Odômetro</th><th>KM Rodado</th><th>Viagens</th><th>Média</th><th>Custo/KM</th><th>Próx. Revisão</th></tr></thead><tbody>{rows_v}</tbody></table>
+  <h3>2. Ranking de Quilometragem por Técnico / Condutor</h3>
+  <table><thead><tr><th>Condutor</th><th>KM Rodado</th><th>Participação</th><th>Viagens</th><th>OS Atendidas</th><th>KM / OS</th><th>Vel. Máx</th></tr></thead><tbody>{rows_c}</tbody></table>
+  <h3>3. Histórico de Abastecimentos &amp; Rendimento</h3>
+  <table><thead><tr><th>Data</th><th>Placa</th><th>Condutor</th><th>Odômetro</th><th>Trecho</th><th>Litros</th><th>Valor</th><th>Média</th></tr></thead><tbody>{rows_ab}</tbody></table>
+</body></html>"""

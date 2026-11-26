@@ -1,4 +1,4 @@
-const CACHE_NAME = 'emed-pwa-v1-11-0-chamado-midia';
+const CACHE_NAME = 'emed-pwa-v1-12-0-metrica-km';
 const ASSETS_TO_CACHE = [
   '/',
   '/?modo=tecnico',
