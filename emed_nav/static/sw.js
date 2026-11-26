@@ -1,5 +1,5 @@
-// EmedNav Service Worker - v35 (Logo Oficial @eMED Padronizada e Imutável)
-const CACHE_NAME = 'emednav-v35-official-arroba-logo';
+// EmedNav Service Worker - v36 (Logo Oficial @eMED Consolidada nos Alfinetes)
+const CACHE_NAME = 'emednav-v36-pure-arroba';
 
 const ASSETS_TO_CACHE = [
   '/',
