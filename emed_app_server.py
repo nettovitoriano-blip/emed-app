@@ -4099,6 +4099,7 @@ async def auth_api_middleware(request: web.Request, handler):
         or path == "/api/proposta/responder"
         or path.startswith("/api/equipe/")
         or path.startswith("/api/backup-os/")
+        or path.startswith("/api/checklist")
         # Proxies para visualização de navegação/radares no veículo (Apenas leituras GET)
         or (request.method == "GET" and (
             path.startswith("/api/car")

@@ -4077,43 +4077,69 @@ function selecionarMenu(menuId, perfilOpcional = null, registrarHistorico = true
     }
     
     // =========================================================================
-    // BANCO MODULAR DE PREVENTIVAS & RESOLUTIVIDADE DE CAMPO
+    // BANCO MODULAR DE PREVENTIVAS & RESOLUTIVIDADE DE CAMPO (HISTÓRICO EMED & EFFORT v3/v4/v6)
     // =========================================================================
     const BANCOS_PREVENTIVA_MODULAR = {
       TOMO: {
         MODULO_1: {
           id: "MODULO_1",
           btnTexto: "📦 Módulo 1 (Gantry & Tubo)",
-          titulo: "Módulo 1: Gantry (Slipring, Brushblock, HV, Óleo, DAS)",
+          titulo: "Módulo 1: Gantry (Slipring, Brushblock, Escovas, JEDI, DAS, Rolamento)",
           icone: "📦",
           itens: [
-            "Slipring: Limpeza física e desoxidação das pistas coletoras deslizantes",
-            "Brushblock: Inspeção de desgaste, pressão e assentamento das escovas",
-            "Conectores de Alta Tensão: Limpeza, verificação de trincas e aplicação de óleo isolante dielétrico",
-            "Rolamento Rotacional: Lubrificação periódica da pista de rolamento com graxa recomendada",
-            "DAS (Data Acquisition System): Limpeza e aspiração de filtros de ar e teste dos coolers de exaustão"
+            "Simulação de exame helicoidal e axial pré-preventiva",
+            "Verificação do funcionamento das luzes, lasers de alinhamento e displays do Gantry",
+            "Verificação dos sensores de posicionamento e segurança do paciente",
+            "Verificação mecânica e eletrônica do funcionamento do TILT (angulação do Gantry)",
+            "Verificação e teste dos botões de parada de emergência do Gantry",
+            "Limpeza rigorosa das carenagens e proteção contra poeira do SLIP RING",
+            "Inspeção visual e teste de integridade das pistas coletoras do SLIP RING",
+            "Verificação do suporte BRUSH BLOCK e pressão das molas de assentamento",
+            "Verificação e medição de desgaste de todas as escovas de contato elétrico",
+            "Limpeza e desobstrução dos filtros de ar, ventiladores e grades do gerador HT",
+            "Limpeza dos filtros de ar e ventiladores do sistema de aquisição de dados (DAS)",
+            "Limpeza das grelhas, exaustores e ventiladores de refrigeração do Gantry",
+            "Limpeza do detector na janela de aquisição de raios-X (MYLAR) com material apropriado",
+            "Limpeza técnica do SCAN WINDOW (janela óptica de varredura)",
+            "Verificação da parte rotacional, correias, polias e sistema de acoplamento mecânico",
+            "Verificação e limpeza do radiador, filtros de ar, fluído térmico e ventiladores do tubo",
+            "Verificação e limpeza do ventilador e dissipadores do inversor do gerador (JEDI)",
+            "Verificação e aplicação de graxa técnica homologada no rolamento principal do Gantry",
+            "Verificação dos parâmetros elétricos de kV, mA e tempo de rotação"
           ]
         },
         MODULO_2: {
           id: "MODULO_2",
-          btnTexto: "🖥️ Módulo 2 (Console & Mesa)",
-          titulo: "Módulo 2: Console de Operação, Mesa de Exames & PDU",
-          icone: "🖥️",
+          btnTexto: "🛏️ Módulo 2 (Mesa & PDU)",
+          titulo: "Módulo 2: Mesa de Exames, Potenciômetro, Trilhos & PDU",
+          icone: "🛏️",
           itens: [
-            "Console de Operação: Limpeza da workstation, periféricos, teclados, telas e ventilação interna",
-            "Mesa de Exames: Inspeção dos trilhos, freios mecânicos, lubrificação e motores de elevação/translação",
-            "PDU (Power Distribution Unit): Checagem de tensões de barramento, fusíveis e reaperto de conexões"
+            "Limpeza técnica minuciosa da mecânica e guias de movimentação da mesa",
+            "Verificação da integridade, ancoragem e tensão do cabo de aço do potenciômetro da mesa",
+            "Verificação, aspiração e lubrificação dos trilhos de deslocamento horizontal e vertical",
+            "Limpeza técnica e despoeiramento da área de eletrônica e encoders da mesa",
+            "Teste do botão de parada de emergência do PDU / quadro elétrico",
+            "Limpeza da área externa, carenagens e organização do cabeamento do PDU"
           ]
         },
         MODULO_3: {
           id: "MODULO_3",
-          btnTexto: "⚡ Módulo 3 (QDF & Logs)",
-          titulo: "Módulo 3: Quadro de Força, Gantry Superior & Logs de Erro",
-          icone: "⚡",
+          btnTexto: "🖥️ Módulo 3 (Console & Phantom)",
+          titulo: "Módulo 3: Console Workstation, Recon, Scan Box, Phantom ROI & Liberação",
+          icone: "🖥️",
           itens: [
-            "Quadro de Força: Verificação de disjuntores, aterramento de carcaça e estabilidade de alimentação",
-            "Gantry Superior: Coolers das tampas superiores e verificação de torque e aperto dos conectores HV",
-            "Logs de Erro: Verificação, extração e análise de logs de hardware e registros de falha do sistema"
+            "Verificação, extração e análise dos logs de erro do sistema operacional e hardware",
+            "Verificação de logs e códigos de erro de comunicação da mesa com o Gantry",
+            "Verificação e registro do número total de pacientes cadastrados e rotações do tubo",
+            "Inspeção visual e limpeza técnica dos monitores de aquisição e laudo médico",
+            "Limpeza dos filtros de ar, ventiladores e grelhas da workstation e rack de recon",
+            "Verificação interna e limpeza dos computadores (Host e Recon)",
+            "Verificação do tempo e estabilidade de inicialização do software operacional (Boot)",
+            "Verificação de funcionamento de todos os botões físicos e iluminação do SCAN BOX",
+            "Verificação das luzes sinalizadoras de exposição no console e sala de exames",
+            "Realização do teste de cortes com phanton de água e calibração de rotina",
+            "Utilização do teste de ruído e número de CT (Hounsfield) com ROI central e periférico",
+            "Realização de testes funcionais completos de exposição e liberação clínica oficial"
           ]
         }
       },
@@ -4121,40 +4147,64 @@ function selecionarMenu(menuId, perfilOpcional = null, registrarHistorico = true
         MODULO_1: {
           id: "MODULO_1",
           btnTexto: "⚡ Módulo 1 (Estativa & Tubo)",
-          titulo: "Módulo 1: Estativa, Tubo de Raios-X e Cabos HV",
+          titulo: "Módulo 1: Estativa Porta Tubo, Colimador, Trilhos e Cabos HT (v6.0)",
           icone: "⚡",
           itens: [
-            "Estativa & Coluna: Inspeção de rolamentos, contra-pesos, trilhos e travas eletromagnéticas",
-            "Conectores HV: Inspeção visual, desoxidação, limpeza e aperto dos cabos de alta tensão",
-            "Cúpula do Tubo: Checagem de isolamento térmico/óleo, aterramento e ausência de vazamentos",
-            "Anodo Giratório: Teste de rotação suave, ausência de ruído e circuito de partida do rotor",
-            "Aterramento de Carcaça: Medição de continuidade e integridade do cabo terra de proteção"
+            "Verificação da integridade, desgaste e fixação do cabo de aço da estativa porta-tubo",
+            "Verificação da integridade dos cabos elétricos de força, comando e chicotes flexíveis",
+            "Verificação do funcionamento dos freios mecânicos e eletromagnéticos da estativa",
+            "Verificação do funcionamento do tubo de raios-X e ausência de vazamento de óleo",
+            "Verificação do funcionamento mecânico do colimador e temporizador do campo luminoso",
+            "Verificação do funcionamento de todo o sistema mecânico de elevação e translação",
+            "Verificação, alinhamento, limpeza e lubrificação dos trilhos superior e inferior",
+            "Verificação do balanceamento mecânico da coluna e contrapesos da estativa",
+            "Verificação dos cabos de alta tensão blindados (HT cables) e conectores de anodo/catodo",
+            "Limpeza externa técnica e lubrificação das engrenagens e rolamentos da estativa",
+            "Verificação e aferição da centralização exata da luz do colimador com o feixe de radiação",
+            "Verificação do desgaste da ampola de raios-X e estabilidade do ponto focal",
+            "Verificação de avarias na pintura e integridade da carcaça da estativa"
           ]
         },
         MODULO_2: {
           id: "MODULO_2",
-          btnTexto: "🎛️ Módulo 2 (Gerador & Mesa)",
-          titulo: "Módulo 2: Gerador de Raios-X, Mesa de Exames & Elétrica",
+          btnTexto: "🎛️ Módulo 2 (Gerador & Comando)",
+          titulo: "Módulo 2: Comando, Fontes DC, Transformador HT e Nobreak",
           icone: "🎛️",
           itens: [
-            "Gerador de Alta Frequência: Limpeza de placas de comando, inversores e banco de capacitores",
-            "Tensões de Alimentação: Medição das tensões de linha e fontes auxiliares reguladas",
-            "Mesa de Exames: Teste dos freios magnéticos/pedal, flutuação e integridade do tampo",
-            "Intertravamento & Segurança: Teste de intertravamento de disparo e sensor de porta da sala",
-            "Reaperto Elétrico: Conferência de torque em bornes, contatoras e barramentos principais"
+            "Verificação da rede elétrica (+- 10%) e conexões de aterramento de segurança (PE)",
+            "Verificação e integridade das ligações elétricas e flats entre placas de circuito",
+            "Verificação e medição das tensões das fontes DC reguladas (+5V, +-12V, +-15V, +24V)",
+            "Verificação do funcionamento do circuito de partida, rotação e freio do anodo giratório",
+            "Verificação das tensões e calibração do estabilizador de filamento do tubo",
+            "Verificação do funcionamento da lâmpada de sinalização de emissão de raios-X",
+            "Verificação e teste visual de toda a sinalização e displays do painel de controle",
+            "Verificação do transformador de alta tensão e tanques geradores de alta frequência",
+            "Verificação do cabo de aço e mecanismo motorizado de seleção de kV",
+            "Verificação e aferição das chaves seletoras e encoders de kV, mA e mAs",
+            "Teste de funcionamento dos bloqueios de segurança e intertravamento de disparos",
+            "Backup completo das configurações do gerador e parâmetros técnicos",
+            "Teste de funcionamento, autonomia e transferência de carga do nobreak"
           ]
         },
         MODULO_3: {
           id: "MODULO_3",
-          btnTexto: "💡 Módulo 3 (Colimador & Bucky)",
-          titulo: "Módulo 3: Colimador Luminoso, Bucky Mural & Disparos",
+          btnTexto: "💡 Módulo 3 (Mesa & Bucky)",
+          titulo: "Módulo 3: Mesa de Exames, Bucky Mural, Grades e Liberação",
           icone: "💡",
           itens: [
-            "Colimador Luminoso: Checagem da lâmpada de campo, espelho, temporizador e lâminas de chumbo",
-            "Coincidência Feixe/Luz: Teste de alinhamento e precisão do campo luminoso com feixe radiográfico",
-            "Bucky Mural & Grade: Inspeção do mecanismo de translação, freios e grade antidifusora",
-            "Disparos de Teste: Execução de disparos técnicos em diversas técnicas de kV e mA/mAs",
-            "Liberação Clínica: Equipamento aprovado nos ensaios mecânicos e elétricos para operação"
+            "Verificação do funcionamento de oscilação e acionamento do bucky vertical (mural)",
+            "Verificação da integridade física e alinhamento da grade anti-difusora mural",
+            "Verificação do funcionamento dos freios de posicionamento vertical da estativa mural",
+            "Verificação da integridade do tampo de acrílico/fibra de carbono do bucky vertical",
+            "Verificação do travamento, molas e mecanismo da bandeja porta-cassete mural",
+            "Verificação do funcionamento de oscilação do bucky da mesa de exames",
+            "Verificação da integridade física da grade anti-difusora da mesa",
+            "Verificação do funcionamento dos freios eletromagnéticos de flutuação da mesa",
+            "Verificação da integridade física, trincas e fixação do tampo flutuante da mesa",
+            "Verificação do funcionamento e travas da bandeja porta-cassete da mesa",
+            "Limpeza interna, externa e lubrificação das guias e pedais da mesa de exame",
+            "Limpeza do console de operação, monitor e periféricos",
+            "Disparos técnicos de validação e liberação operacional do equipamento"
           ]
         }
       },
@@ -4162,40 +4212,168 @@ function selecionarMenu(menuId, perfilOpcional = null, registrarHistorico = true
         MODULO_1: {
           id: "MODULO_1",
           btnTexto: "🔄 Módulo 1 (Braço C & Tubo)",
-          titulo: "Módulo 1: Braço C, Tubo e Filtros de Feixe",
+          titulo: "Módulo 1: Braço em C, Tubo de Mamografia, Anodo e Colimação",
           icone: "🔄",
           itens: [
-            "Braço C: Inspeção mecânica dos movimentos de rotação angulares e travas de posição",
-            "Cúpula & Tubo: Verificação de refrigeração, ausência de ruído no anodo e cabos HV",
-            "Filtros de Feixe: Teste de comutação automática dos filtros (Mo/Rh/Ag) e sensores ópticos",
-            "Conectores de Alta Tensão: Limpeza, desoxidação e aperto das conexões de aterramento",
-            "Colimação: Verificação das lâminas de colimação dedicadas para formatos 18x24 e 24x30"
+            "Verificação da integridade e ancoragem dos cabos de aço da coluna e braço em C",
+            "Verificação da integridade de todos os cabos elétricos e chicotes flexíveis móveis",
+            "Verificação do funcionamento dos freios mecânicos e eletromagnéticos de rotação (CC e MLO)",
+            "Verificação do funcionamento do tubo de raios-X e refrigeração da cúpula",
+            "Verificação do circuito de partida, rotação e freio do anodo do tubo de mamografia",
+            "Verificação do funcionamento do colimador e comutação das palhetas de filtro (Mo/Rh)",
+            "Verificação do balanceamento mecânico da estativa e ausência de folgas",
+            "Verificação dos cabos blindados de alta tensão e conectores isolados",
+            "Realização de limpeza interna técnica, externa e lubrificação das guias de elevação"
           ]
         },
         MODULO_2: {
           id: "MODULO_2",
           btnTexto: "🗜️ Módulo 2 (Compressor & Bucky)",
-          titulo: "Módulo 2: Compressão Automática, Pedais e Bucky",
+          titulo: "Módulo 2: Compressão Automática, Dinamômetro (15-20 daN) e Buckys",
           icone: "🗜️",
           itens: [
-            "Compressão Motorizada: Teste de calibração de força máxima de compressão (15 a 20 daN)",
-            "Descompressão de Emergência: Teste funcional do botão mecânico e elétrico de alívio rápido",
-            "Pás de Compressão: Inspeção visual de ausência de trincas, deformações ou folgas nos suportes",
-            "Pedais de Acionamento: Teste de acionamento suave de subida e descida da compressão",
-            "Bucky & Detector: Higienização técnica, verificação de travas e integridade da fibra de carbono"
+            "Verificação da integridade física e ausência de trincas nas pás de compressão 18x24 e 24x30",
+            "Aferição da força de compressão motorizada (limite regulamentar 15 a 20 daN) e manual com dinamômetro",
+            "Verificação do acionamento e suavidade dos pedais duplos de compressão e descompressão",
+            "Verificação dos botões de liberação rápida de compressão e parada de emergência",
+            "Verificação do funcionamento e deslizamento dos buckys mamográficos 18x24 e 24x30",
+            "Verificação das travas e integridade da fibra de carbono do bucky receptor"
           ]
         },
         MODULO_3: {
           id: "MODULO_3",
-          btnTexto: "🖥️ Módulo 3 (Console & Biombo)",
-          titulo: "Módulo 3: Console de Comando, AEC e Biombo de Proteção",
+          btnTexto: "🖥️ Módulo 3 (Comando & CQ)",
+          titulo: "Módulo 3: Comando, Displays, Célula AEC, Phantom e Liberação",
           icone: "🖥️",
           itens: [
-            "Console de Comando: Teste dos botões, display, seleção manual e modo automático (AEC)",
-            "Célula AEC: Teste de sensibilidade, calibração e posicionamento dos sensores de dose",
-            "Biombo Plumbífero: Integridade do vidro de proteção radiológica e chave de disparo",
-            "Disparos Técnicos: Teste de exposição com phantom acrílico simulador e conferência de mAs",
-            "Liberação Mamográfica: Equipamento aferido, calibrado e liberado para rotina de exames"
+            "Verificação das ligações elétricas entre placas, bornes e chicotes de comando",
+            "Verificação do acionamento e visibilidade da lâmpada indicadora de radiação",
+            "Verificação e teste visual de toda a sinalização e displays digitais do painel",
+            "Verificação do transformador de alta tensão e isolamento do tanque",
+            "Teste de acionamento do controle automático de exposição (AEC) com simulador acrílico",
+            "Ensaio de qualidade de imagem com phantom mamográfico (fibras, calcificações e massas)",
+            "Verificação da integridade do biombo de proteção plumbífero e chave de disparo",
+            "Mamógrafo aferido, calibrado e liberado para rotina diagnóstica conforme RDC 611"
+          ]
+        }
+      },
+      DO: {
+        MODULO_1: {
+          id: "MODULO_1",
+          btnTexto: "🎯 Módulo 1 (Braço & Tubo)",
+          titulo: "Módulo 1: Tubo de Raios-X, Shutter Feixe Lápis/Leque e Alta Tensão",
+          icone: "🎯",
+          itens: [
+            "Verificação dos cabos de alta tensão e conectores isolados do tubo de raios-X",
+            "Verificação dos cabos de sinal, esteiras porta-cabos flexíveis e cabeamento do detector",
+            "Verificação e teste do obturador (shutter) de radiação e colimador de feixe lápis/leque",
+            "Verificação do funcionamento dos botões de parada de emergência e sensores de fim de curso",
+            "Verificação da integridade das esteiras flexíveis e chicotes de movimentação móvel"
+          ]
+        },
+        MODULO_2: {
+          id: "MODULO_2",
+          btnTexto: "🛏️ Módulo 2 (Mesa & Eixos X/Y)",
+          titulo: "Módulo 2: Mesa de Exame, Eixos de Varredura X e Y & Lubrificação",
+          icone: "🛏️",
+          itens: [
+            "Verificação da integridade física, higienização e nivelamento do tampo acolchoado da mesa",
+            "Realização de limpeza técnica interna, externa e despoeiramento das calhas de varredura",
+            "Lubrificação técnica dos eixos de varredura longitudinal X e transversal Y com graxa recomendada",
+            "Inspeção de tensão das correias de tração e ausência de folgas nos motores de passo",
+            "Verificação de alinhamento e calibração do laser óptico de posicionamento do paciente"
+          ]
+        },
+        MODULO_3: {
+          id: "MODULO_3",
+          btnTexto: "📊 Módulo 3 (Fontes & QA Diário)",
+          titulo: "Módulo 3: Fontes de Alimentação DC, QA Bloco Padrão & Liberação",
+          icone: "📊",
+          itens: [
+            "Verificação e medição das tensões de saída das fontes de alimentação DC (+5V, +-12V, +24V, +48V)",
+            "Verificação de avarias na pintura, carenagens e integridade da estrutura",
+            "Realização do teste de controle de qualidade diário (QA diário com bloco padrão de calibração)",
+            "Verificação dos parâmetros BMD, BMC e curva de repetibilidade do detector",
+            "Backup do banco de dados de pacientes e calibrações do software (Lunar/Prodigy/DPX)",
+            "Densitômetro ósseo testado, calibrado e liberado para uso médico"
+          ]
+        }
+      },
+      CR: {
+        MODULO_1: {
+          id: "MODULO_1",
+          btnTexto: "⚙️ Módulo 1 (Mecânica & Transporte)",
+          titulo: "Módulo 1: Mecânica, Trilhos, Roletes de Arraste e Aspiração",
+          icone: "⚙️",
+          itens: [
+            "Verificação mecânica, alinhamento e lubrificação dos trilhos e roletes de transporte do cassete",
+            "Limpeza interna e aspiração técnica minuciosa de poeira e resíduos do interior do leitor CR",
+            "Inspeção dos sensores ópticos de detecção e trava mecânica da bandeja de inserção",
+            "Verificação de suavidade e ausência de ruídos durante a ejeção e fixação do cassete"
+          ]
+        },
+        MODULO_2: {
+          id: "MODULO_2",
+          btnTexto: "🔬 Módulo 2 (Óptica & Fotomultiplicadora)",
+          titulo: "Módulo 2: Leitora Laser, Fotomultiplicadora (PMT), Espelhos e Placas",
+          icone: "🔬",
+          itens: [
+            "Verificação do movimento de precisão da unidade de leitura óptica a laser",
+            "Limpeza técnica dos espelhos ópticos, guias de luz e lentes da fotomultiplicadora (PMT)",
+            "Inspeção física, limpeza e eliminação de artefatos nas placas de fósforo e cassetes",
+            "Verificação e limpeza da lâmpada/LED de apagamento (Eraser lamp) da placa de fósforo"
+          ]
+        },
+        MODULO_3: {
+          id: "MODULO_3",
+          btnTexto: "💻 Módulo 3 (Software & Nobreak)",
+          titulo: "Módulo 3: Workstation CS-7/Regius, PACS/DICOM, Nobreak e Liberação",
+          icone: "💻",
+          itens: [
+            "Backup completo das configurações do software de aquisição e curvas de sensibilidade",
+            "Verificação de espaço em disco, banco de dados local e integridade de envio de exames ao PACS",
+            "Limpeza e higienização do console de operação, monitor touchscreen e leitor de código de barras",
+            "Teste de autonomia de carga e transferência de rede do nobreak dedicado",
+            "Realização de escaneamento de teste com cassete padrão e liberação para rotina diagnóstica"
+          ]
+        }
+      },
+      ARCO: {
+        MODULO_1: {
+          id: "MODULO_1",
+          btnTexto: "🔄 Módulo 1 (Braço C & Freios)",
+          titulo: "Módulo 1: Movimentos Orbitais do Braço em C, Freios e Rodízios",
+          icone: "🔄",
+          itens: [
+            "Verificação dos movimentos orbitais, balanceamento e rotação livre do braço em C",
+            "Verificação de travamento mecânico e freios eletromagnéticos de retenção cirúrgica",
+            "Verificação dos rodízios direcionais, freio de transporte e protetores de cabo de piso",
+            "Inspeção de folgas mecânicas, articulações e integridade estrutural do chassi"
+          ]
+        },
+        MODULO_2: {
+          id: "MODULO_2",
+          btnTexto: "🎯 Módulo 2 (Gerador & Intensificador)",
+          titulo: "Módulo 2: Gerador HT, Intensificador/FPD, Íris e Tubo",
+          icone: "🎯",
+          itens: [
+            "Verificação e teste de resolução do intensificador de imagem ou detector plano FPD",
+            "Verificação do colimador circular / íris e palhetas de sombreamento de corte",
+            "Verificação da integridade do cabo de interligação flexível de alta tensão entre as unidades",
+            "Verificação do isolamento do monobloco gerador e ausência de vazamento de fluído térmico"
+          ]
+        },
+        MODULO_3: {
+          id: "MODULO_3",
+          btnTexto: "📺 Módulo 3 (Monitores & Comandos)",
+          titulo: "Módulo 3: Carrinho de Monitores, Pedal Duplo, Alarme 5 Min e Liberação",
+          icone: "📺",
+          itens: [
+            "Verificação do pedal duplo multifunção de disparo (fluoroscopia contínua/pulsada e radiografia)",
+            "Verificação da articulação, calibração e brilho dos monitores médicos de centro cirúrgico",
+            "Verificação dos botões de emergência e alarme sonoro regulamentar de 5 minutos (RDC 611 / IN 91)",
+            "Teste funcional de exposição em baixa dose e calibração de imagem fluoroscópica",
+            "Arco cirúrgico testado, desinfectado e liberado para procedimentos cirúrgicos"
           ]
         }
       },
@@ -4238,17 +4416,23 @@ function selecionarMenu(menuId, perfilOpcional = null, registrarHistorico = true
     let BANCO_PREVENTIVA_MODULAR = BANCOS_PREVENTIVA_MODULAR.TOMO;
     function detectarModalidadeEquipamento(equipamento) {
       const eq = String(equipamento || "").toUpperCase();
-      const isTomo = eq.includes("TOMO") || eq.includes("BRIGHT") || eq.includes("BRIVO") || /\bCT\b/.test(eq) || eq.includes("OPTIMA") || eq.includes("SOMATOM") || eq.includes("AQUILION") || eq.includes("INGENUITY");
-      const isMamo = !isTomo && (eq.includes("MAMO") || /\bMM\b/.test(eq) || eq.includes("CRYSTAL") || eq.includes("SENOGRAPHE") || eq.includes("HOLOGIC"));
-      const isRx = !isTomo && !isMamo && (eq.includes("RX") || eq.includes("RAIO") || eq.includes("COMPACTO") || eq.includes("LOTUS") || eq.includes("ALTUS") || eq.includes("VMI") || eq.includes("SHIMADZU") || eq.includes("SIEMENS") || eq.includes("POLYMOBIL") || eq.includes("MOBILETT") || eq.includes("DRX") || eq.includes("ARCO"));
-      return { isTomo, isMamo, isRx };
+      const isTomo = eq.includes("TOMO") || eq.includes("BRIGHT") || eq.includes("BRIVO 3") || /\bCT\b/.test(eq) || eq.includes("OPTIMA") || eq.includes("SOMATOM") || eq.includes("AQUILION") || eq.includes("REVOLUTION") || eq.includes("LIGHTSPEED") || eq.includes("NEUVIZ");
+      const isMamo = !isTomo && (eq.includes("MAMO") || /\bMM\b/.test(eq) || eq.includes("CRYSTAL") || eq.includes("SENOGRAPHE") || eq.includes("HOLOGIC") || eq.includes("ALPHA ST") || eq.includes("700T") || eq.includes("LILYUM") || eq.includes("DIAMOND"));
+      const isDO = !isTomo && !isMamo && (eq.includes("DENSITO") || /\bDO\b/.test(eq) || eq.includes("LUNAR") || eq.includes("PRODIGY") || eq.includes("DPX") || eq.includes("PRIMUS") || eq.includes("OSTEOSYS"));
+      const isCR = !isTomo && !isMamo && !isDO && (/\bCR\b/.test(eq) || eq.includes("DIGITALIZADOR") || eq.includes("110HQ") || eq.includes("REGIUS") || eq.includes("AERODR") || eq.includes("DRYPRO"));
+      const isArco = !isTomo && !isMamo && !isDO && !isCR && (eq.includes("ARCO") || eq.includes("C-ARM") || eq.includes("OEC") || eq.includes("CIOS") || eq.includes("EVERVIEW") || eq.includes("PULSERA") || eq.includes("ZENITION"));
+      const isRx = !isTomo && !isMamo && !isDO && !isCR && !isArco && (eq.includes("RX") || eq.includes("RAIO") || eq.includes("COMPACTO") || eq.includes("LOTUS") || eq.includes("ALTUS") || eq.includes("VMI") || eq.includes("SHIMADZU") || eq.includes("SIEMENS") || eq.includes("POLYMOBIL") || eq.includes("MOBILETT") || eq.includes("DRX") || eq.includes("TDK"));
+      return { isTomo, isMamo, isDO, isCR, isArco, isRx };
     }
     function obterBancoPreventivaAtivo() {
       const os = STATE.osAberta || {};
-      const { isTomo, isMamo, isRx } = detectarModalidadeEquipamento(os.equipamento);
+      const { isTomo, isMamo, isDO, isCR, isArco, isRx } = detectarModalidadeEquipamento(os.equipamento);
       if (isTomo) return BANCOS_PREVENTIVA_MODULAR.TOMO;
-      if (isRx) return BANCOS_PREVENTIVA_MODULAR.RX;
       if (isMamo) return BANCOS_PREVENTIVA_MODULAR.MAMO;
+      if (isDO) return BANCOS_PREVENTIVA_MODULAR.DO;
+      if (isCR) return BANCOS_PREVENTIVA_MODULAR.CR;
+      if (isArco) return BANCOS_PREVENTIVA_MODULAR.ARCO;
+      if (isRx) return BANCOS_PREVENTIVA_MODULAR.RX;
       return BANCOS_PREVENTIVA_MODULAR.GERAL;
     }
     function ehViagemLonga(cidade) {
@@ -16378,9 +16562,13 @@ ${linkProp}`;
           badge.style.background = "#f0fdf4";
           badge.style.color = "#15803d";
         } else {
-          if (isTomo) badge.innerText = "🛡️ Preventiva Escalonada (Tomógrafo)";
-          else if (isRx) badge.innerText = "🛡️ Preventiva Modular (Raio-X)";
-          else if (isMamo) badge.innerText = "🛡️ Preventiva Modular (Mamógrafo)";
+          const { isTomo, isMamo, isDO, isCR, isArco, isRx } = detectarModalidadeEquipamento(os.equipamento);
+          if (isTomo) badge.innerText = "🛡️ Preventiva Oficial (Tomógrafo TC v4.0)";
+          else if (isMamo) badge.innerText = "🛡️ Preventiva Oficial (Mamógrafo v3.0)";
+          else if (isDO) badge.innerText = "🛡️ Preventiva Oficial (Densitometria Óssea v1.1)";
+          else if (isCR) badge.innerText = "🛡️ Preventiva Oficial (Digitalizador CR)";
+          else if (isArco) badge.innerText = "🛡️ Preventiva Oficial (Arco Cirúrgico)";
+          else if (isRx) badge.innerText = "🛡️ Preventiva Oficial (Raio-X v6.0)";
           else badge.innerText = "🛡️ Preventiva Periódica Modular";
           badge.style.background = "#f0fdf4";
           badge.style.color = "#166534";
