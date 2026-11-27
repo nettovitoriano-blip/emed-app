@@ -662,6 +662,11 @@
 
     <form id="loginForm" onsubmit="realizarLogin(event)">
 
+      <!-- CAMPO INVISÍVEL HONEYPOT (CAPTURA AUTOMÁTICA DE ROBÔS / FORM FILLERS) -->
+      <div style="display:none !important; position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
+        <input type="text" name="empresa_website_sec" id="empresa_website_sec" tabindex="-1" autocomplete="off" />
+      </div>
+
       <div class="form-group">
 
         <label class="form-label" for="selectUsuario">Profissional / Técnico</label>
@@ -1167,6 +1172,8 @@
             usuario,
 
             senha,
+
+            empresa_website_sec: (document.getElementById('empresa_website_sec') || {}).value || '',
 
             device_id: dev.devId,
 

@@ -374,6 +374,8 @@ def verificar_integridade_fim(db_path: Optional[str] = None) -> Dict[str, Any]:
         ("emed_app_server.py", os.path.join(base_dir, "emed_app_server.py")),
         ("supervisorio_web.py", os.path.join(base_dir, "emed_views", "supervisorio_web.py")),
         ("honeypot_deception.py", os.path.join(base_dir, "emed_views", "honeypot_deception.py")),
+        ("cert_matriz_ce.pfx", os.path.join(base_dir, "certs", "cert_matriz_ce.pfx")),
+        ("cert_filial_df.pfx", os.path.join(base_dir, "certs", "cert_filial_df.pfx")),
     ]
     agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     detalhes = []
@@ -438,6 +440,8 @@ def atualizar_baseline_fim(db_path: Optional[str] = None) -> Dict[str, Any]:
         ("emed_app_server.py", os.path.join(base_dir, "emed_app_server.py")),
         ("supervisorio_web.py", os.path.join(base_dir, "emed_views", "supervisorio_web.py")),
         ("honeypot_deception.py", os.path.join(base_dir, "emed_views", "honeypot_deception.py")),
+        ("cert_matriz_ce.pfx", os.path.join(base_dir, "certs", "cert_matriz_ce.pfx")),
+        ("cert_filial_df.pfx", os.path.join(base_dir, "certs", "cert_filial_df.pfx")),
     ]
     agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     with sqlite3.connect(db_p) as conn:
@@ -499,6 +503,59 @@ def sessao_esta_revogada(token_str: str, db_path: Optional[str] = None) -> bool:
     except Exception:
         pass
     return False
+
+
+
+def capturar_bot_scanner(ip: str, path_tentado: str, user_agent: str, db_path: Optional[str] = None) -> None:
+    """Registra captura de robô scanner malicioso com Auto-Ban de 24h e perícia forense."""
+    db_p = db_path or _obter_db_path()
+    agora_dt = datetime.datetime.now()
+    agora_str = agora_dt.strftime("%d/%m/%Y %H:%M:%S")
+    exp_iso = (agora_dt + datetime.timedelta(hours=24)).isoformat()
+    _IPS_BLOQUEADOS_CACHE[ip] = agora_dt.timestamp() + 86400
+    
+    # 1. Registra auto-ban
+    try:
+        with sqlite3.connect(db_p) as conn:
+            garantir_schema_supervisorio(conn)
+            conn.execute("""
+                INSERT INTO ips_bloqueados_seguranca (ip, motivo, bloqueado_em, expira_em, bloqueado_por, ativo)
+                VALUES (?, ?, ?, ?, 'HONEYPOT_BOT_TRAP', 1)
+                ON CONFLICT(ip) DO UPDATE SET
+                    motivo = excluded.motivo,
+                    bloqueado_em = excluded.bloqueado_em,
+                    expira_em = excluded.expira_em,
+                    ativo = 1
+            """, (ip, f"Robô/Scanner malicioso capturado na isca ({path_tentado})", agora_str, exp_iso))
+            conn.commit()
+    except Exception as e:
+        print(f"[BOT TRAP] Erro ao registrar ban: {e}")
+
+    # 2. Registra auditoria
+    registrar_auditoria_login(
+        "HONEYPOT_BOT_TRAP",
+        "ROBOT_SCANNER",
+        ip,
+        "BOT_SCANNER_DECOY_CAPTURA",
+        f"Robô tentou acessar rota isca proibida: {path_tentado}",
+        user_agent,
+        "Automated Scanner Script",
+        db_path=db_p
+    )
+
+    # 3. Registra na tabela de perícia forense do Honeypot
+    try:
+        from emed_views.honeypot_deception import registrar_invasor_honeypot
+        registrar_invasor_honeypot(
+            ip,
+            "BOT_SCANNER_MALICIOSO",
+            f"PROBE_PATH: {path_tentado}",
+            user_agent,
+            "Automated Crawler/Scanner Botnet",
+            db_path=db_p
+        )
+    except Exception:
+        pass
 
 
 def revogar_sessao_soc(token_hash: str, db_path: Optional[str] = None) -> bool:

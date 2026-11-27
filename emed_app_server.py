@@ -2380,6 +2380,7 @@ def _clear_auth_failure(ident: str):
 # =========================================================================
 _RATE_LIMIT_STORE = {} # {ip: [timestamps]}
 _RATE_LIMIT_SENSITIVE_STORE = {} # {ip: [timestamps]}
+_BURST_SCANNER_TRACKER = {} # {ip: [timestamps]} anti-dirbuster / anti-scanner
 
 # Extensões e caminhos estáticos que NUNCA devem sofrer rate limit
 _STATIC_EXTENSIONS = (
@@ -2775,7 +2776,7 @@ async def api_auth_login(request: web.Request) -> web.Response:
 
     # Armadilha Honeypot de Formulário (Detecta robôs que preenchem campos invisíveis)
     honeypot_bot_check = str(body.get("empresa_website_sec", "")).strip()
-    ip_origem = _obter_ip_real(request) if '_obter_ip_real' in globals() else str(request.remote or "127.0.0.1")
+    ip_origem = obter_ip_real(request)
     ua_hdr = request.headers.get("User-Agent", "")
     if honeypot_bot_check:
         try:
@@ -3962,6 +3963,8 @@ def _validar_token_portal_cliente_raw(conn: sqlite3.Connection, request: web.Req
     return str(row[0]) if row else None
 
 
+_BURST_SCANNER_TRACKER = {}
+
 @web.middleware
 
 async def auth_api_middleware(request: web.Request, handler):
@@ -4009,7 +4012,7 @@ async def auth_api_middleware(request: web.Request, handler):
 
     # 1. BLINDAGEM DE CERTIFICADOS DIGITAIS A1 (.PFX / .P12 / CHAVES FISCAIS)
     if any(k in c_path for k in ("/certs/", "/emeda1/", ".pfx", ".p12", ".key", "cert_matriz", "cert_filial")):
-        ip_inv = _obter_ip_real(request) if '_obter_ip_real' in globals() else str(request.remote or "127.0.0.1")
+        ip_inv = obter_ip_real(request)
         try:
             from emed_views.supervisorio_web import capturar_bot_scanner
             capturar_bot_scanner(ip_inv, f"BLINDAGEM_CERTIFICADO_FISCAL ({path})", request.headers.get("User-Agent", ""), DB_NAME)
@@ -4018,7 +4021,8 @@ async def auth_api_middleware(request: web.Request, handler):
         return web.Response(
             text="⛔ ACESSO RESTRITO: Tentativa de download ou extração de certificado fiscal A1 reportada ao SOC.",
             status=403,
-            content_type="text/plain; charset=utf-8"
+            content_type="text/plain",
+            charset="utf-8"
         )
 
     # 2. ROBOTS.TXT HONEY-TRAP (ISCA PARA CRAWLERS MALICIOSOS)
@@ -4031,7 +4035,7 @@ async def auth_api_middleware(request: web.Request, handler):
             "Disallow: /secret-database-dump/\n"
             "Disallow: /certs-vault/\n"
         )
-        return web.Response(text=corpo_robots, content_type="text/plain; charset=utf-8")
+        return web.Response(text=corpo_robots, content_type="text/plain", charset="utf-8")
 
     # 3. ARMADILHAS DE ROBÔS / SCANNERS DE DIRETÓRIOS (.ENV, WP-LOGIN, PHPMYADMIN, ETC.)
     ROBOT_DECOY_TRAPS = (
@@ -4040,7 +4044,7 @@ async def auth_api_middleware(request: web.Request, handler):
         "/backup.sql", "/config.php", "/shell.php", "/console", "/solr", "/telescope", "/admin-backup-secret"
     )
     if any(c_path == t or c_path.startswith(t + "/") or c_path.startswith(t) for t in ROBOT_DECOY_TRAPS):
-        ip_bot = _obter_ip_real(request) if '_obter_ip_real' in globals() else str(request.remote or "127.0.0.1")
+        ip_bot = obter_ip_real(request)
         try:
             from emed_views.supervisorio_web import capturar_bot_scanner
             capturar_bot_scanner(ip_bot, path, request.headers.get("User-Agent", ""), DB_NAME)
@@ -4050,13 +4054,14 @@ async def auth_api_middleware(request: web.Request, handler):
         return web.Response(
             text="[HONEYPOT_DECOY_SANDBOX]: Acesso restrito. Tentativa registrada para perícia forense.",
             status=403,
-            content_type="text/plain; charset=utf-8"
+            content_type="text/plain",
+            charset="utf-8"
         )
 
     # 4. ANTI-DIRBUSTER / LIMITADOR DE RAJADAS ABERRANTES (> 25 reqs em 5s)
     if not path.startswith("/static/") and not path.startswith("/api/car") and not path.startswith("/api/radars"):
         agora_s = time.time()
-        ip_req = _obter_ip_real(request) if '_obter_ip_real' in globals() else str(request.remote or "127.0.0.1")
+        ip_req = obter_ip_real(request)
         reqs = _BURST_SCANNER_TRACKER.get(ip_req, [])
         reqs = [t for t in reqs if agora_s - t < 5.0]
         reqs.append(agora_s)
@@ -4067,7 +4072,7 @@ async def auth_api_middleware(request: web.Request, handler):
                 if not eh_ip_ou_usuario_protegido(ip_req, "", DB_NAME):
                     capturar_bot_scanner(ip_req, f"BURST_SCANNER_RATE ({len(reqs)} reqs/5s em {path})", request.headers.get("User-Agent", ""), DB_NAME)
                     await asyncio.sleep(3.0)
-                    return web.Response(text="⛔ RATE LIMIT: Taxa abusiva de varredura automatizada detectada.", status=429, content_type="text/plain; charset=utf-8")
+                    return web.Response(text="⛔ RATE LIMIT: Taxa abusiva de varredura automatizada detectada.", status=429, content_type="text/plain", charset="utf-8")
             except Exception:
                 pass
 

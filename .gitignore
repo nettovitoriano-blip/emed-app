@@ -3,6 +3,16 @@ users.json
 config.json
 devices.json
 
+# CERTIFICADOS DIGITAIS A1 & CHAVES CRIPTOGRÁFICAS (PROTEÇÃO MÁXIMA SEFAZ)
+certs/
+emedA1/
+*.pfx
+*.p12
+*.pem
+*.key
+*.crt
+.emed_*_secret
+
 # Cache Python
 __pycache__/
 
@@ -12,5 +22,8 @@ tutorial_emissao_nf.mp4
 # Script de geração de vídeo (opcional)
 gerar_video_tutorial_nf.py
 
-# Caso queira excluir a pasta assets inteira, descomente a linha abaixo:
-# assets/
+# Backups e dumps de banco de dados
+backups_diarios/
+*.db.bak*
+*.sql.gz
+*.sql
