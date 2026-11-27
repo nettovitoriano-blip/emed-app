@@ -2773,7 +2773,18 @@ async def api_auth_login(request: web.Request) -> web.Response:
 
         return web.json_response({"ok": False, "msg": "Payload JSON inválido."}, status=400)
 
-    
+    # Armadilha Honeypot de Formulário (Detecta robôs que preenchem campos invisíveis)
+    honeypot_bot_check = str(body.get("empresa_website_sec", "")).strip()
+    ip_origem = _obter_ip_real(request) if '_obter_ip_real' in globals() else str(request.remote or "127.0.0.1")
+    ua_hdr = request.headers.get("User-Agent", "")
+    if honeypot_bot_check:
+        try:
+            from emed_views.supervisorio_web import capturar_bot_scanner
+            capturar_bot_scanner(ip_origem, f"FORM_HONEYPOT_PREENCHIDO ({honeypot_bot_check[:40]})", ua_hdr, DB_NAME)
+        except Exception:
+            pass
+        await asyncio.sleep(2.0)
+        return web.json_response({"ok": False, "msg": "Verificação de segurança falhou."}, status=403)
 
     usuario = str(body.get("usuario", "")).strip().upper()
 
@@ -3994,13 +4005,79 @@ async def auth_api_middleware(request: web.Request, handler):
     except Exception:
         pass
 
+    c_path = path.lower()
+
+    # 1. BLINDAGEM DE CERTIFICADOS DIGITAIS A1 (.PFX / .P12 / CHAVES FISCAIS)
+    if any(k in c_path for k in ("/certs/", "/emeda1/", ".pfx", ".p12", ".key", "cert_matriz", "cert_filial")):
+        ip_inv = _obter_ip_real(request) if '_obter_ip_real' in globals() else str(request.remote or "127.0.0.1")
+        try:
+            from emed_views.supervisorio_web import capturar_bot_scanner
+            capturar_bot_scanner(ip_inv, f"BLINDAGEM_CERTIFICADO_FISCAL ({path})", request.headers.get("User-Agent", ""), DB_NAME)
+        except Exception:
+            pass
+        return web.Response(
+            text="⛔ ACESSO RESTRITO: Tentativa de download ou extração de certificado fiscal A1 reportada ao SOC.",
+            status=403,
+            content_type="text/plain; charset=utf-8"
+        )
+
+    # 2. ROBOTS.TXT HONEY-TRAP (ISCA PARA CRAWLERS MALICIOSOS)
+    if path == "/robots.txt":
+        corpo_robots = (
+            "User-agent: *\n"
+            "Allow: /\n"
+            "Disallow: /admin-internal-vault/\n"
+            "Disallow: /private-system-backup/\n"
+            "Disallow: /secret-database-dump/\n"
+            "Disallow: /certs-vault/\n"
+        )
+        return web.Response(text=corpo_robots, content_type="text/plain; charset=utf-8")
+
+    # 3. ARMADILHAS DE ROBÔS / SCANNERS DE DIRETÓRIOS (.ENV, WP-LOGIN, PHPMYADMIN, ETC.)
+    ROBOT_DECOY_TRAPS = (
+        "/admin-internal-vault", "/private-system-backup", "/secret-database-dump", "/certs-vault",
+        "/wp-login.php", "/wp-admin", "/.env", "/phpmyadmin", "/actuator/health", "/.git/config",
+        "/backup.sql", "/config.php", "/shell.php", "/console", "/solr", "/telescope", "/admin-backup-secret"
+    )
+    if any(c_path == t or c_path.startswith(t + "/") or c_path.startswith(t) for t in ROBOT_DECOY_TRAPS):
+        ip_bot = _obter_ip_real(request) if '_obter_ip_real' in globals() else str(request.remote or "127.0.0.1")
+        try:
+            from emed_views.supervisorio_web import capturar_bot_scanner
+            capturar_bot_scanner(ip_bot, path, request.headers.get("User-Agent", ""), DB_NAME)
+        except Exception:
+            pass
+        await asyncio.sleep(1.5)  # Tar-pit slowdown para exaurir sockets do scanner
+        return web.Response(
+            text="[HONEYPOT_DECOY_SANDBOX]: Acesso restrito. Tentativa registrada para perícia forense.",
+            status=403,
+            content_type="text/plain; charset=utf-8"
+        )
+
+    # 4. ANTI-DIRBUSTER / LIMITADOR DE RAJADAS ABERRANTES (> 25 reqs em 5s)
+    if not path.startswith("/static/") and not path.startswith("/api/car") and not path.startswith("/api/radars"):
+        agora_s = time.time()
+        ip_req = _obter_ip_real(request) if '_obter_ip_real' in globals() else str(request.remote or "127.0.0.1")
+        reqs = _BURST_SCANNER_TRACKER.get(ip_req, [])
+        reqs = [t for t in reqs if agora_s - t < 5.0]
+        reqs.append(agora_s)
+        _BURST_SCANNER_TRACKER[ip_req] = reqs
+        if len(reqs) > 25:
+            try:
+                from emed_views.supervisorio_web import capturar_bot_scanner, eh_ip_ou_usuario_protegido
+                if not eh_ip_ou_usuario_protegido(ip_req, "", DB_NAME):
+                    capturar_bot_scanner(ip_req, f"BURST_SCANNER_RATE ({len(reqs)} reqs/5s em {path})", request.headers.get("User-Agent", ""), DB_NAME)
+                    await asyncio.sleep(3.0)
+                    return web.Response(text="⛔ RATE LIMIT: Taxa abusiva de varredura automatizada detectada.", status=429, content_type="text/plain; charset=utf-8")
+            except Exception:
+                pass
+
     # Lista estrita de recursos estáticos e públicos (Deny by Default)
     if (
         path in (
             "/", "/login", "/login.html", "/manifest.json", "/sw.js", "/favicon.ico", "/healthz", "/api/ping",
             "/api/logo", "/api/icone-autosave", "/api/logo-circle",
             "/api/app-icon/192", "/api/app-icon/512", "/api/app-icon/180", "/api/app-icon/maskable", "/api/app-icon/favicon",
-            "/nav", "/gps", "/frota", "/apresentacao", "/portal-cliente", "/api/simbolo-emed",
+            "/nav", "/gps", "/frota", "/apresentacao", "/apresentacao-gps", "/portal-cliente", "/api/simbolo-emed",
             "/fiscal"
         )
         or path.startswith("/static/")
@@ -27278,7 +27355,7 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/protocolo-entrega/salvar", api_protocolo_entrega_salvar)
     app.router.add_get("/api/protocolo-entrega/imprimir/{id}", api_protocolo_entrega_imprimir)
     app.router.add_post("/api/estoque/precificacao-atualizar", api_estoque_precificacao_atualizar)
-    app.router.add_get("/apresentacao", lambda req: web.FileResponse(os.path.join(BASE_DIR, "Apresentacao_Sistema_EMED.html")))
+    app.router.add_get("/apresentacao-gps", lambda req: web.FileResponse(os.path.join(BASE_DIR, "emed_nav", "static", "apresentacao_gps.html"), headers={"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache"}))
 
 
 

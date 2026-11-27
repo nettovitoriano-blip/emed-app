@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>EmedNav GPS — Apresentação para Técnicos e Gestores</title>
+<link rel="icon" type="image/svg+xml" href="/static/simbolo_emed_clean.svg">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: #020617; color: #f8fafc; font-family: 'Segoe UI', Roboto, Arial, sans-serif; overflow: hidden; }
+  .deck { position: relative; width: 100%; height: 100%; }
+  .slide {
+    position: absolute; inset: 0; padding: 70px 6vw 90px; overflow-y: auto;
+    opacity: 0; transform: translateX(40px); pointer-events: none; transition: opacity .35s ease, transform .35s ease;
+    background: radial-gradient(circle at 85% 10%, rgba(2,132,199,.18), transparent 45%), radial-gradient(circle at 10% 90%, rgba(168,85,247,.12), transparent 40%), #020617;
+  }
+  .slide.active { opacity: 1; transform: none; pointer-events: auto; }
+  .slide.prev { transform: translateX(-40px); }
+  .topbar { position: fixed; top: 0; left: 0; right: 0; height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: rgba(2,6,23,.92); border-bottom: 1px solid rgba(56,189,248,.35); z-index: 50; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 900; letter-spacing: .5px; font-size: 14px; }
+  .brand .logo { background: #fff; width: 32px; height: 32px; border-radius: 8px; border: 2px solid #38bdf8; display: flex; align-items: center; justify-content: center; }
+  .brand .logo img { width: 24px; height: 24px; }
+  .brand span b { color: #38bdf8; }
+  .aud-tag { font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; border: 1px solid #334155; color: #cbd5e1; }
+  .bottombar { position: fixed; bottom: 0; left: 0; right: 0; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 18px; background: rgba(2,6,23,.94); border-top: 1px solid #1e293b; z-index: 50; }
+  .nav-btn { background: #0284c7; color: #fff; border: none; border-radius: 10px; padding: 11px 18px; font-weight: 900; font-size: 14px; cursor: pointer; min-width: 110px; }
+  .nav-btn.ghost { background: #1e293b; border: 1px solid #334155; }
+  .nav-btn:disabled { opacity: .35; cursor: default; }
+  .progress { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .progress-bar { width: 100%; max-width: 420px; height: 6px; border-radius: 99px; background: #1e293b; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #0284c7, #38bdf8); width: 0; transition: width .35s; }
+  .counter { font-size: 12px; color: #94a3b8; font-weight: 700; }
+  .menu-btn { background: transparent; border: 1px solid #334155; color: #cbd5e1; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 800; cursor: pointer; }
+  .index-panel { position: fixed; top: 52px; right: 0; width: min(360px, 92vw); bottom: 64px; background: #0b1222; border-left: 1px solid #1e293b; z-index: 60; transform: translateX(100%); transition: transform .3s; overflow-y: auto; padding: 14px; }
+  .index-panel.open { transform: none; }
+  .index-panel button { display: block; width: 100%; text-align: left; background: #0f172a; border: 1px solid #1e293b; color: #e2e8f0; border-radius: 8px; padding: 9px 12px; margin-bottom: 6px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .index-panel button.cur { border-color: #38bdf8; color: #38bdf8; }
+
+  .kicker { font-size: 12px; font-weight: 900; letter-spacing: 2px; color: #38bdf8; text-transform: uppercase; margin-bottom: 8px; }
+  h1 { font-size: clamp(30px, 5.2vw, 58px); line-height: 1.05; font-weight: 900; }
+  h2 { font-size: clamp(24px, 3.4vw, 38px); font-weight: 900; margin-bottom: 6px; }
+  .sub { color: #94a3b8; font-size: clamp(14px, 1.6vw, 18px); margin-bottom: 24px; max-width: 900px; line-height: 1.5; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .grid.two { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .card { background: rgba(15,23,42,.88); border: 1px solid #1e293b; border-radius: 14px; padding: 16px 18px; }
+  .card h3 { font-size: 16px; font-weight: 900; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .card p, .card li { font-size: 14px; color: #cbd5e1; line-height: 1.55; }
+  .card ul { padding-left: 18px; }
+  .card.blue { border-color: #0284c7; } .card.green { border-color: #16a34a; } .card.amber { border-color: #f59e0b; } .card.red { border-color: #dc2626; } .card.purple { border-color: #a855f7; }
+  .ico { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 10px; font-size: 19px; border: 2px solid #334155; background: #0f172a; flex-shrink: 0; }
+  .row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #1e293b; }
+  .row:last-child { border-bottom: none; }
+  .row b { color: #f8fafc; } .row div { font-size: 14px; color: #cbd5e1; line-height: 1.5; }
+  .steps { counter-reset: s; list-style: none; }
+  .steps li { counter-increment: s; position: relative; padding: 10px 0 10px 48px; font-size: 15px; color: #e2e8f0; line-height: 1.5; border-bottom: 1px dashed #1e293b; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: 8px; width: 34px; height: 34px; border-radius: 50%; background: #0284c7; color: #fff; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 900; padding: 3px 9px; border-radius: 999px; margin-right: 6px; }
+  .pill.tec { background: rgba(34,197,94,.18); color: #4ade80; border: 1px solid #22c55e; }
+  .pill.ges { background: rgba(168,85,247,.18); color: #d8b4fe; border: 1px solid #a855f7; }
+  .link-box { font-family: Consolas, monospace; background: #020617; border: 1px solid #38bdf8; color: #7dd3fc; border-radius: 8px; padding: 8px 12px; display: inline-block; margin: 4px 0; font-size: 14px; word-break: break-all; }
+  .pin { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #fff; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .pin img { width: 20px; height: 20px; filter: brightness(0) invert(1); }
+  .hero { display: flex; flex-direction: column; justify-content: center; min-height: 100%; gap: 18px; }
+  .hero-logo { width: 110px; height: 110px; background: #fff; border-radius: 26px; border: 4px solid #38bdf8; box-shadow: 0 0 40px rgba(56,189,248,.45); display: flex; align-items: center; justify-content: center; }
+  .hero-logo img { width: 80px; height: 80px; }
+  .tip { background: rgba(56,189,248,.08); border-left: 4px solid #38bdf8; border-radius: 8px; padding: 12px 14px; font-size: 14px; color: #e0f2fe; margin-top: 16px; line-height: 1.5; }
+  .tip.warn { background: rgba(245,158,11,.08); border-color: #f59e0b; color: #fef3c7; }
+  .tip.ok { background: rgba(34,197,94,.08); border-color: #22c55e; color: #dcfce7; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #1e293b; color: #cbd5e1; vertical-align: top; }
+  th { color: #38bdf8; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+  .mock { background: #0a0e17; border: 2px solid #334155; border-radius: 18px; padding: 10px; max-width: 420px; }
+  .mock-hud { display: flex; align-items: center; gap: 6px; background: #0f172a; border-radius: 10px; padding: 8px; flex-wrap: wrap; }
+  .mock-hud span { font-size: 13px; padding: 5px 8px; border-radius: 7px; border: 1px solid #334155; background: #1e293b; }
+  .mock-map { height: 180px; margin-top: 8px; border-radius: 10px; background: repeating-linear-gradient(45deg, #e5e7eb 0 14px, #f1f5f9 14px 28px); position: relative; }
+  .mock-fabs { position: absolute; right: 8px; top: 8px; display: flex; flex-direction: column; gap: 5px; }
+  .mock-fabs span { width: 30px; height: 30px; border-radius: 8px; background: #0f172a; border: 1px solid #38bdf8; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .mock-sheet { margin-top: 8px; display: flex; gap: 6px; }
+  .mock-sheet div { flex: 1; background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 9px; font-size: 12px; color: #94a3b8; }
+  .mock-sheet b { background: #0284c7; border-radius: 8px; padding: 9px 12px; font-size: 12px; }
+  @media (max-width: 640px) {
+    .slide { padding: 66px 16px 86px; }
+    .nav-btn { min-width: 0; padding: 10px 12px; font-size: 13px; }
+    .aud-tag { display: none; }
+  }
+  @media print {
+    html, body { overflow: visible; height: auto; }
+    .topbar, .bottombar, .index-panel { display: none; }
+    .slide { position: relative; opacity: 1; transform: none; page-break-after: always; min-height: 100vh; padding: 30px; }
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <div class="logo"><img src="/static/simbolo_emed_clean.svg" alt="@eMED"></div>
+    <span><b>EMED</b>NAV GPS • TREINAMENTO</span>
+  </div>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <span class="aud-tag">👷 Técnicos &amp; 🧑‍💼 Gestores</span>
+    <button class="menu-btn" onclick="toggleIndex()">☰ Índice</button>
+  </div>
+</header>
+
+<nav class="index-panel" id="indexPanel"></nav>
+
+<main class="deck" id="deck">
+
+  <!-- 1. CAPA -->
+  <section class="slide" data-title="Capa">
+    <div class="hero">
+      <div class="hero-logo"><img src="/static/simbolo_emed_clean.svg" alt="@eMED"></div>
+      <div class="kicker">EMED Eletromedicina • Treinamento Oficial</div>
+      <h1>EmedNav GPS<br><span style="color:#38bdf8;">Navegação, Clientes e Frota</span><br>em um só lugar</h1>
+      <p class="sub">Guia completo e passo a passo para <b>técnicos de campo</b> e <b>gestores</b>: como acessar, traçar rotas, encontrar clientes, receber alertas de radar, ouvir música na estrada e acompanhar a frota da empresa.</p>
+      <div><span class="pill tec">👷 TÉCNICOS</span><span class="pill ges">🧑‍💼 GESTORES</span></div>
+      <p style="color:#64748b; font-size:13px;">Use as setas ← → do teclado, deslize o dedo na tela ou os botões abaixo para navegar.</p>
+    </div>
+  </section>
+
+  <!-- 2. POR QUE -->
+  <section class="slide" data-title="Por que o EmedNav?">
+    <div class="kicker">Visão geral</div>
+    <h2>Para que serve o EmedNav GPS?</h2>
+    <p class="sub">É o GPS próprio da EMED. Ele junta no mesmo mapa tudo o que o técnico precisa na estrada e tudo o que a gestão precisa para planejar os atendimentos.</p>
+    <div class="grid">
+      <div class="card blue"><h3>🗺️ Rotas rápidas</h3><p>Busque um hospital, cliente ou cidade e trace a rota com um toque. Depois é só mandar para o <b>Waze</b> ou <b>Google Maps</b>.</p></div>
+      <div class="card green"><h3>🏥 Clientes no mapa</h3><p>Todos os clientes da EMED aparecem marcados com o <b>@</b> da empresa: azul para Contrato e vermelho para Avulso.</p></div>
+      <div class="card amber"><h3>📷 Radares</h3><p>Mais de 16 mil radares cadastrados, com <b>aviso falado</b> quando você se aproxima e alerta visual de velocidade.</p></div>
+      <div class="card purple"><h3>🎵 Viagem mais leve</h3><p>Música por comando de voz e o <b>Modo Resenha</b> (piadas e causos do trecho), opcional e no tempo que você escolher.</p></div>
+      <div class="card"><h3>🚗 Frota organizada</h3><p>A gestão sabe qual carro está disponível, a quilometragem, o chip 4G e o histórico de viagens para planejar melhor.</p></div>
+      <div class="card"><h3>📶 Funciona com sinal fraco</h3><p>Clientes e radares ficam salvos no aparelho. Mesmo com internet ruim o mapa continua mostrando os pontos principais.</p></div>
+    </div>
+    <div class="tip ok">✅ <b>Importante:</b> o objetivo é <b>apoiar</b> o técnico (rota, segurança e agilidade no atendimento) e ajudar a gestão a organizar a logística, não fiscalizar ninguém.</div>
+  </section>
+
+  <!-- 3. ACESSO -->
+  <section class="slide" data-title="Como acessar">
+    <div class="kicker">Passo 1 • <span class="pill tec">TÉCNICOS</span><span class="pill ges">GESTORES</span></div>
+    <h2>Como acessar o GPS</h2>
+    <p class="sub">Funciona no navegador do celular (Chrome) e do computador. Não precisa baixar nada da loja.</p>
+    <div class="grid two">
+      <div class="card blue">
+        <h3>🔗 Endereços oficiais</h3>
+        <p>GPS do técnico:</p>
+        <div class="link-box">https://app.emedservice.med.br/gps</div>
+        <p style="margin-top:8px;">Endereço reserva (servidor da sede):</p>
+        <div class="link-box">https://sistema.emedservice.med.br/gps</div>
+        <p style="margin-top:8px;">Central de Frota (gestores):</p>
+        <div class="link-box">https://app.emedservice.med.br/frota</div>
+      </div>
+      <div class="card green">
+        <h3>📲 Instalar como aplicativo</h3>
+        <ol class="steps">
+          <li>Abra o link do GPS no <b>Chrome</b> do celular.</li>
+          <li>Toque no botão <b>⋯</b> (lateral direita do mapa) e escolha <b>📲 Instalar App no Celular</b>.</li>
+          <li>Confirme. O ícone <b>EmedNav</b> aparece na tela inicial como um app.</li>
+          <li>Quando o celular pedir, toque em <b>Permitir localização</b>.</li>
+        </ol>
+      </div>
+    </div>
+    <div class="tip">💡 Se um endereço não abrir, use o outro. Os dois mostram o mesmo GPS.</div>
+  </section>
+
+  <!-- 4. TELA PRINCIPAL -->
+  <section class="slide" data-title="Conhecendo a tela">
+    <div class="kicker">Passo 2 • <span class="pill tec">TÉCNICOS</span></div>
+    <h2>Conhecendo a tela principal</h2>
+    <p class="sub">A tela tem três áreas: a <b>barra superior</b> (informações e atalhos), o <b>mapa</b> com os botões laterais e o <b>painel inferior</b> para buscar o destino.</p>
+    <div class="grid two">
+      <div class="mock">
+        <div class="mock-hud"><span style="background:#fff;">🅔</span><span>👤 MODO</span><span style="border-color:#22c55e; color:#4ade80; font-weight:900;">0 km/h</span><span>🛰️ Frota</span><span>🎵</span><span>🔊</span></div>
+        <div class="mock-map"><div class="mock-fabs"><span>🎯</span><span style="background:#fff;">@</span><span>📷</span><span>🛰️</span><span>🎵</span><span>⋯</span></div></div>
+        <div class="mock-sheet"><div>🔍 Buscar destino, hospital ou cidade...</div><b>➕</b><b>IR 🚀</b></div>
+      </div>
+      <div class="card">
+        <div class="row"><span class="ico">🅔</span><div><b>Logo / Condutor:</b> toque para se identificar como motorista do carro (veja o slide “Assumir o volante”).</div></div>
+        <div class="row"><span class="ico" style="border-color:#22c55e;">0</span><div><b>Velocímetro:</b> mostra sua velocidade. Fica <b style="color:#f87171;">vermelho piscando</b> se passar do limite de um radar próximo.</div></div>
+        <div class="row"><span class="ico">🛰️</span><div><b>Frota:</b> abre a Central de Frota (uso da gestão).</div></div>
+        <div class="row"><span class="ico">🎵</span><div><b>Música:</b> abre o painel de música e playlists.</div></div>
+        <div class="row"><span class="ico">🔊</span><div><b>Alerta sonoro:</b> liga/desliga o aviso falado dos radares.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. BARRA SUPERIOR EXTRA -->
+  <section class="slide" data-title="Atalhos da barra superior">
+    <div class="kicker">Passo 2 (cont.) • <span class="pill tec">TÉCNICOS</span></div>
+    <h2>Outros atalhos da barra superior</h2>
+    <p class="sub">No computador ou em celulares maiores aparecem mais botões no topo:</p>
+    <div class="card">
+      <div class="row"><span class="ico" style="border-color:#f59e0b;">🎭</span><div><b>Modo Resenha:</b> liga ou desliga as piadas e causos do trecho. É <b>opcional</b>.</div></div>
+      <div class="row"><span class="ico" style="border-color:#c084fc;">⏱️</span><div><b>Histórico de rotas:</b> lista as rotas que você já traçou, para repetir um trajeto rapidamente.</div></div>
+      <div class="row"><span class="ico">🔍</span><div><b>Serviços próximos:</b> encontra <b>posto de combustível, restaurante/churrascaria e hotel/pousada</b> perto de você e abre direto no Waze ou Maps.</div></div>
+      <div class="row"><span class="ico">🔄</span><div><b>Atualizar:</b> recarrega o mapa, os clientes e os radares.</div></div>
+      <div class="row"><span class="ico">🚗 / 📱</span><div><b>Fonte do GPS:</b> escolhe se a posição vem do <b>rastreador do carro</b> (🚗) ou do <b>GPS do celular</b> (📱). Se o carro ainda não tem rastreador, use o celular.</div></div>
+    </div>
+  </section>
+
+  <!-- 6. BOTÕES LATERAIS -->
+  <section class="slide" data-title="Botões laterais do mapa">
+    <div class="kicker">Passo 3 • <span class="pill tec">TÉCNICOS</span></div>
+    <h2>Botões laterais do mapa</h2>
+    <p class="sub">Ficam na lateral direita, sempre ao alcance do polegar.</p>
+    <div class="grid two">
+      <div class="card">
+        <div class="row"><span class="ico" style="border-color:#22c55e;">🎯</span><div><b>Centralizar:</b> volta o mapa para a sua posição atual.</div></div>
+        <div class="row"><span class="ico" style="background:#fff;"><img src="/static/simbolo_emed_clean.svg" style="width:24px;"></span><div><b>Filtro de clientes:</b> a cada toque alterna <b>Todos → Só Contrato (azul) → Só Avulso (vermelho) → Ocultos</b>.</div></div>
+        <div class="row"><span class="ico" style="border-color:#f59e0b;">📷</span><div><b>Radares:</b> mostra ou esconde os radares no mapa.</div></div>
+        <div class="row"><span class="ico">🛰️</span><div><b>Satélite / Vias:</b> troca entre o mapa de ruas e a imagem de satélite.</div></div>
+        <div class="row"><span class="ico" style="border-color:#ec4899;">🎵</span><div><b>Música:</b> mesmo painel de música da barra superior.</div></div>
+      </div>
+      <div class="card">
+        <h3>⋯ Mais ferramentas</h3>
+        <div class="row"><span class="ico">📍</span><div><b>Fixar Pin no Mapa:</b> toque em qualquer ponto do mapa para marcar um destino que não tem endereço.</div></div>
+        <div class="row"><span class="ico">🗺️</span><div><b>Enquadrar Rota:</b> mostra a rota inteira na tela.</div></div>
+        <div class="row"><span class="ico">🎨</span><div><b>Personalizar Visual:</b> estilo do mapa, radares e clientes.</div></div>
+        <div class="row"><span class="ico">🎭</span><div><b>Causo / Piada da Estrada</b> e <b>Ajustar tempo das piadas</b>.</div></div>
+        <div class="row"><span class="ico">📲</span><div><b>Instalar App no Celular.</b></div></div>
+        <div class="row"><span class="ico" style="border-color:#ef4444;">❌</span><div><b>Cancelar Rota.</b></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. TRAÇAR ROTA -->
+  <section class="slide" data-title="Traçar uma rota">
+    <div class="kicker">Passo 4 • <span class="pill tec">TÉCNICOS</span></div>
+    <h2>Como traçar uma rota</h2>
+    <p class="sub">Do pátio da EMED até o hospital em poucos toques.</p>
+    <div class="grid two">
+      <div class="card blue">
+        <ol class="steps">
+          <li>Toque na barra <b>🔍 Buscar destino, hospital ou cidade</b> no painel inferior.</li>
+          <li>Digite parte do nome (ex.: <b>WILSON ROSADO</b> ou <b>MOSSORÓ</b>). Os clientes da EMED aparecem primeiro na lista.</li>
+          <li>Escolha o destino na lista. O mapa mostra o ponto final 🏁.</li>
+          <li>Toque em <b>IR 🚀</b>. A rota é desenhada e aparece o resumo com distância e tempo.</li>
+          <li>Escolha <b>🚀 WAZE</b> ou <b>🗺️ MAPS</b> para começar a navegação com voz.</li>
+        </ol>
+      </div>
+      <div class="card green">
+        <h3>➕ Várias paradas no mesmo dia</h3>
+        <p>Toque no <b>➕</b> ao lado da busca para incluir paradas (outro cliente, posto, almoço).</p>
+        <ul style="margin-top:8px;">
+          <li><b>Google Maps</b> leva todas as paradas em sequência.</li>
+          <li><b>Waze</b> aceita 1 destino por vez: ele vai até a 1ª parada e depois você abre a próxima.</li>
+        </ul>
+        <div class="tip warn">📶 Viagem para o interior sem sinal? O <b>Waze não funciona sem internet</b>. Prefira o <b>Google Maps</b> e baixe a <b>Área Offline</b> da região antes de sair.</div>
+      </div>
+    </div>
+    <div class="tip">💡 O texto digitado fica sempre em <b>CAIXA ALTA</b>. É o padrão do sistema EMED, não precisa se preocupar com isso.</div>
+  </section>
+
+  <!-- 8. CLIENTES NO MAPA -->
+  <section class="slide" data-title="Clientes no mapa">
+    <div class="kicker">Passo 5 • <span class="pill tec">TÉCNICOS</span><span class="pill ges">GESTORES</span></div>
+    <h2>Os clientes da EMED no mapa</h2>
+    <p class="sub">Cada cliente aparece com o símbolo <b>@</b> da EMED. A cor mostra o tipo de atendimento.</p>
+    <div class="grid">
+      <div class="card blue"><h3><span class="pin" style="background:#0284c7;"><img src="/static/simbolo_emed_clean.svg"></span> Azul • CONTRATO</h3><p>Clientes com contrato de manutenção (preventiva e corretiva programadas).</p></div>
+      <div class="card red"><h3><span class="pin" style="background:#dc2626;"><img src="/static/simbolo_emed_clean.svg"></span> Vermelho • AVULSO</h3><p>Clientes atendidos por chamado avulso.</p></div>
+      <div class="card amber"><h3><span class="pin" style="background:#0f172a; border-color:#f59e0b;"><img src="/static/simbolo_emed_clean.svg" style="filter:none;"></span> Dourado • SEDE</h3><p>Base da EMED em Eusébio/CE, sempre visível.</p></div>
+    </div>
+    <div class="card" style="margin-top:14px;">
+      <h3>👆 Tocando em um cliente você pode:</h3>
+      <ul>
+        <li>Ver nome, cidade e tipo (Contrato/Avulso).</li>
+        <li>Traçar a rota até ele na hora.</li>
+        <li>Abrir direto no Waze ou Google Maps.</li>
+      </ul>
+    </div>
+    <div class="tip">💡 Com o mapa afastado (visão de estrada), os clientes avulsos ficam escondidos para não poluir a tela. Aproxime o zoom e eles aparecem.</div>
+  </section>
+
+  <!-- 9. RADARES -->
+  <section class="slide" data-title="Radares e velocidade">
+    <div class="kicker">Passo 6 • <span class="pill tec">TÉCNICOS</span></div>
+    <h2>Radares e alerta de velocidade</h2>
+    <p class="sub">Uma ajuda para evitar multas e rodar com mais segurança.</p>
+    <div class="grid two">
+      <div class="card amber">
+        <h3>📷 Como funciona</h3>
+        <ul>
+          <li>Os radares aparecem como etiquetas âmbar com o limite (ex.: <b>📷 60</b>).</li>
+          <li>Ao se aproximar, o GPS <b>avisa por voz</b> o limite do trecho.</li>
+          <li>Se você estiver acima do limite, o <b>velocímetro fica vermelho</b> e pisca.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>⚙️ Ajustes</h3>
+        <ul>
+          <li><b>🔊 / 🔇</b> na barra superior: liga ou silencia o aviso falado.</li>
+          <li><b>📷</b> na lateral: mostra ou esconde os radares do mapa.</li>
+          <li>Em <b>⋯ → Personalizar Visual</b> dá para escolher: radares automáticos, sempre visíveis ou desligados.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="tip warn">⚠️ O aviso é um apoio. A sinalização da via sempre vale mais que o aplicativo.</div>
+  </section>
+
+  <!-- 10. MÚSICA -->
+  <section class="slide" data-title="Música na viagem">
+    <div class="kicker">Passo 7 • <span class="pill tec">TÉCNICOS</span></div>
+    <h2>🎵 Música na viagem</h2>
+    <p class="sub">Toque no botão rosa 🎵 para abrir o painel de música.</p>
+    <div class="grid two">
+      <div class="card purple">
+        <h3>🎤 Por comando de voz</h3>
+        <ol class="steps">
+          <li>Abra o painel 🎵 e toque no microfone.</li>
+          <li>Fale o que quer ouvir, por exemplo: <b>“Bruno e Marrone”</b>.</li>
+          <li>O app abre a busca no seu aplicativo de música (YouTube, YouTube Music, Deezer ou Spotify) já logado na sua conta.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>📂 Playlists e downloads</h3>
+        <ul>
+          <li>Escolha seu app de música e ele abre nas suas músicas/downloads.</li>
+          <li>Também dá para colar o link da sua playlist favorita.</li>
+          <li>Depois de dar play, volte para o GPS: a música continua tocando em segundo plano.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="tip">💡 Baixe suas músicas no Wi-Fi antes de viajar. Na estrada elas tocam sem gastar internet.</div>
+  </section>
+
+  <!-- 11. MODO RESENHA -->
+  <section class="slide" data-title="Modo Resenha">
+    <div class="kicker">Passo 8 • <span class="pill tec">TÉCNICOS</span></div>
+    <h2>🎭 Modo Resenha (opcional)</h2>
+    <p class="sub">Para quebrar a monotonia da estrada, o GPS pode contar piadas e causos do trecho em voz alta.</p>
+    <div class="grid">
+      <div class="card amber"><h3>🔘 Ligar / desligar</h3><p>Botão <b>🎭</b> na barra superior. Vem <b>desligado</b>, só funciona se você quiser.</p></div>
+      <div class="card"><h3>⏰ Frequência</h3><p>Em <b>⋯ → Ajustar Tempo das Piadas</b> escolha <b>a cada 30 minutos</b>, <b>a cada 1 hora</b> ou <b>só quando eu pedir</b>.</p></div>
+      <div class="card"><h3>😂 Na hora que quiser</h3><p><b>⋯ → Causo / Piada da Estrada</b> conta uma na hora.</p></div>
+    </div>
+  </section>
+
+  <!-- 12. ASSUMIR VOLANTE -->
+  <section class="slide" data-title="Assumir o volante">
+    <div class="kicker">Passo 9 • <span class="pill tec">TÉCNICOS</span></div>
+    <h2>👤 Assumir o volante (identificar o motorista)</h2>
+    <p class="sub">Quando você pega um carro da empresa, informe ao sistema que é você quem está dirigindo. Assim a gestão sabe qual carro está com quem e o diário de bordo fica certo.</p>
+    <div class="card green">
+      <ol class="steps">
+        <li>Toque no <b>logo @ / “MODO CONSULTA”</b> no canto superior esquerdo.</li>
+        <li>O app procura o carro da EMED mais próximo de você (pela localização).</li>
+        <li>Confirme o veículo e selecione o seu nome (ou digite).</li>
+        <li>Pronto: o selo muda de <b>MODO CONSULTA</b> para o seu nome ao volante.</li>
+      </ol>
+    </div>
+    <div class="tip">💡 Só quer consultar o mapa, sem dirigir? Continue em <b>Modo Consulta</b>, nada é registrado em seu nome.</div>
+  </section>
+
+  <!-- 13. FROTA - VISÃO -->
+  <section class="slide" data-title="Central de Frota (gestores)">
+    <div class="kicker">Módulo Gestão • <span class="pill ges">GESTORES</span></div>
+    <h2>🛰️ Central de Frota</h2>
+    <p class="sub">Acesse pelo botão <b>🛰️ Frota</b> no GPS ou direto em <span class="link-box">/frota</span>. São três abas:</p>
+    <div class="grid">
+      <div class="card blue"><h3>🚗 Veículos</h3><ul><li>Lista de carros com placa, modelo e condutor atual.</li><li>Situação: em movimento, parado ou desligado.</li><li>Busca por placa, modelo ou condutor.</li><li>Toque no carro para abrir a <b>ficha individual</b>.</li></ul></div>
+      <div class="card purple"><h3>⏱️ Histórico</h3><ul><li>Viagens por veículo e por dia.</li><li>Filtros por <b>período (data inicial/final)</b> e por <b>hospital/destino</b>.</li><li>Trajeto desenhado no mapa.</li><li><b>Relatório da Viagem (Diário de Bordo)</b> para imprimir.</li></ul></div>
+      <div class="card green"><h3>🏥 Clientes</h3><ul><li>Busca de cliente ou cidade.</li><li>Corrigir posição, cidade/UF e telefone.</li><li>Definir se é <b>Contrato</b> ou <b>Avulso</b>.</li><li>A alteração aparece no GPS de todos.</li></ul></div>
+    </div>
+  </section>
+
+  <!-- 14. FROTA - CADASTROS -->
+  <section class="slide" data-title="Cadastros da Frota">
+    <div class="kicker">Módulo Gestão • <span class="pill ges">GESTORES</span></div>
+    <h2>Cadastrar veículo, chip 4G e condutor</h2>
+    <div class="grid two">
+      <div class="card blue">
+        <h3>🚗 Cadastrar / Editar Veículo &amp; Chip 4G</h3>
+        <table>
+          <tr><th>Campo</th><th>Para que serve</th></tr>
+          <tr><td><b>Placa</b></td><td>Identificação do carro (ex.: PMT4541).</td></tr>
+          <tr><td><b>Modelo</b></td><td>Ex.: Renault Captur, Fiat Argo.</td></tr>
+          <tr><td><b>KM atual</b></td><td>Base para revisões e consumo.</td></tr>
+          <tr><td><b>IMEI</b></td><td>Número do rastreador instalado no carro.</td></tr>
+          <tr><td><b>Chip 4G</b></td><td>Número, operadora, ativação e validade (o sistema avisa antes de vencer).</td></tr>
+        </table>
+      </div>
+      <div class="card green">
+        <h3>👤 Indicar Condutor Responsável</h3>
+        <p>O gestor pode definir manualmente quem está com o carro, caso o técnico não tenha assumido o volante pelo app.</p>
+        <h3 style="margin-top:14px;">📊 Indicadores no ERP</h3>
+        <ul>
+          <li>Quilometragem rodada por período.</li>
+          <li>Consumo (KM/L) e <b>custo por KM</b>.</li>
+          <li>Próxima revisão por quilometragem.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 15. RASTREADOR -->
+  <section class="slide" data-title="Rastreador no veículo">
+    <div class="kicker">Tecnologia • <span class="pill ges">GESTORES</span><span class="pill tec">TÉCNICOS</span></div>
+    <h2>📡 Rastreador 4G no veículo</h2>
+    <p class="sub">Os carros recebem um rastreador 4G (modelo J16). Ele envia a posição do carro para o servidor da EMED automaticamente.</p>
+    <div class="grid">
+      <div class="card"><h3>🔑 Ignição</h3><p>Identifica quando o carro está <b>ligado ou desligado</b>.</p></div>
+      <div class="card"><h3>📍 Posição</h3><p>Envia localização e velocidade em intervalos regulares enquanto o carro roda.</p></div>
+      <div class="card"><h3>📱 Plano B</h3><p>Sem rastreador ou sem sinal? O GPS usa a <b>localização do celular</b> (botão 🚗/📱).</p></div>
+      <div class="card"><h3>🛡️ Segurança</h3><p>Em caso de roubo, pane ou acidente, a empresa sabe onde o carro e o técnico estão para mandar ajuda.</p></div>
+    </div>
+    <div class="tip ok">✅ O rastreador fica no carro da empresa, não no celular do técnico. Fora do carro, o celular só informa posição se o GPS estiver aberto e você tiver permitido.</div>
+  </section>
+
+  <!-- 16. ROTINA DO TÉCNICO -->
+  <section class="slide" data-title="Rotina recomendada">
+    <div class="kicker">Na prática • <span class="pill tec">TÉCNICOS</span></div>
+    <h2>✅ Rotina recomendada no dia a dia</h2>
+    <div class="grid two">
+      <div class="card blue">
+        <h3>🌅 Antes de sair</h3>
+        <ol class="steps">
+          <li>Abra o EmedNav e permita a localização.</li>
+          <li>Assuma o volante do carro que vai usar.</li>
+          <li>Busque o cliente e adicione as paradas do dia.</li>
+          <li>Viagem longa? Baixe a área offline no Google Maps e as músicas no Wi-Fi.</li>
+        </ol>
+      </div>
+      <div class="card green">
+        <h3>🛣️ Na estrada</h3>
+        <ol class="steps">
+          <li>Toque em <b>IR 🚀</b> e escolha Waze ou Maps.</li>
+          <li>Deixe o alerta de radar 🔊 ligado.</li>
+          <li>Precisa de posto, comida ou hotel? Use 🔍 Serviços próximos.</li>
+          <li><b>Não mexa no celular dirigindo.</b> Pare em local seguro para ajustar.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- 17. PROBLEMAS -->
+  <section class="slide" data-title="Problemas comuns">
+    <div class="kicker">Suporte</div>
+    <h2>🛠️ Problemas comuns e soluções</h2>
+    <div class="card">
+      <table>
+        <tr><th>Problema</th><th>O que fazer</th></tr>
+        <tr><td><b>Mapa preto ou em branco</b></td><td>Puxe a tela para baixo para recarregar ou feche e abra a aba. Se continuar, use o endereço reserva (sistema.emedservice.med.br/gps).</td></tr>
+        <tr><td><b>Minha posição não aparece</b></td><td>Ative a localização do celular e permita o acesso no Chrome (cadeado ao lado do endereço → Localização → Permitir). Confira se o botão está em 📱.</td></tr>
+        <tr><td><b>Clientes ou radares não aparecem</b></td><td>Toque no botão <b>@</b> até mostrar “Todos” e no 📷 para exibir radares. Aproxime o zoom. Toque em 🔄 para atualizar.</td></tr>
+        <tr><td><b>Sem aviso de voz</b></td><td>Verifique o 🔊 na barra superior e o volume de mídia do celular.</td></tr>
+        <tr><td><b>Waze não abre</b></td><td>Confirme que o Waze está instalado. Sem internet, use o Google Maps.</td></tr>
+        <tr><td><b>App desatualizado</b></td><td>Feche e abra o app. As atualizações chegam sozinhas na próxima abertura.</td></tr>
+      </table>
+    </div>
+    <div class="tip">📞 Não resolveu? Mande um print da tela para a gestão/suporte da EMED.</div>
+  </section>
+
+  <!-- 18. RESUMO -->
+  <section class="slide" data-title="Resumo final">
+    <div class="hero">
+      <div class="kicker">Resumo</div>
+      <h2>Tudo em uma tela</h2>
+      <div class="grid">
+        <div class="card blue"><h3>👷 Técnico</h3><ul><li>Buscar cliente → IR 🚀 → Waze/Maps</li><li>Clientes @ azul/vermelho no mapa</li><li>Radares com aviso de voz</li><li>Música por voz e Modo Resenha opcional</li><li>Assumir o volante ao pegar o carro</li></ul></div>
+        <div class="card purple"><h3>🧑‍💼 Gestor</h3><ul><li>Central de Frota: veículos, histórico e clientes</li><li>Diário de bordo com filtros por data e destino</li><li>Cadastro de carro, rastreador e chip 4G</li><li>KM rodado, consumo e custo por KM</li></ul></div>
+      </div>
+      <div style="text-align:center; margin-top:10px;">
+        <div class="hero-logo" style="margin:0 auto 12px; width:80px; height:80px;"><img src="/static/simbolo_emed_clean.svg" style="width:58px; height:58px;"></div>
+        <div class="link-box">app.emedservice.med.br/gps</div>
+        <p style="color:#94a3b8; margin-top:10px;">EMED Eletromedicina • Boa viagem e bons atendimentos! 🚗💨</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="bottombar">
+  <button class="nav-btn ghost" id="btnPrev" onclick="go(cur-1)">← Voltar</button>
+  <div class="progress">
+    <div class="progress-bar"><div class="progress-fill" id="progFill"></div></div>
+    <div class="counter" id="counter">1 / 1</div>
+  </div>
+  <button class="nav-btn" id="btnNext" onclick="go(cur+1)">Avançar →</button>
+</footer>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const panel = document.getElementById('indexPanel');
+  let cur = 0;
+
+  slides.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.textContent = (i + 1) + '. ' + (s.dataset.title || 'Slide');
+    b.onclick = () => { go(i); toggleIndex(false); };
+    panel.appendChild(b);
+  });
+
+  function go(n) {
+    if (n < 0 || n >= slides.length) return;
+    slides.forEach((s, i) => {
+      s.classList.toggle('active', i === n);
+      s.classList.toggle('prev', i < n);
+    });
+    cur = n;
+    slides[n].scrollTop = 0;
+    document.getElementById('counter').textContent = (n + 1) + ' / ' + slides.length;
+    document.getElementById('progFill').style.width = ((n + 1) / slides.length * 100) + '%';
+    document.getElementById('btnPrev').disabled = n === 0;
+    const nx = document.getElementById('btnNext');
+    nx.disabled = n === slides.length - 1;
+    nx.textContent = n === slides.length - 1 ? 'Fim ✓' : 'Avançar →';
+    panel.querySelectorAll('button').forEach((b, i) => b.classList.toggle('cur', i === n));
+    try { history.replaceState(null, '', '#' + (n + 1)); } catch (e) {}
+  }
+
+  function toggleIndex(force) {
+    const open = typeof force === 'boolean' ? force : !panel.classList.contains('open');
+    panel.classList.toggle('open', open);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); go(cur + 1); }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(cur - 1); }
+    if (e.key === 'Home') go(0);
+    if (e.key === 'End') go(slides.length - 1);
+    if (e.key === 'Escape') toggleIndex(false);
+  });
+
+  let tx = null, ty = null;
+  document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (tx === null) return;
+    const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) go(cur + (dx < 0 ? 1 : -1));
+    tx = ty = null;
+  }, { passive: true });
+
+  const start = parseInt((location.hash || '#1').slice(1), 10);
+  go(isNaN(start) ? 0 : Math.min(Math.max(start - 1, 0), slides.length - 1));
+</script>
+</body>
+</html>
