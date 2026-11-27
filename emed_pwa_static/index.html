@@ -3919,6 +3919,23 @@ async function processarFilaOffline() {
         const _bCtrl = new AbortController();
         const _bTimer = setTimeout(() => _bCtrl.abort(), 12000);
         const resp = await fetch("/api/bootstrap?slim=1", { signal: _bCtrl.signal }).finally(() => clearTimeout(_bTimer));
+        if (resp && resp.status === 401) {
+          const box = document.getElementById("mainContainer");
+          if (box) {
+            box.innerHTML = `
+              <div class="section-box" style="text-align:center;padding:36px 16px;">
+                <div style="font-size:28px;margin-bottom:12px;">🔐</div>
+                <div style="font-weight:bold;color:#0077b6;font-size:15px;margin-bottom:6px;">Sessão expirada — redirecionando para a tela de login...</div>
+                <div style="color:#64748b;font-size:12.5px;margin-bottom:16px;">Sua sessão de acesso precisa ser renovada.</div>
+                <a class="btn btn-primary btn-sm" href="/login">🔑 Ir para o Login</a>
+              </div>
+            `;
+          }
+          if (!window.location.pathname.startsWith("/login")) {
+            window.location.replace("/login");
+          }
+          return;
+        }
         if (resp && resp.ok) {
           const dados = await resp.json();
           if (dados && (dados.ok || dados.ordens)) {
@@ -13882,17 +13899,56 @@ function fecharModalInsumosViagem() {
      * SUB-ABA 4: RANKING PONDERADO DE COMPLEXIDADE & DOWNTIME
      ********************************************************************/
     function renderSubAbaRanking(container, ordens) {
-      // Computa o ranking em tempo real a partir da base completa
+      // Computa o ranking em tempo real exclusivamente para a equipe técnica ativa
+      const TECNICOS_ATIVOS_MAP = {
+        "ARQUIMEDES": "ARQUIMEDES",
+        "VALFREDO NETTO": "VALFREDO NETTO",
+        "NETTO": "VALFREDO NETTO",
+        "MARCOS GILSON": "MARCOS GILSON",
+        "MARCOS": "MARCOS GILSON",
+        "DIÓGENES GUERRA": "DIÓGENES GUERRA",
+        "DIOGENES": "DIÓGENES GUERRA",
+        "LEONARDO": "LEONARDO",
+        "ANTÔNIO MATOS": "ANTÔNIO MATOS",
+        "ANTONIO MATOS": "ANTÔNIO MATOS",
+        "FILIPE CANEDO": "FILIPE CANEDO",
+        "FELIPE": "FILIPE CANEDO",
+        "YASMIN FERREIRA": "YASMIN FERREIRA",
+        "YASMIM": "YASMIN FERREIRA",
+        "GABRIEL SOARES": "GABRIEL SOARES",
+        "GABRIEL": "GABRIEL SOARES",
+        "JAIR CUGLER": "JAIR CUGLER",
+        "JAIR": "JAIR CUGLER",
+        "TONY GANZAROLI": "TONY GANZAROLI",
+        "TONY": "TONY GANZAROLI",
+        "PAULO CRUZ": "PAULO CRUZ",
+        "MARCO ANTONIO": "MARCO ANTONIO",
+        "SÉRGIO RICARDO": "SÉRGIO RICARDO",
+        "SÉRGIO": "SÉRGIO RICARDO"
+      };
+
       const mapTec = {};
 
       ordens.forEach(o => {
-        const tec = String(o.tecnico_responsavel || "NÃO INFORMADO").trim();
+        const tecRaw = String(o.tecnico_responsavel || "").trim().toUpperCase();
+        if (!tecRaw) return;
+
+        let tec = null;
+        for (const [k, v] of Object.entries(TECNICOS_ATIVOS_MAP)) {
+          if (tecRaw.includes(k)) {
+            tec = v;
+            break;
+          }
+        }
+        if (!tec) return; // Filtra apenas colaboradores atualmente na empresa
+
         if (!mapTec[tec]) {
           mapTec[tec] = {
             nome: tec,
             qtd_os: 0,
             pontos: 0.0,
             downtime_total: 0.0,
+            downtime_os_validas: 0,
             tc: 0,
             mm_arco: 0,
             rx_dr: 0,
@@ -13902,7 +13958,12 @@ function fecharModalInsumosViagem() {
         }
         mapTec[tec].qtd_os++;
         mapTec[tec].pontos += (Number(o.pontos_complexidade) || 1.0);
-        mapTec[tec].downtime_total += (Number(o.downtime_horas) || 0.0);
+        
+        const dt = Number(o.downtime_horas) || 0.0;
+        if (dt > 0 && dt < 5000) {
+          mapTec[tec].downtime_total += dt;
+          mapTec[tec].downtime_os_validas++;
+        }
 
         const crit = String(o.criticidade_equipamento || "").toUpperCase();
         if (crit.includes("TC/RM") || crit.includes("TOMOGRAFIA")) mapTec[tec].tc++;
@@ -13913,7 +13974,6 @@ function fecharModalInsumosViagem() {
       });
 
       const listaRanking = Object.values(mapTec)
-        .filter(t => t.qtd_os >= 10)
         .sort((a,b) => b.pontos - a.pontos);
 
       container.innerHTML = `
@@ -13950,7 +14010,7 @@ function fecharModalInsumosViagem() {
               <tbody>
                 ${listaRanking.map((tec, idx) => {
                   const densidade = (tec.pontos / tec.qtd_os).toFixed(2);
-                  const dtMedio = (tec.downtime_total / tec.qtd_os).toFixed(1);
+                  const dtMedio = tec.downtime_os_validas > 0 ? (tec.downtime_total / tec.downtime_os_validas).toFixed(1) : (tec.downtime_total / tec.qtd_os).toFixed(1);
                   const medalha = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}º`;
                   const isNetto = tec.nome.toUpperCase().includes("NETTO");
 
