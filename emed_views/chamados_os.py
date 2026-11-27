@@ -372,10 +372,15 @@ def _gerar_html_os_formatada(id_os_c, row_c: pd.Series = None, equipa_tecnica: d
         tec_princ = "VALFREDO V. DE OLIVEIRA NETTO"
 
     # Blindagem estrita: Jamais repetir o nome do técnico na assinatura do cliente
-    _tecs_conhecidos = ["VALFREDO", "NETTO", "ANTONIO MATOS", "ARQUIMEDES", "MARCOS GILSON", "DIOGENES", "WANDSON", "GABRIEL SOARES", "TONY GANZAROLI", "JONATHAN", "LUCAS", "MARCOS AURELIO"]
+    try:
+        with sqlite3.connect(db_file) as _c_sig:
+            _tecs_db = [r[0].strip().upper() for r in _c_sig.execute("SELECT DISTINCT nome FROM tecnicos WHERE nome IS NOT NULL").fetchall() if r[0]]
+    except Exception:
+        _tecs_db = []
+    _tecs_conhecidos = set(["VALFREDO", "NETTO", "ANTONIO MATOS", "ARQUIMEDES", "MARCOS GILSON", "DIOGENES", "WANDSON", "GABRIEL SOARES", "TONY GANZAROLI", "JONATHAN", "LUCAS", "MARCOS AURELIO", "SÉRGIO", "SERGIO", "RICARDO", "FILIPE", "CANEDO", "ÁTILA", "ATILA", "CLEMIR", "MANUTENÇÃO GERAL", "MANUTENCAO GERAL", "EQUIPE EMED"] + _tecs_db)
     _resp_up = resp_hosp.strip().upper()
     _tec_up = tec_princ.strip().upper()
-    if not resp_hosp or _resp_up == _tec_up or any(t in _resp_up for t in _tecs_conhecidos if len(t) > 3) or (_tec_up and _tec_up in _resp_up):
+    if not resp_hosp or _resp_up == _tec_up or any(t == _resp_up or (len(t) > 3 and t in _resp_up) for t in _tecs_conhecidos) or (_tec_up and _tec_up in _resp_up) or (len(_tec_up) > 3 and _tec_up in _resp_up):
         resp_hosp = "Coordenação / Engenharia Clínica"
 
     raw_eq = limpar_texto(row_c.get("equipamento"), "-")

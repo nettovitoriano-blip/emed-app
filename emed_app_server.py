@@ -4015,6 +4015,8 @@ async def auth_api_middleware(request: web.Request, handler):
         or path.startswith("/lab/r/")
         or path.startswith("/proposta/")
         or path == "/api/proposta/responder"
+        or path.startswith("/api/equipe/")
+        or path.startswith("/api/backup-os/")
         # Proxies para visualização de navegação/radares no veículo (Apenas leituras GET)
         or (request.method == "GET" and (
             path.startswith("/api/car")
@@ -24862,7 +24864,12 @@ async def handle_simbolo_emed(request: web.Request) -> web.Response:
     """Serve o símbolo/logo oficial em alta resolução e fundo transparente da EMED."""
     # Se for requisitado o SVG limpo oficial, entrega diretamente o SVG do EmedNav
     path = request.path
-    if "simbolo_emed_clean.svg" in path or path.endswith(".svg"):
+    if "simbolo_emed_red.svg" in path:
+        svg_path = os.path.join(BASE_DIR, "emed_nav", "static", "simbolo_emed_red.svg")
+        if os.path.exists(svg_path):
+            with open(svg_path, "rb") as f:
+                return web.Response(body=f.read(), content_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
+    elif "simbolo_emed_clean.svg" in path or path.endswith(".svg"):
         svg_path = os.path.join(BASE_DIR, "emed_nav", "static", "simbolo_emed_clean.svg")
         if os.path.exists(svg_path):
             with open(svg_path, "rb") as f:
@@ -26659,6 +26666,68 @@ async def api_equipe_dosimetria_imprimir(request: web.Request) -> web.Response:
     return web.Response(text=html_out, content_type="text/html", charset="utf-8")
 
 
+_CACHE_BACKUP_OS_H = []
+_CACHE_BACKUP_OS_H_TIME = 0
+
+async def api_backup_os_listar(request: web.Request) -> web.Response:
+    global _CACHE_BACKUP_OS_H, _CACHE_BACKUP_OS_H_TIME
+    agora = time.time()
+    if _CACHE_BACKUP_OS_H and (agora - _CACHE_BACKUP_OS_H_TIME < 300):
+        return web.json_response({"ok": True, "total": len(_CACHE_BACKUP_OS_H), "arquivos": _CACHE_BACKUP_OS_H})
+
+    base_dir = r"H:\Backup OS - Effort"
+    arquivos = []
+    if os.path.exists(base_dir):
+        try:
+            for root, dirs, files in os.walk(base_dir):
+                for f in files:
+                    if f.lower().endswith(".pdf"):
+                        full_p = os.path.join(root, f)
+                        rel_p = os.path.relpath(full_p, base_dir).replace("\\", "/")
+                        partes = rel_p.split("/")
+                        cli = partes[0] if len(partes) > 1 else "GERAL"
+                        # Extrair equipamento do nome se formato: "OS - <EQUIP> - <CLIENTE>.pdf"
+                        eq = ""
+                        nome_sem_ext = os.path.splitext(f)[0]
+                        if nome_sem_ext.upper().startswith("OS - "):
+                            pedacos = nome_sem_ext[5:].split(" - ")
+                            if pedacos:
+                                eq = pedacos[0].strip()
+                        sz = os.path.getsize(full_p)
+                        mtime = os.path.getmtime(full_p)
+                        dt_str = datetime.fromtimestamp(mtime).strftime("%d/%m/%Y")
+                        arquivos.append({
+                            "cliente": cli,
+                            "equipamento": eq or "Diversos / Laudo Clínico",
+                            "arquivo": f,
+                            "caminho_relativo": rel_p,
+                            "tamanho_kb": round(sz / 1024, 1),
+                            "data_mod": dt_str
+                        })
+            arquivos.sort(key=lambda x: (x["cliente"], x["arquivo"]))
+            _CACHE_BACKUP_OS_H = arquivos
+            _CACHE_BACKUP_OS_H_TIME = agora
+        except Exception as e:
+            return web.json_response({"ok": False, "erro": str(e)}, status=500)
+    return web.json_response({"ok": True, "total": len(arquivos), "arquivos": arquivos})
+
+
+async def api_backup_os_pdf(request: web.Request) -> web.Response:
+    base_dir = os.path.abspath(r"H:\Backup OS - Effort")
+    caminho = request.query.get("path") or request.match_info.get("nome", "")
+    if not caminho:
+        return web.Response(text="Parâmetro path ou nome obrigatório.", status=400)
+    # Sanitização estrita contra path traversal
+    caminho = caminho.replace("\\", "/").lstrip("/")
+    full_path = os.path.abspath(os.path.join(base_dir, caminho))
+    if not full_path.startswith(base_dir) or not os.path.exists(full_path) or not full_path.lower().endswith(".pdf"):
+        return web.Response(text="Arquivo de OS em PDF não encontrado na unidade H:.", status=404)
+    return web.FileResponse(full_path, headers={
+        "Content-Disposition": f'inline; filename="{os.path.basename(full_path)}"'
+    })
+
+
+
 
 async def api_auditoria_historico_modificacoes(request: web.Request) -> web.Response:
     """Retorna o log forense e imutável de todas as retificações de histórico da frota (Apenas Gestor/Admin)."""
@@ -26921,6 +26990,9 @@ def criar_app() -> web.Application:
     app.router.add_post("/api/frota/assumir-veiculo", api_frota_assumir_veiculo)
     app.router.add_get("/api/frota/troca-condutores-historico", api_frota_troca_condutores_historico)
     app.router.add_get("/api/auditoria/historico-modificacoes", api_auditoria_historico_modificacoes)
+    app.router.add_get("/api/backup-os/listar", api_backup_os_listar)
+    app.router.add_get("/api/backup-os/pdf", api_backup_os_pdf)
+    app.router.add_get("/api/backup-os/pdf/{nome:.*}", api_backup_os_pdf)
 
 
 
