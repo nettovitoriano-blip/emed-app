@@ -2193,6 +2193,22 @@ def _validar_magic_bytes_arquivo(raw_bytes: bytes, ext: str) -> bool:
     return False
 
 
+def _detectar_extensao_por_magic_bytes(raw_bytes: bytes) -> str:
+    if raw_bytes.startswith(b"%PDF-"):
+        return ".pdf"
+    if raw_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    if raw_bytes.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    if len(raw_bytes) >= 12 and raw_bytes[:4] == b"RIFF" and raw_bytes[8:12] == b"WEBP":
+        return ".webp"
+    if len(raw_bytes) >= 12 and raw_bytes[4:8] in (b"ftyp", b"moov", b"wide", b"free", b"mdat", b"skip"):
+        return ".mp4"
+    if raw_bytes.startswith(b"\x1a\x45\xdf\xa3"):
+        return ".webm"
+    return ""
+
+
 def _salvar_arquivo_b64_seguro(
     b64_str: str,
     subpasta: str,
@@ -2245,8 +2261,22 @@ def _salvar_arquivo_b64_seguro(
         return "", ""
     if not decoded or len(decoded) > max_bytes:
         return "", ""
-    if not _validar_magic_bytes_arquivo(decoded, ext):
+
+    # Detecção inteligente por magic bytes reais (corrige mismatch de extensão quando browser compacta PNG em JPEG)
+    ext_real = _detectar_extensao_por_magic_bytes(decoded)
+    if ext_real and ext_real in allowed_exts:
+        ext = ext_real
+    elif not _validar_magic_bytes_arquivo(decoded, ext):
         return "", ""
+
+    pasta = os.path.realpath(os.path.join(BASE_DIR, "uploads_os", subpasta)) if subpasta else os.path.realpath(os.path.join(BASE_DIR, "uploads_os"))
+    os.makedirs(pasta, exist_ok=True)
+    stem = _re.sub(r"[^A-Za-z0-9_-]", "_", os.path.splitext(safe_n)[0])[:40] or "arquivo"
+    arq_nome_final = f"{prefixo}_{int(time.time())}_{secrets.token_hex(4)}_{stem}{ext}"
+    arq_path = os.path.join(pasta, arq_nome_final)
+    with open(arq_path, "wb") as fh:
+        fh.write(decoded)
+    return arq_path, f"{stem}{ext}"
     pasta = os.path.realpath(os.path.join(BASE_DIR, "uploads_os", subpasta)) if subpasta else os.path.realpath(os.path.join(BASE_DIR, "uploads_os"))
     os.makedirs(pasta, exist_ok=True)
     stem = _re.sub(r"[^A-Za-z0-9_-]", "_", os.path.splitext(safe_n)[0])[:40] or "arquivo"
@@ -21407,7 +21437,10 @@ async def api_portal_cliente_html(request: web.Request) -> web.Response:
           continue;
         }
         const b64 = await _comprimirFotoPortal(file);
-        if (b64) CH_FOTOS.push({ name: file.name || `foto_${CH_FOTOS.length + 1}.jpg`, data_url: b64 });
+        if (b64) {
+          const nomeAjustado = (file.name || `foto_${CH_FOTOS.length + 1}.jpg`).replace(/\\.[^/.]+$/, "") + ".jpg";
+          CH_FOTOS.push({ name: nomeAjustado, data_url: b64 });
+        }
       }
       inp.value = '';
       renderPortalFotosPreview();
