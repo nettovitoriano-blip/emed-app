@@ -3372,6 +3372,9 @@
       abaStatusOS: "ATIVAS",
       buscaManual: "",
       modalidadeManual: "TODAS",
+      manualEquipAtivo: "TODOS",
+      manualSubAtivo: "TODOS",
+      manualTipoAtivo: "TODOS",
       filtroTV: "TODAS",
       hospitalPortal: "",
       data: null,
@@ -5071,6 +5074,11 @@ async function efetuarLogout() {
         box.innerHTML = `<div class="section-box">Carregando dados...</div>`;
         return;
       }
+      const ativo = document.activeElement;
+      const ativoId = ativo ? ativo.id : null;
+      const selStart = (ativo && typeof ativo.selectionStart === "number") ? ativo.selectionStart : null;
+      const selEnd = (ativo && typeof ativo.selectionEnd === "number") ? ativo.selectionEnd : null;
+
       switch (STATE.menuAtivo) {
         // 👷 TÉCNICO (5)
         case "TEC_ROTAS": renderMenuTecRotas(box); break;
@@ -5117,6 +5125,15 @@ async function efetuarLogout() {
           <span style="font-size:12.5px; font-weight:800; color:#002b54;">${rotuloMenu}</span>
         `;
         box.insertBefore(divVoltar, box.firstChild);
+      }
+
+      // Preservar foco e cursor em inputs com id
+      if (ativoId && selStart !== null) {
+        const novoAtivo = document.getElementById(ativoId);
+        if (novoAtivo) {
+          novoAtivo.focus();
+          try { novoAtivo.setSelectionRange(selStart, selEnd); } catch(e){}
+        }
       }
     }
     /********************************************************************
@@ -6394,17 +6411,85 @@ function renderMenuTecOS(box) {
         </div>
         <div class="toolbar" style="display:flex; flex-direction:column; gap:8px; width:100%; margin-bottom:12px; box-sizing:border-box;">
           <div style="display:flex; gap:6px; flex-wrap:wrap; width:100%;">
-            
-            <div style="flex:1.5; min-width:180px;">
-              <input class="input" style="width:100%;" placeholder="🔍 Buscar por OS, cliente, aparelho..." value="${esc(STATE.buscaOS)}" oninput="STATE.buscaOS=this.value;renderizarTelaPrincipal();" />
+            <div id="wrapperBuscaOSPrincipal" style="flex:1.5; min-width:180px; position:relative; display:flex; align-items:center;">
+              <input id="inpBuscaPrincipalOS" class="input" style="width:100%; padding-right:${STATE.buscaOS ? '34px' : '10px'};" placeholder="🔍 Buscar por OS, cliente, aparelho..." value="${esc(STATE.buscaOS)}" oninput="aoDigitarBuscaPrincipalOS(this.value)" />
+              ${STATE.buscaOS ? `
+                <button id="btnLimparBuscaOSPrincipal" type="button" title="Limpar busca" style="position:absolute; right:8px; background:none; border:none; color:#64748b; font-size:16px; font-weight:700; cursor:pointer; padding:4px 6px; line-height:1; border-radius:50%;" onclick="limparBuscaPrincipalOS()">✕</button>
+              ` : ''}
             </div>
           </div>
-          
         </div>
-        <div class="os-grid">
+        <div id="gridCardsOSPrincipal" class="os-grid">
           ${filtradas.length ? filtradas.map(o => htmlCardOS(o, false)).join("") : `<div class="section-box">Nenhuma Ordem de Serviço encontrada para este filtro.</div>`}
         </div>
       `;
+    }
+
+    function aoDigitarBuscaPrincipalOS(termo) {
+      STATE.buscaOS = termo;
+      const grid = document.getElementById("gridCardsOSPrincipal");
+      if (!grid) {
+        renderizarTelaPrincipal();
+        return;
+      }
+      const wrapper = document.getElementById("wrapperBuscaOSPrincipal");
+      let btnLimpar = document.getElementById("btnLimparBuscaOSPrincipal");
+      if (wrapper) {
+        if (termo && !btnLimpar) {
+          btnLimpar = document.createElement("button");
+          btnLimpar.id = "btnLimparBuscaOSPrincipal";
+          btnLimpar.type = "button";
+          btnLimpar.title = "Limpar busca";
+          btnLimpar.style.cssText = "position:absolute; right:8px; background:none; border:none; color:#64748b; font-size:16px; font-weight:700; cursor:pointer; padding:4px 6px; line-height:1; border-radius:50%;";
+          btnLimpar.innerHTML = "✕";
+          btnLimpar.onclick = limparBuscaPrincipalOS;
+          wrapper.appendChild(btnLimpar);
+        } else if (!termo && btnLimpar) {
+          btnLimpar.remove();
+        }
+      }
+
+      const ordens = (STATE.data && STATE.data.ordens) || [];
+      const usuarioNome = (localStorage.getItem("emed_tecnico_selecionado") || "").toUpperCase().trim();
+      const osPertenceAoTecnico = (o) => {
+        if (!usuarioNome) return true;
+        return String(o.tecnico_responsavel || "").toUpperCase().includes(usuarioNome);
+      };
+      const osConcluidaParaTecnico = (o) => {
+        const st = (o.status || "").toUpperCase();
+        return st.includes("CONCLU") || st.includes("FINALIZ") || st.includes("AGUARDANDO TRIAGEM") || st.includes("APROVAÇÃO DE PROPOSTA");
+      };
+      const osTemPendencia = (o) => {
+        const st = (o.status || "").toUpperCase();
+        if (st.includes("CONCLU") && !st.includes("PEND")) return false;
+        const p = String(o.pendencia_limpa || "").trim().toUpperCase();
+        const pec = String(o.peca_baixada_ref || o.peca_selecionada || "").trim().toUpperCase();
+        const temPecaCobrar = Boolean(pec && pec !== "NENHUMA PEÇA" && pec !== "NENHUMA PECA" && pec !== "-");
+        return st.includes("OBSERVA") || st.includes("PEND") || temPecaCobrar || (Boolean(p) && !p.includes("NENHUMA PEND") && !p.includes("SEM PEND") && p !== "-");
+      };
+      const filtradas = ordens.filter(o => {
+        if (!osPertenceAoTecnico(o)) return false;
+        if (STATE.abaStatusOS === "ATIVAS" && osConcluidaParaTecnico(o)) return false;
+        if ((STATE.abaStatusOS === "PENDENCIAS" || STATE.abaStatusOS === "OBSERVACAO") && !osTemPendencia(o)) return false;
+        if (STATE.abaStatusOS === "CONCLUIDAS" && !osConcluidaParaTecnico(o)) return false;
+        if (STATE.buscaOS) {
+          const q = STATE.buscaOS.toLowerCase();
+          const alvo = `${o.id} ${o.cliente} ${o.equipamento} ${o.cidade} ${o.pendencia_limpa}`.toLowerCase();
+          if (!alvo.includes(q)) return false;
+        }
+        return true;
+      });
+      grid.innerHTML = filtradas.length ? filtradas.map(o => htmlCardOS(o, false)).join("") : `<div class="section-box">Nenhuma Ordem de Serviço encontrada para este filtro.</div>`;
+    }
+
+    function limparBuscaPrincipalOS() {
+      STATE.buscaOS = "";
+      const inp = document.getElementById("inpBuscaPrincipalOS");
+      if (inp) {
+        inp.value = "";
+        inp.focus();
+      }
+      aoDigitarBuscaPrincipalOS("");
     }
     /********************************************************************
      * MENU 2 (TÉCNICO): MINHAS PENDÊNCIAS
@@ -7519,94 +7604,497 @@ Deseja confirmar mesmo assim com justificativa de chegada?`);
       if (box) renderMenuTecPecas(box);
     }
     /********************************************************************
-     * MENU 4 (TÉCNICO): MANUAIS TÉCNICOS, POPs & VÍDEOS MP4
+     * MENU 4 (TÉCNICO): MANUAIS TÉCNICOS, POPs & VÍDEOS MP4 ORGANIZADOS POR EQUIPAMENTO (MENU E SUBMENU)
      ********************************************************************/
-    function renderMenuManuais(box) {
-      const manuais = STATE.data.manuais || [];
-      const modalidades = ["TODAS", ...new Set(manuais.map(m => m.modalidade))];
-      const filtrados = manuais.filter(m => {
-        if (STATE.modalidadeManual !== "TODAS" && m.modalidade !== STATE.modalidadeManual) return false;
-        if (STATE.buscaManual) {
-          const q = STATE.buscaManual.toLowerCase();
-          if (!`${m.titulo} ${m.modalidade} ${m.fabricante} ${m.arquivo}`.toLowerCase().includes(q)) return false;
+    const CONFIG_EQUIPAMENTOS_MANUAIS = [
+      { id: "TODOS", nome: "Todos os Equipamentos", icone: "🌟", cor: "#0284c7" },
+      { id: "TOMOGRAFO", nome: "Tomógrafo (TC)", icone: "🌀", cor: "#0369a1" },
+      { id: "RAIO_X", nome: "Raio-X (Fixo / Móvel / DR)", icone: "⚡", cor: "#ea580c" },
+      { id: "MAMOGRAFO", nome: "Mamógrafo", icone: "🔬", cor: "#9333ea" },
+      { id: "ARCO_CIRURGICO", nome: "Arco Cirúrgico", icone: "⭕", cor: "#0d9488" },
+      { id: "HEMODINAMICA", nome: "Hemodinâmica", icone: "❤️", cor: "#e11d48" },
+      { id: "ULTRASSOM", nome: "Ultrassom", icone: "📡", cor: "#2563eb" },
+      { id: "TREINAMENTO", nome: "Treinamentos & Sistema EMED", icone: "🎬", cor: "#4f46e5" },
+      { id: "GERAL", nome: "Gerais & Instrumentos", icone: "📚", cor: "#475569" }
+    ];
+
+    function categorizarManual(m) {
+      const cam = (m.caminho_rel || m.rel_path || '').replace(/\\/g, '/');
+      const modRaw = (m.modalidade || '').toUpperCase().trim();
+      const arq = (m.arquivo || '').toUpperCase();
+      const tit = (m.titulo || '').toUpperCase();
+      const fab = (m.fabricante || '').toUpperCase();
+
+      let equipCat = "GERAL";
+      let equipIcon = "📚";
+      let equipNome = "Gerais & Instrumentos";
+      let subCat = "GERAL_DOCS";
+      let subNome = "Instrumentação & Manuais Gerais";
+
+      if (modRaw.includes("TOMOGRAFO") || modRaw.includes("TC") || cam.includes("TOMOGRAFO")) {
+        equipCat = "TOMOGRAFO";
+        equipIcon = "🌀";
+        equipNome = "Tomógrafo (TC)";
+        if (cam.includes("BRIGHTSPEED") || tit.includes("BRIGHTSPEED") || arq.includes("BRIGHTSPEED")) {
+          subCat = "TC_BRIGHTSPEED";
+          subNome = "GE BrightSpeed (Lite / Elite)";
+        } else if (cam.includes("BRIVO") || tit.includes("BRIVO") || arq.includes("BRIVO")) {
+          subCat = "TC_BRIVO";
+          subNome = "GE Brivo CT385";
+        } else if (cam.includes("CT_SERVICE_METHODS") || cam.includes("SERVICE_METHODS") || fab.includes("GE")) {
+          subCat = "TC_OEM_METHODS";
+          subNome = "GE CT Service Methods (OEM)";
+        } else {
+          subCat = "TC_OUTROS";
+          subNome = "Outros Tomógrafos";
+        }
+      } else if (modRaw.includes("RAIO-X") || modRaw.includes("RX") || cam.includes("RAIO-X")) {
+        equipCat = "RAIO_X";
+        equipIcon = "⚡";
+        equipNome = "Raio-X (Fixo / Móvel / DR)";
+        if (modRaw.includes("MOVEL") || cam.includes("MOBILEDART") || cam.includes("SHIMADZU") || tit.includes("SHIMADZU") || tit.includes("MX8") || tit.includes("MX9")) {
+          subCat = "RX_SHIMADZU_MX8";
+          subNome = "Móvel Shimadzu MobileDaRt (MX8 / MX9)";
+        } else if (modRaw.includes("DIGITAL") || cam.includes("NEUVISION") || tit.includes("NEUVISION") || fab.includes("NEUSOFT")) {
+          subCat = "RX_NEUSOFT_DR";
+          subNome = "Digital Neusoft (NeuVision 550M / Canon DR)";
+        } else if (cam.includes("LOTUS") || cam.includes("HF500M") || tit.includes("LOTUS") || fab.includes("LOTUS")) {
+          subCat = "RX_LOTUS_FIXO";
+          subNome = "Fixo Lotus (HF500M / Família HF)";
+        } else {
+          subCat = "RX_GERAL";
+          subNome = "Outros Raios-X";
+        }
+      } else if (modRaw.includes("MAMOGRAFO") || modRaw.includes("MAMO") || cam.includes("MAMOGRAFO")) {
+        equipCat = "MAMOGRAFO";
+        equipIcon = "🔬";
+        equipNome = "Mamógrafo";
+        if (cam.includes("CRYSTAL") || tit.includes("CRYSTAL") || fab.includes("GE")) {
+          subCat = "MM_GE_CRYSTAL";
+          subNome = "GE Senographe Crystal Nova";
+        } else if (cam.includes("MAMOMAT") || tit.includes("MAMOMAT") || fab.includes("SIEMENS")) {
+          subCat = "MM_SIEMENS_MAMOMAT";
+          subNome = "Siemens Mammomat";
+        } else {
+          subCat = "MM_OUTROS";
+          subNome = "Outros Mamógrafos";
+        }
+      } else if (modRaw.includes("ARCO") || cam.includes("ARCO_CIRURGICO")) {
+        equipCat = "ARCO_CIRURGICO";
+        equipIcon = "⭕";
+        equipNome = "Arco Cirúrgico";
+        subCat = "ARC_ZIEHM";
+        subNome = "Ziehm Vision";
+      } else if (modRaw.includes("HEMODINAMICA") || cam.includes("HEMODINAMICA")) {
+        equipCat = "HEMODINAMICA";
+        equipIcon = "❤️";
+        equipNome = "Hemodinâmica";
+        subCat = "HEMO_PHILIPS";
+        subNome = "Philips Allura";
+      } else if (modRaw.includes("ULTRASSOM") || cam.includes("ULTRASSOM")) {
+        equipCat = "ULTRASSOM";
+        equipIcon = "📡";
+        equipNome = "Ultrassom";
+        subCat = "US_GE";
+        subNome = "GE Voluson / Logiq";
+      } else if (modRaw.includes("TREINAMENTO") || cam.includes("TREINAMENTO_SISTEMA")) {
+        equipCat = "TREINAMENTO";
+        equipIcon = "🎬";
+        equipNome = "Treinamentos & Sistema EMED";
+        if (fab.includes("FISCAL") || tit.includes("FISCAL") || tit.includes("NFS")) {
+          subCat = "TREIN_FISCAL";
+          subNome = "Fiscal & Faturamento";
+        } else if (fab.includes("FROTA") || tit.includes("FROTA") || tit.includes("KM")) {
+          subCat = "TREIN_FROTA";
+          subNome = "Frota & KM";
+        } else {
+          subCat = "TREIN_PLATAFORMA";
+          subNome = "Plataforma eMED / OS / Estoque";
+        }
+      }
+
+      let tipoDoc = "MANUAL";
+      if (tit.startsWith("IT ") || tit.includes("IT-") || arq.startsWith("IT_") || tit.includes("INSTRUÇÃO DE TRABALHO") || tit.includes("CALIBRAÇÃO") || tit.includes("CALIBRACAO")) {
+        tipoDoc = "IT";
+      } else if (tit.startsWith("POP ") || arq.startsWith("POP_") || tit.includes("ROTEIRO MESTRE")) {
+        tipoDoc = "POP";
+      } else if (m.video || m.somente_video || tit.includes("VÍDEO") || tit.includes("TUTORIAL")) {
+        tipoDoc = "VIDEO";
+      }
+
+      return {
+        ...m,
+        equipCat,
+        equipIcon,
+        equipNome,
+        subCat,
+        subNome,
+        tipoDoc
+      };
+    }
+
+    function obterManuaisProcessados() {
+      const manuais = (STATE.data && STATE.data.manuais) || [];
+      return manuais.map(categorizarManual);
+    }
+
+    function obterManuaisFiltrados() {
+      const todos = obterManuaisProcessados();
+      const equipAtivo = STATE.manualEquipAtivo || "TODOS";
+      const subAtivo = STATE.manualSubAtivo || "TODOS";
+      const tipoAtivo = STATE.manualTipoAtivo || "TODOS";
+      const q = (STATE.buscaManual || "").toLowerCase().trim();
+
+      return todos.filter(m => {
+        if (equipAtivo !== "TODOS" && m.equipCat !== equipAtivo) return false;
+        if (subAtivo !== "TODOS" && m.subCat !== subAtivo) return false;
+        if (tipoAtivo !== "TODOS") {
+          if (tipoAtivo === "IT" && m.tipoDoc !== "IT" && m.tipoDoc !== "POP") return false;
+          if (tipoAtivo === "MANUAL" && m.tipoDoc !== "MANUAL") return false;
+          if (tipoAtivo === "VIDEO" && m.tipoDoc !== "VIDEO" && !m.video) return false;
+        }
+        if (q) {
+          const alvo = `${m.titulo} ${m.modalidade} ${m.fabricante} ${m.arquivo} ${m.equipNome} ${m.subNome}`.toLowerCase();
+          if (!alvo.includes(q)) return false;
         }
         return true;
       });
+    }
+
+    function renderMenuManuais(box) {
+      const todos = obterManuaisProcessados();
+      const equipAtivo = STATE.manualEquipAtivo || "TODOS";
+      const subAtivo = STATE.manualSubAtivo || "TODOS";
+      const tipoAtivo = STATE.manualTipoAtivo || "TODOS";
+
+      // 1. Contagens para o Menu Principal de Equipamentos
+      const contagemPorEquip = { TODOS: todos.length };
+      CONFIG_EQUIPAMENTOS_MANUAIS.forEach(cfg => {
+        if (cfg.id !== "TODOS") {
+          contagemPorEquip[cfg.id] = todos.filter(m => m.equipCat === cfg.id).length;
+        }
+      });
+
+      // 2. Submenus do equipamento ativo
+      let submenusDisponiveis = [];
+      if (equipAtivo !== "TODOS") {
+        const doEquip = todos.filter(m => m.equipCat === equipAtivo);
+        const mapaSubs = {};
+        doEquip.forEach(m => {
+          if (!mapaSubs[m.subCat]) {
+            mapaSubs[m.subCat] = { id: m.subCat, nome: m.subNome, count: 0 };
+          }
+          mapaSubs[m.subCat].count++;
+        });
+        submenusDisponiveis = Object.values(mapaSubs);
+      }
+
+      // Valida se subAtivo ainda é válido para o equipamento atual
+      if (equipAtivo === "TODOS" || !submenusDisponiveis.some(s => s.id === subAtivo)) {
+        STATE.manualSubAtivo = "TODOS";
+      }
+
+      const filtrados = obterManuaisFiltrados();
+
+      // Contagens por tipo de documento no contexto ativo
+      const doEquipContexto = equipAtivo === "TODOS" ? todos : todos.filter(m => m.equipCat === equipAtivo);
+      const countTotalContexto = doEquipContexto.length;
+      const countITs = doEquipContexto.filter(m => m.tipoDoc === "IT" || m.tipoDoc === "POP").length;
+      const countManuais = doEquipContexto.filter(m => m.tipoDoc === "MANUAL").length;
+      const countVideos = doEquipContexto.filter(m => m.tipoDoc === "VIDEO" || m.video).length;
+
       box.innerHTML = `
-        <div class="section-box">
-          <div class="section-title">
-            <span>📚 Biblioteca de Manuais Técnicos, POPs Homologados & Vídeos de Treinamento</span>
-            <span class="badge ativo">${filtrados.length} documentos</span>
-          </div>
-          <div class="toolbar" style="margin-bottom:10px;">
-            <div style="flex:1;min-width:180px;">
-              <select class="select" onchange="STATE.modalidadeManual=this.value;renderizarTelaPrincipal();">
-                ${modalidades.map(mod => `<option value="${esc(mod)}" ${STATE.modalidadeManual===mod?'selected':''}>📂 Modalidade: ${esc(mod)}</option>`).join("")}
-              </select>
-            </div>
-            <div style="flex:2;min-width:220px;">
-              <input class="input" placeholder="🔍 Buscar manual ou IT (ex: GE, Shimadzu, Tomógrafo, Raio-X, Mamógrafo)..." value="${esc(STATE.buscaManual)}" oninput="STATE.buscaManual=this.value;renderizarTelaPrincipal();" />
-            </div>
-            <button type="button" class="btn btn-primary" onclick="abrirModalAcervoBackupH()" style="white-space:nowrap;display:inline-flex;align-items:center;gap:6px;font-weight:800;background:#002b54;border-color:#38bdf8;color:#fff;">
-              🗄️ Acervo OSs Antigas (Backup H:)
-            </button>
-          </div>
-          <div id="videoPlayerContainer" style="display:none;margin-bottom:16px;background:linear-gradient(135deg,#0f172a,#1e293b);padding:14px;border-radius:12px;color:#fff;border:2px solid #f59e0b;box-shadow:0 10px 25px rgba(0,0,0,0.25);">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
-              <div>
-                <b id="videoPlayerTitle" style="font-size:14.5px;color:#fbbf24;">🎬 Vídeo Oficial de Instrução & Treinamento eMED</b>
-                <div style="font-size:11.5px;color:#cbd5e1;margin-top:2px;">Streaming Full HD 1080p Otimizado (FastStart) • Narrado em Português</div>
+        <div class="section-box" style="border:none; box-shadow:none; padding:0; background:transparent;">
+          <!-- Cabeçalho Principal -->
+          <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:12px; padding:14px 18px; margin-bottom:14px; box-shadow:0 2px 6px rgba(0,0,0,0.05); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div style="font-size:16px; font-weight:900; color:#002b54; display:flex; align-items:center; gap:8px;">
+                <span>📚 Biblioteca Técnica EMED: Manuais, POPs & Vídeos</span>
               </div>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <a id="videoDirectLink" href="#" target="_blank" class="btn btn-sm" style="background:#0284c7;color:#fff;text-decoration:none;font-weight:700;">↗️ Abrir em Tela Cheia / Baixar</a>
+              <div style="font-size:12px; color:#64748b; font-weight:600; margin-top:2px;">
+                Catálogo oficial homologado, organizado hierarquicamente por equipamento e modelo
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span id="badgeContadorManuais" class="badge ativo" style="font-size:12.5px; padding:6px 12px; font-weight:800;">
+                ${filtrados.length} documento(s)
+              </span>
+              <button type="button" class="btn btn-primary" onclick="abrirModalAcervoBackupH()" style="white-space:nowrap; display:inline-flex; align-items:center; gap:6px; font-weight:800; background:#002b54; border-color:#38bdf8; color:#fff;">
+                🗄️ Acervo Antigo (H:)
+              </button>
+            </div>
+          </div>
+
+          <!-- NÍVEL 1: MENU PRINCIPAL DE EQUIPAMENTOS (ABAS / TABS) -->
+          <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+            <div style="font-size:11px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+              <span>1️⃣ Selecione o Equipamento / Modalidade:</span>
+            </div>
+            <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; -webkit-overflow-scrolling:touch;">
+              ${CONFIG_EQUIPAMENTOS_MANUAIS.map(cfg => {
+                const count = contagemPorEquip[cfg.id] || 0;
+                if (cfg.id !== "TODOS" && count === 0) return "";
+                const ativo = equipAtivo === cfg.id;
+                return `
+                  <button type="button" onclick="selecionarEquipamentoManual('${cfg.id}')"
+                    style="display:inline-flex; align-items:center; gap:7px; white-space:nowrap; padding:9px 14px; border-radius:9px; font-size:13px; font-weight:${ativo ? '900' : '700'}; cursor:pointer; transition:all 0.15s ease; border:${ativo ? '2px solid ' + cfg.cor : '1px solid #cbd5e1'}; background:${ativo ? '#f0f9ff' : '#ffffff'}; color:${ativo ? cfg.cor : '#334155'}; box-shadow:${ativo ? '0 4px 10px rgba(2,132,199,0.2)' : 'none'};">
+                    <span style="font-size:16px;">${cfg.icone}</span>
+                    <span>${cfg.nome}</span>
+                    <span style="font-size:11px; font-weight:800; padding:2px 7px; border-radius:999px; background:${ativo ? cfg.cor : '#f1f5f9'}; color:${ativo ? '#ffffff' : '#64748b'};">
+                      ${count}
+                    </span>
+                  </button>
+                `;
+              }).join("")}
+            </div>
+          </div>
+
+          <!-- NÍVEL 2: SUBMENU POR MODELO / FAMÍLIA (QUANDO APLICÁVEL) -->
+          ${submenusDisponiveis.length > 0 ? `
+            <div style="background:linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%); border:1.5px solid #cbd5e1; border-radius:12px; padding:12px 14px; margin-bottom:12px; box-shadow:inset 0 1px 3px rgba(0,0,0,0.03);">
+              <div style="font-size:11px; font-weight:800; color:#0369a1; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                <span>2️⃣ Selecione o Modelo / Família de ${CONFIG_EQUIPAMENTOS_MANUAIS.find(c => c.id === equipAtivo)?.nome || 'Equipamento'}:</span>
+              </div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button type="button" onclick="selecionarSubmenuManual('TODOS')"
+                  style="display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:8px; font-size:12.5px; font-weight:${STATE.manualSubAtivo==='TODOS'?'900':'700'}; cursor:pointer; border:${STATE.manualSubAtivo==='TODOS'?'2px solid #0284c7':'1px solid #cbd5e1'}; background:${STATE.manualSubAtivo==='TODOS'?'#0284c7':'#ffffff'}; color:${STATE.manualSubAtivo==='TODOS'?'#ffffff':'#1e293b'};">
+                  <span>📂 Todos os Modelos</span>
+                  <span style="font-size:11px; opacity:0.9;">(${todos.filter(m => m.equipCat === equipAtivo).length})</span>
+                </button>
+                ${submenusDisponiveis.map(sub => {
+                  const isSubAtivo = STATE.manualSubAtivo === sub.id;
+                  return `
+                    <button type="button" onclick="selecionarSubmenuManual('${sub.id}')"
+                      style="display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:8px; font-size:12.5px; font-weight:${isSubAtivo ? '900' : '700'}; cursor:pointer; border:${isSubAtivo ? '2px solid #0369a1' : '1px solid #cbd5e1'}; background:${isSubAtivo ? '#0369a1' : '#ffffff'}; color:${isSubAtivo ? '#ffffff' : '#334155'};">
+                      <span>🔹 ${sub.nome}</span>
+                      <span style="font-size:11px; padding:1px 6px; border-radius:999px; background:${isSubAtivo ? '#ffffff' : '#e2e8f0'}; color:${isSubAtivo ? '#0369a1' : '#475569'}; font-weight:800;">
+                        ${sub.count}
+                      </span>
+                    </button>
+                  `;
+                }).join("")}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- NÍVEL 3: BARRA DE FILTRO POR TIPO + BUSCA INTELIGENTE -->
+          <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; flex-direction:column; gap:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+              <!-- Filtro Rápido por Tipo de Documento -->
+              <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                <span style="font-size:11.5px; font-weight:800; color:#64748b; margin-right:4px;">Tipo:</span>
+                <button type="button" onclick="selecionarTipoManual('TODOS')"
+                  style="font-size:11.5px; font-weight:800; padding:5px 10px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer; background:${tipoAtivo==='TODOS'?'#0f172a':'#f8fafc'}; color:${tipoAtivo==='TODOS'?'#ffffff':'#475569'};">
+                  📑 Todos (${countTotalContexto})
+                </button>
+                <button type="button" onclick="selecionarTipoManual('IT')"
+                  style="font-size:11.5px; font-weight:800; padding:5px 10px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer; background:${tipoAtivo==='IT'?'#0284c7':'#f8fafc'}; color:${tipoAtivo==='IT'?'#ffffff':'#0369a1'};">
+                  🔧 ITs & Calibrações (${countITs})
+                </button>
+                <button type="button" onclick="selecionarTipoManual('MANUAL')"
+                  style="font-size:11.5px; font-weight:800; padding:5px 10px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer; background:${tipoAtivo==='MANUAL'?'#16a34a':'#f8fafc'}; color:${tipoAtivo==='MANUAL'?'#ffffff':'#15803d'};">
+                  📖 Manuais Oficiais (${countManuais})
+                </button>
+                <button type="button" onclick="selecionarTipoManual('VIDEO')"
+                  style="font-size:11.5px; font-weight:800; padding:5px 10px; border-radius:6px; border:1px solid #cbd5e1; cursor:pointer; background:${tipoAtivo==='VIDEO'?'#d97706':'#f8fafc'}; color:${tipoAtivo==='VIDEO'?'#ffffff':'#b45309'};">
+                  🎬 Vídeos MP4 (${countVideos})
+                </button>
+              </div>
+            </div>
+
+            <!-- Campo de Busca Textual Fluida (Digitação Contínua sem perder foco) -->
+            <div style="position:relative; display:flex; align-items:center; width:100%;">
+              <input id="inpBuscaManuais" class="input" style="width:100%; padding-right:${STATE.buscaManual ? '34px' : '12px'}; font-size:13.5px;" 
+                placeholder="🔍 Digite para buscar manual, IT, código de erro ou procedimento (ex: JEDI, calibração, kV, inversor)..." 
+                value="${esc(STATE.buscaManual)}" 
+                oninput="aoDigitarBuscaManual(this.value)" />
+              ${STATE.buscaManual ? `
+                <button type="button" title="Limpar busca" style="position:absolute; right:8px; background:none; border:none; color:#64748b; font-size:16px; font-weight:700; cursor:pointer; padding:4px 6px; line-height:1; border-radius:50%;" onclick="limparBuscaManual()">✕</button>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- PLAYER DE VÍDEO MP4 INTEGRADO -->
+          <div id="videoPlayerContainer" style="display:none; margin-bottom:16px; background:linear-gradient(135deg,#0f172a,#1e293b); padding:14px; border-radius:12px; color:#fff; border:2px solid #f59e0b; box-shadow:0 10px 25px rgba(0,0,0,0.25);">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+              <div>
+                <b id="videoPlayerTitle" style="font-size:14.5px; color:#fbbf24;">🎬 Vídeo Oficial de Instrução & Treinamento eMED</b>
+                <div style="font-size:11.5px; color:#cbd5e1; margin-top:2px;">Streaming Full HD 1080p Otimizado (FastStart) • Narrado em Português</div>
+              </div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <a id="videoDirectLink" href="#" target="_blank" class="btn btn-sm" style="background:#0284c7; color:#fff; text-decoration:none; font-weight:700;">↗️ Abrir em Tela Cheia / Baixar</a>
                 <button class="btn btn-sm btn-danger" onclick="fecharVideoManual()">✕ Fechar Player</button>
               </div>
             </div>
-            <div id="videoErrorBanner" style="display:none;background:#7f1d1d;border:1px solid #ef4444;color:#fecaca;padding:10px 12px;border-radius:8px;margin-bottom:8px;font-size:12.5px;font-weight:600;">
+            <div id="videoErrorBanner" style="display:none; background:#7f1d1d; border:1px solid #ef4444; color:#fecaca; padding:10px 12px; border-radius:8px; margin-bottom:8px; font-size:12.5px; font-weight:600;">
               ⚠️ Falha ao carregar o stream de vídeo: o link temporário pode ter desconectado ou o servidor está reiniciando. Clique em "↗️ Abrir em Tela Cheia" ou verifique se o servidor eMED está online.
             </div>
-            <video id="videoTag" controls playsinline preload="metadata" style="width:100%;max-height:440px;border-radius:8px;background:#000;display:block;"></video>
+            <video id="videoTag" controls playsinline preload="metadata" style="width:100%; max-height:440px; border-radius:8px; background:#000; display:block;"></video>
           </div>
-          <div class="os-grid">
-            ${filtrados.map(m => {
-              const cam = m.caminho_rel || m.rel_path || "";
-              const fmt = m.formato || (m.ext || "PDF").replace(".", "").toUpperCase();
-              const fab = m.fabricante || "HOMOLOGADO EMED";
-              return `
-              <div class="os-card">
-                <div class="os-card-head">
-                  <span class="os-num">📘 ${esc(m.modalidade)}</span>
-                  <span class="badge ${fmt==='PDF'?'concluido':'ativo'}">${esc(fab)} • ${esc(fmt)}</span>
-                </div>
-                <div class="os-card-body">
-                  <div class="os-cli" style="font-size:13.5px;">${esc(m.titulo)}</div>
-                  <div style="font-size:11.5px;color:#64748b;margin-top:4px;">Arquivo: ${esc(m.arquivo)} (${m.tamanho_kb || 120} KB)</div>
-                </div>
-                <div class="os-card-foot" style="display:flex;gap:6px;flex-wrap:wrap;">
-                  ${m.somente_video ? `
-                    <button class="btn btn-amber btn-sm" style="flex:1;font-weight:800;" data-video="${esc(m.video)}" data-titulo="${esc(m.titulo)}" onclick="tocarVideoManual(this.dataset.video, this.dataset.titulo)">
-                      ▶️ Assistir Vídeo de Instrução (MP4)
-                    </button>
-                    <a class="btn btn-outline btn-sm" href="/api/video?name=${encodeURIComponent(m.video)}" download="${esc(m.video)}" target="_blank" style="text-decoration:none;font-weight:700;">
-                      ⬇️ Baixar
-                    </a>
-                  ` : `
-                    <a class="btn btn-primary btn-sm" style="flex:1;" href="/api/manual?path=${encodeURIComponent(cam)}&file=${encodeURIComponent(m.arquivo || '')}&v=rev05" target="_blank">
-                      📄 Abrir Manual Oficial (PDF c/ Logo EMED)
-                    </a>
-                    ${m.video ? `
-                      <button class="btn btn-amber btn-sm" style="font-weight:800;" data-video="${esc(m.video)}" data-titulo="${esc(m.titulo)}" onclick="tocarVideoManual(this.dataset.video, this.dataset.titulo)">
-                        🎬 Vídeo MP4
-                      </button>
-                    ` : ""}
-                  `}
-                </div>
-              </div>
-            `;
-            }).join("")}
+
+          <!-- GRADE DE CARDS ORGANIZADOS -->
+          <div id="gridCardsManuaisContainer">
+            ${htmlCardsManuaisLista(filtrados)}
           </div>
         </div>
       `;
+    }
+
+    function selecionarEquipamentoManual(equipId) {
+      STATE.manualEquipAtivo = equipId;
+      STATE.manualSubAtivo = "TODOS";
+      renderizarTelaPrincipal();
+    }
+
+    function selecionarSubmenuManual(subId) {
+      STATE.manualSubAtivo = subId;
+      renderizarTelaPrincipal();
+    }
+
+    function selecionarTipoManual(tipoId) {
+      STATE.manualTipoAtivo = tipoId;
+      renderizarTelaPrincipal();
+    }
+
+    function htmlCardsManuaisLista(filtrados) {
+      if (!filtrados.length) {
+        return `
+          <div class="section-box" style="padding:28px 18px; text-align:center; color:#64748b; background:#ffffff; border-radius:12px; border:1px dashed #cbd5e1;">
+            <div style="font-size:28px; margin-bottom:6px;">🔎</div>
+            <div style="font-size:15px; font-weight:800; color:#1e293b;">Nenhum documento encontrado com os filtros selecionados.</div>
+            <div style="font-size:12.5px; color:#64748b; margin-top:4px;">Tente selecionar outro modelo, remover o termo de busca ou redefinir para "Todos os Equipamentos".</div>
+            <div style="margin-top:12px;">
+              <button type="button" class="btn btn-outline btn-sm" onclick="limparTodosFiltrosManuais()">🔄 Redefinir Todos os Filtros</button>
+            </div>
+          </div>
+        `;
+      }
+
+      // Se estiver visualizando "Todos os Modelos" de um equipamento com vários modelos, agrupamos por modelo!
+      const equipAtivo = STATE.manualEquipAtivo || "TODOS";
+      const subAtivo = STATE.manualSubAtivo || "TODOS";
+
+      // Agrupamento por Modelo quando em modo aberto
+      if (subAtivo === "TODOS" && (equipAtivo === "TOMOGRAFO" || equipAtivo === "RAIO_X" || equipAtivo === "MAMOGRAFO" || equipAtivo === "TREINAMENTO")) {
+        const grupos = {};
+        filtrados.forEach(m => {
+          if (!grupos[m.subNome]) grupos[m.subNome] = [];
+          grupos[m.subNome].push(m);
+        });
+
+        return Object.entries(grupos).map(([nomeSub, lista]) => `
+          <div style="margin-bottom:20px;">
+            <div style="background:#f1f5f9; border-left:4px solid #0284c7; border-radius:6px; padding:8px 12px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+              <div style="font-size:13.5px; font-weight:900; color:#0f172a;">
+                🔹 ${esc(nomeSub)}
+              </div>
+              <span style="font-size:11px; font-weight:800; background:#0284c7; color:#fff; padding:2px 8px; border-radius:999px;">
+                ${lista.length} doc(s)
+              </span>
+            </div>
+            <div class="os-grid">
+              ${lista.map(htmlSingleCardManual).join("")}
+            </div>
+          </div>
+        `).join("");
+      }
+
+      // Visualização padrão em grade
+      return `
+        <div class="os-grid">
+          ${filtrados.map(htmlSingleCardManual).join("")}
+        </div>
+      `;
+    }
+
+    function htmlSingleCardManual(m) {
+      const cam = m.caminho_rel || m.rel_path || "";
+      const fmt = m.formato || (m.ext || "PDF").replace(".", "").toUpperCase();
+      const fab = m.fabricante || "HOMOLOGADO EMED";
+      const isIT = m.tipoDoc === "IT" || m.tipoDoc === "POP";
+      const badgeTipoClass = isIT ? "obs" : (fmt === "PDF" ? "concluido" : "ativo");
+      const badgeTipoTexto = isIT ? "IT / CALIBRAÇÃO" : (m.video ? "VÍDEO MP4" : "MANUAL OEM");
+
+      return `
+        <div class="os-card" style="display:flex; flex-direction:column; justify-content:space-between;">
+          <div class="os-card-head" style="align-items:flex-start; gap:6px;">
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <span class="os-num" style="font-size:12.5px; font-weight:800; color:#0369a1;">
+                ${m.equipIcon || '📘'} ${esc(m.subNome || m.modalidade)}
+              </span>
+              <span style="font-size:10.5px; font-weight:700; color:#64748b;">
+                ${esc(m.equipNome || m.modalidade)}
+              </span>
+            </div>
+            <span class="badge ${badgeTipoClass}" style="white-space:nowrap; font-size:10px;">
+              ${badgeTipoTexto}
+            </span>
+          </div>
+
+          <div class="os-card-body" style="flex:1;">
+            <div class="os-cli" style="font-size:13.5px; font-weight:800; line-height:1.35; color:#0f172a;">
+              ${esc(m.titulo)}
+            </div>
+            <div style="font-size:11.5px; color:#64748b; margin-top:6px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <span>📁 <b>${esc(fab)}</b></span>
+              <span>•</span>
+              <span style="font-family:monospace; font-size:10.5px; background:#f1f5f9; padding:1px 5px; border-radius:4px;">${esc(m.arquivo)}</span>
+              <span>(${m.tamanho_kb || 120} KB)</span>
+            </div>
+          </div>
+
+          <div class="os-card-foot" style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+            ${m.somente_video ? `
+              <button class="btn btn-amber btn-sm" style="flex:1; font-weight:800;" data-video="${esc(m.video)}" data-titulo="${esc(m.titulo)}" onclick="tocarVideoManual(this.dataset.video, this.dataset.titulo)">
+                ▶️ Assistir Vídeo (MP4)
+              </button>
+              <a class="btn btn-outline btn-sm" href="/api/video?name=${encodeURIComponent(m.video)}" download="${esc(m.video)}" target="_blank" style="text-decoration:none; font-weight:700;">
+                ⬇️ Baixar
+              </a>
+            ` : `
+              <a class="btn btn-primary btn-sm" style="flex:1; font-weight:800; display:inline-flex; align-items:center; justify-content:center; gap:4px;" href="/api/manual?path=${encodeURIComponent(cam)}&file=${encodeURIComponent(m.arquivo || '')}&v=rev05" target="_blank">
+                📄 Abrir Manual Oficial (PDF)
+              </a>
+              ${m.video ? `
+                <button class="btn btn-amber btn-sm" style="font-weight:800;" data-video="${esc(m.video)}" data-titulo="${esc(m.titulo)}" onclick="tocarVideoManual(this.dataset.video, this.dataset.titulo)">
+                  🎬 Vídeo MP4
+                </button>
+              ` : ""}
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    function aoDigitarBuscaManual(termo) {
+      STATE.buscaManual = termo;
+      const grid = document.getElementById("gridCardsManuaisContainer");
+      if (!grid) {
+        renderizarTelaPrincipal();
+        return;
+      }
+      const filtrados = obterManuaisFiltrados();
+      grid.innerHTML = htmlCardsManuaisLista(filtrados);
+      const badgeCount = document.getElementById("badgeContadorManuais");
+      if (badgeCount) badgeCount.innerText = `${filtrados.length} documento(s)`;
+    }
+
+    function limparBuscaManual() {
+      STATE.buscaManual = "";
+      const inp = document.getElementById("inpBuscaManuais");
+      if (inp) {
+        inp.value = "";
+        inp.focus();
+      }
+      aoDigitarBuscaManual("");
+    }
+
+    function limparTodosFiltrosManuais() {
+      STATE.manualEquipAtivo = "TODOS";
+      STATE.manualSubAtivo = "TODOS";
+      STATE.manualTipoAtivo = "TODOS";
+      STATE.buscaManual = "";
+      renderizarTelaPrincipal();
     }
     function tocarVideoManual(nomeVid, titulo) {
       const box = document.getElementById("videoPlayerContainer");
