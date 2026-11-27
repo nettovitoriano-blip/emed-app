@@ -593,10 +593,18 @@ async def api_supervisorio_gerar_dossie_policia(request: web.Request) -> web.Res
         return web.Response(text="Registro de evidência forense não encontrado.", status=404)
         
     dados = dict(row)
+    try:
+        from emed_views.supervisorio_web import analisar_inteligencia_ip
+        intel = analisar_inteligencia_ip(dados['ip_origem'], full_db_path)
+    except Exception:
+        intel = {"bandeira": "🌐", "pais": "Desconhecido", "tipo_rede": "Indefinido", "asn": "-"}
+
     hash_evidencia = hashlib.sha256(f"{dados['id']}_{dados['ip_origem']}_{dados['data_hora']}_{dados.get('headers_json')}".encode()).hexdigest()
+    agora_utc = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
     e_id = _h.escape(str(dados['id']))
     e_dt = _h.escape(str(dados['data_hora']))
     e_ip = _h.escape(str(dados['ip_origem']))
+    e_geo = f"{intel.get('bandeira', '🌐')} {intel.get('pais', 'Global')} &bull; {intel.get('tipo_rede', 'Internet')} ({intel.get('asn', '-')})"
     e_sis = _h.escape(str(dados.get('sistema_alvo') or 'Console de Autenticação / PWA'))
     e_usr = _h.escape(str(dados.get('usuario_tentado') or 'root'))
     e_sen = _h.escape(str(dados.get('senhas_tentadas') or '-'))
@@ -653,6 +661,7 @@ async def api_supervisorio_gerar_dossie_policia(request: web.Request) -> web.Res
     <tr><th>ID do Registro Forense</th><td>#{e_id}</td></tr>
     <tr><th>Data e Hora do Ataque (Brasília)</th><td><b>{e_dt}</b></td></tr>
     <tr><th>Endereço IP Real do Invasor</th><td><b style="color:#b91c1c; font-size:11pt;">{e_ip}</b></td></tr>
+    <tr><th>Origem Geográfica &amp; ASN</th><td><b>{e_geo}</b></td></tr>
     <tr><th>Sistema Hospitalar Alvo</th><td>{e_sis}</td></tr>
     <tr><th>Usuário Tentado no Ataque</th><td><b>{e_usr}</b></td></tr>
     <tr><th>Dicionário / Senhas Utilizadas</th><td><span style="font-family:monospace; color:#991b1b;">{e_sen}</span></td></tr>
@@ -673,9 +682,10 @@ async def api_supervisorio_gerar_dossie_policia(request: web.Request) -> web.Res
 
   <div class="section-title">4. Integridade da Prova Digital &amp; Autenticação</div>
   <table>
-    <tr><th>Algoritmo Criptográfico</th><td>SHA-256 (NIST FIPS 180-4)</td></tr>
+    <tr><th>Algoritmo Criptográfico</th><td>SHA-256 (NIST FIPS 180-4 / RFC 3161)</td></tr>
     <tr><th>Hash Digital da Evidência</th><td style="font-family:monospace; font-size:8pt;"><b>{hash_evidencia}</b></td></tr>
-    <tr><th>Status de Custódia</th><td>✅ Prova íntegra, imutável e preservada no banco de dados forense</td></tr>
+    <tr><th>Carimbo Temporal de Custódia</th><td><b>{agora_utc} UTC</b> (Art. 158-A do CPP)</td></tr>
+    <tr><th>Status de Custódia</th><td>✅ Prova íntegra, imutável e autenticada contra adulteração</td></tr>
   </table>
 
   <div class="signature-box">

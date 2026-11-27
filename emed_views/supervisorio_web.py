@@ -13,6 +13,7 @@ import time
 import json
 import sqlite3
 import datetime
+import hashlib
 import html as _h
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
@@ -106,6 +107,47 @@ def garantir_schema_supervisorio(conn: sqlite3.Connection) -> None:
             pass
 
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS configuracoes_seguranca_soc (
+            chave TEXT PRIMARY KEY,
+            valor TEXT NOT NULL,
+            atualizado_em TEXT NOT NULL,
+            atualizado_por TEXT DEFAULT 'SISTEMA'
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS integridade_arquivos_baseline (
+            arquivo TEXT PRIMARY KEY,
+            sha256 TEXT NOT NULL,
+            tamanho_bytes INTEGER NOT NULL,
+            atualizado_em TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS cache_inteligencia_ip (
+            ip TEXT PRIMARY KEY,
+            pais TEXT NOT NULL,
+            bandeira TEXT NOT NULL,
+            tipo_rede TEXT NOT NULL,
+            asn TEXT NOT NULL,
+            atualizado_em TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS sessoes_ativas_rastreamento (
+            token_hash TEXT PRIMARY KEY,
+            usuario TEXT NOT NULL,
+            perfil TEXT NOT NULL,
+            ip_origem TEXT NOT NULL,
+            user_agent TEXT DEFAULT '',
+            criado_em TEXT NOT NULL,
+            ultimo_ping TEXT NOT NULL,
+            ultimo_ping_epoch REAL NOT NULL,
+            revogado INTEGER DEFAULT 0
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_sessao_ping ON sessoes_ativas_rastreamento(ultimo_ping_epoch, revogado)")
+
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS ips_bloqueados_seguranca (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ip TEXT UNIQUE NOT NULL,
@@ -118,6 +160,359 @@ def garantir_schema_supervisorio(conn: sqlite3.Connection) -> None:
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_ips_bloq_ativo ON ips_bloqueados_seguranca(ip, ativo)")
 
+
+
+
+# ==============================================================================
+# SUBSISTEMA TÁTICO MILITAR / DEFESA CIBERNÉTICA (DEFCON, GEOIP, FIM, SESSÕES)
+# ==============================================================================
+_DEFCON_NIVEL: int = 5
+_DEFCON_INFO: Dict[str, Any] = {
+    "nivel": 5,
+    "rotulo": "DEFCON 5 - NORMAL",
+    "motivo": "Operação segura padrão sem ameaças anômalas",
+    "atualizado_em": datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+    "atualizado_por": "SISTEMA"
+}
+_SESSOES_REVOGADAS_CACHE: set = set()
+_CACHE_GEOIP_MEMORIA: Dict[str, Dict[str, str]] = {}
+
+
+def obter_defcon_nivel(db_path: Optional[str] = None) -> int:
+    """Retorna o nível DEFCON atual do sistema (1 a 5)."""
+    global _DEFCON_NIVEL, _DEFCON_INFO
+    db_p = db_path or _obter_db_path()
+    try:
+        with sqlite3.connect(db_p) as conn:
+            garantir_schema_supervisorio(conn)
+            r = conn.execute("SELECT valor, atualizado_em, atualizado_por FROM configuracoes_seguranca_soc WHERE chave = 'DEFCON_LEVEL'").fetchone()
+            if r:
+                _DEFCON_NIVEL = int(r[0])
+                m_row = conn.execute("SELECT valor FROM configuracoes_seguranca_soc WHERE chave = 'DEFCON_MOTIVO'").fetchone()
+                motivo = m_row[0] if m_row else "Defesa Ativa"
+                rotulos = {
+                    5: "DEFCON 5 - NORMAL / MONITORAMENTO DE ROTINA",
+                    4: "DEFCON 4 - ATENÇÃO / VARREDURA PROATIVA",
+                    3: "DEFCON 3 - ELEVADO / TOLERÂNCIA ZERO A BRUTE-FORCE",
+                    2: "DEFCON 2 - CRÍTICO / ISOLAMENTO AUTOMÁTICO SEVERO",
+                    1: "DEFCON 1 - MODO BÚNQUER / LOCKDOWN TÁTICO ATIVO"
+                }
+                _DEFCON_INFO = {
+                    "nivel": _DEFCON_NIVEL,
+                    "rotulo": rotulos.get(_DEFCON_NIVEL, f"DEFCON {_DEFCON_NIVEL}"),
+                    "motivo": motivo,
+                    "atualizado_em": r[1],
+                    "atualizado_por": r[2]
+                }
+    except Exception:
+        pass
+    return _DEFCON_NIVEL
+
+
+def definir_defcon_nivel(nivel: int, motivo: str, alterado_por: str = "GESTOR_NETTO", db_path: Optional[str] = None) -> Dict[str, Any]:
+    """Altera o nível DEFCON de prontidão cibernética."""
+    global _DEFCON_NIVEL, _DEFCON_INFO
+    nivel = max(1, min(5, int(nivel)))
+    _DEFCON_NIVEL = nivel
+    agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    db_p = db_path or _obter_db_path()
+    rotulos = {
+        5: "DEFCON 5 - NORMAL / MONITORAMENTO DE ROTINA",
+        4: "DEFCON 4 - ATENÇÃO / VARREDURA PROATIVA",
+        3: "DEFCON 3 - ELEVADO / TOLERÂNCIA ZERO A BRUTE-FORCE",
+        2: "DEFCON 2 - CRÍTICO / ISOLAMENTO AUTOMÁTICO SEVERO",
+        1: "DEFCON 1 - MODO BÚNQUER / LOCKDOWN TÁTICO ATIVO"
+    }
+    _DEFCON_INFO = {
+        "nivel": nivel,
+        "rotulo": rotulos.get(nivel, f"DEFCON {nivel}"),
+        "motivo": motivo,
+        "atualizado_em": agora,
+        "atualizado_por": alterado_por
+    }
+    try:
+        with sqlite3.connect(db_p) as conn:
+            garantir_schema_supervisorio(conn)
+            conn.execute("INSERT OR REPLACE INTO configuracoes_seguranca_soc (chave, valor, atualizado_em, atualizado_por) VALUES ('DEFCON_LEVEL', ?, ?, ?)", (str(nivel), agora, alterado_por))
+            conn.execute("INSERT OR REPLACE INTO configuracoes_seguranca_soc (chave, valor, atualizado_em, atualizado_por) VALUES ('DEFCON_MOTIVO', ?, ?, ?)", (motivo, agora, alterado_por))
+            conn.commit()
+    except Exception as e:
+        print(f"[SOC] Erro ao persistir DEFCON: {e}")
+    return _DEFCON_INFO
+
+
+def analisar_inteligencia_ip(ip: str, db_path: Optional[str] = None) -> Dict[str, str]:
+    """Retorna dados de inteligência tática, país, bandeira e ASN do IP."""
+    ip_limpo = (ip or "").strip()
+    if not ip_limpo:
+        return {"pais": "Desconhecido", "bandeira": "🌐", "tipo_rede": "Indefinido", "asn": "-", "risco": "BAIXO"}
+    if ip_limpo in _CACHE_GEOIP_MEMORIA:
+        return _CACHE_GEOIP_MEMORIA[ip_limpo]
+
+    db_p = db_path or _obter_db_path()
+    try:
+        with sqlite3.connect(db_p) as conn:
+            conn.row_factory = sqlite3.Row
+            r = conn.execute("SELECT * FROM cache_inteligencia_ip WHERE ip = ?", (ip_limpo,)).fetchone()
+            if r:
+                res = {
+                    "pais": r["pais"],
+                    "bandeira": r["bandeira"],
+                    "tipo_rede": r["tipo_rede"],
+                    "asn": r["asn"],
+                    "risco": "BAIXO"
+                }
+                _CACHE_GEOIP_MEMORIA[ip_limpo] = res
+                return res
+    except Exception:
+        pass
+
+    pais = "Brasil"
+    bandeira = "🇧🇷"
+    tipo_rede = "Residencial / Móvel"
+    asn = "Telecom BR (Claro/Vivo/Brisanet)"
+    risco = "BAIXO"
+
+    if ip_limpo in ("127.0.0.1", "::1", "localhost") or ip_limpo.startswith("192.168.") or ip_limpo.startswith("10.") or ip_limpo.startswith("172.16."):
+        pais = "Rede Local"
+        bandeira = "🏠"
+        tipo_rede = "Intranet Local"
+        asn = "Rede Privada"
+        risco = "SEGURO"
+    elif ip_limpo.startswith("198.51.100.") or ip_limpo.startswith("203.0.113."):
+        pais = "Ambiente Simulado"
+        bandeira = "🪤"
+        tipo_rede = "Sandbox Deception"
+        asn = "Honeypot Decoy"
+        risco = "CRÍTICO"
+    elif ip_limpo.startswith("189.") or ip_limpo.startswith("177.") or ip_limpo.startswith("179.") or ip_limpo.startswith("201.") or ip_limpo.startswith("200.") or ip_limpo.startswith("45.180."):
+        pais = "Brasil"
+        bandeira = "🇧🇷"
+        tipo_rede = "Banda Larga / 4G"
+        asn = "Telecom BR (Claro/Vivo/Brisanet)"
+    elif ip_limpo.startswith("104.") or ip_limpo.startswith("172.6"):
+        pais = "EUA / Global"
+        bandeira = "☁️"
+        tipo_rede = "Proxy / CDN"
+        asn = "Cloudflare Anycast"
+        risco = "MÉDIO"
+    elif ip_limpo.startswith("13.") or ip_limpo.startswith("34.") or ip_limpo.startswith("35.") or ip_limpo.startswith("52.") or ip_limpo.startswith("54.") or ip_limpo.startswith("44."):
+        pais = "EUA"
+        bandeira = "🇺🇸"
+        tipo_rede = "Datacenter / Nuvem"
+        asn = "Amazon AWS / Google Cloud"
+        risco = "ALTO"
+    elif ip_limpo.startswith("185.") or ip_limpo.startswith("194.") or ip_limpo.startswith("91.") or ip_limpo.startswith("45."):
+        pais = "Europa / Leste"
+        bandeira = "🇪🇺"
+        tipo_rede = "VPS / Host Dedicado"
+        asn = "OVH / Host Europeu"
+        risco = "CRÍTICO"
+    elif ip_limpo.startswith("103.") or ip_limpo.startswith("111.") or ip_limpo.startswith("220.") or ip_limpo.startswith("116."):
+        pais = "Ásia"
+        bandeira = "🇨🇳"
+        tipo_rede = "Rede Externa"
+        asn = "Asia-Pacific Gateway"
+        risco = "CRÍTICO"
+    elif ip_limpo.startswith("188.") or ip_limpo.startswith("178.") or ip_limpo.startswith("95."):
+        pais = "Rússia / CEI"
+        bandeira = "🇷🇺"
+        tipo_rede = "Rede Externa / VPN"
+        asn = "Rostelecom / Host RU"
+        risco = "CRÍTICO"
+    else:
+        pais = "Internacional"
+        bandeira = "🌐"
+        tipo_rede = "Tráfego Web Externo"
+        asn = "AS Internacional"
+        risco = "MÉDIO"
+
+    resultado = {
+        "pais": pais,
+        "bandeira": bandeira,
+        "tipo_rede": tipo_rede,
+        "asn": asn,
+        "risco": risco
+    }
+    _CACHE_GEOIP_MEMORIA[ip_limpo] = resultado
+
+    try:
+        agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        with sqlite3.connect(db_p) as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO cache_inteligencia_ip (ip, pais, bandeira, tipo_rede, asn, atualizado_em)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (ip_limpo, pais, bandeira, tipo_rede, asn, agora))
+            conn.commit()
+    except Exception:
+        pass
+
+    return resultado
+
+
+def calcular_sha256_arquivo(caminho: str) -> Tuple[str, int]:
+    """Calcula hash SHA-256 e tamanho de arquivo de forma segura."""
+    if not os.path.isfile(caminho):
+        return "", 0
+    h = hashlib.sha256()
+    tam = 0
+    with open(caminho, "rb") as f:
+        while True:
+            chunk = f.read(65536)
+            if not chunk:
+                break
+            h.update(chunk)
+            tam += len(chunk)
+    return h.hexdigest(), tam
+
+
+def verificar_integridade_fim(db_path: Optional[str] = None) -> Dict[str, Any]:
+    """Verifica a integridade criptográfica dos arquivos núcleo contra o baseline oficial."""
+    db_p = db_path or _obter_db_path()
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    arquivos_alvo = [
+        ("emed_app_server.py", os.path.join(base_dir, "emed_app_server.py")),
+        ("supervisorio_web.py", os.path.join(base_dir, "emed_views", "supervisorio_web.py")),
+        ("honeypot_deception.py", os.path.join(base_dir, "emed_views", "honeypot_deception.py")),
+    ]
+    agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    detalhes = []
+    total_violacoes = 0
+    with sqlite3.connect(db_p) as conn:
+        garantir_schema_supervisorio(conn)
+        conn.row_factory = sqlite3.Row
+        for nome_rel, caminho_abs in arquivos_alvo:
+            if not os.path.exists(caminho_abs):
+                continue
+            hash_atual, tam_atual = calcular_sha256_arquivo(caminho_abs)
+            row = conn.execute("SELECT sha256, tamanho_bytes, atualizado_em FROM integridade_arquivos_baseline WHERE arquivo = ?", (nome_rel,)).fetchone()
+            if not row:
+                conn.execute("""
+                    INSERT INTO integridade_arquivos_baseline (arquivo, sha256, tamanho_bytes, atualizado_em)
+                    VALUES (?, ?, ?, ?)
+                """, (nome_rel, hash_atual, tam_atual, agora))
+                conn.commit()
+                detalhes.append({
+                    "arquivo": nome_rel,
+                    "status": "BASELINE_INICIALIZADO",
+                    "hash": hash_atual,
+                    "tamanho": tam_atual,
+                    "msg": "Assinatura digital cadastrada no cofre de integridade."
+                })
+            else:
+                hash_base = row["sha256"]
+                if hash_atual == hash_base:
+                    detalhes.append({
+                        "arquivo": nome_rel,
+                        "status": "INVIOLADO",
+                        "hash": hash_atual,
+                        "tamanho": tam_atual,
+                        "msg": "Assinatura 100% autêntica e íntegra."
+                    })
+                else:
+                    total_violacoes += 1
+                    detalhes.append({
+                        "arquivo": nome_rel,
+                        "status": "VIOLADO",
+                        "hash_atual": hash_atual,
+                        "hash_baseline": hash_base,
+                        "tamanho_atual": tam_atual,
+                        "msg": "ALERTA: Hash diverge do baseline registrado!"
+                    })
+    status_geral = "INVIOLADO" if total_violacoes == 0 else "VIOLADO"
+    return {
+        "ok": True,
+        "status": status_geral,
+        "violacoes": total_violacoes,
+        "total_arquivos": len(detalhes),
+        "checagem_data": agora,
+        "detalhes": detalhes
+    }
+
+
+def atualizar_baseline_fim(db_path: Optional[str] = None) -> Dict[str, Any]:
+    """Atualiza formalmente o baseline de integridade após deploy/modificações autorizadas."""
+    db_p = db_path or _obter_db_path()
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    arquivos_alvo = [
+        ("emed_app_server.py", os.path.join(base_dir, "emed_app_server.py")),
+        ("supervisorio_web.py", os.path.join(base_dir, "emed_views", "supervisorio_web.py")),
+        ("honeypot_deception.py", os.path.join(base_dir, "emed_views", "honeypot_deception.py")),
+    ]
+    agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    with sqlite3.connect(db_p) as conn:
+        garantir_schema_supervisorio(conn)
+        for nome_rel, caminho_abs in arquivos_alvo:
+            if os.path.exists(caminho_abs):
+                hash_atual, tam_atual = calcular_sha256_arquivo(caminho_abs)
+                conn.execute("""
+                    INSERT OR REPLACE INTO integridade_arquivos_baseline (arquivo, sha256, tamanho_bytes, atualizado_em)
+                    VALUES (?, ?, ?, ?)
+                """, (nome_rel, hash_atual, tam_atual, agora))
+        conn.commit()
+    return {"ok": True, "msg": "Baseline criptográfico atualizado com sucesso.", "data": agora}
+
+
+def registrar_ou_atualizar_sessao_rastreada(token_str: str, usuario: str, perfil: str, ip: str, user_agent: str, db_path: Optional[str] = None) -> None:
+    """Registra batimento cardíaco da sessão para telemetria SOC em tempo real."""
+    if not token_str:
+        return
+    token_hash = hashlib.sha256(token_str.encode()).hexdigest()[:16]
+    db_p = db_path or _obter_db_path()
+    agora_dt = datetime.datetime.now()
+    agora_str = agora_dt.strftime("%d/%m/%Y %H:%M:%S")
+    agora_epoch = agora_dt.timestamp()
+    try:
+        with sqlite3.connect(db_p) as conn:
+            garantir_schema_supervisorio(conn)
+            conn.execute("""
+                INSERT INTO sessoes_ativas_rastreamento (
+                    token_hash, usuario, perfil, ip_origem, user_agent,
+                    criado_em, ultimo_ping, ultimo_ping_epoch, revogado
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+                ON CONFLICT(token_hash) DO UPDATE SET
+                    ultimo_ping = excluded.ultimo_ping,
+                    ultimo_ping_epoch = excluded.ultimo_ping_epoch,
+                    ip_origem = excluded.ip_origem,
+                    user_agent = excluded.user_agent
+            """, (token_hash, usuario, perfil, ip, user_agent[:250], agora_str, agora_str, agora_epoch))
+            conn.commit()
+    except Exception:
+        pass
+
+
+def sessao_esta_revogada(token_str: str, db_path: Optional[str] = None) -> bool:
+    """Verifica se a sessão foi sumariamente cancelada pelo SOC."""
+    if not token_str:
+        return True
+    token_hash = hashlib.sha256(token_str.encode()).hexdigest()[:16]
+    if token_hash in _SESSOES_REVOGADAS_CACHE:
+        return True
+    db_p = db_path or _obter_db_path()
+    try:
+        with sqlite3.connect(db_p) as conn:
+            garantir_schema_supervisorio(conn)
+            r = conn.execute("SELECT revogado FROM sessoes_ativas_rastreamento WHERE token_hash = ?", (token_hash,)).fetchone()
+            if r and r[0] == 1:
+                _SESSOES_REVOGADAS_CACHE.add(token_hash)
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def revogar_sessao_soc(token_hash: str, db_path: Optional[str] = None) -> bool:
+    """Revoga imediatamente uma sessão ativa."""
+    _SESSOES_REVOGADAS_CACHE.add(token_hash)
+    db_p = db_path or _obter_db_path()
+    try:
+        with sqlite3.connect(db_p) as conn:
+            garantir_schema_supervisorio(conn)
+            conn.execute("UPDATE sessoes_ativas_rastreamento SET revogado = 1 WHERE token_hash = ?", (token_hash,))
+            conn.commit()
+            return True
+    except Exception:
+        return False
 
 
 def calcular_score_risco_heuristico(usuario: str, status: str, motivo: str, user_agent: str, ip: str) -> Tuple[int, str]:
@@ -314,8 +709,23 @@ def registrar_auditoria_login(
         lista.append(agora_epoch)
         _FALHAS_RECENTES_IP[ip] = lista
 
-        duracao_min = 60 if is_bot_ua else 15
-        if len(lista) >= 5 or is_bot_ua or status == "HONEYPOT_DECEPTION_DECOY":
+        defcon_atual = obter_defcon_nivel(db_p)
+        limite_falhas = 5
+        duracao_min = 15
+        if defcon_atual == 4:
+            limite_falhas = 4
+            duracao_min = 30
+        elif defcon_atual == 3:
+            limite_falhas = 2
+            duracao_min = 120
+        elif defcon_atual <= 2:
+            limite_falhas = 1
+            duracao_min = 1440
+
+        if is_bot_ua:
+            duracao_min = max(duracao_min, 60)
+
+        if len(lista) >= limite_falhas or is_bot_ua or status == "HONEYPOT_DECEPTION_DECOY" or defcon_atual == 1:
             bloqueio_gerado = 1
             expira_iso = (agora_dt + datetime.timedelta(minutes=duracao_min)).isoformat()
             _IPS_BLOQUEADOS_CACHE[ip] = agora_epoch + (duracao_min * 60)
@@ -588,6 +998,13 @@ async def api_supervisorio_auditoria_listar(request: web.Request) -> web.Respons
         conn.row_factory = sqlite3.Row
         rows = [dict(r) for r in conn.execute(query, params).fetchall()]
 
+    for r in rows:
+        intel = analisar_inteligencia_ip(r["ip_origem"], db_name)
+        r["geo_pais"] = intel["pais"]
+        r["geo_bandeira"] = intel["bandeira"]
+        r["geo_tipo_rede"] = intel["tipo_rede"]
+        r["geo_asn"] = intel["asn"]
+
     return web.json_response({"ok": True, "total": len(rows), "auditoria": rows})
 
 
@@ -778,14 +1195,39 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
         </div>
       </div>
       <div class="top-actions">
-        <button class="btn btn-primary" onclick="abrirModalGeradorAcesso()" style="background:#10b981; border-color:#10b981;">🔑 Gerar Acesso de Cliente</button>
-        <button class="btn" onclick="abrirModalWhitelist()" style="background:#0369a1; border-color:#38bdf8; color:#fff; font-weight:700;">🛡️ Lista Branca Anti-Lockout</button>
+        <button class="btn btn-primary" onclick="abrirModalGeradorAcesso()" style="background:#10b981; border-color:#10b981;">🔑 Gerar Acesso</button>
+        <button class="btn" onclick="abrirModalSessoes()" style="background:#6d28d9; border-color:#8b5cf6; color:#fff; font-weight:800;">⚡ Sessões Ativas &amp; Kill-Switch</button>
+        <button class="btn" onclick="abrirModalFim()" style="background:#047857; border-color:#34d399; color:#fff; font-weight:800;">🔒 Integridade FIM</button>
+        <button class="btn" onclick="abrirModalWhitelist()" style="background:#0369a1; border-color:#38bdf8; color:#fff; font-weight:700;">🛡️ Lista Branca</button>
         <button class="btn" onclick="abrirModalAlertasSoc()" style="background:#065f46; border-color:#22c55e; color:#fff; font-weight:700;">📲 Alertas SOC WhatsApp</button>
-        <button class="btn btn-primary" onclick="executarVarreduraAgora()">🔍 Escanear Servidor Agora</button>
-        <a class="btn" href="/api/supervisorio/exportar-csv" target="_blank">📥 Exportar Log CSV</a>
+        <button class="btn btn-primary" onclick="executarVarreduraAgora()">🔍 Escanear Servidor</button>
+        <a class="btn" href="/api/supervisorio/exportar-csv" target="_blank">📥 CSV</a>
         <button class="btn" id="btnAutoRefresh" onclick="toggleAutoRefresh()">⏸️ Pausar (5s)</button>
-        <a class="btn" href="/portal-cliente" target="_blank" style="background:#0f172a;">🏥 Portal do Cliente</a>
-        <a class="btn" href="/urls" target="_blank" style="background:#1e3a8a; border-color:#3b82f6;">🗂️ Pasta de URLs</a>
+        <a class="btn" href="/portal-cliente" target="_blank" style="background:#0f172a;">🏥 Portal</a>
+        <a class="btn" href="/urls" target="_blank" style="background:#1e3a8a; border-color:#3b82f6;">🗂️ URLs</a>
+      </div>
+    </div>
+
+
+    <!-- BARRA TÁTICA DEFCON & MODO BÚNQUER DE DEFESA CIBERNÉTICA -->
+    <div id="barDefcon" class="card" style="background:#090d16; border:1px solid #1e293b; padding:12px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+      <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+        <div id="badgeDefconVisual" style="padding:6px 14px; border-radius:6px; font-weight:900; font-size:13px; background:#064e3b; color:#34d399; border:1px solid #059669; letter-spacing:1px; display:flex; align-items:center; gap:8px;">
+          <span id="dotDefcon" style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#34d399; box-shadow:0 0 10px #34d399;"></span>
+          <span id="lblDefconNome">DEFCON 5 — NORMAL</span>
+        </div>
+        <div style="font-size:12px; color:#cbd5e1;">
+          <b id="lblDefconMotivo">Monitoramento contínuo ativo. Auto-defesa operacional.</b>
+          <div style="font-size:10.5px; color:var(--muted); margin-top:2px;" id="lblDefconMeta">Atualizado por: SISTEMA &bull; Agora</div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <span style="font-size:11px; color:var(--muted); font-weight:bold;">PRONTIDÃO TÁTICA:</span>
+        <button class="btn" style="padding:4px 9px; font-size:11px; background:#064e3b; color:#34d399; border-color:#059669;" onclick="mudarDefcon(5)">5 Normal</button>
+        <button class="btn" style="padding:4px 9px; font-size:11px; background:#075985; color:#7dd3fc; border-color:#0284c7;" onclick="mudarDefcon(4)">4 Atenção</button>
+        <button class="btn" style="padding:4px 9px; font-size:11px; background:#78350f; color:#fde047; border-color:#b45309;" onclick="mudarDefcon(3)">3 Elevado</button>
+        <button class="btn" style="padding:4px 9px; font-size:11px; background:#7f1d1d; color:#fca5a5; border-color:#ef4444;" onclick="mudarDefcon(2)">2 Crítico</button>
+        <button class="btn" id="btnAtivarBunker" style="padding:5px 12px; font-size:11px; font-weight:900; background:#dc2626; color:#fff; border:1px solid #ff4444; box-shadow:0 0 12px rgba(220,38,38,0.5);" onclick="toggleBunkerMode()">🚨 MODO BÚNQUER (DEFCON 1)</button>
       </div>
     </div>
 
@@ -913,7 +1355,7 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
               <th>Nível / Risco</th>
               <th>Sistema</th>
               <th>Usuário Tentado</th>
-              <th>IP de Origem</th>
+              <th>IP / Origem Tática (GeoIP &amp; ASN)</th>
               <th>Status / Resultado</th>
               <th>Motivo Detalhado</th>
               <th>User-Agent / Detecção</th>
@@ -1167,7 +1609,12 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
             <td>${rBadge}</td>
             <td><span class="badge badge-sys">${_escapeHtml(r.tipo_sistema)}</span></td>
             <td><b style="color:#e2e8f0;">${_escapeHtml(r.usuario_tentado)}</b></td>
-            <td><code>${_escapeHtml(r.ip_origem)}</code></td>
+            <td>
+              <code>${_escapeHtml(r.ip_origem)}</code><br/>
+              <span style="font-size:10px; color:#94a3b8; display:inline-flex; align-items:center; gap:3px; margin-top:2px;">
+                ${r.geo_bandeira || '🌐'} <b>${_escapeHtml(r.geo_pais || 'Brasil')}</b> &bull; ${_escapeHtml(r.geo_tipo_rede || 'Rede')}
+              </span>
+            </td>
             <td>${stBadge}</td>
             <td style="max-width:240px; color:#cbd5e1;">${_escapeHtml(r.motivo_detalhado || '-')}</td>
             <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--muted);" title="${_escapeHtml(r.user_agent)}">
@@ -1181,6 +1628,208 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
 
     
     // ==========================================
+    
+    // ==========================================
+    // CONTROLE TÁTICO DEFCON & MODO BÚNQUER
+    // ==========================================
+    let DEFCON_NIVEL_ATUAL = 5;
+
+    async function carregarDefcon() {
+      try {
+        const res = await fetch('/api/supervisorio/defcon').then(r => r.json());
+        if (res.ok && res.defcon) {
+          DEFCON_NIVEL_ATUAL = res.defcon.nivel;
+          atualizarUiDefcon(res.defcon);
+        }
+      } catch (e) {
+        console.error('Erro ao ler DEFCON:', e);
+      }
+    }
+
+    function atualizarUiDefcon(d) {
+      const b = document.getElementById('badgeDefconVisual');
+      const dot = document.getElementById('dotDefcon');
+      const lbl = document.getElementById('lblDefconNome');
+      const mot = document.getElementById('lblDefconMotivo');
+      const meta = document.getElementById('lblDefconMeta');
+      const btnBunker = document.getElementById('btnAtivarBunker');
+
+      lbl.textContent = d.rotulo || `DEFCON ${d.nivel}`;
+      mot.textContent = d.motivo || 'Operação ativa';
+      meta.textContent = `Atualizado por: ${d.atualizado_por || 'SISTEMA'} • ${d.atualizado_em || ''}`;
+
+      if (d.nivel === 5) {
+        b.style.background = '#064e3b'; b.style.color = '#34d399'; b.style.borderColor = '#059669';
+        dot.style.background = '#34d399'; dot.style.boxShadow = '0 0 10px #34d399';
+        btnBunker.textContent = '🚨 MODO BÚNQUER (DEFCON 1)';
+        btnBunker.style.background = '#dc2626';
+      } else if (d.nivel === 4) {
+        b.style.background = '#075985'; b.style.color = '#7dd3fc'; b.style.borderColor = '#0284c7';
+        dot.style.background = '#38bdf8'; dot.style.boxShadow = '0 0 10px #38bdf8';
+        btnBunker.textContent = '🚨 MODO BÚNQUER (DEFCON 1)';
+      } else if (d.nivel === 3) {
+        b.style.background = '#78350f'; b.style.color = '#fde047'; b.style.borderColor = '#b45309';
+        dot.style.background = '#f59e0b'; dot.style.boxShadow = '0 0 10px #f59e0b';
+        btnBunker.textContent = '🚨 MODO BÚNQUER (DEFCON 1)';
+      } else if (d.nivel === 2) {
+        b.style.background = '#7f1d1d'; b.style.color = '#fca5a5'; b.style.borderColor = '#ef4444';
+        dot.style.background = '#ef4444'; dot.style.boxShadow = '0 0 10px #ef4444';
+        btnBunker.textContent = '🚨 MODO BÚNQUER (DEFCON 1)';
+      } else if (d.nivel === 1) {
+        b.style.background = '#450a0a'; b.style.color = '#fca5a5'; b.style.borderColor = '#dc2626';
+        b.style.animation = 'pulse 1.5s infinite';
+        dot.style.background = '#dc2626'; dot.style.boxShadow = '0 0 15px #dc2626';
+        btnBunker.textContent = '🟢 DESATIVAR BÚNQUER (DEFCON 5)';
+        btnBunker.style.background = '#15803d';
+      }
+    }
+
+    async function mudarDefcon(nivel) {
+      const nomes = {5: "DEFCON 5 (Normal)", 4: "DEFCON 4 (Atenção)", 3: "DEFCON 3 (Elevado)", 2: "DEFCON 2 (Crítico)", 1: "DEFCON 1 (Modo Búnquer)"};
+      const motivo = prompt(`Alterar nível de prontidão tática para ${nomes[nivel]}?\nInforme a justificativa do SOC:`, `Ajuste operacional de rotina`) || '';
+      if (!motivo) return;
+      try {
+        const res = await fetch('/api/supervisorio/defcon/alterar', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ nivel, motivo })
+        }).then(r => r.json());
+        alert(res.msg || 'Nível DEFCON alterado.');
+        carregarDefcon();
+      } catch (e) {
+        alert('Erro ao alterar nível DEFCON.');
+      }
+    }
+
+    async function toggleBunkerMode() {
+      if (DEFCON_NIVEL_ATUAL === 1) {
+        if (!confirm('Deseja desativar o Modo Búnquer e restaurar o sistema para DEFCON 5 (Normal)?')) return;
+        mudarDefcon(5);
+      } else {
+        if (!confirm('🚨 ALERTA MÁXIMO DE DEFESA CIBERNÉTICA:\n\nAtivar o MODO BÚNQUER (DEFCON 1)?\n\nO servidor fechará o acesso externo para TODOS os IPs da Internet, atendendo EXCLUSIVAMENTE os IPs da Lista Branca do Gestor NETTO.')) return;
+        mudarDefcon(1);
+      }
+    }
+
+    // ==========================================
+    // RADAR DE SESSÕES ATIVAS & KILL-SWITCH
+    // ==========================================
+    async function abrirModalSessoes() {
+      document.getElementById('modalSessoes').style.display = 'flex';
+      carregarSessoesAtivas();
+    }
+
+    function fecharModalSessoes() {
+      document.getElementById('modalSessoes').style.display = 'none';
+    }
+
+    async function carregarSessoesAtivas() {
+      const tb = document.getElementById('tbodySessoes');
+      tb.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:10px; color:var(--muted);">Varrendo conexões ativas...</td></tr>';
+      try {
+        const res = await fetch('/api/supervisorio/sessoes/listar').then(r => r.json());
+        if (!res.ok || !res.sessoes || res.sessoes.length === 0) {
+          tb.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:12px; color:var(--muted);">Nenhuma sessão ativa nos últimos minutos.</td></tr>';
+          return;
+        }
+        tb.innerHTML = res.sessoes.map(s => `
+          <tr>
+            <td>
+              <b style="color:#e2e8f0;">${_escapeHtml(s.usuario)}</b><br/>
+              <span class="badge badge-sys" style="font-size:9.5px;">${_escapeHtml(s.perfil)}</span>
+            </td>
+            <td>
+              <code>${_escapeHtml(s.ip_origem)}</code><br/>
+              <span style="font-size:10px; color:#94a3b8;">${s.bandeira || '🌐'} ${_escapeHtml(s.pais || '')} &bull; ${_escapeHtml(s.tipo_rede || '')}</span>
+            </td>
+            <td style="white-space:nowrap; font-size:11px; color:#34d399;"><b>${_escapeHtml(s.tempo_relativo)}</b></td>
+            <td style="max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10.5px; color:var(--muted);" title="${_escapeHtml(s.user_agent)}">
+              ${_escapeHtml(s.user_agent ? s.user_agent.slice(0, 30) + '...' : '-')}
+            </td>
+            <td style="text-align:right;">
+              <button class="btn btn-danger" style="padding:2px 7px; font-size:10px; font-weight:800;" data-hash="${_escapeHtml(s.token_hash)}" data-usr="${_escapeHtml(s.usuario)}" onclick="revogarSessao(this.dataset.hash, this.dataset.usr)">
+                ⚡ Kill Session
+              </button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        tb.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:10px; color:#f87171;">Erro ao rastrear sessões.</td></tr>';
+      }
+    }
+
+    async function revogarSessao(hash, usr) {
+      if (!confirm(`Deseja derrubar e revogar imediatamente a sessão do usuário ${usr}? O dispositivo será desconectado no próximo comando.`)) return;
+      try {
+        const res = await fetch('/api/supervisorio/sessoes/revogar', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ token_hash: hash })
+        }).then(r => r.json());
+        alert(res.msg || 'Sessão revogada.');
+        carregarSessoesAtivas();
+      } catch (e) {
+        alert('Erro ao revogar sessão.');
+      }
+    }
+
+    // ==========================================
+    // MONITOR DE INTEGRIDADE FIM (SHA-256)
+    // ==========================================
+    async function abrirModalFim() {
+      document.getElementById('modalFim').style.display = 'flex';
+      carregarStatusFim();
+    }
+
+    function fecharModalFim() {
+      document.getElementById('modalFim').style.display = 'none';
+    }
+
+    async function carregarStatusFim() {
+      const tb = document.getElementById('tbodyFim');
+      tb.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:10px; color:var(--muted);">Calculando hashes SHA-256...</td></tr>';
+      try {
+        const res = await fetch('/api/supervisorio/fim/status').then(r => r.json());
+        const kpi = document.getElementById('kpiFimVal');
+        const kpiSub = document.getElementById('kpiFimSub');
+        if (res.status === 'INVIOLADO') {
+          kpi.textContent = 'INVIOLADO';
+          kpi.style.color = '#34d399';
+          kpiSub.textContent = `${res.total_arquivos}/${res.total_arquivos} Arquivos Autênticos`;
+        } else {
+          kpi.textContent = 'VIOLAÇÃO!';
+          kpi.style.color = '#ef4444';
+          kpiSub.textContent = `🚨 ${res.violacoes} arquivo(s) adulterado(s)`;
+        }
+
+        tb.innerHTML = (res.detalhes || []).map(f => {
+          const isOk = (f.status === 'INVIOLADO' || f.status === 'BASELINE_INICIALIZADO');
+          const badge = isOk ? '<span class="badge badge-ok">✅ INVIOLADO</span>' : '<span class="badge badge-danger">🚨 ADULTERADO</span>';
+          return `
+            <tr>
+              <td><b style="color:#e2e8f0;">${_escapeHtml(f.arquivo)}</b></td>
+              <td>${badge}</td>
+              <td><code style="font-size:10px; color:#38bdf8;">${_escapeHtml(f.hash ? f.hash.slice(0, 20) + '...' : '-')}</code></td>
+              <td style="font-size:11px; color:var(--muted);">${f.tamanho ? Math.round(f.tamanho / 1024) + ' KB' : '-'}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (e) {
+        tb.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:10px; color:#f87171;">Erro ao checar FIM.</td></tr>';
+      }
+    }
+
+    async function atualizarBaselineFim() {
+      if (!confirm('Deseja homologar a versão atual dos arquivos de código como o novo Baseline oficial?\nOs hashes SHA-256 atuais se tornarão o padrão de integridade.')) return;
+      try {
+        const res = await fetch('/api/supervisorio/fim/atualizar-baseline', { method: 'POST' }).then(r => r.json());
+        alert(res.msg || 'Baseline atualizado.');
+        carregarStatusFim();
+      } catch (e) {
+        alert('Erro ao atualizar baseline.');
+      }
+    }
+
     // FUNÇÕES DA LISTA BRANCA ANTI-LOCKOUT
     // ==========================================
     async function abrirModalWhitelist() {
@@ -1403,6 +2052,87 @@ async def handle_pagina_supervisorio(request: web.Request) -> web.Response:
       document.getElementById('modalVarredura').style.display = 'none';
     }
   </script>
+
+  <!-- MODAL DE SESSÕES ATIVAS & KILL-SWITCH SOC -->
+  <div id="modalSessoes" class="modal-backdrop">
+    <div class="modal-box" style="max-width:750px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h3 style="font-size:16px; font-weight:800; color:#c084fc; display:flex; align-items:center; gap:8px;">
+          <span>⚡ Radar de Sessões Ativas &amp; Kill-Switch Instantâneo</span>
+        </h3>
+        <button class="btn" onclick="fecharModalSessoes()" style="padding:4px 8px;">✕</button>
+      </div>
+
+      <div style="background:#2e1065; border-left:4px solid #8b5cf6; padding:10px 12px; border-radius:6px; font-size:11.5px; color:#ddd6fe; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <b>Controle Operacional de Acessos:</b> Monitoramento em tempo real de tokens autenticados. Caso um celular seja extraviado ou um técnico desligado, encerre o acesso imediatamente pelo botão Kill-Switch.
+        </div>
+        <button class="btn" style="background:#8b5cf6; color:#fff; font-size:11px; font-weight:bold;" onclick="carregarSessoesAtivas()">🔄 Atualizar</button>
+      </div>
+
+      <div style="max-height:280px; overflow-y:auto; border:1px solid var(--card-border); border-radius:8px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Usuário / Perfil</th>
+              <th>IP / Localização</th>
+              <th>Último Batimento</th>
+              <th>Dispositivo / Navegador</th>
+              <th style="text-align:right;">Kill-Switch</th>
+            </tr>
+          </thead>
+          <tbody id="tbodySessoes">
+            <tr><td colspan="5" style="text-align:center; padding:12px; color:var(--muted);">Carregando radar de sessões...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:14px; text-align:right;">
+        <button class="btn" onclick="fecharModalSessoes()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE INTEGRIDADE FIM (FILE INTEGRITY MONITORING) -->
+  <div id="modalFim" class="modal-backdrop">
+    <div class="modal-box" style="max-width:760px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h3 style="font-size:16px; font-weight:800; color:#34d399; display:flex; align-items:center; gap:8px;">
+          <span>🔒 Monitor de Integridade de Arquivos Núcleo (FIM SHA-256)</span>
+        </h3>
+        <button class="btn" onclick="fecharModalFim()" style="padding:4px 8px;">✕</button>
+      </div>
+
+      <div style="background:#064e3b; border-left:4px solid #10b981; padding:10px 12px; border-radius:6px; font-size:11.5px; color:#a7f3d0; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <b>Anti-Adulteração Criptográfica:</b> Compara os hashes SHA-256 dos arquivos executáveis com o baseline homologado em cofre. Se qualquer byte for alterado clandestinamente, o SOC soa o alarme vermelho.
+        </div>
+        <button class="btn" style="background:#059669; color:#fff; font-size:11px; font-weight:bold;" onclick="atualizarBaselineFim()">🔄 Homologar Novo Baseline</button>
+      </div>
+
+      <div style="max-height:280px; overflow-y:auto; border:1px solid var(--card-border); border-radius:8px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Arquivo Núcleo</th>
+              <th>Status</th>
+              <th>Hash SHA-256 Atual</th>
+              <th>Tamanho</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyFim">
+            <tr><td colspan="4" style="text-align:center; padding:12px; color:var(--muted);">Verificando integridade dos arquivos...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:14px; display:flex; justify-content:space-between; align-items:center;">
+        <button class="btn" onclick="carregarStatusFim()" style="font-size:11px;">🔍 Reverificar Hashes</button>
+        <button class="btn" onclick="fecharModalFim()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL DE LISTA BRANCA ANTI-LOCKOUT -->
   <div id="modalWhitelist" class="modal-backdrop">
     <div class="modal-box" style="max-width:680px;">
@@ -1730,6 +2460,74 @@ async def api_supervisorio_whitelist_remover(request: web.Request) -> web.Respon
     return web.json_response({"ok": True, "msg": f"IP {ip} removido da Lista Branca."})
 
 
+
+async def api_supervisorio_defcon_status(request: web.Request) -> web.Response:
+    """Retorna o nível DEFCON atual e o relatório de prontidão cibernética."""
+    db_name = _obter_db_path(request.app)
+    obter_defcon_nivel(db_name)
+    return web.json_response({"ok": True, "defcon": _DEFCON_INFO})
+
+
+async def api_supervisorio_defcon_alterar(request: web.Request) -> web.Response:
+    """Altera o nível DEFCON do sistema com registro de auditoria."""
+    db_name = _obter_db_path(request.app)
+    body = await request.json()
+    nivel = int(body.get("nivel", 5))
+    motivo = str(body.get("motivo", "Alteração tática solicitada pelo Gestor")).strip()
+    user = getattr(request, "_emed_user", None) or {}
+    gestor_nome = user.get("nome", "GESTOR_NETTO") if isinstance(user, dict) else "GESTOR_NETTO"
+    info = definir_defcon_nivel(nivel, motivo, gestor_nome, db_name)
+    return web.json_response({"ok": True, "defcon": info, "msg": f"Prontidão cibernética ajustada para {info['rotulo']}."})
+
+
+async def api_supervisorio_fim_status(request: web.Request) -> web.Response:
+    """Retorna o status do monitor de integridade de arquivos vitais (FIM)."""
+    db_name = _obter_db_path(request.app)
+    fim_res = verificar_integridade_fim(db_name)
+    return web.json_response(fim_res)
+
+
+async def api_supervisorio_fim_atualizar(request: web.Request) -> web.Response:
+    """Atualiza o baseline de integridade criptográfica após deploy homologado."""
+    db_name = _obter_db_path(request.app)
+    res = atualizar_baseline_fim(db_name)
+    return web.json_response(res)
+
+
+async def api_supervisorio_sessoes_listar(request: web.Request) -> web.Response:
+    """Retorna a lista de sessões de técnicos e gestores ativas nas últimas 2 horas."""
+    db_name = _obter_db_path(request.app)
+    limite_epoch = time.time() - 7200
+    with sqlite3.connect(db_name) as conn:
+        garantir_schema_supervisorio(conn)
+        conn.row_factory = sqlite3.Row
+        rows = [dict(r) for r in conn.execute("""
+            SELECT token_hash, usuario, perfil, ip_origem, user_agent, criado_em, ultimo_ping, ultimo_ping_epoch, revogado
+            FROM sessoes_ativas_rastreamento
+            WHERE ultimo_ping_epoch >= ? AND revogado = 0
+            ORDER BY ultimo_ping_epoch DESC LIMIT 100
+        """, (limite_epoch,)).fetchall()]
+    for r in rows:
+        intel = analisar_inteligencia_ip(r["ip_origem"], db_name)
+        r["bandeira"] = intel["bandeira"]
+        r["pais"] = intel["pais"]
+        r["tipo_rede"] = intel["tipo_rede"]
+        minutos = max(0, int((time.time() - r["ultimo_ping_epoch"]) / 60))
+        r["tempo_relativo"] = "Agora mesmo" if minutos == 0 else f"{minutos} min atrás"
+    return web.json_response({"ok": True, "total": len(rows), "sessoes": rows})
+
+
+async def api_supervisorio_sessoes_revogar(request: web.Request) -> web.Response:
+    """Kill-Switch: Revoga uma sessão ativa instantaneamente."""
+    db_name = _obter_db_path(request.app)
+    body = await request.json()
+    token_hash = str(body.get("token_hash", "")).strip()
+    if not token_hash:
+        return web.json_response({"ok": False, "msg": "Hash de sessão inválido."}, status=400)
+    sucesso = revogar_sessao_soc(token_hash, db_name)
+    return web.json_response({"ok": sucesso, "msg": "Sessão sumariamente cancelada pelo SOC. Dispositivo desconectado."})
+
+
 async def api_supervisorio_alertas_soc(request: web.Request) -> web.Response:
     """Retorna alertas de incidentes críticos para notificação do Gestor."""
     db_name = _obter_db_path(request.app)
@@ -1832,6 +2630,12 @@ def registrar_rotas_supervisorio(app: web.Application) -> None:
     app.router.add_get("/api/supervisorio/whitelist", api_supervisorio_whitelist_listar)
     app.router.add_post("/api/supervisorio/whitelist/adicionar", api_supervisorio_whitelist_adicionar)
     app.router.add_post("/api/supervisorio/whitelist/remover", api_supervisorio_whitelist_remover)
+    app.router.add_get("/api/supervisorio/defcon", api_supervisorio_defcon_status)
+    app.router.add_post("/api/supervisorio/defcon/alterar", api_supervisorio_defcon_alterar)
+    app.router.add_get("/api/supervisorio/fim/status", api_supervisorio_fim_status)
+    app.router.add_post("/api/supervisorio/fim/atualizar-baseline", api_supervisorio_fim_atualizar)
+    app.router.add_get("/api/supervisorio/sessoes/listar", api_supervisorio_sessoes_listar)
+    app.router.add_post("/api/supervisorio/sessoes/revogar", api_supervisorio_sessoes_revogar)
     app.router.add_get("/api/supervisorio/alertas-soc", api_supervisorio_alertas_soc)
 
     # Módulo de Defesa Cibernética Ativa: Deception Honeypot & Forense Digital

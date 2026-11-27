@@ -4028,6 +4028,26 @@ async def auth_api_middleware(request: web.Request, handler):
     ):
         return await handler(request)
 
+    # 0. Verificação DEFCON 1 - Modo Búnquer de Defesa Cibernética (Lockdown Tático)
+    try:
+        from emed_views.supervisorio_web import (
+            obter_defcon_nivel,
+            eh_ip_ou_usuario_protegido,
+            sessao_esta_revogada,
+            registrar_ou_atualizar_sessao_rastreada
+        )
+        defcon_val = obter_defcon_nivel(DB_NAME)
+        ip_req = _obter_ip_real(request) if '_obter_ip_real' in globals() else str(request.remote or "127.0.0.1")
+        if defcon_val == 1 and not path.startswith("/static/"):
+            if not eh_ip_ou_usuario_protegido(ip_req, "", DB_NAME):
+                return web.Response(
+                    text="🛡️ [DEFCON 1 - MODO BÚNQUER DE DEFESA CIBERNÉTICA]: O servidor está em Lockdown Tático. Acesso restrito à Diretoria e IPs Seguros autorizados.",
+                    status=403,
+                    content_type="text/plain; charset=utf-8"
+                )
+    except Exception:
+        pass
+
     auth_h = request.headers.get("Authorization", "").strip()
     api_k = (request.headers.get("X-API-Key", "") or request.query.get("api_key", "")).strip()
 
@@ -4036,7 +4056,33 @@ async def auth_api_middleware(request: web.Request, handler):
     if not token and auth_h.lower().startswith("bearer "):
         token = auth_h[7:].strip()
 
+    # Verificação de Sessão Revogada pelo Kill-Switch SOC e Batimento de Sessão
+    if token:
+        try:
+            from emed_views.supervisorio_web import sessao_esta_revogada, registrar_ou_atualizar_sessao_rastreada
+            if sessao_esta_revogada(token, DB_NAME):
+                return web.json_response({
+                    "ok": False,
+                    "msg": "⛔ Sessão revogada pelo Centro de Operações de Segurança (SOC). Faça novo login."
+                }, status=401)
+        except Exception:
+            pass
+
     user = verificar_token_sessao(token)
+    if user and token:
+        try:
+            from emed_views.supervisorio_web import registrar_ou_atualizar_sessao_rastreada
+            ip_req = _obter_ip_real(request) if '_obter_ip_real' in globals() else str(request.remote or "127.0.0.1")
+            registrar_ou_atualizar_sessao_rastreada(
+                token,
+                user.get("nome", "USUARIO"),
+                user.get("perfil", "COLABORADOR"),
+                ip_req,
+                request.headers.get("User-Agent", ""),
+                DB_NAME
+            )
+        except Exception:
+            pass
     if user:
         request["_emed_user"] = user
         rotas_gestor = (
